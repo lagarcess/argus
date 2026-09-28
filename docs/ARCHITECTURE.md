@@ -1,27 +1,28 @@
 # ARCHITECTURE.md
 
-## Argus System Architecture Source of Truth (Alpha MVP)
+## Existing Runtime Architecture and Technical Contracts
 
 **Status:** Active | **Alpha Architecture v1 Locked**
 **Audience:** Engineers, AI agents, founders
-**Purpose:** Define how Argus is structured technically, how systems communicate, where state lives, what services own what responsibilities, and how to build the Alpha MVP with low complexity and high iteration speed.
+**Purpose:** Define the existing runtime's technical boundaries and intended contracts. The [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) owns product experience. New financial-record, ingestion, household, and native-client architecture remains to be designed through explicit scoped work.
 
 > [!IMPORTANT]
 > **Locked Status**: No structural architecture shifts (service ownership changes or protocol swaps) are allowed without explicit approval. Additive refinements and implementation detail documentation are permitted.
 
 > [!NOTE]
-> This document describes the **target architecture** — the intended production state of the Argus agent runtime. It is the north star for implementation. Where current code diverges from this doc, the doc is correct and the code must change.
+> This document contains both existing system descriptions and intended runtime contracts. Check code and release evidence for availability. Resolve a concrete discrepancy in the assigned scope; this document does not select the architecture of the new ecosystem or authorize an unrelated migration.
 
 ---
 
 # 1. Architecture Philosophy
 
-Argus is a **chat-first product powered by a backtesting engine**.
+The existing conversational runtime and backtesting engine are infrastructure
+that the approved ecosystem carries forward.
 
-This means:
+Their architectural responsibilities remain:
 
-- Conversation UX is the primary product surface.
-- Quantitative execution is supporting infrastructure.
+- Preserve conversational state, grounded responses, and artifact continuity.
+- Keep quantitative execution reproducible and separate from interpretation.
 - Simplicity and speed are favored over premature complexity.
 - Systems should be modular enough to evolve without rewrites.
 - Launch speed matters more than theoretical perfection.
@@ -65,13 +66,13 @@ provider-backed validation — LLMs interpret and voice, they do not own truth.
 
 ---
 
-# 3. Product Surface Architecture
+# 3. Existing Client Surfaces
 
-## Primary Surface
+## Conversational Surface
 
 ### Chat Workspace
 
-The main Argus experience.
+The existing conversational workspace. The MVEE defines its role alongside the other ecosystem surfaces.
 
 Contains:
 
@@ -83,7 +84,7 @@ Contains:
 - result cards
 - follow-up actions
 
-## Supporting Surfaces
+## Retrieval and Account Surfaces
 
 ### Recents
 
@@ -150,9 +151,10 @@ Web app / PWA.
 - Shared codebase
 - Mobile-accessible enough for alpha
 
-## Long-Term Direction
+## Approved Platform Direction
 
-Native mobile + web parity where valuable.
+The MVEE includes native iOS and Android plus web. This document does not yet
+select native frameworks, a shared shell, or the new client/data contracts.
 
 ## Frontend Responsibilities
 
@@ -359,7 +361,10 @@ Provider ownership:
 
 **Use for:**
 
-- Measurement-only product analytics for the approved private-alpha event set.
+- Measurement-only product analytics for the closed wave 1 event registry
+  (`src/argus/observability/analytics_events.py`, listed in `docs/DATA_MODEL.md`
+  section 12.1.1). The sink re-validates each event against the registry and
+  refuses anything else.
 - Aggregate funnels, retention, and loop-health questions.
 
 **Do not use for:**

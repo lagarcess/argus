@@ -79,6 +79,7 @@ import {
   retryLastTurnFailedAssistantIdFromAction,
   retryLastTurnMessageFromAction,
   retryLastTurnRequestMessageIdFromAction,
+  retryLastTurnSendOptions,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
 import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload, settleRetestReceiptProjection } from "@/lib/chat-retest";
@@ -189,7 +190,7 @@ import {
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
-  chatActionRequestFromAction, chatHttpErrorDisplay,
+  chatActionRequestFromAction, chatHttpErrorDisplay, applyChatHttpErrorToMessages, settleAdmissionTransportReadiness,
   applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
@@ -229,13 +230,15 @@ import {
   applyConfirmationActionEffects,
   confirmationActionEffectFromAction,
   consumeResultActionOnMessages,
-  isStaleConfirmationActionRejectionCode,
   normalizeConfirmationHistory,
   settleConfirmationAfterActionTransportError,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
 import { randomId } from "@/lib/random-id";
 import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/send-refusal";
+import { useDailyCapNotice } from "./useDailyCapNotice";
+import { useChatAccountBoundary } from "./useChatAccountBoundary";
+import { authenticatedRequestHeaders, ChatAccountChangedError } from "@/lib/chat-auth-ownership";
 type View = "chat" | "settings";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
@@ -246,12 +249,15 @@ export default function ChatInterface() {
   const [account, setAccount] = useState<Awaited<
     ReturnType<typeof getMe>
   > | null>(null);
+  const dailyCap = useDailyCapNotice(account?.user.id);
   const [profileState, setProfileState] = useState<ProfileState>("probing");
   const [expiredPublicAccountAccessEnabled, setExpiredPublicAccountAccessEnabled] =
     useState(false);
-  const refreshAccount = useCallback(async () => {
-    const nextAccount = await getMe();
+  const authenticatedUserIdRef = useRef<string | null>(null);
+  const refreshAccount = useCallback(async (expectedUserId?: string) => {
+    const nextAccount = await getMe(expectedUserId);
     if (nextAccount === null) return null;
+    authenticatedUserIdRef.current = nextAccount.user.id;
     setAccount(nextAccount);
     const resolvedLanguage = nextAccount.user.language ?? i18n.language;
     if (resolvedLanguage && resolvedLanguage !== i18n.language) {
@@ -328,7 +334,6 @@ export default function ChatInterface() {
   );
   const coldRetrievalTimerRef = useRef<number | null>(null);
   const coldRetrievalConversationIdRef = useRef<string | null>(null);
-  const authenticatedUserIdRef = useRef<string | null>(null);
   const readyTranscriptConversationIdRef = useRef<string | null>(null);
   const pendingScrollRestoreRef = useRef<PendingScrollRestore>(null);
   const pendingMessageAnchorRef = useRef<PendingMessageAnchor>(null);
@@ -473,19 +478,16 @@ export default function ChatInterface() {
     ],
   );
 
+  const accountBoundary = useChatAccountBoundary(account?.user.id ?? null, requestSessions, () => {
+    transcriptSessionCache.clearAuthenticatedState();
+    guestSubmissionRetryRef.current = null;
+    clearHistory();
+    resetToEmptyChatSurface();
+  });
+
   useLayoutEffect(() => {
-    const nextUserId = account?.user.id ?? null;
-    const previousUserId = authenticatedUserIdRef.current;
-    if (
-      previousUserId !== null &&
-      nextUserId !== null &&
-      previousUserId !== nextUserId
-    ) {
-      transcriptSessionCache.clearAuthenticatedState();
-      resetToEmptyChatSurface();
-    }
-    authenticatedUserIdRef.current = nextUserId;
-  }, [account?.user.id, resetToEmptyChatSurface, transcriptSessionCache]);
+    authenticatedUserIdRef.current = account?.user.id ?? null;
+  }, [account?.user.id]);
 
   // ── History ────────────────────────────────────────────────────────────────
 
@@ -935,6 +937,8 @@ export default function ChatInterface() {
       setProfileState("expired");
     },
     onGuestBootstrapError: guestEntry.onGuestBootstrapError,
+    onAuthenticationStart: accountBoundary.beginConversion,
+    onAuthenticationComplete: accountBoundary.finishConversion,
     onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
       showToast(
@@ -1033,7 +1037,7 @@ export default function ChatInterface() {
     let guestSubmissionHandedToStream = false;
     // Never decline a real message in silence; see lib/send-refusal.ts.
     const refuseSend = sendRefusal(showToast, t);
-    if (!trimmed) return false;
+    if (!trimmed || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
     if (sendAdmissionInFlightRef.current || isStreamingResponse) {
       return false;
     }
@@ -1068,12 +1072,18 @@ export default function ChatInterface() {
         text: trimmed,
         mentions,
         action,
-        starterSelection,
         language: i18n.resolvedLanguage ?? i18n.language,
       }))
     ) {
       return false;
     }
+    if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
+    const expectedUserId = authenticatedUserIdRef.current;
+    if (!expectedUserId) return false;
+    try { await authenticatedRequestHeaders(expectedUserId); }
+    catch (error) { if (error instanceof ChatAccountChangedError) accountBoundary.invalidate(); else showToast(t("chat.error_generic"), "error"); return false; }
+    if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
+    const ownedRequest = { expectedUserId, signal: accountBoundary.admission.current.signal };
     hasAcceptedUserInputRef.current = true;
     setIsHydratingConversation(false);
     const replacementAssistantId =
@@ -1092,30 +1102,17 @@ export default function ChatInterface() {
       });
     let shouldResetMessagesForNewConversation = false;
 
-    if (shouldCreateNewRouteConversation) {
+    if (shouldCreateNewRouteConversation || (!targetConversationId && !action?.type)) {
       try {
-        const { conversation } = await createConversation(i18n.language);
+        const { conversation } = await createConversation(i18n.language, ownedRequest);
+        if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
         targetConversationId = conversation.id;
-        shouldResetMessagesForNewConversation = true;
+        shouldResetMessagesForNewConversation = shouldCreateNewRouteConversation || messages.length === 0;
         rememberActiveConversationId(conversation.id);
         setConversationId(conversation.id);
         void refreshHistory();
       } catch (err) {
-        console.error("Failed to start conversation before sending:", err);
-        showToast(t("chat.error_generic"), "error");
-        return false;
-      }
-    }
-
-    if (!targetConversationId && !action?.type) {
-      try {
-        const { conversation } = await createConversation(i18n.language);
-        targetConversationId = conversation.id;
-        shouldResetMessagesForNewConversation = messages.length === 0;
-        rememberActiveConversationId(conversation.id);
-        setConversationId(conversation.id);
-        void refreshHistory();
-      } catch (err) {
+        if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return false; }
         console.error("Failed to start conversation before sending:", err);
         showToast(t("chat.error_generic"), "error");
         return false;
@@ -1134,7 +1131,9 @@ export default function ChatInterface() {
         : isFailedActionRetry(action)
           ? "recovery"
           : "message_send";
-    invalidateTranscriptForMutation(targetConversationId, transcriptMutation);
+    if (!options?.keepLocalTranscript) {
+      invalidateTranscriptForMutation(targetConversationId, transcriptMutation);
+    }
 
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
@@ -1200,6 +1199,7 @@ export default function ChatInterface() {
     if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
     let requestSession: ChatRequestSession = initialRequestSession;
+    const clearObservedDailyCap = dailyCap.captureSuccessClear();
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
     const ordinaryTransportMessageIds =
       action?.type === "run_backtest"
@@ -1309,6 +1309,8 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
+        // Ordinary sends passed compute admission; cancellation has its own handler.
+        if (requestSession.kind === "chat_turn" && requestSessions.authorize(requestSession, "done")) clearObservedDailyCap();
         const identityAuthorized = requestSessions.authorize(requestSession, "final");
         if (!identityAuthorized) return;
         options?.onTerminal?.();
@@ -1590,6 +1592,7 @@ export default function ChatInterface() {
           ? []
           : mentions,
         {
+          expectedUserId,
           requestId: requestSession.identity.requestId,
           signal: requestSession.controller.signal,
           failedAssistantId: replacementAssistantId,
@@ -1606,6 +1609,7 @@ export default function ChatInterface() {
       try {
         await streamToConversation(targetConversationId);
       } catch (err: unknown) {
+        if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return; }
         if (!requestSessions.authorize(requestSession, "catch")) return;
         if (
           err instanceof ChatStreamError &&
@@ -1615,7 +1619,8 @@ export default function ChatInterface() {
           try {
             const retryWasVisible = canApplyVisibleStreamUpdate();
             if (retryWasVisible) clearActiveConversationPointer();
-            const { conversation } = await createConversation(i18n.language);
+            const { conversation } = await createConversation(i18n.language, ownedRequest);
+            if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return;
             if (!moveRequestToConversation(conversation.id)) return;
             if (retryWasVisible) {
               rememberActiveConversationId(conversation.id);
@@ -1628,6 +1633,7 @@ export default function ChatInterface() {
             err = retryErr;
           }
         }
+        if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return; }
         clearNeutralGuestSubmission();
         const isOrdinaryTransportAmbiguity =
           action?.type !== "run_backtest" &&
@@ -1723,38 +1729,25 @@ export default function ChatInterface() {
             return;
           }
         }
+        if (!requestSessions.authorize(requestSession, "catch")) return;
         const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
-        const status = (err as { status?: number }).status;
-        const isRateLimit = status === 429;
+        const status = (err as { status?: number }).status ?? 0;
         const rejectionCode = err instanceof ChatStreamError ? err.code : null;
-        const staleConfirmationRejected =
-          isStaleConfirmationActionRejectionCode(rejectionCode);
         const fallbackMessage =
           err instanceof ChatStreamError && err.message
             ? err.message
             : t("chat.error_backtest");
-        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
+        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage, {
+          status, retryAfter: err instanceof ChatStreamError ? err.retryAfter : null,
+        });
+        dailyCap.record(httpErrorDisplay.recoveryDisplay);
         if (canApplyVisibleUpdate) {
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               settleConfirmationAfterActionTransportError(
-                applyRetestReceipt(prev, userMsg.id, null).map((m) =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        content: staleConfirmationRejected
-                          ? ""
-                          : isRateLimit ? t("chat.rate_limit_error") : httpErrorDisplay.content,
-                        recoveryDisplay: staleConfirmationRejected
-                          ? {
-                              kind: "recovery_code" as const,
-                              code: rejectionCode,
-                            }
-                          : isRateLimit
-                            ? m.recoveryDisplay
-                            : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
-                      }
-                    : m,
+                applyChatHttpErrorToMessages(
+                  applyRetestReceipt(prev, userMsg.id, null), httpErrorDisplay,
+                  { code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction, message: trimmed, assistantMessageId: assistantId },
                 ),
                 action,
                 { rejectionCode },
@@ -1762,7 +1755,7 @@ export default function ChatInterface() {
             ),
           );
         }
-        terminalReadiness.finish(requestSessions.authorize(requestSession, "catch"));
+        settleAdmissionTransportReadiness(terminalReadiness, httpErrorDisplay.recoveryDisplay, assistantId, requestSessions.authorize(requestSession, "catch"));
         finishRequestTransport(requestSession);
       }
     })();
@@ -1805,6 +1798,7 @@ export default function ChatInterface() {
         return;
       }
       requestSessions.synchronizeAccountScope(null);
+      dailyCap.clear();
       setAccount(null);
       transcriptSessionCache.clearAuthenticatedState();
       resetToEmptyChatSurface();
@@ -1822,6 +1816,7 @@ export default function ChatInterface() {
   };
 
   const handleCancelConfirmationAction = async (action: ChatActionOption) => {
+    if (!account?.user.id || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return;
     const routeState = readActiveConversationRouteState();
     const targetConversationId = targetConversationIdForSend({
       routeConversationId: routeState.conversationId,
@@ -1889,11 +1884,13 @@ export default function ChatInterface() {
         },
         [],
         {
+          expectedUserId: account.user.id,
           requestId: request.identity.requestId,
           signal: request.controller.signal,
         },
       );
     } catch (err: unknown) {
+      if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return; }
       if (!requestSessions.authorize(request, "catch")) return;
       const message =
         err instanceof ChatStreamError && err.message
@@ -1938,14 +1935,7 @@ export default function ChatInterface() {
           retryText,
           retryMention ? [retryMention] : (retryChatAction ?? []),
           retryMention ? (retryChatAction ?? undefined) : undefined,
-          failedAssistantId
-            ? {
-                renderUserMessage: false,
-                replacementAssistantId: failedAssistantId,
-              }
-            : requestMessageId
-              ? { renderUserMessage: true }
-              : { renderUserMessage: false },
+          retryLastTurnSendOptions({ failedAssistantId, requestMessageId }),
         );
       }
       return;
@@ -2169,6 +2159,12 @@ export default function ChatInterface() {
   });
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  if (accountBoundary.expired) {
+    return <main className="flex h-[100dvh] flex-col items-center justify-center gap-4 bg-[#f9f9f9] p-6 text-center text-black dark:bg-[#141517] dark:text-white">
+      <p role="alert" className="max-w-lg">{t("chat.account_changed")}</p>
+      <button className="min-h-11 rounded-full bg-black px-6 py-3 text-base font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/25 dark:bg-white dark:text-black dark:focus-visible:ring-white/30" onClick={() => window.location.assign("/chat")}>{t("chat.account_changed_reload")}</button>
+    </main>;
+  }
   if (profileState === "probing" || profileState === "unavailable") {
     return (
       <div className="flex h-[100dvh] w-full items-center justify-center bg-background">
@@ -2423,6 +2419,7 @@ export default function ChatInterface() {
                 canConsumeLandingStarter={initialRoutingSettled}
                 preferredName={greetingName}
                 placeholder={chatInputPlaceholder}
+                composerNotice={dailyCap.notice}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
                 onToast={showToast}
@@ -2444,7 +2441,8 @@ export default function ChatInterface() {
                   role="region"
                   aria-label={t("common.conversation", "Conversation")}
                   aria-busy={isHydratingConversation || guestSubmissionPending}
-                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[190px] pt-[86px]"
+                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pt-[86px]"
+                  style={{ paddingBottom: 190 + dailyCap.height }}
                 >
                   <div className="space-y-8">
                     {showConversationRetrievalState &&
@@ -2546,6 +2544,7 @@ export default function ChatInterface() {
                         />
                       </div>
                     )}
+                    {dailyCap.notice}
                     <ReceiptSelectionComposer><ChatInput
                       key={conversationId ?? "unowned-transcript"}
                       onSend={handleSend}

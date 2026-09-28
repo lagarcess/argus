@@ -343,6 +343,7 @@ async function mockGuestJourney(
     await fulfillJson(route, { items: [], next_cursor: null });
   });
 
+  // Retired endpoint, kept as a tripwire: any call shows up in the evidence.
   await page.route("**/api/v1/analytics/guest-events", async (route) => {
     evidence.starterEventCalls += 1;
     evidence.requestOrder.push("/analytics/guest-events");
@@ -755,7 +756,6 @@ for (const starterEntryCase of [
     expect(evidence.requestOrder).toEqual([
       "/auth/guest",
       "/me",
-      "/analytics/guest-events",
       "/me/usage",
       "/conversations",
       "/chat/stream",
@@ -771,18 +771,11 @@ for (const starterEntryCase of [
       usage: 1,
       conversation: 1,
       stream: 1,
-      starterEvent: 1,
+      starterEvent: 0,
     });
     expect(evidence.sentMessages).toEqual([starterEntryCase.value]);
-    expect(evidence.analyticsEvents).toEqual([
-      {
-        event: "starter_action_selected",
-        language: starterEntryCase.language,
-        surface: "starter_actions",
-        strategy_category: "buy_and_hold",
-        terminal_outcome: "selected",
-      },
-    ]);
+    // The browser sends no analytics of its own (SPEC 0, 0C-1).
+    expect(evidence.analyticsEvents).toEqual([]);
   });
 }
 

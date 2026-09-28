@@ -3,11 +3,19 @@
 Historical docs in this directory are preserved for branch archaeology and
 review context. They are not active execution sources of truth.
 
-For current Private Alpha Next product sequencing, use:
+For current product experience and document ownership, use:
 
-- `docs/specs/private-alpha-interim-roadmap.md` while the interim pivot is active
-- `docs/specs/private-alpha-next-roadmap.md`
-- `docs/specs/private-alpha-next-decision-memo.md`
+- [MVEE](../specs/argus-minimum-viable-ecosystem-experience.md)
+- [Documentation authority](../DOCUMENTATION_AUTHORITY.md)
+- The explicitly assigned package; [Wave 1](../specs/wave-1/README.md) retains its existing gates for assigned work
+
+Retired strategy narratives:
+
+- [Pivot strategy](2026-09-26-argus-pivot-strategy.md)
+- [Answers that stay true](2026-09-26-argus-answers-that-stay-true-roadmap.md)
+- [Private Alpha Next decision memo](2026-09-26-private-alpha-next-decision-memo.md)
+
+Their former paths now contain compatibility pointers, not competing product mandates.
 
 For the release gate, canary evidence, and deploy discipline, use:
 

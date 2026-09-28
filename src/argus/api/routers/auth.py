@@ -28,10 +28,7 @@ from argus.api.guest_access import (
     store_account_context,
     visitor_key_for_request,
 )
-from argus.api.guest_observability import (
-    emit_guest_funnel_event,
-    emit_verified_guest_funnel_event,
-)
+from argus.api.guest_observability import emit_verified_guest_funnel_event
 from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import (
     AccessRequestAccepted,
@@ -265,15 +262,6 @@ def guest_bootstrap(
             visitor_key=visitor_key_for_request(request),
         )
         store_account_context(request, guest_context)
-        emit_guest_funnel_event(
-            account=guest_context,
-            kind="guest_session_started",
-            user_id=profile.id,
-            language=profile.language,
-            surface="guest_entry",
-            product_capability="account",
-            terminal_outcome="started",
-        )
         payload = dict(result)
         payload.update(
             {
@@ -458,16 +446,6 @@ def claim_guest_handoff(
         surface="account_conversion",
         product_capability="account",
         terminal_outcome="completed",
-    )
-    emit_verified_guest_funnel_event(
-        "temporary_workspace_claimed",
-        user_id=source_user_id,
-        visitor_key=conversion_visitor_key,
-        conversation_id=payload.conversation_id,
-        language=user.language,
-        surface="account_conversion",
-        product_capability="history",
-        terminal_outcome="claimed",
     )
     response = JSONResponse(
         content=jsonable_encoder(payload.model_dump(mode="json")),
@@ -745,16 +723,6 @@ def signup_guest_account(
                     product_capability="account",
                     terminal_outcome="completed",
                 )
-                emit_verified_guest_funnel_event(
-                    "temporary_workspace_claimed",
-                    user_id=source_user_id,
-                    visitor_key=conversion_visitor_key,
-                    conversation_id=claim_payload.conversation_id,
-                    language=profile.language,
-                    surface="account_conversion",
-                    product_capability="history",
-                    terminal_outcome="claimed",
-                )
             response = auth_response(request, result)
             _clear_guest_handoff_cookies(request, response)
             return response
@@ -946,15 +914,6 @@ def login(request: Request, body: LoginRequest) -> JSONResponse:
             surface="account_conversion",
             product_capability="account",
             terminal_outcome="completed",
-        )
-        emit_verified_guest_funnel_event(
-            "temporary_workspace_claimed",
-            user_id=source_user_id,
-            visitor_key=conversion_visitor_key,
-            conversation_id=claim_payload.conversation_id,
-            surface="account_conversion",
-            product_capability="history",
-            terminal_outcome="claimed",
         )
     response = auth_response(request, result)
     _clear_guest_handoff_cookies(request, response)

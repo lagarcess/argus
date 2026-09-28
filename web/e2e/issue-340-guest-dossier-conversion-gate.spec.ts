@@ -274,9 +274,6 @@ async function mockJourney(page: Page, language: LocaleFixture["language"]) {
     );
     return fulfillJson(route, searchPayload(accountKind));
   });
-  await page.route("**/api/v1/analytics/guest-events", (route) =>
-    fulfillJson(route, { success: true }),
-  );
   await page.route("**/api/v1/auth/guest/handoffs", async (route) => {
     const body = route.request().postDataJSON() as {
       pending_action?: Record<string, unknown>;

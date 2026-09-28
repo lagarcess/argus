@@ -1,0 +1,31 @@
+{
+  "observed_at": "2026-09-17T21:17:00Z",
+  "observation_time_precision": "approximate; read during promotion preflight",
+  "api": {
+    "service": "argus-api",
+    "id": "srv-d78tanmuk2gs73e17nn0",
+    "status": "live",
+    "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+    "deploy": "dep-dajii17qj5pc73dp04rg",
+    "auto_deploy_trigger": "off"
+  },
+  "web": {
+    "service": "argus-app",
+    "id": "srv-d7ap6bmslomc73eqp8m0",
+    "status": "live",
+    "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+    "deploy": "dep-dajiisnqj5pc73dp2uc0",
+    "auto_deploy_trigger": "off"
+  },
+  "workflow": {
+    "service": "argus-backtests",
+    "id": "wfl-d8hpsmuq1p3s73duv3q0",
+    "version": "wfv-dajijpbm8hqs738ed7i0",
+    "status": "ready",
+    "commit_prefix": "3d98057"
+  },
+  "sources": [
+    "Render MCP list_services/list_deploys",
+    ".github/render-env-sync.sh workflow-version-status"
+  ]
+}

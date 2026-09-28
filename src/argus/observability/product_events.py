@@ -16,41 +16,21 @@ from argus.observability.envelope import (
     capture_event,
 )
 
+# Retired from PostHog (SPEC 0, 0C-1): the sink refuses these envelopes, so
+# nothing below reaches PostHog. Only the kinds a later wave 1 package renames
+# are left, each at the call site that package replaces with its analytics
+# event: ``decision_capture`` becomes ``card_saved`` (0C-4),
+# ``account_registration_completed`` becomes ``signed_in`` (0C-4), and
+# ``receipt_created`` becomes ``receipt_shared`` (0C-8).
 ProductEventKind = Literal[
-    "evidence_capture",
     "decision_capture",
-    "recall_usage",
-    "continuity_mismatch",
-    "compare_started",
-    "next_experiments_offered",
-    "next_experiment_selected",
-    "eval_readiness",
     "receipt_created",
-    "receipt_revoked",
-    "receipt_viewed",
-    "receipt_try_argus",
-    "receipt_followed_up",
-    "receipt_signed_up",
     "account_registration_completed",
 ]
 
 _PRODUCT_EVENT_MAP: dict[ProductEventKind, tuple[EventType, EventAction, FeatureArea]] = {
-    "evidence_capture": ("storage", "completed", "evidence_capture"),
     "decision_capture": ("decision_saved", "completed", "decision_capture"),
-    "recall_usage": ("tool_result", "completed", "recall"),
-    "continuity_mismatch": ("recovery", "failed", "continuity"),
-    "compare_started": ("compare_started", "started", "result_explanation"),
-    "next_experiments_offered": ("system", "completed", "result_explanation"),
-    "next_experiment_selected": ("system", "completed", "result_explanation"),
-    "eval_readiness": ("eval_suite_run", "completed", "chat_interpretation"),
-    # The receipt funnel. Viewer-side stages carry no actor and no source id, so
-    # a public view can never be attributed back to the owner who shared it.
     "receipt_created": ("storage", "completed", "evidence_capture"),
-    "receipt_revoked": ("storage", "redacted", "evidence_capture"),
-    "receipt_viewed": ("system", "completed", "guest_acquisition"),
-    "receipt_try_argus": ("system", "started", "guest_acquisition"),
-    "receipt_followed_up": ("system", "completed", "guest_acquisition"),
-    "receipt_signed_up": ("system", "completed", "guest_acquisition"),
     "account_registration_completed": ("storage", "completed", "guest_acquisition"),
 }
 

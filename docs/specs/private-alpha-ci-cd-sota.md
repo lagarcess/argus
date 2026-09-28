@@ -10,10 +10,10 @@ This document is the release-discipline reference for
 Render validation posture, and deployment discipline. It no longer owns the
 Private Alpha Next product roadmap.
 
-For current product sequencing, use
-`docs/specs/private-alpha-next-roadmap.md` and onboard every slice through the
-relevant details and addenda in
-`docs/specs/private-alpha-next-decision-memo.md`.
+For current product ownership, use
+[documentation authority](../DOCUMENTATION_AUTHORITY.md). Build only the
+explicitly assigned package; historical roadmap and memo references do not
+assign work or override the approved MVEE experience.
 
 Implementation note: the release gate now centers on local smoke, exact-candidate
 production migration parity before deploy, Render release-config audit, live

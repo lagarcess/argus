@@ -4,7 +4,7 @@
 
 **Status:** Active | **Alpha Contract v1 Locked**
 **Audience:** Backend engineers, frontend engineers, AI agents
-**Purpose:** Define the current Alpha MVP interfaces between client and server. All frontend/backend integration should follow this document. Code should bend to the contract unless intentionally revised.
+**Purpose:** Define the existing client/server interfaces and intended contracts. New ecosystem interfaces must be specified explicitly before implementation; the [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) does not imply routes, payloads, or permission models. Preserve these contracts unless intentionally revised in the assigned scope.
 
 > [!IMPORTANT]
 > **Locked Status**: No breaking changes (structural JSON shape changes) are allowed without explicit approval or critical implementation blockers. Additive changes and clarifications are permitted.
@@ -126,10 +126,17 @@ on `session:<guest user id>`. The visitor ceiling defaults to 300. The
 session ceiling defaults to 100 (`ARGUS_GUEST_SESSION_DAILY_TURN_CEILING`)
 so one workspace hopping IPs cannot inherit the shared-NAT headroom. A
 guest hits whichever remaining count is lower. The unit is claimed
-atomically at turn start (`claim_guest_compute_usage`); a failed turn
-keeps the claim. The visitor IP comes from `CF-Connecting-IP` by default
-(`ARGUS_TRUSTED_CLIENT_IP_HEADER`), never from `X-Forwarded-For`. IPv4
-keys stay per-address. IPv6 keys group by the address `/64` so rotating
+atomically before model work (`claim_guest_compute_usage`); a failed turn
+keeps the claim. The claim runs after the conversation is resolved and
+after stale or replayed actions and retest state are validated, so those
+rejections come first and cost nothing: an unknown conversation answers
+`404` `not_found` even at the ceiling, and a rejected replay answers its
+`409` without using a unit. The visitor IP comes from `CF-Connecting-IP`
+by default (`ARGUS_TRUSTED_CLIENT_IP_HEADER`), never from
+`X-Forwarded-For`. A trusted value of `ip:port` has its port stripped. A
+dotted IPv4 value with leading zeros is rejected, and the socket peer is
+used with the `client_ip_rejected_non_canonical` log line. IPv4 keys stay
+per-address. IPv6 keys group by the address `/64` so rotating
 addresses inside one prefix cannot mint a fresh visitor row. These
 ceilings are not an allowance: `GET /me/usage` reports conversation as
 unbounded and never projects this counter, and no product surface names
@@ -140,9 +147,11 @@ persistence error) is not a daily cap: `POST /chat/stream` answers
 `503` with `code: "guest_compute_claim_unavailable"` and a short
 `Retry-After`. Run actions are execution and do not count.
 Signed-in accounts carry their own daily chat ceiling, default 200
-(`ARGUS_REGISTERED_DAILY_TURN_CEILING`), claimed atomically at turn
-start (`claim_registered_compute_usage`) against `user:<account id>`
-on `account_compute_turns`. A failed turn keeps the claim. At the
+(`ARGUS_REGISTERED_DAILY_TURN_CEILING`), claimed atomically before
+model work (`claim_registered_compute_usage`) against `user:<account id>`
+on `account_compute_turns`, at the same point in the turn as the guest
+claim, so a `404` or a rejected replay costs nothing. A failed turn
+keeps the claim. At the
 ceiling `POST /chat/stream` answers the same `429` copy and shape
 guests get. A claim that cannot run answers `503` with
 `code: "registered_compute_claim_unavailable"` and the same short
@@ -717,12 +726,12 @@ Public endpoints, unauthenticated:
 | Method | Path                           | Purpose |
 | :----- | :----------------------------- | :------ |
 | `GET`  | `/public/receipts/{public_id}` | Read one frozen receipt |
-| `POST` | `/public/receipt-funnel`       | Record one viewer-side funnel stage |
+| `POST` | `/public/receipt-funnel`       | Accept a viewer-side funnel stage; records nothing |
 
 A result whose conversation has been deleted is no longer shareable: creation answers
 `404` with the ordinary not-available detail, and the database refuses the insert even
-if the deletion lands mid-request. Revoking is idempotent, and only the state
-transition emits `receipt_revoked`.
+if the deletion lands mid-request. Revoking is idempotent and emits no analytics
+event.
 
 Candidate reads return `{items}`, where each item is
 `{message_id, question, kind, eligible, reason, field}`; the client counts the
@@ -753,9 +762,10 @@ no receipt is created for any part of the selection.
 `{"owner_note": string | null}`, bounded at 280 characters, and returns
 `{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already
 has a live one returns that receipt rather than minting a second link, including
-when two concurrent requests race on the insert. Only a real insert emits the
-`receipt_created` funnel event, so a retry or a reload cannot inflate the
-acquisition funnel's creation stage.
+when two concurrent requests race on the insert. Only a real insert counts as a
+share, so a retry or a reload cannot inflate it. The share event is
+`receipt_shared` (section 17.1), emitted from this insert by SPEC 0 package
+0C-8; until then creation emits nothing.
 
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
 created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
@@ -797,15 +807,12 @@ timestamps cannot drop or repeat a row across pages.
 `POST /public/receipt-funnel` takes
 `{"stage": "viewed" | "try_argus" | "followed_up" | "signed_up", "kind": "backtest" | "research_answer" | "calculation" | "answer" | "mixed"}`
 (kind defaults to `backtest` for compatible callers) and returns
-`204`. It stores nothing and carries no identifier. `viewed` is reported by the
-rendered page rather than counted when the receipt is read, because that read also
-answers the metadata pass and the preview image; a link pasted into a chat would
-otherwise log views nobody caused. It exists because the Try Argus tap
-happens on a public page. Follow-up intent stays in the receiver tab for the
-bridge to normal chat; it adds no viewer identifier or tracking URL parameter.
-An owner preview reports no view, and a multi-turn public page reports one view.
-Tombstones and unavailable pages with no known kind do not emit kind-attributed
-events; they never guess that the missing document was a backtest.
+`204`. It stores nothing, carries no identifier, and emits no analytics event:
+wave 1 does not track share-page views or a share funnel (SPEC 0, section 0.5).
+It stays a validated `204` so a receipt page already open in a browser does not
+error when it reports a stage. It is not rate limited, because it does no work.
+Follow-up intent stays in the receiver tab for the bridge to normal chat; it adds
+no viewer identifier or tracking URL parameter.
 
 #### Receiver-owned fork
 
@@ -2387,6 +2394,22 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   auth_session_verification_unavailable`. Clients must keep the user on the
   current surface and offer retry; they must not reinterpret this transient
   failure as `401` or redirect to login.
+
+**Chat browser ownership:**
+- The signed-in chat view owns one Supabase Auth user identity. Conversation
+  creation for a send, streamed turns and 404 create-and-resend recovery must
+  obtain credentials for that same identity. Missing or changed identity stops
+  the operation before dispatch; bound requests do not fall back to shared
+  browser cookies.
+- Auth identity changes and logout invalidate the existing request-session
+  scope, cancel pending work and retire the private chat view. A stale draft
+  must never be submitted or displayed in the replacement account's chat.
+  Refreshing credentials for the same user does not change ownership.
+- The existing explicit guest claim is the only supported cross-identity
+  continuation. Its verified destination and transferred action, rather than
+  an arbitrary auth event, authorize resuming the claimed work.
+- This is client-side ownership protection, not a replacement for server
+  authentication or owner-scoped authorization.
 
 **Account recovery:**
 - `POST /api/auth/recovery` is a same-origin web route, not an Argus
@@ -4190,10 +4213,8 @@ a comparison whose assets the user has all named becomes grounded
 cross-company research, and discovery's asset-finding runs as the rail's
 `find` operation. One Perplexity provider layer (`research.search` for the
 direct Search API, `research.perplexity_agent` for the Agent API), one
-shared cache under the section 7 per-data-class TTL table (seven classes,
-from seconds-fresh quotes and minutes-fresh movers through days-fresh
-estimates, months-stable peers and constituents, quarterly fundamentals,
-and the two effectively immutable rows), one meter: find turns record
+shared public-discovery packet cache with the existing minutes-fresh movers
+TTL, one meter: find turns record
 capability-classed ledger rows (`peer_expansion` with anchors, `screening`
 for categories) and their source-backed searches are gated by the shared
 research ceiling instead of the separate discovery allowance. The discovery
@@ -4340,11 +4361,10 @@ Contract rules:
   discarded, a claim withheld for want of a public publisher, and a response
   billed and then rejected as unreadable all reach the cost ledger at what
   they cost; only a turn that reached no provider reports zero and
-  `cache_status: "bypass"`. A cache hit is the one turn whose `usage`
-  describes something other than its own work: it serves a stored record and
-  republishes that record's invocations, latency and cost as provenance, and
-  because it spent nothing, its ledger row carries `billable_quantity: 0` with
-  no cost and no latency. The retrieval is charged once, on the miss that
+  `cache_status: "bypass"`. An eligible discovery cache hit reports zero
+  invocations, the stored packet's latency, and no new cost. Because it spent
+  nothing, its ledger row carries `billable_quantity: 0` with no cost and no
+  latency. The retrieval is charged once, on the miss that
   stored it. A completed thorough run whose answer cannot be
   read posts no sidecar to a reader, so its spend is recorded on the ledger
   directly. None of this is reader-facing: `usage` is server-side evidence,
@@ -4437,7 +4457,7 @@ Contract rules:
 - Section 2's five shapes are one rail. Market pulse ("what's moving
   today"), screening ("semiconductor stocks under a 20 P/E"), and sector
   radar ("what's happening in cybersecurity") use the balanced tier and
-  cache as `movers`. Screening
+  the `movers` retrieval recency policy, without shared answer caching. Screening
   carries every stated condition into the provider call and the answer names
   which condition each asset satisfies; a screen that silently drops the
   user's threshold is a defect, not a simplification. Sector radar answers
@@ -4519,8 +4539,8 @@ Contract rules:
   `research_unavailable_malformed_response`, is never cached, and a
   completed background run carrying one fails its job. Genuine prose under a
   typed request is delivered and recorded as prose.
-- **A withheld survey keeps its retrieval record and is cached like an
-  answer.** The withholding left is the survey's own, unchanged from before
+- **A withheld survey keeps its retrieval record on its own turn.** It is not
+  shared with later requests. The withholding is the survey's own, unchanged from before
   the typed contract, and the same no-retrieval rule for every other answer:
   `survey_synthesis_incomplete` when the survey retrieved but its prose names
   no asset the resolver verifies, `survey_not_grounded` when a survey never
@@ -4528,9 +4548,8 @@ Contract rules:
   retrieved, and `scenario_inputs_uncited` when a computed scenario
   (decision 10, `research_query.scenario_question`) retrieved but no input
   row cites a public page, on the inline and the background path alike; the
-  scenario contract is also part of the research cache identity, so a packet
-  answered under the ordinary retrieval contract never serves a scenario
-  question. Whatever withholds the
+  scenario and ordinary answers both bypass shared storage because their
+  requests contain unrestricted text. Whatever withholds the
   prose, the turn's `sources` are the pages the response actually retrieved,
   selected exactly as for a published answer (period-plausible, one page per
   publisher, retrieval order, at most five): no ranking, no content check,
@@ -4545,19 +4564,29 @@ Contract rules:
   Clients render a degraded turn's sources as where Argus looked, never as
   the sources of an answer: the same drawer, framed by the typed
   `degraded.code`, so a page that yielded no figure is never presented as
-  having informed one. A withheld packet that carries a retrieval record is
-  stored in the shared cache under the same key as a published one, for its
-  data class TTL capped at one day (`WITHHELD_TTL_SECONDS`): whether a figure
-  is published somewhere changes on the scale of days, not minutes, so an
-  identical question inside that window is answered from the record with
-  `cache_status: "hit"`, the same withheld note and sources, and no provider
-  spend or capacity claim. A packet without a retrieval record is never
-  stored, published or withheld, because a model that did not look is
-  evidence about the model and not about the world and the shared cache
-  holds provider packets about public markets, never one turn's prose for
-  every other user; a malformed or unavailable response has no packet to
-  store; and a packet withheld for want of a required public source is not
-  stored.
+  having informed one.
+- **Shared-cache eligibility precedes identity (#689).** Grounded inline and
+  thorough answers contain unrestricted request text and may echo private
+  amounts, criteria, or context. They are never read from or written to shared
+  storage, even when requests match or cite public pages. Hashing those inputs
+  would not make them public. Already-queued jobs carrying an older `cache_key`
+  cannot write shared entries when they complete.
+  Discovery retains reuse only for category-free, anchor-based searches whose
+  symbols already have successful `provider_catalog` resolution provenance in
+  runtime state, matching the search asset class. Missing or client-only
+  provenance bypasses storage without additional resolver calls. Only the
+  public search packet is shared; extraction and answer voicing remain per turn.
+  This eligibility applies to the direct Perplexity Search API. Model-backed
+  search adapters remain uncached because their model/configuration needs a
+  separate complete identity contract.
+  One adapter derives both lookup and write from the exact provider search
+  query, provider ID, result limit, and `public-discovery-packet/v2` contract.
+  The query builder owns normalization; the key does not lowercase prose, sort
+  anchors, or erase punctuation. Legacy keys are incompatible. Cache expiry
+  and bounded process-local eviction remain unchanged; no hosted purge occurs.
+  Usage retains its existing accounting vocabulary: uncached provider work is
+  `cache_status: "miss"`, cached public discovery is `"hit"`, and an unpaid
+  path may report `"bypass"`. Storage ineligibility does not erase provider cost.
 - **Retrieval parameters are configuration per question shape.** Each call
   sends a model fallback chain (`models`, the primary and the other priced
   model, served in order; the invoice names the model that served), the
@@ -4574,8 +4603,8 @@ Contract rules:
   lives; a user without a country gets no such line. A thorough job's typed
   request carries the country and currency, so the job sends the location and
   line of the user who asked, and so does a refresh of a computed answer.
-  The research cache key includes that country, so a search made for one
-  country's readers never answers another's. No domain filter is sent.
+  Each grounded request runs independently, preserving its country and
+  currency without sharing its answer. No domain filter is sent.
 - Current external facts ("why is NVDA moving this week") are claim-shaped:
   they ground through the balanced shape with publisher sources required and
   a one-week recency filter, and persist the ordinary `research` sidecar with
@@ -4640,10 +4669,9 @@ Contract rules:
   retry) returns the existing job whatever its status, with no second
   provider run. `operation_scope` rides every serialized job surface,
   including the polling payload; absent means an ordinary backtest.
-- Thorough answers join the shared research cache like every other shape:
-  the finalized packet is stored under the requesting turn's key, a withheld
-  one under the capped TTL above, and an identical question within the TTL
-  answers inline with `cache_status: "hit"`, no job, and no provider spend.
+- Thorough answers remain owner-scoped job results. A later identical question
+  creates its own request through the existing admission and job lifecycle;
+  shared-cache eligibility never replaces the job's existing idempotency rule.
 - Runnable rows name assets in one vocabulary: a short display name derived
   from the resolver's own name (listing boilerplate like "Common Stock" or
   "Inc." stripped, share classes kept) plus the resolver-verified ticker.
@@ -5578,7 +5606,7 @@ and `answer_figures_replaced` is still recorded when one of them drives the
 result. Separately, every research or no-search answer's prose is audited:
 each figure written in digits that is neither a cited row nor a value of its
 calculation is recorded with `answer_figures_unsourced` and a log line with the
-count and the figures, and nothing is replaced. Dates, years, a day number beside its year,
+count only, without the figures or question text, and nothing is replaced. Dates, years, a day number beside its year,
 numbers inside words and a number that names a cited product or a model are not
 counted. A computed answer answers `ready_to_respond`:
 `final_response_payload.tool_result_cards` holds one card per calculation, the
@@ -6143,14 +6171,15 @@ outside frontend reads, PostHog, model context, and the live-eval fingerprint.
 ### Product event envelope
 
 P1 defines a stable measurement envelope for product analytics, future cost
-accounting, and eval readiness. B3 slice 2 emits the approved product-event set
-to PostHog when `POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host
-are configured. If the token is missing, capture is suppressed with
+accounting, and eval readiness. PostHog capture happens only when
+`POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host are configured.
+If the token is missing, capture is suppressed with
 `reason = "posthog_not_configured"`. If the region/host is missing or
 unsupported, capture is suppressed with
 `reason = "posthog_region_not_configured"`.
 
-Event envelope schema version: `argus_observability_event/v1`.
+Event envelope schema version: `argus_observability_event/v1`. Analytics
+events (below) carry `argus_analytics_event/v1`.
 
 Core fields:
 - `schema_version`
@@ -6181,48 +6210,43 @@ Core fields:
 - `sampling_rate`
 - `retention_class`
 - `attributes`
+- `analytics_event` and `internal_account`, which exist only on the frozen
+  `AnalyticsEnvelope` the registry builds; the generic envelope cannot carry them
 
-### Native analytics dimensions
+### Product analytics events (wave 1, SPEC 0)
 
-The PostHog projection promotes a closed set of scalar attributes to event
-properties: `product_event`, `language`, `surface`, `terminal_outcome`,
-`conversion_reason`, `strategy_category`, `product_capability`, and
-`capability_class`. The sanitized `attributes` bag remains intact.
+One closed registry, `src/argus/observability/analytics_events.py`, owns every
+event PostHog receives. Each event is one Pydantic model (`extra="forbid"`,
+strict) whose fields are the event's exact properties, typed only as literal
+values, booleans, a bounded integer, a calculation name checked against the
+calculation catalog at validation time, or the pattern-checked invite
+`cohort`. An amount, a name, an email, question or answer text, or any other
+free text cannot be represented. Events are sent only through
+`capture_analytics_event()`: only the frozen `AnalyticsEnvelope` the registry
+builds can carry an event, and the sink validates it again before sending,
+including that its timestamp is the build time (aware UTC, not backdated or in
+the future). Anything else, including an
+envelope that only names an event, is suppressed with
+`reason = "not_an_analytics_event"`, so nothing else reaches PostHog.
 
-These two capability dimensions deliberately describe different facts:
+PostHog receives each event under its own name as the PostHog `event`. The
+event names and properties are documented in `docs/DATA_MODEL.md` section
+12.1.1: `first_answer_shown`, `signed_in`, `card_saved`, `goal_created`,
+`checklist_step_completed`, `reminders_opted_in`, `reminders_opted_out`,
+`session_started`, `installed_app_opened`, `landing_viewed`, and
+`receipt_shared`. The emitters land package by package (SPEC 0, 0C-3 to 0C-8);
+`goal_created`, `checklist_step_completed`, and the two reminder events are
+registered now and fire in later stages.
 
-| Dimension | Meaning | Owner / values |
-| --- | --- | --- |
-| `product_capability` | The product activity involved in a guest funnel event | `GuestFunnelProductCapability`: `chat`, `simulation`, `decision`, `history`, `account`, `feedback` |
-| `capability_class` | The kind of research work performed | Research `CapabilityClass`: `fast_quote`, `balanced_lookup`, `thorough_research`, `screening`, `peer_expansion` |
-
-They are not interchangeable and must not be merged. `surface` identifies the
-UI location; research `shape` identifies the execution configuration. A
-`screening` task stays `screening` on either balanced or thorough execution.
-The research sidecar owns its work kind; the ledger and analytics read it.
-
-`product_capability` replaces the ambiguous `capability_category` name at all
-guest event producers. New captures emit only the new name, without an alias.
-Existing PostHog events retain `capability_category`; historical queries
-spanning the change must OR the old and new property filters, or coalesce them
-in historical SQL. Do not reinterpret the old value as a research class.
-Research sidecar and cost-ledger keys remain `capability_class`, so persisted
-research messages and ledger readers need no migration.
-
-Research settlement emits `event_type = "research"` from the same sidecar
-used for metering, even without a cost-ledger gateway. `capability_class` is a
-native event property; unknown values become `unknown` rather than leaking
-arbitrary text. A sidecar carrying `degraded.code` emits
-`event_action = "failed"`, `status = "degraded"`; otherwise it emits
-`completed` for both. This describes the research outcome, not billing
-reconciliation or provider health. Cache hits and bypasses are included;
-`cache_status` remains a bounded nested attribute. No sidecar content, error
-detail, provider data, or spend is copied to PostHog. Capture is best effort,
-and network I/O is scheduled off the streaming event loop.
-
-This event covers inline research (including find) and settled background
-answers. Background failures that never produce a research sidecar retain the
-job lifecycle's failure record; they are not research settlement events.
+Each PostHog capture carries only the event's own properties plus these
+technical properties: `$process_person_profile` (always `false`),
+`schema_version`, `event_id`, `environment`, and `internal_account` (a boolean
+every caller must state). The sink checks each technical value is exactly what
+the registry sets. `signed_in` alone may also
+carry `guest_id_hash`. `distinct_id` is `actor_hash_for_user(<user id>)`: the
+account id for signed-in users and the guest user id for guests. Hashed
+conversation, message, or run ids, `status`, `latency_ms`, and nested
+`attributes` are never sent.
 
 Privacy posture:
 - Default mode is `metadata_only`.
@@ -6230,55 +6254,33 @@ Privacy posture:
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
   account balances, exact holdings, exact dates/capital, email, display name,
   private titles/previews, URLs, cookies, headers, IP addresses, payment
-  identifiers, and similar sensitive payloads before capture.
-- PostHog receives only the sanitized projection. Raw identifiers are hashed
-  before emission.
-- PostHog capture remains server-side only. Two browser-owned facts
-  (`starter_action_selected` and `conversion_prompt_shown`) cross the
-  authenticated `POST /analytics/guest-events` contract; the browser never
-  receives a PostHog key or sends prompts, prose, Auth material, provider/model
-  data, or other arbitrary properties. The remaining guest funnel facts emit
-  from their authoritative server settlement, admission, Auth, feedback, and
-  cleanup owners.
+  identifiers, and similar sensitive payloads from envelope attributes.
+- Raw identifiers never reach PostHog; `distinct_id` and `guest_id_hash` are
+  one-way hashes.
+- PostHog capture is server-side only. The browser has no PostHog key and no
+  analytics endpoint of its own: `POST /analytics/guest-events` and its two
+  browser events (`starter_action_selected`, `conversion_prompt_shown`) were
+  removed in SPEC 0 package 0C-1.
 - Frontend PostHog, autocapture, session replay, and product behavior reads
   from analytics remain out of scope.
 - Person profiles are disabled per event with `$process_person_profile = false`.
 - Current PostHog region is US Cloud, selected deliberately for the private
   alpha compliance posture via `POSTHOG_REGION=us` / `https://us.i.posthog.com`.
 
-Approved product events:
-- `evidence_capture`
-- `decision_capture`
-- `recall_usage`
-- `continuity_mismatch`
-- `compare_started`
-- `next_experiments_offered`
-- `next_experiment_selected`
-- `eval_readiness`
-
-Each approved product event sets `attributes.product_event` to the registered
-name above while preserving the envelope `event_type` taxonomy and
-`event_action` state model from memo 15.5.
-
-Approved guest funnel events use `feature_area = "guest_acquisition"`:
-- `guest_session_started`
-- `starter_action_selected`
-- `first_useful_assistant_response_completed`
-- `confirmation_reached`
-- `first_simulation_admitted`
-- `first_result_completed`
-- `conversion_prompt_shown`
-- `account_creation_completed`
-- `existing_account_sign_in_completed`
-- `temporary_workspace_claimed`
-- `guest_limit_reached`
-- `guest_feedback_submitted`
-- `guest_session_expired`
-
-Their optional properties are limited to hashed/correlated identity, language,
-surface, approved typed strategy/capability category, conversion reason, and
-terminal outcome. Provider cost and latency stay in the existing server-owned
-evidence ledger and correlate through privacy-safe identifiers.
+Retired events (clean break, SPEC 0 package 0C-1). None of these reaches
+PostHog any more: the earlier product events (`evidence_capture`,
+`decision_capture`, `recall_usage`, `continuity_mismatch`, `compare_started`,
+`next_experiments_offered`, `next_experiment_selected`, `eval_readiness`, the
+`receipt_*` funnel, and `account_registration_completed`), every guest funnel
+event, and the research settlement event. Their emit calls are removed, except
+`decision_capture`, `receipt_created`, `account_registration_completed`,
+`first_useful_assistant_response_completed`, `account_creation_completed`, and
+`existing_account_sign_in_completed`, whose call sites SPEC 0 packages 0C-3,
+0C-4, and 0C-8 replace with `first_answer_shown`, `signed_in`, `card_saved`,
+and `receipt_shared`. Until then those calls stop at the sink. The guest funnel
+milestone claim stays; `first_answer_shown` reuses it. Research work kind and
+outcome stay on the cost ledger and the research sidecar
+(`capability_class`), which are not analytics.
 
 Implemented operational surface:
 - The append-only first-party `cost_ledger_entries` table is the server-owned

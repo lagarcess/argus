@@ -1,0 +1,16 @@
+{
+  "scope": "disposable-local-only",
+  "supabase_project": "argus-share-walk-7e84",
+  "owned_containers_remaining": 0,
+  "owned_volumes_remaining": 0,
+  "api_web_listeners_remaining": 0,
+  "browser_sessions_closed": [
+    "argus-share-owner",
+    "argus-share-reader",
+    "argus-share-spanish"
+  ],
+  "production_schema_changed": false,
+  "production_deploy_attempted": false,
+  "canary_run": false,
+  "git_stash_used": false
+}

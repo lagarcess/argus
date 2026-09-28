@@ -2,11 +2,13 @@
 
 Conversation is compute: free in the usage panel, never an allowance. A
 signed-in account still cannot run unbounded LLM spend, so ordinary turns
-claim one daily unit against ``user:<account id>`` at turn start. The unit
-is claimed atomically before any model work, the same way guest compute
-and research claim before spend. A claim that is admitted stands even if
-the turn errors: releasing it is possible, but wiring a refund through
-every errored chat path is not free, so the claim stays. Nothing here is
+claim one daily unit against ``user:<account id>``. The unit is claimed
+atomically before any model work, the same way guest compute and research
+claim before spend, and after the conversation is resolved and every stale
+or replayed action is rejected, so a 404 or a rejected replay never costs
+a unit (#692). A claim that is admitted stands even if the turn errors:
+releasing it is possible, but wiring a refund through every errored chat
+path is not free, so the claim stays. Nothing here is
 rendered or promised.
 """
 
@@ -82,7 +84,7 @@ def claim_registered_compute_turn(*, account_key: str) -> RegisteredComputeAdmis
 
 
 def check_registered_compute_ceiling(request: Request, user: User) -> None:
-    """Claim one turn at entry; 429 once the daily ceiling is reached."""
+    """Claim one turn before model work; 429 once the daily ceiling is reached."""
     now = datetime.now(timezone.utc)
     admission = claim_registered_compute_turn(
         account_key=registered_account_usage_key(user.id),

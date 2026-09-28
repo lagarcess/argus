@@ -1,5 +1,7 @@
 import { rememberReceiptFollowupClaim } from './receipt-followup-storage';
 import { parseToolProgress, type ToolProgress, type ToolResultCard, type ToolScalar } from "./tool-result-card";
+import { authenticatedRequestHeaders } from "./chat-auth-ownership";
+import type { AccountRequestOptions } from "./argus-api-transport";
 import { getSupabaseClient } from "./supabase-client";
 import i18next from "i18next";
 import { localizeArtifactFinalPayload } from "./artifact-response-transport";
@@ -409,7 +411,7 @@ export class ChatStreamError extends Error {
     message: string,
     public status: number,
     public code = "unknown",
-    public requestId: string | null = null,
+    public requestId: string | null = null, public retryAfter: string | null = null,
   ) {
     super(message);
     this.name = "ChatStreamError";
@@ -603,8 +605,8 @@ export type ProfilePatch = {
   currency_override?: string | null;
 };
 
-export async function getMe() {
-  return apiFetch<UserResponse>("/me");
+export async function getMe(expectedUserId?: string) {
+  return apiFetch<UserResponse>("/me", { expectedUserId });
 }
 
 export async function getUsageAllowances() {
@@ -719,13 +721,14 @@ export async function logoutFromApi() {
   );
 }
 
-export async function createConversation(language?: string | null) {
+export async function createConversation(language?: string | null, options: AccountRequestOptions = {}) {
   const payload: { title: null; language?: ApiLanguage } = { title: null };
   if (language) {
     payload.language = normalizeApiLanguage(language);
   }
 
   return apiFetch<{ conversation: Conversation }>("/conversations", {
+    ...options,
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -989,6 +992,7 @@ export async function getBacktestJob(jobId: string) {
 // ─── Chat stream ──────────────────────────────────────────────────────────────
 
 export type ChatStreamOptions = Readonly<{
+  expectedUserId?: string;
   requestId?: string;
   signal?: AbortSignal;
   failedAssistantId?: string;
@@ -1002,23 +1006,13 @@ export async function streamChatMessage(
   mentions: ChatMention[] = [],
   options: ChatStreamOptions = {},
 ) {
-  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  const authHeaders: Record<string, string> = {};
   const submittedRequestId = options.requestId ?? randomId();
-  if (!isMockAuth) {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      throw new Error("Supabase auth client is unavailable in non-mock mode.");
-    }
-    const { data, error } = await supabase.auth.getSession();
-    if (!error && data.session) {
-      authHeaders["Authorization"] = `Bearer ${data.session.access_token}`;
-    }
-  }
+  const authHeaders = await authenticatedRequestHeaders(options.expectedUserId);
+  options.signal?.throwIfAborted();
 
   const response = await fetch(`${ARGUS_API_BASE_URL}/chat/stream`, {
     method: "POST",
-    credentials: "include",
+    credentials: options.expectedUserId === undefined ? "include" : "omit",
     signal: options.signal,
     headers: {
       "Content-Type": "application/json",
@@ -1062,6 +1056,7 @@ export async function streamChatMessage(
       message,
       response.status,
       typeof code === "string" ? code : "unknown", responseRequestId,
+      response.headers.get("Retry-After"),
     );
   }
   const reader = response.body.getReader();

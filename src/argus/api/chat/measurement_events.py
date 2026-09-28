@@ -7,7 +7,6 @@ from loguru import logger
 
 from argus.api.guest_access import AccountContext, current_account_context
 from argus.api.guest_observability import emit_guest_turn_funnel_events
-from argus.observability.product_events import capture_product_event
 
 
 def schedule_runtime_measurement_events_after_stream(
@@ -56,8 +55,6 @@ def emit_runtime_measurement_events(
     account: AccountContext | None = None,
 ) -> None:
     if account is not None:
-        raw_run = runtime_result.get("run")
-        raw_job = runtime_result.get("backtest_job")
         raw_action = metadata.get("chat_action")
         emit_guest_turn_funnel_events(
             account=account,
@@ -68,112 +65,7 @@ def emit_runtime_measurement_events(
             is_run_backtest_turn=(
                 isinstance(raw_action, dict) and raw_action.get("type") == "run_backtest"
             ),
-            confirmation_reached=isinstance(metadata.get("confirmation_card"), dict),
-            backtest_run_id=(
-                _clean_event_string(raw_run.get("id"))
-                if isinstance(raw_run, dict)
-                else _clean_event_string(runtime_result.get("result_run_id"))
-            ),
-            job_id=(
-                _clean_event_string(raw_job.get("id"))
-                if isinstance(raw_job, dict)
-                else None
-            ),
         )
-    failure_code = _continuity_failure_code(metadata)
-    if failure_code is not None:
-        _capture_runtime_product_event(
-            "continuity_mismatch",
-            user_id=user_id,
-            conversation_id=conversation_id,
-            status=failure_code,
-            attributes={
-                "failure_code": failure_code,
-                "stage_outcome": str(metadata.get("agent_runtime_stage_outcome") or ""),
-            },
-        )
-
-    next_experiments = metadata.get("next_experiments")
-    if isinstance(next_experiments, dict):
-        rows = next_experiments.get("rows")
-        kinds = (
-            [
-                str(row.get("kind"))
-                for row in rows
-                if isinstance(row, dict) and row.get("kind")
-            ]
-            if isinstance(rows, list)
-            else []
-        )
-        if kinds:
-            # Stage-1 ordering consumes these impressions; acceptance rides
-            # the persisted select_response_option turns.
-            _capture_runtime_product_event(
-                "next_experiments_offered",
-                user_id=user_id,
-                conversation_id=conversation_id,
-                attributes={"kinds": kinds, "row_count": len(kinds)},
-            )
-
-    comparison_started = runtime_result.get("comparison_started")
-    if not isinstance(comparison_started, dict):
-        return
-    source = _clean_event_string(comparison_started.get("source")) or "workflow_boundary"
-    attributes: dict[str, Any] = {
-        "source": source,
-        "baseline_present": bool(_clean_event_string(comparison_started.get("baseline"))),
-    }
-    candidate_count = _positive_int(comparison_started.get("candidate_count"))
-    if candidate_count is not None:
-        attributes["candidate_count"] = candidate_count
-    _capture_runtime_product_event(
-        "compare_started",
-        user_id=user_id,
-        conversation_id=conversation_id,
-        status="started",
-        attributes=attributes,
-    )
-
-
-def _capture_runtime_product_event(
-    kind: str,
-    *,
-    user_id: str,
-    conversation_id: str,
-    status: str | None = None,
-    attributes: dict[str, Any] | None = None,
-) -> None:
-    try:
-        capture_product_event(
-            kind,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            status=status,
-            attributes=attributes,
-        )
-    except Exception as exc:
-        logger.warning(
-            "Runtime measurement product event capture failed",
-            error=str(exc),
-            product_event=kind,
-            conversation_id=conversation_id,
-        )
-
-
-def _continuity_failure_code(metadata: dict[str, Any]) -> str | None:
-    reference = metadata.get("active_confirmation_reference")
-    if not isinstance(reference, dict):
-        return None
-    reference_metadata = reference.get("metadata")
-    if not isinstance(reference_metadata, dict):
-        return None
-    validation = reference_metadata.get("validation")
-    if not isinstance(validation, dict):
-        return None
-    failure_code = _clean_event_string(validation.get("failure_code"))
-    if failure_code is None or not failure_code.endswith("_mismatch"):
-        return None
-    return failure_code
 
 
 def _clean_event_string(value: Any) -> str | None:
@@ -181,11 +73,3 @@ def _clean_event_string(value: Any) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
-
-
-def _positive_int(value: Any) -> int | None:
-    try:
-        number = int(str(value))
-    except (TypeError, ValueError):
-        return None
-    return number if number >= 0 else None

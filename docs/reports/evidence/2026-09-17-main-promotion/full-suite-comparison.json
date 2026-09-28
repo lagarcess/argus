@@ -1,0 +1,100 @@
+{
+  "candidate_sha": "3cecda6933399e53f6ea00edc8004a88d7eefad4",
+  "baseline_sha": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "candidate_totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 70,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "baseline_totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 68,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "candidate_only_cases": [
+    "messy_english_explicit_end_survives_year_qualifier",
+    "messy_spanish_explicit_end_survives_year_qualifier"
+  ],
+  "comparisons": [
+    {
+      "case_id": "capability_honesty_future_performance_btc_regression",
+      "candidate": {
+        "status": "passed",
+        "failed_checks": []
+      },
+      "baseline": {
+        "status": "failed",
+        "failed_checks": [
+          "research.published: expected True, got False"
+        ]
+      }
+    },
+    {
+      "case_id": "capability_honesty_future_performance_nvda_golden_cross",
+      "candidate": {
+        "status": "passed",
+        "failed_checks": []
+      },
+      "baseline": {
+        "status": "failed",
+        "failed_checks": [
+          "research.published: expected True, got False"
+        ]
+      }
+    },
+    {
+      "case_id": "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "candidate": {
+        "status": "failed",
+        "failed_checks": [
+          "date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "requested_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "effective_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}"
+        ]
+      },
+      "baseline": {
+        "status": "passed",
+        "failed_checks": []
+      }
+    },
+    {
+      "case_id": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "candidate": {
+        "status": "failed",
+        "failed_checks": [
+          "missing_required_fields: expected ['capital_amount'], got []"
+        ]
+      },
+      "baseline": {
+        "status": "passed",
+        "failed_checks": []
+      }
+    },
+    {
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "candidate": {
+        "status": "failed",
+        "failed_checks": [
+          "prose_judge:scenario_framing"
+        ]
+      },
+      "baseline": {
+        "status": "failed",
+        "failed_checks": [
+          "intent: expected one of ['conversation_followup', 'beginner_guidance'], got 'backtest_execution'",
+          "capability_verdict: expected 'answer_only', got 'unsupported'",
+          "stage_outcomes: expected ['ready_to_respond'], got ['needs_clarification', 'await_user_reply']",
+          "offered.min_next_experiment_rows: expected at least 1, got []",
+          "research: expected a research sidecar, got None"
+        ]
+      }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AuthFormSubmission } from "@/components/auth/AuthForm";
 import {
   createGuestHandoff,
@@ -12,7 +13,6 @@ import {
   signupWithEmail,
 } from "@/lib/argus-api";
 import type { UserResponse } from "@/lib/guest-account";
-import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import {
   pendingGuestActionSummary,
   verifiedClaimAction,
@@ -21,13 +21,16 @@ import {
   type GuestConversionReason,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
+import { authenticatedRequestHeaders } from "@/lib/chat-auth-ownership";
 import { randomId } from "@/lib/random-id";
 
 type UseGuestConversionInput = {
   account: UserResponse | null;
   conversationId: string | null;
-  refreshAccount: () => Promise<UserResponse | null>;
+  refreshAccount: (expectedUserId?: string) => Promise<UserResponse | null>;
   refreshHistory: () => void | Promise<unknown>;
+  onAuthenticationStart: () => void;
+  onAuthenticationComplete: (userId: string | null) => void;
   onResume: (action: GuestPendingAction) => void | Promise<void>;
 };
 
@@ -37,7 +40,10 @@ export function useGuestConversion({
   refreshAccount,
   refreshHistory,
   onResume,
+  onAuthenticationStart,
+  onAuthenticationComplete,
 }: UseGuestConversionInput) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] =
     useState<GuestConversionReason>("keep_history");
@@ -58,15 +64,6 @@ export function useGuestConversion({
       nextResetAt: string | null = null,
       nextResetKind: "daily" | "workspace" = "daily",
     ) => {
-      if (account?.account_kind === "guest") {
-        captureGuestFunnelEvent({
-          event: "conversion_prompt_shown",
-          language: account.user.language,
-          surface: "conversion_modal",
-          conversion_reason: nextReason,
-          terminal_outcome: "shown",
-        });
-      }
       setReason(nextReason);
       setInitialMode(nextInitialMode);
       setResetAt(nextResetAt);
@@ -77,7 +74,7 @@ export function useGuestConversion({
       handoffPreparedRef.current = false;
       setIsOpen(true);
     },
-    [account],
+    [],
   );
 
   const close = useCallback(() => {
@@ -87,6 +84,9 @@ export function useGuestConversion({
 
   const authenticate = useCallback(
     async (submission: AuthFormSubmission) => {
+      onAuthenticationStart();
+      try {
+      let destinationUserId: unknown;
       const latch = latchRef.current;
       if (submission.mode === "signup") {
         if (!sourceConversationId) {
@@ -96,7 +96,9 @@ export function useGuestConversion({
             language: normalizeApiLanguage(account?.user.language),
             display_name: submission.displayName || null,
           });
+          destinationUserId = registered.response.user?.id;
           if (registered.needsEmailConfirmation) {
+            onAuthenticationComplete(account?.user.id ?? null);
             return { status: "email_confirmation_required" as const };
           }
         } else {
@@ -119,7 +121,9 @@ export function useGuestConversion({
                 },
           });
           handoffPreparedRef.current = true;
+          destinationUserId = registered.response.user?.id;
           if (registered.needsEmailConfirmation) {
+            onAuthenticationComplete(account?.user.id ?? null);
             return { status: "email_confirmation_required" as const };
           }
           const claimed = registered.response.guest_claim;
@@ -159,6 +163,7 @@ export function useGuestConversion({
           email: submission.email,
           password: submission.password,
         });
+        destinationUserId = authenticated.user?.id;
         if (handoffPreparedRef.current && sourceConversationId) {
           const claimed = authenticated.guest_claim;
           if (!claimed) {
@@ -175,22 +180,34 @@ export function useGuestConversion({
         }
       }
 
-      await refreshAccount();
-      // The handoff changes the durable owner in the same request path. Refresh
-      // Recents before a pending follow-up can fail or navigate away, so the
-      // account's canonical conversation projection is visible immediately.
-      await refreshHistory();
+      if (typeof destinationUserId !== "string") throw new Error(t("chat.error_generic"));
+      const refreshed = await refreshAccount(destinationUserId);
+      onAuthenticationComplete(refreshed?.user.id ?? null);
+      } catch (error) {
+        try {
+          if (!account?.user.id) throw error;
+          await authenticatedRequestHeaders(account.user.id);
+          onAuthenticationComplete(account.user.id);
+        } catch { onAuthenticationComplete(null); }
+        throw error;
+      }
       const actionLatch = latchRef.current;
       const action = actionLatch?.take() ?? null;
       setIsOpen(false);
       handoffPreparedRef.current = false;
+      // Recents is a projection: its latency or failure cannot delay the
+      // verified action after the claim has completed.
+      void Promise.resolve().then(refreshHistory).catch(() => undefined);
       if (action) {
         await onResume(action);
       }
     },
     [
-      account?.user.language,
+      account,
+      t,
       onResume,
+      onAuthenticationStart,
+      onAuthenticationComplete,
       refreshAccount,
       refreshHistory,
       sourceConversationId,

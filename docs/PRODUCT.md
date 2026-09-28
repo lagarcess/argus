@@ -1,195 +1,107 @@
-# PRODUCT.md
+# Argus product
 
-## Argus Product Source of Truth (Alpha MVP)
+**Status:** Current product direction, approved September 26, 2026.
+**Audience:** Founders, product/design, engineers, and collaborating agents.
+**Detailed experience owner:** [Minimum viable ecosystem experience (MVEE)](specs/argus-minimum-viable-ecosystem-experience.md).
 
-**Status:** Active | **Alpha Product v1 Locked**
-**Audience:** Founders, engineers, AI agents, designers
-**Purpose:** Define what Argus is, who it serves, what we are building now, and what we are explicitly not building now.
+## 1. Purpose
 
-> [!IMPORTANT]
-> **Locked Status**: No major scope shifts or target audience changes are allowed without explicit approval. Polish and additive refinements are permitted.
+Argus helps people understand where they stand, keep their money organized,
+and know how their choices change their financial picture.
 
----
+Its core promise is: **know what is already committed, what remains until your
+next income, and how your choices change that.** The product connects recording,
+understanding, planning, relevant updates, and returning to an up-to-date picture.
+Conversation is one way to work across that experience; direct controls and
+manual entry are equally valid paths.
 
-# 1. Product Truth
+## 2. Who we design for
 
-**Argus is the easiest place to bring a money question and get an answer you can check.**
+Start with Dominican adults juggling cash, bank accounts, and debt who already
+try to organize their money but cannot confidently tell what remains after
+commitments. Income may arrive by quincena, commissions, remittances, or other
+variable sources. This is a design focus, not an eligibility restriction.
 
-Every answer is computed by Argus or cited to a source, never asserted. The questions that can be tested against real history end in a backtest.
+People can manage their own finances and invite a partner into an explicitly
+shared household view. Individual and joint accounts belong in the picture;
+private information stays private unless its owner chooses to share it.
 
-**Argus is AI-powered, grounded money answers for everyone.**
+## 3. The connected experience
 
-Argus is a **chat-first, AI-first investing sandbox** where users interact through natural conversation instead of dashboards, technical forms, or intimidating trading tools.
+The [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) owns the complete
+surface definitions, ingestion paths, confirmation rules, household boundaries,
+and pain-point coverage. In brief:
 
-Users describe questions and ideas in plain language.
+- Home explains the upcoming financial period and recorded position.
+- Accounts organizes financial facts and corrections.
+- Argus helps record, explain, and compare choices.
+- Plan connects budgets, debts, and goals to the same money.
+- Search recovers records and prior reasoning.
+- Updates draws attention to relevant changes; profile owns app and data controls.
 
-Argus helps them:
+The experience should be useful with cash, manual records, and documents.
+Bank connectivity can improve it but must not be a prerequisite for value.
+Input methods converge on confirmed financial records; guesses and hypothetical
+scenarios must not silently change actual balances.
 
-- understand concepts
-- compute what they are actually asking, from the numbers they gave
-- refine ideas
-- simulate strategies
-- inspect outcomes
-- learn without risking capital
+## 4. Product principles
 
-A money question is any question a person asks about their own money or about
-an asset: what to save, what something costs over time, what a rate really
-means, what an instrument would return, what a company is trading at, what an
-idea would have done. Argus answers them the same way, by computing or citing.
+- Make the picture understandable without dense dashboards or financial jargon.
+- Preserve current Argus typography, chat detail, motion, and grounded answers.
+- Explain assumptions, currency, source coverage, and freshness.
+- Make corrections easy and consistent across surfaces.
+- Keep market questions and historical comparisons accessible without a debt gate.
+- Show the limits of planning: an app cannot create income or guarantee outcomes.
+- Design for phones, with native iOS/Android and web as intended platforms.
+
+[DESIGN.md](../.agent/designs/argus/DESIGN.md) owns visual conventions. Native
+architecture, sequencing, providers, and the new account-onboarding flow remain
+open as specified in the MVEE. Follow the [authority map](DOCUMENTATION_AUTHORITY.md)
+when scoping implementation.
+
+## 5. Existing capabilities and behavior to preserve
+
+Argus is one evolving product. Existing production capabilities, interactions,
+data, and access controls carry forward unless an approved change explicitly
+replaces them. The lists in this overview and the MVEE are not exhaustive:
+omission is not a decision to remove, rebuild, hide, or enable a feature.
+
+The current foundation is grounded finance chat, calculations, research,
+historical simulations, conversations/history, Omnisearch, and account/settings.
+These are capabilities within the ecosystem, not a separate investing product.
+The approved financial-record, household, and native-app experience is not
+claimed implemented by this document.
+
+For supported questions, Argus computes from supplied inputs or provides
+source-backed explanations. General-knowledge responses must be distinguishable
+from current research; assumptions and source freshness stay visible.
 
 **Compute what the user gave you. Never prescribe what they should do.**
-Arithmetic on someone's own numbers is a grounded calculator. Telling them what
-they ought to do is advice, and Argus does not give it.
+Arithmetic on someone's own numbers is a grounded calculator. This pivot does
+not authorize discretionary trading, automatic money movement, or a change to
+the existing advice boundary.
 
-The backtesting engine is critical infrastructure, and the first calculation
-Argus learned.
+Guest chat remains a real entry path. The existing access policy is defined in
+[Guest Entry](#guest-entry-default-on-kill-switch) below; do not replace it with
+an auth-first journey or invent the pivot's account-onboarding policy.
 
-The conversation is the product.
+The remaining sections specify capabilities and behavior to preserve. They do
+not form a new feature queue or establish a backtest-only activation requirement.
 
----
+### Current production availability and planned changes
 
-# 2. Why Argus Exists
+This section owns the availability statements below. The founder confirmed this
+production posture on September 26, 2026; this documentation update changes no
+flags or rollout configuration.
 
-Most investing and backtesting tools are built for experienced users.
+| Capability | Current production state | Approved change |
+| --- | --- | --- |
+| Notifications | Hidden/flagged for Alpha | Enable as part of the next product push; behavior follows the MVEE Updates experience. Implementation and rollout still need their assigned work. |
+| Subscriptions | Hidden/flagged for Alpha | No enablement change approved; preserve the existing gate. |
 
-They are often:
-
-- cluttered
-- technical
-- chart-heavy
-- jargon-filled
-- intimidating for beginners
-- slow to learn
-- high friction to use casually
-
-Argus exists to make idea validation accessible to anyone.
-
-A user should not need:
-
-- finance background
-- coding knowledge
-- trading platform experience
-- quant skills
-
-They should only need curiosity.
-
----
-
-# 3. Primary User Segments (Alpha)
-
-## Curious Beginner
-
-A person interested in markets but intimidated by current tools.
-
-Needs:
-
-- education
-- guidance
-- safe experimentation
-- plain language explanations
-
-## Enthusiast
-
-Someone already interested in stocks, crypto, or trading ideas but without advanced tools.
-
-Needs:
-
-- faster testing
-- cleaner workflows
-- less friction
-- actionable feedback
-
-## Casual Learner
-
-Someone exploring markets socially or intellectually.
-
-Needs:
-
-- conversational discovery
-- intuitive UX
-- low commitment experimentation
-
----
-
-## Trust Through Clarity
-
-Users should understand assumptions, limits, and outcomes. Results are presented with honest context (e.g., explicit assumptions footers on all cards).
-
-Discovery answers follow the same rule: every suggested asset is
-resolver-verified and tappable, and the answer always states its grounding.
-The default path answers from model knowledge and is plainly marked "from
-general knowledge, not a current search"; a source-backed search runs only
-when the answer needs current facts (or the user asks), and then shows its
-sources and freshness date. A remembered answer and a researched one must
-never look alike.
-
-## Chat First
-
-Conversation is the primary interface.
-
-## AI First
-
-The assistant guides the user, asks questions, explains results, and removes friction.
-
-## Simplicity Wins
-
-Avoid complex dashboards, knobs, and enterprise UX.
-
-## Speed Matters
-
-The product should feel immediate and responsive.
-
-## Safe by Default
-
-Users experiment with ideas, not real money.
-
-## Teach Through Use
-
-Learning happens naturally during interaction.
-
-## Honest Boundaries
-
-AI must clearly operate within supported system capabilities.
-
-## Mobile Future
-
-Alpha launches on web/PWA for speed. Long-term direction is mobile + web.
-
----
-
-# 5. Alpha MVP Scope (What We Are Building Now)
-
-## Core Experience
-
-A new user can:
-
-1. Enter Argus and sign up (language is chosen at signup and changeable in Settings)
-2. Arrive directly in normal chat
-3. Interact with **starter prompts** designed to reduce blank-page friction
-4. Describe or choose an investing idea
-5. Receive AI guidance
-6. Run a backtest using supported strategies
-7. View results clearly through **high-fidelity metrics cards, AI explanations, and follow-up questions**
-8. Revisit the conversation later
-9. See prior runs and saved items
-
-There is no separate onboarding flow. Activation begins in normal chat, and
-the first successful backtest is the meaningful onboarding milestone.
-
-## Included Product Surfaces
-
-### Primary Surface
-
-- Multi-chat conversations
-
-### Supporting Surfaces
-
-- Recents/history
-- Omnisearch and Idea Ledger recall
-- Settings / Account
-
-Legacy Strategy and Collection records remain valid read-compatibility objects
-only. No current flag, navigation surface, or writer creates or manages them.
+An approved future experience does not contradict a currently hidden feature.
+Update this table when the corresponding release changes availability. Design
+and experience documents link here rather than maintain separate state lists.
 
 ---
 
@@ -237,11 +149,11 @@ durable read boundary. Registered users may also deliberately mark a task
 unread as a reminder. These states come from backend lifecycle and read truth,
 never message wording, client timers, or changes to recency ordering.
 
-Private-alpha launch keeps the visible product surface to Chat, Recents/history,
-completed result cards, and minimal account/settings/feedback. Dedicated
-Strategies and Collections surfaces have been retired. Historical records remain
-readable so older runs and history never break, but the product no longer creates
-or manages those legacy objects.
+Recents and completed result cards remain part of the existing conversation
+experience. Dedicated Strategies and Collections surfaces are retired.
+Historical records remain readable so older runs and history never break, but
+the product no longer creates or manages those legacy objects. This compatibility
+requirement does not restrict the ecosystem's approved navigation.
 
 ---
 
@@ -267,15 +179,11 @@ state (promising, watching, rejected, revisit) with filter chips. Group order
 and counts are backend-owned; the frontend renders them without synthesizing
 its own groups.
 
-For P2, this durable `Idea` / `IdeaVersion` / `EvidenceArtifact` /
-`DecisionNote` recall is the product's "remembering" contract. It is distinct
-from memory. Memory has shipped: production sets
-`ARGUS_ENABLE_PERSONALIZATION_MEMORY=true`, exposure is limited to `admin`
-and `developer` accounts (`MEMORY_EXPOSURE_ROLES` in
-`src/argus/api/personalization_memory.py`), and semantic recall stays off
-(`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL=false`). Widening memory to every
-registered user remains future work. Memory must not be required for the P2
-idea/evidence/comparison loop.
+Durable `Idea` / `IdeaVersion` / `EvidenceArtifact` / `DecisionNote` recall is
+the existing idea/evidence remembering contract. It is distinct from a general
+cross-conversation memory system. The ecosystem's new financial records and
+chat integration still require explicit technical contracts; do not implement
+them as an assumed extension of legacy Strategy rows or generic memory.
 
 ## Legacy Compatibility Goals
 
@@ -422,53 +330,31 @@ Feedback velocity is strategic.
 
 ---
 
-# 15. Explicitly Out of Scope (Alpha)
+# 15. Boundaries
 
-Not priorities now:
+The [MVEE boundaries](specs/argus-minimum-viable-ecosystem-experience.md#8-differentiation-and-boundaries)
+and [pain-point limits](specs/argus-minimum-viable-ecosystem-experience.md#112-pain-points-only-partially-addressed-or-outside-the-minimum)
+own the minimum ecosystem's exclusions. Technical/provider choices that remain
+open are not implied approvals to build them.
 
-- Real brokerage trading
-- Complex portfolio optimization
-- Native mobile apps deferred until post-Alpha; mobile remains strategic long-term.
-- Billing / subscriptions
-- Social network features
-- Advanced quant tooling
-- Full custom scripting
-- Dozens of strategy parameters
-- Institutional realism modeling
-- Heavy journaling systems
-- **Stablecoins**: Excluded from Alpha backtesting to prevent misleading outcomes.
+Historical simulation constraints still apply: no real brokerage execution,
+unsupported custom strategies, or mixed-asset-class runs. Stablecoins remain
+excluded from Alpha backtesting to prevent misleading outcomes. These engine
+limits do not prohibit users from recording diverse personal assets or asking
+supported finance questions.
 
----
+# 16. Product outcomes
 
-# 16. Success Metrics (Alpha)
+The ecosystem should help people resolve uncertainty, maintain useful records,
+understand choices, and return when their situation changes. Its experience
+loop and pain-point coverage are defined in
+[MVEE section 11](specs/argus-minimum-viable-ecosystem-experience.md#11-pain-points-limits-and-the-reinforcing-loop).
 
-We are optimizing for:
-
-## Activation
-
-Users reach normal chat directly after authentication and complete their
-first successful backtest — that first successful backtest is the meaningful
-onboarding milestone.
-
-## Delight
-
-Users feel the product is modern, intuitive, and useful.
-
-## Retention
-
-Users return repeatedly to explore new ideas and revisit prior ones.
-
-## Exploration
-
-Users return to test new ideas regularly.
-
-## Continuity
-
-Users resume prior chats and workflows.
-
-## Trust
-
-Results feel clear, reproducible, and honest.
+A successful backtest demonstrates one capability; it is not the universal
+onboarding or activation milestone. There is no newly approved numeric target,
+instrumentation schema, or replacement experiment schedule in this document.
+Existing assigned measurement packages retain their scoped definitions until
+explicitly reconciled.
 
 ---
 
@@ -492,7 +378,7 @@ Argus should avoid:
 - **Toy Chatbot**: No generic, shallow, or purposeless "AI chatter."
 - **Generic Finance App**: No "top 10 gainers" lists or generic news content feeds.
 
-**Argus chooses:** Conversational progressive disclosure, simple cards, and focused actions.
+**Argus chooses:** Progressive disclosure, simple cards, focused actions, and equally usable conversational or direct entry.
 
 # 19. Result Trust Standard
 
@@ -584,7 +470,7 @@ configuration rollback and later conversion work.
 
 ---
 
-# 20. Golden Path (Alpha)
+# 20. Historical Simulation Journey
 
 A user opens Argus and says:
 
@@ -599,7 +485,7 @@ Argus responds by:
 5. explaining what happened
 6. suggesting what to test next
 
-If this feels magical and trustworthy, the MVP is working.
+This is one supported journey. The ecosystem also supports recording, planning, household coordination, and general finance questions; its connected journeys are defined in the MVEE.
 
 ---
 
@@ -607,17 +493,20 @@ If this feels magical and trustworthy, the MVP is working.
 
 When evaluating any feature, ask:
 
-## Does this make it easier for a normal person to bring a money question and get an answer they can check?
+## Does this help someone understand, maintain, or improve the same financial picture?
 
-If no, it likely should wait.
+Use the MVEE to decide experience fit and the assigned package to bound work.
+A feature need not end in chat or a backtest to be useful.
 
 ---
 
-# 22. Current Strategic Focus
+# 22. Strategic Direction and Preserved Foundation
 
-We are moving from prototype polish to real product utility.
+The [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) owns approved
+product direction. The [authority map](DOCUMENTATION_AUTHORITY.md) distinguishes
+that direction from existing assignments and technical decisions still to come.
 
-Priorities now:
+Preserve these Alpha foundations while adding the ecosystem:
 
 1. Working AI chat loop
 2. Real backtests
