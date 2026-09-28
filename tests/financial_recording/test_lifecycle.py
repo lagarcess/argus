@@ -143,3 +143,42 @@ def test_positions_never_sum_across_currencies():
         "InvalidInput:amount_precision",
     )
     assert result["unknown_currency"] == "InvalidInput:currency_unsupported"
+
+
+def test_edits_that_move_money_stop_for_review_and_keep_evidence():
+    unexplained_zero = [[0, 0, "unexplained"]]
+    assert scenarios_lifecycle.edits_that_move_money_need_review() == {
+        "removing_a_check_others_depend_on": {
+            "blocked": "ReviewRequired:inclusion_unanswered",
+            "after_answering": "ok",
+            "balance": 800_000,
+            "gaps": unexplained_zero,
+        },
+        "redating_activity_into_a_check": {
+            "before": [950_000, unexplained_zero],
+            "unanswered": "ReviewRequired:inclusion_unanswered",
+            "answered_not_included": [950_000, unexplained_zero],
+        },
+        "restoring_activity_the_check_never_saw": {
+            "unanswered": "ReviewRequired:inclusion_unanswered",
+            "balance": 950_000,
+            "gaps": unexplained_zero,
+        },
+        "redating_a_check": {
+            "unreviewed": "ReviewRequired:inclusion_changed",
+            "balance": 900_000,
+            "gaps": unexplained_zero,
+        },
+        "note_only_correction_keeps_evidence": {
+            "before": [[-50_000, 0, "unexplained"]],
+            "after": [[-50_000, 0, "unexplained"]],
+        },
+        "redating_the_opening_onto_untimed_activity": {
+            "result": "ReviewRequired:inclusion_unanswered"
+        },
+        "purchase_edits_recheck_refunds": {
+            "later_date": "ReviewRequired:refund_before_purchase",
+            "other_category": "ReviewRequired:refund_category_mismatch",
+        },
+        "custom_category_blocks_a_move": {"move": "ReviewRequired:account_has_links"},
+    }

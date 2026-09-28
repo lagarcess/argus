@@ -94,13 +94,14 @@ def test_first_slice_create_reopen_edit_needs_no_category_catalog():
     assert result["stale_edit"] == "StaleVersion"
     assert result["balance_after_opening_correction"] == 1_200_000
     assert result["totals_after_opening_correction"] == [0, 0]
-    assert result["opening_revisions"] == 2
+    assert result["opening_date_edit_without_activity"] == "ok"
+    assert result["opening_revisions"] == 3
 
 
 def test_changing_the_opening_date_reviews_affected_history():
     assert scenarios.opening_date_correction() == {
         "balance_before": 90_000,
-        "unreviewed_date_change": "ReviewRequired:opening_date_reorders_activity",
+        "unreviewed_date_change": "ReviewRequired:inclusion_changed",
         "balance_after": 100_000,
         "spending": 10_000,
         "revisions": [

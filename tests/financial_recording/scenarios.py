@@ -709,7 +709,13 @@ def first_slice_create_reopen_edit() -> dict:
     stale = outcome(lambda: scene.store.edit_account(created.id, 1, nickname="Otra"))
     scene.now = local(3)
     scene.store.correct(opening_id, 1, "typo in starting balance", amount="12000.00")
+    redated = outcome(
+        lambda: scene.store.correct(
+            opening_id, 2, "balance was from the 1st", as_of=local(1, 8)
+        )
+    )
     return {
+        "opening_date_edit_without_activity": redated,
         "reopened": first,
         "unnamed_account": [unnamed.nickname, scene.balance(unnamed)],
         "catalog_untouched": dict(scene.store.book.categories)

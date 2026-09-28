@@ -37,6 +37,7 @@ from tests.financial_recording.derive import (
     activities,
     anchors,
     balance,
+    contained_at_confirmation,
     fulfills,
     legs,
     live_records,
@@ -99,13 +100,13 @@ def parse_fields(
         "note": note,
     }
     if kind == "balance_observation":
-        values["as_of"] = _parsed(found, _instant, text["as_of"])
+        values["as_of"] = _parsed(found, parse_instant, text["as_of"])
         values["basis"] = _parsed(found, _choice, text["basis"], GAP_LABEL)
         return (None if found else Observation(**values)), tuple(found)
     values.update(
         kind=kind,
-        occurred_on=_parsed(found, _date, text["occurred_on"]),
-        occurred_at=_parsed(found, _instant, text.get("occurred_at")),
+        occurred_on=_parsed(found, parse_date, text["occurred_on"]),
+        occurred_at=_parsed(found, parse_instant, text.get("occurred_at")),
         category=text.get("category") or None,
         counter_account_id=text.get("counter_account_id") or None,
         refund_of=text.get("refund_of") or None,
@@ -136,7 +137,7 @@ def validate(
         found.append(issue("note_too_long", str(len(note))))
     if isinstance(body, Activity):
         found.extend(_activity_issues(book, body, record_id))
-    trial = with_trial(book, body, record_id, provenance)
+    trial = with_trial(book, body, record_id, tz, provenance)
     found.extend(_inclusion_issues(trial, body, record_id or TRIAL_ID, tz))
     return found
 
@@ -145,6 +146,7 @@ def with_trial(
     book: Book,
     body: Body,
     record_id: Optional[str],
+    tz: ZoneInfo,
     provenance: Optional[Provenance] = None,
 ) -> Book:
     if record_id is not None:
@@ -152,13 +154,23 @@ def with_trial(
         revision = replace(record.revisions[-1], body=body, removed=False)
         trial = replace(record, revisions=(*record.revisions, revision))
     else:
-        revision = Revision(body, _EPOCH, provenance or Provenance("manual", _EPOCH))
+        contained = (
+            contained_at_confirmation(book, body, tz)
+            if isinstance(body, Observation)
+            else None
+        )
+        revision = Revision(
+            body,
+            _EPOCH,
+            provenance or Provenance("manual", _EPOCH),
+            contained=contained,
+        )
         trial = Record(TRIAL_ID, len(book.records) + 1, (revision,))
     return replace(book, records={**book.records, trial.id: trial})
 
 
 def notices(book: Book, body: Body, tz: ZoneInfo, provenance: Provenance) -> list[Issue]:
-    trial = with_trial(book, body, None, provenance)
+    trial = with_trial(book, body, None, tz, provenance)
     found = [
         issue("negative_asset_balance", account_id)
         for account_id in sorted(accounts_of(body))
@@ -218,7 +230,7 @@ def _activity_issues(book: Book, body: Activity, record_id: Optional[str]) -> li
     found = [issue("amount_not_positive")] if body.amount <= 0 else []
     found.extend(_category_issues(book, body, account))
     found.extend(_counter_issues(book, body, account))
-    found.extend(_refund_issues(book, body, account, record_id))
+    found.extend(refund_issues(book, body, account, record_id))
     found.extend(_expectation_issues(book, body, record_id))
     return found
 
@@ -261,7 +273,7 @@ def _counter_issues(book: Book, body: Activity, account: Account) -> list[Issue]
     return found
 
 
-def _refund_issues(
+def refund_issues(
     book: Book, body: Activity, account: Account, record_id: Optional[str]
 ) -> list[Issue]:
     if body.kind != "refund":
@@ -361,14 +373,14 @@ def _parsed(found: list[Issue], parser: Callable, text: Optional[str], *args):
         return None
 
 
-def _date(text: str) -> date:
+def parse_date(text: str) -> date:
     try:
         return date.fromisoformat(text)
     except ValueError as error:
         raise InvalidInput("date_invalid", text) from error
 
 
-def _instant(text: str) -> datetime:
+def parse_instant(text: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(text)
     except ValueError as error:

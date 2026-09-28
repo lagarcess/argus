@@ -108,6 +108,7 @@ class Revision:
     recorded_by: Optional[str] = None
     confirmed_expected: Optional[int] = None
     confirmed_difference: Optional[int] = None
+    contained: Optional[frozenset[str]] = None
 
 
 @dataclass(frozen=True)
@@ -224,8 +225,9 @@ def placement(
     """Whether an anchor's balance already contains the activity; None means ask.
 
     Activity dated after the anchor never is. Otherwise an explicit answer
-    wins; activity that existed when a check was confirmed, or that came from
-    the same source document, is included; anything else is asked.
+    wins; activity the check stored as contained when it was confirmed, or
+    that came from the same source document, is included; anything else is
+    asked. The stored set, not recording order, is what the person saw.
     """
     activity, anchor = activity_record.body, anchor_record.body
     anchor_day = anchor.as_of.astimezone(tz).date()
@@ -242,11 +244,32 @@ def placement(
         return answer
     if isinstance(anchor, Opening):
         return INCLUDED if earlier_day else None
-    if activity_record.seq < anchor_record.seq or _same_source(
-        activity_record, anchor_record
-    ):
+    contained = anchor_record.revisions[-1].contained or frozenset()
+    if activity_record.id in contained or _same_source(activity_record, anchor_record):
         return INCLUDED
     return None
+
+
+def dated_after(activity: Activity, anchor: Anchor, tz: ZoneInfo) -> bool:
+    if activity.occurred_at is not None:
+        return activity.occurred_at > anchor.as_of
+    return activity.occurred_on > anchor.as_of.astimezone(tz).date()
+
+
+def contained_at_confirmation(
+    book: Book, anchor: Observation, tz: ZoneInfo
+) -> frozenset[str]:
+    """What a check's preview showed as the prior recorded amount."""
+    return frozenset(
+        record.id
+        for record in activities(book, anchor.account_id)
+        if not dated_after(record.body, anchor, tz)
+    )
+
+
+def landed_at(record: Record, ordered: list[Record], tz: ZoneInfo) -> Optional[str]:
+    index = landing(record, ordered, tz)
+    return ordered[index].id if index < len(ordered) else None
 
 
 def landing(record: Record, ordered: list[Record], tz: ZoneInfo) -> int:
@@ -345,7 +368,11 @@ def observation_gaps(book: Book, account_id: str, tz: ZoneInfo = DEFAULT_TZ) -> 
                 record.revisions[-1].confirmed_difference,
                 anchor.amount - expected,
                 GAP_LABEL[anchor.basis],
-                tuple(move.id for move in between if move.seq > record.seq),
+                tuple(
+                    move.id
+                    for move in between
+                    if move.id not in (record.revisions[-1].contained or ())
+                ),
             )
         )
     return gaps

@@ -356,6 +356,91 @@
     "same_account_returned": true,
     "same_key_different_body": "IdempotencyConflict"
   },
+  "edits_that_move_money_need_review": {
+    "custom_category_blocks_a_move": {
+      "move": "ReviewRequired:account_has_links"
+    },
+    "note_only_correction_keeps_evidence": {
+      "after": [
+        [
+          -50000,
+          0,
+          "unexplained"
+        ]
+      ],
+      "before": [
+        [
+          -50000,
+          0,
+          "unexplained"
+        ]
+      ]
+    },
+    "purchase_edits_recheck_refunds": {
+      "later_date": "ReviewRequired:refund_before_purchase",
+      "other_category": "ReviewRequired:refund_category_mismatch"
+    },
+    "redating_a_check": {
+      "balance": 900000,
+      "gaps": [
+        [
+          0,
+          0,
+          "unexplained"
+        ]
+      ],
+      "unreviewed": "ReviewRequired:inclusion_changed"
+    },
+    "redating_activity_into_a_check": {
+      "answered_not_included": [
+        950000,
+        [
+          [
+            0,
+            0,
+            "unexplained"
+          ]
+        ]
+      ],
+      "before": [
+        950000,
+        [
+          [
+            0,
+            0,
+            "unexplained"
+          ]
+        ]
+      ],
+      "unanswered": "ReviewRequired:inclusion_unanswered"
+    },
+    "redating_the_opening_onto_untimed_activity": {
+      "result": "ReviewRequired:inclusion_unanswered"
+    },
+    "removing_a_check_others_depend_on": {
+      "after_answering": "ok",
+      "balance": 800000,
+      "blocked": "ReviewRequired:inclusion_unanswered",
+      "gaps": [
+        [
+          0,
+          0,
+          "unexplained"
+        ]
+      ]
+    },
+    "restoring_activity_the_check_never_saw": {
+      "balance": 950000,
+      "gaps": [
+        [
+          0,
+          0,
+          "unexplained"
+        ]
+      ],
+      "unanswered": "ReviewRequired:inclusion_unanswered"
+    }
+  },
   "equal_amount_not_a_match": {
     "confirm_unresolved": "ReviewRequired:possible_duplicate",
     "different_account": {},
@@ -406,7 +491,8 @@
       "savings",
       2
     ],
-    "opening_revisions": 2,
+    "opening_date_edit_without_activity": "ok",
+    "opening_revisions": 3,
     "reopened": {
       "balance": {
         "amount": 1250000,
@@ -711,7 +797,7 @@
       ]
     ],
     "spending": 10000,
-    "unreviewed_date_change": "ReviewRequired:opening_date_reorders_activity"
+    "unreviewed_date_change": "ReviewRequired:inclusion_changed"
   },
   "overdraft_and_debt": {
     "balances": [

@@ -5,6 +5,7 @@ share the driver in scenes.py and feed the same evidence file as scenarios.py.
 """
 
 from tests.financial_recording.derive import (
+    anchors,
     balance,
     expectation_status,
     forecast,
@@ -225,6 +226,151 @@ def plan_occurrence_counted_once() -> dict:
     return steps
 
 
+def edits_that_move_money_need_review() -> dict:
+    return {
+        "removing_a_check_others_depend_on": _remove_check_with_dependents(),
+        "redating_activity_into_a_check": _redate_into_check(),
+        "restoring_activity_the_check_never_saw": _restore_unseen_activity(),
+        "redating_a_check": _redate_check(),
+        "note_only_correction_keeps_evidence": _note_keeps_evidence(),
+        "redating_the_opening_onto_untimed_activity": _redate_opening_onto_day(),
+        "purchase_edits_recheck_refunds": _purchase_edits_recheck_refunds(),
+        "custom_category_blocks_a_move": _custom_category_blocks_move(),
+    }
+
+
+def _remove_check_with_dependents() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    first = scene.observe(cash, "8000.00", 5)
+    second = scene.observe(cash, "8000.00", 10)
+    scene.now = local(11)
+    late = scene.act("expense", cash, "2000.00", 3)
+    scene.store.resolve(late.id, answers={first.id: "included"})
+    record = scene.confirm(late)
+    blocked = outcome(lambda: scene.store.remove(first.id, 1, "typo"))
+    scene.store.correct(
+        record.id, 1, "also in the later check", answers={second.id: "included"}
+    )
+    removed = outcome(lambda: scene.store.remove(first.id, 1, "typo"))
+    return {
+        "blocked": blocked,
+        "after_answering": removed,
+        "balance": scene.amount(cash),
+        "gaps": scene.gaps(cash),
+    }
+
+
+def _redate_into_check() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    scene.now = local(8)
+    expense = scene.record("expense", cash, "500.00", 7)
+    check = scene.observe(cash, "10000.00", 5)
+    before = [scene.amount(cash), scene.gaps(cash)]
+    silent = outcome(
+        lambda: scene.store.correct(
+            expense.id, 1, "was the 4th", occurred_on=local(4).date().isoformat()
+        )
+    )
+    scene.store.correct(
+        expense.id,
+        1,
+        "was the 4th",
+        occurred_on=local(4).date().isoformat(),
+        answers={check.id: "not_included"},
+    )
+    return {
+        "before": before,
+        "unanswered": silent,
+        "answered_not_included": [scene.amount(cash), scene.gaps(cash)],
+    }
+
+
+def _restore_unseen_activity() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    expense = scene.record("expense", cash, "500.00", 3)
+    scene.store.remove(expense.id, 1, "not mine")
+    check = scene.observe(cash, "10000.00", 5)
+    unanswered = outcome(lambda: scene.store.restore(expense.id, 2, "it was mine"))
+    scene.store.restore(expense.id, 2, "it was mine", answers={check.id: "not_included"})
+    return {
+        "unanswered": unanswered,
+        "balance": scene.amount(cash),
+        "gaps": scene.gaps(cash),
+    }
+
+
+def _redate_check() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    scene.record("expense", cash, "1000.00", 3)
+    check = scene.observe(cash, "9000.00", 5)
+    unreviewed = outcome(
+        lambda: scene.store.correct(check.id, 1, "was the 2nd", as_of=local(2, 18))
+    )
+    return {
+        "unreviewed": unreviewed,
+        "balance": scene.amount(cash),
+        "gaps": scene.gaps(cash),
+    }
+
+
+def _note_keeps_evidence() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    scene.record("expense", cash, "2000.00", 3)
+    check = scene.observe(cash, "7500.00", 5)
+    scene.now = local(6)
+    late = scene.act("expense", cash, "500.00", 4)
+    scene.store.resolve(late.id, answers={check.id: "included"})
+    scene.confirm(late)
+    before = scene.gaps(cash)
+    scene.store.correct(check.id, 1, "add note", note="bank app")
+    return {"before": before, "after": scene.gaps(cash)}
+
+
+def _redate_opening_onto_day() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00", as_of=local(5, 18))
+    opening = anchors(scene.store.book, cash.id)[0].id
+    scene.record("expense", cash, "100.00", 3)
+    return {
+        "result": outcome(
+            lambda: scene.store.correct(opening, 1, "was the 3rd", as_of=local(3, 18))
+        )
+    }
+
+
+def _purchase_edits_recheck_refunds() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    purchase = scene.record("expense", cash, "100.00", 3, category="shopping")
+    scene.record("refund", cash, "40.00", 5, refund_of=purchase.id, category="shopping")
+    return {
+        "later_date": outcome(
+            lambda: scene.store.correct(
+                purchase.id, 1, "date", occurred_on=local(9).date().isoformat()
+            )
+        ),
+        "other_category": outcome(
+            lambda: scene.store.correct(purchase.id, 1, "category", category="dining")
+        ),
+    }
+
+
+def _custom_category_blocks_move() -> dict:
+    scene = Scene()
+    shop = scene.account("Negocio", "checking", "DOP", "5000.00", space_id="business")
+    materials = scene.store.create_category("business", "Materiales", "spending")
+    scene.record("expense", shop, "10.00", 2, category=materials.id)
+    version = scene.store.book.accounts[shop.id].version
+    return {
+        "move": outcome(lambda: scene.store.move_account(shop.id, version, "personal"))
+    }
+
+
 LIFECYCLE = (
     refund_partial_and_limits,
     refund_unlinked_and_cross_account,
@@ -234,4 +380,5 @@ LIFECYCLE = (
     spaces_and_account_moves,
     custom_categories,
     plan_occurrence_counted_once,
+    edits_that_move_money_need_review,
 )

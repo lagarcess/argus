@@ -8,7 +8,7 @@
 
 This document recommends one contract for recording money facts. It approves no schema, migration, API route, permission model or chat change. API_CONTRACT, DATA_MODEL and ARCHITECTURE stay authoritative until an approved change amends them.
 
-**Sources and their state.** PR #727 (`codex/native-interface-decision`, head `a1c294319`) publishes the final September 28 mobile baseline, the MVEE sections above, the reconciliation handoff and the [recording decision response](lanes/financial-recording-decision-response.md). It was an open draft when this revision was written. The founder confirmed the same answers in the lane conversation on September 28. Where this document says "approved", it cites the MVEE text published by #727. PR #714's older September 27 sketch is superseded by #727 and is no longer a source here.
+**Sources and their state.** PR #727 (`codex/native-interface-decision`, head `a1c294319`) publishes the final September 28 mobile baseline, the MVEE sections above, the reconciliation handoff and the [recording decision response](lanes/financial-recording-decision-response.md). It was an open draft when this revision was written. The founder restated the same answers in the lane conversation on September 28, again marking duplicate rows, stale previews and localized categories as recommendations and guest persistence as pending. Where this document says "approved", it cites the MVEE text published by #727. PR #714's older September 27 sketch is superseded by #727 and is no longer a source here.
 
 ## 1. What a person must be able to observe
 
@@ -106,7 +106,7 @@ Every derivation needs one answer: does an anchor's balance already contain a gi
 
 1. Activity dated after the anchor is never contained.
 2. An explicit answer from the person wins. It is stored on the activity against that one anchor.
-3. For a balance check, activity that already existed when the check was confirmed is contained. The check's preview showed the prior recorded amount including it, and the person confirmed against that.
+3. For a balance check, activity in the check's stored contents is contained. When a check is confirmed, its revision stores the ids of the live activity dated on or before it. That is exactly what its preview showed as the prior recorded amount. Recording order is never used, so activity redated or restored later is asked about, not assumed.
 4. Activity from the same source document as the check is contained. A statement's rows do not ask about the statement's own closing balance.
 5. For an opening balance, activity dated before its day is contained.
 6. Anything else is asked. That covers activity recorded after a check and dated on or before it, including older activity, and untimed activity on an opening's own day.
@@ -117,7 +117,7 @@ Anchors are asked in date order, stopping at the first "yes". Once a balance con
 
 - **Balance.** The latest anchor plus every activity that landed after it. With no anchor, the balance is unknown.
 - **Remaining difference.** For each check after the first anchor: the observed amount minus the previous anchor and the activity that landed between them. The first anchor on an account has no difference. An unknown prior balance cannot produce one.
-- **Recorded difference.** The expected amount and difference the check showed at confirmation. Stored on the revision. Never recomputed.
+- **Recorded difference.** The contents, expected amount and difference the check showed at confirmation, stored on its revision. A correction to the check's own amount or date is a re-confirmation and stores new values on its new revision, keeping the old ones in history. A note edit or a restore carries them forward unchanged.
 - **Explained by.** The activities recorded after a check that landed inside it. The history uses this list to show what closed a difference. Argus never labels a difference "resolved" because arithmetic happens to reach zero.
 - **Income and spending**, per currency, for a scope and period by activity date. Spending is purchases minus refunds, and both gross figures are reported. A negative net is shown as it is, never clamped to zero. A transfer or payment with one leg outside the scope is reported as moved in or moved out, never as income or spending.
 - **Position**, per currency, for a scope: assets, liabilities, net and coverage (section 12).
@@ -148,7 +148,7 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 | A refund may land in another account of the same currency. The destination is the account that received the money. | Card purchase refunded into checking |
 | A foreign-currency return is recorded unlinked, in the currency and amount received. No rate is assumed. | USD unlinked refund with negative USD spending, not clamped |
 | A card refund reduces the debt and may leave credit in the person's favor. | `card_refund_credit_balance` |
-| Removing a purchase with live linked refunds, or shrinking it below them, needs review first. A refund is never orphaned silently. | `linked_refunds_present`, `refund_exceeds_purchase` |
+| Removing a purchase with live linked refunds needs review first. Correcting a purchase re-checks every linked refund through the same rule: amount, date, category, currency and kind. A refund is never orphaned silently. | `linked_refunds_present`, and the refund codes above on purchase corrections |
 | Loan principal, interest and fee reversals need a breakdown. A generic refund does not guess them. | Refunds on `other_debt` are refused |
 
 ## 7. Time and provenance
@@ -164,7 +164,7 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 
 **Balance date.** The baseline offers "Balance as of", defaulting to today and never in the future. Today means the creation instant. A chosen earlier date means the end of that local day. The person's time zone decides local days. The recommended default is `America/Santo_Domingo`, which has no daylight-saving shift. This is not the New York market clock, which stays unchanged. The zone used is stored with the date, so a later zone change never reinterprets it.
 
-**Changing the balance date.** Editing the opening date is a correction with a new revision and a reason. If any activity would move across the new date, the correction returns `opening_date_reorders_activity` with those records. It saves nothing until the person accepts the reordering after seeing the affected history. A date change never silently reinterprets existing activity. Checks confirmed later keep their recorded difference.
+**Changing the balance date, and any edit that moves money.** Editing the opening date is a correction with a new revision and a reason. The same review applies to every correction: an opening date, a check's date, an activity's date or legs. If any activity would move between a balance and a difference, the correction returns `inclusion_changed` with those records. It saves nothing until the person accepts the change after seeing the affected history. If the edit would leave an inclusion question open, it returns `inclusion_unanswered` and takes the answer in the same call. Removing a check that other activity depends on, or restoring a record a later check never saw, follows the same rule. A date change never silently reinterprets existing activity.
 
 **Provenance.** Each revision records a capture method (`manual`, `chat`, `voice`, `document`, `connection`) and a source reference: file digest and row, an institution's `external_id` when printed, or the originating conversation and message. It points at context and never copies raw document text, transcripts or credentials.
 
@@ -177,7 +177,7 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 | Confirmed record, revision 1 | Yes | One confirm call |
 | Corrected record, revision n | Yes | `correct(expected_revision, reason, changes)` |
 | Removed record | No | `remove(expected_revision, reason)` appends a tombstone |
-| Restored record | Yes | `restore(expected_revision, reason)` returns the same record, both legs together, after the same review |
+| Restored record | Yes | `restore(expected_revision, reason, answers)` returns the same record, both legs together, after the same review. It takes inclusion answers for checks confirmed while it was removed. |
 | Rejected draft | No | Terminal. Its source is released. |
 
 **Issues.** Blocking issues stop confirmation. The proof's codes are:
@@ -188,7 +188,8 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 - **Linked activity:** `counter_account_missing`, `counter_account_same`, `counter_account_unexpected`, `counter_not_liability`, `cross_currency_unresolved`.
 - **Refunds:** `refund_account_unsupported`, `refund_target_invalid`, `refund_purchase_removed`, `refund_link_currency`, `refund_before_purchase`, `refund_category_mismatch`, `refund_exceeds_purchase`, `refund_link_unexpected`, `linked_refunds_present`.
 - **Plans:** `expectation_unknown`, `expectation_mismatch`, `expectation_already_fulfilled`.
-- **Ordering and repeats:** `inclusion_unanswered`, `opening_date_reorders_activity`, `already_recorded`, `possible_duplicate`.
+- **Ordering and repeats:** `inclusion_unanswered`, `inclusion_changed`, `already_recorded`, `possible_duplicate`.
+- **Spaces:** `account_has_links`.
 
 Notices inform and never block. `negative_asset_balance` flags cash or a bank account below zero, which often means income is missing. `account_archived` flags an entry on an archived account. A short or unknown balance is never an issue. Argus records history. It does not authorize payments.
 
@@ -225,7 +226,7 @@ An import row whose destination is ambiguous keeps its account unresolved until 
 
 ## 12. Spaces, scopes and what each surface reads
 
-**Spaces.** An account lives in exactly one private space. Moving it to another space is organizational. It creates no record, changes no record, and keeps identity, balance, history, corrections, notes and recoverable removed entries together. Only its scope changes. The baseline blocks a move when the account has links: transfers or payments (including removed ones), cross-account refunds, a linked asset or loan, plan expectations, household sharing, open drafts or statement links. The proof enforces the record, asset, plan and draft links and reports them with `account_has_links`. Household sharing and statement links need the household and ingestion contracts. Custom categories belong to a space. A cross-space transfer is unresolved and stays out of scope.
+**Spaces.** An account lives in exactly one private space. Moving it to another space is organizational. It creates no record, changes no record, and keeps identity, balance, history, corrections, notes and recoverable removed entries together. Only its scope changes. The baseline blocks a move when the account has links: transfers or payments (including removed ones), cross-account refunds, a linked asset or loan, plan expectations, household sharing, open drafts or statement links. The proof enforces the record, asset, plan, draft and custom-category links and reports them with `account_has_links`. Custom categories belong to a space, so an account whose entries use one cannot leave that space until the category's disposition is reviewed. Household sharing and statement links need the household and ingestion contracts. A cross-space transfer is unresolved and stays out of scope.
 
 **Scopes.** Every derivation takes a scope, meaning the set of account ids the caller may read. The recording model holds no permission logic. Authorization, household membership and RLS decide the scope first. That work is unproved here and belongs to the household contract.
 
@@ -253,8 +254,8 @@ Creating an account uses no category. A first slice without activity has no cate
 | --- | --- | --- |
 | I1 | Unknown is never zero, for an account or a total. | `blank_opening_unknown`, `unknown_coverage_disclosure` |
 | I2 | Only activity changes income and spending. Anchors, differences, revaluations and refunds-as-income never do. | `clavito_large_opening`, `observation_gap`, `asset_revaluation_and_share`, `refund_unlinked_and_cross_account` |
-| I3 | Derived numbers are never stored. A check's recorded difference is stored and never recomputed. | `late_explanation`, `partial_reconciliation`, `backdated_correction` |
-| I4 | Each activity lands in exactly one interval per account, decided by date, confirmation order, source or an explicit answer. | `older_activity_inclusion`, `two_observations`, `new_expense_after_observation` |
+| I3 | Derived numbers are never stored. A check's contents and recorded difference are stored and change only when the check itself is re-confirmed. | `late_explanation`, `partial_reconciliation`, `backdated_correction` |
+| I4 | Each activity lands in exactly one interval per account, decided by date, the check's stored contents, source or an explicit answer. | `older_activity_inclusion`, `two_observations`, `new_expense_after_observation` |
 | I5 | Linked legs are one record and change, vanish and return together. | `same_currency_transfer`, `linked_correction_and_removal`, `removal_and_restore` |
 | I6 | One currency per record. No netting across currencies. No invented rate. | `cross_currency_transfer_unresolved`, `multiple_precisions`, `refund_unlinked_and_cross_account` |
 | I7 | Confirmed facts change only by revisions, each with a reason and author. Removal is a tombstone that keeps identity. | `backdated_correction`, `linked_correction_and_removal`, `notes_across_records` |
@@ -267,6 +268,7 @@ Creating an account uses no category. A first slice without activity has no cate
 | I14 | Archive and space moves are organizational. They change no money. | `account_edit_rules`, `unknown_coverage_disclosure`, `spaces_and_account_moves` |
 | I15 | Linked refunds never exceed their purchase. A plan occurrence is counted once. | `refund_partial_and_limits`, `plan_occurrence_counted_once` |
 | I16 | Scope is an input. The recording model holds no permission logic. | `same_currency_transfer`, `spaces_and_account_moves` |
+| I17 | No write moves money between a balance and a difference, or leaves a question open, without review. | `edits_that_move_money_need_review`, `opening_date_correction` |
 
 ## 15. Decision table
 
@@ -276,7 +278,7 @@ Creating an account uses no category. A first slice without activity has no cate
 | --- | --- |
 | Confirmed financial records are durable. See the Decision 8 note below. | MVEE section 4 (#727), decision response 1 |
 | Quick setup: type, currency, optional nickname, balance or unknown. Optional assets with ownership share and linked debt. Liabilities entered as amount owed. | MVEE quick account setup, decision log 2026-09-27 |
-| Balance date is an editable account detail, changed through a traceable correction that reviews affected history. | Decision response 2, founder confirmation 2026-09-28 |
+| Balance date is an editable account detail, and a change must not silently reinterpret existing activity. The correction and review mechanics are this contract's recommendation (section 7). | Decision response 2 |
 | Ask whether activity was already included in a checked balance, including older activity and each account leg. Do not ask when provenance already answers. | MVEE balance checks, decision response 3 |
 | Unexplained differences stay on the account, labeled, never income or spending. Confirmation-time evidence and remaining differences stay distinguishable. | MVEE balance checks, handoff, decision response 4 |
 | Archived accounts keep balances and obligations in totals. | MVEE archiving accounts, decision response 5 |
@@ -338,13 +340,13 @@ PR #727's reconciliation contract also names a "recovery destination" as a found
 
 ## 17. What the proof establishes and what it does not
 
-**Establishes.** The rules produce every section 1 behavior on synthetic inputs across 34 named scenarios, including the kit's own CSVs read by `tests.synthetic_ingestion.extract.load_input`. The rules compose without double counting across late answers, corrections, removal and restore, refunds, notes, moves, plan occurrences and duplicate imports. Evidence is committed, and a test fails if it drifts from the model.
+**Establishes.** The rules produce every section 1 behavior on synthetic inputs across 35 named scenarios, including the kit's own CSVs read by `tests.synthetic_ingestion.extract.load_input`. The rules compose without double counting across late answers, corrections, removal and restore, refunds, notes, moves, plan occurrences and duplicate imports. Evidence is committed, and a test fails if it drifts from the model.
 
 **Does not establish.** Postgres locking, RLS and household authorization. Extraction, OCR, speech or model quality. API shape and performance. Link migration during moves beyond refusal. CLDR parity for every code; the proof checks DOP, USD, JPY and KWD, and validates against babel's list because it cannot import `argus`.
 
 **Isolation.** The model lives under `tests/`, imports no `argus` module, and nothing under `src/` or `web/` references it. Tests enforce both.
 
-**How production replaces it.** The scenarios drive the model only through the `Scene` driver in `tests/financial_recording/scenes.py`. The expected outcomes are literal values in the tests and in the evidence file. They do not depend on the model code. When a production owner lands, its PR adds a driver with the same methods that calls the real API and database. It runs the covered scenarios against production with the same expected outcomes. It then deletes the reference model's covered rules in the same change. The expected outcomes stay as the production acceptance suite. Scenarios for scope not yet built keep running against the reference model until their production owner lands.
+**How production replaces it.** The expected outcomes are literal values in the tests and the evidence file, and they do not depend on the model code. The scenarios reach the model through the `Scene` helpers in `tests/financial_recording/scenes.py`, the `Store`'s public operations (`create_account`, `edit_account`, `move_account`, `draft`, `edit_draft`, `resolve`, `reject`, `preview`, `confirm`, `confirm_batch`, `correct`, `remove`, `restore`, `create_category`, `rename_category`, `expect`), and the read functions in `derive.py`. That set is the seam. A production PR adds a driver exposing the same names over the real API and database. It runs the scenarios for its slice against that driver, with the same literal outcomes. Both drivers are checked against the literals, never against each other. The reference model is a test oracle, not a production owner. It keeps its full derivation for scenarios whose slice has not landed. Each later slice moves its rules to production and deletes them from the reference model in the same PR. When the checks slice lands, the reference balance derivation goes with it.
 
 ## 18. First implementation assignment: create, reopen, edit
 
@@ -368,7 +370,7 @@ PR #727's reconciliation contract also names a "recovery destination" as a found
 | HTTP | `src/argus/api/routers/financial_accounts.py`: create with `Idempotency-Key`, read, edit with `expected_version`, and correct the opening with `expected_revision`. OpenAPI regenerated. |
 | Client | Per the ARCHITECTURE platform decision. A surface ships only behind the flag above. |
 
-**Acceptance.** Run `clavito_large_opening`, `blank_opening_unknown`, `first_slice_create_reopen_edit`, `opening_date_correction` (its no-activity part), `multiple_precisions` and `duplicate_submission` (the create part) through a production `Scene` driver, using the literal outcomes already committed. Add the Postgres gate above. A double-submitted create makes one account. A stale edit returns 409 and changes nothing. An unknown balance never reads as RD$0. An archived account stays in totals.
+**Acceptance.** Run `clavito_large_opening`, `blank_opening_unknown`, `first_slice_create_reopen_edit` (including its opening-date edit with no activity), `multiple_precisions` and the create part of `duplicate_submission` through a production driver, using the literal outcomes already committed. Add the Postgres gate above. A double-submitted create makes one account. A stale edit returns 409 and changes nothing. An unknown balance never reads as RD$0. An archived account stays in totals.
 
 **No-touch.** Chat runtime, the interpreter prompt and response-schema descriptions (Never-Violate 12). Calculators, simulations and backtest admission. Existing profile columns. Household, invitations, analytics, logging and notifications. `tests/synthetic_ingestion/`. The frozen mobile archive. PR #722's message and stream owner files.
 

@@ -38,10 +38,12 @@ from tests.financial_recording.derive import (
     accounts_of,
     activities,
     anchors,
-    landing,
+    contained_at_confirmation,
+    landed_at,
     legs,
     live_records,
     observation_gaps,
+    unanswered,
 )
 from tests.financial_recording.money import InvalidInput, exponent, parse_minor
 from tests.financial_recording.review import (
@@ -51,11 +53,20 @@ from tests.financial_recording.review import (
     duplicates,
     issue,
     notices,
+    parse_date,
     parse_fields,
+    parse_instant,
+    refund_issues,
     validate,
+    with_trial,
 )
 
 FULL_SHARE_BPS = 10_000
+TEXT_FIELDS = {
+    "occurred_on": parse_date,
+    "occurred_at": parse_instant,
+    "as_of": parse_instant,
+}
 UNSET = object()
 
 
@@ -383,7 +394,7 @@ class Store:
                 raise ReviewRequired(blocking(found))
             records = dict(working.book.records)
             record = self._new_record(body, draft.provenance, records)
-            records[record.id] = self._audited(working.book, record)
+            records[record.id] = self._stamped(working.book, record)
             book = replace(
                 working.book,
                 accounts={
@@ -412,19 +423,24 @@ class Store:
         answers: Optional[Mapping[str, str]] = None,
         **changes,
     ) -> Record:
+        """A correction that moves any activity between a balance and a difference
+        stops for review; `accept_reordering` records that the person saw it."""
         record = self._current(record_id, expected_revision, reason)
         currency = self.book.accounts[record.body.account_id].currency
         if "amount" in changes:
             changes["amount"] = parse_minor(changes["amount"], currency)
+        for name, parser in TEXT_FIELDS.items():
+            if isinstance(changes.get(name), str):
+                changes[name] = parser(changes[name])
         if answers:
             changes["answers"] = _merged_answers(record.body.answers, answers)
         body = replace(record.body, **changes)
         if self.book.accounts[body.account_id].currency != currency:
             raise InvalidInput("currency_mismatch", body.account_id)
         found = blocking(validate(self.book, body, self.tz, record_id))
-        found.extend(self._orphaned_refunds(record_id, body))
-        if isinstance(body, Opening) and not accept_reordering:
-            found.extend(self._reordered(record, body))
+        found.extend(self._linked_refund_issues(record_id, body))
+        if not found and not accept_reordering:
+            found.extend(self._placement_changes(record, body))
         if found:
             raise ReviewRequired(found)
         return self._revise(record, body, reason, removed=False)
@@ -438,54 +454,80 @@ class Store:
         ]
         if refunds:
             raise ReviewRequired([issue("linked_refunds_present", *refunds)])
+        tombstone = replace(record.revisions[-1], removed=True)
+        after = replace(
+            self.book,
+            records={
+                **self.book.records,
+                record_id: replace(record, revisions=(*record.revisions, tombstone)),
+            },
+        )
+        questions = _open_questions(after, accounts_of(record.body), self.tz)
+        if questions:
+            raise ReviewRequired(questions)
         return self._revise(record, record.body, reason, removed=True)
 
-    def restore(self, record_id: str, expected_revision: int, reason: str) -> Record:
+    def restore(
+        self,
+        record_id: str,
+        expected_revision: int,
+        reason: str,
+        *,
+        answers: Optional[Mapping[str, str]] = None,
+    ) -> Record:
         """Restores the original record, never a copy; both legs return together."""
         record = self.book.records[record_id]
         if len(record.revisions) != expected_revision:
             raise StaleVersion(record_id)
         if not record.removed:
             raise InvalidInput("record_not_removed", record_id)
-        found = blocking(validate(self.book, record.body, self.tz, record_id))
+        body = record.body
+        if answers:
+            body = replace(body, answers=_merged_answers(body.answers, answers))
+        found = blocking(validate(self.book, body, self.tz, record_id))
         if found:
             raise ReviewRequired(found)
-        return self._revise(record, record.body, reason, removed=False)
+        return self._revise(record, body, reason, removed=False)
 
-    def _orphaned_refunds(self, record_id: str, body: Body) -> list[Issue]:
-        """A corrected purchase must still cover every refund linked to it."""
-        linked = [
-            other
-            for other in live_records(self.book)
-            if isinstance(other.body, Activity) and other.body.refund_of == record_id
-        ]
-        if not linked:
-            return []
-        still_purchase = isinstance(body, Activity) and body.kind == "expense"
-        refunded = sum(other.body.amount for other in linked)
-        if still_purchase and refunded <= body.amount:
-            return []
-        return [issue("refund_exceeds_purchase", *(other.id for other in linked))]
+    def _linked_refund_issues(self, record_id: str, body: Body) -> list[Issue]:
+        """A corrected purchase is re-checked through the same refund rule."""
+        trial = with_trial(self.book, body, record_id, self.tz)
+        found = []
+        for other in live_records(self.book):
+            refund = other.body
+            if isinstance(refund, Activity) and refund.refund_of == record_id:
+                account = trial.accounts[refund.account_id]
+                found.extend(blocking(refund_issues(trial, refund, account, other.id)))
+        return found
 
-    def _reordered(self, record: Record, body: Opening) -> list[Issue]:
-        account_id = body.account_id
-        trial_record = replace(
-            record,
-            revisions=(*record.revisions, replace(record.revisions[-1], body=body)),
-        )
-        trial = replace(self.book, records={**self.book.records, record.id: trial_record})
-        before, after = anchors(self.book, account_id), anchors(trial, account_id)
-        moved = [
-            move.id
-            for move in activities(self.book, account_id)
-            if landing(move, before, self.tz) != landing(move, after, self.tz)
-        ]
-        return [issue("opening_date_reorders_activity", *moved)] if moved else []
+    def _placement_changes(self, record: Record, body: Body) -> list[Issue]:
+        after = with_trial(self.book, body, record.id, self.tz)
+        moved = []
+        for account_id in sorted(accounts_of(record.body) | accounts_of(body)):
+            before_anchors = anchors(self.book, account_id)
+            after_anchors = anchors(after, account_id)
+            before = {move.id: move for move in activities(self.book, account_id)}
+            for move in activities(after, account_id):
+                if move.id in before and landed_at(
+                    before[move.id], before_anchors, self.tz
+                ) != landed_at(move, after_anchors, self.tz):
+                    moved.append(move.id)
+        return [issue("inclusion_changed", *sorted(set(moved)))] if moved else []
 
-    def _audited(self, book: Book, record: Record) -> Record:
-        """Keeps what a balance check showed when confirmed; later reads never rewrite it."""
+    def _stamped(self, book: Book, record: Record) -> Record:
+        """Stores what a balance check showed when confirmed: its contents,
+        expected amount and difference. Later reads never rewrite them."""
         if not isinstance(record.body, Observation):
             return record
+        last = record.revisions[-1]
+        contained = (
+            last.contained
+            if last.contained is not None
+            else contained_at_confirmation(book, record.body, self.tz)
+        )
+        record = replace(
+            record, revisions=(*record.revisions[:-1], replace(last, contained=contained))
+        )
         trial = replace(book, records={**book.records, record.id: record})
         gap = next(
             item
@@ -513,6 +555,9 @@ class Store:
             if account_id in touched and len(touched) > 1:
                 found.append(record.id)
             if body.fulfills and account_id in touched:
+                found.append(record.id)
+            category = self.book.categories.get(body.category or "")
+            if category is not None and category.space_id and account_id in touched:
                 found.append(record.id)
         for other in self.book.accounts.values():
             if other.linked_asset_id == account_id or (
@@ -569,12 +614,24 @@ class Store:
         self, record: Record, body: Body, reason: str, *, removed: bool
     ) -> Record:
         now = self.clock()
-        revision = Revision(
-            body, now, Provenance("manual", now), reason, removed, self.actor
+        previous = record.revisions[-1]
+        revision = replace(
+            previous,
+            body=body,
+            recorded_at=now,
+            provenance=Provenance("manual", now),
+            reason=reason,
+            removed=removed,
+            recorded_by=self.actor,
         )
         revised = replace(record, revisions=(*record.revisions, revision))
-        if not removed:
-            revised = self._audited(self.book, revised)
+        # Only a new amount or date re-confirms a check; a note or a restore
+        # keeps the evidence the person accepted.
+        if isinstance(body, Observation) and (body.amount, body.as_of) != (
+            previous.body.amount,
+            previous.body.as_of,
+        ):
+            revised = self._stamped(self.book, revised)
         touched = accounts_of(record.body) | accounts_of(body)
         self._swap(
             accounts={**self.book.accounts, **_bumped(self.book.accounts, touched)},
@@ -656,3 +713,14 @@ def _bumped(accounts: Mapping[str, Account], touched: set[str]) -> dict[str, Acc
         )
         for account_id in touched
     }
+
+
+def _open_questions(book: Book, account_ids: set[str], tz: ZoneInfo) -> list[Issue]:
+    found = []
+    for account_id in sorted(account_ids):
+        ordered = anchors(book, account_id)
+        for move in activities(book, account_id):
+            anchor_id = unanswered(move, ordered, tz)
+            if anchor_id is not None:
+                found.append(issue("inclusion_unanswered", anchor_id, move.id))
+    return found
