@@ -229,7 +229,7 @@ PYTHONPATH=temp/recording-724 poetry run python docs/reports/dominican-bank-conn
 cmp temp/selected-file-import-report.json docs/reports/dominican-bank-connectivity/selected-file-import/proof-report.json
 ```
 
-To confirm that the cases can fail, run the breakage check with the same path. It exits with an error if any breakage goes unnoticed, if a target case stops with an error instead of failing its check, or if the unbroken run fails.
+To confirm that the cases can fail, run the breakage check with the same path. It exits with an error if any breakage goes unnoticed, if a breakage names no case or a case that does not exist, if a target case stops with an error instead of failing its check, or if the unbroken run fails.
 
 ```bash
 PYTHONPATH=temp/recording-724 poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/mutation_check.py

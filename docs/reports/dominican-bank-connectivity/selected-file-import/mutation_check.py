@@ -328,6 +328,18 @@ def mutations():
     )
 
 
+def verdict(case_ids: set[str], results: dict[str, str]) -> str:
+    problems = []
+    if not case_ids:
+        problems.append("no target cases")
+    if unknown := sorted(case_ids - results.keys()):
+        problems.append(f"unknown cases {unknown}")
+    for status, name in (("error", "errors"), ("passed", "still passing")):
+        if hit := sorted(case for case, seen in results.items() if seen == status):
+            problems.append(f"{name} {hit}")
+    return f"MISSED ({'; '.join(problems)})" if problems else "caught"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Break the selected-file import proof on purpose and confirm its cases fail."
@@ -339,19 +351,11 @@ def main() -> int:
     for label, changes, case_ids in mutations():
         with patched(changes):
             results = run(case_ids)
-        crashed = sorted(case for case, status in results.items() if status == "error")
-        caught = all(status == "failed" for status in results.values())
-        ok &= caught
-        verdict = (
-            "caught"
-            if caught
-            else f"MISSED (crashed: {crashed})"
-            if crashed
-            else "MISSED"
-        )
-        print(f"{verdict}: {label} {sorted(results)}")
+        found = verdict(case_ids, results)
+        ok &= found == "caught"
+        print(f"{found}: {label} {sorted(case_ids)}")
     baseline = run({case_id for case_id, *_ in proof.CASES})
-    clean = all(status == "passed" for status in baseline.values())
+    clean = bool(baseline) and all(status == "passed" for status in baseline.values())
     ok &= clean
     print(f"unbroken: {len(baseline)} cases, all pass {clean}")
     return 0 if ok else 1
