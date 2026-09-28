@@ -257,6 +257,19 @@ def main():
         check(retention.holds_contact(shape), f"the contact guard missed {shape}")
     for value in LISTING_VALUES:
         check(not retention.holds_contact(value), f"the contact guard flagged {value}")
+    check(
+        retention.page_kind(f"{CARS}/marca-modelo/1234567890/") == ("supercarros", "detail"),
+        "a ten-digit listing ID was refused as a phone number",
+    )
+    check(
+        retention.page_kind(f"{CARS}/assets/js/searchvalues.js?1234567890")
+        == ("supercarros", "search-values"),
+        "a ten-digit search-values build query was refused as a phone number",
+    )
+    check(
+        retention.page_kind(f"{CARS}/809-555-0000-car/0000001/") is None,
+        "a phone-shaped listing slug was accepted",
+    )
     with tempfile.TemporaryDirectory() as scratch:
         os.chdir(scratch)
         try:

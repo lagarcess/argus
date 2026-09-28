@@ -88,6 +88,21 @@ def holds_contact(text: str) -> bool:
     return any(CONTACT.search(view) for view in views)
 
 
+def url_free_text(url: str) -> str:
+    """URL text that may carry free-form contact data.
+
+    Declared listing IDs and search-values build queries are pure digits that
+    the URL shape already accepts as `\\d+` / `\\d*`. Scanning those tokens as
+    phone numbers would reject valid URLs. Replace digit-only path segments
+    with a placeholder so structural shapes such as `/Dealers/<id>/` still
+    match, omit a pure-digit query, and keep host plus free-form slug text.
+    """
+    parts = urlsplit(url)
+    path = re.sub(r"(?<=/)\d+(?=/|$)", "x", parts.path or "")
+    query = "" if re.fullmatch(r"\d*", parts.query or "") else (parts.query or "")
+    return "\n".join(part for part in (parts.hostname or "", path, query) if part)
+
+
 def page_kind(url: str) -> tuple[str, str] | None:
     try:
         parts = urlsplit(url)
@@ -110,7 +125,7 @@ def page_kind(url: str) -> tuple[str, str] | None:
         or parts.password
         or port is not None
         or parts.fragment
-        or holds_contact(url)
+        or holds_contact(url_free_text(url))
     ):
         return None
     path, query = parts.path, parts.query
