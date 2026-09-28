@@ -111,9 +111,28 @@ def capture_identity() -> dict[str, object]:
     }
 
 
-def api_contains(head: str, path: str, text: str) -> bool | None:
+def api_contains(
+    head: str,
+    path: str,
+    text: str,
+    *,
+    evidence_root: Path | None = None,
+) -> bool | None:
+    """Whether `path` at `head` contains `text`.
+
+    Prefer `git show`. When that object is absent from the local clone (a
+    cross-version capture against another PR's API head), fall back to a
+    committed extract under `<evidence>/api-heads/<head>/<path>` so the gate
+    stays re-verifiable without fetching foreign commits.
+    """
     shown = git("show", f"{head}:{path}")
-    return None if shown.returncode != 0 else text in shown.stdout
+    if shown.returncode == 0:
+        return text in shown.stdout
+    if evidence_root is not None:
+        cached = evidence_root / "api-heads" / head / path
+        if cached.is_file():
+            return text in cached.read_text(encoding="utf-8")
+    return None
 
 
 def runtime_changes_since(head: str) -> list[str]:
@@ -267,13 +286,17 @@ def verify(
     only: Iterable[str] = (),
     expectations: dict | None = None,
     changed_since: ChangedSince = runtime_changes_since,
-    contains: ApiContains = api_contains,
+    contains: ApiContains | None = None,
 ) -> list[str]:
     spec = expectations or load_expectations()
     cross = spec.get("cross_version", {})
     only = set(only)
     problems: list[str] = []
     suites: dict[str, list[str]] = {}
+    if contains is None:
+        contains = lambda head, path, text: api_contains(
+            head, path, text, evidence_root=root
+        )
     if scope in ("automated", "suites", "all"):
         suites.update(spec["automated"])
     if scope in ("cross", "suites", "all"):

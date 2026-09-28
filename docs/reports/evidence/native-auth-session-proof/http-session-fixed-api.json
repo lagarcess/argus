@@ -145,7 +145,7 @@
         "client_refresh_error": null
       },
       "verdict": "pass",
-      "note": "Failed assumption. Argus's shared server-side supabase-py auth client keeps the last session it signed in and refreshes it on a timer (auto_refresh_token defaults to true), rotating the token the client holds. Once it rotates twice, the client's token is refused and the user is signed out. Affects web and native alike."
+      "note": "Against the #728 API, the client alone still owns refresh after access-token expiry: one refresh token remains, none revoked, and client refresh returns 200. The unfixed diagnosis (server-side session keep/rotate) applies only when A14 fails."
     },
     {
       "id": "A7",

@@ -28,7 +28,9 @@ Only these failures are expected:
   client refreshes sessions it returned. This branch's API lacks the fix, so
   A14 fails in `http-session.json`. `http-session-fixed-api.json` runs the same
   suite against the #728 head, where A14 must pass. The gate decides from each
-  file's `argus_api_head`.
+  file's `argus_api_head`. The #728 head may be absent from a PR-only checkout,
+  so `api-heads/<sha>/…` holds a committed extract of the fix marker the gate
+  reads when `git show` cannot.
 - **I11, always.** supabase-swift logs tokens when given a logger, and a
   `Session` description contains them. This is an SDK finding, separate from
   A14.

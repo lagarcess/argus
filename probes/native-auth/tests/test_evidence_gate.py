@@ -438,6 +438,33 @@ def test_fix_marker_is_read_from_the_api_head(tmp_path: Path, monkeypatch) -> No
     assert evidence_gate.api_contains("e" * 40, marker["path"], marker["text"]) is None
 
 
+def test_api_head_extract_resolves_when_git_object_is_absent(tmp_path: Path) -> None:
+    """Cross-version captures must stay re-verifiable without fetching #728."""
+    marker = SPEC["conditional_failures"]["A14"]["fails_unless_api_contains"]
+    foreign = "a" * 40
+    cached = tmp_path / "api-heads" / foreign / marker["path"]
+    cached.parent.mkdir(parents=True)
+    cached.write_text(f"prelude\n{marker['text']}url, key):\n")
+    assert (
+        evidence_gate.api_contains(
+            foreign, marker["path"], marker["text"], evidence_root=tmp_path
+        )
+        is True
+    )
+    assert (
+        evidence_gate.api_contains(
+            foreign, marker["path"], "missing-marker", evidence_root=tmp_path
+        )
+        is False
+    )
+    assert (
+        evidence_gate.api_contains(
+            "b" * 40, marker["path"], marker["text"], evidence_root=tmp_path
+        )
+        is None
+    )
+
+
 def test_judge_files_do_not_make_captures_stale(tmp_path: Path, monkeypatch) -> None:
     def git(*args: str) -> str:
         return subprocess.run(
