@@ -1,377 +1,387 @@
 # Argus financial recording contract
 
-**Status:** Proposed. Not founder-approved. Not an implementation assignment.
-**Date:** September 27, 2026.
-**Serves:** [MVEE](argus-minimum-viable-ecosystem-experience.md) sections 3 (Home, Accounts, Plan, Updates), 4 (one destination for every capture method), 5 (shared ingestion and trust requirements), and 12 (household facts without duplicate money).
-**Fills:** the "financial-record schema, balance/transaction reconciliation model, money arithmetic contracts" gap that [documentation authority](../DOCUMENTATION_AUTHORITY.md) lists as undecided.
+**Status:** Proposed. The experience rules it cites are founder-approved. This technical contract is not. It is not an implementation assignment.
+**Date:** September 28, 2026. Reconciled with the September 28 mobile baseline and the recording decision response.
+**Serves:** [MVEE](argus-minimum-viable-ecosystem-experience.md) sections 3, 4, 5 and 12, including the September 27 and 28 subsections on quick account setup, account activity and balance checks, archiving accounts, refunds, financial spaces and connected plan status.
+**Fills:** the "financial-record schema, balance/transaction reconciliation model, money arithmetic contracts" gap that [documentation authority](../DOCUMENTATION_AUTHORITY.md) lists as undecided. It answers the obligations in the [account balance reconciliation handoff](argus-account-balance-reconciliation-handoff.md).
 **Executable proof:** [`tests/financial_recording/`](../../tests/financial_recording/README.md) and its committed evidence [`docs/reports/evidence/financial-recording/scenarios.json`](../reports/evidence/financial-recording/scenarios.json).
 
-This document recommends one contract for recording money facts. It does not approve a schema, a migration, an API route, a permission model, or a chat change. The existing API contract, data model, and architecture stay authoritative until a founder-approved change amends them. Section 13 lists the choices only the founder can make.
+This document recommends one contract for recording money facts. It approves no schema, migration, API route, permission model or chat change. API_CONTRACT, DATA_MODEL and ARCHITECTURE stay authoritative until an approved change amends them.
+
+**Sources and their state.** PR #727 (`codex/native-interface-decision`, head `a1c294319`) publishes the final September 28 mobile baseline, the MVEE sections above, the reconciliation handoff and the [recording decision response](lanes/financial-recording-decision-response.md). It was an open draft when this revision was written. The founder confirmed the same answers in the lane conversation on September 28. Where this document says "approved", it cites the MVEE text published by #727. PR #714's older September 27 sketch is superseded by #727 and is no longer a source here.
 
 ## 1. What a person must be able to observe
 
-These behaviors come from the MVEE. The contract is the smallest model that produces all of them.
-
-1. An account has a nickname, a type, and one currency. Cash is a first-class type.
-2. A blank starting balance stays unknown. Argus never shows it as zero.
-3. A large starting balance is not income.
-4. An expense that already happened is recorded even when the balance on file is short or unknown. Argus records history. It does not execute payments.
-5. Income and spending count only real activity. A transfer between owned accounts is neither. A credit-card payment does not count the card's purchases twice.
-6. A balance the person checks is a fact. When it disagrees with recorded activity, Argus shows the difference and never invents activity to hide it.
-7. Information supplied later can explain an earlier difference without subtracting the same money twice.
-8. A repeated tap, a retried request, or a re-imported file adds nothing. Two real purchases with the same amount both stay.
-9. A correction or removal changes every affected account together and keeps its history.
-10. Pesos and dollars never combine silently.
-11. Home, Accounts, Plan, and Updates show the same numbers, because they read the same records the same way, and each discloses what it does not know.
+1. An account has a type, one currency, an optional nickname, and a balance or an unknown balance. Cash is first-class. Vehicles, property and other assets are optional items with an estimated value.
+2. A blank balance stays unknown. Argus never shows it as zero, alone or inside a total.
+3. A starting balance is not income. Changing an asset's estimate is not income or spending.
+4. An expense that already happened is recorded even when the balance on file is short or unknown.
+5. Income and spending count only real activity. Transfers between owned accounts and credit-card payments are neither. A refund reduces spending in the month received and is never income.
+6. A balance check is a fact. A difference from the recorded amount is shown on the account as an unexplained difference and never counted as income or spending.
+7. Activity recorded later and dated on or before a balance check asks whether that check already included it. The answer decides whether it explains the difference or moves the balance. The same money is never subtracted twice.
+8. A repeated tap, a retried request or a re-imported file adds nothing. Two real purchases with the same amount both stay.
+9. A correction, removal or restore changes every affected account together and keeps its history, including who made it.
+10. Archiving an account tidies the account list. Its balance, history and obligations stay in totals.
+11. Moving an account to another private space moves no money and rewrites no history.
+12. Pesos and dollars never combine, and no exchange rate is ever invented.
+13. Home, Accounts, Plan and Updates show the same numbers, because they read the same records the same way, and each discloses what it does not know.
 
 ## 2. The model in one paragraph
 
-Argus stores **accounts** and **confirmed records**. A record is either an **anchor** (a known balance at an instant) or **activity** (money that moved). Every other number is **derived** on read: balances, the difference an observation reveals, income, spending, net position, and coverage. Nothing derived is stored. That rule makes late information work. The difference a balance check reveals is recomputed from the records every time, so a missing expense supplied later shrinks that difference automatically, and no compensating entry exists to undo.
-
-The rest of this document defines each piece.
+Argus stores **accounts** and **confirmed records**. A record is either an **anchor**, a known balance at an instant, or **activity**, money that moved. Balances, remaining differences, income, spending and positions are **derived** on read from the current revisions. What a balance check showed when it was confirmed is **kept** on that check's revision and never recomputed. So late information can explain an earlier difference without a compensating entry, and the history still shows what the person saw and accepted. A later performance cache is allowed only if it is rebuilt from the same records. It can never be a second owner and can never erase confirmation-time evidence.
 
 ## 3. Accounts
 
 | Field | Rule |
 | --- | --- |
-| `id` | Server-assigned, stable. |
-| `nickname` | Required. Trimmed. 1 to 60 characters (the founder-locked sketch's limit; PR #714 is still open). A blank name is refused, never replaced by a default such as "My account". |
-| `type` | One of `cash`, `checking`, `savings`, `investment`, `property`, `credit_card`, `loan`, `other_debt`. |
-| `nature` | Derived from `type` by one table. `credit_card`, `loan`, and `other_debt` are liabilities. The rest are assets. Never stored. |
-| `currency` | One ISO 4217 code per account (section 4). Immutable once the account has any record. |
-| `archived` | Boolean. Archived accounts keep their history. New drafts cannot target them. |
-| `ownership_share_bps` | The owner's share of the account, 1 to 10,000 basis points. Default 10,000. This is ownership, not permission (section 11). |
-| `version` | Integer. Increments on every write that touches the account or its records. Used for stale-preview detection (section 8). |
+| `id` | Server-assigned and stable. Nickname, space and archive changes never change it. |
+| `type` | `cash`, `checking`, `savings`, `investment`, `credit_card`, `other_debt`, `property`, `vehicle` or `other_asset` (MVEE quick setup). |
+| `nature` | Derived from `type` by one table. `credit_card` and `other_debt` are liabilities. The rest are assets. Never stored. |
+| `currency` | One ISO 4217 code (section 4). Locked once the account has any record. |
+| `nickname` | Optional. Trimmed. Up to 60 characters. Blank means no nickname, and the client shows the type's localized name. A nickname changes the display name only. |
+| `space_id` | The private space that holds the account: Personal by default, or a named Business or Custom space. Household sharing is a separate visibility fact, not a space move. |
+| `archived` | Organizational only (section 3.2). |
+| `ownership_share_bps` | The person's share of the whole item, 1 to 10,000 basis points. The UI offers All of it, Half, or Another share. Never assume 50/50. Ownership is not permission. |
+| `linked_asset_id` | On a debt only. Names the asset it finances. Display only. The debt stays its own account and is counted once. |
+| `version` | Increments on every write that touches the account or its records. Used for stale previews and edits (section 8). |
 
-**Vehicles and homes.** PR #723 reports that the founder approved vehicle and residential-property records, with optional ownership shares and linked debt, on 2026-09-27. It also reports that the approval is not yet published in the MVEE or the decision log. It calls this a publication gap owned by the delivery lead. This contract treats the approval as reported, not canonical. The `property` type covers both kinds with asset arithmetic. Splitting it into `vehicle` and `home` changes labels only. A loan linked to its asset stays its own debt account, counted once. The link is display-only. It lets the asset card show the loan and the equity, and never subtracts the loan a second time. The proof does not model the link.
+**Type and currency locks.** Currency locks once the account has any record. Type locks once activity touches the account, as the final baseline does ("Keep the currency and account type with their recorded activity"). With only an opening balance, a type change inside the same nature is allowed. A change that flips nature is refused, because it would reverse the meaning of the stored sign.
 
-**Type changes.** A type change inside the same nature is an ordinary edit. A change that flips nature (checking to credit card) is refused once the account has a record, because it would reverse the meaning of every stored sign. The person archives the account and creates the right one.
+**Unknown is not zero.** An account has a known balance only after it has an anchor. With no anchor, Argus reports its activity since tracking began instead ("−RD$850 recorded since you started tracking"). Totals follow the same rule. When every asset in a currency is unknown, that currency's assets total is unknown, not RD$0, and so is its net. Liabilities follow the same rule. Unknown accounts are listed in coverage (section 12).
 
-**Unknown is not zero.** An account has a known balance only after it has an anchor. With no anchor its balance is `unknown`, and Argus reports the activity recorded since tracking began instead ("−RD$850 recorded since you started tracking"). An unknown balance is excluded from totals and listed in coverage (section 11). The same holds for totals. When every asset in a currency has an unknown balance, that currency's assets total is unknown, not RD$0, and so is its net. Liabilities follow the same rule.
+### 3.1 Estimated assets and linked debts
 
-**Archive.** Archived accounts leave position totals and are listed separately in coverage. Their past activity still counts in historical income and spending, because that money really moved. Their records stay correctable, because MVEE 4.1 promises a correction path for every record. Whether Argus warns before archiving an account with a non-zero or unknown balance is founder decision F5.
+A vehicle, property or other asset records its whole estimated value as its opening anchor, or stays unknown. Its later estimates are `value_estimate` checks. The difference between estimates is labeled a revaluation. It changes position, never income or spending. Personal views count the person's share. A linked loan stays a separate debt with its own share and is counted once. Linking never subtracts the loan a second time. Listing-based valuation remains a future candidate (MVEE, PR #723) and is not needed here.
+
+### 3.2 Archiving and removing accounts
+
+Archiving removes an account from the active list, not from money totals. A non-zero or unknown balance may be archived. Its balance, history and obligations stay in Home and Accounts totals, and coverage lists it as archived and included. Archiving never manufactures an outflow or reduces a debt. Its records stay correctable, and a new entry on an archived account raises only the notice `account_archived`. Restore returns it to the active list. Removing an account is a separate action, allowed only for an empty account. That action is outside this proof and outside the first slice.
 
 ## 4. Money
 
-**Representation.** Every recorded amount is an integer count of the currency's minor unit, paired with the currency code. Floats never hold a recorded amount. This matches the payment-ledger assessment ([#719](../reports/payment-ledger-reuse-assessment.md), for issue 716).
+**Representation.** Every recorded amount is an integer count of the currency's minor unit, paired with its currency. Floats never hold a recorded amount. This matches the [payment-ledger assessment](../reports/payment-ledger-reuse-assessment.md).
 
-**Exponent authority.** Argus has no per-currency minor-unit table today. The existing `currency_fraction_digits` in `web/argus_display_contract/result_display_policy.json` is a display rule for backtest results (it is 0). It is not a currency's minor unit and must not be reused as one. The repository's currency authority is CLDR through babel, which `src/argus/domain/home_country.py` already uses for the code set. Recommendation: a currency is accepted only if it is in `home_country.currency_codes()`, and its exponent is `babel.numbers.get_currency_precision(code)`. Validate first. babel returns 2 for any unknown code, including `XXX`, so reading the exponent of an unvalidated code silently invents precision. The proof checks this trap. Do not copy the hardcoded tables in the unmerged `money-view` pilot (`currency_minor_digits()`), and do not reuse the float `Money` in `src/argus/domain/finance/money.py` for recorded amounts. That type serves calculators.
+**Exponent authority.** Argus has no per-currency minor-unit table today. The `currency_fraction_digits` in `web/argus_display_contract/result_display_policy.json` is a backtest display rule, set to 0. It is not a currency's minor unit and must not be reused as one. The repository's currency authority is CLDR through babel, which `src/argus/domain/home_country.py` already uses. Accept a currency only if it is in `home_country.currency_codes()`, then read its exponent with `babel.numbers.get_currency_precision`. Validate first. babel answers 2 for any unknown code, including `XXX`. DESIGN states the same division: currency determines fractional precision, and UI locale determines separators. Do not copy the hardcoded tables of the unmerged `money-view` pilot. Do not reuse the float `Money` in `src/argus/domain/finance/money.py`, which serves calculators.
 
-**Parsing.** User and import input arrives as a decimal string. More fraction digits than the exponent allows is a review issue (`amount_precision`). Argus never rounds a person's input. `1500.5` JPY is an issue. `1.234` KWD is 1,234 minor units.
+**Parsing.** Clients normalize locale separators and send a dot-decimal string. More fraction digits than the exponent allows is `amount_precision`. Argus never rounds a person's input.
 
-**Sign convention.** One rule, with no per-type branching: an account balance is its signed value to the owner. Assets are positive when held. Liabilities are negative when owed. A card that owes RD$3,000 has balance −300,000 minor units. An overdrawn checking account is negative. The entry form still asks for the amount owed as a positive number, as the founder-locked sketch does. The server domain (`recording/accounts.py` in section 16) is the only place that flips that sign. Clients send what the person typed, so the sign cannot flip twice. This avoids the payment ledger's inverted debit/credit convention, which #719 warns would flip balances if copied.
+**Sign.** An account balance is its signed value to the owner. Assets are positive when held. Liabilities are negative when owed. The person types a debt as a positive amount owed, as the baseline does. The server domain is the only place that flips that sign. Clients send what the person typed. A liability above zero is credit in the person's favor and is shown that way.
 
-**Rounding.** Stored amounts are exact, so sums of them are exact. The only rounding happens when a total is weighted by ownership share. That total is computed with exact fractions and rounded once, half up, to the currency exponent, at the reader. Assets, liabilities, and net each round once from exact values, so a displayed net can differ from displayed assets minus liabilities by one minor unit. That is the accepted cost of never rounding twice.
+**Rounding.** Stored amounts are exact, so their sums are exact. Only share-weighted totals round, once each, half up, to the exponent, from exact fractions. A displayed net can therefore differ from displayed assets plus liabilities by one minor unit.
 
-**No combination.** Every total is keyed by currency. No function sums two currencies. Cross-currency transfers and converted totals are unresolved (founder decisions F7 and F8). Argus never invents a rate.
+**No combination.** Every total is keyed by currency. Cross-currency transfers stay blocked in the first slice. Combined totals need a display currency and a rate source with date. Neither is approved.
 
 ## 5. Records
 
-A record has a **body** and an append-only list of **revisions**. There are two families of body.
+A record has a **body** and an append-only list of **revisions**.
 
 ### 5.1 Anchors: known balances
 
-| Anchor | Meaning | Changes income or spending? |
+| Anchor | Meaning | Income or spending? |
 | --- | --- | --- |
-| `opening_balance` | The balance when tracking began. `as_of` defaults to the account's creation instant and is editable. | No. |
-| `balance_observation`, basis `user_check` | "I looked and it said this." | No. |
-| `balance_observation`, basis `statement` | A statement's opening or closing balance at the statement's date. | No. |
-| `balance_observation`, basis `value_estimate` | An estimated value of an asset such as a car, a property, or holdings. | No. The difference is a revaluation. |
+| `opening_balance` | The balance when tracking began, entered at setup | No |
+| `balance_observation`, basis `user_check` | Check balance: "I looked and it said this" | No |
+| `balance_observation`, basis `statement` | A statement's opening or closing balance at its date | No |
+| `balance_observation`, basis `value_estimate` | A new estimate of an asset's value | No. The difference is a revaluation |
 
-A person who only knows today's balance records one anchor and nothing else. That satisfies MVEE 4.1 ("record that fact without inventing a complete transaction history").
+Adding an account with an opening balance completes setup. It needs no second income or expense entry (MVEE). Someone who only knows today's balance records one anchor and nothing else.
 
 ### 5.2 Activity: money that moved
 
-Activity **kind** decides the arithmetic. **Category** is a label the person chooses. They are separate fields. "Income" is a kind. "Salary" and "remittance" are income categories. A category is valid only for the kinds a catalog table allows. A mismatch is the blocking issue `category_kind_mismatch`. The approved sketch presents "Income" as a category next to Groceries and Dining. Under this contract that choice becomes the income kind.
+The activity **kind** decides the arithmetic. The **category** is optional detail. The baseline presents Income, Expense and Transfer as the type, with source or category as extra detail (MVEE account activity).
 
 | Kind | Source leg | Counter leg | Counts as |
 | --- | --- | --- | --- |
 | `expense` | −amount | none | spending |
-| `refund` | +amount | none | reduces spending |
+| `refund` | +amount | none | reduces spending, never income |
 | `income` | +amount | none | income |
-| `transfer` | −amount | +amount, a different account, same currency | neither |
-| `debt_payment` | −amount | +amount, which must be a liability, same currency | neither |
+| `transfer` | −amount | +amount on a different account, same currency | neither |
+| `debt_payment` | −amount | +amount on a liability, same currency | neither |
 
-Amounts are positive. The kind supplies the sign. Card interest and fees are expenses with categories such as `interest` or `fee`, which increase the amount owed. A cash withdrawal is a transfer from checking to cash. Later cash purchases are expenses (MVEE section 3).
+Amounts are positive, and the kind supplies the sign. Card interest and fees are expenses. A cash withdrawal is a transfer to cash.
 
-### 5.3 Derivations
+### 5.3 Deciding whether a balance already contains an activity
 
-- **Balance at time t.** Take the latest anchor with `as_of` at or before t. If none exists, the balance is unknown. Otherwise add every activity effect placed after that anchor and at or before t.
-- **Observation gap.** For each observation, subtract the previous anchor plus the activity between the two from the observed amount. The first anchor on an account has no gap. It establishes the balance. A `value_estimate` gap is labeled `revaluation`. Every other gap is labeled `unexplained`.
-- **Income and spending** for a scope and period, per currency. Spending is expenses minus refunds. Income is income. Transfers and debt payments are excluded. A transfer or payment with exactly one leg inside the scope is reported as `moved_in_from_outside_scope` or `moved_out_of_scope`, never as income or spending. Anchors, gaps, and revaluations never enter income or spending.
-- **Position** for a scope, per currency. It reports assets, liabilities, and net over accounts with a known balance, plus coverage (section 11).
+Every derivation needs one answer: does an anchor's balance already contain a given activity? This rule answers it for each pair of an activity and an anchor on the same account.
 
-### 5.4 Worked example: the observed balance
+1. Activity dated after the anchor is never contained.
+2. An explicit answer from the person wins. It is stored on the activity against that one anchor.
+3. For a balance check, activity that already existed when the check was confirmed is contained. The check's preview showed the prior recorded amount including it, and the person confirmed against that.
+4. Activity from the same source document as the check is contained. A statement's rows do not ask about the statement's own closing balance.
+5. For an opening balance, activity dated before its day is contained.
+6. Anything else is asked. That covers activity recorded after a check and dated on or before it, including older activity, and untimed activity on an opening's own day.
 
-Opening 10,000 on September 1. Expense 2,000 on September 3. On September 10 the person checks and sees 7,500.
+Anchors are asked in date order, stopping at the first "yes". Once a balance contains an activity, every later balance does too. So each activity lands in exactly one interval of one account and is counted once. A transfer or payment asks separately for each account leg, because each leg has its own checks. The baseline asks only about the latest check. Asking in date order is the recommended production refinement, because an older entry can predate several checks.
 
-| Step | Records | Spending | Gap at Sept 10 | Balance now |
+### 5.4 Derivations
+
+- **Balance.** The latest anchor plus every activity that landed after it. With no anchor, the balance is unknown.
+- **Remaining difference.** For each check after the first anchor: the observed amount minus the previous anchor and the activity that landed between them. The first anchor on an account has no difference. An unknown prior balance cannot produce one.
+- **Recorded difference.** The expected amount and difference the check showed at confirmation. Stored on the revision. Never recomputed.
+- **Explained by.** The activities recorded after a check that landed inside it. The history uses this list to show what closed a difference. Argus never labels a difference "resolved" because arithmetic happens to reach zero.
+- **Income and spending**, per currency, for a scope and period by activity date. Spending is purchases minus refunds, and both gross figures are reported. A negative net is shown as it is, never clamped to zero. A transfer or payment with one leg outside the scope is reported as moved in or moved out, never as income or spending.
+- **Position**, per currency, for a scope: assets, liabilities, net and coverage (section 12).
+
+### 5.5 Worked example: the approved balance check
+
+Opening 10,000 on September 1. Expense 2,000 on September 3. On September 5 the person checks and sees 7,500. The check shows prior recorded 8,000, observed 7,500, difference −500. Confirming saves a labeled balance adjustment.
+
+| Step | Spending | Recorded difference | Remaining | Balance |
 | --- | --- | --- | --- | --- |
-| Check balance | opening, expense, observation | 2,000 | −500 unexplained | 7,500 |
-| Supply the missing 500 dated Sept 7 | + expense 500 before the check | 2,500 | 0 | 7,500 |
-| New 500 expense dated Sept 12 | + expense 500 after the check | 3,000 | 0 | 7,000 |
-| Instead, supply only 300 dated Sept 7 | + expense 300 before the check | 2,300 | −200 | 7,500 |
+| Confirm the check | 2,000 | −500 | −500 | 7,500 |
+| Record the missing 500 dated September 4, answer "already included" | 2,500 | −500 | 0 | 7,500 |
+| Instead answer "changed the balance afterward" | 2,500 | −500 | −500 | 7,000 |
+| Instead record only 300, "already included" | 2,300 | −500 | −200 | 7,500 |
+| After the first answer, a new 500 dated September 7 (no question) | 3,000 | −500 | 0 | 7,000 |
 
-The balance after the check follows the observation, because the bank is the better witness to what the account held on September 10. Known spending is never inflated to absorb the gap. The late 500 is subtracted once. It lands before the observation, so it explains the gap instead of lowering the balance.
+Correcting the September 3 expense to 2,100 leaves the recorded difference at −500 and moves the remaining difference to −400. Today's balance stays 7,500. Two checks each measure their difference from the anchor just before them.
 
-A backdated correction behaves the same way. Changing the September 3 expense from 2,000 to 2,100 moves the gap from −500 to −400 and leaves today's balance at 7,500. Two successive observations each measure their gap against the anchor immediately before them, so activity between them affects only the later gap.
+This is the "explicitly labeled balance adjustment" the MVEE requires. The adjustment is the confirmed check with its recorded difference, not an invented income or expense. The remaining difference is derived beside it, so the history keeps both what the person accepted and what is still unexplained.
 
-## 6. Time and provenance
+## 6. Refunds
 
-Each record carries separate times. The MVEE requires Argus to distinguish the activity date, the statement or as-of date, and the capture time (section 5).
+| Rule | Proof |
+| --- | --- |
+| Refunds are money actually returned to cash, checking, savings or a credit card. Other accounts use Check balance. | `refund_account_unsupported` on investment and debt accounts |
+| A refund may link its purchase. It is optional. | Linked and unlinked refunds in `refund_unlinked_and_cross_account` |
+| A linked refund needs a live purchase, the same currency, a date on or after the purchase and the purchase's category. The refunds linked to one purchase never exceed it. | `refund_purchase_removed`, `refund_link_currency`, `refund_before_purchase`, `refund_category_mismatch`, `refund_exceeds_purchase` |
+| A refund may land in another account of the same currency. The destination is the account that received the money. | Card purchase refunded into checking |
+| A foreign-currency return is recorded unlinked, in the currency and amount received. No rate is assumed. | USD unlinked refund with negative USD spending, not clamped |
+| A card refund reduces the debt and may leave credit in the person's favor. | `card_refund_credit_balance` |
+| Removing a purchase with live linked refunds, or shrinking it below them, needs review first. A refund is never orphaned silently. | `linked_refunds_present`, `refund_exceeds_purchase` |
+| Loan principal, interest and fee reversals need a breakdown. A generic refund does not guess them. | Refunds on `other_debt` are refused |
+
+## 7. Time and provenance
 
 | Field | Meaning |
 | --- | --- |
-| `occurred_on` | Local calendar date the activity happened. Required for activity. |
-| `occurred_at` | Optional instant, when the source gives one. |
-| `as_of` | Instant an anchor describes. A statement closing balance uses the end of its local day. |
-| `captured_at` | When the source was captured (a photo, an import, a message). |
-| `recorded_at` | Server instant of the confirming write. Every revision has its own. |
-| `recorded_by` | The signed-in person who confirmed, corrected, or removed. Every revision has its own. MVEE section 12 needs this to show who recorded or corrected an entry. It says nothing about who may edit. |
+| `occurred_on` | Local date the activity happened |
+| `occurred_at` | Optional instant, when the source gives one |
+| `as_of` | Instant an anchor describes |
+| `captured_at` | When the source was captured |
+| `recorded_at` | Server instant of each revision |
+| `recorded_by` | Who made each revision, so either partner can see who recorded or corrected an entry. It grants nothing. |
 
-**Local day.** A person's local dates use their time zone. Recommended default: `America/Santo_Domingo`, which has no daylight-saving shift. This is not the New York market clock in `src/argus/domain/market_data/new_york_clock.py`, which owns market dates and stays unchanged. Where a per-person time zone lives is part of the first slice's profile dependency.
+**Balance date.** The baseline offers "Balance as of", defaulting to today and never in the future. Today means the creation instant. A chosen earlier date means the end of that local day. The person's time zone decides local days. The recommended default is `America/Santo_Domingo`, which has no daylight-saving shift. This is not the New York market clock, which stays unchanged. The zone used is stored with the date, so a later zone change never reinterprets it.
 
-**Same-day ordering.** Activity with only a date, on the same local date as a timed balance check, is ambiguous. Whichever of the two is confirmed second gets the blocking issue `observation_order_unknown`, and review asks whether the balance the person saw already included the activity. The answer belongs to that one pair of records and is stored on the record confirmed second. A second check the same day asks again, because the same purchase can fall after one check and before the next. Two anchors need no question. An opening balance comes first on its day, because tracking starts there. A statement balance covers its whole day, so every untimed row on that date falls before it. The two answers give different, correct results. Argus does not guess, because the guess decides whether the entry explains a gap or lowers the balance. Founder decision F3 covers the question's wording and when it appears.
+**Changing the balance date.** Editing the opening date is a correction with a new revision and a reason. If any activity would move across the new date, the correction returns `opening_date_reorders_activity` with those records. It saves nothing until the person accepts the reordering after seeing the affected history. A date change never silently reinterprets existing activity. Checks confirmed later keep their recorded difference.
 
-**Provenance.** Every revision records its capture `method` (`manual`, `chat`, `voice`, `document`, `connection`) and a `source_ref`. For an import that is the file digest and row, and an `external_id` when the institution prints a reference. A chat draft points at its conversation and message, following the existing `EvidenceArtifact` and `MemoryProvenance` precedents. Source references point at context. They do not copy raw document text, transcripts, or credentials into the record (MVEE section 5, privacy).
+**Provenance.** Each revision records a capture method (`manual`, `chat`, `voice`, `document`, `connection`) and a source reference: file digest and row, an institution's `external_id` when printed, or the originating conversation and message. It points at context and never copies raw document text, transcripts or credentials.
 
-## 7. Lifecycle
+## 8. Lifecycle, idempotency and stale previews
 
-Every capture method feeds one operation. The MVEE path is capture, interpret or extract, review and resolve, confirm, save, update dependent surfaces.
-
-| State | Affects balances or totals? | How it moves on |
+| State | Affects totals? | How it moves on |
 | --- | --- | --- |
-| `draft` | No. | Capture creates it. Review attaches issues. |
-| `draft` with blocking issues | No. | The person resolves each issue or rejects the draft. |
-| `preview` | No. | Shows the draft's effects and records the basis it was computed on (section 8). |
-| `confirmed` record, revision 1 | Yes. | One confirm call. |
-| Corrected record, revision n | Yes, as the latest revision. | `correct(expected_revision, reason, changes)`. |
-| Removed record | No. History kept. | `remove(expected_revision, reason)` appends a tombstone revision. |
-| `rejected` draft | No. | Terminal. |
+| Draft | No | Capture creates it. Review attaches issues. Editing it raises its revision. |
+| Preview | No | Shows effects and records its basis: every touched account's version and the draft revision. |
+| Confirmed record, revision 1 | Yes | One confirm call |
+| Corrected record, revision n | Yes | `correct(expected_revision, reason, changes)` |
+| Removed record | No | `remove(expected_revision, reason)` appends a tombstone |
+| Restored record | Yes | `restore(expected_revision, reason)` returns the same record, both legs together, after the same review |
+| Rejected draft | No | Terminal. Its source is released. |
 
-Issues carry a severity. **Blocking** issues stop confirmation. The proof uses these codes.
+**Issues.** Blocking issues stop confirmation. The proof's codes are:
 
-- **Input:** `field_missing`, `kind_unsupported`, `amount_invalid`, `amount_precision`, `amount_not_positive`, `currency_unsupported`, `currency_mismatch`, `date_invalid`, `choice_invalid`.
-- **Accounts:** `account_unknown`, `account_archived`.
-- **Categories:** `category_unknown`, `category_kind_mismatch`.
+- **Input:** `field_missing`, `kind_unsupported`, `amount_invalid`, `amount_precision`, `amount_not_positive`, `currency_unsupported`, `currency_mismatch`, `date_invalid`, `choice_invalid`, `note_too_long`.
+- **Accounts:** `account_unknown`.
+- **Categories:** `category_unknown`, `category_kind_mismatch`, `category_not_applicable`, `category_other_space`.
 - **Linked activity:** `counter_account_missing`, `counter_account_same`, `counter_account_unexpected`, `counter_not_liability`, `cross_currency_unresolved`.
-- **Ordering and repeats:** `observation_order_unknown`, `already_recorded`, `possible_duplicate`.
+- **Refunds:** `refund_account_unsupported`, `refund_target_invalid`, `refund_purchase_removed`, `refund_link_currency`, `refund_before_purchase`, `refund_category_mismatch`, `refund_exceeds_purchase`, `refund_link_unexpected`, `linked_refunds_present`.
+- **Plans:** `expectation_unknown`, `expectation_mismatch`, `expectation_already_fulfilled`.
+- **Ordering and repeats:** `inclusion_unanswered`, `opening_date_reorders_activity`, `already_recorded`, `possible_duplicate`.
 
- **Notices** inform and never block: `negative_asset_balance` tells the person that cash or a bank account would fall below zero, which often means income is missing. A short or unknown balance is never a blocking issue.
+Notices inform and never block. `negative_asset_balance` flags cash or a bank account below zero, which often means income is missing. `account_archived` flags an entry on an archived account. A short or unknown balance is never an issue. Argus records history. It does not authorize payments.
 
-Editing a draft, for example to pick the account an import left open, raises its revision, so any earlier preview of it is stale. Rejecting a draft releases its source, so a later import of the same row is reviewed afresh.
+**Manual saves and batches.** A manual form save runs draft, preview and confirm in one call. It adds no separate AI approval. A statement batch confirms the rows the person selects in one all-or-nothing call. Flagged rows stay held as drafts with their progress. A batch re-reviews each row against the rows confirmed before it. A row that becomes ambiguous inside the batch stops the batch and writes nothing.
 
-A manual form save is the person's confirmation. MVEE 4.1 forbids an extra AI approval step, so a manual save runs draft, preview, and confirm in one call. A statement batch confirms the selected previews in one all-or-nothing operation. Flagged rows stay drafts and do not hold back the reliable rows (MVEE 4.4). The batch re-reviews each row against the rows confirmed before it. A batch that holds a user balance check and an untimed row from the same day therefore returns `observation_order_unknown` and writes nothing, even though each preview looked clean alone. A statement's own balances cannot cause this, because a statement balance covers its whole day.
+**Idempotent confirmation.** Confirm and create carry an idempotency key. The server fingerprints the request with SHA-256 over canonical JSON of the draft ids and reviewed fields. The same key and fingerprint return the original result without a second write. The same key with a different fingerprint is `idempotency_conflict`. An already-confirmed draft returns its record. This reuses the API contract's [idempotency section](../API_CONTRACT.md#contract-idempotency-admission) and the replay-or-conflict pattern in `supabase/migrations/20260722000002_atomic_backtest_admission.sql`.
 
-**A record keeps its currency.** A correction may move a record to another account only in the same currency. Otherwise its integer amount would silently change meaning. The proof refuses the move with `currency_mismatch`.
+**Stale previews.** Confirmation succeeds only if the preview's basis still holds. Otherwise it writes nothing and returns `stale_preview` with a refreshed preview. The draft and the person's edits are kept. The person sees the changed effects and confirms again. Two confirmations of one stale preview both fail.
 
-**Correction instead of reversal.** A correction appends a revision with a reason, and derivations read the latest revision. The payment ledger undoes a payment by posting a linked reversal at a new time. For personal records that would move a corrected September expense into October's spending. A revision keeps the corrected fact at its true date and keeps the full history.
+**Stale edits.** Corrections carry `expected_revision`, and account edits carry `expected_version`. A mismatch is `stale_version` and changes nothing. One partner never silently overwrites another's work.
 
-## 8. Idempotency, stale previews, and concurrent writes
+**Correction, not reversal.** A correction keeps the fact at its true date and appends a revision. The payment ledger's reversal postings would move a corrected September expense into October. A record also keeps its currency. A correction may move it only to an account in the same currency.
 
-**Idempotent confirmation.** A confirm call carries an idempotency key. The server fingerprints the request as the SHA-256 of canonical JSON over the draft ids and the fields the person reviewed.
+**Postgres realization (a target, not a migration).** Each confirm runs as one database function in one transaction. It locks the touched accounts, compares their versions to the basis, reserves the key, inserts the record and revision, stores a check's recorded difference, and bumps versions. Every leg commits or none does. The proof runs in memory, so it demonstrates the rules but not the locking.
 
-- The same key with the same fingerprint returns the original record, with no second write.
-- The same key with a different fingerprint is `idempotency_conflict`.
-- Confirming a draft that is already confirmed returns its record.
-- Account creation follows the same rule, so a double tap creates one account.
+## 9. Notes
 
-This reuses the existing Argus pattern. `Idempotency-Key` grammar and `(user_id, operation_scope, key)` reservation are in the API contract's [idempotency section](../API_CONTRACT.md#contract-idempotency-admission). The replay-or-conflict hash comparison lives in `supabase/migrations/20260722000002_atomic_backtest_admission.sql`.
+Every financial activity form offers an optional note of up to 200 characters. That includes expenses, income, refunds, transfers, payments and balance checks, including asset value updates (MVEE, DESIGN). The server counts Unicode code points and is the authority. Clients must count the same way. JavaScript `length` counts UTF-16 units and Swift `count` counts grapheme clusters, so neither can be used directly. A note is part of the record's revision. Editing a note is a correction with history. A note never changes money or duplicate matching. Search and partner visibility for notes belong to the search and household contracts.
 
-**Stale previews.** A preview records a basis: the `version` of every account it touches and the draft's revision. Confirmation succeeds only if that basis still holds. Otherwise the call returns `stale_preview` and writes nothing. The client then asks for a fresh preview. Two confirmations of the same stale preview, whatever their keys, both return `stale_preview`, and neither writes. The person sees the refreshed effects and confirms once. The model follows `ToolResultCard.input_revision`, which returns `409 tool_result_changed` today, and the confirm-once guard in `src/argus/domain/pending_artifacts.py`.
+## 10. Linked activity and plan occurrences
 
-**Corrections and edits** carry `expected_revision` or `expected_version`. A mismatch is `stale_version` and changes nothing. One partner's correction therefore never silently overwrites the other's (MVEE section 12).
+A transfer or debt payment is one record with two legs. Creation, correction, removal and restore act on the record, so one leg never changes alone. Correcting the counter account moves the leg. A card purchase is an expense on the card, and its payment is a `debt_payment`, so spending counts the purchase once.
 
-**Realization in Postgres (not a migration).** The confirming write runs as one database function in one transaction. It locks the touched account rows, compares their versions to the preview basis, reserves the idempotency key, inserts the record and its first revision, and bumps each touched account's version. Every leg of a linked record commits or none does. The proof runs in memory, single process. It demonstrates the rules, not Postgres locking (section 15).
+A plan's dated expectation is fulfilled by at most one live activity, and one activity fulfills at most one occurrence. Status is derived on every read, never stored. The occurrence is completed while a live activity names it with a matching account and kind. It returns to planned when that activity is removed, unlinked, or changed to another account or kind. That kind of change needs review (`expectation_mismatch`). An amount correction keeps it fulfilled. A refund never reopens a paid bill. The forecast excludes fulfilled occurrences, so the payment counts once, in actual cash.
 
-## 9. Linked activity
+## 11. Duplicates, overlap and late information
 
-A transfer or a debt payment is **one record with two legs**, not two records that point at each other. Creation, correction, and removal act on the record, so one leg can never change without the other. Correcting the amount changes both legs. Changing the counter account removes the leg from the old account and adds it to the new one. Removal takes both legs away and keeps the history.
+1. **Identity.** The same file digest and row, or the same institution `external_id` on the same account, is `already_recorded`. This covers confirmed records, removed records and pending drafts. Re-importing a file or an overlapping statement creates nothing, and a removed row does not return with the next import.
+2. **Signature.** Any leg with the same account, amount and date, without shared identity, is `possible_duplicate`. It blocks until the person chooses. "Same as that record" links the new source to the existing record and creates nothing. "Different" saves it. The kind is ignored, so a card statement's payment row meets the payment recorded from checking. Notes are ignored too.
 
-A credit-card purchase is an `expense` on the card. The later card payment is a `debt_payment` from checking to the card. Spending counts the purchase once. The payment moves money between the person's own accounts.
+Equal amounts alone never match. The same amount on another account or another date raises nothing. Nothing is merged or deleted automatically. The synthetic kit confirms two identical rows from one file silently. This contract asks once, because a row with no reference cannot prove two purchases happened.
 
-Both legs must share one currency. A peso-to-dollar movement gets the blocking issue `cross_currency_unresolved`. Section 13 lists the options (F7). The proof never computes a rate.
+An import row whose destination is ambiguous keeps its account unresolved until the person picks one. Statement balances become `statement` checks, and statement rows answer the inclusion question from their shared source. Late information needs no special operation. The person records the missing activity with its true date and answers the inclusion question.
 
-## 10. Duplicates, overlap, and late information
+## 12. Spaces, scopes and what each surface reads
 
-Two tests decide whether a new draft repeats an existing record.
+**Spaces.** An account lives in exactly one private space. Moving it to another space is organizational. It creates no record, changes no record, and keeps identity, balance, history, corrections, notes and recoverable removed entries together. Only its scope changes. The baseline blocks a move when the account has links: transfers or payments (including removed ones), cross-account refunds, a linked asset or loan, plan expectations, household sharing, open drafts or statement links. The proof enforces the record, asset, plan and draft links and reports them with `account_has_links`. Household sharing and statement links need the household and ingestion contracts. Custom categories belong to a space. A cross-space transfer is unresolved and stays out of scope.
 
-1. **Identity.** The same file digest and row, or the same institution `external_id` on the same account, means the draft is `already_recorded`. The match runs against confirmed records and against drafts still waiting for review, so re-importing a file or an overlapping statement creates nothing new, not even a second pending copy. Removed records keep their identity, so a row the person removed does not return with the next import.
-2. **Signature.** Any leg on the same account, with the same amount and date, without shared identity, means `possible_duplicate`. Every leg counts and the kind does not, so a card statement's payment row meets the payment already recorded from checking. The cost is that two same-day outflows of one amount from one account prompt review even when their kinds differ. This blocks the draft until the person chooses. **Same as that record** links the draft's source to the existing record as extra provenance and creates nothing. **Different purchase** saves it.
-
-The synthetic kit confirms two identical rows from one file without asking. This contract asks once, because a statement row with no reference cannot prove two purchases happened. Equal amounts alone never match. The same amount on another account or another date raises no issue at all. Nothing is ever merged or deleted automatically (MVEE section 5, duplicates). A spoken entry later seen on a statement follows the signature path. The statement row becomes provenance on the spoken record, so the purchase counts once.
-
-An import row whose destination the kit leaves ambiguous (`personal or household`) keeps its account unresolved. The person picks the account before confirming. Who else can see that row is a household-contract question (MVEE section 9).
-
-A statement's opening and closing balances become `statement` observations at the statement's dates, and its rows become activity. Section 5.3 then reconciles the statement against itself and against earlier anchors. Imported balances and imported rows never add together as new money (MVEE 4.4).
-
-Late information that explains an old difference needs no special operation. The person records the missing activity with its true date, and the derived gap shrinks (section 5.4).
-
-## 11. What each surface reads
-
-Every surface calls the same three derivations: balance, income and spending, and position with coverage. They take a **scope**, which is a set of account ids the caller is authorized to read. The recording model contains no permission logic. Authorization chooses the scope before the derivation runs.
+**Scopes.** Every derivation takes a scope, meaning the set of account ids the caller may read. The recording model holds no permission logic. Authorization, household membership and RLS decide the scope first. That work is unproved here and belongs to the household contract.
 
 | Surface | Reads | Must disclose |
 | --- | --- | --- |
-| Home | Position per currency, recent activity, open gaps, drafts waiting for review | "Based on your recorded accounts", unknown accounts, the oldest anchor date |
-| Accounts | Per-account balance or unknown, anchors with gaps, activity, provenance, revisions | The last anchor's date and basis, and whether the figure is observed or derived |
-| Plan | Income and spending for the period, per currency, and contributions as transfers into goal accounts | Accounts outside the scope and unknown balances |
-| Updates | Events emitted when a record is confirmed, corrected, or removed, or when an observation creates or clears a gap | The same scope rules. No amounts in push previews (MVEE section 3) |
-| Search | Records and accounts by id, linking to their owner surface | The same scope rules |
+| Home | Position per currency, recent activity, open differences, drafts waiting | "Based on your recorded accounts", unknown accounts, archived accounts included, estimate dates, oldest anchor date |
+| Accounts | Balance or unknown, standing (held, overdrawn, owed, credit in your favor), checks with recorded and remaining differences, activity, notes, revisions | Last anchor date and basis. Whether the figure is observed, estimated or derived. |
+| Plan | Income and spending by period, expectations and their derived status, forecast of open occurrences | Accounts outside the scope, unknown balances |
+| Updates | Events on confirm, correct, remove, restore, or a check that opens a difference | Same scope rules. No amounts in push or email previews. |
+| Search | Records and accounts by id with their space | Same scope rules |
 
-**Coverage** is part of every position. It lists accounts with a known balance, accounts with an unknown balance, archived accounts left out, the oldest anchor date, and open unexplained gaps. Home must never present a total over partial data as the person's whole picture.
+**Coverage** is part of every position. It lists known accounts, unknown accounts, archived accounts included, the oldest anchor date and open unexplained differences. A total over partial data is never presented as the whole picture.
 
-**Personal and household.** A joint account is one account. It can sit in a personal scope and a household scope, and it counts once in each. Argus never adds two scopes together. A transfer from a private account into a joint account is `moved_in_from_outside_scope` in the household view, never household income (MVEE section 12).
+**Personal and household.** Personal totals use the person's ownership share. Household totals count each authorized shared account once. Scopes are never added together. A transfer from a private account into a joint account is money moved in from outside the household scope, never household income. The recommended account detail shows the full balance with an explicit personal-share readout. Where ownership data is absent, the production contract must resolve it explicitly rather than assume a share.
 
-**Ownership share is not permission.** `ownership_share_bps` says how much of an asset or debt belongs to the person. It never decides who may view or edit a record. The proof values a view two ways, full and owner share, and applies the same weighting to assets and debts. In the proof, a car revalued from RD$1,000,000 to RD$900,000 and its RD$400,000 loan, each 50% owned, give RD$250,000 in the owner-share view and RD$500,000 in the full view. The RD$100,000 drop is a revaluation, not spending. The founder picks the default view (F6). Household membership, invitations, who may edit a shared record, revocation, and RLS belong to a separate household contract (MVEE section 9) and are not designed here.
+## 13. Categories
 
-## 12. Invariants
+There is one category owner with stable identifiers. Default categories have fixed ids and localized labels in English and Spanish. Custom categories are allowed in private Business and Custom spaces, approved for Business. Each gets a stable id owned by its space. Renaming changes only the label, so totals keyed by id never move. A custom category cannot be used in another space. The Personal space uses the defaults. Transfers and payments carry no category. Budgets reuse the same owner and never keep a second list.
 
-The proof checks each invariant through the named scenarios in [`scenarios.py`](../../tests/financial_recording/scenarios.py).
+Creating an account uses no category. A first slice without activity has no category dependency.
+
+## 14. Invariants
 
 | # | Invariant | Scenarios |
 | --- | --- | --- |
-| I1 | Unknown is never zero. | `blank_opening_unknown`, `unknown_coverage_disclosure` |
-| I2 | Only activity changes income and spending. Anchors, gaps, and revaluations never do. | `clavito_large_opening`, `observation_gap`, `asset_revaluation_and_share` |
-| I3 | Derived numbers are never stored. Every surface reads the same derivation. | `late_explanation`, `partial_reconciliation`, `backdated_correction` |
-| I4 | A balance is the latest anchor plus the activity after it. | `new_expense_after_observation`, `two_observations`, `same_day_order` |
-| I5 | Linked legs are one record and change together. | `same_currency_transfer`, `credit_card_purchase_then_payment`, `linked_correction_and_removal` |
-| I6 | One currency per record. No cross-currency netting. No invented rate. | `cross_currency_transfer_unresolved`, `multiple_precisions` |
-| I7 | A confirmed fact is never edited in place. Revisions append, each with who made it. Removal is a tombstone that keeps its source identity. | `backdated_correction`, `linked_correction_and_removal` |
+| I1 | Unknown is never zero, for an account or a total. | `blank_opening_unknown`, `unknown_coverage_disclosure` |
+| I2 | Only activity changes income and spending. Anchors, differences, revaluations and refunds-as-income never do. | `clavito_large_opening`, `observation_gap`, `asset_revaluation_and_share`, `refund_unlinked_and_cross_account` |
+| I3 | Derived numbers are never stored. A check's recorded difference is stored and never recomputed. | `late_explanation`, `partial_reconciliation`, `backdated_correction` |
+| I4 | Each activity lands in exactly one interval per account, decided by date, confirmation order, source or an explicit answer. | `older_activity_inclusion`, `two_observations`, `new_expense_after_observation` |
+| I5 | Linked legs are one record and change, vanish and return together. | `same_currency_transfer`, `linked_correction_and_removal`, `removal_and_restore` |
+| I6 | One currency per record. No netting across currencies. No invented rate. | `cross_currency_transfer_unresolved`, `multiple_precisions`, `refund_unlinked_and_cross_account` |
+| I7 | Confirmed facts change only by revisions, each with a reason and author. Removal is a tombstone that keeps identity. | `backdated_correction`, `linked_correction_and_removal`, `notes_across_records` |
 | I8 | Drafts affect nothing. | `duplicate_import_vs_twins`, `stale_preview_two_confirms` |
-| I9 | Confirmation is idempotent by key and fingerprint, and by draft. | `duplicate_submission` |
+| I9 | Confirmation and creation are idempotent. | `duplicate_submission` |
 | I10 | A preview confirms only against the basis it showed. | `stale_preview_two_confirms` |
 | I11 | A historical expense is never refused for a short or unknown balance. | `expense_beyond_known_balance`, `overdraft_and_debt` |
-| I12 | Equal amounts never establish a match. Identity or the person's choice does. | `equal_amount_not_a_match`, `duplicate_import_vs_twins` |
-| I13 | Amounts are integer minor units with a validated CLDR exponent. Input is never silently rounded. Weighted totals round once. | `multiple_precisions`, `asset_revaluation_and_share` |
-| I14 | Scope is an input. The recording model holds no permission logic. | `same_currency_transfer`, `unknown_coverage_disclosure` |
+| I12 | Equal amounts never establish a match. | `equal_amount_not_a_match`, `duplicate_import_vs_twins` |
+| I13 | Integer minor units with a validated CLDR exponent. Input never rounded. Weighted totals round once. | `multiple_precisions`, `asset_revaluation_and_share` |
+| I14 | Archive and space moves are organizational. They change no money. | `account_edit_rules`, `unknown_coverage_disclosure`, `spaces_and_account_moves` |
+| I15 | Linked refunds never exceed their purchase. A plan occurrence is counted once. | `refund_partial_and_limits`, `plan_occurrence_counted_once` |
+| I16 | Scope is an input. The recording model holds no permission logic. | `same_currency_transfer`, `spaces_and_account_moves` |
 
-## 13. Decision table
+## 15. Decision table
 
-### Already approved experience (MVEE and existing rules)
+### Approved experience
 
 | Topic | Source |
 | --- | --- |
-| Accounts include cash, checking, savings, investments, credit cards, other debts. Cash is first-class. | MVEE section 3 |
-| Nicknamed accounts, balance per currency, manual activity, corrections, reconciliation against statement or observed balance | MVEE sections 3, 4.1 |
-| All capture methods converge on capture, review, confirm, save. Drafts affect nothing. A manual save is the confirmation. | MVEE sections 4, 4.1, 5 |
-| Transfers are not spending. A card payment never counts purchases twice. Balance changes never manufacture income or spending. | MVEE section 3 |
-| Never invent activity to force agreement. Distinguish a correction from a new transaction. | MVEE section 5 |
-| DOP and USD are separate. No silent combination. A future conversion shows rate, date, and source. | MVEE section 2, Wave 1 rule R2 |
-| Activity date, as-of date, and capture time are distinct. Old balances stay old. | MVEE section 5 |
-| Uncertain duplicates go to review. Legitimate similar purchases are never deleted silently. | MVEE section 5 |
-| Joint account is one account. Private-to-joint transfers are not household income. Membership is not permission. | MVEE section 12 |
-| Liabilities are entered as a positive amount owed. | Founder-locked mobile sketch, published by PR #714, which is still open |
-| Vehicle and home records with optional ownership shares and linked debt | Reported approved 2026-09-27 by PR #723. Not yet in the MVEE or the decision log. Publication belongs to the delivery lead, so it is not a founder question here. |
+| Confirmed financial records are durable. See the Decision 8 note below. | MVEE section 4 (#727), decision response 1 |
+| Quick setup: type, currency, optional nickname, balance or unknown. Optional assets with ownership share and linked debt. Liabilities entered as amount owed. | MVEE quick account setup, decision log 2026-09-27 |
+| Balance date is an editable account detail, changed through a traceable correction that reviews affected history. | Decision response 2, founder confirmation 2026-09-28 |
+| Ask whether activity was already included in a checked balance, including older activity and each account leg. Do not ask when provenance already answers. | MVEE balance checks, decision response 3 |
+| Unexplained differences stay on the account, labeled, never income or spending. Confirmation-time evidence and remaining differences stay distinguishable. | MVEE balance checks, handoff, decision response 4 |
+| Archived accounts keep balances and obligations in totals. | MVEE archiving accounts, decision response 5 |
+| Personal views use ownership share. Household counts an authorized account once. Never assume 50/50. | MVEE quick setup and section 12, decision response 6 |
+| No implicit FX and no combined-currency total. Cross-currency transfers are blocked in the first slice. | MVEE section 2 and Home summary, decision response 7 |
+| Refund semantics in section 6 | MVEE refunds, corrections and adjustments |
+| 200-character notes on every financial activity form | MVEE refunds, DESIGN |
+| Private spaces, organizational account moves, custom Business categories | MVEE financial spaces and reassigning accounts |
+| Plan occurrences counted once, with derived status | MVEE connected plan status |
+| Restore returns the original record into its original space and account, with both legs together | MVEE account activity (recovery) |
 
-### Recommended engineering choices (this proposal)
+**Historical Decision 8, corrected.** An earlier version of this contract said Decision 8 kept typed personal figures out of storage. That was wrong. Decision 8 (September 8, 2026, archived grounded-finance roadmap) left typed figures inside conversation messages and put them on the never-store list for personalization memory. The MVEE published by #727 supersedes its prohibition on a new personal-figure storage surface only for explicit financial-record confirmation. Unconfirmed figures keep the existing conversation policy. They are not deleted from chat history, and nothing new enters personalization memory. Guest financial-record persistence is a separate open decision.
 
-| Choice | Recommendation | Main alternative rejected |
+### Recommended engineering choices
+
+| Choice | Recommendation | Alternative rejected |
 | --- | --- | --- |
-| Storage shape | Accounts plus confirmed records with append-only revisions. Everything else derived. | Stored reconciliation adjustments (section 14) |
-| Money | Integer minor units. CLDR exponent through babel, validated against `home_country.currency_codes()` first. | Floats, or a second hand-written currency table |
-| Sign | Signed value to the owner. Liabilities negative. | Debit/credit columns per account type |
-| Kind vs category | Kind drives arithmetic. Category is a validated label. | Category-only, as the sketch shows |
-| Linked movements | One record, two legs | Two records cross-referenced |
-| Undo | Revisions and tombstones | Reversal postings |
-| Retry safety | Idempotency key plus body fingerprint, reusing the existing admission pattern | Client-side dedupe only |
-| Concurrency | Per-account version as preview basis. `stale_preview` writes nothing. | Last write wins |
-| Matching | Identity, or the person's explicit choice | Amount and date heuristics that merge automatically |
-| Short balance | Record it, with a notice for a negative asset | The payment ledger's `InsufficientFundsError` |
+| Storage shape | Accounts and records with append-only revisions. Totals derived. Check evidence stored. | Stored adjustment transactions |
+| Inclusion | The section 5.3 rule, asking checks in date order | Asking only the latest check |
+| Money | Integer minor units. CLDR exponent after validation. | Floats, or a second currency table |
+| Sign | Signed value to the owner, flipped once on the server | Debit and credit columns per type |
+| Linked movements | One record with two legs | Two cross-referenced records |
+| Undo | Revisions, tombstones, restore of the same record | Reversal postings |
+| Retry safety | Key plus fingerprint, reusing admission | Client-side dedupe |
+| Concurrency | Account versions as the preview basis. A stale confirm writes nothing. | Last write wins |
+| Batches | Hold flagged rows. Confirm selected clean rows all-or-nothing. | Auto-drop equal amounts |
+| Stale confirm | Refresh, keep edits, confirm again | Silent acceptance |
+| Categories | One owner, stable ids, localized defaults, space-owned custom labels | Fixed-only list |
+| Note length | Unicode code points, server authoritative | Each client's native count |
 
-### Unresolved user-visible choices for the founder
+### Still open
 
-| # | Decision | Recommendation |
-| --- | --- | --- |
-| F1 | Decision 8 (2026-09-08, archived grounded-finance roadmap) keeps typed personal figures out of storage. Does the MVEE supersede it for **confirmed** records, while unconfirmed chat figures stay ephemeral? | Yes. Record the supersession in the decision log before any migration. |
-| F2 | Opening balance date: fixed to account creation, or editable to an earlier date? | Default to creation, editable. |
-| F3 | Same-day ordering question: wording, and whether to ask or assume. | Ask only when a same-day observation exists. "Was this already included in the RD$7,500 you saw?" |
-| F4 | How an unexplained difference appears, and whether a person can mark it resolved without adding activity. | Show it on the account with "Add what's missing" and "Leave as unexplained". Never count it as spending. |
-| F5 | Archiving an account whose balance is non-zero or unknown. | Allow it with a warning that the balance leaves totals. |
-| F6 | Default view of shared ownership: full balance or owner's share. | Account detail shows the full balance. Personal totals use the owner's share. Household totals count the shared account once, in full. |
-| F7 | Cross-currency transfer (DOP to USD). | Until an FX policy exists, let the person state both amounts and show the implied rate as theirs. Never fetch or invent one. The proof keeps this blocked. |
-| F8 | Any combined-currency total. | None until F7 and a rate source are decided. |
-| F9 | A possible duplicate inside a statement batch. | Confirm the reliable rows. Hold the flagged ones as drafts. |
-| F10 | A stale preview at confirm time. | Re-show the refreshed effects and require one more tap. |
-| F11 | Category catalog: fixed, editable, or user-created, with Spanish and English labels. | Fixed bilingual catalog for the first release. |
-| F12 | Guest persistence of accounts. | Registered users only for the first slice. Guest persistence stays parked (MVEE section 9). |
+| # | Decision | Owner | Recommendation |
+| --- | --- | --- | --- |
+| G1 | Durable guest financial records | Founder, pending | Sign-in required for durable accounts at first. Guest chat unchanged. |
+| G2 | Recovery period, retention and purge for removed entries and accounts | Founder with the data-retention contract | Session-level restore in the baseline only. No invented deadline. |
+| G3 | Cross-currency transfer contract (actual amounts on both sides) | Founder, later | Keep blocked. It is separate from unlinked foreign refunds. |
+| G4 | Household authorization, RLS, sharing links during moves | Household contract | Unproved here. Do not infer it from ownership. |
+| G5 | Partial payment allocation and loan principal, interest and fee breakdown | Later recording contract | Use Check balance until defined. |
 
-Household permission mechanics are **not** in this table. The MVEE parks them (section 9), and they need their own contract.
+PR #727's reconciliation contract also names a "recovery destination" as a founder decision. No published text defines the term. This contract restores into the original space and account, as the MVEE states. G2 covers the period and retention.
 
-## 14. Alternatives rejected and tradeoffs
+## 16. Alternatives rejected and tradeoffs
 
 | Alternative | Why rejected |
 | --- | --- |
-| **Store a reconciliation adjustment** (−500 "balance adjustment" at the check, as many trackers do) | When the missing 500 arrives later, spending would subtract it twice unless something rewrites the adjustment. That is a second copy of one fact with nothing forcing agreement, the split-brain shape AGENTS.md forbids. Deriving the gap avoids it. |
-| **Transplant the payment ledger** | #719 found SQLite locks, clearing-pool account types, no user or household identity, and a refusal to record a short-balance expense. Its money rules, retry proof, and concurrency test shapes are reused. The service is not. |
-| **Full double-entry with equity and suspense accounts** | Every opening balance and every gap would need an invisible counter-account. People see accounts, not journals. The two-leg record keeps the useful property, that linked legs always agree, without inventing accounts. |
-| **Treat the latest observation as the only truth and discard activity before it** | Spending history and late explanations would be lost. Anchors keep both. |
-| **Reject an expense beyond the known balance** | Argus records history. A refusal drops a real expense (#719, MVEE section 1.1). |
-| **Merge on equal amount and date** | Two real RD$125.50 purchases at one store would collapse into one. The synthetic kit's CSV twins `tx-dop-02` and `tx-dop-03` exercise exactly this. |
+| Post the difference as an adjustment transaction and rewrite it when missing activity arrives | Two copies of one fact with nothing forcing agreement, the split-brain shape AGENTS.md forbids. Storing the check's evidence and deriving the remainder keeps one owner for each fact. |
+| Treat the latest snapshot as authoritative and stop there | The baseline sketch does this in memory. It loses the remaining difference that the handoff requires once later activity arrives. |
+| Transplant the payment ledger | SQLite locks, clearing accounts, no identity, and refusal of short-balance expenses (#719). Its money rules and race-test shapes are reused. |
+| Full double-entry with equity and suspense accounts | Every opening and difference would need an invisible counter-account. The two-leg record keeps agreement between legs without inventing accounts. |
+| Merge on equal amount and date | Collapses real twins such as the kit's `tx-dop-02` and `tx-dop-03`. |
 
 **Tradeoffs accepted.**
 
-- Deriving on read costs computation that grows with an account's history. Scanning from the latest anchor bounds it. A cache may come later only as a rebuildable projection, never as a second owner.
-- Rejecting stale previews adds one extra tap under concurrent use. It is rare for one person and protects partners from overwriting each other.
-- Blocking same-day ordering adds a question. It appears only when a same-day balance check exists, and a wrong guess would silently shift money between a gap and the balance.
-- Revisions keep more rows than in-place edits. The history is what lets Updates explain changes (MVEE section 5, corrections).
+- Deriving on read costs work proportional to history since the latest anchor. A rebuildable cache can come later.
+- A stale preview costs one extra tap under concurrent use.
+- The inclusion question adds friction for late entries dated on or before a check. Guessing would silently move money between a difference and a balance.
+- Asking checks in date order can mean more than one question for an old entry.
 
-## 15. What the proof establishes and what it does not
+## 17. What the proof establishes and what it does not
 
-**Establishes.** Under synthetic inputs, the proposed rules produce the observable behaviors in section 1. That covers each scenario in section 12, including the kit's own CSVs read through `tests.synthetic_ingestion.extract.load_input`. The rules are consistent with one another. Late explanation, corrections, linked removal, stale previews, and duplicate imports compose without double counting. The committed evidence file equals the model's regenerated output, and a test fails if they drift.
+**Establishes.** The rules produce every section 1 behavior on synthetic inputs across 34 named scenarios, including the kit's own CSVs read by `tests.synthetic_ingestion.extract.load_input`. The rules compose without double counting across late answers, corrections, removal and restore, refunds, notes, moves, plan occurrences and duplicate imports. Evidence is committed, and a test fails if it drifts from the model.
 
-**Does not establish.**
+**Does not establish.** Postgres locking, RLS and household authorization. Extraction, OCR, speech or model quality. API shape and performance. Link migration during moves beyond refusal. CLDR parity for every code; the proof checks DOP, USD, JPY and KWD, and validates against babel's list because it cannot import `argus`.
 
-- **Postgres behavior.** The model is a single in-memory process. Row locks, RLS, and concurrency under real transactions need their own tests against the chosen store, following the three race-test shapes #719 names.
-- **Extraction or interpretation quality.** Drafts come from authored inputs and the kit's CSV parser. No OCR, speech, model, or bank data is involved. #720 lists what a real Dominican statement must show first.
-- **API shape, performance at scale, or UI.**
-- **Household permission.** Scopes are passed in.
-- **CLDR parity with ISO 4217 for every code.** The proof checks DOP, USD, JPY, and KWD. The proof validates codes against `babel.numbers.list_currencies()` because the reference model cannot import `argus`. Production validates against `home_country.currency_codes()`.
+**Isolation.** The model lives under `tests/`, imports no `argus` module, and nothing under `src/` or `web/` references it. Tests enforce both.
 
-The reference model lives under `tests/`, imports no `argus` module, and is referenced by nothing under `src/` or `web/`. Tests enforce both properties. It cannot become a second production ledger without a deliberate move.
+**How production replaces it.** The scenarios drive the model only through the `Scene` driver in `tests/financial_recording/scenes.py`. The expected outcomes are literal values in the tests and in the evidence file. They do not depend on the model code. When a production owner lands, its PR adds a driver with the same methods that calls the real API and database. It runs the covered scenarios against production with the same expected outcomes. It then deletes the reference model's covered rules in the same change. The expected outcomes stay as the production acceptance suite. Scenarios for scope not yet built keep running against the reference model until their production owner lands.
 
-It must not become a second copy of the rules either. When a production owner lands, the PR that adds it runs the named scenarios against production through one adapter and deletes the reference model's matching derivations in the same change. Until then, this model is the only executable statement of the rules.
+## 18. First implementation assignment: create, reopen, edit
 
-## 16. First implementation proposal (not authorized)
+**Outcome.** A signed-in person creates an account and later reopens and edits it. Creation takes type, currency, an optional nickname, and a balance or estimate, or unknown. Cash, checking and savings also take an optional balance date. Assets also take an ownership share. Editing covers the nickname, type (until activity exists), ownership share, archive and restore, and the balance or its date through a traceable correction. Nothing else is in scope: no activity, balance checks, categories, transfers, refunds, notes, spaces other than Personal, household, listings, bank connections or chat.
 
-**Outcome.** A registered person creates an account, saves a starting balance or leaves it blank, reopens the account, and edits its details. Nothing else: no activity, no observations, no chat, no household, no import.
+**Dependencies to bind in the assignment, before code.**
 
-**Dependencies before any code.** Founder answers F1, F2, F11 (types only), and F12. API_CONTRACT.md and DATA_MODEL.md amended first (Never-Violate 1). SQL and RLS audited against `postgres-best-practices` (Never-Violate 10). An assigned package names the owner.
+1. **Guest policy (G1).** The founder has not answered. The assignment either waits for the answer or builds registered-only behind a default-off flag, with guests seeing no accounts surface. That second path does not change onboarding. The flag's release criteria must name the guest answer.
+2. **API and data ownership.** Amend API_CONTRACT and DATA_MODEL first (Never-Violate 1). Audit SQL and RLS against `postgres-best-practices` (Never-Violate 10).
+3. **Opening-date correction behavior.** Adopt section 7. With no activity yet, a date correction reorders nothing, but the revision and reason are still stored.
+4. **A database acceptance gate.** Postgres tests for confirm-or-replay, version checks and owner-only RLS, in the `tests/test_*_postgres.py` family CI already gates.
 
-**Intended production owners.**
+**Owned contracts and production owners.**
 
-| Concern | Proposed owner |
+| Concern | Owner |
 | --- | --- |
-| Currency exponent and validation | `src/argus/domain/recording/currency.py`, reading `src/argus/domain/home_country.py` and babel. The one owner, projected to web by extending `scripts/generate_home_country_codes.py` if the client needs exponents. |
-| Account types, nature table, account rules, and the only liability sign flip | `src/argus/domain/recording/accounts.py` |
-| Category catalog with Spanish and English labels (F11) | One display-contract JSON such as `web/argus_display_contract/recording_categories.json`, read by Python and web the way `support_contact.json` is |
-| Anchor records, revisions, balance derivation | `src/argus/domain/recording/records.py` and `derive.py` |
-| Persistence | A new Supabase migration: `financial_accounts`, `financial_records`, `financial_record_revisions`, and one confirm-or-replay SQL function. Owner-only RLS (`owner_id = auth.uid()`). No household columns. |
-| HTTP | A new router `src/argus/api/routers/financial_accounts.py`: create with `Idempotency-Key`, read, edit with `expected_version`. Schemas beside the existing ones. OpenAPI regenerated. |
-| Client | Deferred to the platform decision in ARCHITECTURE.md. A web surface ships behind a default-off flag if assigned. |
+| Currency validation and exponent | `src/argus/domain/recording/currency.py`, reading `home_country.currency_codes()` and babel |
+| Types, nature table, locks, the single liability sign flip | `src/argus/domain/recording/accounts.py` |
+| Opening anchor, revisions, balance derivation | `src/argus/domain/recording/records.py` |
+| Persistence | One migration: `financial_accounts` (with `space_id` defaulting to Personal, `archived`, `ownership_share_bps`, `version`) and `financial_records` with `financial_record_revisions`, plus one create-or-replay SQL function. Owner-only RLS on `auth.uid()`. No household columns. |
+| HTTP | `src/argus/api/routers/financial_accounts.py`: create with `Idempotency-Key`, read, edit with `expected_version`, and correct the opening with `expected_revision`. OpenAPI regenerated. |
+| Client | Per the ARCHITECTURE platform decision. A surface ships only behind the flag above. |
 
-**Acceptance.**
+**Acceptance.** Run `clavito_large_opening`, `blank_opening_unknown`, `first_slice_create_reopen_edit`, `opening_date_correction` (its no-activity part), `multiple_precisions` and `duplicate_submission` (the create part) through a production `Scene` driver, using the literal outcomes already committed. Add the Postgres gate above. A double-submitted create makes one account. A stale edit returns 409 and changes nothing. An unknown balance never reads as RD$0. An archived account stays in totals.
 
-- Create "Clavito" (savings, DOP) with RD$250,000.00. Reopen it and see RD$250,000.00 known, with income RD$0.
-- Create an account with a blank balance. Reopen it and see "unknown", never RD$0.
-- A double-submitted create with one key makes one account. The same key with a different body returns `409 idempotency_conflict`.
-- A rename with a stale `expected_version` returns 409 and changes nothing. A currency change after the opening is saved is refused.
-- Correcting the opening balance appends a revision and never touches income.
-- `amount_precision` for extra decimals, and an unknown currency refused before its exponent is read.
-- Postgres tests for the confirm-or-replay function and owner-only RLS, in the `tests/test_*_postgres.py` family CI already gates.
-- The scenario `first_slice_create_reopen_edit` in this proof, run against the real API through the shared adapter described in section 15.
+**No-touch.** Chat runtime, the interpreter prompt and response-schema descriptions (Never-Violate 12). Calculators, simulations and backtest admission. Existing profile columns. Household, invitations, analytics, logging and notifications. `tests/synthetic_ingestion/`. The frozen mobile archive. PR #722's message and stream owner files.
 
-**No-touch.** Chat runtime, interpreter prompt, and response-schema field descriptions (Never-Violate 12). Calculators, simulations, and backtest admission. Existing profile columns. The opening defaults to the server's creation instant, so this slice needs no time zone. Household, invitations, analytics, logging, notifications. `tests/synthetic_ingestion/`. The mobile sketch in PR #714.
+## 19. Existing mechanisms reused
 
-## 17. Existing mechanisms reused
-
-| Mechanism | Where | Use here |
+| Mechanism | Where | Use |
 | --- | --- | --- |
 | CLDR currency set | `src/argus/domain/home_country.py` `currency_codes()` | Currency validation |
-| Idempotency key grammar and replay-or-conflict | API_CONTRACT `contract-idempotency-admission`, `20260722000002_atomic_backtest_admission.sql` | Confirm and create |
-| Revision compare-and-set | `ToolResultCard.input_revision`, memory `revision` trigger in `20260729225600_add_personalization_memory_persistence.sql` | Stale preview and `expected_revision` |
-| Confirm-once guard | `src/argus/domain/pending_artifacts.py` `consume_pending_artifact` | Draft consumed once |
-| Canonical hashing | `canonical_hash` in `src/argus/domain/backtest_admission.py` | Body fingerprint |
-| Provenance shapes | `EvidenceArtifact`, `MemoryProvenance`, `ToolFactSource` | `source_ref` and capture method |
-| Synthetic ingestion kit | `tests/synthetic_ingestion/extract.py` `load_input` | Drafts from real CSV bytes in the proof |
-| Payment-ledger rules (#719) | integer minor units, per-currency balance, key plus fingerprint, append-only history, race-test shapes | Adopted as rules. Reversal postings and funds refusal are not. |
+| Idempotency grammar and replay-or-conflict | API_CONTRACT `contract-idempotency-admission`, `20260722000002_atomic_backtest_admission.sql` | Create and confirm |
+| Revision compare-and-set | `ToolResultCard.input_revision`, the memory `revision` trigger | Stale previews and edits |
+| Confirm-once guard | `src/argus/domain/pending_artifacts.py` | Draft consumed once |
+| Canonical hashing | `canonical_hash` in `src/argus/domain/backtest_admission.py` | Fingerprints |
+| Provenance shapes | `EvidenceArtifact`, `MemoryProvenance`, `ToolFactSource` | Source references |
+| Display-contract JSON read by Python and web | `web/argus_display_contract/support_contact.json` pattern | Category catalog labels |
+| Synthetic ingestion kit | `tests/synthetic_ingestion/extract.py` `load_input` | Drafts from real CSV bytes |
+| Payment-ledger rules (#719) | Minor units, per-currency balance, key plus fingerprint, append-only history, race-test shapes | Adopted as rules. Reversal postings and funds refusal are not. |

@@ -12,13 +12,20 @@ scenarios?
 
 - `money.py` validates currency codes against babel (CLDR) and parses decimal
   strings into integer minor units. It never rounds user input.
-- `derive.py` holds the recorded-fact types, the domain tables and the pure
-  reads: balance, observation gaps, activity totals, and position with
-  coverage. Nothing derived is stored.
-- `model.py` is the in-memory write side: accounts, drafts, review issues,
-  previews, idempotent confirmation, corrections and removal. Every operation
-  builds a new state and then swaps it in.
-- `scenarios.py` holds the named acceptance scenarios and the evidence writer.
+- `catalog.py` holds the domain tables: account natures, leg signs, refundable
+  account types and the default category catalog with stable ids.
+- `derive.py` holds the recorded-fact types and the pure reads: the inclusion
+  rule, balances, recorded and remaining differences, totals, positions with
+  coverage, standing, space scopes and plan occurrence status.
+- `review.py` computes review issues. Issues are never stored.
+- `model.py` is the in-memory write side: accounts, drafts, previews,
+  idempotent confirmation, corrections, removal, restore, space moves,
+  categories and expectations. Every operation builds a new state and then
+  swaps it in.
+- `scenes.py` is the driver every scenario uses. A production driver with the
+  same methods can run the same scenarios against the real API.
+- `scenarios.py` and `scenarios_lifecycle.py` hold the named acceptance
+  scenarios and the evidence writer.
 
 The model imports only the standard library, babel, and
 `tests.synthetic_ingestion.extract.load_input`. It makes no network or model
