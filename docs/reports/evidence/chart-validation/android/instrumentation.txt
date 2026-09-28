@@ -4,5 +4,3 @@ ai.argus.chartprototype.ChartProofTest:.....
 Time: 20.268
 
 OK (5 tests)
-
-
