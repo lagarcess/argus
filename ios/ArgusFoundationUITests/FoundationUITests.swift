@@ -50,13 +50,14 @@ final class FoundationUITests: XCTestCase {
         }
     }
 
-    func testDarkNavigation() {
+    func testDarkNavigation() throws {
         openPreferences()
         app.buttons["appearance.dark"].tap()
         app.buttons["sheet.close"].tap()
         for destination in destinations {
             app.buttons["tab.\(destination)"].tap()
             XCTAssertTrue(app.buttons["tab.\(destination)"].isSelected)
+            try app.performAccessibilityAudit(for: .contrast)
             capture("dark-\(destination)")
         }
         openPreferences()

@@ -196,7 +196,8 @@ struct SearchSampleView: View {
         SamplePage {
             HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass").accessibilityHidden(true)
-                TextField("search.placeholder", text: $query)
+                TextField("search.placeholder", text: $query,
+                          prompt: Text("search.placeholder").foregroundStyle(ArgusStyle.secondary))
                     .font(ArgusStyle.body())
                     .focused($focused)
                     .autocorrectionDisabled()
