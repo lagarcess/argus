@@ -15,8 +15,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.core.graphics.toColorInt
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import com.patrykandpatrick.vico.compose.cartesian.*
@@ -31,15 +31,31 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.cartesianLayerPadding
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
+    private var chartIsDark = false
+    private fun updateSystemBars(dark: Boolean) {
+        chartIsDark = dark
+        window.decorView.post {
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !chartIsDark
+                isAppearanceLightNavigationBars = !chartIsDark
+            }
+        }
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) updateSystemBars(chartIsDark)
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val cases = assets.open("series.json").bufferedReader().use { parseFixtures(it.readText()) }
-        setContent { Prototype(cases) }
+        val palette = assets.open("visual-style.json").bufferedReader().use { org.json.JSONObject(it.readText()) }
+        require(palette.getString("version") == "argus.chart-prototype-style/v1")
+        setContent { Prototype(cases, palette, ::updateSystemBars) }
     }
 }
 
 @Composable
-fun Prototype(cases: List<Scenario>) {
+fun Prototype(cases: List<Scenario>, palette: org.json.JSONObject, onAppearance: (Boolean) -> Unit) {
     var caseIndex by rememberSaveable { mutableIntStateOf(0) }
     var selected by rememberSaveable { mutableStateOf<Int?>(null) }
     var language by rememberSaveable { mutableStateOf("en") }
@@ -49,69 +65,87 @@ fun Prototype(cases: List<Scenario>) {
     val scenario = cases[caseIndex]
     fun t(en: String, spanish: String) = if (es) spanish else en
     val dark = theme == "Dark" || (theme == "System" && isSystemInDarkTheme())
-    val view = LocalView.current
-    SideEffect {
-        val window = (view.context as ComponentActivity).window
-        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !dark
-    }
-    val colors = if (dark) darkColorScheme(primary = Color(0xFF5BA897), onPrimary = Color.Black, background = Color(0xFF0B0B0B), surface = Color(0xFF0B0B0B), surfaceContainer = Color(0xFF202020), onSurface = Color(0xFFF1F1F1)) else lightColorScheme(primary = Color(0xFF287B69), onPrimary = Color.White, background = Color(0xFFFAFAFA), surface = Color(0xFFFAFAFA), surfaceContainer = Color(0xFFF0F0F0), onSurface = Color(0xFF202020))
-    MaterialTheme(colorScheme = colors) {
+    SideEffect { onAppearance(dark) }
+    val resolvedPalette = palette.getJSONObject(if(dark) "dark" else "light")
+    val actualColor = Color(resolvedPalette.getString("actual").toColorInt())
+    val projectedColor = Color(resolvedPalette.getString("projected").toColorInt())
+    ArgusChartTheme(dark) {
         Surface(Modifier.fillMaxSize().testTag("appearance").semantics { stateDescription = if(dark) "dark" else "light" }) {
-            Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).testTag("page").padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).testTag("page").padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Argus", style = MaterialTheme.typography.headlineSmall)
-                Text(t("Chart validation · synthetic data", "Validación de gráficos · datos sintéticos"))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { language = if (es) "en" else "es-419" }, modifier = Modifier.testTag("locale")) { Text(if (es) "English" else "Español") }
-                    var expanded by remember { mutableStateOf(false) }
-                    Box {
-                        OutlinedButton(onClick = { expanded = true }, modifier = Modifier.testTag("theme")) { Text(when(theme) { "Dark" -> t("Dark", "Oscuro"); "Light" -> t("Light", "Claro"); else -> t("System", "Sistema") }) }
-                        DropdownMenu(expanded, { expanded = false }) { listOf("System", "Light", "Dark").forEach { mode -> DropdownMenuItem(text = { Text(when(mode) { "Dark" -> t("Dark", "Oscuro"); "Light" -> t("Light", "Claro"); else -> t("System", "Sistema") }) }, onClick = { theme = mode; expanded = false }, modifier = Modifier.testTag("theme-$mode")) } }
-                    }
-                }
-                var expanded by remember { mutableStateOf(false) }
-                Box {
-                    OutlinedButton(onClick = { expanded = true }, modifier = Modifier.testTag("scenario")) { Text(scenario.titles.getValue(language)) }
-                    DropdownMenu(expanded, { expanded = false }) { cases.forEachIndexed { index, case -> DropdownMenuItem(text = { Text(case.titles.getValue(language)) }, onClick = { caseIndex = index; selected = null; expanded = false }, modifier = Modifier.testTag("case-${case.id}")) } }
-                }
-                Text(t("Actual ━   Projected ┄", "Real ━   Proyectado ┄"))
-                Text("${scenario.currency} · ${t("major currency units · UTC civil dates", "unidades monetarias · fechas civiles UTC")}", style = MaterialTheme.typography.bodySmall)
-                key(scenario.id) { FinancialChart(scenario, selected, { selected = it }, t("No data", "Sin datos")) }
-                if (scenario.points.isNotEmpty()) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(date(scenario.points.first().time, locale), style = MaterialTheme.typography.labelSmall)
-                    Text(date(scenario.points.last().time, locale), style = MaterialTheme.typography.labelSmall)
-                }
+                Text(t("SYNTHETIC EXAMPLE", "EJEMPLO SINTÉTICO"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(scenario.titles.getValue(language), style = MaterialTheme.typography.titleLarge)
                 val sample = selected?.let(scenario.points::get)
-                val readout = if (sample == null) t("Select a date with the chart or Previous/Next.", "Selecciona una fecha en el gráfico o con Anterior/Siguiente.") else listOf(
-                    date(sample.time, locale),
-                    t("Actual", "Real") + ": " + amount(sample.actual, scenario.currency, locale),
-                    t("Projected", "Proyectado") + ": " + amount(sample.projected, scenario.currency, locale),
-                    t("Contribution", "Aporte") + ": " + amount(sample.contribution, scenario.currency, locale)
-                ).joinToString("\n")
-                Text(readout, Modifier.fillMaxWidth().heightIn(min = 112.dp).testTag("readout").semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodyLarge)
+                val scale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+                Column(Modifier.fillMaxWidth().testTag("readout").semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }) {
+                    Text(if(sample != null) date(sample.time, locale) else if(scenario.points.isEmpty()) t("No observations", "Sin observaciones") else t("Select a date", "Selecciona una fecha"), Modifier.heightIn(min = (24 * scale).dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(t("Actual", "Real") + ": " + if(sample != null) amount(sample.actual, scenario.currency, locale) else "—", Modifier.fillMaxWidth().heightIn(min = (60 * scale).dp), style = MaterialTheme.typography.headlineSmall)
+                    Text(t("Projected", "Proyectado") + ": " + if(sample != null) amount(sample.projected, scenario.currency, locale) else "—", Modifier.fillMaxWidth().heightIn(min = (24 * scale).dp), style = MaterialTheme.typography.bodyMedium)
+                    Text(t("Contribution", "Aporte") + ": " + if(sample != null) amount(sample.contribution, scenario.currency, locale) else "—", Modifier.fillMaxWidth().heightIn(min = (24 * scale).dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    SeriesLegend(t("Actual", "Real"), actualColor, false)
+                    SeriesLegend(t("Projected", "Proyectado"), projectedColor, true)
+                }
+                key(scenario.id) { FinancialChart(scenario, selected, { selected = it }, t("No data", "Sin datos"), locale, actualColor, projectedColor) }
+                if (scenario.points.isNotEmpty()) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(date(scenario.points.first().time, locale), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if(scenario.points.size > 1) Text(date(scenario.points.last().time, locale), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     OutlinedButton(onClick = { selected = selected?.minus(1)?.coerceAtLeast(0) ?: scenario.points.lastIndex }, enabled = scenario.points.isNotEmpty(), modifier = Modifier.testTag("previous")) { Text(t("Previous", "Anterior")) }
                     OutlinedButton(onClick = { selected = selected?.plus(1)?.coerceAtMost(scenario.points.lastIndex) ?: 0 }, enabled = scenario.points.isNotEmpty(), modifier = Modifier.testTag("next")) { Text(t("Next", "Siguiente")) }
                     TextButton(onClick = { selected = null }, modifier = Modifier.testTag("reset")) { Text(t("Reset", "Borrar")) }
                 }
-                Text(t("Horizontal drag selects. Vertical drag scrolls. Release keeps the date; cancellation restores the prior selection. Missing dates remain selectable.", "Arrastra horizontalmente para seleccionar y verticalmente para desplazar. Al soltar se conserva la fecha; al cancelar se restaura la selección anterior. Las fechas sin datos siguen disponibles."))
-                Text(t("Synthetic fixture only. No forecasts, returns, balances, provider calls or account data are calculated here.", "Solo datos sintéticos. Aquí no se calculan pronósticos, rendimientos ni saldos, ni se consultan proveedores o cuentas."))
-                Spacer(Modifier.height(280.dp))
-                Text(t("End of scroll proof", "Fin de prueba de desplazamiento"), Modifier.testTag("footer"))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = .45f))
+                Text(t("Prototype controls", "Controles del prototipo"), style = MaterialTheme.typography.titleMedium)
+                LabControls(cases, caseIndex, language, theme,
+                    onCase = { caseIndex = it; selected = null },
+                    onLanguage = { language = if(es) "en" else "es-419" },
+                    onTheme = { theme = it })
+                Text("${scenario.currency} · ${t("major currency units · UTC civil dates", "unidades monetarias · fechas civiles UTC")}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(t("Horizontal drag selects. Vertical drag scrolls. Release keeps the date; cancellation restores the prior selection. Use Previous and Next to read every date, including missing data.", "Arrastra horizontalmente para seleccionar y verticalmente para desplazar. Al soltar se conserva la fecha; al cancelar se restaura la selección anterior. Usa Anterior y Siguiente para leer todas las fechas, incluso las que no tienen datos."), style = MaterialTheme.typography.bodySmall)
+                Text(t("Synthetic data only. No forecasts, returns, balances, provider calls or account data are calculated here.", "Solo datos sintéticos. Aquí no se calculan pronósticos, rendimientos ni saldos, ni se consultan proveedores o cuentas."), style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(160.dp))
+                Text(t("End of scroll proof", "Fin de prueba de desplazamiento"), Modifier.testTag("footer"), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
 }
 
 @Composable
-fun FinancialChart(scenario: Scenario, selection: Int?, onSelect: (Int?) -> Unit, empty: String) {
+private fun SeriesLegend(label: String, color: Color, dashed: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Canvas(Modifier.width(24.dp).height(12.dp)) {
+            drawLine(color, Offset(0f, center.y), Offset(size.width, center.y), 2.dp.toPx(), pathEffect = if(dashed) androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 3.dp.toPx())) else null)
+        }
+        Text(label, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+fun FinancialChart(scenario: Scenario, selection: Int?, onSelect: (Int?) -> Unit, empty: String, locale: Locale, actualColor: Color, projectedColor: Color) {
     val pieces = remember(scenario) { segments(scenario.points) }
     val currentSelection by rememberUpdatedState(selection)
     val currentSelect by rememberUpdatedState(onSelect)
     val foreground = MaterialTheme.colorScheme.onSurface
-    Box(Modifier.fillMaxWidth().height(220.dp).testTag("chart")) {
+    val values = remember(scenario) { scenario.points.flatMap { listOfNotNull(it.actual, it.projected) } }
+    val minY = (values.minOrNull() ?: 0.0).coerceAtMost(0.0)
+    val maxY = (values.maxOrNull() ?: 1.0).coerceAtLeast(0.0).let { if(it == minY) it + 1 else it }
+    val middleY = (minY + maxY) / 2
+    val ticks = listOf(maxY, middleY, minY)
+    val axisFormat = remember(locale) { java.text.NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 0 } }
+    Row(Modifier.fillMaxWidth()) {
+        if(values.isNotEmpty()) Column(Modifier.width((52 * androidx.compose.ui.platform.LocalDensity.current.fontScale).dp).height(220.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            ticks.forEach { Text(axisFormat.format(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+        Box(Modifier.weight(1f).height(220.dp).testTag("chart")) {
+        if(values.isNotEmpty()) Canvas(Modifier.fillMaxSize()) {
+            ticks.forEach { val y = ((maxY - it) / (maxY - minY) * size.height).toFloat(); drawLine(foreground.copy(alpha = .12f), Offset(0f, y), Offset(size.width, y), 1f) }
+        }
         if (pieces.isEmpty()) Text(empty, Modifier.align(Alignment.Center)) else {
             val lines = pieces.map { piece ->
-                val color = if (piece.projected) Color(0xFFC88732) else Color(0xFF3D9986)
+                val color = if (piece.projected) projectedColor else actualColor
                 val lineFill = LineCartesianLayer.LineFill.single(fill(color))
                 LineCartesianLayer.rememberLine(
                     fill = lineFill,
@@ -125,7 +159,7 @@ fun FinancialChart(scenario: Scenario, selection: Int?, onSelect: (Int?) -> Unit
             }) }
             val first = scenario.points.first().time.toEpochDay().toDouble()
             val last = scenario.points.last().time.toEpochDay().toDouble()
-            val range = remember(scenario) { CartesianLayerRangeProvider.fixed(minX = if(first == last) first - .5 else first, maxX = if(first == last) last + .5 else last) }
+            val range = remember(scenario) { CartesianLayerRangeProvider.fixed(minX = if(first == last) first - .5 else first, maxX = if(first == last) last + .5 else last, minY = minY, maxY = maxY) }
             CartesianChartHost(
                 chart = rememberCartesianChart(rememberLineCartesianLayer(lineProvider = LineCartesianLayer.LineProvider.series(lines), rangeProvider = range), layerPadding = { cartesianLayerPadding() }),
                 model = model,
@@ -145,5 +179,6 @@ fun FinancialChart(scenario: Scenario, selection: Int?, onSelect: (Int?) -> Unit
         }.semantics { contentDescription = if(empty == "Sin datos") "Gráfico. Usa Anterior y Siguiente para leer todas las fechas." else "Chart. Use Previous and Next to read every date." }) {
             selection?.let { val x = position(scenario.points, it) * size.width; drawLine(foreground, Offset(x, 0f), Offset(x, size.height), 2f) }
         }
+    }
     }
 }

@@ -86,3 +86,30 @@ The instrumented suite exercises every fixture, missing-row segment preservation
 endpoint readouts, English/es-419, theme modes, horizontal release/cancel/reset,
 vertical scroll, and twelve real-time shell-input long-series scrubs (300 ms each). Measurements explicitly
 include test synchronization and are not finger-to-screen latency claims.
+
+## Bounded visual revision
+
+The chart uses Space Grotesk 500 and Inter from the already licensed #730 native
+TTF assets; `licenses/` records upstream revisions. Typography and neutral colors
+reuse that foundation's treatment inside this isolated application only.
+
+One shared `../fixtures/visual-style.json` owns actual/projected colors across
+clients. Light-theme 85% RGB variants provide 3.78:1 actual and 3.66:1 projected
+contrast against white; dark base tokens provide 6.11:1 and 6.32:1 against
+`#191c1f`. Neutral legend/readout text carries meaning independently of color.
+Dashed projection, straight segments and missing intervals remain unchanged.
+
+The date/readout now precedes the chart in stable text slots, with diagnostics
+under “Prototype controls”. Three quiet Y ticks/grids describe the Vico plotting
+range; tick arithmetic only positions the scale, never computes financial facts.
+Minimum text slots scale with system font size, and the enlarged-text acceptance
+checks that selecting a point does not change readout height. Empty cases give
+no selection instructions; singleton dates appear once. The standalone host
+updates both system bars when focus returns after a popup/theme change.
+
+The capture helper waits for the screenshot background to match the resolved
+appearance before saving, avoiding the prior theme's compositor frame. System
+appearance, 1.5× font size and reduced-motion settings receive focused device
+checks. The chart model uses direct, unanimated updates; no decorative curve or
+selection animation is introduced. Earlier performance evidence describes the
+prior layout and must not be relabeled as the revised layout's measurement.

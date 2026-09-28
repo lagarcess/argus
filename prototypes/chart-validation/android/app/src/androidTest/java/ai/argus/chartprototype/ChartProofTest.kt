@@ -1,6 +1,7 @@
 package ai.argus.chartprototype
 
 import android.os.SystemClock
+import androidx.core.graphics.toColorInt
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -18,14 +19,29 @@ class ChartProofTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val cases get() = context.assets.open("series.json").bufferedReader().use { parseFixtures(it.readText()) }
     private fun choose(id: String) {
-        compose.onNodeWithTag("scenario").performClick()
+        compose.onNodeWithTag("scenario").performScrollTo().performClick()
         compose.onNodeWithTag("case-$id").performClick()
+        compose.onNodeWithText("Argus").performScrollTo()
         compose.waitForIdle()
     }
     private fun readout() = compose.onNodeWithTag("readout").fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
-    private fun screenshot(name: String) {
+    private fun screenshot(name: String, scrollToTop: Boolean = true) {
+        if(scrollToTop) compose.onNodeWithText("Argus").performScrollTo()
         compose.waitForIdle()
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(context.getExternalFilesDir(null), "$name.png"))
+        val dark = compose.onNodeWithTag("appearance").fetchSemanticsNode().config[SemanticsProperties.StateDescription] == "dark"
+        val expected = (if(dark) "#191c1f" else "#ffffff").toColorInt()
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val deadline = SystemClock.uptimeMillis() + 5000
+        var bitmap: android.graphics.Bitmap
+        do {
+            compose.mainClock.advanceTimeByFrame()
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            bitmap = automation.takeScreenshot()
+            if(bitmap.getPixel(10, bitmap.height / 2) == expected) break
+            SystemClock.sleep(50)
+        } while(SystemClock.uptimeMillis() < deadline)
+        assertEquals("Capture must show resolved appearance, not the prior frame", expected, bitmap.getPixel(10, bitmap.height / 2))
+        File(context.getExternalFilesDir(null), "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
     }
     @Test fun fixturesAndSegmentsPreserveEveryFact() {
         cases.forEach { case ->
@@ -65,17 +81,17 @@ class ChartProofTest {
             assertTrue(readout().contains("Actual: " + amount(point.actual, stress.currency, Locale.US)))
             assertTrue(readout().contains("Projected: " + amount(point.projected, stress.currency, Locale.US)))
         }
-        compose.onNodeWithTag("locale").performClick()
+        compose.onNodeWithTag("locale").performScrollTo().performClick()
         val spanish = Locale.forLanguageTag("es-419")
         assertTrue(readout().contains(date(stress.points.last().time, spanish)))
         assertTrue(readout().contains("Real: " + amount(stress.points.last().actual, stress.currency, spanish)))
-        compose.onNodeWithTag("theme").performClick()
+        compose.onNodeWithTag("theme").performScrollTo().performClick()
         compose.onNodeWithTag("theme-Dark").performClick()
         screenshot("spanish-dark")
-        compose.onNodeWithTag("theme").performClick()
+        compose.onNodeWithTag("theme").performScrollTo().performClick()
         compose.onNodeWithTag("theme-Light").performClick()
         screenshot("spanish-light")
-        compose.onNodeWithTag("theme").performClick()
+        compose.onNodeWithTag("theme").performScrollTo().performClick()
         compose.onNodeWithTag("theme-System").performClick()
         screenshot("spanish-system")
     }
@@ -100,7 +116,7 @@ class ChartProofTest {
         compose.onNodeWithTag("scrub").performTouchInput { swipe(Offset(centerX, height*.9f), Offset(centerX, 1f), 500) }
         val after = compose.onNodeWithTag("page").fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         assertTrue("Vertical chart gesture must scroll page", after > before)
-        screenshot("vertical-scroll")
+        screenshot("vertical-scroll", scrollToTop = false)
     }
     @Test fun systemAppearanceFollowsDeviceSetting() {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
@@ -112,6 +128,31 @@ class ChartProofTest {
             compose.waitUntil(10000) { compose.onNodeWithTag("appearance").fetchSemanticsNode().config[SemanticsProperties.StateDescription] == "light" }
             screenshot("system-os-light")
         } finally { device.executeShellCommand("cmd uimode night auto") }
+    }
+    @Test fun enlargedTextRetainsReadoutGeometry() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        try {
+            device.executeShellCommand("settings put system font_scale 1.5")
+            compose.waitUntil(10000) { compose.activity.resources.configuration.fontScale >= 1.5f }
+            choose("stress")
+            val before = compose.onNodeWithTag("readout").getUnclippedBoundsInRoot().let { it.bottom.value - it.top.value }
+            compose.onNodeWithTag("next").performScrollTo().performClick()
+            val after = compose.onNodeWithTag("readout").getUnclippedBoundsInRoot().let { it.bottom.value - it.top.value }
+            assertEquals("Readout slots stay stable at enlarged font size", before, after, 1f)
+            screenshot("enlarged-text")
+        } finally { device.executeShellCommand("settings put system font_scale 1.0") }
+    }
+    @Test fun reducedMotionKeepsDirectSelection() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        val settings = listOf("animator_duration_scale", "transition_animation_scale", "window_animation_scale")
+        val original = settings.associateWith { device.executeShellCommand("settings get global $it").trim() }
+        try {
+            settings.forEach { device.executeShellCommand("settings put global $it 0") }
+            choose("stress")
+            compose.onNodeWithTag("next").performClick()
+            assertTrue(readout().contains(date(cases.first { it.id == "stress" }.points.first().time, Locale.US)))
+            screenshot("reduced-motion")
+        } finally { original.forEach { (key, value) -> device.executeShellCommand(if(value == "null") "settings delete global $key" else "settings put global $key $value") } }
     }
     @Test fun longSeriesMeasuredInteraction() {
         val start = SystemClock.elapsedRealtimeNanos()
