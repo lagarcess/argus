@@ -395,6 +395,7 @@
       "after_edit_possible_duplicate": {
         "possible_duplicate": "blocking"
       },
+      "distinct_requires_revision": "InvalidInput:revision_required",
       "distinct_without_match": "InvalidInput:distinct_not_applicable",
       "matches_the_other_expense": true
     },
@@ -407,6 +408,12 @@
       "after_check": -220000,
       "opening_after_correction": -250000,
       "still_owed": true
+    },
+    "linked_duplicate_keeps_import_account": {
+      "linked_import_account": true,
+      "reimport": {
+        "already_recorded": "blocking"
+      }
     },
     "moving_activity_across_accounts_needs_reordering": {
       "balances": [
@@ -443,6 +450,9 @@
       "issues": {
         "date_mismatch": "blocking"
       }
+    },
+    "oldest_anchor_in_coverage": {
+      "oldest_anchor_as_of": "2026-09-01T09:00:00-04:00"
     },
     "purchase_edits_recheck_refunds": {
       "later_date": "ReviewRequired:refund_before_purchase",
@@ -520,6 +530,13 @@
         ]
       ],
       "unanswered": "ReviewRequired:inclusion_unanswered"
+    },
+    "spanish_labels_use_supported_locale": {
+      "groceries": "Supermercado",
+      "locale_keys": [
+        "en",
+        "es-419"
+      ]
     },
     "stale_duplicate_resolve_is_refused": {
       "edited_away": "ReviewRequired:duplicate_target_invalid",

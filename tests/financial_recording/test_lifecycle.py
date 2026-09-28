@@ -250,5 +250,17 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "after_edit_possible_duplicate": {"possible_duplicate": "blocking"},
             "matches_the_other_expense": True,
             "distinct_without_match": "InvalidInput:distinct_not_applicable",
+            "distinct_requires_revision": "InvalidInput:revision_required",
+        },
+        "linked_duplicate_keeps_import_account": {
+            "reimport": {"already_recorded": "blocking"},
+            "linked_import_account": True,
+        },
+        "oldest_anchor_in_coverage": {
+            "oldest_anchor_as_of": "2026-09-01T09:00:00-04:00",
+        },
+        "spanish_labels_use_supported_locale": {
+            "locale_keys": ["en", "es-419"],
+            "groceries": "Supermercado",
         },
     }

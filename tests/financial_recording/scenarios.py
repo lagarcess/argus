@@ -206,14 +206,16 @@ def _equal_amounts() -> tuple[Scene, object, str, object, dict]:
 
 def equal_amount_not_a_match() -> dict:
     scene, first, _, twin, seen = _equal_amounts()
-    scene.store.resolve(twin.id, distinct=True)
+    scene.store.resolve(twin.id, distinct=True, expected_revision=twin.revision)
     scene.confirm(twin)
     distinct = {
         "activity_records": scene.activity_count(),
         "spending": scene.spending(first)[0],
     }
     scene, first, original, twin, _ = _equal_amounts()
-    scene.store.resolve(twin.id, duplicate_of=original)
+    scene.store.resolve(
+        twin.id, duplicate_of=original, expected_revision=twin.revision
+    )
     replay = scene.confirm(twin)
     linked = {
         "activity_records": scene.activity_count(),
@@ -445,7 +447,11 @@ def duplicate_import_vs_twins() -> dict:
     accounts = {"cash-dop": dop.id, "cash-usd": usd.id}
     first = scene.import_file("transactions.csv", accounts)
     first_issues = {row: scene.issues(draft) for row, draft in first.items()}
-    scene.store.resolve(first["tx-dop-03"].id, distinct=True)
+    scene.store.resolve(
+        first["tx-dop-03"].id,
+        distinct=True,
+        expected_revision=first["tx-dop-03"].revision,
+    )
     previews = [scene.store.preview(draft.id) for draft in first.values()]
     clean = [
         item

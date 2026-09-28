@@ -253,6 +253,9 @@ def edits_that_move_money_need_review() -> dict:
         "anchor_zone_survives_reader_tz_change": _anchor_zone_stable(),
         "type_edit_revalidates_existing_anchors": _type_edit_revalidates_anchors(),
         "distinct_bound_to_reviewed_revision": _distinct_bound_to_revision(),
+        "linked_duplicate_keeps_import_account": _linked_duplicate_account(),
+        "oldest_anchor_in_coverage": _oldest_anchor_in_coverage(),
+        "spanish_labels_use_supported_locale": _spanish_labels_locale(),
     }
 
 
@@ -267,14 +270,22 @@ def _stale_duplicate_resolve() -> dict:
             twin.id, duplicate_of=original.id, expected_revision=1
         )
     )
-    edited_away = outcome(lambda: scene.store.resolve(twin.id, duplicate_of=original.id))
+    edited_away = outcome(
+        lambda: scene.store.resolve(
+            twin.id,
+            duplicate_of=original.id,
+            expected_revision=scene.store.state.drafts[twin.id].revision,
+        )
+    )
     removed = Scene()
     cash = removed.account("Efectivo", "cash", "DOP", "5000.00")
     original = removed.record("expense", cash, "500.00", 3)
     twin = removed.act("expense", cash, "500.00", 3, method="chat")
     removed.store.remove(original.id, 1, "gone")
     after_remove = outcome(
-        lambda: removed.store.resolve(twin.id, duplicate_of=original.id)
+        lambda: removed.store.resolve(
+            twin.id, duplicate_of=original.id, expected_revision=twin.revision
+        )
     )
     return {
         "stale_revision": stale_revision,
@@ -458,17 +469,77 @@ def _distinct_bound_to_revision() -> dict:
     scene.record("expense", cash, "500.00", 3)
     other = scene.record("expense", cash, "400.00", 4)
     twin = scene.act("expense", cash, "500.00", 3, method="chat")
-    scene.store.resolve(twin.id, distinct=True)
+    scene.store.resolve(twin.id, distinct=True, expected_revision=twin.revision)
     scene.store.edit_draft(
         twin.id, amount="400.00", occurred_on=local(4).date().isoformat()
     )
     after_edit = scene.issues(twin)
     unique = scene.act("expense", cash, "123.00", 5, method="chat")
-    without_match = outcome(lambda: scene.store.resolve(unique.id, distinct=True))
+    without_match = outcome(
+        lambda: scene.store.resolve(
+            unique.id, distinct=True, expected_revision=unique.revision
+        )
+    )
+    missing_revision = outcome(lambda: scene.store.resolve(twin.id, distinct=True))
     return {
         "after_edit_possible_duplicate": after_edit,
         "matches_the_other_expense": scene.refs(twin, "possible_duplicate") == [other.id],
         "distinct_without_match": without_match,
+        "distinct_requires_revision": missing_revision,
+    }
+
+
+def _linked_duplicate_account() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "5000.00")
+    savings = scene.account("Ahorros", "savings", "DOP", "0.00")
+    move = scene.record("transfer", checking, "500.00", 3, counter=savings)
+    twin = scene.draft(
+        "document",
+        {"external_id": "savings-stmt-99"},
+        kind="transfer",
+        account_id=savings.id,
+        amount="500.00",
+        occurred_on=local(3).date().isoformat(),
+        counter_account_id=checking.id,
+    )
+    scene.store.resolve(twin.id, duplicate_of=move.id, expected_revision=twin.revision)
+    again = scene.draft(
+        "document",
+        {"external_id": "savings-stmt-99"},
+        kind="transfer",
+        account_id=savings.id,
+        amount="500.00",
+        occurred_on=local(3).date().isoformat(),
+        counter_account_id=checking.id,
+    )
+    linked = scene.store.book.records[move.id].linked[-1]
+    return {
+        "reimport": scene.issues(again),
+        "linked_import_account": linked.account_id == savings.id,
+    }
+
+
+def _oldest_anchor_in_coverage() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00", as_of=local(1))
+    scene.observe(cash, "900.00", 5)
+    return {
+        "oldest_anchor_as_of": scene.position(cash)["DOP"]["coverage"][
+            "oldest_anchor_as_of"
+        ]
+    }
+
+
+def _spanish_labels_locale() -> dict:
+    from tests.financial_recording.catalog import DEFAULT_CATEGORIES
+
+    locales = sorted(
+        {locale for category in DEFAULT_CATEGORIES.values() for locale in category.labels}
+    )
+    return {
+        "locale_keys": locales,
+        "groceries": DEFAULT_CATEGORIES["groceries"].labels.get("es-419"),
     }
 
 

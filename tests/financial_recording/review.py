@@ -249,7 +249,13 @@ def duplicates(
     same_source = [
         item_id
         for item_id, _, item_account, sources in existing
-        if any(mine & _identities(source, item_account) for source in sources)
+        if any(
+            mine
+            & _identities(
+                source, source.account_id if source.account_id is not None else item_account
+            )
+            for source in sources
+        )
     ]
     if same_source:
         return [issue("already_recorded", *same_source)]

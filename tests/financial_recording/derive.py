@@ -98,6 +98,7 @@ class Provenance:
     method: str
     captured_at: datetime
     source_ref: Optional[dict] = None
+    account_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -478,7 +479,13 @@ def position(
         group[side] += current.amount * share
         group["known"].append(account_id)
         group["known_sides"].add(side)
-        group["as_of"].append(current.as_of)
+        applicable = [
+            record
+            for record in anchors(book, account_id)
+            if at is None or record.body.as_of <= at
+        ]
+        if applicable:
+            group["as_of"].append(applicable[0].body.as_of)
         group["gaps"].extend(
             gap
             for gap in observation_gaps(book, account_id, tz)

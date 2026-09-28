@@ -338,7 +338,12 @@ class Store:
         expected_revision: Optional[int] = None,
     ) -> Draft:
         draft = self._proposed(draft_id)
-        if expected_revision is not None and draft.revision != expected_revision:
+        if distinct or duplicate_of is not None:
+            if expected_revision is None:
+                raise InvalidInput("revision_required", draft_id)
+            if draft.revision != expected_revision:
+                raise StaleVersion(draft_id)
+        elif expected_revision is not None and draft.revision != expected_revision:
             raise StaleVersion(draft_id)
         changes: dict = {"revision": draft.revision + 1}
         records = self.book.records
@@ -358,9 +363,13 @@ class Store:
                     else [issue("duplicate_target_invalid", duplicate_of)]
                 )
             target = records[duplicate_of]
+            linked = replace(
+                draft.provenance,
+                account_id=(draft.fields.get("account_id") or "").strip() or None,
+            )
             records = {
                 **records,
-                duplicate_of: replace(target, linked=(*target.linked, draft.provenance)),
+                duplicate_of: replace(target, linked=(*target.linked, linked)),
             }
             changes.update(status="confirmed", record_id=duplicate_of)
         if answers:

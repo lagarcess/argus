@@ -87,7 +87,7 @@ class Category:
 
 
 def _default(identifier: str, family: Family, en: str, es: str) -> Category:
-    return Category(identifier, family, {"en": en, "es": es})
+    return Category(identifier, family, {"en": en, "es-419": es})
 
 
 DEFAULT_CATEGORIES: Mapping[str, Category] = {
