@@ -1574,7 +1574,7 @@ def main() -> int:
     for item in results:
         if item["status"] != "passed":
             print(f"{item['status'].upper()}: {item['case']}")
-    return 1 if counts["failed"] or counts["error"] else 0
+    return 0 if results and counts["passed"] == len(results) else 1
 
 
 if __name__ == "__main__":

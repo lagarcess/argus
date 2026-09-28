@@ -13,7 +13,7 @@ The evidence behind the wider bank report is listed in the [evidence index](../e
 
 With pull request 724's model at `d081bfcdf5c7c2bee767d873f232752432098c39` on the path, every case passes. Without it, the intake cases pass and every case that needs the model reports blocked. The two committed reports own the counts and what each case observed.
 
-Blocked means a case needs the recording model and could not run. It is not a pass.
+Blocked means a case needs the recording model and could not run. It is not a pass, and the proof exits with status 0 only when every case passes.
 
 - The committed [report with pull request 724](proof-report.json) and [report without it](proof-report-without-724.json) are those runs. A second run of each writes the same bytes.
 - The first report records the model's head as given to the runner, a digest of every Python file in that package (`88baa7c4...3f3c8`), and a digest of the ingestion kit (`48c40767...9925c`), so a reader can tell which versions it proves.
@@ -201,7 +201,7 @@ Until then, the proof stays documentation. Stop dependent work if another owner 
 
 ## Rerun
 
-The proof needs `pdftotext` from Poppler, as the ingestion kit does. Without pull request 724, the intake cases run and the recording cases report blocked.
+The proof needs `pdftotext` from Poppler, as the ingestion kit does. Without pull request 724, the intake cases run and the recording cases report blocked, so that run writes its report and exits with status 1.
 
 ```bash
 poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/proof.py --report temp/selected-file-import-without-724.json
