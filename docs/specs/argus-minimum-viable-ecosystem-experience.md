@@ -44,7 +44,7 @@ The experience promise is:
 
 Lock these refinements into the ecosystem:
 
-- **Home leads with the upcoming financial period.** Show near-term commitments, received versus expected income, and an understandable estimate of remaining money. Preserve asset/debt summaries and deeper detail.
+- **Home connects recorded position with the upcoming financial period.** The populated view leads with recorded net worth, followed by near-term commitments and a clearly separate cash projection. Distinguish received versus expected income, show the period and included accounts, and retain asset/debt detail.
 - **Budgets, debt payments, and goals share the same financial picture.** They must not independently allocate the same money. Match completed activity against its planned commitment rather than subtracting both.
 - **Each confirmed entry reduces future effort.** Reuse relevant confirmed context, match later imports, preserve corrections, and make returning easier than reconstructing the picture elsewhere.
 - **Tracking and decisions reinforce each other.** Existing Argus calculations and explanations use the recorded context to explore consequences; hypothetical scenarios never silently become actual financial activity.
@@ -73,7 +73,7 @@ Use a refined floating glass treatment on mobile, simple recognizable icons, and
 
 The bar may compact or recede while scrolling and return when needed. Movement must not make navigation difficult to recover, obscure input, or ignore reduced-motion settings.
 
-Updates and profile live in the header, outside the primary bar. Profile opens app/account settings; Home owns the personal financial overview. Keep the chat header restrained: no redundant “Ask Argus” title or duplicate top-left branding over the branded cold start. Home may retain the wordmark; other surfaces use clear destination titles.
+Updates and profile live in the header outside the primary bar on financial surfaces. Chat uses its dedicated conversation controls described below. Profile opens app/account settings; Home owns the personal financial overview. Keep the chat header restrained: no redundant “Ask Argus” title or duplicate top-left branding over the branded cold start. Home may retain the wordmark; other surfaces use clear destination titles.
 
 ## 3. Minimum useful capacity of each surface
 
@@ -96,6 +96,24 @@ Minimum capacity:
 
 Use a simple vertical mobile flow. Do not turn Home into a generic market-news feed or a collection of charts. Incomplete information should still be useful: say “Based on your recorded accounts” and show freshness instead of suggesting comprehensive live coverage.
 
+#### Populated Home summary and list boundary
+
+Founder-locked September 27, 2026. The populated sketch leads with recorded net
+worth, a quiet source note and cash/debt breakdown. Remove promotional headings
+and repeated coverage explanations. Show missing balances and estimate provenance
+when relevant. Keep a short account preview with View all leading to Accounts;
+[DESIGN growing lists](../../.agent/designs/argus/DESIGN.md#growing-lists-across-ecosystem-surfaces)
+owns the row limits and inherited disclosure/loading interaction.
+
+Net worth stays separate by currency. A future combined view is optional and
+requires explicit display-currency and exchange-rate source/date rules; no FX
+conversion is approved or implemented by this mock. Original account currencies
+must remain intact. Below the recorded summary, Coming up previews the same
+dated expectations and projected cash shown in Plan, with View plan as its
+destination. Do not present that estimate as net worth or guaranteed spendable
+money. Without expectations, invite the person to add their next income or bill;
+do not assume future expenses are zero.
+
 ### Accounts: organize the financial facts
 
 Minimum account types include cash, checking, savings, investments, credit cards, and other debts. Cash is first-class.
@@ -111,6 +129,219 @@ Minimum capacity:
 - Distinguish individual and joint accounts, with explicit household visibility. One joint account can appear in both personal and household contexts without becoming two accounts or being counted twice.
 
 Transfers between owned accounts are not spending. A credit-card payment must not count purchases twice. A cash withdrawal is a transfer to cash when that is what happened; later cash purchases are expenses. Changes to a balance must not silently manufacture income or spending.
+
+#### Account activity and balance checks
+
+Founder-approved September 27, 2026. Adding an account with an opening balance
+completes setup; it does not require a second income/expense entry. Account
+details editing, recording new activity, inspecting an existing activity row,
+and checking a balance are distinct actions. Keep their labels stable; do not
+turn a completed account into a misleading “Resume entry” task.
+
+“Record new activity” creates a new transaction. Opening an activity row inspects
+or corrects an existing transaction. Income/Expense/Transfer is the activity type;
+source (salary, remittance, interest, other income) or spending category is optional
+additional detail, not another selection of the same type. Transfers do not need
+an income source or spending category.
+
+“Check balance” compares the user's observed amount with recorded information
+before confirmation. Show the prior recorded amount, observed amount, currency,
+check date and difference. If they differ, offer recording missing activity or
+saving an explicitly labeled balance adjustment. Preserve the discrepancy in
+history; never silently replace the amount or classify unexplained differences
+as income/spending. A matching balance needs no nonzero adjustment. An unknown
+prior balance cannot produce a calculated difference. Asset estimate changes
+remain value updates, not unexplained cash transactions.
+
+A confirmed adjustment can establish a known balance while transaction coverage
+remains incomplete. Keep that distinction visible in account history and affected
+summaries. Later imports, missing activity, corrections and removals must reconcile
+against the check without double-counting. The production design obligations and
+unresolved technical choices are recorded in the
+[backend reconciliation handoff](argus-account-balance-reconciliation-handoff.md).
+This locks behavior, not a schema, API or posting model.
+
+Removal names the affected record, explains effects on linked accounts and uses
+the shared destructive confirmation treatment in
+[DESIGN.md](../../.agent/designs/argus/DESIGN.md#destructive-confirmations).
+Recovery language must match actual capability: the disposable sketch supports
+immediate Undo and session-only restoration through Data & privacy → Removed
+financial entries. List the original space and account, preview balance effects,
+and restore the original record rather than creating a copy. Transfers/payments
+return together. Production retention, authorization and recovery periods remain
+open; no conversation-deletion policy is silently inherited.
+
+#### Archiving accounts
+
+Account archiving in the final September 28 mobile baseline is organizational:
+allow a nonzero or unknown balance, retain its balance/history and existing
+obligations in the financial picture, and make restoration available from Manage
+accounts. It removes the account from the ordinary active list, not from money
+totals. Do not manufacture an outflow or silently reduce debt by archiving.
+Removing an empty account is a separate reviewed action; this does not authorize
+deleting accounts with history or changing permissions.
+
+#### Refunds, corrections and adjustments
+
+September 28 UI refinement: a refund records money actually returned to cash,
+a bank account or a credit card. It is distinct from income and reduces spending
+in the month received. A card refund reduces debt and may leave credit in the
+person's favor. Show that credit explicitly. Partial refunds can reference the
+original purchase; linked refunds cannot exceed it. Keep the purchase and refund
+as separate records with a shared category. Refunding to another account must
+identify the actual destination. Never assume an exchange rate for a foreign-
+currency return; use the actual received amount and mark an unlinked purchase.
+
+When the original purchase is absent, allow an explicitly unlinked refund with
+an optional category. Do not fabricate a purchase or retroactively rewrite old
+months. Correcting an erroneous entry is a separate action from money returned.
+A balance adjustment or property-value change changes position, not spending or
+income. Loan principal/interest reversals need a breakdown; do not treat them as
+ordinary purchase refunds. An unexplained loan difference uses Check balance.
+
+Activity dated on or before a previously recorded balance check needs a clear
+account-level question: was it already included in that checked balance? If yes,
+record its activity without applying the same balance movement again. If no,
+show the resulting balance change. Paired movements may need an answer for each
+account. This UI choice does not resolve source matching, adjustment lineage or
+concurrent corrections in production; those obligations remain in the backend
+handoff. Preserve the optional 200-character note across every financial activity
+form, including refunds and balance checks.
+
+#### Financial spaces
+
+Founder-approved sketch boundary: Personal is the default. Add a space offers
+Household, a named private Business space, and Custom for another named private
+financial picture (September 28 template refinement requested by the founder).
+Custom reuses the private account/activity/plan flow; it is not a new permission
+type. Personal remains the single permanent default. Business reuses manual accounts,
+activity and plans, with optional user-entered categories. It does not imply
+employees, payroll, invoicing or tax accounting. Retirement remains an account
+or goal within an appropriate space, not a mandatory new space.
+
+Use the quiet horizontal space selector on Home, Accounts and Plan. A space is
+not an account type or category. Household projects only explicitly shared
+records; it must not silently combine private Business or Personal information.
+Global search can find authorized records across spaces and must identify the
+record's space. Space ownership and authorization still need production contracts.
+
+#### Managing private spaces
+
+The September 28 disposable UI refinement closes creation and recovery together:
+`+` offers Household, Business and Custom, with Manage spaces below. The final
+mobile lock removes duplicate space and household management entries from
+Profile & settings; use the existing space and Manage household controls.
+Private spaces can be renamed. Their names
+must be distinct, including archived and recoverable deleted spaces.
+
+Archive removes a private space from ordinary space navigation, retaining its
+accounts, balances, activity, corrections, notes, plans and recovery records.
+Search still finds these records with an Archived space label. Opening an
+archived space identifies its status; archiving is organization, not a read-only
+financial freeze, a cancellation of commitments, or a change in permissions.
+Restore brings it back to the space selector. Leaving or archiving the active
+private space returns to Personal, without moving records or money.
+
+Delete is available only for an empty private space: no accounts (including
+archived accounts), activity, plans, expected items, entry drafts or recoverable
+removed accounts. Use the existing destructive confirmation, Undo, and Recently
+deleted within Manage spaces. Never cascade-delete financial records from this
+control or encourage deleting history to make the space eligible. Personal
+cannot be archived, renamed or deleted. Household retains its separate membership
+and sharing flow; deleting a private space cannot revoke a partner's access.
+
+The sketch permits multiple named private spaces but does not establish an
+unlimited production entitlement. Production limits, retention/purge policy,
+concurrent deletion checks and lifecycle authorization remain technical/product
+contracts to settle before implementation. No employee, payroll, tax, nested-space
+or bulk migration capability is introduced by Custom.
+
+#### Reassigning accounts between spaces
+
+Founder-approved UI refinement, September 28, 2026. Manage account offers
+**Move to another space** between Personal, private Business and Custom spaces, and
+**Share with household** separately for personal accounts. Household sharing
+changes visibility/access, not the account's owner or private-space assignment.
+
+Moving first names the source and destination. Keep balance, opening position,
+full activity/correction history, notes and recoverable removed entries together,
+with original record identity. A move creates no transaction, income or expense.
+Explain which space budgets stop/start including the account's matching activity;
+the budgets and goals themselves remain where they are. Open the moved account
+in its destination and identify that space. Moving it back uses the same review.
+
+Before confirmation, identify links to transfers/payments, cross-account refunds,
+asset loans, household sharing, forecasts, debt plans, documents and unfinished
+entries. Never break these links or suggest deleting valid history to make a move
+possible. The disposable sketch moves standalone accounts and explains why a
+linked account is blocked; group moves and permission-aware link migration need
+the production contract. Creating a destination is explicit and does not itself
+move the account. Cancelling a move leaves its account and activity in place.
+
+#### Quick account setup and optional assets
+
+Founder-approved September 27, 2026. Keep a short, single-screen setup with
+progressive details, not a required wizard. Once chosen, the type picker folds
+into a compact row with a Change action. Let users choose an account type,
+confirm its currency, optionally give it a nickname, and enter a balance or
+leave it unknown. A missing value is not zero. A nickname changes the display
+name, not the underlying account identity or institution.
+
+Initial creation contains only type, nickname, currency, and balance or estimated
+value. Move the optional details below into the saved item's editing surface;
+do not show a More details questionnaire during initial creation. Keep unknown
+values supported so completing the financial picture is not a prerequisite.
+
+For assets, show a compact ownership summary beside this simple entry:
+“You own all of it · Change.” Change reveals “All of it,” “Half,” or “Another
+share”; only the last choice asks for a percentage. Reflect the selected share
+in plain language and calculate its contribution automatically. This remains
+one item, without inviting a partner or configuring sharing during creation.
+
+Use the same entry pattern with fields that fit the item:
+
+| Item | Starting value | Optional details, disclosed when relevant |
+| --- | --- | --- |
+| Cash, checking, savings | Recorded balance or unknown | Balance date; institution for bank accounts |
+| Investments | Recorded value or unknown | Institution, date, supported holdings later |
+| Credit card | Amount owed or unknown | Credit limit, payment due date, interest rate |
+| Other debt | Amount owed or unknown | Lender, payment dates, rate and repayment details |
+| Property, vehicle, other asset | Estimated whole-asset value or unknown | Estimate date and basis, ownership share, related debt |
+
+Offer property, vehicles and other assets through a secondary entry alongside
+accounts. They are optional parts of the financial picture, not prerequisites
+for getting started. Users can record an item before knowing its value and
+update the estimate later. Cash remains the easiest first item to add.
+
+Asset estimates must remain visibly distinct from cash and bank balances.
+Home can include them in a clearly labeled recorded net-worth picture, separated
+by currency, but must not present them as spendable money. Unknown values make
+that picture incomplete rather than silently contributing zero. Show the
+estimate's date and basis; changing an estimate does not create income or an
+expense.
+
+Record the full asset value and the user's ownership share explicitly. Count
+only the relevant share in a personal view. Household aggregation must use the
+same underlying asset and ownership records, so inviting a partner cannot
+create a second copy of the property. Ownership and permission to view are
+separate facts; adding an asset does not grant household access.
+
+A mortgage or vehicle loan is a separate debt that can be linked to the asset.
+Linking organizes the picture; it does not add another debt or subtract the
+same liability a second time. Do not require an asset's estimated value to add
+its related debt.
+
+**Future valuation assistance:** investigate Dominican listing sources such as
+[SuperCarros](https://www.supercarros.com/) for vehicles and
+[SuperCasas](https://www.supercasas.com/) for residential property. Published
+asking prices are comparison evidence, not verified sale prices or an appraisal.
+Any later estimate should expose its comparable listings, date, currency,
+relevant differences and uncertainty, then let the user accept or adjust it.
+Manual estimates remain available. Automated collection, source access and
+reuse terms, valuation methodology, coverage and refresh behavior still need
+technical validation; these sites are candidates, not committed integrations.
+This decision authorizes the experience and disposable sketch, not production
+scrapers or a new financial-record contract.
 
 ### Argus: ask, understand, and get things done
 
@@ -130,6 +361,12 @@ Conversational answers and financial writes are distinct. Asking “What if I sp
 
 Guest chat remains part of the intended experience. Do not settle persistent storage, registration timing, or onboarding policy through incidental UI choices; those decisions are parked.
 
+#### Temporary chat and conversation recovery
+
+Founder-locked mobile presentation, September 28, 2026: one Temporary chat mode replaces separate private/incognito names. Optional Use my context starts off; neither temporary variant creates new memories or enters chat history. Context choice locks after the first message. A nonempty session asks before discarding; returning can restore the prior regular draft. This is the experience target, not a shipped retention or anonymity guarantee. Context authorization, provider handling and retention need explicit technical contracts before implementation.
+
+Recents distinguishes no chats, archived-only and no matching results. New chat from a search creates an unsent draft. Archive/restore and delete/recovery preserve the original identity. The More menu concerns the current chat; temporary entry is not duplicated there. DESIGN.md owns the stable header positions and motion.
+
 ### Plan: decide what I want to change
 
 Minimum capacity:
@@ -143,6 +380,32 @@ Each shows the same understandable structure: current position, intended outcome
 Existing calculators supply useful scenarios. A savings calculation can become a goal; a payoff calculation can become a debt plan; an opportunity-cost comparison can inform a decision. Saving a scenario does not authorize any real-money action.
 
 Projected progress and actual progress are separate. “If you save RD$3,000 monthly” is a projection. Recorded contributions establish what happened. Avoid counting the same contribution twice when it appears through multiple sources.
+
+#### Connected plan status
+
+A dated expectation may reference a budget; that budget's limit is not another
+cash movement. Show Planned until an actual entry is explicitly recorded or
+linked. Recording from an expectation names the account and actual date, previews
+the amount, and creates one activity entry. Accounts and budget spending use it;
+the forecast excludes that fulfilled occurrence. A refund changes recorded cash
+and spending without automatically making the paid bill unpaid. Removing or
+correcting the linked entry must re-evaluate the link rather than preserving a
+false Completed label. Dates, included accounts and currency remain visible.
+
+In the connected UI study, a debt or savings plan can name its funding account,
+destination and next date. Overview derives those expected movements from the
+plan; it does not keep another editable copy. Show why an unconfigured plan is
+excluded. Transfers between included cash accounts remain visible but do not
+reduce their combined cash. Use “Net cash change” for inflow minus outflow;
+reserve a shortfall warning for a projected negative balance.
+
+A linked contribution opens its original activity for correction or recovery.
+When linking an existing contribution, clarify whether a manually recorded goal
+total already includes it. Correcting the amount of an explicitly fulfilled
+occurrence changes actual balances without creating a second expected payment;
+a changed type or account requires review. Removal and restoration re-evaluate
+the link. These are sketch behavior requirements, not production recurrence,
+allocation, or reconciliation contracts.
 
 ### Search: find what I already know
 
@@ -164,7 +427,9 @@ Notifications should invite a return without exposing financial amounts in push/
 
 ### Profile: control Argus
 
-Own language, notification preferences, security, data controls, export, account management, and household invitations/membership. Keep this separate from Accounts and Home so “my profile” does not ambiguously mean “my finances.” The financial view itself switches between personal and household context within the main experience.
+Own app preferences, notification preferences, security, data controls, export and the Argus login account. Keep this separate from Accounts and Home so “my profile” does not ambiguously mean “my finances.” Financial space organization and household invitations/membership remain at their existing space controls, without duplicate Settings entries.
+
+The September 28 mobile lock keeps Personal details above three groups: App (Preferences, Personalization, Notifications), Account (Security, Data & privacy, Usage), and Support (Help & feedback). Language lives only in Preferences. Personal details offers an avatar theme or profile photo; response preferences remain distinct from remembered context and financial records. Light, Dark and System persist as appearance preferences.
 
 ## 4. Information ingestion: one destination, several entry methods
 
@@ -175,6 +440,14 @@ The product must work with incomplete banking connectivity. Users may mix input 
 **Capture → interpret/extract → review and resolve → confirm → save the canonical record → update dependent surfaces.**
 
 The confirmed record is the durable financial fact. Chat messages, uploaded files, notifications, and extracted text provide context and provenance; they are not independent competing ledgers. Home, Accounts, Plan, Search, and Updates derive from the same confirmed records.
+
+This approved confirmed-record scope supersedes the September 8 historical
+Decision 8 prohibition on a new personal-figure storage surface only for explicit
+financial-record confirmation. It does not copy arbitrary chat figures into
+personalization memory or change conversation retention. That older decision
+already allowed figures inside conversation messages; “unconfirmed” must not be
+misread as “never persisted in chat history.” Guest financial-record persistence
+remains a separate open decision.
 
 The input methods below are part of the experience direction. Their technical readiness differs. Wallet integrations and bank access are experiments, not promises of universal support or prerequisites for a useful ecosystem. Provider selection is not locked.
 
@@ -206,7 +479,17 @@ Voice is another way to express the same questions and activities, not a separat
 - Save only after confirmation.
 - Handle interrupted recordings or uncertain amounts without creating partial financial records.
 
-ElevenLabs or another provider may be evaluated; none is selected by this decision. Speech-to-text is the core capture need. A full real-time spoken assistant is not implied. Audio retention and consent must be explicit product decisions, not hidden provider defaults.
+**Founder update September 28, 2026:** include full spoken conversation alongside
+dictation and transcription. The microphone produces editable text; voice mode
+supports spoken replies and interruption while preserving the same review and
+confirmation journey. Speech must not silently save a draft or bypass a material
+correction. Users can return to text without losing the relevant conversation or
+confirmed records. Audio retention and consent, including Temporary chat, remain
+explicit product decisions rather than hidden provider defaults.
+
+The selected provider direction and integration boundaries are owned by
+[ARCHITECTURE.md](../ARCHITECTURE.md#voice-and-chart-direction). Full voice is an
+approved target, not a claim that the frozen template or production implements it.
 
 ### 4.4 Upload a file or statement
 
@@ -314,14 +597,14 @@ The boundary for adding a capability is: **does it help someone understand, main
 ## 9. Decisions deliberately left open
 
 - Account onboarding, guest persistence, and conversion timing.
-- Exact voice, OCR/document, and banking providers and supported formats/institutions.
+- Voice integration, retention and acceptance contracts under the [selected provider direction](../ARCHITECTURE.md#voice-and-chart-direction); OCR/document and banking providers and supported formats/institutions.
 - Wallet/device automation feasibility and permissions by platform.
 - Secure design and institution-specific conditions for browser-assisted bank access.
 - Source-file/audio retention details and any future automatic acceptance policy.
 - Notification delivery channels and scheduling defaults.
 - Maintained market-product inventory, commercial relationships, and execution permissions.
 - Engineering breakdown, release order, timelines, and platform sequencing.
-- Household invitation delivery channel and detailed membership, removal, retention, and permission mechanics. The household capability itself is approved; these details must preserve section 12's visibility and consent boundaries.
+- Household invitation security and delivery integration, membership, removal, retention, and permission mechanics. Copy link and email delivery are selected in section 12; the integration contracts must preserve its visibility and consent boundaries.
 
 These open implementation choices do not reopen the approved ecosystem structure. Agents should preserve the distinction between the intended experience, an exploratory integration, and a currently working feature.
 
@@ -408,7 +691,7 @@ The personal view contains the person's own financial picture and any joint acco
 
 **Accounts:** Label individual versus joint ownership and who can see or edit the record. Both partners can inspect authorized shared activity. Keep private account details out of the household view.
 
-**Plan:** Support shared budgets, bills, debt commitments, and goals. Make contribution responsibilities understandable without requiring a 50/50 split. Private plans remain private unless explicitly shared.
+**Plan:** Support shared budgets, bills, debt commitments, and goals. Show each contributor, planned versus recorded progress, and who can view or edit the plan. A planned contribution is not received cash or saved progress. Plan editing does not grant access to private funding accounts. Make responsibilities understandable without requiring a 50/50 split. Private plans remain private unless explicitly shared. The sketch demonstrates these distinctions with optional fictional shared-plan examples, not a working multi-user permission system.
 
 **Argus:** Let a person ask about the personal or shared picture, with the active context clear. A proposed entry must identify the relevant account or household commitment before confirmation. Answers, summaries, and calculations must not expose another person's private facts indirectly.
 
@@ -423,6 +706,28 @@ The personal view contains the person's own financial picture and any joint acco
 - A shared bill appears once in the household obligation total, even when both people contribute toward it. A planned contribution is not actual available cash.
 - Confirmed shared updates propagate to both partners' authorized views. Make it possible to identify who recorded or corrected an entry and resolve mistakes without silently overwriting another person's work.
 - Information that was not shared must not be silently included in shared calculations, even if a personalized aggregate could conceal its source.
+
+### Invitation delivery: founder-locked September 27, 2026
+
+- **Copy invite link** is the simple sharing action. People can paste it into
+  WhatsApp, Messages, or another channel themselves; Argus does not send a
+  WhatsApp Business API message for this flow.
+- Reuse the founder's **do-blitz** URL shortener as the selected integration
+  direction. Argus must own invitation authorization, expiry, revocation and
+  acceptance; a short URL is only delivery. This choice does not attest that
+  do-blitz currently meets the required security or deployment contract.
+- **Email invitations through Resend** are also selected. Both delivery methods
+  refer to the same invitation lifecycle. Email contents contain no financial
+  amounts or account details.
+- Invitations carry no rewards or incentives in this iteration.
+- Acceptance does not create a joint financial account or share personal accounts
+  automatically. Joint account creation and account sharing are explicit actions.
+
+The disposable UI may explore choosing an individual contact as a shortcut to
+entering the recipient. Contact synchronization, revealing who already uses
+Argus, a social feed, automatic friend creation, and acquisition incentives are
+not approved by this delivery decision. Any later discovery design needs explicit
+consent, discoverability controls, and a scoped privacy contract.
 
 ### How the household strengthens the loop
 

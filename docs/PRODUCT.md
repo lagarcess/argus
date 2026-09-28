@@ -55,8 +55,9 @@ scenarios must not silently change actual balances.
 - Design for phones, with native iOS/Android and web as intended platforms.
 
 [DESIGN.md](../.agent/designs/argus/DESIGN.md) owns visual conventions. Native
-architecture, sequencing, providers, and the new account-onboarding flow remain
-open as specified in the MVEE. Follow the [authority map](DOCUMENTATION_AUTHORITY.md)
+implementation contracts, sequencing, remaining providers, and the new account-onboarding flow remain
+open as specified in the MVEE. The [voice and chart direction](ARCHITECTURE.md#voice-and-chart-direction)
+is selected; integration and acceptance remain to be completed. Follow the [authority map](DOCUMENTATION_AUTHORITY.md)
 when scoping implementation.
 
 ## 5. Existing capabilities and behavior to preserve

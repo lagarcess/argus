@@ -13,16 +13,20 @@ generous whitespace, and the restrained neutral palette. Existing large
 marketing-hero sizes are surface-specific examples, not default sizes for
 mobile financial screens.
 
-The color system is built on a comprehensive `--rui-*` (Argus UI) token architecture with semantic naming for every state: danger (`#e23b4a`), warning (`#ec7e00`), teal (`#00a87e`), blue (`#494fdf`), deep-pink (`#e61e49`), and more. But the marketing surface itself is remarkably restrained — near-black (`#191c1f`) and pure white (`#ffffff`) dominate, with the colorful semantic tokens reserved for the product interface, not the marketing page.
+Near-black and white dominate Argus. Product status and financial meaning use
+the muted palette below. The implemented shared colors are owned by
+[`web/app/globals.css`](../../../web/app/globals.css); existing artifact and
+failure treatments have their own shared owners listed below. Do not introduce
+bright alternate values or assume every reference color has a global CSS token.
 
-What distinguishes Argus is its pill-everything button system. Every button uses 9999px radius — primary dark (`#191c1f`), secondary light (`#f4f4f4`), outlined (`transparent + 2px solid`), and ghost on dark (`rgba(244,244,244,0.1) + 2px solid`). The padding is generous (14px 32px–34px), creating large, confident touch targets. Combined with Inter for body text at various weights and positive letter-spacing (0.16px–0.24px), the result is a design that feels both premium and accessible — banking for the modern era.
+Argus uses pill-shaped action buttons. Primary and secondary action buttons use 9999px radius — primary dark (`#191c1f`), secondary light (`#f4f4f4`), outlined (`transparent + 2px solid`), and ghost on dark (`rgba(244,244,244,0.1) + 2px solid`). The padding is generous (14px 32px–34px), creating large, confident touch targets. Combined with Inter for body text at various weights and positive letter-spacing (0.16px–0.24px), the result is a design that feels both premium and accessible — banking for the modern era.
 
 **Key Characteristics:**
 - Space Grotesk weight 500; 136px is a large marketing-hero example, not a mobile default
-- Near-black (`#191c1f`) + white binary with comprehensive `--rui-*` semantic tokens
-- Universal pill buttons (9999px radius) with generous padding (14px 32px)
+- Near-black (`#191c1f`) + white, with restrained semantic color
+- Pill action buttons (9999px radius) with generous padding (14px 32px); quiet text controls for navigation
 - Inter for body text with positive letter-spacing (0.16px–0.24px)
-- Rich semantic color system: blue, teal, pink, yellow, green, brown, danger, warning
+- Muted financial, informational, attention, and failure treatments
 - Flat content surfaces with depth through contrast; glass mobile navigation follows the MVEE
 - Tight display line-heights (1.00) with relaxed body (1.50–1.56)
 
@@ -30,29 +34,49 @@ What distinguishes Argus is its pill-everything button system. Every button uses
 
 ### Primary
 - **Argus Dark** (`#191c1f`): Primary dark surface, button background, near-black text
-- **Pure White** (`#ffffff`): `--rui-color-action-label`, primary light surface
+- **Pure White** (`#ffffff`): Primary light surface and dark-button label
 - **Light Surface** (`#f4f4f4`): Secondary button background, subtle surface
 
-### Brand / Interactive
-- **Argus Blue** (`#494fdf`): `--rui-color-blue`, primary brand blue
-- **Action Blue** (`#4f55f1`): `--rui-color-action-photo-header-text`, header accent
-- **Blue Text** (`#376cd5`): `--website-color-blue-text`, link blue
+### Historical Brand / Interactive References
+The earlier guide also listed blue references (`#494fdf`, `#4f55f1`,
+`#376cd5`). These are not shared tokens in `web/app/globals.css` and are not
+instructions to recolor current primary controls or links. Preserve each
+existing component's treatment unless its redesign is explicitly assigned.
 
 ### Semantic (Muted Alpha Palette)
 Argus avoids "casino-terminal" vibrancy. Semantic tones are desaturated to feel educational and premium.
 
-- **Muted Rose** (`#d66d75`): `--rui-color-danger`, negative states
-- **Clay Red** (`#b85c5c`): `--rui-color-clay`, alternate negative
+- **Muted Rose** (`#d66d75`): `--rui-color-danger`, financial negatives and existing destructive controls; not the universal system-failure color
 - **Muted Teal** (`#5ba897`): `--rui-color-teal`, positive states
-- **Emerald Mist** (`#70a38d`): `--rui-color-success`, secondary positive
-- **Soft Blue** (`#7da0ca`): `--rui-color-info`, informational/neutral
-- **Slate Indigo** (`#5a677d`): `--rui-color-neutral`, baseline/neutral
+- **Emerald Mist** (`#70a38d`): Existing artifact success tint
+- **Soft Blue** (`#7da0ca`): Existing artifact informational tint
+- **Slate Indigo** (`#5a677d`): Reference neutral accent; not a shared global token
 - **Dusty Gold** (`#c2a44d`): `--rui-color-warning`, attention/warning
 
 ### Neutral Scale
 - **Mid Slate** (`#505a63`): Secondary text
 - **Cool Gray** (`#8d969e`): Muted text, tertiary
-- **Gray Tone** (`#c9c9cd`): `--rui-color-grey-tone-20`, borders/dividers
+- **Gray Tone** (`#c9c9cd`): Reference for borders/dividers
+
+### Existing Implementation Owners
+
+- [`globals.css`](../../../web/app/globals.css) owns the shared teal, warning,
+  and rose tokens, plus light/dark page backgrounds and foregrounds.
+- [`artifact-status-tones.ts`](../../../web/lib/artifact-status-tones.ts) owns
+  artifact status colors, including their text, border, wash, and dark variants.
+  Use its existing status mapping; a finished calculation is not automatically
+  a positive financial outcome.
+- [`failure-treatment.ts`](../../../web/lib/failure-treatment.ts) owns retryable,
+  terminal, degraded, and quiet failure treatments. Terminal failures use warm
+  red (`#b3593f` light / `#e08d70` dark), distinct from financial-negative rose.
+- [`avatar-theme.ts`](../../../web/lib/avatar-theme.ts) owns avatar color choices;
+  they are personalization, not financial status.
+
+Use these owners rather than recreating their treatments from the palette.
+Muted swatches are not universal small-text colors: retain the existing darker
+light-theme text and lighter dark-theme text variants. Always pair meaning with
+labels or symbols. New financial-record states and a complete ecosystem dark
+theme still require design; this reconciliation does not define those contracts.
 
 ## 3. Typography Rules
 
@@ -115,6 +139,50 @@ Argus avoids "casino-terminal" vibrancy. Semantic tones are desaturated to feel 
 - Padding: 14px 32px
 - Radius: 9999px
 
+### Destructive confirmations
+
+The existing web owner is
+[`ConfirmDialog.tsx`](../../../web/components/ui/ConfirmDialog.tsx), used by
+Recents (`ChatSidebar`) and Omnisearch (`ChatCommandPalette`). Preserve this
+pattern when carrying record removal into new surfaces:
+
+- Center the dialog above the active surface with a dimmed, lightly blurred
+  backdrop. Existing light treatment: black at 25%, 4px blur, white panel,
+  18px radius, subtle border, 20px padding, maximum width 384px. Dark treatment
+  uses black at 60% and the existing dark panel. Respect viewport margins.
+- Use a specific question, name the record, and explain the real consequence.
+  Keep supporting copy restrained; do not imply permanent deletion or recovery
+  that the operation does not support.
+- Cancel is an outlined pill. The explicit destructive action is a muted-rose
+  (`--rui-color-danger`, `#d66d75`) pill with a white label; destructive entry
+  points use the same semantic treatment. Keep 48px targets in the phone sketch.
+- Retain the component's compact 17px display heading and 13px body/action text;
+  its existing semibold dialog heading is an exception to general heading defaults.
+- Use a labeled modal alert dialog with focus containment, safe initial focus,
+  Escape/backdrop cancellation and focus return. Production `useModalSurface`
+  owns topmost-layer and system-back behavior. Do not claim native parity from
+  the disposable web dialog. While saving, prevent duplicate confirmation and
+  respect the owner's busy-state dismissal rules.
+- Apply the rose family consistently to destructive entry points in Accounts,
+  chat, Recents/Search and Profile & settings, including Delete all conversations
+  and Request account deletion. Do not color ordinary navigation (such as opening
+  Recently Deleted) as destructive.
+- Account deletion remains a support request in the existing product, not an
+  immediate delete operation. `ProfileDeleteRequestDialog.tsx` uses a soft rose
+  action (12% rose background, `#b94c55` text; `#e7a2a8` text in dark mode) for
+  Contact support. Preserve that semantic difference from a filled-rose delete
+  confirmation; common color meaning does not require identical action severity.
+- Conversation deletion can name Recently Deleted because that recovery exists.
+  Financial-entry removal must describe its own actual recovery. The sketch's
+  immediate Undo is not a promise of a production retention policy.
+
+Founder confirmed reuse of this pattern for account-entry removal on September
+27, 2026. The balance-check experience is owned by
+[MVEE account activity and balance checks](../../../docs/specs/argus-minimum-viable-ecosystem-experience.md#account-activity-and-balance-checks).
+Use inline form errors, not browser validation popups, in the reviewed account
+forms. Financial differences stay neutral and labeled; rose is reserved here
+for the destructive action, not for an unexplained balance difference.
+
 ### Cards & Containers
 - Radius: 12px (small), 20px (cards)
 - No shadows — flat surfaces with color contrast
@@ -138,7 +206,7 @@ The MVEE owns the pivot navigation and header behavior; retain the following as 
 ### Border Radius Scale
 - Standard (12px): Navigation, containers
 - Card (20px): Feature cards
-- Pill (9999px): All buttons
+- Pill (9999px): Primary and secondary action buttons
 
 ## 6. Depth & Elevation
 
@@ -325,6 +393,48 @@ control or destination.
 - **Fuzzy Search UI**: Global omni-search should support "Fuzzy Human Memory" with suggestion chips:
   - *Suggestions*: `Last week`, `Tesla ideas`, `Crypto`, `Pinned`, `Recent chats`.
 
+### Growing lists across ecosystem surfaces
+
+Founder-locked September 27, 2026. Inherit the current Argus list interaction
+patterns; do not independently reinvent pagination or disclosure in each surface.
+
+| Surface | Approved interaction |
+| --- | --- |
+| Home account preview | Up to three rows with View all opening Accounts; no unbounded inline expansion |
+| Accounts | Show more / Show less within groups when lists become long; short lists need no expansion control |
+| Account activity, Search, Updates | Fetch further rows in batches, keep visible results and scroll position, and offer retry on failure |
+| Plan | Compact previews with View all, or expandable groups when the content warrants them |
+
+“Show more / Show less” changes visibility of already loaded rows. “Load more”
+fetches another batch. Do not present those as interchangeable operations. Preserve
+stable row geometry, keyboard focus, accessible expanded-state/group labels and
+adequate touch targets. Hide unnecessary controls when no more rows exist.
+
+**Identified inheritance from the current product code:**
+
+- [`ChatSidebar.tsx`](../../../web/components/sidebar/ChatSidebar.tsx) owns Recents
+  group expansion controls with `aria-controls`, `aria-expanded` and group-specific
+  accessible names. [`chat-recents.ts`](../../../web/lib/chat-recents.ts) owns
+  visibility selection and the existing five-row group default. Home's three-row
+  preview is a separate summary choice, not a change to the Recents constant.
+- [`ChatCommandPalette.tsx`](../../../web/components/sidebar/ChatCommandPalette.tsx)
+  owns cursor-backed result loading, request-currentness and duplicate protection.
+  [`CommandPaletteLoadMoreControl.tsx`](../../../web/components/sidebar/CommandPaletteLoadMoreControl.tsx)
+  owns loading/disabled/error/retry presentation and explicitly retains current
+  results on failure. Its current visible label is “More”; “Load more” above
+  describes the behavior, not a claim about the existing string.
+
+These are inspected repository owners, not a new verification of the deployed
+build. Reuse appropriate web owners and carry their behavior into native clients
+through agreed contracts; do not blindly copy chat-specific grouping, page sizes
+or identity rules into financial records.
+
+**Mock boundary:** the Home three-row preview and View all are demonstrated.
+Accounts grouping and paginated activity/Search/Updates are approved interaction
+direction, not implemented server pagination in the disposable sketch. Production
+integration requires an assigned contract and verification; this lock assigns no
+new backend work.
+
 ### Conversation activity and unread presentation
 
 Conversation activity is a typed continuity signal, not a reason to reorder
@@ -410,6 +520,34 @@ using this locked precedence:
 - **Generous Tap Targets**: All interactive elements (buttons, chips, nav) must meet the **44px minimum** hit area.
 - **Phone-first Layout**: Design for native iOS/Android and responsive web. Existing web/PWA details do not decide the native architecture. Avoid desktop-only dashboard patterns.
 
+### Money entry in the ecosystem sketch
+
+Approved interaction direction, September 27, 2026; not a claim that production
+has this shared control yet. Preserve existing decimal keyboards, readable
+currency markers, inline validation and editing continuity. Account balances,
+asset estimates, credit limits, goals and entry corrections should derive their
+input behavior from one money-entry owner per client and a common contract.
+
+- Show the currency unambiguously; a bare `$` is insufficient context.
+- Keep at least 16px input text, tabular figures, a decimal keyboard, and a
+  visible example of separators and decimal precision. Currency determines
+  fractional precision; UI locale determines separators.
+- Preserve the user's text and caret during typing. Show a formatted readback;
+  group and pad decimals on blur. Editing and pasting must not silently change
+  the amount's meaning.
+- Validate the complete input. Do not blindly remove commas, letters or currency
+  labels; reject malformed grouping, mismatched currency, excess precision and
+  exponent notation with an inline explanation. Do not guess an ambiguous
+  decimal separator or silently round a pasted amount.
+- Blank optional amounts mean unknown, independently of zero. Required goals
+  and positive-only amounts retain their own constraints. Allow negative bank
+  balances where the account supports being overdrawn.
+- A currency change revalidates the same amount; it does not perform FX
+  conversion. Make that distinction visible when an amount is already entered.
+- Save and redisplay the same accepted value, including cents. Native/web
+  integrations still require the production money-arithmetic and API contracts;
+  the disposable sketch's local numeric storage is not that contract.
+
 ## 18. Product Anti-Patterns
 
 Argus is **NOT**:
@@ -480,3 +618,76 @@ When designing any Argus surface, ask:
 > *Does this help someone understand, maintain, or improve their financial picture with less effort?*
 
 If not, it likely should wait.
+
+### Financial context and planning refinement — September 28, 2026
+
+Financial spaces use one quiet horizontal text row: selected dark semibold,
+others muted, with an accessible 44px Add target. Do not apply the action-pill
+style or the section underline to spaces. Plan sections retain their underline
+below the space row. Currency belongs beside amounts, not in the space row. The `+` opens
+Household, Business and Custom creation, with a quiet Manage spaces action.
+Use the same private-space naming form from this menu and account-move review.
+Space lifecycle meaning is owned by the MVEE's Managing private spaces section.
+Archive is neutral and reversible; Delete empty space uses the existing rose
+destructive confirmation. Recently deleted and Restore remain neutral. Preserve
+space names and archived status in Search, and do not put lifecycle controls
+beside every space tab.
+
+Home places a restrained Coming up section between recorded position and the
+account preview. Reuse Plan's forecast and show its date, currency and included
+accounts; no promotional banner, duplicate chart or independent calculation.
+List at most two upcoming items and link to Plan. Existing growing-list rules,
+blur, typography, destructive confirmations and reduced-motion behavior apply.
+
+Financial recovery identifies space and account before confirmation. Refunds,
+balance adjustments and value changes use explicit labels; color alone never
+carries their meaning. Optional financial notes share the 200-character limit.
+These are disposable-template decisions, not claims of backend implementation.
+
+### Transient confirmations and errors
+
+Carry forward `web/components/chat/ChatToast.tsx` and `useChatToast.ts`:
+neutral confirmations use the white, lightly bordered floating pill; errors use
+its warm error text/border and warning icon, with the existing dark variants.
+Undo uses teal. These toast error colors are distinct from the muted-rose
+confirmation button used for destructive actions. Do not invent a green success
+banner or insert status blocks that shift page content.
+
+Use one presenter across surfaces, one toast at a time, above navigation and
+clear of safe areas. Neutral feedback expires after three seconds. An action
+such as Undo can last longer, with its timer paused while focused or hovered;
+recovery remains available after it expires. Respect reduced motion and use
+polite status announcements, assertive announcements for errors. Keep field
+validation beside its field. The template uses a shared adapter, not independent
+account/settings notification styling.
+
+
+### Final mobile design lock — September 28, 2026
+
+The founder locked the complete disposable mobile template and ecosystem reports.
+The [lock handoff](../../../docs/reports/mobile-design-lock-2026-09-28.md)
+identifies the immutable source/evidence archive and verification limits.
+MVEE owns the accepted behavior; this lock does not change existing API/data
+contracts or enable production features.
+
+Chat header layout is fixed by state:
+
+| State | Left | Right |
+| --- | --- | --- |
+| Empty regular | Recents | Temporary entry |
+| Active regular | Recents, New chat | Share, More |
+| Empty or active temporary | Recents, New regular chat | Temporary settings |
+
+New stays left, with a reserved slot to prevent Recents shifting. The dashed
+conversation glyph stays right; it never morphs into New. No redundant landing
+pill. Header/landing fade is 150ms and reduced motion disables it. Composer
+suggestions collapse at the same 200ms pace as the attachment tray expands;
+keep the greeting mounted and make hidden suggestions inert.
+
+Settings keeps the identity row followed by App, Account, Support. Use quiet
+headings and group spacing, with separators only between related rows. Space
+and Household management remain in the space controls, not duplicated here.
+Recents, account activity and global Search retain the shared quiet search
+language. Empty Chats and no matching results offer an explicit New chat action.
+No additional visual exploration is required by this freeze; later changes
+need an explicit request and a new dated checkpoint.

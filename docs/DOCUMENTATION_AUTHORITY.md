@@ -54,7 +54,7 @@ Do not infer these from a polished demo or the MVEE:
 - Financial-record schema, balance/transaction reconciliation model, money arithmetic contracts, migrations, and historical-data conversion.
 - Household membership lifecycle, permission enforcement/RLS, ownership, revocation, deletion, and retention implementation. The consent/visibility experience is settled; its technical realization is not.
 - API routes, action schemas, chat-to-record integration, runtime state ownership, jobs, and event contracts for the new surfaces.
-- Voice/OCR providers, supported file formats/institutions, secure bank-access design, wallet/device capabilities, and automatic-acceptance policies.
+- Voice integration contracts under the [selected voice/chart direction](ARCHITECTURE.md#voice-and-chart-direction), OCR providers, supported file formats/institutions, secure bank-access design, wallet/device capabilities, and automatic-acceptance policies.
 - Scheduling, external-fact monitoring, notification delivery channels, and associated data access.
 - Native client architecture beyond the locked interface stacks: shared contracts/components, authentication, local storage/offline synchronization, supported OS/device ranges, delivery order, rollout flags, acceptance gates, and work packages for the full ecosystem.
 

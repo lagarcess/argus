@@ -188,6 +188,43 @@ ranges, financial-record and household design, ownership/task breakdown, and
 rollout order still require scoped technical definition. No runtime, feature
 gate, or production deployment changes are made by this decision.
 
+### Voice and chart direction
+
+**Founder-locked September 28, 2026.** This section owns provider and chart
+library direction; [MVEE voice](specs/argus-minimum-viable-ecosystem-experience.md#43-speak-to-argus)
+owns the experience. These are implementation choices to validate, not shipped
+integrations or an authorization for paid calls or deployment.
+
+- **Voice:** xAI is the selected provider direction for dictation, transcription
+  and full spoken conversation. The proposed integration path is xAI streaming
+  speech-to-text → existing Argus runtime → xAI streaming text-to-speech.
+  LangGraph remains the single conversational owner; financial drafts,
+  confirmation, permissions and durable records keep their existing owners.
+  Direct speech-to-speech orchestration requires a bounded architecture review
+  before adoption. The hosted Voice Agent Builder's separate reasoning,
+  knowledge store and recording defaults are not adopted by this decision.
+- **Charts:** Swift Charts for iOS, Vico as the Android Compose candidate to
+  validate, and retained TradingView Lightweight Charts for web. Do not add a
+  React Native stack for charting. Validate one representative financial chart
+  before committing library versions or spreading the implementation.
+- **Shared chart contract:** consume the same canonical series, units, dates,
+  projection/actual distinction and missing-data semantics. Clients render and
+  select points; they must not reconstruct financial calculations independently.
+  Use a stable date/value readout, responsive scrubbing and restrained styling.
+  Preserve actual jumps, gaps and flat periods rather than smoothing away facts.
+- **Acceptance still required:** spoken Dominican Spanish and English, language
+  switching, amounts and corrections, interruption/cancellation, disconnection,
+  transcript/card consistency, privacy modes, retention and cost. Charts need
+  scrolling/gesture coexistence, accessibility, theme and representative-device
+  performance checks. Exact API contracts, credentials, versions, OS ranges and
+  rollout remain scoped implementation work.
+
+Sources checked September 28, 2026: [xAI voice APIs](https://docs.x.ai/developers/rest-api-reference/inference/voice),
+[Voice Agent Builder](https://x.ai/news/grok-voice-agent-builder),
+[Swift Charts interaction](https://developer.apple.com/videos/play/wwdc2023/10037/),
+[Vico](https://github.com/patrykandpatrick/vico), and
+[Lightweight Charts](https://github.com/tradingview/lightweight-charts).
+
 ## Frontend Responsibilities
 
 - Chat UI
