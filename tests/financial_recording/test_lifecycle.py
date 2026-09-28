@@ -422,4 +422,14 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "accepted": "2026-09-07",
             "first_still_present": True,
         },
+        "duplicate_link_bumps_account_version": {
+            "checking_bumped": True,
+            "savings_bumped": True,
+            "linked_sources": 1,
+        },
+        "anchor_correct_takes_nested_answers": {
+            "unanswered": "ReviewRequired:inclusion_unanswered",
+            "flat_refused": "InvalidInput:answers_not_applicable",
+            "opening_answered_included": True,
+        },
     }

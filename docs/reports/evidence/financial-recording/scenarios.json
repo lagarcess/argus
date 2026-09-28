@@ -369,6 +369,11 @@
       "activity_zone": "America/Santo_Domingo",
       "note_edit_after_tz_change": "ok"
     },
+    "anchor_correct_takes_nested_answers": {
+      "flat_refused": "InvalidInput:answers_not_applicable",
+      "opening_answered_included": true,
+      "unanswered": "ReviewRequired:inclusion_unanswered"
+    },
     "anchor_zone_survives_reader_tz_change": {
       "balance_stable": true,
       "opening_zone": "America/Santo_Domingo",
@@ -481,6 +486,11 @@
       "distinct_requires_revision": "InvalidInput:revision_required",
       "distinct_without_match": "InvalidInput:distinct_not_applicable",
       "matches_the_other_expense": true
+    },
+    "duplicate_link_bumps_account_version": {
+      "checking_bumped": true,
+      "linked_sources": 1,
+      "savings_bumped": true
     },
     "duplicate_of_draft_is_refused": {
       "link_to_draft": "ReviewRequired:duplicate_target_invalid",

@@ -12,7 +12,7 @@ import json
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 from zoneinfo import ZoneInfo
 
 from tests.financial_recording.catalog import (
@@ -386,6 +386,7 @@ class Store:
             raise StaleVersion(draft_id)
         changes: dict = {"revision": draft.revision + 1}
         records = self.book.records
+        linked_accounts: set[str] = set()
         if distinct:
             matches = self._live_duplicate_matches(draft)
             if not matches:
@@ -418,11 +419,22 @@ class Store:
                 **records,
                 duplicate_of: replace(target, linked=(*target.linked, linked)),
             }
+            linked_accounts = accounts_of(target.body)
             changes.update(status="confirmed", record_id=duplicate_of)
         if answers:
             changes["answers"] = _merged_answers(draft.answers, answers)
         resolved = replace(draft, **changes)
-        self._swap(records=records, drafts={**self.state.drafts, draft_id: resolved})
+        # Linking a provenance source mutates a confirmed record; bump every
+        # account that record touches so stale bases cannot survive the write.
+        self._swap(
+            accounts=(
+                {**self.book.accounts, **_bumped(self.book.accounts, linked_accounts)}
+                if linked_accounts
+                else None
+            ),
+            records=records,
+            drafts={**self.state.drafts, draft_id: resolved},
+        )
         return resolved
 
     def preview(self, draft_id: str) -> Preview:
@@ -548,7 +560,7 @@ class Store:
         reason: str,
         *,
         accept_reordering: bool = False,
-        answers: Optional[Mapping[str, str]] = None,
+        answers: Optional[Mapping[str, Any]] = None,
         account_basis: Optional[Mapping[str, int]] = None,
         check: Optional[Mapping[str, Optional[int]]] = None,
         **changes,
@@ -561,6 +573,11 @@ class Store:
         from the correction screen so concurrent included activity cannot rewrite
         what the person accepted. `accept_reordering` also requires `account_basis`
         for every touched account. The observation field `basis` stays in `changes`.
+
+        Activity corrections take flat `answers` ({check_id: choice}). Opening and
+        check corrections take nested activity answers
+        ({activity_id: {check_id: choice}}) for questions the trial write exposes,
+        same shape as check removal.
         """
         record = self._current(record_id, expected_revision, reason)
         currency = self.book.accounts[record.body.account_id].currency
@@ -579,12 +596,29 @@ class Store:
             "occurred_on" in changes or "occurred_at" in changes
         ):
             changes["zone"] = str(self.tz)
-        if answers and not isinstance(record.body, Activity):
+        nested = _as_nested_answers(answers) if answers is not None else None
+        flat = _as_flat_answers(answers) if answers is not None else None
+        if answers is not None and nested is None and flat is None:
             raise InvalidInput("answers_not_applicable", record_id)
-        if answers:
-            changes["answers"] = _merged_answers(record.body.answers, answers)
+        if nested is not None and isinstance(record.body, Activity):
+            raise InvalidInput("answers_not_applicable", record_id)
+        if flat is not None and not isinstance(record.body, Activity):
+            raise InvalidInput("answers_not_applicable", record_id)
+        if flat is not None:
+            changes["answers"] = _merged_answers(record.body.answers, flat)
         body = replace(record.body, **changes)
-        found = blocking(validate(self.book, body, self.tz, record_id, now=self.clock()))
+        working = dict(self.book.records)
+        now = self.clock()
+        if nested is not None:
+            trial = with_trial(self.book, body, record_id, self.tz)
+            exposed = _exposed_inclusions(trial, accounts_of(body), self.tz)
+            self._apply_nested_activity_answers(
+                working, exposed, nested, reason, now
+            )
+        answered_book = replace(self.book, records=working)
+        found = blocking(
+            validate(answered_book, body, self.tz, record_id, now=now)
+        )
         if (
             not isinstance(body, Activity)
             and body.account_id != record.body.account_id
@@ -595,15 +629,20 @@ class Store:
         if target is not None and target.currency != currency:
             raise InvalidInput("currency_mismatch", body.account_id)
         left = accounts_of(record.body) - accounts_of(body)
-        trial = with_trial(self.book, body, record_id, self.tz)
+        trial = with_trial(answered_book, body, record_id, self.tz)
         found.extend(inclusion_issues(trial, left, self.tz))
-        found.extend(self._linked_refund_issues(record_id, body))
-        only_answers = set(changes) == {"answers"}
+        found.extend(self._linked_refund_issues(record_id, body, book=answered_book))
+        only_answers = set(changes) == {"answers"} and nested is None
         touched = accounts_of(record.body) | accounts_of(body)
+        for other in working.values():
+            if other.id in self.book.records and other is not self.book.records[other.id]:
+                touched |= accounts_of(other.body)
         if accept_reordering:
             self._assert_reordering_basis(touched, account_basis, record_id)
         elif not found and not only_answers:
-            found.extend(self._placement_changes(record, body))
+            found.extend(
+                self._placement_changes(record, body, book=answered_book)
+            )
         if found:
             raise ReviewRequired(found)
         will_reconfirm = isinstance(body, Observation) and _observation_needs_restamp(
@@ -612,8 +651,12 @@ class Store:
         if will_reconfirm:
             if account_basis is None or check is None:
                 raise InvalidInput("check_correction_basis_required", record_id)
-            self._assert_check_correction_basis(record_id, body, account_basis, check)
-        return self._revise(record, body, reason, removed=False)
+            self._assert_check_correction_basis(
+                record_id, body, account_basis, check, book=answered_book
+            )
+        return self._revise(
+            record, body, reason, removed=False, extra_records=working
+        )
 
     def remove(
         self,
@@ -650,47 +693,15 @@ class Store:
                 ),
             },
         )
-        exposed = {
-            (item.refs[1], item.refs[0])
-            for item in inclusion_issues(trial, scope, self.tz)
-            if item.code == "inclusion_unanswered" and len(item.refs) >= 2
-        }
+        exposed = _exposed_inclusions(trial, scope, self.tz)
         records = dict(self.book.records)
         touched = set(scope)
         if answers:
-            for activity_id, activity_answers in answers.items():
-                target = records.get(activity_id)
-                if (
-                    target is None
-                    or target.removed
-                    or not isinstance(target.body, Activity)
-                    or not activity_answers
-                ):
-                    raise InvalidInput("answer_target_invalid", activity_id)
-                for check_id in activity_answers:
-                    if (activity_id, check_id) not in exposed:
-                        raise InvalidInput("answer_target_invalid", activity_id)
-                new_body = replace(
-                    target.body,
-                    answers=_merged_answers(target.body.answers, activity_answers),
-                )
-                previous = target.revisions[-1]
-                revised = replace(
-                    target,
-                    revisions=(
-                        *target.revisions,
-                        replace(
-                            previous,
-                            body=new_body,
-                            recorded_at=now,
-                            provenance=Provenance("manual", now),
-                            reason=reason,
-                            recorded_by=self.actor,
-                        ),
-                    ),
-                )
-                records[activity_id] = revised
-                touched |= accounts_of(new_body)
+            self._apply_nested_activity_answers(
+                records, exposed, answers, reason, now
+            )
+            for activity_id in answers:
+                touched |= accounts_of(records[activity_id].body)
         tombstone = replace(
             record.revisions[-1],
             removed=True,
@@ -724,11 +735,15 @@ class Store:
         expected_revision: int,
         reason: str,
         *,
-        answers: Optional[Mapping[str, str]] = None,
+        answers: Optional[Mapping[str, Any]] = None,
         accept_reordering: bool = False,
         account_basis: Optional[Mapping[str, int]] = None,
     ) -> Record:
-        """Restores the original record, never a copy; both legs return together."""
+        """Restores the original record, never a copy; both legs return together.
+
+        A restored activity takes flat inclusion answers. A restored opening or
+        check takes nested activity answers for questions the restore exposes.
+        """
         record = self.book.records[record_id]
         if len(record.revisions) != expected_revision:
             raise StaleVersion(record_id)
@@ -737,22 +752,45 @@ class Store:
         if not reason.strip():
             raise InvalidInput("reason_required", record_id)
         body = record.body
-        if answers and not isinstance(body, Activity):
+        nested = _as_nested_answers(answers) if answers is not None else None
+        flat = _as_flat_answers(answers) if answers is not None else None
+        if answers is not None and nested is None and flat is None:
             raise InvalidInput("answers_not_applicable", record_id)
-        if answers:
-            body = replace(body, answers=_merged_answers(body.answers, answers))
-        found = blocking(validate(self.book, body, self.tz, record_id, now=self.clock()))
+        if nested is not None and isinstance(body, Activity):
+            raise InvalidInput("answers_not_applicable", record_id)
+        if flat is not None and not isinstance(body, Activity):
+            raise InvalidInput("answers_not_applicable", record_id)
+        if flat is not None:
+            body = replace(body, answers=_merged_answers(body.answers, flat))
+        working = dict(self.book.records)
+        now = self.clock()
+        if nested is not None:
+            trial = with_trial(self.book, body, record_id, self.tz)
+            exposed = _exposed_inclusions(trial, accounts_of(body), self.tz)
+            self._apply_nested_activity_answers(
+                working, exposed, nested, reason, now
+            )
+        answered_book = replace(self.book, records=working)
+        found = blocking(
+            validate(answered_book, body, self.tz, record_id, now=now)
+        )
         if found:
             raise ReviewRequired(found)
         touched = accounts_of(record.body) | accounts_of(body)
-        after = with_trial(self.book, body, record_id, self.tz)
+        for other in working.values():
+            if other.id in self.book.records and other is not self.book.records[other.id]:
+                touched |= accounts_of(other.body)
+        after = with_trial(answered_book, body, record_id, self.tz)
         if accept_reordering:
             self._assert_reordering_basis(touched, account_basis, record_id)
         else:
+            # Compare against the live book; answered activities live only in `after`.
             moved = self._placement_changes_against(after, touched)
             if moved:
                 raise ReviewRequired(moved)
-        return self._revise(record, body, reason, removed=False)
+        return self._revise(
+            record, body, reason, removed=False, extra_records=working
+        )
 
     def _live_duplicate_matches(self, draft: Draft) -> tuple[str, ...]:
         """Current possible_duplicate targets for this draft revision."""
@@ -787,37 +825,44 @@ class Store:
                 if estimated and body.basis != "value_estimate":
                     raise InvalidInput("basis_not_applicable", body.basis)
 
-    def _linked_refund_issues(self, record_id: str, body: Body) -> list[Issue]:
+    def _linked_refund_issues(
+        self, record_id: str, body: Body, *, book: Optional[Book] = None
+    ) -> list[Issue]:
         """A corrected purchase is re-checked through the same refund rule."""
-        trial = with_trial(self.book, body, record_id, self.tz)
+        source = self.book if book is None else book
+        trial = with_trial(source, body, record_id, self.tz)
         found = []
-        for other in live_records(self.book):
+        for other in live_records(source):
             refund = other.body
             if isinstance(refund, Activity) and refund.refund_of == record_id:
                 account = trial.accounts[refund.account_id]
                 found.extend(blocking(refund_issues(trial, refund, account, other.id)))
         return found
 
-    def _placement_changes(self, record: Record, body: Body) -> list[Issue]:
+    def _placement_changes(
+        self, record: Record, body: Body, *, book: Optional[Book] = None
+    ) -> list[Issue]:
         """Any activity whose landing relative to an account's anchors changes.
 
         Includes activity that leaves one account or enters another, so a
         same-currency move cannot silently rewrite a destination check.
         """
-        after = with_trial(self.book, body, record.id, self.tz)
+        source = self.book if book is None else book
+        after = with_trial(source, body, record.id, self.tz)
         return self._placement_changes_against(
-            after, accounts_of(record.body) | accounts_of(body)
+            after, accounts_of(record.body) | accounts_of(body), book=source
         )
 
     def _placement_changes_against(
-        self, after: Book, account_ids: set[str]
+        self, after: Book, account_ids: set[str], *, book: Optional[Book] = None
     ) -> list[Issue]:
-        """Compare landings in `self.book` vs `after` for the given accounts."""
+        """Compare landings in `book` (or `self.book`) vs `after`."""
+        before_book = self.book if book is None else book
         moved = set()
         for account_id in sorted(account_ids):
-            before_anchors = anchors(self.book, account_id)
+            before_anchors = anchors(before_book, account_id)
             after_anchors = anchors(after, account_id)
-            before = {item.id: item for item in activities(self.book, account_id)}
+            before = {item.id: item for item in activities(before_book, account_id)}
             later = {item.id: item for item in activities(after, account_id)}
             for move_id in set(before) | set(later):
                 before_land = (
@@ -833,6 +878,47 @@ class Store:
                 if before_land != after_land:
                     moved.add(move_id)
         return [issue("inclusion_changed", *sorted(moved))] if moved else []
+
+    def _apply_nested_activity_answers(
+        self,
+        records: dict[str, Record],
+        exposed: set[tuple[str, str]],
+        answers: Mapping[str, Mapping[str, str]],
+        reason: str,
+        now: datetime,
+    ) -> None:
+        """Apply activity_id → {check_id: choice} for exposed inclusion questions."""
+        for activity_id, activity_answers in answers.items():
+            target = records.get(activity_id)
+            if (
+                target is None
+                or target.removed
+                or not isinstance(target.body, Activity)
+                or not activity_answers
+            ):
+                raise InvalidInput("answer_target_invalid", activity_id)
+            for check_id in activity_answers:
+                if (activity_id, check_id) not in exposed:
+                    raise InvalidInput("answer_target_invalid", activity_id)
+            new_body = replace(
+                target.body,
+                answers=_merged_answers(target.body.answers, activity_answers),
+            )
+            previous = target.revisions[-1]
+            records[activity_id] = replace(
+                target,
+                revisions=(
+                    *target.revisions,
+                    replace(
+                        previous,
+                        body=new_body,
+                        recorded_at=now,
+                        provenance=Provenance("manual", now),
+                        reason=reason,
+                        recorded_by=self.actor,
+                    ),
+                ),
+            )
 
     def _stamped(self, book: Book, record: Record) -> Record:
         """Stores what a balance check showed when confirmed: its contents,
@@ -956,8 +1042,11 @@ class Store:
         body: Observation,
         basis: Mapping[str, int],
         check: Mapping[str, Optional[int]],
+        *,
+        book: Optional[Book] = None,
     ) -> None:
         """Refuse a restamp when the reviewed account state or evidence moved."""
+        source = self.book if book is None else book
         # The observation's own account version must be present; `{}` is not enough.
         if body.account_id not in basis:
             raise StaleVersion(body.account_id)
@@ -980,7 +1069,7 @@ class Store:
                 ),
             ),
         )
-        stamped = self._stamped(self.book, placeholder)
+        stamped = self._stamped(source, placeholder)
         last = stamped.revisions[-1]
         if (
             last.confirmed_expected != check.get("prior")
@@ -990,7 +1079,13 @@ class Store:
             raise StaleVersion(body.account_id)
 
     def _revise(
-        self, record: Record, body: Body, reason: str, *, removed: bool
+        self,
+        record: Record,
+        body: Body,
+        reason: str,
+        *,
+        removed: bool,
+        extra_records: Optional[Mapping[str, Record]] = None,
     ) -> Record:
         now = self.clock()
         previous = record.revisions[-1]
@@ -1004,6 +1099,12 @@ class Store:
             recorded_by=self.actor,
         )
         revised = replace(record, revisions=(*record.revisions, revision))
+        source_records = (
+            {**self.book.records, **extra_records}
+            if extra_records is not None
+            else self.book.records
+        )
+        source = replace(self.book, records=source_records)
         # Amount, instant, or stored zone changes re-confirm a check; a note or
         # restore keeps the evidence the person accepted. Zone belongs here
         # because correct() rewrites it with as_of and a TZ day-boundary shift
@@ -1013,12 +1114,19 @@ class Store:
         ):
             reconfirmed = replace(revised.revisions[-1], contained=None)
             revised = self._stamped(
-                self.book, replace(revised, revisions=(*record.revisions, reconfirmed))
+                source, replace(revised, revisions=(*record.revisions, reconfirmed))
             )
         touched = accounts_of(record.body) | accounts_of(body)
+        if extra_records is not None:
+            for other_id, other in extra_records.items():
+                if other_id == record.id:
+                    continue
+                prior = self.book.records.get(other_id)
+                if prior is None or other is not prior:
+                    touched |= accounts_of(other.body)
         self._swap(
             accounts={**self.book.accounts, **_bumped(self.book.accounts, touched)},
-            records={**self.book.records, record.id: revised},
+            records={**source_records, record.id: revised},
         )
         return revised
 
@@ -1082,6 +1190,33 @@ def _observation_needs_restamp(before: Observation, after: Observation) -> bool:
         before.as_of,
         before.zone,
     )
+
+
+def _as_flat_answers(
+    answers: Mapping[str, Any],
+) -> Optional[Mapping[str, str]]:
+    if answers and all(isinstance(value, str) for value in answers.values()):
+        return answers  # type: ignore[return-value]
+    return None
+
+
+def _as_nested_answers(
+    answers: Mapping[str, Any],
+) -> Optional[Mapping[str, Mapping[str, str]]]:
+    if answers and all(isinstance(value, Mapping) for value in answers.values()):
+        return answers  # type: ignore[return-value]
+    return None
+
+
+def _exposed_inclusions(
+    book: Book, account_ids: set[str], tz: ZoneInfo
+) -> set[tuple[str, str]]:
+    """(activity_id, check_id) pairs with an open inclusion question."""
+    return {
+        (item.refs[1], item.refs[0])
+        for item in inclusion_issues(book, account_ids, tz)
+        if item.code == "inclusion_unanswered" and len(item.refs) >= 2
+    }
 
 
 def _merged_answers(current: Answers, answers: Mapping[str, str]) -> Answers:

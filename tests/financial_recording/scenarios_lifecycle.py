@@ -295,6 +295,8 @@ def edits_that_move_money_need_review() -> dict:
         "zone_change_restamps_check": _zone_change_restamps_check(),
         "correction_dry_run_keeps_seq": _correction_dry_run_keeps_seq(),
         "reordering_bound_to_account_state": _reordering_bound_to_account_state(),
+        "duplicate_link_bumps_account_version": _duplicate_link_bumps_version(),
+        "anchor_correct_takes_nested_answers": _anchor_correct_takes_nested_answers(),
     }
 
 
@@ -1013,14 +1015,23 @@ def _redated_check_restamps() -> dict:
     expense = scene.record("expense", cash, "100.00", 8)
     redate = {"as_of": local(9, 18), "amount": "900.00"}
     unanswered = outcome(lambda: scene.store.correct(check.id, 1, "9th", **redate))
-    scene.store.correct(expense.id, 1, "seen on the 9th", answers={check.id: "included"})
-    unaccepted = outcome(lambda: scene.store.correct(check.id, 1, "9th", **redate))
+    # Nested activity answers travel with the anchor correction in one call.
+    unaccepted = outcome(
+        lambda: scene.store.correct(
+            check.id,
+            1,
+            "9th",
+            answers={expense.id: {check.id: "included"}},
+            **redate,
+        )
+    )
     scene.store.correct(
         check.id,
         1,
         "9th",
         accept_reordering=True,
-        account_basis={cash.id: scene.store.book.accounts[cash.id].version},
+        account_basis=scene.account_basis(cash),
+        answers={expense.id: {check.id: "included"}},
         check={"prior": 90_000, "observed": 90_000, "difference": 0},
         **redate,
     )
@@ -1501,6 +1512,72 @@ def _remove_rejects_empty_answer_map() -> dict:
                 answers={record.id: {second.id: "included"}},
             )
         ),
+    }
+
+
+def _duplicate_link_bumps_version() -> dict:
+    """Same-as linking mutates a confirmed record and must bump its accounts."""
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "5000.00")
+    savings = scene.account("Ahorros", "savings", "DOP", "5000.00")
+    move = scene.record(
+        "transfer", checking, "100.00", 3, counter=savings
+    )
+    before = scene.account_basis(checking, savings)
+    twin = scene.act(
+        "transfer",
+        checking,
+        "100.00",
+        3,
+        counter=savings,
+        method="document",
+    )
+    scene.store.resolve(
+        twin.id, duplicate_of=move.id, expected_revision=twin.revision
+    )
+    after = scene.account_basis(checking, savings)
+    return {
+        "checking_bumped": after[checking.id] == before[checking.id] + 1,
+        "savings_bumped": after[savings.id] == before[savings.id] + 1,
+        "linked_sources": len(scene.store.book.records[move.id].linked),
+    }
+
+
+def _anchor_correct_takes_nested_answers() -> dict:
+    """Opening/check corrections accept nested activity answers in one call."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00", as_of=local(5))
+    opening = anchors(scene.store.book, cash.id)[0].id
+    expense = scene.record("expense", cash, "100.00", 3)
+    # Moving the opening onto the expense day asks inclusion in the same call.
+    unanswered = outcome(
+        lambda: scene.store.correct(opening, 1, "was the 3rd", as_of=local(3, 18))
+    )
+    flat_refused = outcome(
+        lambda: scene.store.correct(
+            opening,
+            1,
+            "was the 3rd",
+            as_of=local(3, 18),
+            answers={opening: "included"},
+        )
+    )
+    scene.store.correct(
+        opening,
+        1,
+        "was the 3rd",
+        as_of=local(3, 18),
+        answers={expense.id: {opening: "included"}},
+        account_basis=scene.account_basis(cash),
+        accept_reordering=True,
+    )
+    return {
+        "unanswered": unanswered,
+        "flat_refused": flat_refused,
+        "opening_answered_included": dict(
+            scene.store.book.records[expense.id].body.answers
+        ).get(opening)
+        == "included",
     }
 
 
