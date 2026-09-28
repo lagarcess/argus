@@ -4,7 +4,6 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
-import io.github.jan.supabase.auth.user.UserSession
 import java.io.File
 import java.security.KeyStore
 import javax.crypto.KeyGenerator
@@ -13,9 +12,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.put
 
 /** Auth-only, device-bound storage. No profile, password, plaintext preference, or backup file. */
 internal class EncryptedSessionVault(
@@ -36,25 +32,14 @@ internal class EncryptedSessionVault(
         }
         val plain = SessionEnvelope.open(bytes, key(create = false))
         try {
-            val json = sessionJson.parseToJsonElement(plain.toString(Charsets.UTF_8)).jsonObject
-            val session = sessionJson.decodeFromJsonElement(UserSession.serializer(), json.getValue("session"))
-            val id = requireNotNull(json.string("identity_id"))
-            require(id.isNotBlank() && session.user?.id == id)
-            require(session.accessToken.isNotBlank() && session.refreshToken.isNotBlank())
-            StoredSession(session, id, AccountKind.valueOf(requireNotNull(json.string("kind"))),
-                Revocation.valueOf(requireNotNull(json.string("revocation"))))
+            SessionRecordCodec.decode(plain)
         } finally {
             plain.fill(0)
         }
     }
 
     override suspend fun save(value: StoredSession) = storage {
-        val plain = buildJsonObject {
-            put("session", sessionJson.encodeToJsonElement(UserSession.serializer(), value.session))
-            put("identity_id", value.identityId)
-            put("kind", value.kind.name)
-            put("revocation", value.revocation.name)
-        }.toString().toByteArray(Charsets.UTF_8)
+        val plain = SessionRecordCodec.encode(value)
         try {
             val encrypted = SessionEnvelope.seal(plain, key(create = true))
             val output = file.startWrite()

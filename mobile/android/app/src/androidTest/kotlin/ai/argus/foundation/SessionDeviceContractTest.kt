@@ -32,6 +32,12 @@ class SessionDeviceContractTest {
         val owner = requireNotNull(controller.state.value.profile).id
         val vault = EncryptedSessionVault(context)
         val first = requireNotNull(vault.load())
+        assertEquals(owner, first.session.user?.id)
+        assertNull("Provider email must remain memory-only", first.session.user?.email)
+        assertNull("Provider user metadata must remain memory-only", first.session.user?.userMetadata)
+        assertNull("Provider app metadata must remain memory-only", first.session.user?.appMetadata)
+        assertNull("Unused provider credentials must not be persisted", first.session.providerToken)
+        assertNull(first.session.providerRefreshToken)
         val disk = File(context.noBackupFilesDir, "argus-session-v1.enc").readBytes().toString(Charsets.ISO_8859_1)
         assertFalse("Access credential must not be plaintext on disk", disk.contains(first.session.accessToken))
         assertFalse("Refresh credential must not be plaintext on disk", disk.contains(first.session.refreshToken))

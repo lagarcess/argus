@@ -129,7 +129,9 @@ in Android afterward. Local recovery web origins remain limited to the existing
 
 Sessions are encrypted with a device-only Android Keystore AES-GCM key, written
 atomically under `noBackupFilesDir`. Backup is disabled. Passwords are ephemeral
-form values; profiles stay in memory. One controller serializes SDK mutations
+form values; profiles stay in memory. The stored record contains only session
+credentials, expiry, minimal identity and lifecycle markers; provider profile
+metadata and unused provider credentials are excluded. One controller serializes SDK mutations
 and ignores responses belonging to a retired identity. Foreground/relaunch
 verification refreshes expiring sessions before loading `/me`. Network or
 verification failures retain a retry path while hiding the profile. Explicit
