@@ -13,7 +13,7 @@
     "default-off release"
   ],
   "lint": "pass",
-  "local_review": "latest fixes clean; PR review not requested because remote publication needs clarification",
+  "local_review": "Latest fixes clean; founder explicitly authorized GitHub push and PR; hosted review pending",
   "modularity": "pass; integration unchanged, current tree is would-be merged tree",
   "browser": "Native ACTION_VIEW URL intent verified; unchanged localhost forgot-password form rendered. Password reset not performed.",
   "limitations": [
@@ -44,5 +44,10 @@
     "inspection": "Small screen scrolls vertically; large screen displays full profile/actions. No horizontal overflow observed."
   },
   "foundation_tests": 9,
-  "foundation_failures": 0
+  "foundation_failures": 0,
+  "revalidation": {
+    "head": "19dc55a589f9c71aebb73bbdbc1b2cea3d2c71fd",
+    "android_tree": "ccb5ec18ae954175336cc83da46bb5086c037ed4",
+    "result": "Build/lint/JVM, real expiry refresh and revocation, UI account switch, separate-process restore passed. Screenshot source tree identical; only documentation/evidence changed."
+  }
 }

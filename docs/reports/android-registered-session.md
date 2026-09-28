@@ -1,7 +1,8 @@
 # Android registered-session local acceptance
 
 September 28, 2026. Implementation is locally verified; GitHub publication,
-hosted CI and PR review remain pending explicit publication authorization.
+hosted CI and PR review remain pending publication. The founder has explicitly
+authorized the branch push and PR creation.
 This is not a merge/deployment or production-readiness claim.
 
 ## Delivered behavior
@@ -75,9 +76,14 @@ market-provider calls were needed.
 
 ## Remaining delivery gate
 
-Automatic approval review rejected the branch push and PR creation because it
-interpreted the founder's “no hosted changes” constraint as including GitHub
-publication. No push or new PR was performed. After explicit authorization,
-publish the existing branch, attach its PR, run exact-head CI, process review
-findings and record the terminal review/CI state. No merge or deployment is
-authorized by that publication step.
+Publication was initially blocked because automatic approval review interpreted
+“no hosted changes” as including GitHub publication. The founder subsequently
+explicitly authorized pushing this branch and opening its PR in the delivery
+lead chat. Hosted CI and the normal PR review loop remain required. No merge,
+deployment or hosted configuration change is authorized.
+
+The acceptance-artifact commit `19dc55a589f9c71aebb73bbdbc1b2cea3d2c71fd`
+was revalidated with build/lint/JVM tests, real expiry-refresh-revocation,
+account switching and separate-process restore. Its Android source tree
+`ccb5ec18ae954175336cc83da46bb5086c037ed4` is identical to the screenshot
+source commit; screenshots remain valid after documentation-only updates.
