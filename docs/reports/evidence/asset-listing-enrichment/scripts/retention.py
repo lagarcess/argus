@@ -3,7 +3,9 @@
 The fetcher holds every response in memory and writes only what `retain`
 returns. A non-200 response, an unknown page kind, a page without the expected
 listing and seller boundaries, and any kept text that still contains a contact
-detail all keep nothing.
+detail all keep nothing. Response headers that reach the ledger or cache meta
+also go through this module: `sanitize_location` is the single owner of the
+Location value that may be persisted.
 """
 
 from __future__ import annotations
@@ -37,6 +39,10 @@ LISTING_VARS = frozenset(
 )
 SELLER_KINDS = frozenset({"Vendedor", "Inmobiliaria", "Particular"})
 PLACE = re.compile(r"[^\W\d_](?:[^\W\d_]|[ .'-]){1,39}")
+ATTR_VALUE = re.compile(
+    r"""(?:content|href|value|title|alt)\s*=\s*(?:"([^"]*)"|'([^']*)')""",
+    re.I,
+)
 CONTACT = re.compile(
     r"(?<!\d)\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"
     r"|\+\d{1,3}[\s.-]?(?:\d[\s.-]?){7,12}\d"
@@ -46,6 +52,38 @@ CONTACT = re.compile(
     r"|/Dealers/[^\s\"'/]",
     re.I,
 )
+
+
+def contact_surfaces(text: str) -> str:
+    """Decode entities, strip tags, and join scanned attribute values.
+
+    The contact guard must see what a parser would see after unescaping and
+    after markup is removed, not only the serialized bytes on disk. Tags are
+    removed without inserting spaces so a number split by markup still joins
+    on the hyphen or digits that remain.
+    """
+    unescaped = html.unescape(text)
+    visible = re.sub(r"<[^>]+>", "", unescaped)
+    attrs = " ".join(
+        html.unescape(group)
+        for match in ATTR_VALUE.finditer(unescaped)
+        for group in match.groups()
+        if group
+    )
+    return f"{unescaped}\n{visible}\n{attrs}"
+
+
+def holds_contact(text: str) -> bool:
+    return bool(CONTACT.search(contact_surfaces(text)))
+
+
+def sanitize_location(location: str | None) -> str | None:
+    """Persist only Locations that do not carry seller or contact shapes."""
+    if not location:
+        return None
+    if holds_contact(location):
+        return None
+    return location
 
 
 def retain(kind: str, status: int, body: bytes) -> tuple[bytes | None, str]:
@@ -62,7 +100,7 @@ def retain(kind: str, status: int, body: bytes) -> tuple[bytes | None, str]:
     kept = builders[kind](body)
     if kept is None:
         return None, "not kept: expected structure not found"
-    if CONTACT.search(kept.decode("utf-8", "replace")):
+    if holds_contact(kept.decode("utf-8", "replace")):
         return None, "not kept: a contact detail survived the projection"
     return kept, "kept whole" if kind == "search-values" else "kept projection"
 

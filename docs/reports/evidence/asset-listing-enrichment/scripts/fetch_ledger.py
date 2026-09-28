@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-from retention import DETAIL_PATH, retain
+from retention import DETAIL_PATH, retain, sanitize_location
 
 USER_AGENT = (
     "ArgusFeasibilityAudit/0.1 "
@@ -228,7 +228,7 @@ def fetch(url: str) -> dict:
         "elapsed_ms": elapsed_ms,
         "bytes": len(body),
         "content_type": get("Content-Type"),
-        "location": get("Location"),
+        "location": sanitize_location(get("Location")),
         "server": get("Server"),
         "cache_control": get("Cache-Control"),
         "last_modified": get("Last-Modified"),

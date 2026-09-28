@@ -46,6 +46,16 @@ PHONE_IN_TITLE = DETAIL.replace(
 PHONE_IN_SPEC = DETAIL.replace(
     b"<br>4 cilindros</li>", b"<br>4 cilindros, llamar 305-555-0000</li>"
 )
+ENCODED_EMAIL_IN_TITLE = DETAIL.replace(
+    b"2021 Marca Ejemplo Modelo X EX</h1>",
+    b"2021 Marca Ejemplo Modelo X EX vendedor&#64;example.invalid</h1>",
+)
+MARKUP_SPLIT_PHONE = DETAIL.replace(
+    b"2021 Marca Ejemplo Modelo X EX</h1>",
+    b"2021 Marca Ejemplo Modelo X EX <span>305</span>-555-0000</h1>",
+)
+DEALER_REDIRECT = "/Dealers/Vendedor-Ficticio/"
+SAFE_ROBOTS_REDIRECT = "https://m.supercarros.com/robots.txt"
 PAGES = {
     f"{HOST}/robots.txt": ROBOTS,
     f"{HOST}/sitemap.xml": SITEMAP,
@@ -54,6 +64,11 @@ PAGES = {
     f"{HOST}/marca-ejemplo-modelo-x/0000002/": NO_SELLER_BOUNDARY,
     f"{HOST}/marca-ejemplo-modelo-x/0000003/": PHONE_IN_TITLE,
     f"{HOST}/marca-ejemplo-modelo-x/0000004/": PHONE_IN_SPEC,
+    f"{HOST}/marca-ejemplo-modelo-x/0000005/": ENCODED_EMAIL_IN_TITLE,
+    f"{HOST}/marca-ejemplo-modelo-x/0000006/": MARKUP_SPLIT_PHONE,
+}
+REDIRECTS = {
+    f"{HOST}/marca-ejemplo-modelo-x/0000007/": (302, DEALER_REDIRECT, b""),
 }
 PHONE_SHAPES = (
     "8090000000",
@@ -63,6 +78,8 @@ PHONE_SHAPES = (
     "809.000.0000",
     "305-555-0000",
     "+52 55 0000 0000",
+    "vendedor&#64;example.invalid",
+    "<span>305</span>-555-0000",
 )
 LISTING_VALUES = (
     "US$ 43,900",
@@ -102,8 +119,8 @@ REFUSED_AFTER_ROBOTS = {
 
 
 class FakeResponse:
-    def __init__(self, status, body):
-        self.status, self.headers, self._body = status, {}, body
+    def __init__(self, status, body, headers=None):
+        self.status, self.headers, self._body = status, headers or {}, body
 
     def read(self):
         return self._body
@@ -115,6 +132,9 @@ class FakeOpener:
 
     def open(self, request, timeout):
         self.calls.append(request.full_url)
+        if request.full_url in REDIRECTS:
+            status, location, body = REDIRECTS[request.full_url]
+            return FakeResponse(status, body, {"Location": location})
         if request.full_url not in PAGES:
             return FakeResponse(404, b"")
         return FakeResponse(200, PAGES[request.full_url])
@@ -146,9 +166,23 @@ def main():
     os.chdir(SCRIPTS)
     check(refused(fetch_ledger.study_root), "the fetcher ran inside the repository")
     for shape in PHONE_SHAPES:
-        check(retention.CONTACT.search(shape), f"the contact guard missed {shape}")
+        check(
+            retention.holds_contact(shape),
+            f"the contact guard missed {shape}",
+        )
     for value in LISTING_VALUES:
-        check(not retention.CONTACT.search(value), f"the contact guard flagged {value}")
+        check(
+            not retention.holds_contact(value),
+            f"the contact guard flagged {value}",
+        )
+    check(
+        retention.sanitize_location(DEALER_REDIRECT) is None,
+        "a dealer Location was allowed through sanitize_location",
+    )
+    check(
+        retention.sanitize_location(SAFE_ROBOTS_REDIRECT) == SAFE_ROBOTS_REDIRECT,
+        "a safe robots Location was dropped",
+    )
     with tempfile.TemporaryDirectory() as scratch:
         os.chdir(scratch)
         try:
@@ -223,16 +257,41 @@ def main():
                     f"{HOST}/marca-ejemplo-modelo-x/0000004/",
                     "a page with a foreign phone number in a specification",
                 ),
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000005/",
+                    "a page with an HTML-encoded email in its title",
+                ),
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000006/",
+                    "a page with a markup-split phone in its title",
+                ),
             ):
                 body, note = kept(url)
                 check(
                     body is None and note.startswith("not kept"), f"kept {reason}: {note}"
                 )
+            redirect_url = f"{HOST}/marca-ejemplo-modelo-x/0000007/"
+            redirect_meta = fetch_ledger.fetch(redirect_url)
+            check(
+                redirect_meta["status"] == 302
+                and redirect_meta["location"] is None
+                and redirect_meta["retention"].startswith("not kept"),
+                "a dealer Location was persisted on a detail redirect",
+            )
+            _, redirect_disk = fetch_ledger.cache_paths(redirect_url)
+            disk_meta = json.loads(redirect_disk.read_text())
+            check(
+                disk_meta["location"] is None
+                and DEALER_REDIRECT not in redirect_disk.read_text()
+                and DEALER_REDIRECT
+                not in (Path(scratch) / "ledger.jsonl").read_text(),
+                "a dealer Location reached the cache or ledger",
+            )
             written = [path for path in Path(scratch).rglob("*") if path.is_file()]
             for path in written:
                 text = path.read_text("utf-8", "replace")
                 found = [value for value in expected["seller_strings"] if value in text]
-                match = retention.CONTACT.search(text)
+                match = retention.CONTACT.search(retention.contact_surfaces(text))
                 found += [match.group(0)] if match else []
                 check(not found, f"{path.relative_to(scratch)} holds {found}")
         finally:
