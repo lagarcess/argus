@@ -605,7 +605,7 @@
   "fictional": true,
   "format": "selected-file-import-proof-v5",
   "provenance": {
-    "digest": "554fc853b212d8442841ed2e277c4e54f5c0bfb0dc6d9656e8f9c5fc03602886",
+    "digest": "c0075af04448a498179082ca0bcaef7bffd3a65382ad9beeb80323edc0c96fef",
     "environment": {
       "packages": {
         "Faker": "30.10.0",
@@ -660,7 +660,7 @@
       "pull_request": "lagarcess/argus#724"
     },
     "runner": {
-      "digest": "57860c7ee0fce3a5b3be4371b18910653b56075d1f0968d2af7912691436c6b2",
+      "digest": "baea9d80314e685254718cbd5eac2f9c2aec6101a538b738093fb9c084889c51",
       "file": "docs/reports/dominican-bank-connectivity/selected-file-import/proof.py"
     }
   }

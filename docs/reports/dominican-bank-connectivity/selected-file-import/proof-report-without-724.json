@@ -434,7 +434,7 @@
   "fictional": true,
   "format": "selected-file-import-proof-v5",
   "provenance": {
-    "digest": "cf96cba6ba7696def406dba5fe2cb0ce7a8c206399f6634f097db6f772f723bc",
+    "digest": "283c0e1a0e1315d364e7def5d244369d0ebcbb22f353cf104573f1ff708416bb",
     "environment": {
       "packages": {
         "Faker": "30.10.0",
@@ -463,7 +463,7 @@
     },
     "recording_model": null,
     "runner": {
-      "digest": "57860c7ee0fce3a5b3be4371b18910653b56075d1f0968d2af7912691436c6b2",
+      "digest": "baea9d80314e685254718cbd5eac2f9c2aec6101a538b738093fb9c084889c51",
       "file": "docs/reports/dominican-bank-connectivity/selected-file-import/proof.py"
     }
   }

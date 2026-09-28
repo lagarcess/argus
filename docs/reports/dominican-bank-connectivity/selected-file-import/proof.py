@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+sys.path.append(str(Path(__file__).resolve().parents[4]))
 
 from tests.synthetic_ingestion.extract import load_input
 from tests.synthetic_ingestion.generate import generate

@@ -219,14 +219,14 @@ poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/
 cmp temp/selected-file-import-without-724.json docs/reports/dominican-bank-connectivity/selected-file-import/proof-report-without-724.json
 ```
 
-To run every case, fetch pull request 724 and extract the reference model at the head this proof records. The model reads accepted currencies from the repository's `src/argus/domain/home_country.py`, so the archive includes that file. The proof refuses to run the model without `--recording-commit`, with a commit this repository does not have, or with an extracted tree whose files differ from that commit's. It also refuses a model imported from a git checkout, because the report's identity is the extracted tree.
+To run every case, fetch pull request 724 and extract the reference model at the head this proof records. The model reads accepted currencies from the repository's `src/argus/domain/home_country.py`, so the archive includes that file. The proof refuses to run the model without `--recording-commit`, with a commit this repository does not have, or with an extracted tree whose files are not exactly that commit's, such as a file left from extracting another head. It also refuses a model imported from a git checkout, because the report's identity is the extracted tree. A model extracted on `PYTHONPATH` takes precedence over one in the checkout.
 
 ```bash
 git fetch origin pull/724/head
 ```
 
 ```bash
-mkdir -p temp/recording-724 && git archive d081bfcdf5c7c2bee767d873f232752432098c39 tests/financial_recording src/argus/domain/home_country.py | tar -x -C temp/recording-724
+rm -rf temp/recording-724 && mkdir -p temp/recording-724 && git archive d081bfcdf5c7c2bee767d873f232752432098c39 tests/financial_recording src/argus/domain/home_country.py | tar -x -C temp/recording-724
 ```
 
 ```bash
