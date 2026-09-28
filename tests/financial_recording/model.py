@@ -602,10 +602,9 @@ class Store:
             found.extend(self._placement_changes(record, body))
         if found:
             raise ReviewRequired(found)
-        will_reconfirm = isinstance(body, Observation) and (
-            body.amount,
-            body.as_of,
-        ) != (record.body.amount, record.body.as_of)
+        will_reconfirm = isinstance(body, Observation) and _observation_needs_restamp(
+            record.body, body
+        )
         if will_reconfirm:
             if account_basis is None or check is None:
                 raise InvalidInput("check_correction_basis_required", record_id)
@@ -976,11 +975,12 @@ class Store:
             recorded_by=self.actor,
         )
         revised = replace(record, revisions=(*record.revisions, revision))
-        # Only a new amount or date re-confirms a check; a note or a restore
-        # keeps the evidence the person accepted.
-        if isinstance(body, Observation) and (body.amount, body.as_of) != (
-            previous.body.amount,
-            previous.body.as_of,
+        # Amount, instant, or stored zone changes re-confirm a check; a note or
+        # restore keeps the evidence the person accepted. Zone belongs here
+        # because correct() rewrites it with as_of and a TZ day-boundary shift
+        # can move date-only activity into or out of the check.
+        if isinstance(body, Observation) and _observation_needs_restamp(
+            previous.body, body
         ):
             reconfirmed = replace(revised.revisions[-1], contained=None)
             revised = self._stamped(
@@ -1044,6 +1044,15 @@ class Store:
         }
         book = replace(state.book, **changes)
         self.state = State(book, state.drafts if drafts is None else drafts, replays)
+
+
+def _observation_needs_restamp(before: Observation, after: Observation) -> bool:
+    """True when confirmation evidence must be recomputed for the new body."""
+    return (after.amount, after.as_of, after.zone) != (
+        before.amount,
+        before.as_of,
+        before.zone,
+    )
 
 
 def _merged_answers(current: Answers, answers: Mapping[str, str]) -> Answers:

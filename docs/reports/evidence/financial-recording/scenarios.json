@@ -751,6 +751,15 @@
       "user_check_on_vehicle": {
         "basis_not_applicable": "blocking"
       }
+    },
+    "zone_change_restamps_check": {
+      "confirmed_difference": 10000,
+      "entry_zone": "America/Santo_Domingo",
+      "expense_in_contents": true,
+      "expense_outside_before": true,
+      "restamped_zone": "UTC",
+      "zone_change_moves_inclusion": "ReviewRequired:inclusion_changed",
+      "zone_change_requires_basis": "InvalidInput:check_correction_basis_required"
     }
   },
   "equal_amount_not_a_match": {

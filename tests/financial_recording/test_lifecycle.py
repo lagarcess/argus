@@ -401,4 +401,13 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "check_still_present": True,
             "exposed_still_works": "ok",
         },
+        "zone_change_restamps_check": {
+            "entry_zone": "America/Santo_Domingo",
+            "expense_outside_before": True,
+            "zone_change_moves_inclusion": "ReviewRequired:inclusion_changed",
+            "zone_change_requires_basis": "InvalidInput:check_correction_basis_required",
+            "restamped_zone": "UTC",
+            "expense_in_contents": True,
+            "confirmed_difference": 10_000,
+        },
     }

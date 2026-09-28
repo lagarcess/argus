@@ -292,6 +292,7 @@ def edits_that_move_money_need_review() -> dict:
         "remove_answers_limited_to_exposed": _remove_answers_limited_to_exposed(),
         "observation_preview_requires_check": _observation_preview_requires_check(),
         "remove_rejects_empty_answer_map": _remove_rejects_empty_answer_map(),
+        "zone_change_restamps_check": _zone_change_restamps_check(),
     }
 
 
@@ -1476,6 +1477,64 @@ def _remove_rejects_empty_answer_map() -> dict:
                 answers={record.id: {second.id: "included"}},
             )
         ),
+    }
+
+
+def _zone_change_restamps_check() -> dict:
+    """Resubmitting the same as_of after a store TZ change must restamp.
+
+    01:00Z is Sept 4 in America/Santo_Domingo and Sept 5 in UTC. A date-only
+    expense on the 5th stays outside the check under the entry zone. Answering
+    it included and then rewriting the zone without restamping would keep the
+    old empty contained set and zero difference after that expense becomes
+    same-day.
+    """
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    as_of = datetime(2026, 9, 5, 1, 0, tzinfo=ZoneInfo("UTC"))
+    scene.now = as_of
+    check = scene.confirm(
+        scene.draft(
+            kind="balance_observation",
+            account_id=cash.id,
+            amount="1000.00",
+            as_of=as_of.isoformat(),
+            basis="user_check",
+        )
+    )
+    scene.now = local(6)
+    expense = scene.record("expense", cash, "100.00", 5)
+    before_zone = scene.store.book.records[check.id].body.zone
+    before_contained = scene.store.book.records[check.id].revisions[-1].contained or ()
+    scene.store.correct(
+        expense.id, 1, "seen on check day", answers={check.id: "included"}
+    )
+    scene.store.tz = ZoneInfo("UTC")
+    moved = outcome(lambda: scene.store.correct(check.id, 1, "reread", as_of=as_of))
+    missing = outcome(
+        lambda: scene.store.correct(
+            check.id, 1, "reread", as_of=as_of, accept_reordering=True
+        )
+    )
+    scene.store.correct(
+        check.id,
+        1,
+        "reread",
+        as_of=as_of,
+        accept_reordering=True,
+        account_basis={cash.id: scene.store.book.accounts[cash.id].version},
+        check={"prior": 90_000, "observed": 100_000, "difference": 10_000},
+    )
+    revised = scene.store.book.records[check.id]
+    stamped = revised.revisions[-1]
+    return {
+        "entry_zone": before_zone,
+        "expense_outside_before": expense.id not in before_contained,
+        "zone_change_moves_inclusion": moved,
+        "zone_change_requires_basis": missing,
+        "restamped_zone": stamped.body.zone,
+        "expense_in_contents": expense.id in (stamped.contained or ()),
+        "confirmed_difference": stamped.confirmed_difference,
     }
 
 
