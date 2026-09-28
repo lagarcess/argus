@@ -70,7 +70,12 @@ final class AuthUITests: XCTestCase {
         XCTAssertFalse(app.buttons["auth.submit"].isEnabled)
         XCTAssertFalse(app.staticTexts["auth.confirmation"].exists)
         capture("\(scenario)-sign-in")
-        try app.performAccessibilityAudit(for: [.hitRegion, .sufficientElementDescription, .trait])
+        try app.performAccessibilityAudit(for: [.hitRegion, .sufficientElementDescription, .trait, .contrast]) { issue in
+            // iOS27 flags the system glass Close button despite readable text.
+            // Its captured black/white text is readable; keep all authored
+            // auth content and every other audit type under the audit.
+            issue.auditType == .contrast && issue.element?.identifier == "sheet.close"
+        }
         for control in [app.textFields["auth.email"], app.secureTextFields["auth.password"],
                         app.buttons["auth.submit"], app.buttons["auth.createAccount"],
                         app.buttons["auth.forgotPassword"]] {

@@ -31,6 +31,8 @@ The foundation worker branch remains unchanged.
 2. Auth exposure is default off. Disabled mode creates no client or network
    request. Enable through ignored, validated development configuration;
    production bundle identity, signing and hosted endpoints remain unapproved.
+   Local simulator Keychain requires an ad-hoc signature with a derived local
+   application-identifier; no signing account/team is configured.
 3. Ordinary signup/login use existing `/api/v1/auth/signup` and `/auth/login`.
    Preserve CAPTCHA, attempt limits, account access rules, profile creation,
    request language and canonical errors. No direct SDK password login.
@@ -110,7 +112,7 @@ Local environment allocation from lead: unique stack `ios-auth-8be2`, ports
 58400 API, 58401 Supabase gateway, 58402 DB, 58403 mail UI, 58404 SMTP,
 58405 test CAPTCHA bridge; lead subsequently reserved 127.0.0.1:3001 for
 unchanged web recovery because canonical validation rejects HTTP58406.
-58406-58419 remain spare.
+58406 and 58412-58419 remain spare; 58407-58411 are local stack internals.
 Bind-check before startup; never stop another listener. Copy canonical local
 Supabase configuration/migrations to ignored scratch, never mutate shared stacks.
 Synthetic accounts/credentials only; provider configuration blank and no turns.

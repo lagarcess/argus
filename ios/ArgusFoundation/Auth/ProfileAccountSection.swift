@@ -83,14 +83,14 @@ private struct AuthFormView: View {
                     .accessibilityIdentifier("auth.return.signIn")
             } else {
                 if signup {
-                    TextField("auth.name", text: $displayName).textContentType(.name)
+                    TextField("auth.name", text: $displayName, prompt: Text("auth.name").foregroundStyle(ArgusStyle.secondary)).textContentType(.name)
                         .authField().accessibilityLabel(Text("auth.name")).accessibilityIdentifier("auth.name")
                 }
-                TextField("auth.email", text: $email)
+                TextField("auth.email", text: $email, prompt: Text("auth.email").foregroundStyle(ArgusStyle.secondary))
                     .keyboardType(.emailAddress).textContentType(.emailAddress)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .focused($fieldFocused).authField().accessibilityLabel(Text("auth.email")).accessibilityIdentifier("auth.email")
-                SecureField("auth.password", text: $password)
+                SecureField("auth.password", text: $password, prompt: Text("auth.password").foregroundStyle(ArgusStyle.secondary))
                     .textContentType(signup ? .newPassword : .password)
                     .focused($fieldFocused).authField().accessibilityLabel(Text("auth.password")).accessibilityIdentifier("auth.password")
                 if signup { Text("auth.password.requirement").font(ArgusStyle.body(12, relativeTo: .caption)) }
