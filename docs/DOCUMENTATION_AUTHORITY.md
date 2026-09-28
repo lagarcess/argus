@@ -109,8 +109,8 @@ below, and they do not replace production auth or the chat runtime.
 | --- | --- | --- |
 | Integration landing / merges to `codex/private-alpha-next` | VM serial captain (integration orchestrator) | Only landing executor under the founder's existing bounded merge authorization. The Project delivery lead coordinates but does not push to integration or edit branches another lane already owns. |
 | Account domain, API, persistence; `API_CONTRACT` / `DATA_MODEL` amendments | Existing VM account-backend worker | Sole backend owner for this batch. No competing backend worker. Clients bind to its accepted first-slice payload contract once published. |
-| `ios/` continuation | Existing iPhone owner (Build iPhone iOS foundation) | Maps real sessions; continuation branches after foundations/dependencies land. Does not rewrite #729/#730 during their landing. |
-| `mobile/android/` continuation and pending #726 probe validation | Existing Android owner (Android phone foundation) | Same continuation rules as iPhone. Does not rewrite #729/#730 during their landing. |
+| `ios/` continuation | Existing iPhone owner (Build iPhone iOS foundation) | Maps real sessions; continuation after foundations. [#729](https://github.com/lagarcess/argus/pull/729) landed as `f61e47f1`. Does not rewrite #730 during its landing. |
+| `mobile/android/` continuation and pending #726 probe validation | Existing Android owner (Android phone foundation) | Same continuation rules as iPhone. [#729](https://github.com/lagarcess/argus/pull/729) landed as `f61e47f1`. Does not rewrite #730 during its landing. |
 | Isolated responsive preview, then later account API wiring | Existing web owner (Build responsive Argus preview) | Finishes the isolated preview first; wires to the accepted backend contract afterward. No production-auth rewrite. |
 | Chart validation | Existing chart owner under `prototypes/chart-validation` | Remains isolated. Not a prerequisite for the account journey. |
 
@@ -119,8 +119,9 @@ below, and they do not replace production auth or the chat runtime.
 [#725](https://github.com/lagarcess/argus/pull/725),
 [#726](https://github.com/lagarcess/argus/pull/726), and
 [#724](https://github.com/lagarcess/argus/pull/724). Do not push concurrent
-fixes to those branches. Continue gated landing of #729/#730 and #724 as
-their applicable gates close. Do not hold independent ready foundations for
+fixes to those branches. [#729](https://github.com/lagarcess/argus/pull/729)
+landed as `f61e47f1`. Continue gated landing of #730 and #724 as their
+applicable gates close. Do not hold independent ready foundations for
 unrelated research.
 
 **#725 hold:** Landing of [#725](https://github.com/lagarcess/argus/pull/725)
