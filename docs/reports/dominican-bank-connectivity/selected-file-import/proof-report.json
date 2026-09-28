@@ -570,7 +570,7 @@
   "format": "selected-file-import-proof-v2",
   "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
   "recording_model": {
-    "digest": "b39749d5c3461ccd2aaf7b33d7f2872711171b188abd4a1bf9384f9d84ff8faa",
-    "ref": "lagarcess/argus#724 at 2c9ae114b5f8d260992fabb598288cb788b79a61"
+    "digest": "27300e3b9945a6b16888ef528fac9c51a5185519070cb6c6b14e14c7556255fa",
+    "ref": "lagarcess/argus#724 at 6f8fc4421f34c1a2979c1f9fb232ce45cb9155d3"
   }
 }
