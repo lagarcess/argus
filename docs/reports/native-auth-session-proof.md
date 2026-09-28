@@ -62,7 +62,7 @@ Evidence levels are kept separate throughout, as the assignment requires:
 | Original integration base | `f0a90763b` |
 | Current integration at capture | `3b9313f3d` (#721, agent-runtime log fields only; no overlap, §10) |
 | Reconciliation merge | `8e88294f7` |
-| Evidence capture head | `8f4b05de0`, clean tree, every file. Later commits change only Markdown and evidence, which the gate checks (§2.1) |
+| Evidence capture head | `0216bb1ba`, clean tree, every file. The cross-version file ran these probes against the API at the #728 head `80cea8e62`. Later commits change only Markdown, evidence, and the gate's own judge files, none of which change what a capture observed (§2.1). Android and production mobile auth remain unverified |
 | Local auth stack | Supabase CLI 2.117.0, GoTrue v2.196.0, project `argus-native-auth-proof` on ports 57450 to 57459, created from this branch's migrations. Overrides: `jwt_expiry = 60`, email confirmations on, one synthetic redirect `argusnativeproof://auth-callback` |
 | Argus API | Unchanged source at the head above, port 57460, provider keys blank, synthetic market data, guest access on, public account access off |
 | iOS | Xcode 27.0 (27A266a), iOS 27.0 simulator "Argus Native Auth Proof" (iPhone 17 Pro), supabase-swift 2.55.2 pinned |
@@ -323,7 +323,7 @@ Each is a separate proposal. None is implemented here.
 
 | # | Proposal | Type | Why | Size |
 | --- | --- | --- | --- | --- |
-| P1 | Create `SupabaseGateway.auth_client` with `auto_refresh_token=False` and `persist_session=False` (or sign out of it after each call), with a failing test first that asserts no user session is retained | Backend fix | F1. Needed by web today | Small |
+| P1 | Create `SupabaseGateway.auth_client` with `auto_refresh_token=False` and `persist_session=False` (or sign out of it after each call), with a failing test first that asserts no user session is retained. **Owned by [PR #728](https://github.com/lagarcess/argus/pull/728)**, which replaced the shared client with a per-call one; not implemented in this evidence PR | Backend fix | F1 / A14. Needed by web today | Small |
 | P2 | Additive handoff transport for bearer clients in `src/argus/api/routers/auth.py`, read through the same helper as the cookies: opt-in request header, `handoff_secret` in the create response, `Argus-Guest-Handoff-Id` and `-Secret` request headers, a "cleared" signal, and no `Set-Cookie` for that transport. `API_CONTRACT.md` first | API contract + backend | F4, and removes cookie parsing from both apps | Small to medium |
 | P3 | When sign-in succeeds but the claim fails, return the session in the body for the header transport | API contract + backend | F3 | Small, with P2 |
 | P4 | Let Argus `/auth/signup` and `/auth/guest/signup` pass an allowlisted `emailRedirectTo`, and review hosted confirmation and recovery email templates (the `token_hash` pattern if scanners pre-open links) | Backend + hosted | D1. Confirmation returns to the app | Small backend, hosted review |
@@ -361,14 +361,14 @@ on any device, as today.
 | Token expiry and reuse against real Cloudflare | Test secrets do not model them (F12) | On staging, obtain a token, wait over 300 s, submit it, and expect `timeout-or-duplicate`. Then submit one token twice |
 | Hosted Supabase settings (JWT lifetime, rotation, reuse interval, captcha provider, redirect list, templates) | Dashboard not inspected; production access out of scope | Owner exports the auth settings. Rerun A4, A5, A6, and B1 against a staging project |
 | Universal links and App Links | No identifiers or hosting | After P8, test on physical devices with `?mode=developer` (iOS) and `adb shell pm verify-app-links` (Android) |
-| Android client | No toolchain | `probes/native-auth/android/README.md` |
-| F1 in production | Local stack only | After P1 ships, rerun A14. Before that, the effect is predicted from source and local timing |
+| Android client | No toolchain on the evidence machine. Android probe verification is handed to the Android lane on this PR and must not block #730 sample landing | `probes/native-auth/android/README.md`. Production mobile auth stays unverified until that verification compiles and passes |
+| F1 in production | Local stack only. Production mobile auth remains unverified until #728 lands and the Android verification is solid | Locally, A14 already passes against the #728 head (`http-session-fixed-api.json`). After #728 ships, rerun A14 against the hosted API. Do not treat production mobile auth as verified |
 
 ## 9. Implementation assignments
 
 | # | Assignment | Owner | Depends on |
 | --- | --- | --- | --- |
-| N1 | P1: stop the server auth client from retaining and refreshing user sessions; failing test first; A14 as acceptance | Backend auth (`supabase_gateway.py`) | None |
+| N1 | P1: stop the server auth client from retaining and refreshing user sessions; failing test first; A14 as acceptance. **In flight as [PR #728](https://github.com/lagarcess/argus/pull/728)** | Backend auth (`supabase_gateway.py`) | None |
 | N2 | Write the native session subsection of `API_CONTRACT.md` §7 from §3 of this report | API contract owner | None |
 | N3 | P2 and P3: header handoff transport and session beside a claim failure | Backend auth router | N2 |
 | N4 | P5: captcha-specific problem code | Backend auth router | N2 |
@@ -380,7 +380,7 @@ on any device, as today.
 ## 10. Delivery record
 
 - Original integration base `f0a90763b`. Current integration `3b9313f3d`.
-  Reconciled by merge `8e88294f7`. Evidence captured at `8f4b05de0`.
+  Reconciled by merge `8e88294f7`. Evidence captured at `0216bb1ba`.
 - Overlap disposition: #721 changes agent-runtime debug log fields
   (`discovery_focused_read.py`, `knowledge_answer.py`, one test). This lane
   adds only `probes/native-auth/`, this report, and evidence. There is no shared

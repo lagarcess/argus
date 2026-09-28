@@ -1,9 +1,11 @@
 {
   "client": "python-httpx language-neutral probe (not a native client)",
   "suite": "captcha",
-  "captured_at": "2026-09-28T18:41:29+00:00",
-  "argus_source_head": "8f4b05de0c01b3ab2067a439d13921a2d0498726",
+  "captured_at": "2026-09-28T20:02:36+00:00",
+  "argus_source_head": "0216bb1ba8066261649f2ee39e6ba31929aba2c1",
   "source_dirty": false,
+  "argus_api_head": "0216bb1ba8066261649f2ee39e6ba31929aba2c1",
+  "api_dirty": false,
   "environment": "local lane Supabase stack argus-native-auth-proof (jwt_expiry=60, confirmations on) + unchanged Argus API",
   "results": [
     {

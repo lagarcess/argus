@@ -435,3 +435,39 @@ def test_fix_marker_is_read_from_the_api_head(tmp_path: Path, monkeypatch) -> No
     assert evidence_gate.api_contains(unfixed, marker["path"], marker["text"]) is False
     assert evidence_gate.api_contains(fixed, marker["path"], marker["text"]) is True
     assert evidence_gate.api_contains("e" * 40, marker["path"], marker["text"]) is None
+
+
+def test_judge_files_do_not_make_captures_stale(tmp_path: Path, monkeypatch) -> None:
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "gate@example.test")
+    git("config", "user.name", "gate")
+    probes = tmp_path / "probes/native-auth"
+    (probes / "tests").mkdir(parents=True)
+    judges = [
+        probes / "evidence_gate.py",
+        probes / "expectations.json",
+        probes / "tests/t.py",
+    ]
+    producer = probes / "run-all.sh"
+    for path in [*judges, producer]:
+        path.write_text("v1\n")
+    git("add", ".")
+    git("commit", "-qm", "capture")
+    captured = git("rev-parse", "HEAD")
+    monkeypatch.setattr(evidence_gate, "REPO", tmp_path)
+
+    for path in judges:
+        path.write_text("v2\n")
+    git("commit", "-qam", "judges only")
+    assert evidence_gate.runtime_changes_since(captured) == []
+
+    producer.write_text("v2\n")
+    git("commit", "-qam", "producer")
+    assert evidence_gate.runtime_changes_since(captured) == [
+        "probes/native-auth/run-all.sh"
+    ]

@@ -29,8 +29,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 EXPECTATIONS = HERE / "expectations.json"
-# Anything that can change what a capture observed: the probes and the Argus
-# API, its schema, and its packaged contract. Prose cannot, so Markdown is out.
+# Anything that can change what a capture observed: the probe producers and
+# the Argus API, its schema, and its packaged contract. Prose cannot, so
+# Markdown is out. The gate, its declaration, and its tests only judge
+# captures; the judgment is re-run at every head, so they are out too.
 RUNTIME_PATHS = (
     "probes/native-auth",
     "src",
@@ -39,6 +41,9 @@ RUNTIME_PATHS = (
     "pyproject.toml",
     "poetry.lock",
     ":(exclude,glob)**/*.md",
+    ":(exclude)probes/native-auth/evidence_gate.py",
+    ":(exclude)probes/native-auth/expectations.json",
+    ":(exclude,glob)probes/native-auth/tests/**",
 )
 API_PATHS = (
     "src",

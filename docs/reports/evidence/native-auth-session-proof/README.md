@@ -7,13 +7,16 @@ password, handoff secret, PKCE verifier, or email link.
 
 ## Current acceptance
 
-Every file here was captured at `8f4b05de0` from a clean tree, and each
-records that head and `source_dirty: false`. The evidence gate verifies the
-set against `probes/native-auth/expectations.json`. It fails on a missing,
-repeated, or undeclared check, on any failure other than the documented ones,
-on a documented failure that now passes, on an iOS run whose xcodebuild
-counts disagree, on an app log that departs from the declared steps, and on
-runtime code that changed after the capture. Re-verify at any later head:
+Every file here was captured at `0216bb1ba` from a clean tree, and each
+records that head, `source_dirty: false`, the API head it tested, and
+`api_dirty: false`. The evidence gate verifies the
+set against `probes/native-auth/expectations.json`. It fails on any
+undeclared, missing, or mistyped field in any document, on a missing,
+repeated, or undeclared check, on any unexpected failure, on an expected
+failure that now passes, on an iOS run whose xcodebuild counts disagree, on
+an app log step that is neither declared nor the incidental `launch`, on a
+missing or non-numeric prompt count, and on runtime code that changed after
+the capture. Re-verify at any later head:
 
 ```bash
 python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-session-proof
@@ -29,6 +32,11 @@ Only these failures are expected:
 - **I11, always.** supabase-swift logs tokens when given a logger, and a
   `Session` description contains them. This is an SDK finding, separate from
   A14.
+
+Android remains unverified: its source has never been compiled here, and its
+verification is handed to the Android lane on this PR without blocking #730.
+Production mobile auth remains unverified until #728 lands and that
+verification passes.
 
 | File | Client | Level | Checks |
 | --- | --- | --- | --- |

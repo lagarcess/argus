@@ -1,10 +1,10 @@
 {
   "client": "python-httpx language-neutral probe (not a native client)",
   "suite": "session",
-  "captured_at": "2026-09-28T20:00:00+00:00",
+  "captured_at": "2026-09-28T20:05:30+00:00",
   "argus_source_head": "0216bb1ba8066261649f2ee39e6ba31929aba2c1",
   "source_dirty": false,
-  "argus_api_head": "0216bb1ba8066261649f2ee39e6ba31929aba2c1",
+  "argus_api_head": "80cea8e62d88ca7b2952479d83869d01dec1c847",
   "api_dirty": false,
   "environment": "local lane Supabase stack argus-native-auth-proof (jwt_expiry=60, confirmations on) + unchanged Argus API",
   "results": [
@@ -138,13 +138,13 @@
           0
         ],
         "refresh_tokens_after_expiry_total_revoked": [
-          3,
-          2
+          1,
+          0
         ],
-        "client_refresh_status": 400,
-        "client_refresh_error": "refresh_token_already_used"
+        "client_refresh_status": 200,
+        "client_refresh_error": null
       },
-      "verdict": "fail",
+      "verdict": "pass",
       "note": "Failed assumption. Argus's shared server-side supabase-py auth client keeps the last session it signed in and refreshes it on a timer (auto_refresh_token defaults to true), rotating the token the client holds. Once it rotates twice, the client's token is refused and the user is signed out. Affects web and native alike."
     },
     {
