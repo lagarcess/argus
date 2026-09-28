@@ -99,6 +99,9 @@ def test_argus_api_disables_the_default_render_subdomain() -> None:
     assert "Cloudflare Worker" in waitlist_floor
     assert "CF-Connecting-IP" in waitlist_floor
     assert "#674" in waitlist_floor
+    assert "release-config-audit` does not read this setting" in waitlist_floor
+    assert "serviceDetails.renderSubdomainPolicy=disabled" in waitlist_floor
+    assert "#694" in waitlist_floor
 
 
 def test_workflow_version_status_derives_proof_from_ready_version(

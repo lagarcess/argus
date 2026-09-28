@@ -1154,7 +1154,14 @@ and would collapse every guest into one rate-limit bucket.
 The API `renderSubdomainPolicy` takes effect only when Blueprint or
 dashboard settings are applied at the next `main` promotion, together with
 #674. Autodeploy is off, so merging this field does not change live
-routing by itself.
+routing by itself. The checked-in Blueprint field and its contract test
+declare intent only; `release-config-audit` does not read this setting
+back. When that promotion applies the policy, require live proof before
+calling the hostname hygiene done: either a control-plane readback of
+`serviceDetails.renderSubdomainPolicy=disabled` on `argus-api`, or a
+public `GET https://argus-ohr5.onrender.com/health` that returns HTTP
+`404`. That live proof is promotion-ceremony evidence, not a substitute
+for the #694 forged-header test that owns IP-trust verification.
 
 Generic error statuses are not maintenance proof. If control-plane state,
 response fingerprint, restart drain, exact SHA, or a private verification
