@@ -34,6 +34,15 @@ def test_default_outputs_stay_under_temp_render_benchmark_directory() -> None:
     assert output_dir == REPO_ROOT / "temp" / "benchmarks" / "render-internet"
 
 
+def test_default_api_url_uses_the_custom_api_host() -> None:
+    module = _load_benchmark_module()
+    env_contract = (REPO_ROOT / ".github" / "argus-env.sh").read_text(encoding="utf-8")
+
+    assert module.DEFAULT_API_URL == "https://api.arguschat.ai"
+    assert 'ARGUS_PRIVATE_LAUNCH_API_URL="https://api.arguschat.ai"' in env_contract
+    assert "argus-ohr5.onrender.com" not in module.DEFAULT_API_URL
+
+
 def test_parse_sse_events_accepts_canonical_data_frames() -> None:
     module = _load_benchmark_module()
 
@@ -223,7 +232,7 @@ def test_markdown_summary_reports_live_timings_and_unavailable_metrics() -> None
     report = {
         "schema_version": "argus_render_internet_benchmark/v1",
         "generated_at": "2026-06-07T12:00:00+00:00",
-        "api_url": "https://argus-ohr5.onrender.com",
+        "api_url": "https://api.arguschat.ai",
         "app_url": "https://argus-app-suz5.onrender.com",
         "runs": [
             {

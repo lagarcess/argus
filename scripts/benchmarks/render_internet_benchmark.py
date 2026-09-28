@@ -15,7 +15,7 @@ import httpx
 from dotenv import load_dotenv
 
 DEFAULT_APP_URL = "https://argus-app-suz5.onrender.com"
-DEFAULT_API_URL = "https://argus-ohr5.onrender.com"
+DEFAULT_API_URL = "https://api.arguschat.ai"
 DEFAULT_PROMPT = (
     "Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, "
     "2025 through June 5, 2026 with 10,000 dollars"
