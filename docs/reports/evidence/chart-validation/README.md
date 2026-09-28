@@ -6,7 +6,7 @@ PR closeout comment. See the [recommendations report](../../chart-validation-pro
 - [iPhone](ios/README.md): adopt Swift Charts direction; simulator limits apply.
 - [Android](android/README.md): change dependency alignment and long-series
   performance before adoption.
-- [Web](web/README.md): adopt Lightweight Charts direction; WebKit touch remains
+- [Web](../../../../prototypes/chart-validation/web/README.md): adopt Lightweight Charts direction; WebKit touch remains
   unverified.
 
 All data comes from the synthetic fixture bundle under
