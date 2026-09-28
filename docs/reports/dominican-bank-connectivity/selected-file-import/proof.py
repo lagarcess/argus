@@ -44,7 +44,7 @@ REFERENCE_KEYS = {"digest", "file", "row", "page", "external_id", "entry", "stub
 HOUSEHOLD = "household"
 ASSUMPTIONS = {
     "status": "Experimental choices made to run the proof. Unresolved, and not approved production defaults.",
-    "source_file_retention": "A stored file is deleted once no row from it is left in review.",
+    "source_file_retention": "A stored file is deleted once no row from it is left in review, checked after every importer step and when the importer starts.",
     "password_entry": "None. A file that needs a password is refused, and the person is asked for an unlocked copy.",
     "upload_limit_bytes": SIZE_LIMIT,
     "household_source_file_visibility": "Not modeled. Records carry a reference to the file, never the file.",
@@ -155,6 +155,7 @@ class Importer:
         self.sources = workdir / "sources"
         self.selections: dict[str, Selection] = {}
         self._ids = itertools.count(1)
+        self.sweep()
 
     def select(self, selection: Selection) -> Session:
         intake = check(selection)
@@ -175,47 +176,53 @@ class Importer:
         self, session: Session, account_map: dict[str, str], stub: Path | None = None
     ) -> Session:
         self.sources.mkdir(exist_ok=True)
-        path, loaded = extract(
-            self.sources, self.selections.pop(session.id), session.intake, stub
-        )
-        session.mode, session.errors = loaded["mode"], list(loaded["errors"])
-        rows = loaded["proposals"]
-        for proposal in rows:
-            row = proposal["fields"]
-            account = (
-                account_map.get(row["account"], "")
-                if row["destination"] == "personal"
-                else ""
+        try:
+            path, loaded = extract(
+                self.sources, self.selections.pop(session.id), session.intake, stub
             )
-            self._add(
-                session,
-                row["source_id"],
-                {
-                    "kind": row["kind"],
-                    "account_id": account,
-                    "amount": row["amount"],
-                    "currency": row["currency"],
-                    "occurred_on": row["date"],
-                },
-                {**proposal["source_ref"], "external_id": row["source_id"]},
-            )
-        if loaded.get("balances") and rows:
-            session.balances = dict(loaded["balances"])
-            self._add(
-                session,
-                "closing-balance",
-                {
-                    "kind": "balance_observation",
-                    "account_id": account_map.get(rows[0]["fields"]["account"], ""),
-                    "amount": loaded["balances"]["closing"],
-                    "as_of": "",
-                    "basis": "statement",
-                },
-                {"digest": session.intake.digest, "file": path.name, "row": "closing"},
-            )
-        session.status = "in_review"
-        self._release(session)
-        return session
+            session.mode, session.errors = loaded["mode"], list(loaded["errors"])
+            rows = loaded["proposals"]
+            for proposal in rows:
+                row = proposal["fields"]
+                account = (
+                    account_map.get(row["account"], "")
+                    if row["destination"] == "personal"
+                    else ""
+                )
+                self._add(
+                    session,
+                    row["source_id"],
+                    {
+                        "kind": row["kind"],
+                        "account_id": account,
+                        "amount": row["amount"],
+                        "currency": row["currency"],
+                        "occurred_on": row["date"],
+                    },
+                    {**proposal["source_ref"], "external_id": row["source_id"]},
+                )
+            if loaded.get("balances") and rows:
+                session.balances = dict(loaded["balances"])
+                self._add(
+                    session,
+                    "closing-balance",
+                    {
+                        "kind": "balance_observation",
+                        "account_id": account_map.get(rows[0]["fields"]["account"], ""),
+                        "amount": loaded["balances"]["closing"],
+                        "as_of": "",
+                        "basis": "statement",
+                    },
+                    {
+                        "digest": session.intake.digest,
+                        "file": path.name,
+                        "row": "closing",
+                    },
+                )
+            session.status = "in_review"
+            return session
+        finally:
+            self.sweep()
 
     def _add(self, session: Session, label: str, fields: dict, reference: dict) -> None:
         provenance = derive.Provenance(
@@ -245,19 +252,22 @@ class Importer:
         ]
         ready = [item for item in previews if not blocking(item)]
         confirmed = self.store.confirm_batch(ready, key) if ready else []
-        self._release(session)
+        self.sweep()
         return confirmed
 
     def cancel(self, session: Session) -> None:
         for item in self.pending(session.intake.digest):
             self.store.reject(item)
         self.selections.pop(session.id, None)
-        self._release(session)
+        self.sweep()
         session.status = "cancelled"
 
-    def _release(self, session: Session) -> None:
-        if session.intake.subtype in SUFFIX and not self.pending(session.intake.digest):
-            stored_path(self.sources, session.intake).unlink(missing_ok=True)
+    def sweep(self) -> None:
+        stored = list(self.sources.glob("*"))
+        keep = {digest[:16] for digest in self.open_reviews()} if stored else set()
+        for path in stored:
+            if path.stem not in keep:
+                path.unlink()
 
     def summary(self, session: Session) -> dict[str, int]:
         states = [self.store.state.drafts[item].status for item in session.drafts]
@@ -1013,7 +1023,7 @@ def earlier_day_check(fx, workdir):
     written_directly = len(env.store.book.records) - records_before
     env.decide(rows["statement-03"], distinct=True)
     for item in rows.values():
-        env.store.resolve(item, answers={check_id: "included"})
+        env.decide(item, answers={check_id: "included"})
     confirmed_answered = env.importer.confirm_ready(session, "batch-2")
     [gap] = [
         item
@@ -1181,6 +1191,31 @@ def pause_resume(fx, workdir):
         "files_after_restart": 1,
         "second_copy_drafts": 0,
         "already_imported": 11,
+    }, observed
+
+
+@case(
+    "interrupted_review_leaves_no_file",
+    "cancellation",
+    "A file written by a review that stopped before creating drafts is deleted when the importer starts again, and the file of an open review stays.",
+)
+def interrupted_review(fx, workdir):
+    env = make_env(workdir)
+    open_review = _csv_session(env)
+    stopped = Selection("file_picker", "statement.pdf", FIXTURES["statement.pdf"])
+    env.importer.sources.mkdir(exist_ok=True)
+    extract(env.importer.sources, stopped, check(stopped))
+    files_before_restart = len(env.importer.held()["on_disk"])
+    env.importer = Importer(env.store, workdir)
+    observed = {
+        "files_before_restart": files_before_restart,
+        "files_after_restart": env.importer.held()["on_disk"],
+    }
+    return observed == {
+        "files_before_restart": 2,
+        "files_after_restart": [
+            stored_path(env.importer.sources, open_review.intake).name
+        ],
     }, observed
 
 

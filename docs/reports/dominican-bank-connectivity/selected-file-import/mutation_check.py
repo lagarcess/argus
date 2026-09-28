@@ -80,8 +80,11 @@ def answer_for_the_person(original):
             and fields["kind"] != "balance_observation"
         ):
             anchors = proof.derive.anchors(self.store.book, account)
+            draft = session.drafts[-1]
             self.store.resolve(
-                session.drafts[-1], answers={record.id: "included" for record in anchors}
+                draft,
+                answers={record.id: "included" for record in anchors},
+                expected_revision=self.store.preview(draft).draft_revision,
             )
 
     return add
@@ -98,7 +101,7 @@ def stop_asking(original):
 def cancel_without_reject(original):
     def cancel(self, session):
         self.selections.pop(session.id, None)
-        self._release(session)
+        self.sweep()
         session.status = "cancelled"
 
     return cancel
@@ -123,6 +126,16 @@ def completion_keeps_file(original):
         return self.store.confirm_batch(ready, key) if ready else []
 
     return confirm_ready
+
+
+def start_without_sweep(original):
+    def init(self, store, workdir):
+        self.store = store
+        self.sources = workdir / "sources"
+        self.selections = {}
+        self._ids = iter(range(1, 10_000))
+
+    return init
 
 
 def remember_reviews(original):
@@ -217,6 +230,11 @@ def mutations():
                 (proof.Importer, "open_reviews", only_remembered_reviews),
             ],
             {"pause_and_resume"},
+        ),
+        (
+            "restart keeps a file from an interrupted review",
+            [(proof.Importer, "__init__", start_without_sweep)],
+            {"interrupted_review_leaves_no_file"},
         ),
         (
             "file stored under its original name",

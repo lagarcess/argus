@@ -2,7 +2,7 @@
   "assumptions": {
     "household_source_file_visibility": "Not modeled. Records carry a reference to the file, never the file.",
     "password_entry": "None. A file that needs a password is refused, and the person is asked for an unlocked copy.",
-    "source_file_retention": "A stored file is deleted once no row from it is left in review.",
+    "source_file_retention": "A stored file is deleted once no row from it is left in review, checked after every importer step and when the importer starts.",
     "status": "Experimental choices made to run the proof. Unresolved, and not approved production defaults.",
     "upload_limit_bytes": 10485760
   },
@@ -495,6 +495,18 @@
       "status": "passed"
     },
     {
+      "case": "interrupted_review_leaves_no_file",
+      "claim": "A file written by a review that stopped before creating drafts is deleted when the importer starts again, and the file of an open review stays.",
+      "group": "cancellation",
+      "observed": {
+        "files_after_restart": [
+          "ba7c8753f79438fd.csv"
+        ],
+        "files_before_restart": 2
+      },
+      "status": "passed"
+    },
+    {
       "case": "retry_with_same_key",
       "claim": "Retrying a confirmation with the same key returns the same records and writes nothing new.",
       "group": "retry",
@@ -552,13 +564,13 @@
   "counts": {
     "blocked": 0,
     "failed": 0,
-    "passed": 37
+    "passed": 38
   },
   "fictional": true,
   "format": "selected-file-import-proof-v2",
   "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
   "recording_model": {
-    "digest": "db2f71ef1bdc8d85b5c6531b3b44da59c1f2b6b1c10ae1a8286d1e210e4d07ae",
-    "ref": "lagarcess/argus#724 at 71f6d27b3343c133785bf969005876d1eab583b3"
+    "digest": "b39749d5c3461ccd2aaf7b33d7f2872711171b188abd4a1bf9384f9d84ff8faa",
+    "ref": "lagarcess/argus#724 at 2c9ae114b5f8d260992fabb598288cb788b79a61"
   }
 }

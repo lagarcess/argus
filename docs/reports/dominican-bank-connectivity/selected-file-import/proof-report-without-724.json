@@ -2,7 +2,7 @@
   "assumptions": {
     "household_source_file_visibility": "Not modeled. Records carry a reference to the file, never the file.",
     "password_entry": "None. A file that needs a password is refused, and the person is asked for an unlocked copy.",
-    "source_file_retention": "A stored file is deleted once no row from it is left in review.",
+    "source_file_retention": "A stored file is deleted once no row from it is left in review, checked after every importer step and when the importer starts.",
     "status": "Experimental choices made to run the proof. Unresolved, and not approved production defaults.",
     "upload_limit_bytes": 10485760
   },
@@ -344,6 +344,15 @@
       "status": "blocked"
     },
     {
+      "case": "interrupted_review_leaves_no_file",
+      "claim": "A file written by a review that stopped before creating drafts is deleted when the importer starts again, and the file of an open review stays.",
+      "group": "cancellation",
+      "observed": {
+        "reason": "requires the recording contract's reference model (pull request 724)"
+      },
+      "status": "blocked"
+    },
+    {
       "case": "retry_with_same_key",
       "claim": "Retrying a confirmation with the same key returns the same records and writes nothing new.",
       "group": "retry",
@@ -390,7 +399,7 @@
     }
   ],
   "counts": {
-    "blocked": 22,
+    "blocked": 23,
     "failed": 0,
     "passed": 15
   },
