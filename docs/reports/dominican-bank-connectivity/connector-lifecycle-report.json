@@ -188,6 +188,18 @@
       "passed": true
     },
     {
+      "case": "unreadable_balance_rejected",
+      "claim": "A balance that is not a number rejects the whole batch like a malformed row",
+      "observed": {
+        "last_error": "parse_error",
+        "result": {
+          "applied": false,
+          "state": "degraded"
+        }
+      },
+      "passed": true
+    },
+    {
       "case": "expired_session",
       "claim": "An expired session asks for reconnection; records and last success stay as they were",
       "observed": {
@@ -251,7 +263,7 @@
       "case": "privacy_boundaries",
       "claim": "Events carry codes and counts only; the secret never leaves the vault; a partner cannot refresh",
       "observed": {
-        "events": 33
+        "events": 34
       },
       "passed": true
     }
@@ -301,7 +313,7 @@
       "rows_in_export": 52
     }
   ],
-  "passed": 22,
+  "passed": 23,
   "review_workload": [
     {
       "actions_if_clean_rows_were_auto_accepted": 3,
@@ -419,6 +431,13 @@
       "records": 20,
       "state": "degraded",
       "step": "malformed batch rejected"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-16T06:10",
+      "records": 20,
+      "state": "degraded",
+      "step": "unreadable balance rejected"
     },
     {
       "connection": "conn-0012",

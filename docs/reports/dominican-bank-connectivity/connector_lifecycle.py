@@ -10,7 +10,7 @@ import unicodedata
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -270,10 +270,11 @@ def _parse(result: Refresh) -> None:
         if field_issues(probe) or txn.direction not in ("debit", "credit"):
             raise BatchRejected("parse_error")
     for balance in result.balances:
-        if (
-            balance.currency not in ("DOP", "USD")
-            or not Decimal(balance.amount).is_finite()
-        ):
+        try:
+            finite = Decimal(balance.amount).is_finite()
+        except InvalidOperation:
+            finite = False
+        if balance.currency not in ("DOP", "USD") or not finite:
             raise BatchRejected("parse_error")
 
 
@@ -1492,6 +1493,29 @@ def scenario(checks: Checks) -> dict:
         ),
     )
     mark("malformed batch rejected", bank)
+    unreadable_balance = refresh(
+        store,
+        owner,
+        bank,
+        Refresh(
+            at="2026-09-19T07:00",
+            accounts=renamed,
+            balances=(Balance("src-chk-dop", "2026-09-19T07:00", "N/A", "DOP"),),
+            txns=second_rows,
+            coverage=("2026-09-01", "2026-09-19"),
+        ),
+    )
+    mark("unreadable balance rejected", bank)
+    checks.add(
+        "unreadable_balance_rejected",
+        "A balance that is not a number rejects the whole batch like a malformed row",
+        unreadable_balance == {"applied": False, "state": DEGRADED}
+        and store.connections[bank]["last_error"] == "parse_error"
+        and len(store.observations) == observations_before
+        and len(store.records) == records_after_second,
+        result=unreadable_balance,
+        last_error=store.connections[bank]["last_error"],
+    )
     checks.add(
         "expired_session",
         "An expired session asks for reconnection; records and last success stay as they were",

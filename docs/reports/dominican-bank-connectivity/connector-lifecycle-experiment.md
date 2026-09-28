@@ -16,7 +16,7 @@ poetry run python docs/reports/dominican-bank-connectivity/connector_lifecycle.p
 cmp temp/connector-lifecycle-report.json docs/reports/dominican-bank-connectivity/connector-lifecycle-report.json
 ```
 
-The script prints `22/22 checks passed` and exits with code 0. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
+The script prints `23/23 checks passed` and exits with code 0. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
 
 The run used Python 3.10.20 and Faker 30.10.0, which match `poetry.lock`. The kit's own 46 checks passed in the same environment before the experiment reused them.
 
@@ -63,7 +63,7 @@ stateDiagram-v2
 
 ## Results
 
-All 22 checks passed. Each row names the assignment's failure case and the behavior the script asserts.
+All 23 checks passed. Each row names the assignment's failure case and the behavior the script asserts.
 
 | Check | Assignment case | Asserted behavior |
 | --- | --- | --- |
@@ -84,6 +84,7 @@ All 22 checks passed. Each row names the assignment's failure case and the behav
 | `partial_history_and_stale_balance` | Partial history and stale balances | The source returned history from 2026-09-01 only, and the connection records that start date. A stale balance keeps its old as-of time. |
 | `expired_session` | Expired sessions | An expired session moves to `reauth_required`. Cancelling reconnection keeps it there. Records do not change. |
 | `source_failure_keeps_last_good` | Source failure without erasing data | A source outage and a malformed batch leave records, observations, the last success time, and balance freshness unchanged. The malformed batch applies none of its rows, including a valid one. |
+| `unreadable_balance_rejected` | Source failure without erasing data | A balance of N/A rejects the whole batch with `parse_error`, like a malformed row. Records and observations do not change. An automated review found that this case escaped as an exception before the fix. |
 | `idempotent_refresh` | Repeated imports | After recovery, 16 known rows are seen again and only the 1 new row becomes a proposal. |
 | `revocation_and_deletion` | Revocation, disconnect, and deletion | Revoking drops the vault entry, stops refresh, withdraws open proposals, and purges observations. Deleting imported data removes records whose only source is the connection. Manual records and records that also came from the CSV file stay. |
 | `kit_contract_and_totals` | Observations to proposals to records | Every confirmed connector record passes the kit's `field_issues` and the kit's `Harness` reproduces the connector's totals. |
