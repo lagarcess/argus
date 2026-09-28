@@ -18,11 +18,18 @@ enum AppearancePreference: String, CaseIterable {
 
 @main
 struct ArgusFoundationApp: App {
+    @StateObject private var auth = ProfileAuthModel()
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppearancePreference.storageKey) private var appearance = AppearancePreference.system
 
     var body: some Scene {
         WindowGroup {
             FoundationShell(appearance: $appearance)
+                .environmentObject(auth)
+                .task { await auth.start() }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { Task { await auth.restore() } }
+                }
                 .preferredColorScheme(appearance.colorScheme)
                 .tint(ArgusStyle.ink)
                 .foregroundStyle(ArgusStyle.ink)
