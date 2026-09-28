@@ -388,6 +388,11 @@
         ]
       ]
     },
+    "correction_unknown_account_is_structured": {
+      "anchor_keeps_account": "InvalidInput:anchor_account_immutable",
+      "unknown_activity_account": "ReviewRequired:account_unknown",
+      "unknown_anchor_account": "ReviewRequired:account_unknown"
+    },
     "custom_category_blocks_a_move": {
       "move": "ReviewRequired:account_has_links"
     },
@@ -403,6 +408,12 @@
       "future_check": "ReviewRequired:date_in_future",
       "future_opening": "InvalidInput:date_in_future",
       "future_opening_correction": "ReviewRequired:date_in_future"
+    },
+    "inclusion_answers_bound_to_revision": {
+      "after_edit_asks_again": {
+        "inclusion_unanswered": "blocking"
+      },
+      "answers_require_revision": "InvalidInput:revision_required"
     },
     "liability_anchors_use_owner_sign": {
       "after_check": -220000,
@@ -504,6 +515,9 @@
     },
     "redating_the_opening_onto_untimed_activity": {
       "result": "ReviewRequired:inclusion_unanswered"
+    },
+    "rejected_draft_cannot_confirm": {
+      "confirm_rejected": "InvalidInput:draft_not_proposed"
     },
     "removing_a_check_others_depend_on": {
       "after_answering": "ok",

@@ -319,6 +319,7 @@ class Store:
             fields={**draft.fields, **fields},
             revision=draft.revision + 1,
             distinct=False,
+            answers=(),
         )
         self._swap(drafts={**self.state.drafts, draft_id: edited})
         return edited
@@ -338,7 +339,7 @@ class Store:
         expected_revision: Optional[int] = None,
     ) -> Draft:
         draft = self._proposed(draft_id)
-        if distinct or duplicate_of is not None:
+        if distinct or duplicate_of is not None or answers is not None:
             if expected_revision is None:
                 raise InvalidInput("revision_required", draft_id)
             if draft.revision != expected_revision:
@@ -414,6 +415,8 @@ class Store:
             if draft.status == "confirmed":
                 confirmed.append(draft.record_id)
                 continue
+            if draft.status != "proposed":
+                raise InvalidInput("draft_not_proposed", draft.id)
             # Staleness is judged against the batch's starting state, so one
             # batch may carry several previews of the same account.
             if draft.revision != preview.draft_revision or any(
@@ -475,11 +478,16 @@ class Store:
         if answers:
             changes["answers"] = _merged_answers(record.body.answers, answers)
         body = replace(record.body, **changes)
-        if self.book.accounts[body.account_id].currency != currency:
-            raise InvalidInput("currency_mismatch", body.account_id)
-        if not isinstance(body, Activity) and body.account_id != record.body.account_id:
-            raise InvalidInput("anchor_account_immutable", body.account_id)
         found = blocking(validate(self.book, body, self.tz, record_id, now=self.clock()))
+        if (
+            not isinstance(body, Activity)
+            and body.account_id != record.body.account_id
+            and body.account_id in self.book.accounts
+        ):
+            raise InvalidInput("anchor_account_immutable", body.account_id)
+        target = self.book.accounts.get(body.account_id)
+        if target is not None and target.currency != currency:
+            raise InvalidInput("currency_mismatch", body.account_id)
         left = accounts_of(record.body) - accounts_of(body)
         trial = with_trial(self.book, body, record_id, self.tz)
         found.extend(inclusion_issues(trial, left, self.tz))

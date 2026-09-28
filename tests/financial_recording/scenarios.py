@@ -157,7 +157,11 @@ def _late_expense(answer: Optional[str]) -> tuple[Scene, object, dict]:
         "confirm_unanswered": outcome(lambda: scene.confirm(late)),
     }
     if answer is not None:
-        scene.store.resolve(late.id, answers={check.id: answer})
+        scene.store.resolve(
+            late.id,
+            answers={check.id: answer},
+            expected_revision=scene.store.state.drafts[late.id].revision,
+        )
         record = scene.confirm(late)
         gap = observation_gaps(scene.store.book, checking.id, scene.store.tz)[0]
         seen["explained_by_late_record"] = list(gap.explained_by) == [record.id]
@@ -213,9 +217,7 @@ def equal_amount_not_a_match() -> dict:
         "spending": scene.spending(first)[0],
     }
     scene, first, original, twin, _ = _equal_amounts()
-    scene.store.resolve(
-        twin.id, duplicate_of=original, expected_revision=twin.revision
-    )
+    scene.store.resolve(twin.id, duplicate_of=original, expected_revision=twin.revision)
     replay = scene.confirm(twin)
     linked = {
         "activity_records": scene.activity_count(),
@@ -234,7 +236,11 @@ def partial_reconciliation() -> dict:
     check = scene.observe(checking, "9500.00", 5)
     before = scene.gaps(checking)
     part = scene.act("expense", checking, "300.00", 3)
-    scene.store.resolve(part.id, answers={check.id: "included"})
+    scene.store.resolve(
+        part.id,
+        answers={check.id: "included"},
+        expected_revision=scene.store.state.drafts[part.id].revision,
+    )
     scene.confirm(part)
     return {
         "gaps_before": before,
@@ -271,7 +277,11 @@ def two_observations() -> dict:
     before = scene.gaps(checking)
     between = scene.act("expense", checking, "200.00", 8)
     asked = scene.refs(between, "inclusion_unanswered")[:1] == [second.id]
-    scene.store.resolve(between.id, answers={second.id: "included"})
+    scene.store.resolve(
+        between.id,
+        answers={second.id: "included"},
+        expected_revision=scene.store.state.drafts[between.id].revision,
+    )
     scene.confirm(between)
     return {
         "gaps_before": before,
@@ -299,7 +309,11 @@ def _same_day_check() -> dict:
         check = scene.observe(checking, "9000.00", 5)
         purchase = scene.act("expense", checking, "1000.00", 5)
         asked = scene.refs(purchase, "inclusion_unanswered")[:1] == [check.id]
-        scene.store.resolve(purchase.id, answers={check.id: answer})
+        scene.store.resolve(
+            purchase.id,
+            answers={check.id: answer},
+            expected_revision=scene.store.state.drafts[purchase.id].revision,
+        )
         scene.confirm(purchase)
         results[answer] = {
             "asked": asked,
@@ -316,9 +330,17 @@ def _older_than_two_checks() -> dict:
     second = scene.observe(checking, "9000.00", 10)
     old = scene.act("expense", checking, "1000.00", 3)
     first_question = scene.refs(old, "inclusion_unanswered")[:1]
-    scene.store.resolve(old.id, answers={first.id: "not_included"})
+    scene.store.resolve(
+        old.id,
+        answers={first.id: "not_included"},
+        expected_revision=scene.store.state.drafts[old.id].revision,
+    )
     second_question = scene.refs(old, "inclusion_unanswered")[:1]
-    scene.store.resolve(old.id, answers={second.id: "included"})
+    scene.store.resolve(
+        old.id,
+        answers={second.id: "included"},
+        expected_revision=scene.store.state.drafts[old.id].revision,
+    )
     confirm = outcome(lambda: scene.confirm(old))
     return {
         "questions_in_date_order": [first_question, second_question]
@@ -337,9 +359,17 @@ def _transfer_per_leg() -> dict:
     savings_check = scene.observe(savings, "5000.00", 5)
     move = scene.act("transfer", checking, "1000.00", 3, counter=savings)
     first = scene.refs(move, "inclusion_unanswered")[:1]
-    scene.store.resolve(move.id, answers={checking_check.id: "included"})
+    scene.store.resolve(
+        move.id,
+        answers={checking_check.id: "included"},
+        expected_revision=scene.store.state.drafts[move.id].revision,
+    )
     second = scene.refs(move, "inclusion_unanswered")[:1]
-    scene.store.resolve(move.id, answers={savings_check.id: "not_included"})
+    scene.store.resolve(
+        move.id,
+        answers={savings_check.id: "not_included"},
+        expected_revision=scene.store.state.drafts[move.id].revision,
+    )
     scene.confirm(move)
     return {
         "one_question_per_leg": [first, second]
@@ -386,7 +416,11 @@ def _same_day_opening() -> dict:
     opening_id = anchors(scene.store.book, cash.id)[0].id
     lunch = scene.act("expense", cash, "200.00", 1)
     asked = scene.refs(lunch, "inclusion_unanswered")[:1] == [opening_id]
-    scene.store.resolve(lunch.id, answers={opening_id: "included"})
+    scene.store.resolve(
+        lunch.id,
+        answers={opening_id: "included"},
+        expected_revision=scene.store.state.drafts[lunch.id].revision,
+    )
     scene.confirm(lunch)
     spending, _ = scene.spending(cash)
     return {"asked": asked, "balance": scene.amount(cash), "spending": spending}

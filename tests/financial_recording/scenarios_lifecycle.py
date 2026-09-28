@@ -256,6 +256,9 @@ def edits_that_move_money_need_review() -> dict:
         "linked_duplicate_keeps_import_account": _linked_duplicate_account(),
         "oldest_anchor_in_coverage": _oldest_anchor_in_coverage(),
         "spanish_labels_use_supported_locale": _spanish_labels_locale(),
+        "rejected_draft_cannot_confirm": _rejected_draft_cannot_confirm(),
+        "inclusion_answers_bound_to_revision": _answers_bound_to_revision(),
+        "correction_unknown_account_is_structured": _correction_unknown_account(),
     }
 
 
@@ -452,9 +455,7 @@ def _type_edit_revalidates_anchors() -> dict:
     car = scene.account("Carro", "vehicle", "DOP", "100000.00")
     scene.observe(car, "90000.00", 5, basis="value_estimate")
     version = scene.store.book.accounts[car.id].version
-    refused = outcome(
-        lambda: scene.store.edit_account(car.id, version, type="checking")
-    )
+    refused = outcome(lambda: scene.store.edit_account(car.id, version, type="checking"))
     cash = scene.account("Efectivo", "cash", "DOP", "100.00")
     allowed = outcome(lambda: scene.store.edit_account(cash.id, 1, type="checking"))
     return {
@@ -543,6 +544,63 @@ def _spanish_labels_locale() -> dict:
     }
 
 
+def _rejected_draft_cannot_confirm() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    draft = scene.act("expense", cash, "10.00", 3)
+    preview = scene.store.preview(draft.id)
+    scene.store.reject(draft.id)
+    return {
+        "confirm_rejected": outcome(
+            lambda: scene.store.confirm(preview, f"confirm:{draft.id}")
+        )
+    }
+
+
+def _answers_bound_to_revision() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    check = scene.observe(cash, "1000.00", 5)
+    draft = scene.act("expense", cash, "10.00", 3)
+    scene.store.resolve(
+        draft.id,
+        answers={check.id: "included"},
+        expected_revision=draft.revision,
+    )
+    scene.store.edit_draft(draft.id, amount="500.00")
+    after_edit = scene.issues(draft)
+    missing_revision = outcome(
+        lambda: scene.store.resolve(draft.id, answers={check.id: "included"})
+    )
+    return {
+        "after_edit_asks_again": after_edit,
+        "answers_require_revision": missing_revision,
+    }
+
+
+def _correction_unknown_account() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    other = scene.account("Monedero", "cash", "DOP", "100.00")
+    expense = scene.record("expense", cash, "10.00", 3)
+    opening = anchors(scene.store.book, cash.id)[0]
+    return {
+        "unknown_activity_account": outcome(
+            lambda: scene.store.correct(
+                expense.id, 1, "typo", account_id="acct-missing"
+            )
+        ),
+        "unknown_anchor_account": outcome(
+            lambda: scene.store.correct(
+                opening.id, 1, "typo", account_id="acct-missing"
+            )
+        ),
+        "anchor_keeps_account": outcome(
+            lambda: scene.store.correct(opening.id, 1, "wrong", account_id=other.id)
+        ),
+    }
+
+
 def _redated_check_restamps() -> dict:
     scene = Scene()
     cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
@@ -578,7 +636,11 @@ def _contradicting_answers() -> dict:
     later = scene.observe(cash, "1000.00", 15)
     scene.now = local(20)
     pending = scene.act("expense", cash, "200.00", 5)
-    scene.store.resolve(pending.id, answers={later.id: "not_included"})
+    scene.store.resolve(
+        pending.id,
+        answers={later.id: "not_included"},
+        expected_revision=scene.store.state.drafts[pending.id].revision,
+    )
     expense = scene.confirm(pending)
     before = scene.amount(cash)
     earlier = scene.observation(cash, "800.00", 10)
@@ -612,7 +674,11 @@ def _anchor_account_fixed() -> dict:
     check = scene.observe(cash, "8000.00", 5)
     scene.now = local(6)
     late = scene.act("expense", cash, "2000.00", 3)
-    scene.store.resolve(late.id, answers={check.id: "included"})
+    scene.store.resolve(
+        late.id,
+        answers={check.id: "included"},
+        expected_revision=scene.store.state.drafts[late.id].revision,
+    )
     expense = scene.confirm(late)
     moved = outcome(
         lambda: scene.store.correct(check.id, 1, "wrong", account_id=other.id)
@@ -641,7 +707,11 @@ def _remove_check_with_dependents() -> dict:
     second = scene.observe(cash, "8000.00", 10)
     scene.now = local(11)
     late = scene.act("expense", cash, "2000.00", 3)
-    scene.store.resolve(late.id, answers={first.id: "included"})
+    scene.store.resolve(
+        late.id,
+        answers={first.id: "included"},
+        expected_revision=scene.store.state.drafts[late.id].revision,
+    )
     record = scene.confirm(late)
     blocked = outcome(lambda: scene.store.remove(first.id, 1, "typo"))
     scene.store.correct(
@@ -719,7 +789,11 @@ def _note_keeps_evidence() -> dict:
     check = scene.observe(cash, "7500.00", 5)
     scene.now = local(6)
     late = scene.act("expense", cash, "500.00", 4)
-    scene.store.resolve(late.id, answers={check.id: "included"})
+    scene.store.resolve(
+        late.id,
+        answers={check.id: "included"},
+        expected_revision=scene.store.state.drafts[late.id].revision,
+    )
     scene.confirm(late)
     before = scene.gaps(cash)
     scene.store.correct(check.id, 1, "add note", note="bank app")

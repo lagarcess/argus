@@ -263,4 +263,16 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "locale_keys": ["en", "es-419"],
             "groceries": "Supermercado",
         },
+        "rejected_draft_cannot_confirm": {
+            "confirm_rejected": "InvalidInput:draft_not_proposed",
+        },
+        "inclusion_answers_bound_to_revision": {
+            "after_edit_asks_again": {"inclusion_unanswered": "blocking"},
+            "answers_require_revision": "InvalidInput:revision_required",
+        },
+        "correction_unknown_account_is_structured": {
+            "unknown_activity_account": "ReviewRequired:account_unknown",
+            "unknown_anchor_account": "ReviewRequired:account_unknown",
+            "anchor_keeps_account": "InvalidInput:anchor_account_immutable",
+        },
     }
