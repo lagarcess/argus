@@ -269,7 +269,13 @@ test("sample account creation remains an unsaved draft and leaves sample balance
   await expect(dialog).toContainText(copy.unknownBalance);
   await expect(dialog).toContainText("Weekend cash example");
   await capture(page, testInfo, networkAudit, "account-create-unsaved-review");
+  // Closing the shared overlay spends its temporary history entry. Reload
+  // only after that real traversal, otherwise it can abort the test's reload.
+  const closedOverlayHistory = page.evaluate(() => new Promise<void>((resolve) => {
+    window.addEventListener("popstate", () => resolve(), { once: true });
+  }));
   await page.keyboard.press("Escape");
+  await closedOverlayHistory;
   await expect(page.getByTestId("preview-main")).toHaveText(before, { useInnerText: true });
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.getByTestId("preview-main")).toHaveText(before, { useInnerText: true });
