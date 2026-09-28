@@ -32,6 +32,12 @@ The product remains one connected Argus experience that carries forward existing
 
 “Locked” means founder-approved direction. It does not mean implemented, validated market demand, a final schema, a model instruction change, or permission to deploy.
 
+The current mobile reference is the [September 28 design lock](reports/mobile-design-lock-2026-09-28.md).
+It succeeds the earlier September 27 sketch carried by PR #714. Read its archive
+and current MVEE/DESIGN together; historical screenshots do not reopen later
+decisions. The [recording response](specs/lanes/financial-recording-decision-response.md)
+distinguishes settled experience from remaining recommendations for PR #724.
+
 ## Carry forward, change explicitly
 
 Argus has one evolving product and one set of technical owners. The MVEE
