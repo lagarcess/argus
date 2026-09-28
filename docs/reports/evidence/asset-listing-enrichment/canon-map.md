@@ -2,7 +2,7 @@
 
 Read-only audit of `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963`, 2026-09-27. The question is whether Dominican vehicle and residential-property classified listings could help a user review and update the estimated value of a vehicle or property recorded in Accounts. This file maps canon and code. It changes no product decision.
 
-**Scope note.** This map records published canon at the commit above, and its findings stay as recorded. The founder approved vehicle and residential-property records, with optional ownership shares and linked debt, on 2026-09-27. That approval was recorded locally but was not yet published at this commit. Bottom-line item 1, topics 1.1 and 1.3 to 1.5, the second unresolved tension in section 4, and gaps 1 to 4 in section 5 therefore describe a publication gap. They do not describe an open product question. The approval settles gap 1. Gaps 2 to 4 now ask how the approved fields work, not whether they exist. The delivery lead owns publication in the MVEE and the decision log.
+**Scope note.** This map records published canon at the commit above. Its findings stay as recorded, as historical evidence. The founder approved vehicle and residential-property records, with optional ownership shares and linked debt, on 2026-09-27, independently of listing enrichment. That approval was not yet published at this commit. [PR #727](https://github.com/lagarcess/argus/pull/727), an open draft at `a1c294319`, publishes it in its decision log and in the MVEE section "Quick account setup and optional assets". Bottom-line item 1, topics 1.1 and 1.3 to 1.5, and the second unresolved tension in section 4 describe that historical gap. #727 settles gap 1 in section 5 and answers the experience side of gaps 3 and 4. It answers part of gap 2, while match inputs such as make, model, year, and size stay undefined. #727 also publishes the limited supersession of Decision 8 for explicitly confirmed financial records, which bears on the first tension in section 4 and on gap 16. The technical contracts behind all of these stay open.
 
 ## Legend
 
@@ -406,18 +406,19 @@ Unresolved tensions (C):
 
 ## 6. Quote check
 
-Every quote-and-reference pair in this file was checked by the script below. It resolves aliases from the table, reads the cited lines with two lines of slack, collapses whitespace, and requires an exact substring match and fewer than 25 words. Run it from the repository root with this file's path as the argument.
+Every quote-and-reference pair in this file was checked by the script below. It resolves aliases from the table, reads the cited lines with two lines of slack, collapses whitespace, and requires an exact substring match and fewer than 25 words. It reads each cited file at the audited commit with `git show`, so later canon changes, such as #727, do not break it. Run it from the repository root.
 
 ```
-python3 - canon.md <<'EOF'
-import re, sys, pathlib
-root = pathlib.Path(".")
+python3 - docs/reports/evidence/asset-listing-enrichment/canon-map.md <<'EOF'
+import re, subprocess, sys, pathlib
+COMMIT = "f0a90763b79e5625ac0a4789cdfa171cda023963"
 text = pathlib.Path(sys.argv[1]).read_text()
 alias = dict(re.findall(r"^\| ([A-Z0-9]+) \| `([^`]+)` \|$", text, re.M))
 pairs = re.findall(r'"([^"]+)" \(([^():\s]+):(\d+)(?:-(\d+))?\)', text)
 bad = []
 for q, ref, a, b in pairs:
-    lines = (root / alias.get(ref, ref)).read_text().splitlines()
+    shown = subprocess.run(["git", "show", f"{COMMIT}:{alias.get(ref, ref)}"], capture_output=True, text=True, check=True)
+    lines = shown.stdout.splitlines()
     lo, hi = max(int(a) - 3, 0), min(int(b or a) + 2, len(lines))
     window = " ".join(" ".join(lines[lo:hi]).split())
     if " ".join(q.split()) not in window or len(q.split()) >= 25:

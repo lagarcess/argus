@@ -40,7 +40,7 @@ All 33 responses were HTTP 200. None met a stop condition. The smallest gap betw
 - `parser-comparison.json` holds parse times, the output comparison, and the markup-change test.
 - `fixtures/` holds two synthetic detail pages and `expected.json`, the hand-reviewed output that `scripts/check_fixtures.py` asserts.
 - `scripts/` holds the code that produced the files above and the fixture checks.
-- `canon-map.md` maps the canon on assets, ownership, valuation, currency, evidence, and open decisions at the audited commit. Its quote-check script matched all 272 quotes to their cited lines.
+- `canon-map.md` maps the canon on assets, ownership, valuation, currency, evidence, and open decisions at the audited commit. Its quote-check script reads that commit with `git show` and matched all 272 quotes to their cited lines.
 - `code-reuse-map.md` maps reusable code with a path and line for each claim.
 - `web-research.md` records public facts about both sites, Dominican law, Scrapling, and other value sources. It lists every URL it read. None was on either site.
 

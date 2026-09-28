@@ -4,10 +4,12 @@ This report answers one question. Can SuperCarros and SuperCasas listings help a
 
 The audit read `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963` on 2026-09-27. The run record, sanitized evidence, synthetic fixtures, and scripts live in [the evidence folder](evidence/asset-listing-enrichment/README.md).
 
+**Status.** Closed on 2026-09-28. [PR #727](https://github.com/lagarcess/argus/pull/727) publishes the account decision this report depended on. Licensed access and asking-price ranges remain founder decisions. No further work is authorized under this assignment.
+
 ## Recommendation
 
-- **Vehicles.** Prefer partnership or licensed access first. The pages are easy to read, and robots.txt allows the detail pages, but access is not reuse. Clause 4.1 of the operator's published terms reserves commercial reproduction, distribution, and public communication of the content to its authorization. robots.txt also disallows the search pages that would find same-year comparables. Until a written agreement exists, keep the manual estimate and let the user add comparable ads they found.
-- **Residential property.** Use the simpler manual path. Record the user's estimate with its source, such as an appraisal, an insured value, or a purchase price. Even under a license, show at most a list of similar home ads, because the sampled ads mixed sale and rent prices, recorded areas as zero, and contradicted their own room counts.
+- **Vehicles.** Prefer partnership or licensed access first. The pages are easy to read, and robots.txt allows the detail pages, but access is not reuse. Clause 4.1 of the operator's published terms reserves commercial reproduction, distribution, and public communication of the content to its authorization. robots.txt also disallows the search pages that would find same-year comparables. Until a written agreement exists, the approved manual estimate stays the path, and the user can name ads they found as the estimate's basis.
+- **Residential property.** Use the approved manual path. The user records an estimate or leaves it unknown, with a basis such as an appraisal, an insured value, or a purchase price. Even under a license, show at most a list of similar home ads, because the sampled ads mixed sale and rent prices, recorded areas as zero, and contradicted their own room counts.
 - **Scrapling.** Do not adopt it. The pages are server-rendered HTML. Scrapling's parser produced the same output as BeautifulSoup on every sampled page. After a simulated markup change, its adaptive mode returned the accessories list or the seller contact list in place of the specifications. Its fetchers imitate a browser by default, which this work must not do.
 - **Market value.** Argus should never present a market value derived from asking prices. A list of similar ads is supportable with access. An asking-price range is an unvalidated experimental proposal, for vehicles only, and it must meet the requirements in this report before anyone tests it. A value estimate is not supportable from these sources.
 
@@ -17,9 +19,13 @@ Three facts drive that verdict.
 2. The robots.txt files disallow `/buscar/` and `/buscador/` on both sites. The sitemap is the inventory a crawler may read, and its URLs name a model or a sector with no year, price, or size. Finding same-year comparables therefore means fetching every detail page of a model.
 3. No sampled page shows a listing date, a sold status, or any damage or title field. Vehicle prices come in both US$ and RD$, even within one model.
 
-### A publication gap, not an open decision
+### PR #727 publishes the account decision
 
-The founder approved vehicle and residential-property records, with optional ownership shares and linked debt, on 2026-09-27. That decision is not yet published at the audited commit. There, the MVEE minimum account list reads "cash, checking, savings, investments, credit cards, and other debts", and the decision log has no entry for the approval. The exact-commit findings in this report and in [the canon map](evidence/asset-listing-enrichment/canon-map.md) describe that commit and stay as recorded. This report does not restate the approval as canon. The delivery lead owns its publication in the MVEE and the decision log.
+The founder approved vehicle and home records on 2026-09-27, independently of listing enrichment. [PR #727](https://github.com/lagarcess/argus/pull/727), an open draft at `a1c294319`, publishes that decision. Its decision log entry for 2026-09-27 approves unknown balances and optional property, vehicle, and other asset tracking, and locks the estimate, ownership, and linked-debt boundaries. Its MVEE section "Quick account setup and optional assets" owns the details. A user records an estimated whole-asset value or leaves it unknown, and may add the estimate's date and basis, an ownership share, and a linked debt.
+
+The same section keeps listing-based valuation as a future candidate capability. It names SuperCarros and SuperCasas as candidate sources and calls asking prices comparison evidence, not verified sale prices or an appraisal. This report is evidence for that future work. It approves none of it.
+
+At the audited commit `f0a90763b`, the decision was not yet published. The MVEE minimum account list there reads "cash, checking, savings, investments, credit cards, and other debts". The exact-commit findings in this report and in [the canon map](evidence/asset-listing-enrichment/canon-map.md) stay as historical evidence. When #727 merges, the decision becomes canon on `codex/private-alpha-next`.
 
 ## What was tested and what was inferred
 
@@ -133,7 +139,7 @@ Every page had the same 10 specification labels, including `Construcción:` for 
 | An indicative asking-price range | An unvalidated experimental proposal. A candidate only when at least 5 ads meet every requirement below. | Not proposed. |
 | A market-value estimate | No. There are no sale prices, no damage data, and no measured gap between asking and selling prices. | No. The same gaps apply, and a home's price depends on facts no ad records reliably. |
 
-The 5-ad floor is an experimental proposal with one mechanical basis. With linear interpolation, the NumPy default, the middle half of 5 sorted prices runs from the 2nd to the 4th price, so neither extreme ad sets an endpoint. It is not a sample size, a confidence level, or evidence of reliability. Five ads can still share one dealer's pricing, one trim, or one stale week. The next assignment measures whether any floor holds up. The floor may change, and the range may be dropped.
+The 5-ad floor is an experimental proposal with one mechanical basis. With linear interpolation, the NumPy default, the middle half of 5 sorted prices runs from the 2nd to the 4th price, so neither extreme ad sets an endpoint. It is not a sample size, a confidence level, or evidence of reliability. Five ads can still share one dealer's pricing, one trim, or one stale week. The next assignment measures whether any floor holds up. The floor may change, and the range may be dropped. #727's MVEE sets the same boundary for any later estimate. It must show its comparable listings, date, currency, relevant differences, and uncertainty, and the user accepts or adjusts it.
 
 An ad counts as a vehicle comparable only when all of these hold:
 
@@ -170,11 +176,11 @@ The smallest inputs follow.
 
 ## Recommended journey
 
-This journey is a recommendation that the founder has not locked. It builds on the vehicle and home records approved on 2026-09-27, whose publication is pending, and on account contracts not yet written.
+The listing step in this journey is a recommendation the founder has not approved, because licensed access and asking-price ranges are unresolved. Everything around it follows the account experience that #727 publishes. The account contracts behind that experience are not yet written.
 
 ```mermaid
 flowchart TD
-    A["Vehicle or home account: current estimate, currency, date, source"] --> B{"See similar listings?"}
+    A["Vehicle or home account: estimate or unknown, currency, date, basis"] --> B{"See similar listings?"}
     B -- "No" --> A
     B -- "Yes" --> C["Ask only missing match inputs"]
     C --> D["Checking similar ads, neutral loading"]
@@ -194,10 +200,8 @@ flowchart TD
 
 "Checking similar ads" reads observations Argus already stored under its license. It never calls the site while the person waits. The archived answers board set that rule for two Dominican financial data sources. The loading state is a neutral indicator, never a timed progress bar (DESIGN.md). Argus does not fill in a number for the user. An asking-price midpoint would present an unmeasured bias as a value. The user types the value, and any range sits beside the field as context.
 
-- **Ownership share.** The estimate describes the whole asset. The personal view shows the user's share of it. The household view shows a shared asset once, labeled as shared, and never sums two personal shares.
-- **Related loan.** The loan stays a debt account with its own owners, and Home counts it once in debts. The asset card may show the linked loan and the equity for explanation, but totals never subtract the loan a second time.
-- **Spendable cash.** Asset estimates appear in Home's "what I have and owe" summary, separated by currency and marked as estimates with a date. They never enter "what remains until your next income".
-- **Not income or spending.** A new estimate changes the asset's value and nothing else. It creates no transaction, no income, no expense, and no budget effect (MVEE section 3).
+The MVEE section in #727 owns how ownership shares, linked debts, unknown values, and estimates behave. An estimate is never spendable money, and changing it creates no income or expense. This report adds three recommendations:
+
 - **History.** Each estimate is an append-only revision with its value, currency, as-of date, source kind, and the person who recorded it. A correction is a new revision that points at the one it corrects. Undo records the previous value again.
 - **Stale evidence.** A saved comparison keeps the date Argus saw the ads, and later reads "ads checked on September 12". A dead link says the ad is gone, not that the car sold.
 - **Future updates.** A refresh reminder needs no listing data. For example: "Your car's estimate is from March. Do you want to review it?" With licensed data, an update can say that similar ads changed since the last check and link to the comparison. Push and email previews carry no amount (MVEE section 3), and nothing changes the recorded estimate without confirmation.
@@ -232,7 +236,7 @@ flowchart LR
 | Listing observation | A new provider adapter for the licensed source | Source, source listing ID, date seen, and public fields only. No seller data, photos, or free text. Retention follows the license. |
 | Normalized comparable | The same adapter's normalizer | Typed year, make, model, trim, mileage in km, or type, sector, and areas in m². Currency and amount as a `Decimal`. Every exclusion keeps its reason. |
 | Matching and summary | A pure domain function | Deterministic, versioned, and free of model calls. Same-currency only. It returns ads and exclusion counts. A range, if the experiment keeps one, follows the tested rule. |
-| Vehicle or home account | The financial-record contract, not yet written | Private. Ownership share, visibility, and edit rights stay distinct (MVEE section 12). |
+| Vehicle or home account | The financial-record contract, not yet written. #727 publishes the experience | Private. Ownership share, visibility, and edit rights stay distinct (MVEE section 12). |
 | Valuation revision | The same contract | Append-only. The current estimate is the latest confirmed revision, so no second copy can drift. |
 
 No user identifier, address, description, or recorded value enters a shared cache key, a log line, or an analytics event. A shared cache may key on public facets such as make, model, and year band, and it holds public listing data only. That follows the rule for the research cache, which holds public-market data only (AGENTS.md runtime principles). Web, Swift, and Kotlin clients call one API and render its result. None of them scrapes or computes a range. The chat interpreter never scrapes. It can call the same capability through a tool, and a proposed write still needs a confirmation card.
@@ -267,9 +271,9 @@ Two founder decisions remain.
 1. Should Argus ask Cibermercado for licensed access, and on what display, attribution, caching, and retention terms? Only the founder can open that conversation.
 2. Should Argus show asking-price ranges at all, given that people may read them as values?
 
-The approval of vehicle and home records is settled. Its publication belongs to the delivery lead, as described above.
+The account decision is not open. #727 publishes it, and manual estimates, unknown values, ownership shares, and linked debts stand approved independently of listing enrichment.
 
-[Documentation authority](../DOCUMENTATION_AUTHORITY.md) already lists the technical contracts this work needs as open. They include the financial-record schema, household ownership and permissions, chat-to-record integration, and scheduling and notifications. Wave 1 leaves the exchange-rate source to the founder. The chat path also needs decision 8 reconciled. That archived 2026-09-08 decision treats stated personal figures as ephemeral, while MVEE section 4 makes confirmed records durable.
+[Documentation authority](../DOCUMENTATION_AUTHORITY.md) already lists the technical contracts this work needs as open. They include the financial-record schema, household ownership and permissions, chat-to-record integration, and scheduling and notifications. Wave 1 leaves the exchange-rate source to the founder. #727 also publishes the limited supersession of historical Decision 8 for explicitly confirmed financial records. Guest financial-record persistence stays open.
 
 ## Proposed next assignment
 
@@ -298,7 +302,7 @@ This is a proposal for the founder to assign or discard. It does not assign work
 
 **Stop conditions.** Stop on any 401, 403, 429, bot check, or login wall. Stop if robots.txt or the terms change against the authorization. Stop if pages fail to parse because the template changed. Stop and delete the output if any seller name, phone, or email reaches a file.
 
-**Dependencies.** The measurement is independent of the financial contracts. It needs only the authorization. A product prototype would depend on the two founder decisions above, on publication of the 2026-09-27 account decision, and on the account, revision, household, and notification contracts. Residential property gets no experiment until vehicles show that the range survives this test.
+**Dependencies.** The measurement is independent of the financial contracts. It needs only the authorization. A product prototype would depend on the two founder decisions above, on #727 merging, and on the account, revision, household, and notification contracts. Residential property gets no experiment until vehicles show that the range survives this test.
 
 ## Verification and limits
 
@@ -309,3 +313,4 @@ This is a proposal for the founder to assign or discard. It does not assign work
 - Twenty pages cannot show market coverage, the meaning of the hidden dates, or valuation accuracy. The density figures count listings by model or sector, not by model year.
 - The legal notes restate statutes and terms read on 2026-09-27. They are not legal advice.
 - A public GitHub scraper fetches SuperCasas search pages every day, which robots.txt disallows. Its logs show no blocking. That shows technical reach, not permission.
+- The account decision is cited from PR #727 at `a1c294319`, an open draft. If #727 changes before it merges, these citations need a recheck.
