@@ -59,7 +59,7 @@ runs in Pacific/Honolulu. Amounts display ISO currency codes and two decimals.
 ## Evidence and limits
 
 [Durable browser evidence](../../../docs/reports/evidence/chart-validation/web/)
-contains English/light, es-419/dark, missing-point and desktop/long screenshots
+contains English/light, es-419/dark, missing-point, recurring-contribution and desktop/long screenshots
 for Chromium and WebKit. `measurements.json` records capture head, fixture hash,
 OS/engine versions, assertions, and raw measurements. Parent delivery records
 source equality after evidence-only commits. Initial development captures are

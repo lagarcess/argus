@@ -40,6 +40,16 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
       }
       assert.ok((await page.locator('#readout').innerText()).includes(formattedDate(scenario.points.at(-1).time,'es-419')));
       await page.selectOption('#locale','en');
+      const contributionIndex=scenario.points.findIndex(point=>point.contribution!==null);
+      if(contributionIndex>=0) {
+        await page.click('#reset');
+        for(let i=0;i<=contributionIndex;i++) await page.click('#next');
+        assert.ok((await page.locator('[data-field=contribution]').innerText()).includes(formattedValue(scenario.points[contributionIndex].contribution,scenario.currency,'en')));
+        if(scenario.id==='recurring-contributions') {
+          await page.locator('#chart').scrollIntoViewIfNeeded();
+          await page.screenshot({path:new URL(`${name}-recurring-contribution.png`,evidence).pathname,fullPage:true});
+        }
+      }
     }
     results.push(`${scenario.id}: endpoints, reset, independent values, segment structure, formatting pass`);
   }
@@ -76,6 +86,13 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
   await page.screenshot({path:new URL(`${name}-light-en.png`,evidence).pathname,fullPage:true});
   await page.selectOption('#locale','es-419');await page.selectOption('#theme','dark');
   assert.equal(await page.locator('html').getAttribute('data-dark'),'true');
+  await page.locator('#chart').scrollIntoViewIfNeeded();
+  await page.waitForFunction(()=>{
+    const canvas=document.querySelector('#chart canvas');
+    const pixel=canvas.getContext('2d').getImageData(5,5,1,1).data;
+    const expected=getComputedStyle(document.querySelector('.card')).backgroundColor.match(/\d+/g).map(Number);
+    return expected.slice(0,3).every((value,index)=>pixel[index]===value);
+  });
   await page.screenshot({path:new URL(`${name}-dark-es-419.png`,evidence).pathname,fullPage:true});
   await page.selectOption('#theme','system');
   await page.emulateMedia({colorScheme:'light'});await page.waitForFunction(()=>document.documentElement.dataset.dark==='false');assert.equal(await page.locator('html').getAttribute('data-dark'),'false');
