@@ -6,3 +6,4 @@ source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 python3 "$(dirname "${BASH_SOURCE[0]}")/configure.py" "$NATIVE_AUTH_STACK_DIR" --captcha "${1:?mode}"
 native_auth_supabase stop
 native_auth_supabase start -x "$NATIVE_AUTH_EXCLUDE"
+echo "Postgres restarted too: restart api.sh so the Argus API reopens its session-check pool." >&2

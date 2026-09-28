@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security check</title>
+  <!-- Local probe page. Production must serve this from an Argus HTTPS origin
+       listed on the Turnstile sitekey. -->
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onload="start()"></script>
+  <style>body{font-family:-apple-system,sans-serif;display:flex;justify-content:center;padding-top:24px}</style>
+</head>
+<body>
+  <div id="widget"></div>
+  <script>
+    function post(event, extra) {
+      window.webkit.messageHandlers.turnstile.postMessage(Object.assign({ event: event }, extra || {}));
+    }
+    function start() {
+      var sitekey = new URLSearchParams(location.search).get("sitekey");
+      turnstile.render("#widget", {
+        sitekey: sitekey,
+        "refresh-expired": "never",
+        callback: function (token) { post("token", { token: token }); },
+        "error-callback": function (code) { post("error", { detail: String(code) }); return true; },
+        "expired-callback": function () { post("expired"); },
+        "timeout-callback": function () { post("timeout"); },
+        "before-interactive-callback": function () { post("interactive"); }
+      });
+    }
+  </script>
+</body>
+</html>

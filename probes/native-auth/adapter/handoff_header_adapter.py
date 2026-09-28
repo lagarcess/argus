@@ -21,6 +21,7 @@ from evidence against unchanged Argus.
 
 from __future__ import annotations
 
+import http.cookiejar
 import json
 import os
 from http.cookies import SimpleCookie
@@ -41,7 +42,15 @@ HANDOFF_COOKIES = {
 }
 HOP_HEADERS = {"host", "content-length", "connection", "cookie", "transfer-encoding"}
 
-client = httpx.AsyncClient(base_url=UPSTREAM, timeout=60.0)
+# A jar that refuses every cookie: the proxy must never replay one caller's
+# Argus session cookie on another caller's request.
+client = httpx.AsyncClient(
+    base_url=UPSTREAM,
+    timeout=60.0,
+    cookies=http.cookiejar.CookieJar(
+        policy=http.cookiejar.DefaultCookiePolicy(allowed_domains=[])
+    ),
+)
 
 
 def _set_cookies(response: httpx.Response) -> dict[str, tuple[str, bool]]:

@@ -251,3 +251,30 @@ def run(stack: Stack, ids: Identities, rec: Recorder) -> None:
         ok=problem_code(bad) == "guest_handoff_invalid" and outside.status_code == 200,
         note="The tampered attempt signs the user in (Argus answers the handoff problem after password success), which S4's session-in-body rule covers.",
     )
+
+    stranger = HeaderClient(
+        Device(stack, "native-header-stranger", device_ip(34), "none"), adapter
+    )
+    fresh_guest = stranger.call(
+        "POST",
+        "/auth/guest",
+        json_body={"captcha_token": LOCAL_CAPTCHA, "language": "en"},
+    )
+    rec.check(
+        "S7",
+        area="adapter-isolation",
+        scenario="A new install starts a guest through the adapter after other accounts signed in",
+        path=SYNTHETIC,
+        level=2,
+        expected="200 new guest; the proxy never replays another caller's Argus cookie",
+        observed={
+            "status": fresh_guest.status_code,
+            "code": problem_code(fresh_guest),
+            "account_kind": fresh_guest.json().get("account_kind")
+            if fresh_guest.status_code == 200
+            else None,
+        },
+        ok=fresh_guest.status_code == 200
+        and fresh_guest.json().get("account_kind") == "guest",
+        note="Regression for a bug in the first adapter build, caught by iOS I8: its upstream client kept sb-auth-token and a new guest was treated as signed in (409).",
+    )
