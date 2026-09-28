@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.cookiejar
 import os
 import time
 from collections.abc import Callable
@@ -10,6 +11,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import httpx
+from supabase_auth import SyncGoTrueClient
 
 from argus.api.schemas import (
     BacktestRun,
@@ -136,6 +138,37 @@ def _supabase_client_options() -> ClientOptions:
     )
 
 
+AuthClientFactory = Callable[[], SyncGoTrueClient]
+
+
+def _auth_client_factory(url: str, key: str) -> AuthClientFactory:
+    """One throwaway Auth client per call: the server keeps no user's session.
+
+    A shared supabase-py client retains, auto-refreshes, and forwards as its
+    default Authorization header the last session it signed in.
+    """
+    auth_url = f"{url.rstrip('/')}/auth/v1"
+    headers = {"apiKey": key, "Authorization": f"Bearer {key}"}
+    refuse_cookies = http.cookiejar.DefaultCookiePolicy(allowed_domains=[])
+    http_client = httpx.Client(
+        http2=False,
+        timeout=120,
+        cookies=http.cookiejar.CookieJar(policy=refuse_cookies),
+    )
+
+    def build() -> SyncGoTrueClient:
+        return SyncGoTrueClient(
+            url=auth_url,
+            headers=dict(headers),
+            auto_refresh_token=False,
+            persist_session=False,
+            flow_type="pkce",
+            http_client=http_client,
+        )
+
+    return build
+
+
 @dataclass
 class SupabaseGateway(
     GuestAccountPersistenceMixin,
@@ -149,7 +182,7 @@ class SupabaseGateway(
     SupabaseComputedAnswerReadMixin,
 ):
     client: Client
-    auth_client: Client | None = None
+    auth_client_factory: AuthClientFactory | None = None
     history_reader: PostgresHistoryReader | None = None
     search_reader: PostgresSearchReader | None = None
     keyset_reader: PostgresKeysetReader | None = None
@@ -175,11 +208,7 @@ class SupabaseGateway(
         history_reader = history_reader_for_database_url(database_url)
         return cls(
             client=create_client(url, key, options=_supabase_client_options()),
-            auth_client=create_client(
-                url,
-                auth_key,
-                options=_supabase_client_options(),
-            ),
+            auth_client_factory=_auth_client_factory(url, auth_key),
             history_reader=history_reader,
             keyset_reader=PostgresKeysetReader(history_reader.pool),
             search_reader=PostgresSearchReader(history_reader.pool),
@@ -188,6 +217,11 @@ class SupabaseGateway(
 
     def new_id(self) -> str:
         return str(uuid4())
+
+    def _auth(self) -> SyncGoTrueClient:
+        if self.auth_client_factory is None:
+            raise RuntimeError("Supabase Auth is not configured.")
+        return self.auth_client_factory()
 
     def _fetch_all_rows(
         self,
@@ -306,7 +340,6 @@ class SupabaseGateway(
         guest_signup_handoff: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         try:
-            auth_client = self.auth_client or self.client
             metadata: dict[str, Any] = {
                 "display_name": display_name,
                 "username": username,
@@ -314,7 +347,7 @@ class SupabaseGateway(
             }
             if guest_signup_handoff is not None:
                 metadata["argus_guest_signup"] = guest_signup_handoff
-            response = auth_client.auth.sign_up(
+            response = self._auth().sign_up(
                 {
                     "email": email,
                     "password": password,
@@ -337,8 +370,7 @@ class SupabaseGateway(
         return response.user.model_dump(mode="json")
 
     def resend_signup_confirmation(self, *, email: str, captcha_token: str) -> None:
-        auth_client = self.auth_client or self.client
-        auth_client.auth.resend(
+        self._auth().resend(
             {
                 "type": "signup",
                 "email": email,
@@ -466,8 +498,7 @@ class SupabaseGateway(
         captcha_token: str,
     ) -> dict[str, Any]:
         try:
-            auth_client = self.auth_client or self.client
-            response = auth_client.auth.sign_in_with_password(
+            response = self._auth().sign_in_with_password(
                 {
                     "email": email,
                     "password": password,
