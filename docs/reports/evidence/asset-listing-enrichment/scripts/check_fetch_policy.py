@@ -223,6 +223,7 @@ REFUSED_AFTER_ROBOTS = {
     "a mixed-case robots rule": f"{CARS}/motos/0000009/",
     "an uppercase listing slug": f"{CARS}/Marca-Ejemplo-Modelo-X/0000001/",
     "a phone number in a listing slug": f"{CARS}/marca-ejemplo-809-000-0000/0000009/",
+    "a phone number as the whole listing slug": f"{CARS}/8095550000/0000009/",
     "a seller-named subdomain": SELLER_SUBDOMAIN,
     "dot segments": f"{CARS}/robots.txt/../carros/0000009/",
     "percent-encoded dot segments": f"{CARS}/x/%2E%2E/carros/0000009/",
