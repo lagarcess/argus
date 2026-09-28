@@ -76,6 +76,12 @@ async def lifespan(app: FastAPI):
     )
 
     start_personalization_memory(app)
+    from argus.api.financial_accounts import (
+        start_financial_accounts,
+        stop_financial_accounts,
+    )
+
+    start_financial_accounts(app)
     from argus.api.chat.research_pricing_evidence import ResearchPricingRecorder
     from argus.domain.research.billing import set_unpriced_spend_recorder
 
@@ -87,6 +93,7 @@ async def lifespan(app: FastAPI):
         set_unpriced_spend_recorder(None)
         await research_pricing_recorder.close()
         stop_personalization_memory(app)
+        stop_financial_accounts(app)
         if checkpointer_cm is not None:
             await checkpointer_cm.__aexit__(None, None, None)
 
