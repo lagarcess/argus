@@ -4,7 +4,7 @@ This report answers one question. Can SuperCarros and SuperCasas listings help a
 
 The audit read `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963` on 2026-09-27. The run record, sanitized evidence, synthetic fixtures, and scripts live in [the evidence folder](evidence/asset-listing-enrichment/README.md).
 
-**Status.** Closed on 2026-09-28. [PR #727](https://github.com/lagarcess/argus/pull/727) publishes the account decision this report depended on. Licensed access and asking-price ranges remain founder decisions. No further work is authorized under this assignment. A review round on 2026-09-28 hardened the proof's fetch tooling and changed no finding.
+**Status.** Closed on 2026-09-28. [PR #727](https://github.com/lagarcess/argus/pull/727) publishes the account decision this report depended on. Licensed access and asking-price ranges remain founder decisions. No further work is authorized under this assignment. Review rounds on 2026-09-28 hardened the proof's fetch tooling and changed no finding.
 
 ## Recommendation
 
@@ -308,7 +308,8 @@ This is a proposal for the founder to assign or discard. It does not assign work
 
 - The live sample ran on 2026-09-27 within the assignment limits: 16 and 17 requests, 4-second spacing, and a robots gate. No request was blocked or rate-limited.
 - Before deleting the raw page cache, the audit replayed the scripts as first committed on it. That replay regenerated the ledger, sitemap profile, field summary, and parser outputs byte for byte. Only parse timings varied.
-- A reviewer cannot repeat that replay. The raw pages held seller data and were deleted, and a new fetch needs a new authorization and would sample a different day. A reviewer can run `scripts/check_fetch_policy.py` with any Python 3.10 or later, and `scripts/check_fixtures.py` in the two parser environments. Together they check that no caller input bypasses the robots gate, that only listing projections reach disk, both parsers, normalization, and the markup-change results. Both fail on injected defects, and the fetch-policy invariants fail on the fetcher before the review fix.
+- A reviewer cannot repeat that replay. The raw pages held seller data and were deleted, and a new fetch needs a new authorization and would sample a different day. A reviewer can run `scripts/check_fetch_policy.py` with any Python 3.10 or later, and `scripts/check_fixtures.py` in the two parser environments. Together they check that no caller input bypasses the robots gate, that only listing projections reach disk, and that no written file holds a contact detail even with entities decoded or tags removed. They also check both parsers, normalization, and the markup-change results. Both fail on injected defects, and the fetch-policy invariants fail on the fetcher before each review fix.
+- The fetcher's contact guard matches shapes, such as phone digit groups, email addresses, and contact links. It cannot recognize a phone number spelled in words or broken by unusual separators. Keeping only the listing fields the parsers read is the main control.
 - The fixtures reproduce the class-rename and label-lookup results and Scrapling's relocation to the accessories list. They do not reproduce the relocation to the seller contact list, which appeared only on real pages.
 - Twenty pages cannot show market coverage, the meaning of the hidden dates, or valuation accuracy. The density figures count listings by model or sector, not by model year.
 - The legal notes restate statutes and terms read on 2026-09-27. They are not legal advice.

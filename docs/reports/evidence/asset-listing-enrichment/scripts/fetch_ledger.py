@@ -2,9 +2,9 @@
 """Budgeted, serial, cached page fetcher for the listing feasibility audit.
 
 Stdlib only. The URL alone decides the page kind and the robots check. Every
-network request is appended to ledger.jsonl, and only what retention.retain
-keeps reaches the cache. A URL already in the cache is replayed and never
-refetched.
+network request is appended to ledger.jsonl with its headers reduced by
+retention.header_facts, and only what retention.retain keeps reaches the cache.
+A URL already in the cache is replayed and never refetched.
 """
 
 from __future__ import annotations
@@ -13,11 +13,9 @@ import argparse
 import gzip
 import hashlib
 import json
-import re
 import sys
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 import urllib.robotparser
 import zlib
@@ -25,13 +23,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-from retention import DETAIL_PATH, retain, sanitize_location
+from retention import REDIRECT_STATUSES, header_facts, page_kind, retain
 
 USER_AGENT = (
     "ArgusFeasibilityAudit/0.1 "
     "(one-time manual research sample; at most 20 requests per site; 4s spacing)"
 )
-SITES = {"supercarros": "supercarros.com", "supercasas": "supercasas.com"}
 BUDGET_PER_SITE = 20
 MIN_SPACING_S = 4.0
 STOP_STATUSES = {401, 403, 407, 429, 503}
@@ -67,44 +64,16 @@ def study_root() -> Path:
     return root
 
 
-def site_of(url: str) -> str:
-    host = (urlsplit(url).hostname or "").lower()
-    for key, domain in SITES.items():
-        if host == domain or host.endswith("." + domain):
-            return key
-    raise SystemExit(f"refused: {host} is not an audited site")
-
-
 def classify(url: str) -> tuple[str, str]:
-    parts = urlsplit(url)
-    try:
-        port = parts.port
-    except ValueError:
-        port = -1
-    if (
-        parts.scheme != "https"
-        or parts.username
-        or parts.password
-        or port is not None
-        or parts.fragment
-    ):
-        raise SystemExit(f"refused: {url} is not a plain https URL")
-    site = site_of(url)
-    path, query = parts.path, parts.query
-    if path == "/robots.txt" and not query:
-        return site, "robots"
-    if path == "/sitemap.xml" and not query:
-        return site, "sitemap"
-    if path == "/assets/js/searchvalues.js" and re.fullmatch(r"\d*", query):
-        return site, "search-values"
-    if DETAIL_PATH.fullmatch(path) and not query:
-        return site, "detail"
-    raise SystemExit(f"refused: {url} is not a URL shape this fetcher may request")
+    found = page_kind(url)
+    if found is None:
+        raise SystemExit(f"refused: {url} is not a URL this fetcher may request")
+    return found
 
 
 def cache_paths(url: str) -> tuple[Path, Path]:
     key = hashlib.sha256(url.encode()).hexdigest()[:24]
-    folder = study_root() / "cache" / site_of(url)
+    folder = study_root() / "cache" / classify(url)[0]
     return folder / f"{key}.body", folder / f"{key}.json"
 
 
@@ -126,14 +95,16 @@ def robots_url(url: str) -> str:
 
 
 def robots_verdict(url: str) -> tuple[bool, float | None, str]:
-    target = robots_url(url)
+    site, target = classify(url)[0], robots_url(url)
     for _ in range(5):
         body_path, meta_path = cache_paths(target)
         if not meta_path.exists():
             return False, None, f"{target} not fetched yet"
         meta = json.loads(meta_path.read_text())
-        if meta["status"] in (301, 302, 303, 307, 308) and meta["location"]:
-            target = urllib.parse.urljoin(target, meta["location"])
+        location = meta.get("location") or ""
+        redirected = meta["status"] in REDIRECT_STATUSES
+        if redirected and page_kind(location) == (site, "robots"):
+            target = location
             continue
         break
     status = meta["status"]
@@ -218,7 +189,7 @@ def fetch(url: str) -> dict:
     body = decode(raw, get("Content-Encoding"))
     lowered = body[:200_000].decode("utf-8", "replace").lower()
     wall = [marker for marker in WALL_MARKERS if marker in lowered]
-    kept, retention = retain(kind, status, body)
+    kept, retention = retain(url, status, body)
     meta = {
         "site": site,
         "label": kind,
@@ -227,13 +198,7 @@ def fetch(url: str) -> dict:
         "status": status,
         "elapsed_ms": elapsed_ms,
         "bytes": len(body),
-        "content_type": get("Content-Type"),
-        "location": sanitize_location(get("Location")),
-        "server": get("Server"),
-        "cache_control": get("Cache-Control"),
-        "last_modified": get("Last-Modified"),
-        "x_robots_tag": get("X-Robots-Tag"),
-        "set_cookie_present": bool(get("Set-Cookie")),
+        **header_facts(url, headers),
         "wall_markers": wall,
         "captcha_mentions": lowered.count("captcha"),
         "robots_note": robots_note,

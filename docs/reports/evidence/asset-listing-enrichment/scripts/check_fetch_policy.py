@@ -1,7 +1,8 @@
 """Offline checks that no caller input bypasses the fetch policy and no seller data reaches disk.
 
-Runs the real fetcher against a fake network in a temporary study directory.
-Uses only the standard library and sends no request. Run it with
+Runs the real fetcher against a fake network in a temporary study directory,
+then reads every file it wrote raw, entity-decoded, and with tags removed. Uses
+only the standard library and sends no request. Run it with
 `python3 check_fetch_policy.py`.
 """
 
@@ -19,80 +20,160 @@ sys.path.insert(0, str(SCRIPTS))
 
 import fetch_ledger  # noqa: E402
 import retention  # noqa: E402
+from offline import FakeOpener, leaks_in_directory  # noqa: E402
 
-HOST = "https://m.supercarros.com"
+CARS = "https://m.supercarros.com"
+HOMES = "https://m.supercasas.com"
+HTML = {"Content-Type": "text/html; charset=utf-8", "Server": "cloudflare"}
 ROBOTS = (
     b"# questions: webmaster@example.invalid\n"
     b"User-agent: *\nDisallow: /buscar/\nDisallow: /carros/\nDisallow: /Motos/\n\n"
     b"Sitemap: https://m.supercarros.com/sitemap.xml\n"
 )
+KEPT_SITEMAP_ROWS = [
+    f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000001/</loc>"
+    "<lastmod>2026-09-20</lastmod></url>",
+    f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000008/</loc></url>",
+]
 SITEMAP = (
     '<?xml version="1.0" encoding="UTF-8"?>\n'
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-    f"<url><loc>{HOST}/marca-ejemplo-modelo-x/0000001/</loc><lastmod>2026-09-20</lastmod></url>\n"
-    f"<url><loc>{HOST}/dealers/vendedor-ficticio/</loc><lastmod>2026-09-20</lastmod></url>\n"
+    f"{KEPT_SITEMAP_ROWS[0]}\n"
+    f"<url><loc>{CARS}/dealers/vendedor-ficticio/</loc></url>\n"
+    "<url><loc>https://vendedor-ficticio.example.invalid/marca-ejemplo-modelo-x/0000006/"
+    "</loc></url>\n"
+    f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000007/?ref=vendedor-ficticio</loc></url>\n"
+    f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000008/</loc>"
+    "<lastmod>Vendedor Ficticio</lastmod></url>\n"
     "</urlset>\n"
 ).encode()
-SEARCH_VALUES = b'var SearchBrands = ["27|Marca Ejemplo|1|16|0|0"];\n'
+KEPT_HOMES_SITEMAP_ROWS = [
+    f"<url><loc>{HOMES}/apartamentos-sector-ejemplo/0000002/</loc></url>",
+]
+HOMES_SITEMAP = (
+    '<?xml version="1.0" encoding="UTF-8"?>\n'
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    f"{KEPT_HOMES_SITEMAP_ROWS[0]}\n"
+    f"<url><loc>{HOMES}/apartamentos-809-000-0000/0000003/</loc></url>\n"
+    "</urlset>\n"
+).encode()
+SEARCH_BRANDS = b'var SearchBrands = ["27|Marca Ejemplo|1|16|0|0"];\n'
+SEARCH_VALUES = SEARCH_BRANDS + b'var SearchDealers = ["41|Vendedor Ficticio"];\n'
 DETAIL = (FIXTURES / "vehicle-detail.html").read_bytes()
+PROPERTY = (FIXTURES / "property-detail.html").read_bytes()
 SELLER_START = DETAIL.index(
     b'<h1 class="content-block">', DETAIL.index(b'<h1 class="content-block">') + 1
 )
-NO_SELLER_BOUNDARY = DETAIL[:SELLER_START] + b"</div></body></html>\n"
-PHONE_IN_TITLE = DETAIL.replace(
-    b"2021 Marca Ejemplo Modelo X EX</h1>",
-    b"2021 Marca Ejemplo Modelo X EX 809-000-0000</h1>",
+TITLE = b"2021 Marca Ejemplo Modelo X EX</h1>"
+MOTOR = b"<br>4 cilindros</li>"
+
+
+def edit(*changes):
+    page = DETAIL
+    for old, new in changes:
+        if old not in page:
+            raise ValueError(f"the vehicle fixture no longer holds {old!r}")
+        page = page.replace(old, new, 1)
+    return page
+
+
+KEEPS_NOTHING = {
+    "a page without a seller boundary": DETAIL[:SELLER_START] + b"</div></body></html>\n",
+    "a phone number in the title": edit(
+        (TITLE, b"2021 Marca Ejemplo Modelo X EX 809-000-0000</h1>")
+    ),
+    "a foreign phone number in a specification": edit(
+        (MOTOR, b"<br>4 cilindros, llamar 305-555-0000</li>")
+    ),
+    "an entity-encoded email in the title": edit(
+        (TITLE, b"2021 Marca Ejemplo Modelo X EX vendedor&#64;example.invalid</h1>")
+    ),
+    "a phone split by markup in the title": edit(
+        (TITLE, b"2021 Marca Ejemplo Modelo X EX <span>305</span>-555-0000</h1>")
+    ),
+    "a phone split by markup in a specification": edit(
+        (MOTOR, b"<br>4 cilindros, <span>305</span>-555-0000</li>")
+    ),
+    "a phone with entity-encoded digits in a feature": edit(
+        (b"<li>Color Gris</li>", b"<li>Color Gris 8&#48;9-000-0000</li>")
+    ),
+    "a phone split across elements in an accessory": edit(
+        (b"<li>Alarma</li>", b"<li>Alarma <b>809</b><i>000</i>0000</li>")
+    ),
+    "an entity-encoded phone in the meta description": edit(
+        (b'0.00 Mi." />', b'0.00 Mi. Llamar 809&#45;000&#45;0000" />')
+    ),
+    "a WhatsApp link written with an entity in the price": edit(
+        (
+            b'<li class="notable">US$ 25,000</li>',
+            b'<li class="notable">US$ 25,000 wa&period;me/18090000000</li>',
+        )
+    ),
+}
+SELLER_ATTRIBUTES = edit(
+    (b"<li>Gasolina</li>", b'<li data-seller="Vendedor Ficticio">Gasolina</li>'),
+    (b"<li>Alarma</li>", b'<li><img src="https://img.example.invalid/1.jpg">Alarma</li>'),
 )
-PHONE_IN_SPEC = DETAIL.replace(
-    b"<br>4 cilindros</li>", b"<br>4 cilindros, llamar 305-555-0000</li>"
+CONTACT_ATTRIBUTES = edit(
+    (
+        b"<li>Gasolina</li>",
+        b'<li title="809-000-0000" data-phone="8090000000">Gasolina</li>',
+    ),
+    (
+        b"<li>Color Gris</li>",
+        b'<li><a href="/Dealers/vendedor-ficticio/">Color Gris</a></li>',
+    ),
 )
-ENCODED_EMAIL_IN_TITLE = DETAIL.replace(
-    b"2021 Marca Ejemplo Modelo X EX</h1>",
-    b"2021 Marca Ejemplo Modelo X EX vendedor&#64;example.invalid</h1>",
+SELLER_HEADERS = {
+    "Content-Type": "text/html; name=vendedor@example.invalid",
+    "Server": "Vendedor Ficticio 809-000-0000",
+}
+SELLER_REDIRECTS = (
+    "/Dealers/Vendedor-Ficticio/",
+    "/vendedores/vendedor-ficticio/",
+    "/%44ealers/Vendedor-Ficticio/",
+    "/contacto/vendedor%40example.invalid",
+    "/%2544ealers/Vendedor-Ficticio/",
+    "/contacto/vendedor%2540example.invalid",
+    "/%252525252525252544ealers/Vendedor-Ficticio/",
 )
-MARKUP_SPLIT_PHONE = DETAIL.replace(
-    b"2021 Marca Ejemplo Modelo X EX</h1>",
-    b"2021 Marca Ejemplo Modelo X EX <span>305</span>-555-0000</h1>",
-)
-DEALER_REDIRECT = "/Dealers/Vendedor-Ficticio/"
-ENCODED_DEALER_REDIRECT = "/%44ealers/Vendedor-Ficticio/"
-ENCODED_EMAIL_REDIRECT = "/contacto/vendedor%40example.invalid"
-DOUBLE_ENCODED_DEALER_REDIRECT = "/%2544ealers/Vendedor-Ficticio/"
-DOUBLE_ENCODED_EMAIL_REDIRECT = "/contacto/vendedor%2540example.invalid"
-# Nine encoding layers of "D" so eight unquote rounds leave "%44" behind.
-OVER_BOUND_DEALER_REDIRECT = "/%252525252525252544ealers/Vendedor-Ficticio/"
-SAFE_ROBOTS_REDIRECT = "https://m.supercarros.com/robots.txt"
+LISTING_REDIRECT = "/apartamentos-sector-ejemplo/0000009/"
+
+
+def listing(number):
+    return f"{CARS}/marca-ejemplo-modelo-x/{number:07d}/"
+
+
+def home(number):
+    return f"{HOMES}/apartamentos-sector-ejemplo/{number:07d}/"
+
+
 PAGES = {
-    f"{HOST}/robots.txt": ROBOTS,
-    f"{HOST}/sitemap.xml": SITEMAP,
-    f"{HOST}/assets/js/searchvalues.js?20260927053": SEARCH_VALUES,
-    f"{HOST}/marca-ejemplo-modelo-x/0000001/": DETAIL,
-    f"{HOST}/marca-ejemplo-modelo-x/0000002/": NO_SELLER_BOUNDARY,
-    f"{HOST}/marca-ejemplo-modelo-x/0000003/": PHONE_IN_TITLE,
-    f"{HOST}/marca-ejemplo-modelo-x/0000004/": PHONE_IN_SPEC,
-    f"{HOST}/marca-ejemplo-modelo-x/0000005/": ENCODED_EMAIL_IN_TITLE,
-    f"{HOST}/marca-ejemplo-modelo-x/0000006/": MARKUP_SPLIT_PHONE,
+    f"{CARS}/robots.txt": (200, ROBOTS, {"Content-Type": "text/plain"}),
+    f"{CARS}/sitemap.xml": (200, SITEMAP, {"Content-Type": "text/xml"}),
+    f"{CARS}/assets/js/searchvalues.js?20260927053": (200, SEARCH_VALUES, {}),
+    listing(1): (200, DETAIL, HTML),
+    listing(2): (200, SELLER_ATTRIBUTES, HTML),
+    listing(3): (200, CONTACT_ATTRIBUTES, SELLER_HEADERS),
+    **{
+        listing(10 + n): (200, page, HTML)
+        for n, page in enumerate(KEEPS_NOTHING.values())
+    },
+    f"{HOMES}/robots.txt": (
+        301,
+        b"",
+        {"Location": "https://www.supercasas.com/robots.txt"},
+    ),
+    "https://www.supercasas.com/robots.txt": (200, ROBOTS, {}),
+    "https://www.supercasas.com/sitemap.xml": (200, HOMES_SITEMAP, {}),
+    home(2): (200, PROPERTY, HTML),
+    **{
+        home(10 + n): (302, b"", {"Location": location})
+        for n, location in enumerate(SELLER_REDIRECTS)
+    },
+    home(20): (301, b"", {"Location": LISTING_REDIRECT}),
 }
-REDIRECTS = {
-    f"{HOST}/marca-ejemplo-modelo-x/0000007/": (302, DEALER_REDIRECT, b""),
-    f"{HOST}/marca-ejemplo-modelo-x/0000008/": (302, ENCODED_DEALER_REDIRECT, b""),
-    f"{HOST}/marca-ejemplo-modelo-x/0000009/": (302, ENCODED_EMAIL_REDIRECT, b""),
-    f"{HOST}/marca-ejemplo-modelo-x/0000010/": (
-        302,
-        DOUBLE_ENCODED_DEALER_REDIRECT,
-        b"",
-    ),
-    f"{HOST}/marca-ejemplo-modelo-x/0000011/": (
-        302,
-        DOUBLE_ENCODED_EMAIL_REDIRECT,
-        b"",
-    ),
-    f"{HOST}/marca-ejemplo-modelo-x/0000012/": (
-        302,
-        OVER_BOUND_DEALER_REDIRECT,
-        b"",
-    ),
-}
+PLANTED = ("305-555-0000", "8090000000")
 PHONE_SHAPES = (
     "8090000000",
     "(809) 000-0000",
@@ -115,60 +196,44 @@ LISTING_VALUES = (
     "2026-09-28T21:32:19.123456+00:00",
 )
 REFUSED_AFTER_ROBOTS = {
-    "robots.txt disallows the path": f"{HOST}/carros/0000009/",
-    "a case variant of a disallowed path": f"{HOST}/CARROS/0000009/",
-    "a percent-encoded disallowed path": f"{HOST}/%63arros/0000009/",
-    "a double percent-encoded disallowed path": f"{HOST}/%2563arros/0000009/",
-    "a semicolon path parameter": f"{HOST}/carros;jsessionid=x/0000009/",
-    "a mixed-case robots rule": f"{HOST}/motos/0000009/",
-    "an uppercase listing slug": f"{HOST}/Marca-Ejemplo-Modelo-X/0000001/",
-    "dot segments": f"{HOST}/robots.txt/../carros/0000009/",
-    "percent-encoded dot segments": f"{HOST}/x/%2E%2E/carros/0000009/",
-    "a backslash": f"{HOST}/x%5C..%5Ccarros/0000009/",
-    "robots.txt with a query": f"{HOST}/robots.txt?next=/carros/0000009/",
+    "robots.txt disallows the path": f"{CARS}/carros/0000009/",
+    "a case variant of a disallowed path": f"{CARS}/CARROS/0000009/",
+    "a percent-encoded disallowed path": f"{CARS}/%63arros/0000009/",
+    "a double percent-encoded disallowed path": f"{CARS}/%2563arros/0000009/",
+    "a semicolon path parameter": f"{CARS}/carros;jsessionid=x/0000009/",
+    "a mixed-case robots rule": f"{CARS}/motos/0000009/",
+    "an uppercase listing slug": f"{CARS}/Marca-Ejemplo-Modelo-X/0000001/",
+    "a phone number in a listing slug": f"{CARS}/marca-ejemplo-809-000-0000/0000009/",
+    "a dealer path shaped like a listing": f"{CARS}/dealers/0000009/",
+    "dot segments": f"{CARS}/robots.txt/../carros/0000009/",
+    "percent-encoded dot segments": f"{CARS}/x/%2E%2E/carros/0000009/",
+    "a backslash": f"{CARS}/x%5C..%5Ccarros/0000009/",
+    "robots.txt with a query": f"{CARS}/robots.txt?next=/carros/0000009/",
     "a search values query that is not a build number": (
-        f"{HOST}/assets/js/searchvalues.js?redirect=//evil.invalid/x"
+        f"{CARS}/assets/js/searchvalues.js?redirect=//evil.invalid/x"
     ),
     "plain http": "http://m.supercarros.com/marca-ejemplo-modelo-x/0000001/",
     "an explicit port": "https://m.supercarros.com:8443/marca-ejemplo-modelo-x/0000001/",
     "an explicit default port": "https://m.supercarros.com:443/marca-ejemplo-modelo-x/0000001/",
     "a malformed port": "https://m.supercarros.com:abc/marca-ejemplo-modelo-x/0000001/",
     "userinfo": "https://user@m.supercarros.com/marca-ejemplo-modelo-x/0000001/",
-    "the home page": f"{HOST}/",
-    "a dealer page": f"{HOST}/dealers/vendedor-ficticio/",
-    "a search page": f"{HOST}/buscar/?q=1",
+    "the home page": f"{CARS}/",
+    "a dealer page": f"{CARS}/dealers/vendedor-ficticio/",
+    "a search page": f"{CARS}/buscar/?q=1",
     "an unaudited host": "https://example.invalid/robots.txt",
 }
 
 
-class FakeResponse:
-    def __init__(self, status, body, headers=None):
-        self.status, self.headers, self._body = status, headers or {}, body
-
-    def read(self):
-        return self._body
-
-
-class FakeOpener:
-    def __init__(self):
-        self.calls = []
-
-    def open(self, request, timeout):
-        self.calls.append(request.full_url)
-        if request.full_url in REDIRECTS:
-            status, location, body = REDIRECTS[request.full_url]
-            return FakeResponse(status, body, {"Location": location})
-        if request.full_url not in PAGES:
-            return FakeResponse(404, b"")
-        return FakeResponse(200, PAGES[request.full_url])
+def quiet():
+    stack = contextlib.ExitStack()
+    stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
+    stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+    return stack
 
 
 def refused(call):
     try:
-        with (
-            contextlib.redirect_stderr(io.StringIO()),
-            contextlib.redirect_stdout(io.StringIO()),
-        ):
+        with quiet():
             call()
     except SystemExit:
         return True
@@ -189,187 +254,139 @@ def main():
     os.chdir(SCRIPTS)
     check(refused(fetch_ledger.study_root), "the fetcher ran inside the repository")
     for shape in PHONE_SHAPES:
-        check(
-            retention.holds_contact(shape),
-            f"the contact guard missed {shape}",
-        )
+        check(retention.holds_contact(shape), f"the contact guard missed {shape}")
     for value in LISTING_VALUES:
-        check(
-            not retention.holds_contact(value),
-            f"the contact guard flagged {value}",
-        )
-    check(
-        retention.sanitize_location(DEALER_REDIRECT) is None,
-        "a dealer Location was allowed through sanitize_location",
-    )
-    check(
-        retention.sanitize_location(ENCODED_DEALER_REDIRECT) is None,
-        "a percent-encoded dealer Location was allowed through sanitize_location",
-    )
-    check(
-        retention.sanitize_location(ENCODED_EMAIL_REDIRECT) is None,
-        "a percent-encoded email Location was allowed through sanitize_location",
-    )
-    check(
-        retention.sanitize_location(DOUBLE_ENCODED_DEALER_REDIRECT) is None,
-        "a double-encoded dealer Location was allowed through sanitize_location",
-    )
-    check(
-        retention.sanitize_location(DOUBLE_ENCODED_EMAIL_REDIRECT) is None,
-        "a double-encoded email Location was allowed through sanitize_location",
-    )
-    check(
-        retention.fully_decode(OVER_BOUND_DEALER_REDIRECT) is None,
-        "an over-bound encoded Location was treated as fully decoded",
-    )
-    check(
-        retention.sanitize_location(OVER_BOUND_DEALER_REDIRECT) is None,
-        "an over-bound encoded dealer Location was allowed through sanitize_location",
-    )
-    check(
-        retention.sanitize_location(SAFE_ROBOTS_REDIRECT) == SAFE_ROBOTS_REDIRECT,
-        "a safe robots Location was dropped",
-    )
+        check(not retention.holds_contact(value), f"the contact guard flagged {value}")
     with tempfile.TemporaryDirectory() as scratch:
         os.chdir(scratch)
         try:
-            opener = FakeOpener()
+            opener = FakeOpener(PAGES)
             fetch_ledger.OPENER, fetch_ledger.MIN_SPACING_S = opener, 0
             check(
-                refused(
-                    lambda: fetch_ledger.fetch(f"{HOST}/marca-ejemplo-modelo-x/0000001/")
-                ),
+                refused(lambda: fetch_ledger.fetch(listing(1))),
                 "a detail page was fetched before robots.txt",
             )
             check(
                 refused(
                     lambda: fetch_ledger.main(
-                        [f"{HOST}/carros/0000009/", "--label", "robots"]
+                        [f"{CARS}/carros/0000009/", "--label", "robots"]
                     )
                 ),
                 "a caller label was accepted",
             )
             check(opener.calls == [], f"requests sent before robots.txt: {opener.calls}")
-            fetch_ledger.fetch(f"{HOST}/robots.txt")
+            with quiet():
+                fetch_ledger.fetch(f"{CARS}/robots.txt")
             for reason, url in REFUSED_AFTER_ROBOTS.items():
                 check(
                     refused(lambda url=url: fetch_ledger.fetch(url)),
                     f"not refused: {reason}",
                 )
             check(
-                opener.calls == [f"{HOST}/robots.txt"],
+                opener.calls == [f"{CARS}/robots.txt"],
                 f"a refused URL was requested: {opener.calls}",
             )
             for url in list(PAGES)[1:]:
-                fetch_ledger.fetch(url)
+                try:
+                    with quiet():
+                        fetch_ledger.fetch(url)
+                except (SystemExit, Exception) as error:
+                    failures.append(f"a valid request was not sent: {url}: {error}")
             check(
                 opener.calls == list(PAGES), f"unexpected request order: {opener.calls}"
             )
 
             def kept(url):
                 body_path, meta_path = fetch_ledger.cache_paths(url)
+                if not meta_path.exists():
+                    return None, {}
                 meta = json.loads(meta_path.read_text())
-                return (body_path.read_bytes() if body_path.exists() else None), meta[
-                    "retention"
-                ]
+                return (body_path.read_bytes() if body_path.exists() else None), meta
 
-            body, _ = kept(f"{HOST}/robots.txt")
+            def sitemap_rows(url):
+                body, _ = kept(url)
+                lines = (body or b"").decode().splitlines()
+                return [line for line in lines if line.startswith("<url>")]
+
+            body, _ = kept(f"{CARS}/robots.txt")
             check(
-                body == retention.robots_rules(ROBOTS),
+                body is not None and b"#" not in body and b"Disallow: /carros/" in body,
                 "robots.txt was not reduced to its rules",
             )
-            body, _ = kept(f"{HOST}/sitemap.xml")
+            rows = sitemap_rows(f"{CARS}/sitemap.xml")
+            check(rows == KEPT_SITEMAP_ROWS, f"the sitemap kept these rows: {rows}")
+            rows = sitemap_rows("https://www.supercasas.com/sitemap.xml")
             check(
-                body is not None and b"0000001" in body and b"dealers" not in body,
-                "the sitemap kept more than listing URLs",
+                rows == KEPT_HOMES_SITEMAP_ROWS,
+                f"a sitemap with a contact detail in one row kept these rows: {rows}",
             )
-            body, _ = kept(f"{HOST}/assets/js/searchvalues.js?20260927053")
-            check(body == SEARCH_VALUES, "the search values script was not kept whole")
-            body, _ = kept(f"{HOST}/marca-ejemplo-modelo-x/0000001/")
+            body, _ = kept(f"{CARS}/assets/js/searchvalues.js?20260927053")
+            check(body == SEARCH_BRANDS, f"the search values script kept {body!r}")
+            body, meta = kept(listing(1))
             check(
-                body == retention.project_detail(DETAIL)
+                body is not None
+                and b'<h1 class="content-block">2021 Marca Ejemplo Modelo X EX</h1>'
+                in body
+                and b"<li><label>Motor:</label><br>4 cilindros</li>" in body
                 and b"Provincia Ficticia" in body,
                 "the detail page was not kept as its projection",
             )
-            for url, reason in (
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000002/",
-                    "a page without a seller boundary",
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000003/",
-                    "a page with a phone in its title",
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000004/",
-                    "a page with a foreign phone number in a specification",
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000005/",
-                    "a page with an HTML-encoded email in its title",
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000006/",
-                    "a page with a markup-split phone in its title",
-                ),
-            ):
-                body, note = kept(url)
+            check(
+                meta.get("content_type") == "text/html; charset=utf-8"
+                and meta.get("server") == "cloudflare",
+                f"declared headers were not recorded: {meta}",
+            )
+            body, _ = kept(listing(2))
+            check(
+                body is not None
+                and b"<li>Gasolina</li>" in body
+                and b"<li>Alarma</li>" in body,
+                "a page with seller attributes and an image was not kept as text",
+            )
+            body, meta = kept(listing(3))
+            check(
+                body is not None
+                and b"<li>Gasolina</li>" in body
+                and b"<li>Color Gris</li>" in body,
+                "a page with contact attributes and a dealer link was not kept as text",
+            )
+            check(
+                meta.get("content_type") == "undeclared"
+                and meta.get("server") == "undeclared",
+                f"undeclared headers were recorded: {meta}",
+            )
+            for n, reason in enumerate(KEEPS_NOTHING):
+                body, meta = kept(listing(10 + n))
+                note = meta.get("retention", "")
                 check(
                     body is None and note.startswith("not kept"), f"kept {reason}: {note}"
                 )
-            redirect_url = f"{HOST}/marca-ejemplo-modelo-x/0000007/"
-            redirect_meta = fetch_ledger.fetch(redirect_url)
+            _, meta = kept(f"{HOMES}/robots.txt")
             check(
-                redirect_meta["status"] == 302
-                and redirect_meta["location"] is None
-                and redirect_meta["retention"].startswith("not kept"),
-                "a dealer Location was persisted on a detail redirect",
+                meta.get("location") == "https://www.supercasas.com/robots.txt",
+                f"a declared robots.txt redirect was not recorded: {meta}",
             )
-            _, redirect_disk = fetch_ledger.cache_paths(redirect_url)
-            disk_meta = json.loads(redirect_disk.read_text())
+            body, meta = kept(home(2))
             check(
-                disk_meta["location"] is None
-                and DEALER_REDIRECT not in redirect_disk.read_text()
-                and DEALER_REDIRECT
-                not in (Path(scratch) / "ledger.jsonl").read_text(),
-                "a dealer Location reached the cache or ledger",
+                body is not None and meta.get("retention") == "kept projection",
+                "a page behind a declared robots.txt redirect was not kept",
             )
-            for url, leaked in (
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000008/",
-                    ENCODED_DEALER_REDIRECT,
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000009/",
-                    ENCODED_EMAIL_REDIRECT,
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000010/",
-                    DOUBLE_ENCODED_DEALER_REDIRECT,
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000011/",
-                    DOUBLE_ENCODED_EMAIL_REDIRECT,
-                ),
-                (
-                    f"{HOST}/marca-ejemplo-modelo-x/0000012/",
-                    OVER_BOUND_DEALER_REDIRECT,
-                ),
-            ):
-                meta = fetch_ledger.fetch(url)
-                _, disk = fetch_ledger.cache_paths(url)
-                text = disk.read_text() + (Path(scratch) / "ledger.jsonl").read_text()
+            for n, location in enumerate(SELLER_REDIRECTS):
+                body, meta = kept(home(10 + n))
                 check(
-                    meta["location"] is None and leaked not in text,
-                    f"encoded Location {leaked} reached disk",
+                    body is None
+                    and meta.get("location") == "undeclared"
+                    and meta.get("retention") == "not kept: status 302",
+                    f"the redirect to {location} was recorded as {meta.get('location')}",
                 )
-            written = [path for path in Path(scratch).rglob("*") if path.is_file()]
-            for path in written:
-                text = path.read_text("utf-8", "replace")
-                found = [value for value in expected["seller_strings"] if value in text]
-                match = retention.CONTACT.search(retention.contact_surfaces(text))
-                found += [match.group(0)] if match else []
-                check(not found, f"{path.relative_to(scratch)} holds {found}")
+            _, meta = kept(home(20))
+            check(
+                meta.get("location") == f"{HOMES}{LISTING_REDIRECT}",
+                f"a redirect to a listing was not recorded: {meta.get('location')}",
+            )
+            planted = [*expected["seller_strings"], *PLANTED]
+            for path, found in leaks_in_directory(scratch, planted).items():
+                failures.append(f"{path} holds {found}")
         finally:
             os.chdir(previous)
     for failure in failures:

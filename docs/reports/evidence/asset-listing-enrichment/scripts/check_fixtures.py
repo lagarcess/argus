@@ -1,15 +1,15 @@
 """Offline checks on the synthetic fixtures for one parser.
 
 Each fixture is parsed twice: as the raw page, and as the projection the
-fetcher would keep. Both must give the reviewed record in expected.json. The
-parse and resilience scripts then run in a temporary study directory, and no
-file they write may hold seller data. Run it with the environment of the
-parser it names, for example `venv-simple/bin/python check_fixtures.py bs4`.
-It sends no request.
+fetcher would keep. Both must give the reviewed record in expected.json. Then,
+in a temporary study directory, the real fetcher keeps both fixtures from a fake
+network and the parse and resilience scripts run on what it kept. No file
+written there may hold seller data, read raw, entity-decoded, or with tags
+removed. Run it with the environment of the parser it names, for example
+`venv-simple/bin/python check_fixtures.py bs4`. It sends no request.
 """
 
 import contextlib
-import hashlib
 import importlib
 import io
 import json
@@ -21,7 +21,8 @@ from pathlib import Path
 from common import recovered
 from mutate import MUTATIONS
 from normalize import normalize
-from retention import CONTACT, retain
+from offline import FakeOpener, leaks, leaks_in_directory
+from retention import retain
 
 FIXTURES = Path(__file__).resolve().parent.parent / "fixtures"
 CASES = {
@@ -35,12 +36,7 @@ CASES = {
     ),
 }
 SALT = "fixture"
-
-
-def leaks(text, seller_strings):
-    found = [value for value in seller_strings if value in text]
-    match = CONTACT.search(text)
-    return found + ([match.group(0)] if match else [])
+ROBOTS = b"User-agent: *\nDisallow: /buscar/\n"
 
 
 def resilience(parser_name, parser, site, html, base):
@@ -85,26 +81,31 @@ def study_directory():
 
 
 def pipeline(parser_name, expected):
+    import fetch_ledger
     import run_parse
 
     failures = []
+    pages = {}
+    for site, (fixture, url) in CASES.items():
+        pages[f"https://m.{site}.com/robots.txt"] = (200, ROBOTS, {})
+        pages[url] = (200, (FIXTURES / fixture).read_bytes(), {})
     with study_directory() as root:
-        sample = {}
-        for site, (fixture, url) in CASES.items():
-            kept, _ = retain("detail", 200, (FIXTURES / fixture).read_bytes())
-            key = hashlib.sha256(url.encode()).hexdigest()[:24]
-            page = Path("cache", site, key + ".body")
-            page.parent.mkdir(parents=True)
-            page.write_bytes(kept)
-            sample[site] = [{"url": url, "stratum": "fixture", "age": 0}]
+        fetch_ledger.OPENER, fetch_ledger.MIN_SPACING_S = FakeOpener(pages), 0
+        for url in pages:
+            fetch_ledger.fetch(url)
+        sample = {
+            site: [{"url": url, "stratum": "fixture", "age": 0}]
+            for site, (_, url) in CASES.items()
+        }
         Path("sample.json").write_text(json.dumps(sample))
         Path("salt.txt").write_text(SALT)
         with contextlib.redirect_stdout(io.StringIO()):
             run_parse.main(parser_name)
             importlib.import_module(f"resilience_{parser_name}").main()
-        for record in json.loads(
-            Path("out", f"{parser_name}.normalized.json").read_text()
-        ):
+        records = json.loads(Path("out", f"{parser_name}.normalized.json").read_text())
+        if sorted(record["site"] for record in records) != sorted(CASES):
+            failures.append(f"pipeline parsed {len(records)} of {len(CASES)} fixtures")
+        for record in records:
             core = {
                 k: v
                 for k, v in record.items()
@@ -114,15 +115,8 @@ def pipeline(parser_name, expected):
                 failures.append(
                     f"{record['site']}: pipeline record differs from expected.json"
                 )
-        for path in sorted(root.rglob("*")):
-            if path.is_file():
-                found = leaks(
-                    path.read_text("utf-8", "replace"), expected["seller_strings"]
-                )
-                if found:
-                    failures.append(
-                        f"pipeline file {path.relative_to(root)} holds {found}"
-                    )
+        for path, found in leaks_in_directory(root, expected["seller_strings"]).items():
+            failures.append(f"pipeline file {path} holds {found}")
     return failures
 
 
@@ -130,7 +124,7 @@ def main(parser_name):
     parser = importlib.import_module(f"parse_{parser_name}")
     expected = json.loads((FIXTURES / "expected.json").read_text())
     failures = []
-    for site, (fixture, _) in CASES.items():
+    for site, (fixture, url) in CASES.items():
         raw_bytes = (FIXTURES / fixture).read_bytes()
         html = raw_bytes.decode()
         raw = parser.extract(html, site)
@@ -140,7 +134,7 @@ def main(parser_name):
         found = leaks(json.dumps(record, ensure_ascii=False), expected["seller_strings"])
         if found or "adCustomerId" in raw["js"]:
             failures.append(f"{site}: seller data reached the record: {found}")
-        kept, note = retain("detail", 200, raw_bytes)
+        kept, note = retain(url, 200, raw_bytes)
         if kept is None:
             failures.append(f"{site}: the fetcher would keep nothing ({note})")
         else:
