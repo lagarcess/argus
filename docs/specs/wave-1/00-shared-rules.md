@@ -572,7 +572,9 @@ amounts in log fields.
 
 `docs/API_CONTRACT.md` (any endpoint or payload change), `docs/DATA_MODEL.md`
 (any table, event property, or retention change), `docs/ARCHITECTURE.md`
-(registered calculations table, analytics), `docs/PRODUCT.md`,
+(analytics and the pointer to the runtime calculation catalog
+`get_calculation_declarations()` in `src/argus/domain/calculations/__init__.py`;
+do not recreate a hand-maintained calculations table), `docs/PRODUCT.md`,
 `.agent/designs/argus/DESIGN.md` (navigation), `docs/BREAKPOINTS.md`
 (layout). Decision log: `docs/specs/argus-decision-log.md`. Wave 1 package
 authority: `docs/specs/wave-1/README.md` and this directory's stage specs.
