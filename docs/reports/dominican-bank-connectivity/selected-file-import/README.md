@@ -16,7 +16,7 @@ With pull request 724's model at `d081bfcdf5c7c2bee767d873f232752432098c39` on t
 Blocked means a case needs the recording model and could not run. It is not a pass, and the proof exits with status 0 only when every case passes.
 
 - The committed [report with pull request 724](proof-report.json) and [report without it](proof-report-without-724.json) are those runs. A second run of each writes the same bytes.
-- The first report records the model's head as given to the runner, a digest of every Python file in that package (`88baa7c4...3f3c8`), and a digest of the ingestion kit (`48c40767...9925c`), so a reader can tell which versions it proves.
+- The first report records the model's head as given to the runner, a digest of every Python file in that package, and a digest of the ingestion kit, so a reader can tell which versions it proves.
 - Each deliberate breakage in [`mutation_check.py`](mutation_check.py) makes its target cases fail. The breakages ignore encryption, refuse every encrypted PDF, treat a PDF reader failure as a password or let it stop the import, drop the recovery steps, drop the ingestion kit's extraction errors, keep duplicate rows, answer balance-check questions for the person, stop the model from asking them, cancel without discarding drafts, cancel without deleting the file, cancel every draft from the same file instead of one review's, rebuild a retried confirmation instead of replaying it, keep the file after a completed review, track open reviews only in memory, skip clearing an interrupted review's file at start, store a file under its original name, and hold a refused file.
 - A case that raises an exception is recorded with status `error` and the exception in the report, instead of stopping the run. An error is not a failed check, so the breakage check does not count it as catching a breakage, because the exception may come from the breakage itself. Each target case has to run to its check and fail it.
 
@@ -24,7 +24,7 @@ Blocked means a case needs the recording model and could not run. It is not a pa
 
 This proof first ran against pull request 724 at `720aad3fd`. There, statement rows dated the day before a confirmed balance check confirmed without review. The [recording decision response](../../../specs/lanes/financial-recording-decision-response.md) in pull request 727 settles question 3 the other way, and the [reconciliation handoff](../../../specs/argus-account-balance-reconciliation-handoff.md) says document import must hand off to account review. The proof recorded this as an expected failure.
 
-The lane named the revised model at `0df86aa8c`, which asks about activity dated on or before a confirmed check, unless the check contained it when confirmed or it came from the same document. The proof reproduced the scenario against it, and all four rows are asked about the check. The expected-failure case is now a regression assertion, `earlier_day_rows_behind_a_balance_check`. It passes only when each row names the check it waits on, nothing confirms the rows before the person answers, a direct confirmation of the unanswered rows is refused and writes nothing, and the answer reaches the check. After the answer, the check still shows its DOP 1,000.00 difference from confirmation time, and DOP 25.50 remains, which is 2,000.00 less 1,974.50. The case fails if the importer answers for the person or the model stops asking. Two of the breakages do exactly that.
+The lane named the revised model at `0df86aa8c`, which asks about activity dated on or before a confirmed check, unless the check contained it when confirmed or it came from the same document. The proof reproduced the scenario against it, and all four rows are asked about the check. The expected-failure case is now a regression assertion, `earlier_day_rows_behind_a_balance_check`. It passes only when each row names the check it waits on, nothing confirms the rows before the person answers, a direct confirmation of the unanswered rows is refused and writes nothing, and the answer reaches the check. After the answer, the check keeps the difference it showed when it was confirmed, and the difference that remains is what the answered rows do not explain. The case's entry in the report gives both amounts. The case fails if the importer answers for the person or the model stops asking. Two of the breakages do exactly that.
 
 Pull request 724's technical contract is proposed, not approved, and it kept moving during review. The proof was adapted to each head only at its integration boundary, and every case observed the same values at each head it was checked against. The committed report was produced at `d081bfcdf`, the last head checked during review, which is not an accepted contract. A read-only check at `e2a9ad6b8`, the head when this delivery's scope was reduced, also passed every case with the same observations and was not committed. Once pull request 724 is accepted, rerun the proof once against the accepted head with the [steps below](#rerun) and commit that report. No intermediate head is pinned before then.
 
@@ -97,21 +97,27 @@ The proof relies on these rules and does not restate them in code. Each is the m
 
 ## Experimental assumptions still unresolved
 
-The proof's importer makes these choices so the cases can run. None is an approved production default, and each stays open. The report repeats them under `assumptions`.
+The proof's importer makes these choices so the cases can run. None is an approved production default, and each stays open. The report holds them under `assumptions`, and this table is rendered from it.
+
+<!-- rendered assumptions start -->
 
 | Question | The proof's assumption | Status |
 | --- | --- | --- |
 | Retention of source files | A stored file is deleted once no row from it is left in review, whether the review ends by confirming, by cancelling, or by stopping before any draft. The importer checks after every step and when it starts. Records keep the file's digest, its stored name, and the row. | Unresolved |
 | Password entry | None. A file that needs a password is refused, and the person is asked for an unlocked copy. The alternative is to let a person type the password once so the server opens the file in memory and keeps nothing. | Unresolved |
 | Upload limit | 10 MiB | Unresolved |
-| Time limit for opening a PDF | 20 seconds for the reader to open an encrypted PDF before it is refused as unreadable | Unresolved |
+| Time limit for opening an encrypted PDF | 20 seconds | Unresolved |
 | Household visibility of source files | Not modeled. A record confirmed into a household account carries a reference to the file, never the file or its original name. Whether a household member may ever open the file is undecided. | Unresolved |
+
+<!-- rendered assumptions end -->
 
 The importer's other choices are equally experimental. It sniffs content to classify files, stores a file under a digest-based name, leaves the account blank unless the file marks a row as personal, and asks the person for the closing balance date because the kit does not read the statement period.
 
 ## Acceptance matrix
 
-Rendered from the two committed reports in the same commit that regenerates them. The reports own each result and what each case observed.
+[`render_tables.py`](render_tables.py) renders this table and the assumptions table from the two committed reports, which own each result and what each case observed.
+
+<!-- rendered matrix start -->
 
 | Case | Group | Claim | With 724 at `d081bfcdf` | Without 724 |
 | --- | --- | --- | --- | --- |
@@ -156,6 +162,8 @@ Rendered from the two committed reports in the same commit that regenerates them
 | `reimport_after_partial_confirmation` | retry | Re-importing after a partial batch re-adds neither confirmed rows nor rows still in review. | Passed | Blocked, needs 724 |
 | `nothing_posts_without_confirmation` | boundary | Import creates drafts only. Records change only when the person confirms. | Passed | Blocked, needs 724 |
 
+<!-- rendered matrix end -->
+
 The matrix covers each item the lane names:
 
 - Unsupported, encrypted, and unreadable documents: the intake group and `unlocked_copy_after_refusal`.
@@ -186,7 +194,7 @@ The matrix covers each item the lane names:
 | Household permission contract | Absent | Who may see imported records and source files |
 | Retention of source files | Unresolved | Whether a file outlives its review |
 | Password entry | Unresolved | A recovery path easier than an unlocked copy |
-| Upload limit | Unresolved | The 10 MiB assumption |
+| Upload limit | Unresolved | The upload-limit assumption |
 | OCR provider | Not selected | Photos and scanned PDFs |
 | Per-bank parsers | Need consented samples | Any claim about a real bank |
 | Native share extension | Not built or assigned | Importing from the share sheet |
@@ -227,6 +235,12 @@ PYTHONPATH=temp/recording-724 poetry run python docs/reports/dominican-bank-conn
 
 ```bash
 cmp temp/selected-file-import-report.json docs/reports/dominican-bank-connectivity/selected-file-import/proof-report.json
+```
+
+The README's matrix and assumptions table are rendered from the two committed reports. This check exits with an error and prints the difference when either table is stale. After a report is regenerated, `--write` rewrites both tables.
+
+```bash
+poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/render_tables.py
 ```
 
 To confirm that the cases can fail, run the breakage check with the same path. It exits with an error if any breakage goes unnoticed, if a breakage names no case or a case that does not exist, if a target case stops with an error instead of failing its check, or if the unbroken run fails.

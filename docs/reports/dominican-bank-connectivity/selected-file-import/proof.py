@@ -45,11 +45,11 @@ SUFFIX = {"pdf": ".pdf", "csv": ".csv", "png": ".png", "jpeg": ".jpg", "heic": "
 HOUSEHOLD = "household"
 ASSUMPTIONS = {
     "status": "Experimental choices made to run the proof. Unresolved, and not approved production defaults.",
-    "source_file_retention": "A stored file is deleted once no row from it is left in review, checked after every importer step and when the importer starts.",
-    "password_entry": "None. A file that needs a password is refused, and the person is asked for an unlocked copy.",
+    "source_file_retention": "A stored file is deleted once no row from it is left in review, whether the review ends by confirming, by cancelling, or by stopping before any draft. The importer checks after every step and when it starts. Records keep the file's digest, its stored name, and the row.",
+    "password_entry": "None. A file that needs a password is refused, and the person is asked for an unlocked copy. The alternative is to let a person type the password once so the server opens the file in memory and keeps nothing.",
     "upload_limit_bytes": SIZE_LIMIT,
     "pdf_open_time_limit_seconds": PDF_TIMEOUT_SECONDS,
-    "household_source_file_visibility": "Not modeled. Records carry a reference to the file, never the file.",
+    "household_source_file_visibility": "Not modeled. A record confirmed into a household account carries a reference to the file, never the file or its original name. Whether a household member may ever open the file is undecided.",
 }
 
 
