@@ -55,8 +55,9 @@ scenarios must not silently change actual balances.
 - Design for phones, with native iOS/Android and web as intended platforms.
 
 [DESIGN.md](../.agent/designs/argus/DESIGN.md) owns visual conventions. Native
-architecture, sequencing, providers, and the new account-onboarding flow remain
-open as specified in the MVEE. Follow the [authority map](DOCUMENTATION_AUTHORITY.md)
+implementation contracts, sequencing, remaining providers, and the new account-onboarding flow remain
+open as specified in the MVEE. The [voice and chart direction](ARCHITECTURE.md#voice-and-chart-direction)
+is selected; integration and acceptance remain to be completed. Follow the [authority map](DOCUMENTATION_AUTHORITY.md)
 when scoping implementation.
 
 ## 5. Existing capabilities and behavior to preserve
@@ -82,8 +83,11 @@ not authorize discretionary trading, automatic money movement, or a change to
 the existing advice boundary.
 
 Guest chat remains a real entry path. The existing access policy is defined in
-[Guest Entry](#guest-entry-default-on-kill-switch) below; do not replace it with
-an auth-first journey or invent the pivot's account-onboarding policy.
+[Guest Entry](#guest-entry-default-on-kill-switch) below. The pivot's
+[guest access boundary](specs/argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration)
+is now founder-locked; it preserves guest chat while gating other ecosystem
+features behind registration. Its implementation is separate from this
+publication and must not introduce an auth-first gate for chat.
 
 The remaining sections specify capabilities and behavior to preserve. They do
 not form a new feature queue or establish a backtest-only activation requirement.

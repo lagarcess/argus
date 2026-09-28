@@ -153,8 +153,77 @@ Web app / PWA.
 
 ## Approved Platform Direction
 
-The MVEE includes native iOS and Android plus web. This document does not yet
-select native frameworks, a shared shell, or the new client/data contracts.
+**Founder-locked September 26, 2026.** This section owns the interface stack
+decision; other product and agent documents link here.
+
+| Platform | Selected interface stack |
+| --- | --- |
+| iOS | Swift + SwiftUI, with UIKit where a component requires it |
+| Android | Kotlin + Jetpack Compose, with Android Views where a component requires it |
+| Web/PWA | Retain and evolve the existing Next.js + React + TypeScript app |
+
+Mobile interfaces are platform-native implementations, not PWA/WebView shells.
+React Native is not the selected mobile framework. Preserve the Argus visual
+identity and product behavior while respecting each platform's navigation,
+gestures, keyboard behavior, accessibility, and device capabilities.
+
+All clients use the same Argus backend and canonical financial records,
+permissions, calculations, and conversational runtime. Extend the existing
+backend through shared contracts; do not create an independent financial or
+chat truth for each interface. Existing web UI code does not automatically
+become native UI; carry forward its design and behavior through explicit
+native implementation and verification.
+
+The founder accepts separate interface implementation and maintenance to gain
+direct platform integration and control over interaction quality. Coordinated
+agents may implement against shared specifications and acceptance criteria;
+agent capacity does not replace device testing or integration review. Judge
+quality on representative devices, including affordable and midrange Android
+phones, rather than assuming the chosen framework guarantees performance.
+
+This locks the platform stacks, not a new service topology or implementation
+assignment. Client/API contracts, native authentication and guest continuity,
+local storage/offline synchronization, device integrations, supported OS/device
+ranges, financial-record and household design, ownership/task breakdown, and
+rollout order still require scoped technical definition. No runtime, feature
+gate, or production deployment changes are made by this decision.
+
+### Voice and chart direction
+
+**Founder-locked September 28, 2026.** This section owns provider and chart
+library direction; [MVEE voice](specs/argus-minimum-viable-ecosystem-experience.md#43-speak-to-argus)
+owns the experience. These are implementation choices to validate, not shipped
+integrations or an authorization for paid calls or deployment.
+
+- **Voice:** xAI is the selected provider direction for dictation, transcription
+  and full spoken conversation. The proposed integration path is xAI streaming
+  speech-to-text → existing Argus runtime → xAI streaming text-to-speech.
+  LangGraph remains the single conversational owner; financial drafts,
+  confirmation, permissions and durable records keep their existing owners.
+  Direct speech-to-speech orchestration requires a bounded architecture review
+  before adoption. The hosted Voice Agent Builder's separate reasoning,
+  knowledge store and recording defaults are not adopted by this decision.
+- **Charts:** Swift Charts for iOS, Vico as the Android Compose candidate to
+  validate, and retained TradingView Lightweight Charts for web. Do not add a
+  React Native stack for charting. Validate one representative financial chart
+  before committing library versions or spreading the implementation.
+- **Shared chart contract:** consume the same canonical series, units, dates,
+  projection/actual distinction and missing-data semantics. Clients render and
+  select points; they must not reconstruct financial calculations independently.
+  Use a stable date/value readout, responsive scrubbing and restrained styling.
+  Preserve actual jumps, gaps and flat periods rather than smoothing away facts.
+- **Acceptance still required:** spoken Dominican Spanish and English, language
+  switching, amounts and corrections, interruption/cancellation, disconnection,
+  transcript/card consistency, privacy modes, retention and cost. Charts need
+  scrolling/gesture coexistence, accessibility, theme and representative-device
+  performance checks. Exact API contracts, credentials, versions, OS ranges and
+  rollout remain scoped implementation work.
+
+Sources checked September 28, 2026: [xAI voice APIs](https://docs.x.ai/developers/rest-api-reference/inference/voice),
+[Voice Agent Builder](https://x.ai/news/grok-voice-agent-builder),
+[Swift Charts interaction](https://developer.apple.com/videos/play/wwdc2023/10037/),
+[Vico](https://github.com/patrykandpatrick/vico), and
+[Lightweight Charts](https://github.com/tradingview/lightweight-charts).
 
 ## Frontend Responsibilities
 
