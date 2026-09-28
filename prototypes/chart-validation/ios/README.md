@@ -76,7 +76,8 @@ after a real drag starts, it disables the pan recognizer so UIKit sends native
 state. It does not certify every possible OS interruption source.
 
 Long-series performance records five automated drags with XCTest clock, app CPU,
-app memory and (iOS 26+) [UI hitch metrics](https://developer.apple.com/documentation/xctest/xcthitchmetric).
+app memory and requests (iOS 26+) [UI hitch metrics](https://developer.apple.com/documentation/xctest/xcthitchmetric).
+The tested simulator exported no hitch samples; absence is not zero hitches.
 Clock includes injected touch duration and test automation, not just renderer time.
 There is no physical-device FPS claim or regression baseline.
 

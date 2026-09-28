@@ -64,6 +64,15 @@ class FixtureTests(unittest.TestCase):
         recurring = next(c for c in self.bundle["cases"] if c["shape"] == "dca-accumulation")
         deposits = [p for p in recurring["points"] if p["contribution"] is not None]
         self.assertGreaterEqual(len(deposits), 3)
+        funding = recurring["funding"]
+        self.assertEqual(deposits[0]["contribution"], funding["starting_capital"])
+        self.assertEqual(funding["cadence"], "weekly")
+        for earlier, later in zip(deposits, deposits[1:]):
+            self.assertEqual(later["contribution"], funding["recurring_contribution"])
+            self.assertEqual(
+                (dt.date.fromisoformat(later["time"]) - dt.date.fromisoformat(earlier["time"])).days,
+                7,
+            )
         self.assertTrue(any(
             b["contribution"] is not None and a["actual"] is not None
             and b["actual"] - a["actual"] == b["contribution"]

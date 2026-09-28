@@ -71,12 +71,12 @@ In another terminal:
 ```sh
 export ANDROID_SERIAL=emulator-5584
 ./gradlew :app:connectedDebugAndroidTest
-adb -s "$ANDROID_SERIAL" pull /sdcard/Android/data/ai.argus.chartprototype/files/ ./device-evidence
+adb -s "$ANDROID_SERIAL" pull /sdcard/Download/argus-chart-proof/ ./device-evidence
 adb -s "$ANDROID_SERIAL" shell dumpsys gfxinfo ai.argus.chartprototype
 adb -s "$ANDROID_SERIAL" emu kill
 ```
 
 The instrumented suite exercises every fixture, missing-row segment preservation,
 endpoint readouts, English/es-419, theme modes, horizontal release/cancel/reset,
-vertical scroll, and twelve real-time UiAutomator long-series scrubs (60 steps each). Measurements explicitly
+vertical scroll, and twelve real-time shell-input long-series scrubs (300 ms each). Measurements explicitly
 include test synchronization and are not finger-to-screen latency claims.

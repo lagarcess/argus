@@ -135,6 +135,8 @@ struct FinancialChart: View, Equatable {
             }
         }
         .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) }
+        .chartXAxis(scenario.points.isEmpty ? .hidden : .automatic)
+        .chartYAxis(scenario.points.isEmpty ? .hidden : .automatic)
         .chartOverlay { proxy in
             ChartInteraction(proxy: proxy, data: data, selection: $selection)
         }

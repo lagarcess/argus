@@ -65,15 +65,16 @@
       "currency": "USD",
       "unit": "major-currency",
       "shape": "dca-accumulation",
+      "funding": {"starting_capital": 1000, "recurring_contribution": 250, "cadence": "weekly"},
       "points": [
         {"time": "2026-03-02", "actual": 1000, "projected": null, "contribution": 1000},
         {"time": "2026-03-03", "actual": 1000, "projected": null, "contribution": null},
         {"time": "2026-03-04", "actual": 990, "projected": null, "contribution": null},
-        {"time": "2026-03-05", "actual": 1240, "projected": null, "contribution": 250},
-        {"time": "2026-03-06", "actual": 1240, "projected": null, "contribution": null},
-        {"time": "2026-03-09", "actual": null, "projected": null, "contribution": null},
-        {"time": "2026-03-10", "actual": 1235.5, "projected": null, "contribution": null},
-        {"time": "2026-03-11", "actual": 1485.5, "projected": null, "contribution": 250}
+        {"time": "2026-03-09", "actual": 1240, "projected": null, "contribution": 250},
+        {"time": "2026-03-10", "actual": 1240, "projected": null, "contribution": null},
+        {"time": "2026-03-11", "actual": null, "projected": null, "contribution": null},
+        {"time": "2026-03-13", "actual": 1235.5, "projected": null, "contribution": null},
+        {"time": "2026-03-16", "actual": 1485.5, "projected": null, "contribution": 250}
       ]
     },
     {

@@ -12,6 +12,11 @@ and `contribution` (number or null). Null is missing, never zero. All columns
 are explicit. `contribution` is a dated fixture fact, not computed from prices.
 At least one fully missing point represents each internal missing interval.
 
+The recurring case includes authored `funding` metadata: `starting_capital`,
+`recurring_contribution`, and `cadence`. Its first contribution row is initial
+funding; later weekly Monday deposits carry the recurring amount. Clients render
+the dated amounts already present and never generate a schedule from this metadata.
+
 Actual backtest values retain the canonical `chart.series` time/value semantics:
 `points.map(p => ({time:p.time,value:p.actual}))` restricted to non-null actuals
 is the canonical historical shape. Gap and projection envelope fields are

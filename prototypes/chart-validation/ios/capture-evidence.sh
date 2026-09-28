@@ -33,6 +33,10 @@ xcrun swiftc -module-cache-path /tmp/argus-chart-model-cache \
   prototypes/chart-validation/ios/ChartPrototype/ChartData.swift \
   prototypes/chart-validation/ios/verify-model.swift -o /tmp/argus-chart-model
 /tmp/argus-chart-model prototypes/chart-validation/fixtures/series.json > "$chart_evidence/model-checks.txt"
+if ! xcrun simctl list devices booted | grep -q "$chart_device"; then
+  xcrun simctl boot "$chart_device"
+fi
+xcrun simctl bootstatus "$chart_device" -b
 xcrun simctl ui "$chart_device" appearance light
 SIMCTL_CHILD_CHART_THEME=system SIMCTL_CHILD_CHART_CASE=stress \
   xcrun simctl launch --terminate-running-process "$chart_device" ai.argus.chartprototype

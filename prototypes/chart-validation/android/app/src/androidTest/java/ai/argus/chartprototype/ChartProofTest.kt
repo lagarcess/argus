@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import org.junit.Assert.*
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -26,6 +27,13 @@ class ChartProofTest {
     private fun screenshot(name: String) {
         compose.waitForIdle()
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(context.getExternalFilesDir(null), "$name.png"))
+    }
+    // AGP removes the test app after the run, so preserve artifacts outside its sandbox.
+    @After fun preserveEvidenceBeforeUninstall() {
+        val source = context.getExternalFilesDir(null)!!.absolutePath
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).executeShellCommand(
+            "sh -c 'mkdir -p /sdcard/Download/argus-chart-proof && cp -R $source/. /sdcard/Download/argus-chart-proof/'"
+        )
     }
     @Test fun fixturesAndSegmentsPreserveEveryFact() {
         cases.forEach { case ->
@@ -121,15 +129,20 @@ class ChartProofTest {
         device.executeShellCommand("dumpsys gfxinfo ai.argus.chartprototype reset")
         val bounds = compose.onNodeWithTag("scrub").fetchSemanticsNode().boundsInWindow
         repeat(12) { n ->
-            val a = (if(n % 2 == 0) bounds.left + 1 else bounds.right - 1).toInt()
-            val b = (if(n % 2 == 0) bounds.right - 1 else bounds.left + 1).toInt()
-            device.swipe(a, bounds.center.y.toInt(), b, bounds.center.y.toInt(), 60)
+            val a = (bounds.left + bounds.width * if(n % 2 == 0) .15f else .85f).toInt()
+            val b = (bounds.left + bounds.width * if(n % 2 == 0) .85f else .15f).toInt()
+            val before = readout()
+            device.executeShellCommand("input swipe $a ${bounds.center.y.toInt()} $b ${bounds.center.y.toInt()} 300")
             compose.waitForIdle()
+            assertNotEquals("Paced swipe must change the chart readout", before, readout())
         }
         val finish = SystemClock.elapsedRealtimeNanos()
-        val report = "scenario_switch_to_idle_ms=${(ready-start)/1e6}\n12_uiautomator_60step_swipes_including_test_sync_ms=${(finish-ready)/1e6}\npoints=${cases.first { it.id == "long" }.points.size}\n"
+        val report = "scenario_switch_to_idle_ms=${(ready-start)/1e6}\n12_shell_300ms_swipes_including_test_sync_ms=${(finish-ready)/1e6}\npoints=${cases.first { it.id == "long" }.points.size}\n"
         File(context.getExternalFilesDir(null), "interaction-measurements.txt").writeText(report)
-        File(context.getExternalFilesDir(null), "long-series-gfxinfo.txt").writeText(device.executeShellCommand("dumpsys gfxinfo ai.argus.chartprototype framestats"))
+        val frames = device.executeShellCommand("dumpsys gfxinfo ai.argus.chartprototype framestats")
+        val frameCount = Regex("Total frames rendered: ([0-9]+)").find(frames)?.groupValues?.get(1)?.toIntOrNull()
+        assertTrue("Frame sample must report a positive rendered frame count", frameCount != null && frameCount > 0)
+        File(context.getExternalFilesDir(null), "long-series-gfxinfo.txt").writeText(frames)
         screenshot("long-scrub")
     }
 }
