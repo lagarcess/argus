@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ai.argus.foundation.Appearance
 import ai.argus.foundation.R
+import ai.argus.foundation.auth.SessionStatus
+import ai.argus.foundation.auth.SessionUiState
 
 internal enum class Destination(@StringRes val title: Int) {
     HOME(R.string.home), ACCOUNTS(R.string.accounts), ARGUS(R.string.argus),
@@ -59,16 +62,37 @@ internal enum class Destination(@StringRes val title: Int) {
 internal enum class Page(@StringRes val title: Int) {
     ROOT(R.string.argus), SETTINGS(R.string.profile_settings),
     PREFERENCES(R.string.preferences), UPDATES(R.string.updates), RECENTS(R.string.recents),
+    SESSION(R.string.session_title),
 }
 
-/** A disconnected sample presentation. No UI action invokes a service or writes a record. */
+/** Financial pages remain samples; optional session access is isolated in Settings. */
 @Composable
-fun ArgusApp(appearance: Appearance, onAppearanceChange: (Appearance) -> Unit) {
+fun ArgusApp(
+    appearance: Appearance,
+    onAppearanceChange: (Appearance) -> Unit,
+    sessionState: SessionUiState? = null,
+    onSignIn: (String, String) -> Unit = { _, _ -> },
+    onSignOut: () -> Unit = {},
+    onSessionRetry: () -> Unit = {},
+    onRecovery: (() -> Unit)? = null,
+) {
     var destination by rememberSaveable { mutableStateOf(Destination.ARGUS) }
     var page by rememberSaveable { mutableStateOf(Page.ROOT) }
     var settingsSource by rememberSaveable { mutableStateOf(Page.ROOT) }
     var dialog by rememberSaveable { mutableStateOf<Int?>(null) }
-    var composer by rememberSaveable { mutableStateOf("") }
+    val sessionEnabled = sessionState != null && sessionState.status != SessionStatus.DISABLED
+    // Authenticated drafts never enter Android saved state. The controller owns retirement;
+    // refresh keeps its epoch, while sign-out/switch creates a fresh one immediately.
+    val draft = if (sessionEnabled) {
+        remember(sessionState?.ownershipEpoch, sessionState?.status == SessionStatus.SIGNED_OUT) {
+            mutableStateOf("")
+        }
+    } else {
+        rememberSaveable { mutableStateOf("") }
+    }
+    val composerEnabled = !sessionEnabled || sessionState?.status == SessionStatus.SIGNED_OUT ||
+        (sessionState?.status == SessionStatus.SIGNED_IN && sessionState.profile != null)
+    val composer = if (composerEnabled) draft.value else ""
     val focus = LocalFocusManager.current
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     var compactNavigation by remember(destination) { mutableStateOf(false) }
@@ -85,11 +109,17 @@ fun ArgusApp(appearance: Appearance, onAppearanceChange: (Appearance) -> Unit) {
             }
         }
     }
-    val requireRegistration = { dialog = R.string.registration_body }
+    val requireRegistration = {
+        dialog = when (sessionState?.status) {
+            SessionStatus.SIGNED_IN -> R.string.session_financial_boundary
+            null, SessionStatus.DISABLED -> R.string.registration_body
+            else -> R.string.session_registration_body
+        }
+    }
     val unavailable = { dialog = R.string.unavailable_body }
     val back = {
         page = when (page) {
-            Page.PREFERENCES -> Page.SETTINGS
+            Page.PREFERENCES, Page.SESSION -> Page.SETTINGS
             Page.SETTINGS -> settingsSource
             else -> Page.ROOT
         }
@@ -99,18 +129,26 @@ fun ArgusApp(appearance: Appearance, onAppearanceChange: (Appearance) -> Unit) {
         if (page != Page.ROOT) back() else destination = Destination.ARGUS
     }
 
+    CompositionLocalProvider(LocalSessionEnabled provides
+        (sessionState != null && sessionState.status != SessionStatus.DISABLED)) {
     Surface(Modifier.fillMaxSize().testTag("app_surface")) {
         Column(Modifier.fillMaxSize().systemBarsPadding().imePadding()) {
             AppHeader(destination, page, back,
                 onRecents = { page = Page.RECENTS },
-                onTemporary = { dialog = R.string.temporary_body },
+                onTemporary = { dialog = if (sessionState != null && sessionState.status != SessionStatus.DISABLED)
+                    R.string.session_temporary_body else R.string.temporary_body },
                 onUpdates = { page = Page.UPDATES },
                 onSettings = { settingsSource = Page.ROOT; page = Page.SETTINGS })
             Box(Modifier.weight(1f).fillMaxWidth().nestedScroll(navigationScroll)) {
                 when (page) {
                     Page.SETTINGS -> SettingsPage(
                         onPreferences = { page = Page.PREFERENCES }, unavailable = unavailable,
+                        sessionState = sessionState?.takeUnless { it.status == SessionStatus.DISABLED },
+                        onSession = { page = Page.SESSION },
                     )
+                    Page.SESSION -> sessionState?.let { state ->
+                        SessionPage(state, onSignIn, onSignOut, onSessionRetry, onRecovery)
+                    }
                     Page.PREFERENCES -> PreferencesPage(appearance, onAppearanceChange)
                     Page.UPDATES -> SecondarySamplePage(R.string.updates_empty, R.string.updates_body)
                     Page.RECENTS -> RecentsPage(onSettings = {
@@ -118,9 +156,9 @@ fun ArgusApp(appearance: Appearance, onAppearanceChange: (Appearance) -> Unit) {
                     })
                     Page.ROOT -> when (destination) {
                         Destination.ARGUS -> ChatPage(
-                            composer, { composer = it }, requireRegistration,
+                            composer, { if (composerEnabled) draft.value = it }, requireRegistration,
                             onSend = { focus.clearFocus(); dialog = R.string.chat_disconnected },
-                            unavailable = unavailable,
+                            unavailable = unavailable, composerEnabled = composerEnabled,
                         )
                         else -> key(destination) {
                             EcosystemPage(destination, requireRegistration, unavailable)
@@ -135,14 +173,16 @@ fun ArgusApp(appearance: Appearance, onAppearanceChange: (Appearance) -> Unit) {
             }
         }
     }
+    }
     dialog?.let { body ->
+        val registrationBoundary = body == R.string.registration_body || body == R.string.session_registration_body
         AlertDialog(
             modifier = Modifier.testTag(
-                if (body == R.string.registration_body) "registration_dialog" else "sample_dialog",
+                if (registrationBoundary) "registration_dialog" else "sample_dialog",
             ),
             onDismissRequest = { dialog = null },
             title = { Text(stringResource(
-                if (body == R.string.registration_body) R.string.registration_title
+                if (registrationBoundary) R.string.registration_title
                 else R.string.sample_title,
             )) },
             text = { Text(stringResource(body)) },

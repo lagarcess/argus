@@ -1,9 +1,10 @@
 # Argus Android foundation
 
 Open this directory in Android Studio. This is a native Kotlin/Compose **sample
-application**, package `ai.argus.foundation.sample`. It has no network permission,
-backend connection, authentication, financial calculations or record storage.
-Only the Light/Dark/System preference uses local app storage. The unsent sample
+application**, package `ai.argus.foundation.sample`. Financial features remain
+illustrative. Registered authentication is available only in an explicitly
+configured local debug build; it is disabled by default and in release builds.
+The Light/Dark/System preference uses local app storage. The unsent sample
 draft uses Android saved UI state to survive activity recreation. Other content is
 explicitly illustrative. A UI registration notice is not server authorization.
 
@@ -83,10 +84,74 @@ adapters must consume server-owned identity, capabilities, quotas and artifacts;
 these display fixtures are not proposed API models. #726's isolated auth proof
 is evidence only and is not included in this application.
 
-Production application identity, signing, Play enrollment, publishing, real
-session lifecycle, server enforcement, domain persistence, voice and sharing
+Production application identity, signing, Play enrollment, publishing,
+production authentication exposure, domain persistence, voice and sharing
 remain separate assignments. Do not distribute this development shell as a
 working financial app.
 
 See the [acceptance report](../../docs/reports/android-phone-foundation.md) for
 exact device evidence, source revisions and remaining limitations.
+
+## Local registered-session development
+
+The [session spec](../../docs/superpowers/specs/2026-09-28-android-registered-session.md)
+owns this continuation. The five-tab sample remains available without sign-in.
+An enabled build adds Account under Profile & settings. Argus owns password
+validation and profile truth through `/api/v1/auth/login` and bearer `/api/v1/me`.
+The pinned Supabase Kotlin SDK 3.2.6 owns refresh and provider logout. Ktor 3.3.1
+matches that SDK's declared dependency. No financial endpoint is connected.
+
+Set these variables only for a disposable, CAPTCHA-disabled local stack:
+
+```text
+ARGUS_ANDROID_LOCAL_AUTH=true
+ARGUS_ANDROID_API_URL=http://10.0.2.2:59400
+ARGUS_ANDROID_SUPABASE_URL=http://10.0.2.2:59401
+ARGUS_ANDROID_SUPABASE_ANON_KEY=<generated local public anon key>
+ARGUS_ANDROID_CAPTCHA_TOKEN=<nonempty local test token>
+ARGUS_ANDROID_RECOVERY_URL=http://127.0.0.1:3000/auth/forgot-password
+```
+
+Then run the ordinary Gradle commands above. Configuration accepts only explicit
+localhost, 127.0.0.1 or emulator 10.0.2.2 URLs with ports, without credentials,
+queries or fragments. Missing/invalid configuration disables auth. Release
+builds always have empty configuration and auth disabled. Cleartext permission
+is restricted to those exact hosts in debug. Never provide a service-role key
+to the app or enable this test CAPTCHA mode against a hosted service.
+
+Recovery opens the existing browser forgot-password page. For an emulator,
+reverse its local browser ports to the dedicated host stack:
+`adb -s <dedicated-device> reverse tcp:3000 tcp:3000` and
+`adb -s <dedicated-device> reverse tcp:59401 tcp:59401`.
+The existing browser flow owns recovery from start to finish; sign in afresh
+in Android afterward. Local recovery web origins remain limited to the existing
+3000/3001 contract. Coordinate port ownership before starting any service.
+
+Sessions are encrypted with a device-only Android Keystore AES-GCM key, written
+atomically under `noBackupFilesDir`. Backup is disabled. Passwords are ephemeral
+form values; profiles stay in memory. One controller serializes SDK mutations
+and ignores responses belonging to a retired identity. Foreground/relaunch
+verification refreshes expiring sessions before loading `/me`. Network or
+verification failures retain a retry path while hiding the profile. Explicit
+session rejection clears the invalid session. Logout hides the profile at once,
+records pending revocation durably, and reports success only after provider
+revocation and local cleanup. The SDK's ordinary signOut helper suppresses some
+HTTP errors, so its explicit-bearer `auth.admin.signOut(..., LOCAL)` wrapper is
+used for the same logout endpoint with the user's bearer and public anon key.
+It uses no privileged credential or user-administration endpoint.
+
+Account switching completes logout before another login. A restored guest
+session remains preserved behind a continuity notice; this slice neither
+bootstraps nor converts guests. Production CAPTCHA, app identity, signup,
+native recovery callbacks and financial APIs remain separate assignments.
+In the local-auth build, composer drafts remain in memory only: same-owner
+refresh retains them, unverified sessions hide them, and account retirement or
+activity/process recreation discards them. Default-off sample drafts retain
+their existing saved-state behavior.
+
+`SessionDeviceContractTest` and `RegisteredSessionLocalTest` are opt-in device
+checks; they skip without the local build and synthetic instrumentation inputs.
+Use only disposable credentials and keep input files restricted. The former
+proves encrypted storage, expired-token refresh, server rejection after logout,
+and separate-process restoration. The latter drives the real bilingual UI and
+checks the browser handoff. Default builds run the ordinary sample/UI tests.
