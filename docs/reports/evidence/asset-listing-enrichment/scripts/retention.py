@@ -14,7 +14,7 @@ import html
 import json
 import re
 import xml.etree.ElementTree as ET
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from common import JS_VAR, squash
 from normalize import text_facts
@@ -78,10 +78,16 @@ def holds_contact(text: str) -> bool:
 
 
 def sanitize_location(location: str | None) -> str | None:
-    """Persist only Locations that do not carry seller or contact shapes."""
+    """Persist only Locations that do not carry seller or contact shapes.
+
+    Percent-encoding is normalized before the contact filter so
+    `/%44ealers/...` and `/contacto/vendedor%40example.invalid` cannot bypass
+    the same guard that catches the literal forms.
+    """
     if not location:
         return None
-    if holds_contact(location):
+    decoded = unquote(html.unescape(location))
+    if holds_contact(location) or holds_contact(decoded):
         return None
     return location
 

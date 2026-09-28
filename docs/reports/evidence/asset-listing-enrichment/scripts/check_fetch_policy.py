@@ -55,6 +55,8 @@ MARKUP_SPLIT_PHONE = DETAIL.replace(
     b"2021 Marca Ejemplo Modelo X EX <span>305</span>-555-0000</h1>",
 )
 DEALER_REDIRECT = "/Dealers/Vendedor-Ficticio/"
+ENCODED_DEALER_REDIRECT = "/%44ealers/Vendedor-Ficticio/"
+ENCODED_EMAIL_REDIRECT = "/contacto/vendedor%40example.invalid"
 SAFE_ROBOTS_REDIRECT = "https://m.supercarros.com/robots.txt"
 PAGES = {
     f"{HOST}/robots.txt": ROBOTS,
@@ -69,6 +71,8 @@ PAGES = {
 }
 REDIRECTS = {
     f"{HOST}/marca-ejemplo-modelo-x/0000007/": (302, DEALER_REDIRECT, b""),
+    f"{HOST}/marca-ejemplo-modelo-x/0000008/": (302, ENCODED_DEALER_REDIRECT, b""),
+    f"{HOST}/marca-ejemplo-modelo-x/0000009/": (302, ENCODED_EMAIL_REDIRECT, b""),
 }
 PHONE_SHAPES = (
     "8090000000",
@@ -180,6 +184,14 @@ def main():
         "a dealer Location was allowed through sanitize_location",
     )
     check(
+        retention.sanitize_location(ENCODED_DEALER_REDIRECT) is None,
+        "a percent-encoded dealer Location was allowed through sanitize_location",
+    )
+    check(
+        retention.sanitize_location(ENCODED_EMAIL_REDIRECT) is None,
+        "a percent-encoded email Location was allowed through sanitize_location",
+    )
+    check(
         retention.sanitize_location(SAFE_ROBOTS_REDIRECT) == SAFE_ROBOTS_REDIRECT,
         "a safe robots Location was dropped",
     )
@@ -287,6 +299,23 @@ def main():
                 not in (Path(scratch) / "ledger.jsonl").read_text(),
                 "a dealer Location reached the cache or ledger",
             )
+            for url, leaked in (
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000008/",
+                    ENCODED_DEALER_REDIRECT,
+                ),
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000009/",
+                    ENCODED_EMAIL_REDIRECT,
+                ),
+            ):
+                meta = fetch_ledger.fetch(url)
+                _, disk = fetch_ledger.cache_paths(url)
+                text = disk.read_text() + (Path(scratch) / "ledger.jsonl").read_text()
+                check(
+                    meta["location"] is None and leaked not in text,
+                    f"encoded Location {leaked} reached disk",
+                )
             written = [path for path in Path(scratch).rglob("*") if path.is_file()]
             for path in written:
                 text = path.read_text("utf-8", "replace")
