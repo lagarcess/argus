@@ -6364,6 +6364,200 @@ Chat integration:
 
 ---
 
+# 17.3 Financial accounts (first slice)
+
+Registered users record the financial accounts that make up their picture:
+create one, reopen it, edit its details, and record or correct its starting
+balance with preserved history. Spec:
+[`docs/specs/lanes/financial-accounts-first-slice.md`](specs/lanes/financial-accounts-first-slice.md).
+This slice holds no activity, balance checks, categories, transfers, refunds,
+imports, plans, spaces beyond the Personal default, or household sharing.
+
+Behind the default-off `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` flag. While it is
+off, or when durable mode has no `DATABASE_URL`, every route below returns
+`404 financial_accounts_unavailable` before authentication, so the surface
+does not exist for anyone. When on, each route requires a verified session
+(`401 unauthorized` otherwise) and the registered account kind: a verified
+guest receives `403 account_conversion_required` before any read or write.
+Registration is the gate, not payment. Guest chat behavior and quotas are
+unchanged.
+
+## Account shape
+
+```json
+{
+  "id": "uuid",
+  "type": "checking",
+  "nature": "asset",
+  "currency": "DOP",
+  "currency_fraction_digits": 2,
+  "nickname": "Cuenta nomina",
+  "archived": false,
+  "ownership_share_bps": 10000,
+  "version": 1,
+  "created_at": "2026-09-01T13:00:00Z",
+  "updated_at": "2026-09-01T13:00:00Z",
+  "balance": {
+    "state": "known",
+    "amount_minor": 1250000,
+    "amount": "12500.00",
+    "as_of": "2026-09-01T09:00:00-04:00",
+    "basis": "opening",
+    "activity_since_tracking_minor": 0
+  },
+  "opening": {
+    "record_id": "uuid",
+    "revision": 1,
+    "amount_minor": 1250000,
+    "amount": "12500.00",
+    "as_of": "2026-09-01T09:00:00-04:00",
+    "time_zone": "America/Santo_Domingo",
+    "reason": null,
+    "recorded_at": "2026-09-01T13:00:00Z",
+    "revisions": [
+      {
+        "revision": 1,
+        "amount_minor": 1250000,
+        "amount": "12500.00",
+        "as_of": "2026-09-01T09:00:00-04:00",
+        "time_zone": "America/Santo_Domingo",
+        "reason": null,
+        "recorded_by": "uuid",
+        "recorded_at": "2026-09-01T13:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+- `type` is one of `cash`, `checking`, `savings`, `investment`, `credit_card`,
+  `other_debt`, `property`, `vehicle`, `other_asset`. `nature` derives from it
+  (`credit_card` and `other_debt` are liabilities) and is never stored.
+- `currency` is an ISO 4217 code accepted only when it is in the CLDR tender
+  set the profile's `currency_override` already uses; unknown codes are
+  `422 currency_unsupported`. `currency_fraction_digits` is that currency's
+  CLDR exponent. Every stored amount is an integer count of minor units
+  (`amount_minor`); `amount` is the same value as a dot-decimal string. The
+  client formats separators for its locale and sends dot-decimal strings back.
+- A balance is the signed value to the owner. The person types a liability as
+  the positive amount owed; the server flips the sign once. A liability above
+  zero is credit in the person's favor.
+- `balance.state = "unknown"` means the account has no opening record. It has
+  no amount and is never presented as zero. `activity_since_tracking_minor`
+  is `0` in this slice, which records no activity.
+- `nickname` is optional, trimmed, at most 60 Unicode code points; blank
+  clears it. `ownership_share_bps` is 1 to 10,000 (default 10,000) and is a
+  fact about the item, never a permission.
+- `as_of` values render in the revision's stored IANA `time_zone` (default
+  `America/Santo_Domingo`) so a later zone change never reinterprets a date.
+- `version` increments on every write that touches the account or its
+  records. `opening.revision` increments on every opening write.
+
+## `POST /api/v1/financial-accounts`
+
+`Idempotency-Key` is required with the
+[contract grammar](#contract-idempotency-admission): missing or blank is
+`400 idempotency_key_required`; whitespace or bad length is
+`422 validation_error`. The reservation key is
+`(user_id, "financial_accounts.create", Idempotency-Key)` and the identity is
+the canonical hash of the validated body (type, currency, trimmed nickname,
+share, and the opening's minor units, explicit `as_of`, and zone). Same key
+and identity returns the original account with `200` and writes nothing; same
+key with a different identity is `409 idempotency_conflict`. Keys are scoped to
+the user; another user's identical key is a different reservation.
+
+**Request:**
+```json
+{
+  "type": "checking",
+  "currency": "DOP",
+  "nickname": "Cuenta nomina",
+  "amount": "12500.00",
+  "as_of": "2026-09-01T09:00:00-04:00",
+  "time_zone": "America/Santo_Domingo",
+  "ownership_share_bps": 10000
+}
+```
+
+- `amount` is optional; omitting it leaves the balance unknown. More fraction
+  digits than the currency allows is `422 amount_precision`; anything but
+  digits with one optional dot and leading minus is `422 amount_invalid`. Input
+  is never rounded.
+- `as_of` is optional and defaults to the creation instant. A future instant
+  is `422 date_in_future`; a missing UTC offset is `422 date_invalid`. An
+  unknown zone is `422 time_zone_invalid`. A nickname over 60 code points is
+  `422 nickname_invalid`.
+
+**Response:** `201` with the account shape on first write, `200` on an exact
+replay.
+
+## `GET /api/v1/financial-accounts`
+
+**Response:** `{"accounts": [...]}` with every account the caller owns, oldest
+first, archived accounts included and flagged.
+
+## `GET /api/v1/financial-accounts/{id}`
+
+**Response:** the account shape. An account that does not exist or belongs to
+another user is `404 financial_account_not_found`; the shape never differs.
+
+## `PATCH /api/v1/financial-accounts/{id}`
+
+**Request:**
+```json
+{
+  "expected_version": 1,
+  "nickname": "Nomina",
+  "type": "savings",
+  "currency": "USD",
+  "archived": false,
+  "ownership_share_bps": 5000
+}
+```
+
+- `expected_version` is required. A mismatch is `409 stale_version` and
+  changes nothing. A successful edit increments `version`.
+- Fields are optional and independent. `nickname: null` or blank clears it.
+- Currency locks once the account has a record: `422 currency_locked`. Type
+  locks once activity exists (`422 type_locked`, unreachable in this slice);
+  with only an opening, a change inside the same nature is allowed and a nature
+  flip is `422 nature_change_requires_empty_account`.
+- `archived` is organizational. It changes no record and no balance, and the
+  account stays in the owner's list and totals. Restore is `archived: false`.
+
+**Response:** `200` with the account shape.
+
+## `PUT /api/v1/financial-accounts/{id}/opening`
+
+Record the starting balance on an account that has none, or correct it.
+
+**Request:**
+```json
+{
+  "expected_revision": 1,
+  "amount": "12000.00",
+  "as_of": "2026-09-01T08:00:00-04:00",
+  "time_zone": "America/Santo_Domingo",
+  "reason": "typo in starting balance"
+}
+```
+
+- `expected_revision` is the current opening revision, or `null` when the
+  account has no opening yet. A mismatch is `409 stale_version` and writes
+  nothing.
+- A first opening needs `amount`; `reason` is optional. A correction needs a
+  non-empty `reason` of at most 200 code points (`422 reason_required`,
+  `422 reason_invalid`) and at least one of `amount`, `as_of`, `time_zone`
+  (`422 field_missing`). Unchanged fields carry forward.
+- Every write appends a revision with the acting user and server instant and
+  increments both `opening.revision` and `version`. Earlier revisions stay in
+  `opening.revisions`; nothing is rewritten. With no activity in this slice a
+  date change reorders nothing, and the revision is still stored.
+
+**Response:** `200` with the account shape.
+
+---
+
 # 18. Feedback
 
 ## `POST /feedback`

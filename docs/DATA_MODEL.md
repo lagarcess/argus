@@ -91,6 +91,14 @@ memory_provider_projections
 memory_provider_cleanup
 ```
 
+Default-off, registered-only (`ARGUS_FINANCIAL_ACCOUNTS_ENABLED`):
+```text
+financial_accounts
+financial_records
+financial_record_revisions
+financial_account_idempotency
+```
+
 Optional or later:
 ```
 - assets
@@ -1810,6 +1818,67 @@ back without transferring memory. A clean conversion carries zero memory,
 performs no retrospective extraction, and leaves personalization disabled until
 the registered user later completes a fresh scoped opt-in.
 
+## 12.1.4 Financial accounts (first slice)
+
+Registered-only, behind `ARGUS_FINANCIAL_ACCOUNTS_ENABLED`. Spec:
+[`docs/specs/lanes/financial-accounts-first-slice.md`](specs/lanes/financial-accounts-first-slice.md).
+Migration `20260928200000_financial_accounts_first_slice.sql`. Ownership is one
+fact, `financial_accounts.user_id`; records and revisions carry a copy for
+indexed RLS, and composite foreign keys `(account_id, user_id)` and
+`(record_id, user_id)` force the copies to agree with the account.
+
+### financial_accounts
+
+| Field | Rule |
+| --- | --- |
+| `id` | uuid, server-assigned, stable across nickname, archive and edits |
+| `user_id` | owner, `auth.users(id)` on delete cascade |
+| `space_id` | text, default `personal`; created for the later spaces slice, read and written by no route today |
+| `type` | one of the nine account types; nature derives from it in code and is never stored |
+| `currency` | ISO 4217 code, `^[A-Z]{3}$`; accepted set is the CLDR tender set in code |
+| `nickname` | null or 1–60 characters, trimmed by the domain |
+| `archived` | boolean, organizational only |
+| `ownership_share_bps` | 1–10,000, default 10,000; never a permission |
+| `version` | starts at 1; every account edit, opening write and correction increments it; the edit's compare-and-set key |
+| `created_at`, `updated_at` | `set_updated_at()` trigger |
+
+### financial_records
+
+One row per confirmed record. This slice writes only `record_kind =
+'opening_balance'`, at most one per account (partial unique index).
+`current_revision` is the correction compare-and-set key.
+
+### financial_record_revisions
+
+Append-only. `(record_id, revision)` unique. Each row stores the owner-signed
+`amount_minor` (bigint), `as_of` (timestamptz) with `as_of_zone` (IANA),
+optional `reason` (1–200 characters; null on revision 1), `capture_method`
+(`manual` only in this slice), `recorded_by` (`auth.users` on delete set null,
+so history keeps its row when an author is later deleted) and `recorded_at`.
+Balances are derived on read from the current revision; nothing derived is
+stored.
+
+### financial_account_idempotency
+
+The create reservation, keyed `(user_id, operation_scope, idempotency_key)`
+with `operation_scope = 'financial_accounts.create'`, `identity_hash` and the
+`account_id` it produced. Same key and identity replays; a different identity
+conflicts. Rows cascade with their account.
+
+### Functions
+
+- `create_financial_account(...)` writes the account, its opening record and
+  revision 1, and the reservation in one transaction. A concurrent duplicate
+  blocks on the reservation primary key and then re-reads to replay or
+  conflict. It returns `registered_required` for an anonymous `auth.users` row.
+- `write_financial_opening(...)` locks the account, compares the caller's
+  `expected_revision` (null when no opening exists) with `current_revision`,
+  and either appends the next revision and bumps `version` or returns `stale`
+  having written nothing.
+
+Both are `security definer`, executable by `service_role` only. The API calls
+them over `DATABASE_URL`; there is no client write path.
+
 ## 12.2 backtest_jobs
 
 Represents durable lifecycle state for a backtest execution job. Jobs bridge
@@ -2309,6 +2378,14 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   read-source, reconciliation, or baseline functions; service-role persistence
   owns those operations.
 
+### Financial accounts
+- `financial_accounts`, `financial_records` and `financial_record_revisions`
+  grant authenticated owners `SELECT` only, and only when the trusted
+  `is_anonymous` JWT claim is not `true`, so a guest reads nothing even about
+  rows carrying its own id. No client role may insert, update, delete, or
+  execute the two write functions; `financial_account_idempotency` has no
+  client policy at all. Proven by `tests/test_financial_accounts_postgres.py`.
+
 ### Tables Requiring RLS
 - `private_alpha_allowlist`, `private_alpha_access_welcome_claims`,
   `private_alpha_access_welcome_deliveries`,
@@ -2318,7 +2395,9 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   `usage_counters`, `guest_workspaces`, `memory_settings`,
   `memory_candidates`, `memory_consent_actions`, `memory_records`,
   `memory_provenance`, `memory_prompt_history`, `memory_reconciliations`,
-  `memory_provider_projections`, `memory_provider_cleanup`.
+  `memory_provider_projections`, `memory_provider_cleanup`,
+  `financial_accounts`, `financial_records`, `financial_record_revisions`,
+  `financial_account_idempotency`.
 
 ### Guest ownership
 - Supabase anonymous identities use the `authenticated` role, so every guest

@@ -1643,6 +1643,173 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts:
+    get:
+      tags:
+      - financial-accounts
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialAccountListResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - financial-accounts
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFinancialAccountRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialAccountResponse'
+        '200':
+          description: Exact replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialAccountResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}:
+    get:
+      tags:
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialAccountResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditFinancialAccountRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialAccountResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/opening:
+    put:
+      tags:
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WriteOpeningRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialAccountResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/history:
     get:
       tags:
@@ -2906,6 +3073,37 @@ components:
       type: object
       required:
       - run
+    BalanceResponse:
+      properties:
+        state:
+          type: string
+          enum:
+          - known
+          - unknown
+        amount_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+        as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        basis:
+          anyOf:
+          - type: string
+            const: opening
+          - type: 'null'
+        activity_since_tracking_minor:
+          type: integer
+          default: 0
+      type: object
+      required:
+      - state
     BulkConversationDeleteResponse:
       properties:
         success:
@@ -3589,6 +3787,57 @@ components:
       type: object
       required:
       - conversation
+    CreateFinancialAccountRequest:
+      properties:
+        type:
+          type: string
+          enum:
+          - cash
+          - checking
+          - savings
+          - investment
+          - credit_card
+          - other_debt
+          - property
+          - vehicle
+          - other_asset
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+        nickname:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          description: Starting balance as the person typed it, dot-decimal. A liability is
+            the positive amount owed. Omit it to leave the balance unknown.
+        as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          description: Instant the balance describes; defaults to now.
+        time_zone:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+        ownership_share_bps:
+          type: integer
+          maximum: 10000.0
+          minimum: 1.0
+          default: 10000
+      additionalProperties: false
+      type: object
+      required:
+      - type
+      - currency
     DecisionCalculation:
       properties:
         kind:
@@ -3853,6 +4102,50 @@ components:
       type: object
       required:
       - items
+    EditFinancialAccountRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        nickname:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        type:
+          anyOf:
+          - type: string
+            enum:
+            - cash
+            - checking
+            - savings
+            - investment
+            - credit_card
+            - other_debt
+            - property
+            - vehicle
+            - other_asset
+          - type: 'null'
+        currency:
+          anyOf:
+          - type: string
+            maxLength: 3
+            minLength: 3
+          - type: 'null'
+        archived:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        ownership_share_bps:
+          anyOf:
+          - type: integer
+            maximum: 10000.0
+            minimum: 1.0
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
     Error:
       type: object
       description: RFC 9457 Problem Details with code and request_id.
@@ -3951,6 +4244,77 @@ components:
       required:
       - type
       - message
+    FinancialAccountListResponse:
+      properties:
+        accounts:
+          items:
+            $ref: '#/components/schemas/FinancialAccountResponse'
+          type: array
+      type: object
+      required:
+      - accounts
+    FinancialAccountResponse:
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+          - cash
+          - checking
+          - savings
+          - investment
+          - credit_card
+          - other_debt
+          - property
+          - vehicle
+          - other_asset
+        nature:
+          type: string
+          enum:
+          - asset
+          - liability
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        nickname:
+          anyOf:
+          - type: string
+          - type: 'null'
+        archived:
+          type: boolean
+        ownership_share_bps:
+          type: integer
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        balance:
+          $ref: '#/components/schemas/BalanceResponse'
+        opening:
+          anyOf:
+          - $ref: '#/components/schemas/OpeningResponse'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - type
+      - nature
+      - currency
+      - currency_fraction_digits
+      - nickname
+      - archived
+      - ownership_share_bps
+      - version
+      - created_at
+      - updated_at
+      - balance
+      - opening
     GuestAccountSignupRequest:
       properties:
         email:
@@ -4831,6 +5195,77 @@ components:
         old profile rows carry it and deployed clients may still read the `/me`
 
         shape during a rollout.'
+    OpeningResponse:
+      properties:
+        record_id:
+          type: string
+        revision:
+          type: integer
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+        revisions:
+          items:
+            $ref: '#/components/schemas/OpeningRevisionResponse'
+          type: array
+      type: object
+      required:
+      - record_id
+      - revision
+      - amount_minor
+      - amount
+      - as_of
+      - time_zone
+      - reason
+      - recorded_at
+      - revisions
+    OpeningRevisionResponse:
+      properties:
+        revision:
+          type: integer
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - revision
+      - amount_minor
+      - amount
+      - as_of
+      - time_zone
+      - reason
+      - recorded_by
+      - recorded_at
     PaginatedConversations:
       properties:
         items:
@@ -7008,6 +7443,36 @@ components:
       - guest
       - capabilities
       - public_account_access_enabled
+    WriteOpeningRequest:
+      properties:
+        expected_revision:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          description: Current opening revision, or null when the account has no opening yet.
+        amount:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+        as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        time_zone:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+      additionalProperties: false
+      type: object
   responses:
     AuthSessionVerificationUnavailable:
       description: Bounded Supabase session verification is temporarily unavailable; retry
