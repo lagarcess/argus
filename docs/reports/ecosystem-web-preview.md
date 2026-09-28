@@ -5,6 +5,39 @@ layout. It is not a production financial application or an authentication proof.
 The [bounded spec](../superpowers/specs/2026-09-28-responsive-ecosystem-preview.md)
 was committed first as `265adac5`.
 
+**Refinement in progress, September 28:** the earlier READY claim is withdrawn.
+The founder has not given visual acceptance or authorized landing. The existing
+web application governs desktop/tablet composition; the mobile archive governs
+shared identity, ecosystem experience and narrow layouts. Earlier checks and
+screenshots below remain historical, not proof of acceptance of the refinement.
+
+## Web inheritance checkpoint
+
+The production-source reference is fetched `origin/main` at
+`a9286b21886eb03df7a21f2f4b7d5e79af570679`; integration is
+`c3b2042b9b69c5b75e173d145ed0020f00ccd79e`. Both were rendered locally using
+synthetic fixtures at 1440, 834 and 390 pixels. The production source was
+extracted into a temporary directory, not checked out over another lane. This
+does not assert that a hosted deployment currently matches that source.
+
+| Inheritance | Existing web owner | Refinement decision |
+| --- | --- | --- |
+| Navigation geometry | `sidebar/ChatSidebar`, `SidebarNavButton`; 288/56px widths, 44px icon lane, 14px corners, Space Grotesk labels | Keep ecosystem anchors, add local collapse/expand and shared Tooltip; no live history/session hook |
+| Width bands | `lib/responsive-layout`, `layout/useResponsiveLayout`; 720/1024px | Derive rail/pane behavior from the existing owner; narrow bottom navigation remains the mobile-lock adaptation |
+| Starting conversation | `chat/EmptyChatSurface`; centered 672px composer composition | Keep greeting, chips and disconnected composer together |
+| Open conversation | `chat/ChatInterface`; 1024px canvas, 768px composer, independent transcript scroll | Keep sample header and composer visible while the transcript scrolls |
+| Account inspection | `sidebar/ChatCommandPalette`; list plus dossier on desktop, sheet below 1024px | Use one local account-detail body in a side pane or existing AdaptivePanel; create/edit/correction keep focused dialogs |
+| Typography and surface density | `globals.css`, `SidebarNavButton`, existing chat/settings | Use web canvas/surface contrast and compact rows with 44px targets; do not add global tokens |
+| Settings and overlays | `sidebar/ProfileMenu`, `ui/AdaptivePanel`, existing appearance/language dialogs | Retain approved App/Account/Support hierarchy and reuse safe dialogs; never mount profile writes |
+
+The first rendered comparison identified an empty-chat composer separated from
+its greeting by excessive blank space, a custom 112px tablet tile rail, and
+modal-only inspection despite desktop room for list and detail. These concrete
+differences define the refinement. It does not copy live controllers or create a
+parallel production design system. `SidebarHeader` currently has English-only
+collapse labels; the preview uses its visual pattern with local bilingual
+labels instead of changing a shared owner.
+
 ## Launch and inspect
 
 From the repository root:
