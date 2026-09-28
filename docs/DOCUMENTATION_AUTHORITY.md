@@ -119,9 +119,14 @@ below, and they do not replace production auth or the chat runtime.
 [#725](https://github.com/lagarcess/argus/pull/725),
 [#726](https://github.com/lagarcess/argus/pull/726), and
 [#724](https://github.com/lagarcess/argus/pull/724). Do not push concurrent
-fixes to those branches. Continue gated landing of #727, #729/#730, and #724 as
+fixes to those branches. Continue gated landing of #729/#730 and #724 as
 their applicable gates close. Do not hold independent ready foundations for
 unrelated research.
+
+**#725 hold:** Landing of [#725](https://github.com/lagarcess/argus/pull/725)
+is held for a narrowed research / selected-file-import scope. That hold does
+not block account creation, native auth, or client wiring to the accepted
+account contract. Do not expand #725 scope from this note.
 
 **Shared rules for this batch:** fetch current integration at start and before
 readiness; one-way reconciliation only (no rebase); one canonical server
