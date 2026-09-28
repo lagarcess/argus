@@ -55,7 +55,7 @@ not rerun or independently certified in this intake.
 - Why this mode: no safe code lane exists for a blanket four-lane production launch from these reports alone. Individual work can be separated; auth defect repair is the first candidate for a normal feature branch once current ownership is checked.
 - Why not the others: no shared execution assignment, exposure flag or validated complete record contract exists. Repository rules prohibit incubation branches; a flag cannot resolve undecided persistence or permissions.
 - Safe preparatory work: publication delta, bounded report corrections, contract reconciliation and synthetic test planning; proposed prompts follow.
-- Blocking decision owner: founder for guest persistence and recovery destination; release captain for publication, merge overlap and assignment ownership.
+- Blocking decision owner: founder for native recovery destination; guest access is now locked in the MVEE. The release captain owns publication, merge overlap and assignment ownership.
 
 ## Scope
 
@@ -147,9 +147,9 @@ not another list asking for already approved experience.
   categories. Recommend a single category owner with stable identifiers and
   localized defaults plus permitted custom labels. Account-only creation has no
   category input; do not make a full catalog a false dependency of that slice.
-- F12: guest chat remains supported; durable guest financial records remain an
-  explicit founder choice. Registered-only first delivery is a proposal, not an
-  approved global onboarding change.
+- F12: follow the [founder-locked guest access boundary](../argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration).
+  Registered-account access is settled; implement server enforcement without
+  changing existing guest-chat capabilities or quotas.
 
 Audit missing scenarios for 200-character notes across record types, partial and
 unlinked refunds, cross-account returns, credit balances, linked refund limits,
@@ -249,8 +249,8 @@ No runtime or hosted rollback is needed because none was changed.
 
 ## Caveats
 
-Outstanding decisions include guest financial persistence and native recovery
-destination. Account archive-total behavior is now published; the custom-category
+Native recovery destination remains an outstanding decision; guest access is
+settled in the MVEE. Account archive-total behavior is now published; the custom-category
 contract needs reconciliation, not guesses. The bank narrative is not a full evidence
 handoff. Claimed local environment failures do not establish remote CI results.
 

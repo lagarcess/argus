@@ -99,3 +99,17 @@ separates settled experience from remaining recommendations.
 
 The founder parked public growth sharing until there is evidence of what users
 want to share. Household invitations and file ingestion remain in scope.
+
+## September 28, 2026 — guest access and ecosystem runtime sequence
+
+The founder locked [guest access](argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration):
+guests can see the app and use existing finance chat within current limits;
+other ecosystem features require registration across native and web interfaces.
+This settles the recording lane's guest-persistence question without changing
+existing guest-chat quotas or authorizing a production auth change here.
+
+The founder also confirmed [agentic ecosystem direction and sequence](argus-minimum-viable-ecosystem-experience.md#agentic-ecosystem-direction-and-sequence).
+Manual UI and future conversational actions must share the same canonical
+operations. The ecosystem runtime lane follows definition of the core workflows
+and UI. This is not permission to replace the existing runtime, change its
+model-facing instructions, or remove research and historical simulations now.

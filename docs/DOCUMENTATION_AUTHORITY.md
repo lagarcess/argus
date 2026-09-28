@@ -56,7 +56,7 @@ merely to make an experience specification read as if it has shipped.
 
 Do not infer these from a polished demo or the MVEE:
 
-- Account onboarding, guest persistence, registration/conversion timing, and any changes to current access gates.
+- Registration/conversion mechanics and enforcement of the [locked guest access boundary](specs/argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration); guest financial persistence is no longer an open product choice.
 - Financial-record schema, balance/transaction reconciliation model, money arithmetic contracts, migrations, and historical-data conversion.
 - Household membership lifecycle, permission enforcement/RLS, ownership, revocation, deletion, and retention implementation. The consent/visibility experience is settled; its technical realization is not.
 - API routes, action schemas, chat-to-record integration, runtime state ownership, jobs, and event contracts for the new surfaces.

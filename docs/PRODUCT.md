@@ -83,8 +83,11 @@ not authorize discretionary trading, automatic money movement, or a change to
 the existing advice boundary.
 
 Guest chat remains a real entry path. The existing access policy is defined in
-[Guest Entry](#guest-entry-default-on-kill-switch) below; do not replace it with
-an auth-first journey or invent the pivot's account-onboarding policy.
+[Guest Entry](#guest-entry-default-on-kill-switch) below. The pivot's
+[guest access boundary](specs/argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration)
+is now founder-locked; it preserves guest chat while gating other ecosystem
+features behind registration. Its implementation is separate from this
+publication and must not introduce an auth-first gate for chat.
 
 The remaining sections specify capabilities and behavior to preserve. They do
 not form a new feature queue or establish a backtest-only activation requirement.

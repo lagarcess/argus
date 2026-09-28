@@ -16,7 +16,7 @@ not retroactively labeled founder approvals. The MVEE remains experience owner.
 | 8. Duplicate-looking statement rows? | **Lead recommendation:** hold flagged/uncertain rows for review; let the user explicitly confirm independent clean rows. Preserve batch progress and linked-record atomicity. Do not auto-drop equal amounts or commit half a transfer. Exact partial-batch behavior remains a proposed contract. |
 | 9. Stale confirmation? | **Lead recommendation:** write nothing; refresh, explain changed effects and ask for confirmation again. Preserve the user's edits where safe. The interaction follows the existing review/confirmation boundary; concurrency mechanics require real database proof. |
 | 10. Fixed/editable categories? | **Optional custom labels are already approved for Business.** Fixed-only everywhere conflicts. Lead recommendation: localized defaults and stable custom-category identity, separate from arithmetic-driving activity kind. Rename must not change money meaning. A catalog is not needed to create an account without activity. |
-| 11. Guests saving accounts? | **Founder choice pending.** Recommend sign-in for durable accounts in the first slice, retaining guest chat. Asked explicitly during publication. Do not silently broaden or narrow onboarding while waiting. |
+| 11. Guests saving accounts? | **No, founder-locked September 28.** Follow the [MVEE guest access boundary](../argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration). The product decision is settled; server enforcement and registration/return-to-action mechanics still need contracts. |
 
 ## Engineering disposition
 

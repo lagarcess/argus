@@ -30,7 +30,7 @@ This document owns the founder-approved pivot experience described here. It chan
 
 Existing production documentation continues to describe current implementation and operational safeguards. This document does not assert that the pivot is implemented, silently rewrite release gates, authorize deployment, or establish an engineering sequence. Older chat-primary scope statements should not be used to erase this explicitly approved future experience. Implementation work must reconcile relevant contracts and product documentation explicitly.
 
-Wave sequencing and engineering breakdown are deliberately outside this document. Account onboarding and the exact guest-to-account conversion flow remain undecided.
+Wave sequencing and engineering breakdown are deliberately outside this document, except for explicit founder sequencing decisions recorded below. The guest access boundary is locked below; the exact registration and return-to-action flow still needs its technical contract.
 
 ### 1.1 Locked audience and experience emphasis
 
@@ -359,7 +359,37 @@ Minimum capacity:
 
 Conversational answers and financial writes are distinct. Asking “What if I spent RD$5,000?” must not record an expense. New proposed financial records require confirmation. The assistant can help across the app; it is not necessary to visit chat for every edit.
 
-Guest chat remains part of the intended experience. Do not settle persistent storage, registration timing, or onboarding policy through incidental UI choices; those decisions are parked.
+#### Guest access and registration
+
+Founder-locked September 28, 2026: guests can see the app and use the existing
+Argus finance chat under its current capability, quota and usage rules. Using
+any other ecosystem feature requires a registered account. Seeing a surface
+does not grant permission to use it. Creating a financial account, recording
+activity, importing documents, managing plans or participating in a household
+must lead to sign-up or sign-in before the operation. The same boundary applies
+on iPhone, Android and web, and to actions requested through chat. No durable
+guest financial records are authorized. Existing guest-chat behavior and limits
+are preserved; this decision does not expand guest compute or research access.
+
+Registration is the gate, not payment. The exact registration/return-to-action
+journey and server enforcement need implementation contracts. This publication
+does not claim that the gate is implemented or change current auth endpoints.
+
+#### Agentic ecosystem direction and sequence
+
+Founder-locked September 28, 2026: Argus should eventually let a registered
+person perform the supported app workflows through conversation as well as
+manual controls. Both entry points use the same canonical actions, financial
+rules, permission checks and confirmation boundaries. Research, calculations
+and historical simulations remain capabilities within this broader assistant.
+
+The ecosystem conversational-runtime work is deferred until the core workflows
+and their UI are defined. Build the manual workflows and their shared service
+contracts first, then assign the chat action integration and runtime evolution
+as a separate lane. Preserve the existing single conversational runtime until
+that lane explicitly changes its architecture; do not create a parallel chat
+brain or modify model-facing prompts as part of the mobile foundation. Existing
+chat maintenance and security fixes continue independently.
 
 #### Temporary chat and conversation recovery
 
@@ -446,8 +476,8 @@ Decision 8 prohibition on a new personal-figure storage surface only for explici
 financial-record confirmation. It does not copy arbitrary chat figures into
 personalization memory or change conversation retention. That older decision
 already allowed figures inside conversation messages; “unconfirmed” must not be
-misread as “never persisted in chat history.” Guest financial-record persistence
-remains a separate open decision.
+misread as “never persisted in chat history.” Financial-record access follows
+the [registered-account boundary](#guest-access-and-registration).
 
 The input methods below are part of the experience direction. Their technical readiness differs. Wallet integrations and bank access are experiments, not promises of universal support or prerequisites for a useful ecosystem. Provider selection is not locked.
 
@@ -547,7 +577,7 @@ Begin with the same draft/review boundary. Any future automatic acceptance of tr
 - **Reconciliation:** distinguish a balance correction from a new transaction. Explain discrepancies; never invent missing activity to force agreement.
 - **Corrections:** let users edit, undo, or remove mistakes and see the resulting changes across surfaces. Keep enough history to explain changes.
 - **Freshness:** an old known balance remains old, even if Argus opens the screen today. The app must not imply continuous awareness beyond available data.
-- **Privacy and control:** explain what is collected and retained; provide appropriate deletion/export controls. Keep financial amounts, document contents, transcripts, and credentials out of analytics and ordinary logs. Storage and guest policies still need explicit implementation decisions.
+- **Privacy and control:** explain what is collected and retained; provide appropriate deletion/export controls. Keep financial amounts, document contents, transcripts, and credentials out of analytics and ordinary logs. Storage contracts and enforcement of the registered-account boundary still need implementation.
 - **Recovery:** preserve review progress where appropriate and offer a manual path when parsing, voice, or bank access fails.
 
 ## 6. Connected journeys that the ecosystem must support
@@ -596,14 +626,14 @@ The boundary for adding a capability is: **does it help someone understand, main
 
 ## 9. Decisions deliberately left open
 
-- Account onboarding, guest persistence, and conversion timing.
+- Registration, guest conversion and return-to-action mechanics under the [locked access boundary](#guest-access-and-registration).
 - Voice integration, retention and acceptance contracts under the [selected provider direction](../ARCHITECTURE.md#voice-and-chart-direction); OCR/document and banking providers and supported formats/institutions.
 - Wallet/device automation feasibility and permissions by platform.
 - Secure design and institution-specific conditions for browser-assisted bank access.
 - Source-file/audio retention details and any future automatic acceptance policy.
 - Notification delivery channels and scheduling defaults.
 - Maintained market-product inventory, commercial relationships, and execution permissions.
-- Engineering breakdown, release order, timelines, and platform sequencing.
+- Engineering breakdown, release order, timelines, and platform sequencing, subject to the [deferred ecosystem runtime lane](#agentic-ecosystem-direction-and-sequence).
 - Household invitation security and delivery integration, membership, removal, retention, and permission mechanics. Copy link and email delivery are selected in section 12; the integration contracts must preserve its visibility and consent boundaries.
 
 These open implementation choices do not reopen the approved ecosystem structure. Agents should preserve the distinction between the intended experience, an exploratory integration, and a currently working feature.
