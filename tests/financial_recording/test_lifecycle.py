@@ -150,7 +150,8 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
     assert scenarios_lifecycle.edits_that_move_money_need_review() == {
         "removing_a_check_others_depend_on": {
             "blocked": "ReviewRequired:inclusion_unanswered",
-            "after_answering": "ok",
+            "after_answering": "ReviewRequired:inclusion_changed",
+            "accepted_reordering": "ok",
             "balance": 800_000,
             "gaps": unexplained_zero,
         },
@@ -304,5 +305,12 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             },
             "preview_effects": {"acct-1": -5_000},
             "stamped": [90_000, -5_000],
+        },
+        "batch_checks_bind_to_previewed_prior": {
+            "batch": "StalePreview",
+            "stored": [[100_000, -10_000], [90_000, -10_000]],
+        },
+        "correction_rejects_bogus_kind": {
+            "bogus_kind": "ReviewRequired:kind_unsupported",
         },
     }

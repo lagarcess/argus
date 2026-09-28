@@ -440,7 +440,7 @@ class Store:
             if draft.status != "proposed":
                 raise InvalidInput("draft_not_proposed", draft.id)
             # Staleness is judged against the batch's starting state, so one
-            # batch may carry several previews of the same account.
+            # batch may carry several activity previews of the same account.
             if draft.revision != preview.draft_revision or any(
                 start.book.accounts[account_id].version != version
                 for account_id, version in preview.basis.items()
@@ -451,7 +451,23 @@ class Store:
                 raise ReviewRequired(blocking(found))
             records = dict(working.book.records)
             record = self._new_record(body, draft.provenance, records)
-            records[record.id] = self._stamped(working.book, record)
+            stamped = self._stamped(working.book, record)
+            if isinstance(body, Observation) and preview.check is not None:
+                last = stamped.revisions[-1]
+                shown = preview.check
+                if (
+                    last.confirmed_expected != shown.get("prior")
+                    or last.confirmed_difference != shown.get("difference")
+                    or body.amount != shown.get("observed")
+                ):
+                    # An earlier batch row changed the prior; re-preview.
+                    saved = self.state
+                    self.state = working
+                    try:
+                        raise StalePreview(self.preview(preview.draft_id))
+                    finally:
+                        self.state = saved
+            records[record.id] = stamped
             book = replace(
                 working.book,
                 accounts={
@@ -521,7 +537,14 @@ class Store:
             raise ReviewRequired(found)
         return self._revise(record, body, reason, removed=False)
 
-    def remove(self, record_id: str, expected_revision: int, reason: str) -> Record:
+    def remove(
+        self,
+        record_id: str,
+        expected_revision: int,
+        reason: str,
+        *,
+        accept_reordering: bool = False,
+    ) -> Record:
         record = self._current(record_id, expected_revision, reason)
         refunds = [
             other.id
@@ -541,6 +564,10 @@ class Store:
         questions = inclusion_issues(after, accounts_of(record.body), self.tz)
         if questions:
             raise ReviewRequired(questions)
+        if not accept_reordering:
+            moved = self._placement_changes_against(after, accounts_of(record.body))
+            if moved:
+                raise ReviewRequired(moved)
         return self._revise(record, record.body, reason, removed=True)
 
     def restore(
@@ -617,8 +644,16 @@ class Store:
         same-currency move cannot silently rewrite a destination check.
         """
         after = with_trial(self.book, body, record.id, self.tz)
+        return self._placement_changes_against(
+            after, accounts_of(record.body) | accounts_of(body)
+        )
+
+    def _placement_changes_against(
+        self, after: Book, account_ids: set[str]
+    ) -> list[Issue]:
+        """Compare landings in `self.book` vs `after` for the given accounts."""
         moved = set()
-        for account_id in sorted(accounts_of(record.body) | accounts_of(body)):
+        for account_id in sorted(account_ids):
             before_anchors = anchors(self.book, account_id)
             after_anchors = anchors(after, account_id)
             before = {item.id: item for item in activities(self.book, account_id)}

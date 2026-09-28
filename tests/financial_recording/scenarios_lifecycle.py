@@ -266,6 +266,8 @@ def edits_that_move_money_need_review() -> dict:
         "corrected_observation_basis_is_canonical": _corrected_basis_canonical(),
         "linked_digest_places_restored_activity": _linked_digest_placement(),
         "balance_check_preview_exposes_effect": _check_preview_effect(),
+        "batch_checks_bind_to_previewed_prior": _batch_checks_bind_prior(),
+        "correction_rejects_bogus_kind": _correction_rejects_bogus_kind(),
     }
 
 
@@ -702,6 +704,36 @@ def _check_preview_effect() -> dict:
     }
 
 
+def _batch_checks_bind_prior() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    first = scene.observation(cash, "900.00", 5)
+    second = scene.observation(cash, "800.00", 10)
+    previews = [scene.store.preview(first.id), scene.store.preview(second.id)]
+    stale = outcome(lambda: scene.store.confirm_batch(previews, "two-checks"))
+    scene.confirm(first)
+    scene.confirm(second)
+    stored = [
+        [
+            scene.store.book.records[gap.record_id].revisions[-1].confirmed_expected,
+            scene.store.book.records[gap.record_id].revisions[-1].confirmed_difference,
+        ]
+        for gap in observation_gaps(scene.store.book, cash.id, scene.store.tz)
+    ]
+    return {"batch": stale, "stored": stored}
+
+
+def _correction_rejects_bogus_kind() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    expense = scene.record("expense", cash, "100.00", 3)
+    return {
+        "bogus_kind": outcome(
+            lambda: scene.store.correct(expense.id, 1, "typo", kind="bogus")
+        ),
+    }
+
+
 def _redated_check_restamps() -> dict:
     scene = Scene()
     cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
@@ -818,10 +850,16 @@ def _remove_check_with_dependents() -> dict:
     scene.store.correct(
         record.id, 1, "also in the later check", answers={second.id: "included"}
     )
-    removed = outcome(lambda: scene.store.remove(first.id, 1, "typo"))
+    # Contained by the later check too, so inclusion is answered — but landing
+    # still shifts. Removal needs the same placement acknowledgement as correct.
+    shifted = outcome(lambda: scene.store.remove(first.id, 1, "typo"))
+    removed = outcome(
+        lambda: scene.store.remove(first.id, 1, "typo", accept_reordering=True)
+    )
     return {
         "blocked": blocked,
-        "after_answering": removed,
+        "after_answering": shifted,
+        "accepted_reordering": removed,
         "balance": scene.amount(cash),
         "gaps": scene.gaps(cash),
     }

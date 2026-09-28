@@ -219,7 +219,11 @@ def legs(activity: Activity) -> dict[str, int]:
 
 
 def accounts_of(body: Body) -> set[str]:
-    return set(legs(body)) if isinstance(body, Activity) else {body.account_id}
+    if not isinstance(body, Activity):
+        return {body.account_id}
+    if body.kind not in LEG_SIGNS:
+        return {body.account_id}
+    return set(legs(body))
 
 
 def anchor_zone(anchor: Anchor) -> ZoneInfo:

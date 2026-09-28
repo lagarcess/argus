@@ -382,6 +382,19 @@
         -5000
       ]
     },
+    "batch_checks_bind_to_previewed_prior": {
+      "batch": "StalePreview",
+      "stored": [
+        [
+          100000,
+          -10000
+        ],
+        [
+          90000,
+          -10000
+        ]
+      ]
+    },
     "contradicting_answers_stop_for_review": {
       "after_correcting_the_answer": "ok",
       "anchor_answers": "InvalidInput:answers_not_applicable",
@@ -411,6 +424,9 @@
           "unexplained"
         ]
       ]
+    },
+    "correction_rejects_bogus_kind": {
+      "bogus_kind": "ReviewRequired:kind_unsupported"
     },
     "correction_unknown_account_is_structured": {
       "anchor_keeps_account": "InvalidInput:anchor_account_immutable",
@@ -575,7 +591,8 @@
       "confirm_rejected": "InvalidInput:draft_not_proposed"
     },
     "removing_a_check_others_depend_on": {
-      "after_answering": "ok",
+      "accepted_reordering": "ok",
+      "after_answering": "ReviewRequired:inclusion_changed",
       "balance": 800000,
       "blocked": "ReviewRequired:inclusion_unanswered",
       "gaps": [

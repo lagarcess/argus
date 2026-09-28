@@ -149,6 +149,8 @@ def validate(
     now: Optional[datetime] = None,
 ) -> list[Issue]:
     """Issues for `body` as a new record, or as the next revision of `record_id`."""
+    if isinstance(body, Activity) and body.kind not in LEG_SIGNS:
+        return [issue("kind_unsupported", body.kind)]
     missing = sorted(item for item in accounts_of(body) if item not in book.accounts)
     if missing:
         return [issue("account_unknown", *missing)]

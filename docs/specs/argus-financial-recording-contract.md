@@ -173,10 +173,10 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 | State | Affects totals? | How it moves on |
 | --- | --- | --- |
 | Draft | No | Capture creates it. Review attaches issues. Editing it raises its revision. |
-| Preview | No | Shows effects and records its basis: every touched account's version and the draft revision. |
-| Confirmed record, revision 1 | Yes | One confirm call |
+| Preview | No | Shows effects and records its basis: every touched account's version and the draft revision. A balance-check preview also carries the prior recorded amount, observed amount and difference that confirm will store. |
+| Confirmed record, revision 1 | Yes | One confirm call. A batch that would store check evidence different from `Preview.check` returns `stale_preview`. |
 | Corrected record, revision n | Yes | `correct(expected_revision, reason, changes)` |
-| Removed record | No | `remove(expected_revision, reason)` appends a tombstone |
+| Removed record | No | `remove(expected_revision, reason, accept_reordering=False)` appends a tombstone. A check removal that shifts activity placement needs `accept_reordering`, same as correct. |
 | Restored record | Yes | `restore(expected_revision, reason, answers)` returns the same record, both legs together, after the same review. A restored activity takes inclusion answers for checks confirmed while it was removed. A restored check takes none, because answers belong to activity. |
 | Rejected draft | No | Terminal. Its source is released. |
 
