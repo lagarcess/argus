@@ -44,6 +44,17 @@ Inspected open, unmerged references: #727 `802b82306cc29373d7e4dce44c17d33adb243
 9. Measure local rendering/interaction performance; identify simulator/emulator
    evidence explicitly. No physical-device or minimum-OS certification by inference.
 
+## Visual acceptance refinement
+
+The representative chart follows DESIGN and #727: loaded display/body fonts,
+restrained theme-aware series tokens, a non-color projected distinction, quiet
+axes/grid, flat surfaces, generous spacing and a stable readable selected-value
+hierarchy. Diagnostic scenario/locale/appearance controls and engineering units
+live in a separate lab area below it. Synthetic labeling and required library
+attribution stay visible. Compare light/dark and enlarged text, and retain short
+motion evidence for scrub/scroll behavior. Visual acceptance and Android adoption
+conditions (dependency convergence and measured performance) are separate.
+
 ## 3. Reserved / parked scope
 
 Production screens, account/chat/forecast logic, navigation/shell files, shared

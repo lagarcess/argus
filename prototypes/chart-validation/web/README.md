@@ -14,6 +14,7 @@ node prototypes/chart-validation/web/server.mjs
 # Separate terminal; synthetic local browser checks only:
 node --test prototypes/chart-validation/web/model.test.mjs
 node prototypes/chart-validation/web/verify.mjs
+node prototypes/chart-validation/web/motion.mjs
 ```
 
 Open http://127.0.0.1:4179. `PORT` can select a different server port; the evidence
@@ -45,6 +46,23 @@ Native or native-wrapper chart is used. No minimum browser version or mobile OS
 support is certified: ES2020, ResizeObserver, Pointer Events, Intl and modern
 canvas support are required. Browsers tested are recorded in the measurements.
 
+## Visual acceptance
+
+The representative card uses locally served repository Inter and Space Grotesk
+assets (existing [font attribution](../../../web/app/fonts/FONT-ATTRIBUTION.md)),
+Space Grotesk 500 headings, neutral text, flat surfaces, pill actions and reserved
+readout height. Diagnostic controls and date/unit mechanics sit below in the lab.
+No shared CSS or build files are changed. The single shared
+`fixtures/visual-style.json` owns chart colors for all three clients; the server
+serves those exact bytes. Light strokes are contrast variants of DESIGN's muted
+teal/soft blue, while dark retains the base colors. Both themes measure at least
+3:1 for chart strokes and 4.5:1 for readout text against their actual backgrounds.
+
+Quiet horizontal grids and sparse ticks support the values. Marker visibility
+uses whole-case density, so a short fragment of the long series cannot turn into
+a thick cluster. Singleton fragments still render an isolated point. There are
+no authored transitions or animations; reduced-motion remains static.
+
 ## Behavior
 
 Actual and projected facts are separate solid/dashed line series. Nulls create
@@ -59,15 +77,18 @@ runs in Pacific/Honolulu. Amounts display ISO currency codes and two decimals.
 ## Evidence and limits
 
 [Durable browser evidence](../../../docs/reports/evidence/chart-validation/web/)
-contains English/light, es-419/dark, missing-point, recurring-contribution and desktop/long screenshots
+contains English/light, es-419/dark, empty/single, enlarged-text, missing-point, recurring-contribution and desktop/long screenshots
 for Chromium and WebKit. `measurements.json` records capture head, fixture hash,
-OS/engine versions, assertions, and raw measurements. Parent delivery records
+OS/engine versions, assertions, raw measurements and shared-palette hash.
+`chromium-touch-motion.webm` records a short scrub/release/cancel/scroll sequence;
+`motion-metadata.json` records its capture head and hash. Parent delivery records
 source equality after evidence-only commits. Initial development captures are
 superseded by the final committed-head rerun.
 
 The automated suite exercises all six fixture cases, endpoint selection, all
 stress rows, no-data readouts, segment boundaries, English/es-419, all themes,
-keyboard buttons, scenario reset, and retained mouse release in both engines.
+keyboard buttons, local font loading, contrast, 150% body text without overflow or
+readout height changes between neighboring selections, reduced motion, scenario reset, and retained mouse release in both engines.
 Chromium CDP dispatches actual browser touch events for horizontal drag, release,
 cancellation and vertical scrolling; these are not synthetic DOM pointer events.
 WebKit's touch cancellation/scroll coexistence is **not** certified by this runner.

@@ -79,6 +79,20 @@ class FixtureTests(unittest.TestCase):
             for a, b in zip(recurring["points"], recurring["points"][1:])
         ))
 
+    def test_shared_series_colors_remain_visible_on_both_surfaces(self):
+        style = json.loads(FIXTURE.with_name("visual-style.json").read_text())
+
+        def luminance(color):
+            channels = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            linear = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+            return sum(c * weight for c, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+        for theme, background in (("light", "#ffffff"), ("dark", "#191c1f")):
+            for series, color in style[theme].items():
+                with self.subTest(theme=theme, series=series):
+                    values = sorted((luminance(color), luminance(background)))
+                    self.assertGreaterEqual((values[1] + 0.05) / (values[0] + 0.05), 3)
+
     def test_ambiguous_or_invalid_facts_are_rejected(self):
         for invalid in (True, float("nan"), float("inf"), "100", 1.001):
             with self.subTest(invalid=invalid):

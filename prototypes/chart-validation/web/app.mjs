@@ -1,10 +1,12 @@
 import { createChart, LineSeries, LineStyle, LineType, ColorType } from '/charts.mjs';
 import { segments, nearestIndex, formattedDate, formattedValue } from './model.mjs';
+await Promise.all([document.fonts.load('500 22px "Space Grotesk"'), document.fonts.load('400 16px Inter')]);
 const bundle = await fetch('/fixtures.json').then(response => response.json());
+const visualStyle = await fetch('/visual-style.json').then(response => response.json());
 const $ = id => document.getElementById(id);
 const words = {
-  en: { prototype:'CHART PROTOTYPE', heading:'A clear view of each point', intro:'Synthetic examples for chart interaction testing.', scenario:'Example', language:'Language', appearance:'Appearance', system:'System', light:'Light', dark:'Dark', actual:'Actual', projected:'Projected', contribution:'Contribution', empty:'No points in this example', instructions:'Drag left or right to inspect. Scroll up or down to move the page. Buttons inspect every point.', previous:'Previous', next:'Next', reset:'Reset', select:'Choose a point with the chart or buttons.', notes:'About these examples', truth:'Synthetic data only. Lines stop at missing values. Dashed projections are supplied examples, not calculated forecasts.', scroll:'This space lets you test vertical page scrolling while your finger starts on the chart.', unit:'Major currency units · civil dates in UTC', none:'No selection' },
-  'es-419': { prototype:'PROTOTIPO DE GRÁFICA', heading:'Cada punto, con claridad', intro:'Ejemplos sintéticos para probar la interacción con gráficas.', scenario:'Ejemplo', language:'Idioma', appearance:'Apariencia', system:'Sistema', light:'Claro', dark:'Oscuro', actual:'Real', projected:'Proyectado', contribution:'Aportación', empty:'Este ejemplo no tiene puntos', instructions:'Arrastra a los lados para consultar. Desliza arriba o abajo para mover la página. Los botones recorren cada punto.', previous:'Anterior', next:'Siguiente', reset:'Restablecer', select:'Elige un punto en la gráfica o con los botones.', notes:'Sobre estos ejemplos', truth:'Solo datos sintéticos. Las líneas se interrumpen donde faltan datos. Las proyecciones son ejemplos proporcionados, no pronósticos calculados.', scroll:'Este espacio permite probar el desplazamiento vertical iniciando sobre la gráfica.', unit:'Unidades monetarias principales · fechas civiles en UTC', none:'Sin selección' },
+  en: { synthetic:'SYNTHETIC EXAMPLE', prototype:'CHART PROTOTYPE', heading:'A clear view of each point', intro:'Synthetic examples for chart interaction testing.', scenario:'Example', language:'Language', appearance:'Appearance', system:'System', light:'Light', dark:'Dark', actual:'Actual', projected:'Projected', contribution:'Contribution', empty:'No points in this example', instructions:'Drag left or right to inspect. Scroll up or down to move the page. Buttons inspect every point.', previous:'Previous', next:'Next', reset:'Reset', select:'Choose a point with the chart or buttons.', notes:'About these examples', truth:'Synthetic data only. Lines stop at missing values. Dashed projections are supplied examples, not calculated forecasts.', scroll:'This space lets you test vertical page scrolling while your finger starts on the chart.', unit:'Major currency units · civil dates in UTC', none:'No selection' },
+  'es-419': { synthetic:'EJEMPLO SINTÉTICO', prototype:'PROTOTIPO DE GRÁFICA', heading:'Cada punto, con claridad', intro:'Ejemplos sintéticos para probar la interacción con gráficas.', scenario:'Ejemplo', language:'Idioma', appearance:'Apariencia', system:'Sistema', light:'Claro', dark:'Oscuro', actual:'Real', projected:'Proyectado', contribution:'Aportación', empty:'Este ejemplo no tiene puntos', instructions:'Arrastra a los lados para consultar. Desliza arriba o abajo para mover la página. Los botones recorren cada punto.', previous:'Anterior', next:'Siguiente', reset:'Restablecer', select:'Elige un punto en la gráfica o con los botones.', notes:'Sobre estos ejemplos', truth:'Solo datos sintéticos. Las líneas se interrumpen donde faltan datos. Las proyecciones son ejemplos proporcionados, no pronósticos calculados.', scroll:'Este espacio permite probar el desplazamiento vertical iniciando sobre la gráfica.', unit:'Unidades monetarias principales · fechas civiles en UTC', none:'Sin selección' },
 };
 let locale = 'en', selected = null, scenario = bundle.cases[0], drag = null, plotted = [];
 const media = matchMedia('(prefers-color-scheme: dark)');
@@ -15,14 +17,15 @@ const chart = createChart($('chart'), {
   crosshair: { vertLine:{visible:false}, horzLine:{visible:false} },
   rightPriceScale:{borderVisible:false},
   timeScale:{borderVisible:false, fixLeftEdge:true, fixRightEdge:true, minBarSpacing:0.01},
-  layout:{attributionLogo:false},
+  layout:{attributionLogo:false,fontFamily:'Inter, Arial, sans-serif',fontSize:12},
 });
 const anchor = chart.addSeries(LineSeries, { visible:false });
 function theme() {
   const dark = $('theme').value === 'dark' || ($('theme').value === 'system' && media.matches);
   document.documentElement.dataset.dark = String(dark);
+  for (const key of ['actual','projected']) document.documentElement.style.setProperty(`--${key}`,visualStyle[dark?'dark':'light'][key]);
   const css = getComputedStyle(document.documentElement);
-  chart.applyOptions({ layout:{background:{type:ColorType.Solid, color:css.getPropertyValue('--surface').trim()},textColor:css.getPropertyValue('--muted').trim()}, grid:{vertLines:{visible:false},horzLines:{color:css.getPropertyValue('--border').trim()}} });
+  chart.applyOptions({ layout:{background:{type:ColorType.Solid, color:css.getPropertyValue('--surface').trim()},textColor:css.getPropertyValue('--muted').trim()}, grid:{vertLines:{visible:false},horzLines:{color:css.getPropertyValue('--grid').trim()}} });
   for (const {series,key} of plotted) series.applyOptions({color:css.getPropertyValue(`--${key}`).trim()});
 }
 function text() {
@@ -31,6 +34,7 @@ function text() {
   for (const node of document.querySelectorAll('[data-text]')) node.textContent = copy[node.dataset.text];
   $('scenario').replaceChildren(...bundle.cases.map(item => new Option(item.title[locale],item.id,false,item.id === scenario.id)));
   $('case-title').textContent = scenario.title[locale];
+  $('currency').textContent = scenario.currency;
   $('unit').textContent = `${scenario.currency} · ${copy.unit}`;
   $('scrub').setAttribute('aria-label',locale === 'en' ? 'Chart touch surface' : 'Área táctil de la gráfica');
   chart.applyOptions({localization:{locale:locale === 'en'?'en-US':'es-419', priceFormatter:value => formattedValue(value,scenario.currency,locale), timeFormatter:time => formattedDate(typeof time==='string'?time:`${time.year}-${String(time.month).padStart(2,'0')}-${String(time.day).padStart(2,'0')}`,locale)}});
@@ -71,7 +75,7 @@ function render() {
   anchor.setData(scenario.points.map(({time})=>({time})));
   for (const key of ['actual','projected']) {
     for (const data of segments(scenario.points,key)) {
-      const series = chart.addSeries(LineSeries, {lineWidth:2,lineType:LineType.Simple,lineStyle:key === 'actual'?LineStyle.Solid:LineStyle.Dashed,pointMarkersVisible:data.length < 100,pointMarkersRadius:3,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+      const series = chart.addSeries(LineSeries, {lineWidth:2,lineType:LineType.Simple,lineStyle:key === 'actual'?LineStyle.Solid:LineStyle.Dashed,pointMarkersVisible:scenario.points.length < 100 || data.length === 1,pointMarkersRadius:3,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
       series.setData(data);
       plotted.push({series,key});
     }

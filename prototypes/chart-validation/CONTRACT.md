@@ -42,3 +42,12 @@ All cases, including 2,000-point long series, are authored synthetic inputs.
 Clients consume the committed JSON; no runtime generator or financial formula
 is part of the bundle. The long case deliberately repeats step-shaped drawing
 values and gaps, rather than representing an investment process.
+
+## Prototype visual tokens
+
+`fixtures/visual-style.json` owns the shared series palette consumed by all three
+clients. Dark uses DESIGN's muted teal and soft blue. Light variants scale their
+RGB channels to 85% to reach at least 3:1 against white while preserving hue.
+These distinguish actual/projected observations, not gains/losses. Dashed
+projection and text legends remain necessary non-color distinctions. This
+proposed presentation contract does not change financial data or product tokens.

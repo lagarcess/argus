@@ -8,7 +8,7 @@ import { segments, formattedValue, formattedDate } from './model.mjs';
 const evidence = new URL('../../../docs/reports/evidence/chart-validation/web/',import.meta.url);
 await mkdir(evidence,{recursive:true});
 const fixture=JSON.parse(await readFile(new URL('../fixtures/series.json',import.meta.url)));
-const report={sourceHead:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),timestamp:new Date().toISOString(),host:`${os.platform()} ${os.release()} ${os.arch()}`,node:process.version,library:JSON.parse(await readFile(new URL('../../../web/node_modules/lightweight-charts/package.json',import.meta.url))).version,fixtureSha256:createHash('sha256').update(await readFile(new URL('../fixtures/series.json',import.meta.url))).digest('hex'),device:'Desktop browser and touch-enabled viewport emulation; no physical device',browsers:[]};
+const report={sourceHead:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),timestamp:new Date().toISOString(),host:`${os.platform()} ${os.release()} ${os.arch()}`,node:process.version,library:JSON.parse(await readFile(new URL('../../../web/node_modules/lightweight-charts/package.json',import.meta.url))).version,visualStyleSha256:createHash('sha256').update(await readFile(new URL('../fixtures/visual-style.json',import.meta.url))).digest('hex'),fixtureSha256:createHash('sha256').update(await readFile(new URL('../fixtures/series.json',import.meta.url))).digest('hex'),device:'Desktop browser and touch-enabled viewport emulation; no physical device',browsers:[]};
 for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
   const browser=await engine.launch({headless:true});
   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,timezoneId:'Pacific/Honolulu'});
@@ -18,6 +18,21 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
   await page.goto('http://127.0.0.1:4179');
   await page.waitForFunction(()=>window.chartPrototype?.metrics.renders.length>0);
   const results=[];
+  assert.equal(await page.evaluate(()=>document.fonts.check('500 22px "Space Grotesk"') && document.fonts.check('400 16px Inter')),true);
+  const contrast=[];
+  for(const appearance of ['light','dark']) {
+    await page.selectOption('#theme',appearance);
+    const ratios=await page.evaluate(()=>{
+      const css=getComputedStyle(document.documentElement);
+      function luminance(hex){const channels=hex.replace('#','').match(/.{2}/g).map(x=>parseInt(x,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return channels[0]*.2126+channels[1]*.7152+channels[2]*.0722;}
+      function ratio(a,b){const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);}
+      const surface=css.getPropertyValue('--surface').trim().replace('#fff','#ffffff');
+      return {actual:ratio(css.getPropertyValue('--actual').trim(),surface),projected:ratio(css.getPropertyValue('--projected').trim(),surface),readout:ratio(css.getPropertyValue('--text').trim(),css.getPropertyValue('--bg').trim())};
+    });
+    assert.ok(ratios.actual>=3 && ratios.projected>=3 && ratios.readout>=4.5);
+    contrast.push({appearance,...ratios});
+  }
+  await page.selectOption('#theme','light');
   for(const scenario of fixture.cases) {
     await page.selectOption('#scenario',scenario.id);
     await page.waitForTimeout(80);
@@ -51,6 +66,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
         }
       }
     }
+    if(['empty','single'].includes(scenario.id)) {await page.locator('#chart').scrollIntoViewIfNeeded();await page.screenshot({path:new URL(`${name}-${scenario.id}.png`,evidence).pathname,fullPage:true});}
     results.push(`${scenario.id}: endpoints, reset, independent values, segment structure, formatting pass`);
   }
   const scenario=fixture.cases.find(c=>c.id==='stress');
@@ -94,6 +110,15 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
     return expected.slice(0,3).every((value,index)=>pixel[index]===value);
   });
   await page.screenshot({path:new URL(`${name}-dark-es-419.png`,evidence).pathname,fullPage:true});
+  await page.evaluate(()=>document.body.style.fontSize='24px');
+  await page.locator('#readout').scrollIntoViewIfNeeded();
+  const enlargedHeight=(await page.locator('#readout').boundingBox()).height;
+  await page.click('#previous');
+  assert.equal((await page.locator('#readout').boundingBox()).height,enlargedHeight);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.screenshot({path:new URL(`${name}-enlarged-text.png`,evidence).pathname,fullPage:true});
+  await page.evaluate(()=>document.body.style.fontSize='');
+  await page.click('#next');
   await page.selectOption('#theme','system');
   await page.emulateMedia({colorScheme:'light'});await page.waitForFunction(()=>document.documentElement.dataset.dark==='false');assert.equal(await page.locator('html').getAttribute('data-dark'),'false');
   await page.emulateMedia({colorScheme:'dark'});await page.waitForFunction(()=>document.documentElement.dataset.dark==='true');assert.equal(await page.locator('html').getAttribute('data-dark'),'true');
@@ -121,6 +146,9 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
   // Keyboard access: reset then focus Next and activate it with Enter.
   await page.click('#reset');await page.focus('#next');await page.keyboard.press('Enter');
   assert.equal(await page.locator('#readout').getAttribute('data-index'),'0');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await page.evaluate(()=>document.getAnimations().length),0);
+  results.push('Local fonts loaded; both themes meet stroke/readout contrast; 150% text selection height stable without overflow; reduced-motion has no authored animations');
   const frameTimes=await page.evaluate(async()=>{
     const values=[];let last=performance.now();
     for(let i=0;i<120;i++) await new Promise(resolve=>requestAnimationFrame(now=>{values.push(now-last);last=now;resolve();}));
@@ -135,7 +163,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
   const metrics=await page.evaluate(()=>window.chartPrototype.metrics);
   const percentile=(arr,p)=>[...arr].sort((a,b)=>a-b)[Math.min(arr.length-1,Math.floor(arr.length*p))];
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  report.browsers.push({name,version:browser.version(),viewport:'390x844 @2x',results,renderLongMs:metrics.renders.filter(v=>v.scenario===long.id).map(v=>v.ms),readoutMs:{samples:metrics.selections.length,p50:percentile(metrics.selections,.5),p95:percentile(metrics.selections,.95),max:Math.max(...metrics.selections)},idleFrameMs:{samples:frameTimes.length,p50:percentile(frameTimes,.5),p95:percentile(frameTimes,.95)},pageErrors:errors});
+  report.browsers.push({name,version:browser.version(),viewport:'390x844 @2x',contrast,results,renderLongMs:metrics.renders.filter(v=>v.scenario===long.id).map(v=>v.ms),readoutMs:{samples:metrics.selections.length,p50:percentile(metrics.selections,.5),p95:percentile(metrics.selections,.95),max:Math.max(...metrics.selections)},idleFrameMs:{samples:frameTimes.length,p50:percentile(frameTimes,.5),p95:percentile(frameTimes,.95)},pageErrors:errors});
   assert.deepEqual(errors,[]);
   await page.setViewportSize({width:1280,height:800});await page.screenshot({path:new URL(`${name}-desktop-long.png`,evidence).pathname,fullPage:true});
   await browser.close();

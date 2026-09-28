@@ -1,10 +1,13 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 const routes = {
+  '/fonts/inter.woff2': [new URL('../../../web/app/fonts/InterVariable.woff2', import.meta.url), 'font/woff2'],
+  '/fonts/space-grotesk.woff2': [new URL('../../../web/app/fonts/SpaceGrotesk[wght].woff2', import.meta.url), 'font/woff2'],
   '/': [new URL('./index.html', import.meta.url), 'text/html'],
   '/app.mjs': [new URL('./app.mjs', import.meta.url), 'text/javascript'],
   '/model.mjs': [new URL('./model.mjs', import.meta.url), 'text/javascript'],
   '/style.css': [new URL('./style.css', import.meta.url), 'text/css'],
+  '/visual-style.json': [new URL('../fixtures/visual-style.json', import.meta.url), 'application/json'],
   '/fixtures.json': [new URL('../fixtures/series.json', import.meta.url), 'application/json'],
   '/charts.mjs': [new URL('../../../web/node_modules/lightweight-charts/dist/lightweight-charts.standalone.production.mjs', import.meta.url), 'text/javascript'],
 };
