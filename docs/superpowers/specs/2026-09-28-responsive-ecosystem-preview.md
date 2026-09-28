@@ -5,6 +5,70 @@ with narrow-width support and explicit sample boundaries.
 
 Founder assignment: September 28, 2026. Execution is limited to this preview.
 
+## September 28 refinement checkpoint
+
+The first technical checkpoint is withdrawn as a design-readiness claim.
+The founder has not visually approved this preview. This same PR now refines
+desktop/tablet composition against the existing Argus web application. The
+mobile lock remains the identity, experience and narrow-layout reference.
+
+### Inspected web references
+
+- Production-source reference: fetched `origin/main` at
+  `a9286b21886eb03df7a21f2f4b7d5e79af570679`, rendered from an isolated temporary
+  source extraction. This is source evidence, not a new verification of a
+  hosted deployment.
+- Integration reference: `c3b2042b9b69c5b75e173d145ed0020f00ccd79e`, reconciled
+  one way as `2b6a953ccf2c3955c7b0a9707c8a7fdecfd6c1d6`. Intervening changes
+  add landing documents and an isolated chart prototype, with no preview or
+  shared web overlap. The chart remains a reference, not an imported dependency.
+- Local fixture renders inspected at 1440, 834 and 390 pixels: cold chat,
+  navigation and settings. Existing source owners are listed in the refinement
+  report. Fixtures replace API reads; no provider turn or real account is used.
+
+### Bounded changes before further visual review
+
+These decisions refine the original layout decisions below without changing
+feature scope or assigning any production/shared owner to this lane.
+
+1. Inherit the web sidebar's 288px expanded and 56px collapsed geometry,
+   44px action lanes, 14px row corners and display-font navigation. Use the
+   existing responsive-layout owner for 720px/1024px behavior. Desktop begins
+   expanded; tablet begins collapsed with a local expand control. Keep the
+   locked five-destination bottom navigation at narrow widths. Do not write a
+   new global sidebar preference or mount live history/session hooks.
+2. Restore the web canvas/surface relationship and bounded reading widths.
+   Use existing global colors/fonts and web density instead of oversized
+   navigation pills and custom tablet tiles. Maintain readable labels and
+   44px targets, including at 200% text.
+3. Keep empty-chat greeting, suggestions and disconnected composer together
+   in the central reading area, following `EmptyChatSurface`. Active sample
+   conversations use a bounded, independently scrollable transcript with a
+   visible composer, following `ChatInterface`. Preserve local draft, Recents,
+   header slots, focus and browser history. No live `ChatInput` discovery hooks.
+4. Use desktop list/detail space for reopened account inspection on Accounts
+   and Search, based on the existing Omnisearch dossier pattern. Retain the
+   list while inspecting; edits, creation and correction remain explicit
+   focused panels. Tablet/narrow detail uses the existing `AdaptivePanel`.
+   One preview account-detail renderer owns the displayed facts. Do not add a
+   second financial projection or API contract.
+5. Improve Home hierarchy and tablet reflow so Coming up remains connected to
+   recorded position and precedes account/activity browsing on narrow screens.
+   Keep its approved maximum of two upcoming rows and link to Plan. Retain all
+   currency, freshness, hypothetical and sample disclosures.
+6. Use web reading density for settings and long lists while retaining the
+   approved identity / App / Account / Support grouping. Reuse existing theme,
+   language and modal owners unchanged. Do not copy live profile mutations.
+7. Commit before/after and web-reference captures with exact source/harness
+   provenance under `docs/reports/evidence/pr-732/web-refinement/`. Preserve all
+   earlier evidence as historical. Re-run affected responsive/interaction and
+   production-isolation gates; obtain a proportional review of the new delta.
+   Technical verification does not assert founder design acceptance.
+
+The scope, no-touch surfaces, stop conditions and founder-only merge/deploy
+authority in sections 3–6 remain unchanged. Work ends at the reviewed preview
+PR, not financial API wiring or production exposure.
+
 ## 1. Why
 
 MVEE sections 2, 3, 7 and 12 define one Argus experience across native mobile
