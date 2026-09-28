@@ -6,193 +6,20 @@ results as JSON-ready data. `python -m tests.financial_recording.scenarios
 """
 
 import argparse
-import dataclasses
 import json
-from collections.abc import Callable, Mapping
-from datetime import date, datetime
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
-from tests.financial_recording.derive import (
-    DEFAULT_TZ,
-    Account,
-    Activity,
-    Provenance,
-    activity_totals,
-    anchors,
-    balance,
-    live_records,
-    observation_gaps,
-    position,
-)
-from tests.financial_recording.model import (
-    Draft,
-    IdempotencyConflict,
-    ReviewRequired,
-    StalePreview,
-    StaleVersion,
-    Store,
-)
-from tests.financial_recording.money import InvalidInput
-from tests.synthetic_ingestion.extract import load_input
+from tests.financial_recording import scenarios_lifecycle
+from tests.financial_recording.catalog import DEFAULT_CATEGORIES
+from tests.financial_recording.derive import anchors, observation_gaps
+from tests.financial_recording.scenes import Scene, jsonable, local, outcome
 
-SAMPLES = Path(__file__).resolve().parents[1] / "synthetic_ingestion" / "samples"
 EVIDENCE = (
     Path(__file__).resolve().parents[2]
     / "docs/reports/evidence/financial-recording/scenarios.json"
 )
-
-
-def local(day: int, hour: int = 9, minute: int = 0) -> datetime:
-    return datetime(2026, 9, day, hour, minute, tzinfo=DEFAULT_TZ)
-
-
-def jsonable(value: object) -> object:
-    if dataclasses.is_dataclass(value):
-        return {
-            item.name: jsonable(getattr(value, item.name))
-            for item in dataclasses.fields(value)
-        }
-    if isinstance(value, date):
-        return value.isoformat()
-    if isinstance(value, Mapping):
-        return {str(key): jsonable(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [jsonable(item) for item in value]
-    return value
-
-
-def outcome(action: Callable[[], object]) -> str:
-    try:
-        action()
-    except ReviewRequired as error:
-        return "ReviewRequired:" + ",".join(sorted({item.code for item in error.issues}))
-    except InvalidInput as error:
-        return f"InvalidInput:{error.code}"
-    except (StaleVersion, StalePreview, IdempotencyConflict) as error:
-        return type(error).__name__
-    return "ok"
-
-
-class Scene:
-    def __init__(self) -> None:
-        self.now = local(1)
-        self.store = Store(lambda: self.now)
-
-    def account(
-        self,
-        nickname: str,
-        type: str = "checking",
-        currency: str = "DOP",
-        opening=None,
-        **options,
-    ) -> Account:
-        return self.store.create_account(
-            nickname,
-            type,
-            currency,
-            opening,
-            idempotency_key=f"create:{nickname}",
-            **options,
-        )
-
-    def draft(
-        self, method: str = "manual", source_ref: Optional[dict] = None, **fields
-    ) -> Draft:
-        return self.store.draft(fields, Provenance(method, self.now, source_ref))
-
-    def act(
-        self, kind: str, account: Account, amount: str, day: int, counter=None, **fields
-    ) -> Draft:
-        if counter is not None:
-            fields["counter_account_id"] = counter.id
-        occurred_on = local(day).date().isoformat()
-        return self.draft(
-            kind=kind,
-            account_id=account.id,
-            amount=amount,
-            occurred_on=occurred_on,
-            **fields,
-        )
-
-    def confirm(self, draft: Draft):
-        return self.store.confirm(self.store.preview(draft.id), f"confirm:{draft.id}")
-
-    def record(self, kind: str, account: Account, amount: str, day: int, **options):
-        return self.confirm(self.act(kind, account, amount, day, **options))
-
-    def observation(
-        self,
-        account: Account,
-        amount: str,
-        day: int,
-        basis: str = "user_check",
-        hour: int = 18,
-        as_of: Optional[datetime] = None,
-    ) -> Draft:
-        return self.draft(
-            kind="balance_observation",
-            account_id=account.id,
-            amount=amount,
-            as_of=(as_of or local(day, hour)).isoformat(),
-            basis=basis,
-        )
-
-    def observe(self, account: Account, amount: str, day: int, **options):
-        return self.confirm(self.observation(account, amount, day, **options))
-
-    def issues(self, draft: Draft) -> dict[str, str]:
-        return {item.code: item.severity for item in self.store.preview(draft.id).issues}
-
-    def balance(self, account: Account) -> object:
-        return jsonable(balance(self.store.book, account.id, tz=self.store.tz))
-
-    def amount(self, account: Account) -> int:
-        return balance(self.store.book, account.id, tz=self.store.tz).amount
-
-    def gaps(self, account: Account) -> list:
-        return [
-            [gap.amount, gap.label]
-            for gap in observation_gaps(self.store.book, account.id, self.store.tz)
-        ]
-
-    def totals(self, *accounts: Account) -> object:
-        return jsonable(
-            activity_totals(
-                self.store.book, [item.id for item in accounts], tz=self.store.tz
-            )
-        )
-
-    def position(self, *accounts: Account, weighting: str = "full") -> object:
-        scope = [item.id for item in accounts]
-        return jsonable(
-            position(self.store.book, scope, weighting=weighting, tz=self.store.tz)
-        )
-
-    def activity_count(self) -> int:
-        return sum(
-            isinstance(record.body, Activity) for record in live_records(self.store.book)
-        )
-
-    def import_file(self, name: str, accounts: Mapping[str, str]) -> dict[str, Draft]:
-        loaded = load_input(SAMPLES / name)
-        drafts = {}
-        for proposal in loaded["proposals"]:
-            row = proposal["fields"]
-            drafts[row["source_id"]] = self.draft(
-                "document",
-                {**proposal["source_ref"], "external_id": row["source_id"]},
-                kind=row["kind"],
-                account_id=(
-                    accounts.get(row["account"], row["account"])
-                    if row["destination"] == "personal"
-                    else ""
-                ),
-                amount=row["amount"],
-                currency=row["currency"],
-                occurred_on=row["date"],
-            )
-        return drafts
 
 
 def clavito_large_opening() -> dict:
@@ -203,10 +30,11 @@ def clavito_large_opening() -> dict:
 
 def blank_opening_unknown() -> dict:
     scene = Scene()
-    wallet = scene.account("Billetera", "cash", "DOP", "")
+    wallet = scene.account(None, "cash", "DOP")
     before = scene.balance(wallet)
-    scene.record("expense", wallet, "850.00", 3)
+    scene.record("expense", wallet, "850.00", 2)
     return {
+        "nickname": wallet.nickname,
         "balance_before": before,
         "balance_after": scene.balance(wallet),
         "totals": scene.totals(wallet),
@@ -217,14 +45,14 @@ def blank_opening_unknown() -> dict:
 def expense_beyond_known_balance() -> dict:
     scene = Scene()
     cash = scene.account("Efectivo", "cash", "DOP", "100.00")
-    unknown = scene.account("Sobre", "cash", "DOP")
-    over = scene.act("expense", cash, "150.00", 2)
-    on_unknown = scene.act("expense", unknown, "40.00", 2)
-    issues = {"known": scene.issues(over), "unknown": scene.issues(on_unknown)}
+    unknown = scene.account("Billetera", "cash", "DOP")
+    known_draft = scene.act("expense", cash, "150.00", 2)
+    unknown_draft = scene.act("expense", unknown, "40.00", 2)
+    issues = {"known": scene.issues(known_draft), "unknown": scene.issues(unknown_draft)}
     return {
         "issues": issues,
-        "confirm_known": outcome(lambda: scene.confirm(over)),
-        "confirm_unknown": outcome(lambda: scene.confirm(on_unknown)),
+        "confirm_known": outcome(lambda: scene.confirm(known_draft)),
+        "confirm_unknown": outcome(lambda: scene.confirm(unknown_draft)),
         "balances": {"known": scene.balance(cash), "unknown": scene.balance(unknown)},
     }
 
@@ -232,15 +60,17 @@ def expense_beyond_known_balance() -> dict:
 def income_with_category() -> dict:
     scene = Scene()
     checking = scene.account("Nomina", "checking", "DOP", "1000.00")
+    savings = scene.account("Ahorro", "savings", "DOP", "0.00")
     scene.record("income", checking, "18000.00", 2, category="remittance")
-    scene.record("income", checking, "200.00", 3, category="other")
-    scene.record("expense", checking, "300.00", 3, category="other")
-    mismatch = scene.act("expense", checking, "50.00", 4, category="remittance")
+    scene.record("expense", checking, "300.00", 3)
+    wrong_family = scene.act("expense", checking, "50.00", 3, category="salary")
+    on_transfer = scene.act(
+        "transfer", checking, "60.00", 3, counter=savings, category="groceries"
+    )
     return {
-        "mismatch_issues": scene.issues(mismatch),
-        "mismatch_confirm": outcome(lambda: scene.confirm(mismatch)),
-        "activity_records": scene.activity_count(),
         "totals": scene.totals(checking),
+        "category_on_wrong_kind": scene.issues(wrong_family),
+        "category_on_transfer": scene.issues(on_transfer),
     }
 
 
@@ -276,62 +106,86 @@ def credit_card_purchase_then_payment() -> dict:
     statement_row = scene.act("refund", card, "3000.00", 5, method="document")
     return {
         "after_purchase": after_purchase,
-        "card_statement_payment_row": {
-            "issues": scene.issues(statement_row),
-            "matches": list(scene.store.preview(statement_row.id).issues[0].refs),
-            "payment_record": payment.id,
-        },
         "after_payment": {
             "card": scene.amount(card),
             "checking": scene.amount(checking),
             "totals": scene.totals(checking, card),
         },
+        "card_statement_payment_row": {
+            "issues": scene.issues(statement_row),
+            "matches": scene.refs(statement_row, "possible_duplicate"),
+            "payment_record": payment.id,
+        },
     }
 
 
-def _gap_scene() -> tuple[Scene, Account, str]:
+def _gap_scene() -> tuple[Scene, object, object, str]:
     scene = Scene()
     checking = scene.account("Corriente", "checking", "DOP", "10000.00")
     expense = scene.record("expense", checking, "2000.00", 3)
     scene.now = local(5, 19)
-    scene.observe(checking, "7500.00", 5)
-    return scene, checking, expense.id
+    check = scene.observe(checking, "7500.00", 5)
+    return scene, checking, check, expense.id
 
 
-def _reading(scene: Scene, account: Account) -> dict:
-    totals = scene.totals(account)["DOP"]
+def _reading(scene: Scene, account) -> dict:
+    spending, income = scene.spending(account)
     return {
-        "balance": scene.balance(account),
+        "balance": scene.amount(account),
         "gaps": scene.gaps(account),
-        "spending": totals["spending"],
-        "income": totals["income"],
+        "spending": spending,
+        "income": income,
     }
 
 
 def observation_gap() -> dict:
-    scene, checking, _ = _gap_scene()
-    return _reading(scene, checking)
+    scene, checking, check, _ = _gap_scene()
+    audit = check.revisions[-1]
+    return {
+        **_reading(scene, checking),
+        "shown_at_confirmation": [audit.confirmed_expected, audit.confirmed_difference],
+    }
 
 
-def _late_explanation_scene() -> tuple[Scene, Account, str]:
-    scene, checking, first = _gap_scene()
+def _late_expense(answer: Optional[str]) -> tuple[Scene, object, dict]:
+    scene, checking, check, _ = _gap_scene()
     scene.now = local(6)
-    scene.record("expense", checking, "500.00", 4)
-    return scene, checking, first
+    late = scene.act("expense", checking, "500.00", 4)
+    seen = {
+        "asked_about_the_check": scene.refs(late, "inclusion_unanswered")[:1]
+        == [check.id],
+        "confirm_unanswered": outcome(lambda: scene.confirm(late)),
+    }
+    if answer is not None:
+        scene.store.resolve(late.id, answers={check.id: answer})
+        record = scene.confirm(late)
+        gap = observation_gaps(scene.store.book, checking.id, scene.store.tz)[0]
+        seen["explained_by_late_record"] = list(gap.explained_by) == [record.id]
+    return scene, checking, seen
 
 
 def late_explanation() -> dict:
-    scene, checking, _ = _late_explanation_scene()
-    return _reading(scene, checking)
+    scene, checking, seen = _late_expense("included")
+    other_scene, other_checking, other_seen = _late_expense("not_included")
+    return {
+        **seen,
+        **_reading(scene, checking),
+        "answered_not_included": {
+            **_reading(other_scene, other_checking),
+            "explained_by_late_record": other_seen["explained_by_late_record"],
+        },
+    }
 
 
 def new_expense_after_observation() -> dict:
-    scene, checking, _ = _late_explanation_scene()
-    scene.record("expense", checking, "500.00", 7)
-    return _reading(scene, checking)
+    scene, checking, _ = _late_expense("included")
+    later = scene.act("expense", checking, "500.00", 7)
+    questions = scene.refs(later, "inclusion_unanswered")
+    scene.confirm(later)
+    return {"questions": questions, **_reading(scene, checking)}
 
 
-def _equal_amounts() -> tuple[Scene, Account, str, Draft, dict]:
+def _equal_amounts() -> tuple[Scene, object, str, object, dict]:
     scene = Scene()
     first = scene.account("Efectivo", "cash", "DOP", "5000.00")
     other = scene.account("Monedero", "cash", "DOP", "5000.00")
@@ -356,15 +210,15 @@ def equal_amount_not_a_match() -> dict:
     scene.confirm(twin)
     distinct = {
         "activity_records": scene.activity_count(),
-        "totals": scene.totals(first)["DOP"]["spending"],
+        "spending": scene.spending(first)[0],
     }
     scene, first, original, twin, _ = _equal_amounts()
     scene.store.resolve(twin.id, duplicate_of=original)
     replay = scene.confirm(twin)
     linked = {
         "activity_records": scene.activity_count(),
-        "totals": scene.totals(first)["DOP"]["spending"],
-        "confirm_returns": replay.id,
+        "spending": scene.spending(first)[0],
+        "confirm_returns_the_existing_record": replay.id == original,
         "linked_methods": [
             source.method for source in scene.store.book.records[original].linked
         ],
@@ -375,9 +229,11 @@ def equal_amount_not_a_match() -> dict:
 def partial_reconciliation() -> dict:
     scene = Scene()
     checking = scene.account("Corriente", "checking", "DOP", "10000.00")
-    scene.observe(checking, "9500.00", 5)
+    check = scene.observe(checking, "9500.00", 5)
     before = scene.gaps(checking)
-    scene.record("expense", checking, "300.00", 3)
+    part = scene.act("expense", checking, "300.00", 3)
+    scene.store.resolve(part.id, answers={check.id: "included"})
+    scene.confirm(part)
     return {
         "gaps_before": before,
         "gaps_after": scene.gaps(checking),
@@ -386,7 +242,7 @@ def partial_reconciliation() -> dict:
 
 
 def backdated_correction() -> dict:
-    scene, checking, expense_id = _gap_scene()
+    scene, checking, _, expense_id = _gap_scene()
     before = scene.gaps(checking)
     scene.now = local(8)
     corrected = scene.store.correct(
@@ -397,7 +253,8 @@ def backdated_correction() -> dict:
         "gaps_before": before,
         **_reading(scene, checking),
         "revisions": [
-            [revision.body.amount, revision.reason] for revision in corrected.revisions
+            [revision.body.amount, revision.reason, revision.recorded_by]
+            for revision in corrected.revisions
         ],
         "stale_correction": stale,
     }
@@ -408,97 +265,153 @@ def two_observations() -> dict:
     checking = scene.account("Corriente", "checking", "DOP", "10000.00")
     scene.observe(checking, "9000.00", 5)
     scene.record("expense", checking, "300.00", 7)
-    scene.observe(checking, "8500.00", 10)
+    second = scene.observe(checking, "8500.00", 10)
     before = scene.gaps(checking)
-    scene.record("expense", checking, "200.00", 8)
+    between = scene.act("expense", checking, "200.00", 8)
+    asked = scene.refs(between, "inclusion_unanswered")[:1] == [second.id]
+    scene.store.resolve(between.id, answers={second.id: "included"})
+    scene.confirm(between)
     return {
         "gaps_before": before,
+        "asked_only_the_later_check": asked,
         "gaps_after": scene.gaps(checking),
         "balance": scene.amount(checking),
     }
 
 
-def _same_day(order: Optional[str]) -> dict:
-    scene = Scene()
-    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
-    observed = scene.observe(checking, "9000.00", 5)
-    draft = scene.act("expense", checking, "1000.00", 5)
-    seen = {
-        "issues": scene.issues(draft),
-        "confirm": outcome(lambda: scene.confirm(draft)),
+def older_activity_inclusion() -> dict:
+    return {
+        "same_day_after_timed_check": _same_day_check(),
+        "older_than_two_checks": _older_than_two_checks(),
+        "transfer_answers_each_leg": _transfer_per_leg(),
+        "statement_rows_answer_from_source": _statement_source(),
+        "same_day_as_opening": _same_day_opening(),
     }
-    if order is not None:
-        scene.store.resolve(draft.id, placements={observed.id: order})
-        seen = {
-            "issues": scene.issues(draft),
-            "confirm": outcome(lambda: scene.confirm(draft)),
+
+
+def _same_day_check() -> dict:
+    results = {}
+    for answer in ("included", "not_included"):
+        scene = Scene()
+        checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+        check = scene.observe(checking, "9000.00", 5)
+        purchase = scene.act("expense", checking, "1000.00", 5)
+        asked = scene.refs(purchase, "inclusion_unanswered")[:1] == [check.id]
+        scene.store.resolve(purchase.id, answers={check.id: answer})
+        scene.confirm(purchase)
+        results[answer] = {
+            "asked": asked,
+            "gaps": scene.gaps(checking),
+            "balance": scene.amount(checking),
         }
-    return {**seen, "gaps": scene.gaps(checking), "balance": scene.amount(checking)}
+    return results
 
 
-def _reading_after(scene: Scene, account: Account, confirm: str) -> dict:
+def _older_than_two_checks() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+    first = scene.observe(checking, "10000.00", 5)
+    second = scene.observe(checking, "9000.00", 10)
+    old = scene.act("expense", checking, "1000.00", 3)
+    first_question = scene.refs(old, "inclusion_unanswered")[:1]
+    scene.store.resolve(old.id, answers={first.id: "not_included"})
+    second_question = scene.refs(old, "inclusion_unanswered")[:1]
+    scene.store.resolve(old.id, answers={second.id: "included"})
+    confirm = outcome(lambda: scene.confirm(old))
     return {
+        "questions_in_date_order": [first_question, second_question]
+        == [[first.id], [second.id]],
         "confirm": confirm,
-        "gaps": scene.gaps(account),
-        "balance": scene.amount(account),
+        "gaps": scene.gaps(checking),
+        "balance": scene.amount(checking),
     }
 
 
-def _statement_close() -> dict:
+def _transfer_per_leg() -> dict:
     scene = Scene()
     checking = scene.account("Corriente", "checking", "DOP", "10000.00")
-    scene.record("expense", checking, "1000.00", 5)
-    close = scene.observation(
-        checking, "9000.00", 5, basis="statement", as_of=local(5, 23, 59)
-    )
-    issues = scene.issues(close)
-    confirm = outcome(lambda: scene.confirm(close))
-    return {"issues": issues, **_reading_after(scene, checking, confirm)}
-
-
-def _check_after_logging() -> dict:
-    scene = Scene()
-    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
-    expense = scene.record("expense", checking, "1000.00", 5)
-    check = scene.observation(checking, "9000.00", 5)
-    unresolved = scene.issues(check)
-    scene.store.resolve(check.id, placements={expense.id: "before"})
-    confirm = outcome(lambda: scene.confirm(check))
-    return {"unresolved": unresolved, **_reading_after(scene, checking, confirm)}
-
-
-def _two_checks_same_day() -> dict:
-    scene = Scene()
-    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
-    early = scene.observe(checking, "10000.00", 5, hour=18)
-    late = scene.observe(checking, "9000.00", 5, hour=20)
-    purchase = scene.act("expense", checking, "1000.00", 5)
-    unresolved = sorted(
-        ref for item in scene.store.preview(purchase.id).issues for ref in item.refs
-    )
-    scene.store.resolve(purchase.id, placements={early.id: "after", late.id: "before"})
-    confirm = outcome(lambda: scene.confirm(purchase))
-    return {"unresolved": unresolved, **_reading_after(scene, checking, confirm)}
-
-
-def _opening_same_day() -> dict:
-    scene = Scene()
-    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
-    check = scene.observe(checking, "7500.00", 1)
-    expense = scene.act("expense", checking, "2000.00", 1)
-    scene.store.resolve(expense.id, placements={check.id: "before"})
-    return _reading_after(scene, checking, outcome(lambda: scene.confirm(expense)))
-
-
-def same_day_order() -> dict:
+    savings = scene.account("Ahorro", "savings", "DOP", "5000.00")
+    checking_check = scene.observe(checking, "9000.00", 5)
+    savings_check = scene.observe(savings, "5000.00", 5)
+    move = scene.act("transfer", checking, "1000.00", 3, counter=savings)
+    first = scene.refs(move, "inclusion_unanswered")[:1]
+    scene.store.resolve(move.id, answers={checking_check.id: "included"})
+    second = scene.refs(move, "inclusion_unanswered")[:1]
+    scene.store.resolve(move.id, answers={savings_check.id: "not_included"})
+    scene.confirm(move)
     return {
-        "unresolved": _same_day(None),
-        "before": _same_day("before"),
-        "after": _same_day("after"),
-        "statement_close_covers_its_day": _statement_close(),
-        "check_recorded_after_logging": _check_after_logging(),
-        "two_checks_same_day": _two_checks_same_day(),
-        "opening_same_day_stays_first": _opening_same_day(),
+        "one_question_per_leg": [first, second]
+        == [[checking_check.id], [savings_check.id]],
+        "balances": [scene.amount(checking), scene.amount(savings)],
+        "gaps": [scene.gaps(checking), scene.gaps(savings)],
+    }
+
+
+def _statement_source() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+    statement = {"digest": "synthetic-statement-1"}
+    close = scene.draft(
+        "document",
+        {**statement, "row": 0},
+        kind="balance_observation",
+        account_id=checking.id,
+        amount="9500.00",
+        as_of=local(5, 23, 59).isoformat(),
+        basis="statement",
+    )
+    scene.confirm(close)
+    row = scene.draft(
+        "document",
+        {**statement, "row": 1},
+        kind="expense",
+        account_id=checking.id,
+        amount="500.00",
+        occurred_on=local(4).date().isoformat(),
+    )
+    return {
+        "row_issues": scene.issues(row),
+        "confirm": outcome(lambda: scene.confirm(row)),
+        "gaps": scene.gaps(checking),
+        "balance": scene.amount(checking),
+    }
+
+
+def _same_day_opening() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    opening_id = anchors(scene.store.book, cash.id)[0].id
+    lunch = scene.act("expense", cash, "200.00", 1)
+    asked = scene.refs(lunch, "inclusion_unanswered")[:1] == [opening_id]
+    scene.store.resolve(lunch.id, answers={opening_id: "included"})
+    scene.confirm(lunch)
+    spending, _ = scene.spending(cash)
+    return {"asked": asked, "balance": scene.amount(cash), "spending": spending}
+
+
+def opening_date_correction() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00", as_of=local(5))
+    opening_id = anchors(scene.store.book, cash.id)[0].id
+    scene.record("expense", cash, "100.00", 6)
+    before = scene.amount(cash)
+    unreviewed = outcome(
+        lambda: scene.store.correct(
+            opening_id, 1, "balance was on the 7th", as_of=local(7)
+        )
+    )
+    scene.store.correct(
+        opening_id, 1, "balance was on the 7th", as_of=local(7), accept_reordering=True
+    )
+    history = scene.store.book.records[opening_id].revisions
+    return {
+        "balance_before": before,
+        "unreviewed_date_change": unreviewed,
+        "balance_after": scene.amount(cash),
+        "spending": scene.spending(cash)[0],
+        "revisions": [
+            [revision.body.as_of.isoformat(), revision.reason] for revision in history
+        ],
     }
 
 
@@ -516,7 +429,7 @@ def duplicate_submission() -> dict:
         "accounts": len(scene.store.book.accounts),
         "same_account_returned": again.id == cash.id,
         "create_changed_body": changed,
-        "record_ids": [first.id, second.id, other_key.id],
+        "one_record_for_three_confirms": len({first.id, second.id, other_key.id}) == 1,
         "same_key_different_body": outcome(lambda: scene.store.confirm(different, "k1")),
         "activity_records": scene.activity_count(),
         "balance": scene.amount(cash),
@@ -589,11 +502,14 @@ def stale_preview_two_confirms() -> dict:
     ]
     count_after_attempts = scene.activity_count()
     fresh = scene.store.preview(pending.id)
-    confirmed = scene.store.confirm(fresh, "k1")
+    scene.store.confirm(fresh, "k1")
     return {
         "stale_attempts": attempts,
         "activity_records_after_stale": count_after_attempts,
-        "fresh_confirm_record": confirmed.id,
+        "draft_kept_for_the_refreshed_review": scene.store.state.drafts[
+            pending.id
+        ].fields["amount"],
+        "fresh_preview_effects": dict(fresh.effects),
         "activity_records": scene.activity_count(),
         "balance": scene.amount(cash),
     }
@@ -623,37 +539,33 @@ def linked_correction_and_removal() -> dict:
     steps["moved_to_other_currency"] = outcome(
         lambda: scene.store.correct(transfer.id, 3, "wrong", account_id=dollars.id)
     )
-    removed = scene.store.remove(transfer.id, 3, "never happened")
+    scene.store.remove(transfer.id, 3, "never happened")
     steps["removed"] = balances()
+    restored = scene.store.restore(transfer.id, 4, "it did happen")
+    steps["restored_same_record"] = restored.id == transfer.id
+    steps["restored"] = balances()
     steps["history"] = [
-        [
-            rev.body.amount,
-            rev.body.counter_account_id,
-            rev.reason,
-            rev.removed,
-            rev.recorded_by,
-        ]
-        for rev in removed.revisions
+        [rev.body.amount, rev.reason, rev.removed, rev.recorded_by]
+        for rev in restored.revisions
     ]
-    steps["versions"] = [scene.store.book.accounts[item.id].version for item in (a, b, c)]
     return steps
 
 
 def multiple_precisions() -> dict:
     scene = Scene()
-    yen = scene.account("Yenes", "cash", "JPY", "1500")
-    dinar = scene.account("Dinares", "cash", "KWD", "1.234")
-    peso = scene.account("Pesos", "cash", "DOP", "10.00")
+    yen = scene.account("Yen", "cash", "JPY", "1500")
+    dinar = scene.account("Dinar", "cash", "KWD", "1.234")
+    pesos = scene.account("Pesos", "cash", "DOP", "10.50")
     return {
-        "yen_balance": scene.amount(yen),
-        "dinar_balance": scene.amount(dinar),
-        "yen_fraction_issues": scene.issues(scene.act("expense", yen, "1500.5", 2)),
-        "yen_fraction_opening": outcome(
-            lambda: scene.account("Yenes2", "cash", "JPY", "1500.5")
+        "minor_units": [scene.amount(yen), scene.amount(dinar), scene.amount(pesos)],
+        "jpy_fraction": outcome(lambda: scene.account("Yen2", "cash", "JPY", "1500.5")),
+        "dop_three_decimals": outcome(
+            lambda: scene.account("Pesos2", "cash", "DOP", "1.005")
         ),
-        "unknown_currency": outcome(lambda: scene.account("Raro", "cash", "ZZZ", "10")),
+        "unknown_currency": outcome(lambda: scene.account("Zeta", "cash", "ZZZ", "1")),
         "positions": {
-            code: item["net"] for code, item in scene.position(yen, dinar, peso).items()
+            currency: value["net"]
+            for currency, value in scene.position(yen, dinar, pesos).items()
         },
     }
 
@@ -661,24 +573,16 @@ def multiple_precisions() -> dict:
 def overdraft_and_debt() -> dict:
     scene = Scene()
     checking = scene.account("Corriente", "checking", "DOP", "1000.00")
-    loan = scene.account("Prestamo", "loan", "DOP", "-21500.00")
-    card = scene.account("Tarjeta", "credit_card", "DOP", "-1000.00")
-    savings = scene.account("Ahorro", "savings", "DOP", "0.00")
-    overdraft = scene.act("expense", checking, "1500.00", 2)
-    overdraft_issues = scene.issues(overdraft)
-    scene.confirm(overdraft)
+    loan = scene.account("Prestamo", "other_debt", "DOP", "21500.00")
+    card = scene.account("Tarjeta", "credit_card", "DOP", "2000.00")
+    scene.record("expense", checking, "1500.00", 2)
     scene.record("debt_payment", checking, "500.00", 3, counter=loan)
-    scene.record("expense", card, "45.00", 4, category="interest")
-    wrong_counter = scene.act("debt_payment", checking, "10.00", 5, counter=savings)
+    scene.record("expense", card, "45.00", 4, category="interest_charge")
     return {
-        "overdraft_issues": overdraft_issues,
-        "balances": {
-            "checking": scene.amount(checking),
-            "loan": scene.amount(loan),
-            "card": scene.amount(card),
-        },
-        "payment_to_asset_issues": scene.issues(wrong_counter),
-        "totals": scene.totals(checking, loan, card)["DOP"]["spending_by_category"],
+        "balances": [scene.amount(checking), scene.amount(loan), scene.amount(card)],
+        "spending_by_category": scene.totals(checking, loan, card)["DOP"][
+            "spending_by_category"
+        ],
         "position": {
             key: value
             for key, value in scene.position(checking, loan, card)["DOP"].items()
@@ -691,7 +595,7 @@ def cross_currency_transfer_unresolved() -> dict:
     scene = Scene()
     pesos = scene.account("Pesos", "checking", "DOP", "10000.00")
     dollars = scene.account("Dolares", "savings", "USD", "100.00")
-    card = scene.account("Tarjeta USD", "credit_card", "USD", "-50.00")
+    card = scene.account("Tarjeta USD", "credit_card", "USD", "50.00")
     transfer = scene.act("transfer", pesos, "1000.00", 2, counter=dollars)
     payment = scene.act("debt_payment", pesos, "500.00", 2, counter=card)
     return {
@@ -710,128 +614,149 @@ def unknown_coverage_disclosure() -> dict:
     scene.record("expense", old, "100.00", 2)
     scene.store.edit_account(old.id, 2, archived=True)
     scene.observe(checking, "7900.00", 5)
-    card = scene.account("Tarjeta", "credit_card", "DOP", "-3000.00")
+    card = scene.account("Tarjeta", "credit_card", "DOP", "3000.00")
     sides = scene.position(wallet, card)["DOP"]
     return {
         "position": scene.position(checking, wallet, old),
-        "totals": scene.totals(checking, wallet, old)["DOP"]["spending"],
+        "spending": scene.spending(checking, wallet, old)[0],
         "unknown_asset_side": [sides["assets"], sides["liabilities"], sides["net"]],
     }
 
 
 def asset_revaluation_and_share() -> dict:
     scene = Scene()
-    car = scene.account("Carro", "property", "DOP", ownership_share_bps=5000)
+    car = scene.account("Carro", "vehicle", "DOP", "1000000.00", ownership_share_bps=5000)
     loan = scene.account(
-        "Prestamo carro", "loan", "DOP", "-400000.00", ownership_share_bps=5000
+        "Prestamo carro", "other_debt", "DOP", "400000.00", ownership_share_bps=5000
     )
-    scene.observe(car, "1000000.00", 1, basis="value_estimate")
+    scene.store.edit_account(loan.id, 1, linked_asset_id=car.id)
+    basis = scene.balance(car)["basis"]
     scene.observe(car, "900000.00", 20, basis="value_estimate")
-    strip = ("coverage",)
+
+    def totals_only(weighting: str) -> dict:
+        found = scene.position(car, loan, weighting=weighting)["DOP"]
+        return {key: value for key, value in found.items() if key != "coverage"}
+
     return {
+        "estimate_basis": basis,
         "gaps": scene.gaps(car),
         "totals": scene.totals(car, loan),
-        "full": {
-            k: v for k, v in scene.position(car, loan)["DOP"].items() if k not in strip
-        },
-        "owner_share": {
-            k: v
-            for k, v in scene.position(car, loan, weighting="owner_share")["DOP"].items()
-            if k not in strip
-        },
+        "full": totals_only("full"),
+        "owner_share": totals_only("owner_share"),
+        "loan_linked_to": scene.store.book.accounts[loan.id].linked_asset_id == car.id,
     }
 
 
 def account_edit_rules() -> dict:
     scene = Scene()
-    empty = scene.account("  Clavito  ", "savings", "DOP")
-    used = scene.account("Corriente", "checking", "DOP", "100.00")
     store = scene.store
-    return {
+    empty = scene.account("  Clavito  ", "savings", "DOP")
+    opened = scene.account("Solo apertura", "checking", "DOP", "100.00")
+    used = scene.account("Corriente", "checking", "DOP", "100.00")
+    scene.record("expense", used, "10.00", 2)
+    cleared = store.edit_account(empty.id, 1, nickname="   ")
+    results = {
         "trimmed": empty.nickname,
-        "blank_name": outcome(lambda: store.edit_account(empty.id, 1, nickname="   ")),
-        "currency_on_empty": store.edit_account(empty.id, 1, currency="USD").currency,
-        "currency_on_used": outcome(
-            lambda: store.edit_account(used.id, 1, currency="USD")
+        "blank_clears_nickname": cleared.nickname,
+        "long_nickname": outcome(
+            lambda: store.edit_account(empty.id, 2, nickname="x" * 61)
         ),
-        "nature_flip_on_used": outcome(
-            lambda: store.edit_account(used.id, 1, type="credit_card")
+        "currency_on_empty": store.edit_account(empty.id, 2, currency="USD").currency,
+        "currency_on_opened": outcome(
+            lambda: store.edit_account(opened.id, 1, currency="USD")
         ),
-        "same_nature_on_used": store.edit_account(used.id, 1, type="savings").type,
+        "nature_flip_on_opened": outcome(
+            lambda: store.edit_account(opened.id, 1, type="credit_card")
+        ),
+        "same_nature_on_opened": store.edit_account(opened.id, 1, type="savings").type,
+        "type_after_activity": outcome(
+            lambda: store.edit_account(used.id, 2, type="savings")
+        ),
         "stale_version": outcome(lambda: store.edit_account(used.id, 1, nickname="Otra")),
-        "archived_version": store.edit_account(used.id, 2, archived=True).version,
-        "archived_draft_issues": scene.issues(scene.act("expense", used, "10.00", 2)),
-        "correct_on_archived": outcome(
+    }
+    archived = store.edit_account(used.id, 2, archived=True)
+    late = scene.act("expense", used, "5.00", 3)
+    results.update(
+        archived_version=archived.version,
+        archived_draft_issues=scene.issues(late),
+        archived_draft_confirm=outcome(lambda: scene.confirm(late)),
+        correct_on_archived=outcome(
             lambda: store.correct(
-                anchors(store.book, used.id)[0][0], 1, "typo", amount="150.00"
+                anchors(store.book, used.id)[0].id, 1, "typo", amount="150.00"
             )
         ),
-    }
+        archived_still_in_totals=scene.position(used)["DOP"]["net"],
+    )
+    return results
 
 
 def first_slice_create_reopen_edit() -> dict:
     scene = Scene()
     created = scene.account("Cuenta nomina", "checking", "DOP", "12500.00")
+    unnamed = scene.account(None, "cash", "USD")
     reopened = scene.store.book.accounts[created.id]
-    opening_id = anchors(scene.store.book, created.id)[0][0]
+    opening_id = anchors(scene.store.book, created.id)[0].id
     first = {
         "nickname": reopened.nickname,
+        "type": reopened.type,
+        "currency": reopened.currency,
+        "balance": scene.balance(reopened),
         "version": reopened.version,
-        "balance": scene.amount(reopened),
     }
-    edited = scene.store.edit_account(created.id, 1, nickname=" Nomina ", type="savings")
-    after_edit = {
-        "nickname": edited.nickname,
-        "type": edited.type,
-        "version": edited.version,
-        "balance": scene.amount(edited),
-    }
-    scene.store.correct(opening_id, 1, "bank app showed 13,000", amount="13000.00")
+    edited = scene.store.edit_account(
+        created.id, reopened.version, nickname="Nomina", type="savings"
+    )
+    stale = outcome(lambda: scene.store.edit_account(created.id, 1, nickname="Otra"))
+    scene.now = local(3)
+    scene.store.correct(opening_id, 1, "typo in starting balance", amount="12000.00")
     return {
         "reopened": first,
-        "edited": after_edit,
-        "after_opening_correction": {
-            "balance": scene.balance(created),
-            "version": scene.store.book.accounts[created.id].version,
-            "totals": scene.totals(created),
-        },
+        "unnamed_account": [unnamed.nickname, scene.balance(unnamed)],
+        "catalog_untouched": dict(scene.store.book.categories)
+        == dict(DEFAULT_CATEGORIES),
+        "edited": [edited.nickname, edited.type, edited.version],
+        "stale_edit": stale,
+        "balance_after_opening_correction": scene.amount(created),
+        "totals_after_opening_correction": scene.spending(created),
+        "opening_revisions": len(scene.store.book.records[opening_id].revisions),
     }
 
 
+CORE = (
+    clavito_large_opening,
+    blank_opening_unknown,
+    expense_beyond_known_balance,
+    income_with_category,
+    same_currency_transfer,
+    credit_card_purchase_then_payment,
+    observation_gap,
+    late_explanation,
+    new_expense_after_observation,
+    equal_amount_not_a_match,
+    partial_reconciliation,
+    backdated_correction,
+    two_observations,
+    older_activity_inclusion,
+    opening_date_correction,
+    duplicate_submission,
+    duplicate_import_vs_twins,
+    stale_preview_two_confirms,
+    linked_correction_and_removal,
+    multiple_precisions,
+    overdraft_and_debt,
+    cross_currency_transfer_unresolved,
+    unknown_coverage_disclosure,
+    asset_revaluation_and_share,
+    account_edit_rules,
+    first_slice_create_reopen_edit,
+)
 SCENARIOS: dict[str, Callable[[], dict]] = {
-    scenario.__name__: scenario
-    for scenario in (
-        clavito_large_opening,
-        blank_opening_unknown,
-        expense_beyond_known_balance,
-        income_with_category,
-        same_currency_transfer,
-        credit_card_purchase_then_payment,
-        observation_gap,
-        late_explanation,
-        new_expense_after_observation,
-        equal_amount_not_a_match,
-        partial_reconciliation,
-        backdated_correction,
-        two_observations,
-        same_day_order,
-        duplicate_submission,
-        duplicate_import_vs_twins,
-        stale_preview_two_confirms,
-        linked_correction_and_removal,
-        multiple_precisions,
-        overdraft_and_debt,
-        cross_currency_transfer_unresolved,
-        unknown_coverage_disclosure,
-        asset_revaluation_and_share,
-        account_edit_rules,
-        first_slice_create_reopen_edit,
-    )
+    scenario.__name__: scenario for scenario in (*CORE, *scenarios_lifecycle.LIFECYCLE)
 }
 
 
 def render() -> str:
-    results = {name: scenario() for name, scenario in SCENARIOS.items()}
+    results = {name: jsonable(scenario()) for name, scenario in SCENARIOS.items()}
     return json.dumps(results, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
 
 

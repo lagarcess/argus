@@ -1,19 +1,24 @@
 {
   "account_edit_rules": {
+    "archived_draft_confirm": "ok",
     "archived_draft_issues": {
-      "account_archived": "blocking"
+      "account_archived": "notice"
     },
+    "archived_still_in_totals": 13500,
     "archived_version": 3,
-    "blank_name": "InvalidInput:nickname_invalid",
+    "blank_clears_nickname": null,
     "correct_on_archived": "ok",
     "currency_on_empty": "USD",
-    "currency_on_used": "InvalidInput:currency_locked",
-    "nature_flip_on_used": "InvalidInput:nature_change_requires_empty_account",
-    "same_nature_on_used": "savings",
+    "currency_on_opened": "InvalidInput:currency_locked",
+    "long_nickname": "InvalidInput:nickname_invalid",
+    "nature_flip_on_opened": "InvalidInput:nature_change_requires_empty_account",
+    "same_nature_on_opened": "savings",
     "stale_version": "StaleVersion",
-    "trimmed": "Clavito"
+    "trimmed": "Clavito",
+    "type_after_activity": "InvalidInput:type_locked"
   },
   "asset_revaluation_and_share": {
+    "estimate_basis": "value_estimate",
     "full": {
       "assets": 90000000,
       "liabilities": -40000000,
@@ -21,14 +26,12 @@
     },
     "gaps": [
       [
-        null,
-        null
-      ],
-      [
+        -10000000,
         -10000000,
         "revaluation"
       ]
     ],
+    "loan_linked_to": true,
     "owner_share": {
       "assets": 45000000,
       "liabilities": -20000000,
@@ -40,26 +43,25 @@
         "income_by_category": {},
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
+        "purchases": 0,
+        "refunds": 0,
         "spending": 0,
         "spending_by_category": {}
       }
     }
   },
   "backdated_correction": {
-    "balance": {
-      "amount": 750000,
-      "as_of": "2026-09-05T18:00:00-04:00",
-      "basis": "user_check",
-      "state": "known"
-    },
+    "balance": 750000,
     "gaps": [
       [
+        -50000,
         -40000,
         "unexplained"
       ]
     ],
     "gaps_before": [
       [
+        -50000,
         -50000,
         "unexplained"
       ]
@@ -68,11 +70,13 @@
     "revisions": [
       [
         200000,
-        null
+        null,
+        "person-1"
       ],
       [
         210000,
-        "receipt shows 2,100"
+        "receipt shows 2,100",
+        "person-1"
       ]
     ],
     "spending": 210000,
@@ -87,6 +91,7 @@
       "activity_since_tracking": 0,
       "state": "unknown"
     },
+    "nickname": null,
     "position": {
       "DOP": {
         "assets": null,
@@ -95,7 +100,7 @@
           "accounts_unknown": [
             "acct-1"
           ],
-          "archived_excluded": [],
+          "archived_included": [],
           "oldest_anchor_as_of": null,
           "unexplained_gaps": []
         },
@@ -109,12 +114,21 @@
         "income_by_category": {},
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
+        "purchases": 85000,
+        "refunds": 0,
         "spending": 85000,
         "spending_by_category": {
           "uncategorized": 85000
         }
       }
     }
+  },
+  "card_refund_credit_balance": {
+    "balance_after": 20000,
+    "income": 0,
+    "liabilities_total": 20000,
+    "standing_after": "credit_in_your_favor",
+    "standing_before": "owed"
   },
   "clavito_large_opening": {
     "balance": {
@@ -129,6 +143,8 @@
         "income_by_category": {},
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
+        "purchases": 0,
+        "refunds": 0,
         "spending": 0,
         "spending_by_category": {}
       }
@@ -144,6 +160,8 @@
           "income_by_category": {},
           "moved_in_from_outside_scope": 0,
           "moved_out_of_scope": 0,
+          "purchases": 300000,
+          "refunds": 0,
           "spending": 300000,
           "spending_by_category": {
             "shopping": 300000
@@ -159,6 +177,8 @@
           "income_by_category": {},
           "moved_in_from_outside_scope": 0,
           "moved_out_of_scope": 0,
+          "purchases": 300000,
+          "refunds": 0,
           "spending": 300000,
           "spending_by_category": {
             "shopping": 300000
@@ -190,6 +210,23 @@
       "cross_currency_unresolved": "blocking"
     }
   },
+  "custom_categories": {
+    "business_category_on_personal_account": {
+      "category_other_space": "blocking"
+    },
+    "custom_in_personal": "InvalidInput:custom_category_space",
+    "rename_default": "InvalidInput:default_category_fixed",
+    "rename_keeps_identity": true,
+    "renamed_label": "Materia prima",
+    "totals_by_id_before_and_after_rename": [
+      {
+        "cat-5": 70000
+      },
+      {
+        "cat-5": 70000
+      }
+    ]
+  },
   "duplicate_import_vs_twins": {
     "after_first_import": {
       "activity_records": 5,
@@ -201,6 +238,8 @@
           },
           "moved_in_from_outside_scope": 0,
           "moved_out_of_scope": 0,
+          "purchases": 25100,
+          "refunds": 2550,
           "spending": 22550,
           "spending_by_category": {
             "uncategorized": 22550
@@ -211,6 +250,8 @@
           "income_by_category": {},
           "moved_in_from_outside_scope": 0,
           "moved_out_of_scope": 0,
+          "purchases": 4000,
+          "refunds": 0,
           "spending": 4000,
           "spending_by_category": {
             "uncategorized": 4000
@@ -285,6 +326,8 @@
         },
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
+        "purchases": 101100,
+        "refunds": 0,
         "spending": 101100,
         "spending_by_category": {
           "uncategorized": 101100
@@ -295,6 +338,8 @@
         "income_by_category": {},
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
+        "purchases": 4000,
+        "refunds": 0,
         "spending": 4000,
         "spending_by_category": {
           "uncategorized": 4000
@@ -307,11 +352,7 @@
     "activity_records": 1,
     "balance": 90000,
     "create_changed_body": "IdempotencyConflict",
-    "record_ids": [
-      "rec-4",
-      "rec-4",
-      "rec-4"
-    ],
+    "one_record_for_three_confirms": true,
     "same_account_returned": true,
     "same_key_different_body": "IdempotencyConflict"
   },
@@ -321,15 +362,15 @@
     "different_day": {},
     "resolved_distinct": {
       "activity_records": 4,
-      "totals": 150000
+      "spending": 150000
     },
     "resolved_duplicate_of": {
       "activity_records": 3,
-      "confirm_returns": "rec-6",
+      "confirm_returns_the_existing_record": true,
       "linked_methods": [
         "chat"
       ],
-      "totals": 100000
+      "spending": 100000
     },
     "same_signature": {
       "possible_duplicate": "blocking"
@@ -358,68 +399,84 @@
     }
   },
   "first_slice_create_reopen_edit": {
-    "after_opening_correction": {
+    "balance_after_opening_correction": 1200000,
+    "catalog_untouched": true,
+    "edited": [
+      "Nomina",
+      "savings",
+      2
+    ],
+    "opening_revisions": 2,
+    "reopened": {
       "balance": {
-        "amount": 1300000,
+        "amount": 1250000,
         "as_of": "2026-09-01T09:00:00-04:00",
         "basis": "opening",
         "state": "known"
       },
-      "totals": {
-        "DOP": {
-          "income": 0,
-          "income_by_category": {},
-          "moved_in_from_outside_scope": 0,
-          "moved_out_of_scope": 0,
-          "spending": 0,
-          "spending_by_category": {}
-        }
-      },
-      "version": 3
-    },
-    "edited": {
-      "balance": 1250000,
-      "nickname": "Nomina",
-      "type": "savings",
-      "version": 2
-    },
-    "reopened": {
-      "balance": 1250000,
+      "currency": "DOP",
       "nickname": "Cuenta nomina",
+      "type": "checking",
       "version": 1
-    }
+    },
+    "stale_edit": "StaleVersion",
+    "totals_after_opening_correction": [
+      0,
+      0
+    ],
+    "unnamed_account": [
+      null,
+      {
+        "activity_since_tracking": 0,
+        "state": "unknown"
+      }
+    ]
   },
   "income_with_category": {
-    "activity_records": 3,
-    "mismatch_confirm": "ReviewRequired:category_kind_mismatch",
-    "mismatch_issues": {
+    "category_on_transfer": {
+      "category_not_applicable": "blocking"
+    },
+    "category_on_wrong_kind": {
       "category_kind_mismatch": "blocking"
     },
     "totals": {
       "DOP": {
-        "income": 1820000,
+        "income": 1800000,
         "income_by_category": {
-          "other": 20000,
           "remittance": 1800000
         },
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
+        "purchases": 30000,
+        "refunds": 0,
         "spending": 30000,
         "spending_by_category": {
-          "other": 30000
+          "uncategorized": 30000
         }
       }
     }
   },
   "late_explanation": {
-    "balance": {
-      "amount": 750000,
-      "as_of": "2026-09-05T18:00:00-04:00",
-      "basis": "user_check",
-      "state": "known"
+    "answered_not_included": {
+      "balance": 700000,
+      "explained_by_late_record": false,
+      "gaps": [
+        [
+          -50000,
+          -50000,
+          "unexplained"
+        ]
+      ],
+      "income": 0,
+      "spending": 250000
     },
+    "asked_about_the_check": true,
+    "balance": 750000,
+    "confirm_unanswered": "ReviewRequired:inclusion_unanswered",
+    "explained_by_late_record": true,
     "gaps": [
       [
+        -50000,
         0,
         "unexplained"
       ]
@@ -446,30 +503,32 @@
     "history": [
       [
         100000,
-        "acct-3",
         null,
         false,
         "person-1"
       ],
       [
         150000,
-        "acct-3",
         "amount was 1,500",
         false,
         "person-1"
       ],
       [
         150000,
-        "acct-5",
         "went to Meta",
         false,
         "person-2"
       ],
       [
         150000,
-        "acct-5",
         "never happened",
         true,
+        "person-2"
+      ],
+      [
+        150000,
+        "it did happen",
+        false,
         "person-2"
       ]
     ],
@@ -484,78 +543,189 @@
       0,
       0
     ],
-    "stale_correction": "StaleVersion",
-    "versions": [
-      5,
-      4,
-      3
-    ]
+    "restored": [
+      850000,
+      0,
+      150000
+    ],
+    "restored_same_record": true,
+    "stale_correction": "StaleVersion"
   },
   "multiple_precisions": {
-    "dinar_balance": 1234,
+    "dop_three_decimals": "InvalidInput:amount_precision",
+    "jpy_fraction": "InvalidInput:amount_precision",
+    "minor_units": [
+      1500,
+      1234,
+      1050
+    ],
     "positions": {
-      "DOP": 1000,
+      "DOP": 1050,
       "JPY": 1500,
       "KWD": 1234
     },
-    "unknown_currency": "InvalidInput:currency_unsupported",
-    "yen_balance": 1500,
-    "yen_fraction_issues": {
-      "amount_precision": "blocking"
-    },
-    "yen_fraction_opening": "InvalidInput:amount_precision"
+    "unknown_currency": "InvalidInput:currency_unsupported"
   },
   "new_expense_after_observation": {
-    "balance": {
-      "amount": 700000,
-      "as_of": "2026-09-05T18:00:00-04:00",
-      "basis": "user_check",
-      "state": "known"
-    },
+    "balance": 700000,
     "gaps": [
       [
+        -50000,
         0,
         "unexplained"
       ]
     ],
     "income": 0,
+    "questions": [],
     "spending": 300000
   },
-  "observation_gap": {
-    "balance": {
-      "amount": 750000,
-      "as_of": "2026-09-05T18:00:00-04:00",
-      "basis": "user_check",
-      "state": "known"
+  "notes_across_records": {
+    "longest_note_characters": 200,
+    "note_edit_keeps_money": [
+      92000,
+      92000
+    ],
+    "note_edit_revisions": 2,
+    "note_edit_too_long": "ReviewRequired:note_too_long",
+    "note_too_long": {
+      "note_too_long": "blocking"
     },
+    "notes_ignored_for_duplicates": {
+      "possible_duplicate": "blocking"
+    },
+    "notes_saved": [
+      "devolución parcial",
+      "saldo en la app"
+    ]
+  },
+  "observation_gap": {
+    "balance": 750000,
     "gaps": [
       [
+        -50000,
         -50000,
         "unexplained"
       ]
     ],
     "income": 0,
+    "shown_at_confirmation": [
+      800000,
+      -50000
+    ],
     "spending": 200000
   },
+  "older_activity_inclusion": {
+    "older_than_two_checks": {
+      "balance": 900000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          0,
+          0,
+          "unexplained"
+        ],
+        [
+          -100000,
+          0,
+          "unexplained"
+        ]
+      ],
+      "questions_in_date_order": true
+    },
+    "same_day_after_timed_check": {
+      "included": {
+        "asked": true,
+        "balance": 900000,
+        "gaps": [
+          [
+            -100000,
+            0,
+            "unexplained"
+          ]
+        ]
+      },
+      "not_included": {
+        "asked": true,
+        "balance": 800000,
+        "gaps": [
+          [
+            -100000,
+            -100000,
+            "unexplained"
+          ]
+        ]
+      }
+    },
+    "same_day_as_opening": {
+      "asked": true,
+      "balance": 100000,
+      "spending": 20000
+    },
+    "statement_rows_answer_from_source": {
+      "balance": 950000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          -50000,
+          0,
+          "unexplained"
+        ]
+      ],
+      "row_issues": {}
+    },
+    "transfer_answers_each_leg": {
+      "balances": [
+        900000,
+        600000
+      ],
+      "gaps": [
+        [
+          [
+            -100000,
+            0,
+            "unexplained"
+          ]
+        ],
+        [
+          [
+            0,
+            0,
+            "unexplained"
+          ]
+        ]
+      ],
+      "one_question_per_leg": true
+    }
+  },
+  "opening_date_correction": {
+    "balance_after": 100000,
+    "balance_before": 90000,
+    "revisions": [
+      [
+        "2026-09-05T09:00:00-04:00",
+        null
+      ],
+      [
+        "2026-09-07T09:00:00-04:00",
+        "balance was on the 7th"
+      ]
+    ],
+    "spending": 10000,
+    "unreviewed_date_change": "ReviewRequired:opening_date_reorders_activity"
+  },
   "overdraft_and_debt": {
-    "balances": {
-      "card": -104500,
-      "checking": -100000,
-      "loan": -2100000
-    },
-    "overdraft_issues": {
-      "negative_asset_balance": "notice"
-    },
-    "payment_to_asset_issues": {
-      "counter_not_liability": "blocking"
-    },
+    "balances": [
+      -100000,
+      -2100000,
+      -204500
+    ],
     "position": {
       "assets": -100000,
-      "liabilities": -2204500,
-      "net": -2304500
+      "liabilities": -2304500,
+      "net": -2404500
     },
-    "totals": {
-      "interest": 4500,
+    "spending_by_category": {
+      "interest_charge": 4500,
       "uncategorized": 150000
     }
   },
@@ -563,6 +733,7 @@
     "balance": 950000,
     "gaps_after": [
       [
+        -50000,
         -20000,
         "unexplained"
       ]
@@ -570,9 +741,123 @@
     "gaps_before": [
       [
         -50000,
+        -50000,
         "unexplained"
       ]
     ]
+  },
+  "plan_occurrence_counted_once": {
+    "account_change_needs_review": "ReviewRequired:expectation_mismatch",
+    "after_amount_correction": "completed",
+    "after_refund": "completed",
+    "after_unlinking": [
+      "planned",
+      {
+        "DOP": -300000
+      }
+    ],
+    "completed": [
+      "completed",
+      {},
+      300000
+    ],
+    "planned": [
+      "planned",
+      {
+        "DOP": -300000
+      }
+    ],
+    "second_payment_for_same_occurrence": {
+      "expectation_already_fulfilled": "blocking"
+    }
+  },
+  "refund_partial_and_limits": {
+    "balance": 500000,
+    "before_purchase": {
+      "refund_before_purchase": "blocking"
+    },
+    "first_refund_removed": false,
+    "income": 0,
+    "other_category": {
+      "refund_category_mismatch": "blocking"
+    },
+    "over_limit": {
+      "refund_exceeds_purchase": "blocking"
+    },
+    "purchases": 100000,
+    "refund_shares_purchase_category": {
+      "shopping": 0
+    },
+    "refunds": 100000,
+    "remove_purchase": "ReviewRequired:linked_refunds_present",
+    "shrink_purchase": "ReviewRequired:refund_exceeds_purchase",
+    "spending": 0
+  },
+  "refund_unlinked_and_cross_account": {
+    "cross_account_balances": [
+      -200000,
+      185000
+    ],
+    "dop_totals": {
+      "income": 0,
+      "income_by_category": {},
+      "moved_in_from_outside_scope": 0,
+      "moved_out_of_scope": 0,
+      "purchases": 200000,
+      "refunds": 85000,
+      "spending": 115000,
+      "spending_by_category": {
+        "groceries": -25000,
+        "shopping": 150000,
+        "uncategorized": -10000
+      }
+    },
+    "foreign_currency_link": {
+      "refund_link_currency": "blocking"
+    },
+    "foreign_unlinked": "ok",
+    "refund_on_investment": {
+      "refund_account_unsupported": "blocking"
+    },
+    "refund_on_loan": {
+      "refund_account_unsupported": "blocking"
+    },
+    "usd_totals_not_clamped": {
+      "income": 0,
+      "income_by_category": {},
+      "moved_in_from_outside_scope": 0,
+      "moved_out_of_scope": 0,
+      "purchases": 0,
+      "refunds": 1000,
+      "spending": -1000,
+      "spending_by_category": {
+        "uncategorized": -1000
+      }
+    }
+  },
+  "removal_and_restore": {
+    "both_restored": 70000,
+    "purchase_history": [
+      [
+        null,
+        false
+      ],
+      [
+        "wrong account",
+        true
+      ],
+      [
+        "right account after all",
+        false
+      ]
+    ],
+    "purchase_removed": 100000,
+    "refund_removed": 60000,
+    "restore_refund_first": "ReviewRequired:refund_purchase_removed",
+    "same_record": true,
+    "spending": 30000,
+    "stale_restore": "StaleVersion",
+    "start": 70000
   },
   "same_currency_transfer": {
     "balances": {
@@ -590,6 +875,8 @@
         "income_by_category": {},
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
+        "purchases": 0,
+        "refunds": 0,
         "spending": 0,
         "spending_by_category": {}
       }
@@ -600,6 +887,8 @@
         "income_by_category": {},
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 500000,
+        "purchases": 0,
+        "refunds": 0,
         "spending": 0,
         "spending_by_category": {}
       }
@@ -610,118 +899,51 @@
         "income_by_category": {},
         "moved_in_from_outside_scope": 500000,
         "moved_out_of_scope": 0,
+        "purchases": 0,
+        "refunds": 0,
         "spending": 0,
         "spending_by_category": {}
       }
     }
   },
-  "same_day_order": {
-    "after": {
-      "balance": 800000,
-      "confirm": "ok",
-      "gaps": [
-        [
-          -100000,
-          "unexplained"
-        ]
-      ],
-      "issues": {}
-    },
-    "before": {
-      "balance": 900000,
-      "confirm": "ok",
-      "gaps": [
-        [
-          0,
-          "unexplained"
-        ]
-      ],
-      "issues": {}
-    },
-    "check_recorded_after_logging": {
-      "balance": 900000,
-      "confirm": "ok",
-      "gaps": [
-        [
-          0,
-          "unexplained"
-        ]
-      ],
-      "unresolved": {
-        "observation_order_unknown": "blocking"
-      }
-    },
-    "opening_same_day_stays_first": {
-      "balance": 750000,
-      "confirm": "ok",
-      "gaps": [
-        [
-          -50000,
-          "unexplained"
-        ]
-      ]
-    },
-    "statement_close_covers_its_day": {
-      "balance": 900000,
-      "confirm": "ok",
-      "gaps": [
-        [
-          0,
-          "unexplained"
-        ]
-      ],
-      "issues": {}
-    },
-    "two_checks_same_day": {
-      "balance": 900000,
-      "confirm": "ok",
-      "gaps": [
-        [
-          0,
-          "unexplained"
-        ],
-        [
-          0,
-          "unexplained"
-        ]
-      ],
-      "unresolved": [
-        "rec-4",
-        "rec-6"
-      ]
-    },
-    "unresolved": {
-      "balance": 900000,
-      "confirm": "ReviewRequired:observation_order_unknown",
-      "gaps": [
-        [
-          -100000,
-          "unexplained"
-        ]
-      ],
-      "issues": {
-        "observation_order_unknown": "blocking"
-      }
-    }
+  "spaces_and_account_moves": {
+    "business_balance": 170000,
+    "business_scope": [
+      "acct-1"
+    ],
+    "business_spending": 30000,
+    "linked_account_move": "ReviewRequired:account_has_links",
+    "moved_to": "business",
+    "personal_scope": [
+      "acct-3",
+      "acct-5"
+    ],
+    "records_untouched": true
   },
   "stale_preview_two_confirms": {
     "activity_records": 2,
     "activity_records_after_stale": 1,
     "balance": 70000,
-    "fresh_confirm_record": "rec-6",
+    "draft_kept_for_the_refreshed_review": "100.00",
+    "fresh_preview_effects": {
+      "acct-1": -10000
+    },
     "stale_attempts": [
       "StalePreview",
       "StalePreview"
     ]
   },
   "two_observations": {
+    "asked_only_the_later_check": true,
     "balance": 850000,
     "gaps_after": [
       [
         -100000,
+        -100000,
         "unexplained"
       ],
       [
+        -20000,
         0,
         "unexplained"
       ]
@@ -729,9 +951,11 @@
     "gaps_before": [
       [
         -100000,
+        -100000,
         "unexplained"
       ],
       [
+        -20000,
         -20000,
         "unexplained"
       ]
@@ -740,33 +964,36 @@
   "unknown_coverage_disclosure": {
     "position": {
       "DOP": {
-        "assets": 790000,
+        "assets": 1080000,
         "coverage": {
           "accounts_known": [
-            "acct-1"
+            "acct-1",
+            "acct-4"
           ],
           "accounts_unknown": [
             "acct-3"
           ],
-          "archived_excluded": [
+          "archived_included": [
             "acct-4"
           ],
-          "oldest_anchor_as_of": "2026-09-05T18:00:00-04:00",
+          "oldest_anchor_as_of": "2026-09-01T09:00:00-04:00",
           "unexplained_gaps": [
             {
               "account_id": "acct-1",
-              "amount": -10000,
               "as_of": "2026-09-05T18:00:00-04:00",
+              "explained_by": [],
               "label": "unexplained",
-              "record_id": "rec-9"
+              "record_id": "rec-9",
+              "recorded": -10000,
+              "remaining": -10000
             }
           ]
         },
         "liabilities": 0,
-        "net": 790000
+        "net": 1080000
       }
     },
-    "totals": 10000,
+    "spending": 10000,
     "unknown_asset_side": [
       null,
       -300000,

@@ -9,7 +9,9 @@ REPO = Path(__file__).resolve().parents[2]
 SKIPPED_DIRS = {"node_modules", ".next"}
 
 
-@pytest.mark.parametrize("module", ["model", "derive", "scenarios"])
+@pytest.mark.parametrize(
+    "module", ["catalog", "derive", "review", "model", "scenes", "scenarios"]
+)
 def test_reference_model_loads_no_argus_module(module):
     probe = (
         "import sys; "

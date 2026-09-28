@@ -1,10 +1,9 @@
 """In-memory write side of a PROPOSED financial-recording contract (test-only).
 
 This is an executable reference model, not a production ledger. Every
-operation computes a complete new State and swaps it in, so a failure leaves
-nothing half written. Issues are recomputed at every review, never stored.
-The model has no permission logic: which accounts a caller may see or change
-is outside it.
+operation computes a complete new state and swaps it in, so a failure leaves
+nothing half written. The model has no permission logic: which accounts a
+caller may see or change is outside it.
 """
 
 import hashlib
@@ -16,57 +15,48 @@ from datetime import date, datetime
 from typing import Literal, Optional
 from zoneinfo import ZoneInfo
 
+from tests.financial_recording.catalog import (
+    CUSTOM_CATEGORY_MAX,
+    NATURE,
+    NICKNAME_MAX,
+    PERSONAL_SPACE,
+    Category,
+)
 from tests.financial_recording.derive import (
     DEFAULT_TZ,
-    GAP_LABEL,
-    LEG_SIGNS,
-    NATURE,
     Account,
     Activity,
+    Answers,
     Body,
     Book,
-    Known,
+    Expectation,
     Observation,
     Opening,
-    Placements,
     Provenance,
     Record,
     Revision,
     accounts_of,
     activities,
     anchors,
-    balance,
+    landing,
     legs,
-    order,
+    live_records,
+    observation_gaps,
 )
 from tests.financial_recording.money import InvalidInput, exponent, parse_minor
+from tests.financial_recording.review import (
+    Issue,
+    ReviewRequired,
+    blocking,
+    duplicates,
+    issue,
+    notices,
+    parse_fields,
+    validate,
+)
 
-NICKNAME_MAX = 60
 FULL_SHARE_BPS = 10_000
-LIQUID_TYPES = frozenset({"cash", "checking", "savings"})
-NOTICE_CODES = frozenset({"negative_asset_balance"})
-EXPENSE_CATEGORIES = frozenset(
-    {"groceries", "dining", "transport", "housing", "utilities", "health"}
-    | {"education", "entertainment", "shopping", "interest", "fees", "other"}
-)
-INCOME_CATEGORIES = frozenset(
-    {"salary", "remittance", "business", "interest", "gift", "other"}
-)
-KIND_CATEGORIES: Mapping[str, frozenset] = {
-    "expense": EXPENSE_CATEGORIES,
-    "refund": EXPENSE_CATEGORIES,
-    "income": INCOME_CATEGORIES,
-    "transfer": frozenset(),
-    "debt_payment": frozenset(),
-}
-COUNTER_NATURE: Mapping[str, Optional[str]] = {
-    "transfer": None,
-    "debt_payment": "liability",
-}
-REQUIRED_FIELDS: Mapping[str, tuple[str, ...]] = {
-    **{kind: ("account_id", "amount", "occurred_on") for kind in LEG_SIGNS},
-    "balance_observation": ("account_id", "amount", "as_of", "basis"),
-}
+UNSET = object()
 
 
 class StaleVersion(Exception):
@@ -74,24 +64,13 @@ class StaleVersion(Exception):
 
 
 class StalePreview(Exception):
-    pass
+    def __init__(self, fresh: "Preview") -> None:
+        super().__init__(fresh.draft_id)
+        self.fresh = fresh
 
 
 class IdempotencyConflict(Exception):
     pass
-
-
-@dataclass(frozen=True)
-class Issue:
-    code: str
-    severity: str
-    refs: tuple[str, ...] = ()
-
-
-class ReviewRequired(Exception):
-    def __init__(self, issues: Sequence[Issue]) -> None:
-        super().__init__(", ".join(item.code for item in issues))
-        self.issues = tuple(issues)
 
 
 @dataclass(frozen=True)
@@ -103,7 +82,7 @@ class Draft:
     revision: int = 1
     distinct: bool = False
     record_id: Optional[str] = None
-    placements: Placements = ()
+    answers: Answers = ()
 
 
 @dataclass(frozen=True)
@@ -122,236 +101,32 @@ class State:
     replays: Mapping[tuple[str, str], tuple[str, object]]
 
 
-def issue(code: str, *refs: str) -> Issue:
-    return Issue(code, "notice" if code in NOTICE_CODES else "blocking", refs)
-
-
 def fingerprint(value: object) -> str:
     canonical = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def parse_fields(
-    fields: Mapping[str, Optional[str]],
-    accounts: Mapping[str, Account],
-    placements: Placements = (),
-) -> tuple[Optional[Body], tuple[Issue, ...]]:
-    kind = fields.get("kind") or ""
-    if kind not in REQUIRED_FIELDS:
-        return None, (issue("kind_unsupported", kind),)
-    text = {name: (value or "").strip() for name, value in fields.items()}
-    missing = tuple(name for name in REQUIRED_FIELDS[kind] if not text.get(name))
-    if missing:
-        return None, (issue("field_missing", *missing),)
-    account = accounts.get(text["account_id"])
-    if account is None:
-        return None, (issue("account_unknown", text["account_id"]),)
-    found: list[Issue] = []
-    currency = text.get("currency") or account.currency
-    if _parsed(found, exponent, currency) is not None and currency != account.currency:
-        found.append(issue("currency_mismatch", currency))
-    values = {
-        "account_id": account.id,
-        "amount": _parsed(found, parse_minor, text["amount"], account.currency),
-        "placements": placements,
-    }
-    if kind == "balance_observation":
-        values["as_of"] = _parsed(found, _instant, text["as_of"])
-        values["basis"] = _parsed(found, _choice, text["basis"], GAP_LABEL)
-        return (None if found else Observation(**values)), tuple(found)
-    values.update(
-        kind=kind,
-        occurred_on=_parsed(found, _date, text["occurred_on"]),
-        occurred_at=_parsed(found, _instant, text.get("occurred_at")),
-        category=text.get("category") or None,
-        counter_account_id=text.get("counter_account_id") or None,
-    )
-    return (None if found else Activity(**values)), tuple(found)
-
-
-def validate(book: Book, body: Body, tz: ZoneInfo) -> list[Issue]:
-    unusable = [
-        issue(
-            "account_archived" if account_id in book.accounts else "account_unknown",
-            account_id,
-        )
-        for account_id in sorted(accounts_of(body))
-        if account_id not in book.accounts or book.accounts[account_id].archived
-    ]
-    if unusable:
-        return unusable
-    if isinstance(body, Activity):
-        return _activity_issues(book, body, tz)
-    if isinstance(body, Observation):
-        return [
-            issue("observation_order_unknown", record_id)
-            for record_id, activity in activities(book, body.account_id)
-            if order(activity, body, tz, record_id, None) is None
-        ]
-    return []
-
-
 def review(
     state: State, draft: Draft, tz: ZoneInfo
 ) -> tuple[Optional[Body], tuple[Issue, ...]]:
-    body, parsed = parse_fields(draft.fields, state.book.accounts, draft.placements)
-    found = [*parsed, *(validate(state.book, body, tz) if body is not None else ())]
-    found.extend(_duplicates(state, draft, body))
-    if body is not None and not any(item.severity == "blocking" for item in found):
-        found.extend(_notices(state.book, body, tz))
-    return body, tuple(found)
-
-
-def _activity_issues(book: Book, body: Activity, tz: ZoneInfo) -> list[Issue]:
-    found = [issue("amount_not_positive")] if body.amount <= 0 else []
-    if body.category and body.category not in EXPENSE_CATEGORIES | INCOME_CATEGORIES:
-        found.append(issue("category_unknown", body.category))
-    elif body.category and body.category not in KIND_CATEGORIES[body.kind]:
-        found.append(issue("category_kind_mismatch", body.category))
-    needs_counter = body.kind in COUNTER_NATURE
-    counter = book.accounts.get(body.counter_account_id or "")
-    if needs_counter and counter is None:
-        found.append(issue("counter_account_missing"))
-    elif needs_counter and counter.id == body.account_id:
-        found.append(issue("counter_account_same", counter.id))
-    elif not needs_counter and body.counter_account_id:
-        found.append(issue("counter_account_unexpected", body.counter_account_id))
-    elif needs_counter:
-        if counter.currency != book.accounts[body.account_id].currency:
-            found.append(issue("cross_currency_unresolved", counter.id))
-        wanted = COUNTER_NATURE[body.kind]
-        if wanted is not None and NATURE[counter.type] != wanted:
-            found.append(issue("counter_not_liability", counter.id))
-    found.extend(
-        issue("observation_order_unknown", record_id)
-        for account_id in sorted(accounts_of(body))
-        for record_id, anchor in anchors(book, account_id)
-        if isinstance(anchor, Observation)
-        and order(body, anchor, tz, None, record_id) is None
-    )
-    return found
-
-
-def _identities(provenance: Provenance, account_id: str) -> set[tuple]:
-    ref = provenance.source_ref or {}
-    keys = set()
-    if "digest" in ref and "row" in ref:
-        keys.add(("file", ref["digest"], ref["row"]))
-    if ref.get("external_id") and account_id:
-        keys.add(("external", account_id, ref["external_id"]))
-    return keys
-
-
-def _signature(body: Optional[Body]) -> frozenset:
-    # Every leg counts, so a card statement's payment row meets the payment
-    # already recorded from the checking side.
-    if not isinstance(body, Activity):
-        return frozenset()
-    return frozenset(
-        (account_id, abs(effect), body.occurred_on)
-        for account_id, effect in legs(body).items()
-    )
-
-
-def _duplicates(state: State, draft: Draft, body: Optional[Body]) -> list[Issue]:
-    # Only drafts created earlier count as existing, so a later import never
-    # re-flags the rows it duplicates.
-    earlier = list(state.drafts.values())[: list(state.drafts).index(draft.id)]
-    existing = [
-        (
-            record.id,
-            None if record.removed else record.body,
-            record.body.account_id,
-            (record.revisions[0].provenance, *record.linked),
-        )
-        for record in state.book.records.values()
-    ] + [
-        (
-            other.id,
-            parse_fields(other.fields, state.book.accounts)[0],
-            (other.fields.get("account_id") or "").strip(),
-            (other.provenance,),
-        )
-        for other in earlier
+    book = state.book
+    body, parsed = parse_fields(draft.fields, book, draft.answers)
+    found = list(parsed)
+    if body is not None:
+        found.extend(validate(book, body, tz, provenance=draft.provenance))
+    order = list(state.drafts)
+    earlier = [
+        (other.id, other.fields, other.provenance)
+        for other in list(state.drafts.values())[: order.index(draft.id)]
         if other.status == "proposed"
     ]
-    mine = _identities(draft.provenance, (draft.fields.get("account_id") or "").strip())
-    same_source = [
-        item_id
-        for item_id, _, account_id, sources in existing
-        if any(mine & _identities(source, account_id) for source in sources)
-    ]
-    if same_source:
-        return [issue("already_recorded", *same_source)]
-    signature = _signature(body)
-    if not signature or draft.distinct:
-        return []
-    matches = [
-        item_id
-        for item_id, item_body, _, _ in existing
-        if signature & _signature(item_body)
-    ]
-    return [issue("possible_duplicate", *matches)] if matches else []
-
-
-def _notices(book: Book, body: Body, tz: ZoneInfo) -> list[Issue]:
-    trial_revision = Revision(body, _EPOCH, Provenance("manual", _EPOCH))
-    trial = Book(
-        book.accounts, {**book.records, "trial": Record("trial", (trial_revision,))}
+    account_id = (draft.fields.get("account_id") or "").strip()
+    found.extend(
+        duplicates(book, earlier, draft.provenance, account_id, body, draft.distinct)
     )
-    after = {
-        account_id: balance(trial, account_id, tz=tz) for account_id in accounts_of(body)
-    }
-    return [
-        issue("negative_asset_balance", account_id)
-        for account_id, current in sorted(after.items())
-        if book.accounts[account_id].type in LIQUID_TYPES
-        and isinstance(current, Known)
-        and current.amount < 0
-    ]
-
-
-def _parsed(found: list[Issue], parser: Callable, text: Optional[str], *args):
-    if not text:
-        return None
-    try:
-        return parser(text, *args)
-    except InvalidInput as error:
-        found.append(issue(error.code, text))
-        return None
-
-
-def _date(text: str) -> date:
-    try:
-        return date.fromisoformat(text)
-    except ValueError as error:
-        raise InvalidInput("date_invalid", text) from error
-
-
-def _instant(text: str) -> datetime:
-    try:
-        parsed = datetime.fromisoformat(text)
-    except ValueError as error:
-        raise InvalidInput("date_invalid", text) from error
-    if parsed.tzinfo is None:
-        raise InvalidInput("date_invalid", f"{text} has no UTC offset")
-    return parsed
-
-
-def _choice(text: str, allowed: Sequence[str]) -> str:
-    if text not in allowed:
-        raise InvalidInput("choice_invalid", text)
-    return text
-
-
-def _nickname(text: str) -> str:
-    trimmed = text.strip()
-    if not 1 <= len(trimmed) <= NICKNAME_MAX:
-        raise InvalidInput("nickname_invalid", repr(text))
-    return trimmed
-
-
-_EPOCH = datetime.fromisoformat("1970-01-01T00:00:00+00:00")
+    if body is not None and not blocking(found):
+        found.extend(notices(book, body, tz, draft.provenance))
+    return body, tuple(found)
 
 
 class Store:
@@ -374,16 +149,29 @@ class Store:
 
     def create_account(
         self,
-        nickname: str,
         type: str,
         currency: str,
-        opening: Optional[str] = None,
+        entered: Optional[str] = None,
         *,
         idempotency_key: str,
+        nickname: Optional[str] = None,
         as_of: Optional[datetime] = None,
         ownership_share_bps: int = FULL_SHARE_BPS,
+        space_id: str = PERSONAL_SPACE,
     ) -> Account:
-        request = [nickname, type, currency, opening, as_of, ownership_share_bps]
+        """`entered` is what the person typed; a debt's amount owed is positive.
+
+        This is the only place a typed amount owed becomes a negative balance.
+        """
+        request = [
+            type,
+            currency,
+            entered,
+            nickname,
+            as_of,
+            ownership_share_bps,
+            space_id,
+        ]
         replayed = self._replayed(("create_account", idempotency_key), request)
         if replayed is not None:
             return self.book.accounts[replayed]
@@ -400,11 +188,14 @@ class Store:
             currency,
             ownership_share_bps,
             now,
+            space_id,
         )
         records = dict(self.book.records)
-        if opening is not None and opening.strip():
-            anchor = Opening(account.id, parse_minor(opening, currency), as_of or now)
-            record = self._new_record(anchor, Provenance("manual", now))
+        if entered is not None and entered.strip():
+            amount = parse_minor(entered, currency)
+            signed = -amount if NATURE[type] == "liability" else amount
+            opening = Opening(account.id, signed, as_of or now)
+            record = self._new_record(opening, Provenance("manual", now), records)
             records[record.id] = record
         self._swap(
             accounts={**self.book.accounts, account.id: account},
@@ -418,73 +209,91 @@ class Store:
         account_id: str,
         expected_version: int,
         *,
-        nickname: Optional[str] = None,
+        nickname=UNSET,
         type: Optional[str] = None,
         currency: Optional[str] = None,
         archived: Optional[bool] = None,
+        ownership_share_bps: Optional[int] = None,
+        linked_asset_id=UNSET,
     ) -> Account:
-        account = self.book.accounts[account_id]
-        if account.version != expected_version:
-            raise StaleVersion(account_id)
-        in_use = any(
-            account_id in accounts_of(revision.body)
+        account = self._fresh_account(account_id, expected_version)
+        records = [
+            record.body
             for record in self.book.records.values()
-            for revision in record.revisions
-        )
+            if account_id in accounts_of(record.body)
+        ]
+        has_activity = any(isinstance(body, Activity) for body in records)
         changes: dict = {"version": account.version + 1}
-        if nickname is not None:
+        if nickname is not UNSET:
             changes["nickname"] = _nickname(nickname)
-        if type is not None:
+        if type is not None and type != account.type:
             if type not in NATURE:
                 raise InvalidInput("account_type_unsupported", type)
-            if in_use and NATURE[type] != NATURE[account.type]:
+            if has_activity:
+                raise InvalidInput("type_locked", type)
+            if records and NATURE[type] != NATURE[account.type]:
                 raise InvalidInput("nature_change_requires_empty_account", type)
             changes["type"] = type
         if currency is not None and currency != account.currency:
             exponent(currency)
-            if in_use:
+            if records:
                 raise InvalidInput("currency_locked", currency)
             changes["currency"] = currency
         if archived is not None:
             changes["archived"] = archived
+        if ownership_share_bps is not None:
+            if not 1 <= ownership_share_bps <= FULL_SHARE_BPS:
+                raise InvalidInput("ownership_share_invalid", str(ownership_share_bps))
+            changes["ownership_share_bps"] = ownership_share_bps
+        if linked_asset_id is not UNSET:
+            changes["linked_asset_id"] = self._linked_asset(account, linked_asset_id)
         edited = replace(account, **changes)
         self._swap(accounts={**self.book.accounts, account_id: edited})
         return edited
+
+    def move_account(
+        self, account_id: str, expected_version: int, destination: str
+    ) -> Account:
+        """Organizational only: no record is created, changed or re-dated."""
+        account = self._fresh_account(account_id, expected_version)
+        links = self._links(account_id)
+        if links:
+            raise ReviewRequired([issue("account_has_links", *links)])
+        moved = replace(account, space_id=destination, version=account.version + 1)
+        self._swap(accounts={**self.book.accounts, account_id: moved})
+        return moved
+
+    def create_category(self, space_id: str, label: str, family: str) -> Category:
+        if space_id == PERSONAL_SPACE:
+            raise InvalidInput("custom_category_space", space_id)
+        category = Category(self._id("cat"), family, {"custom": _label(label)}, space_id)
+        self._swap(categories={**self.book.categories, category.id: category})
+        return category
+
+    def rename_category(self, category_id: str, label: str) -> Category:
+        category = self.book.categories[category_id]
+        if category.space_id is None:
+            raise InvalidInput("default_category_fixed", category_id)
+        renamed = replace(category, labels={"custom": _label(label)})
+        self._swap(categories={**self.book.categories, category_id: renamed})
+        return renamed
+
+    def expect(self, account_id: str, direction: str, amount: str, due_on: date) -> str:
+        account = self.book.accounts[account_id]
+        expectation = Expectation(
+            self._id("exp"),
+            account_id,
+            direction,
+            parse_minor(amount, account.currency),
+            due_on,
+        )
+        self._swap(expectations={**self.book.expectations, expectation.id: expectation})
+        return expectation.id
 
     def draft(self, fields: Mapping[str, Optional[str]], provenance: Provenance) -> Draft:
         created = Draft(self._id("draft"), dict(fields), provenance)
         self._swap(drafts={**self.state.drafts, created.id: created})
         return created
-
-    def resolve(
-        self,
-        draft_id: str,
-        *,
-        distinct: bool = False,
-        duplicate_of: Optional[str] = None,
-        placements: Optional[Mapping[str, str]] = None,
-    ) -> Draft:
-        draft = self._proposed(draft_id)
-        changes: dict = {
-            "revision": draft.revision + 1,
-            "distinct": draft.distinct or distinct,
-        }
-        records = self.book.records
-        if duplicate_of is not None:
-            target = records[duplicate_of]
-            records = {
-                **records,
-                duplicate_of: replace(target, linked=(*target.linked, draft.provenance)),
-            }
-            changes.update(status="confirmed", record_id=duplicate_of)
-        if placements:
-            for answer in placements.values():
-                _choice(answer, ("before", "after"))
-            merged = {**dict(draft.placements), **placements}
-            changes["placements"] = tuple(sorted(merged.items()))
-        resolved = replace(draft, **changes)
-        self._swap(records=records, drafts={**self.state.drafts, draft_id: resolved})
-        return resolved
 
     def edit_draft(self, draft_id: str, **fields: Optional[str]) -> Draft:
         draft = self._proposed(draft_id)
@@ -499,11 +308,32 @@ class Store:
         self._swap(drafts={**self.state.drafts, draft_id: rejected})
         return rejected
 
-    def _proposed(self, draft_id: str) -> Draft:
-        draft = self.state.drafts[draft_id]
-        if draft.status != "proposed":
-            raise InvalidInput("draft_not_proposed", draft_id)
-        return draft
+    def resolve(
+        self,
+        draft_id: str,
+        *,
+        distinct: bool = False,
+        duplicate_of: Optional[str] = None,
+        answers: Optional[Mapping[str, str]] = None,
+    ) -> Draft:
+        draft = self._proposed(draft_id)
+        changes: dict = {
+            "revision": draft.revision + 1,
+            "distinct": draft.distinct or distinct,
+        }
+        records = self.book.records
+        if duplicate_of is not None:
+            target = records[duplicate_of]
+            records = {
+                **records,
+                duplicate_of: replace(target, linked=(*target.linked, draft.provenance)),
+            }
+            changes.update(status="confirmed", record_id=duplicate_of)
+        if answers:
+            changes["answers"] = _merged_answers(draft.answers, answers)
+        resolved = replace(draft, **changes)
+        self._swap(records=records, drafts={**self.state.drafts, draft_id: resolved})
+        return resolved
 
     def preview(self, draft_id: str) -> Preview:
         draft = self.state.drafts[draft_id]
@@ -534,11 +364,10 @@ class Store:
         replayed = self._replayed(("confirm", idempotency_key), request)
         if replayed is not None:
             return [self.book.records[record_id] for record_id in replayed]
-        accounts, records = dict(start.book.accounts), dict(start.book.records)
-        drafts = dict(start.drafts)
+        working = start
         confirmed = []
         for preview in previews:
-            draft = drafts[preview.draft_id]
+            draft = working.drafts[preview.draft_id]
             if draft.status == "confirmed":
                 confirmed.append(draft.record_id)
                 continue
@@ -548,57 +377,183 @@ class Store:
                 start.book.accounts[account_id].version != version
                 for account_id, version in preview.basis.items()
             ):
-                raise StalePreview(preview.draft_id)
-            working = State(Book(accounts, records), drafts, start.replays)
+                raise StalePreview(self.preview(preview.draft_id))
             body, found = review(working, draft, self.tz)
-            blocking = [item for item in found if item.severity == "blocking"]
-            if blocking:
-                raise ReviewRequired(blocking)
-            record = self._new_record(body, draft.provenance)
-            records[record.id] = record
-            accounts.update(_bumped(accounts, accounts_of(body)))
-            drafts[draft.id] = replace(draft, status="confirmed", record_id=record.id)
+            if blocking(found):
+                raise ReviewRequired(blocking(found))
+            records = dict(working.book.records)
+            record = self._new_record(body, draft.provenance, records)
+            records[record.id] = self._audited(working.book, record)
+            book = replace(
+                working.book,
+                accounts={
+                    **working.book.accounts,
+                    **_bumped(working.book.accounts, accounts_of(body)),
+                },
+                records=records,
+            )
+            drafts = {
+                **working.drafts,
+                draft.id: replace(draft, status="confirmed", record_id=record.id),
+            }
+            working = State(book, drafts, working.replays)
             confirmed.append(record.id)
-        self._swap(
-            accounts=accounts,
-            records=records,
-            drafts=drafts,
-            replay=(("confirm", idempotency_key), request, tuple(confirmed)),
-        )
-        return [records[record_id] for record_id in confirmed]
+        self.state = working
+        self._swap(replay=(("confirm", idempotency_key), request, tuple(confirmed)))
+        return [self.book.records[record_id] for record_id in confirmed]
 
     def correct(
-        self, record_id: str, expected_revision: int, reason: str, **changes
+        self,
+        record_id: str,
+        expected_revision: int,
+        reason: str,
+        *,
+        accept_reordering: bool = False,
+        answers: Optional[Mapping[str, str]] = None,
+        **changes,
     ) -> Record:
         record = self._current(record_id, expected_revision, reason)
-        if "amount" in changes:
-            account = self.book.accounts[
-                changes.get("account_id", record.body.account_id)
-            ]
-            changes["amount"] = parse_minor(changes["amount"], account.currency)
-        body = replace(record.body, **changes)
         currency = self.book.accounts[record.body.account_id].currency
+        if "amount" in changes:
+            changes["amount"] = parse_minor(changes["amount"], currency)
+        if answers:
+            changes["answers"] = _merged_answers(record.body.answers, answers)
+        body = replace(record.body, **changes)
         if self.book.accounts[body.account_id].currency != currency:
             raise InvalidInput("currency_mismatch", body.account_id)
-        others = {
-            key: value for key, value in self.book.records.items() if key != record_id
-        }
-        # A record on an archived account stays correctable; it just takes no new ones.
-        found = [
-            item
-            for item in validate(Book(self.book.accounts, others), body, self.tz)
-            if not (
-                item.code == "account_archived"
-                and set(item.refs) <= accounts_of(record.body)
-            )
-        ]
+        found = blocking(validate(self.book, body, self.tz, record_id))
+        found.extend(self._orphaned_refunds(record_id, body))
+        if isinstance(body, Opening) and not accept_reordering:
+            found.extend(self._reordered(record, body))
         if found:
             raise ReviewRequired(found)
         return self._revise(record, body, reason, removed=False)
 
     def remove(self, record_id: str, expected_revision: int, reason: str) -> Record:
         record = self._current(record_id, expected_revision, reason)
+        refunds = [
+            other.id
+            for other in live_records(self.book)
+            if isinstance(other.body, Activity) and other.body.refund_of == record_id
+        ]
+        if refunds:
+            raise ReviewRequired([issue("linked_refunds_present", *refunds)])
         return self._revise(record, record.body, reason, removed=True)
+
+    def restore(self, record_id: str, expected_revision: int, reason: str) -> Record:
+        """Restores the original record, never a copy; both legs return together."""
+        record = self.book.records[record_id]
+        if len(record.revisions) != expected_revision:
+            raise StaleVersion(record_id)
+        if not record.removed:
+            raise InvalidInput("record_not_removed", record_id)
+        found = blocking(validate(self.book, record.body, self.tz, record_id))
+        if found:
+            raise ReviewRequired(found)
+        return self._revise(record, record.body, reason, removed=False)
+
+    def _orphaned_refunds(self, record_id: str, body: Body) -> list[Issue]:
+        """A corrected purchase must still cover every refund linked to it."""
+        linked = [
+            other
+            for other in live_records(self.book)
+            if isinstance(other.body, Activity) and other.body.refund_of == record_id
+        ]
+        if not linked:
+            return []
+        still_purchase = isinstance(body, Activity) and body.kind == "expense"
+        refunded = sum(other.body.amount for other in linked)
+        if still_purchase and refunded <= body.amount:
+            return []
+        return [issue("refund_exceeds_purchase", *(other.id for other in linked))]
+
+    def _reordered(self, record: Record, body: Opening) -> list[Issue]:
+        account_id = body.account_id
+        trial_record = replace(
+            record,
+            revisions=(*record.revisions, replace(record.revisions[-1], body=body)),
+        )
+        trial = replace(self.book, records={**self.book.records, record.id: trial_record})
+        before, after = anchors(self.book, account_id), anchors(trial, account_id)
+        moved = [
+            move.id
+            for move in activities(self.book, account_id)
+            if landing(move, before, self.tz) != landing(move, after, self.tz)
+        ]
+        return [issue("opening_date_reorders_activity", *moved)] if moved else []
+
+    def _audited(self, book: Book, record: Record) -> Record:
+        """Keeps what a balance check showed when confirmed; later reads never rewrite it."""
+        if not isinstance(record.body, Observation):
+            return record
+        trial = replace(book, records={**book.records, record.id: record})
+        gap = next(
+            item
+            for item in observation_gaps(trial, record.body.account_id, self.tz)
+            if item.record_id == record.id
+        )
+        expected = None if gap.remaining is None else record.body.amount - gap.remaining
+        revision = replace(
+            record.revisions[-1],
+            confirmed_expected=expected,
+            confirmed_difference=gap.remaining,
+        )
+        return replace(record, revisions=(*record.revisions[:-1], revision))
+
+    def _links(self, account_id: str) -> list[str]:
+        found = []
+        for record in self.book.records.values():
+            body = record.body
+            if not isinstance(body, Activity):
+                continue
+            touched = accounts_of(body)
+            refund = self.book.records.get(body.refund_of or "")
+            if refund is not None:
+                touched = touched | accounts_of(refund.body)
+            if account_id in touched and len(touched) > 1:
+                found.append(record.id)
+            if body.fulfills and account_id in touched:
+                found.append(record.id)
+        for other in self.book.accounts.values():
+            if other.linked_asset_id == account_id or (
+                other.id == account_id and other.linked_asset_id
+            ):
+                found.append(other.id)
+        found.extend(
+            expectation.id
+            for expectation in self.book.expectations.values()
+            if expectation.account_id == account_id
+        )
+        found.extend(
+            draft.id
+            for draft in self.state.drafts.values()
+            if draft.status == "proposed"
+            and account_id
+            in {draft.fields.get("account_id"), draft.fields.get("counter_account_id")}
+        )
+        return sorted(set(found))
+
+    def _linked_asset(self, account: Account, asset_id: Optional[str]) -> Optional[str]:
+        if asset_id is None:
+            return None
+        asset = self.book.accounts.get(asset_id)
+        if NATURE[account.type] != "liability" or asset is None:
+            raise InvalidInput("linked_asset_invalid", str(asset_id))
+        if NATURE[asset.type] != "asset":
+            raise InvalidInput("linked_asset_invalid", asset_id)
+        return asset_id
+
+    def _fresh_account(self, account_id: str, expected_version: int) -> Account:
+        account = self.book.accounts[account_id]
+        if account.version != expected_version:
+            raise StaleVersion(account_id)
+        return account
+
+    def _proposed(self, draft_id: str) -> Draft:
+        draft = self.state.drafts[draft_id]
+        if draft.status != "proposed":
+            raise InvalidInput("draft_not_proposed", draft_id)
+        return draft
 
     def _current(self, record_id: str, expected_revision: int, reason: str) -> Record:
         record = self.book.records[record_id]
@@ -618,6 +573,8 @@ class Store:
             body, now, Provenance("manual", now), reason, removed, self.actor
         )
         revised = replace(record, revisions=(*record.revisions, revision))
+        if not removed:
+            revised = self._audited(self.book, revised)
         touched = accounts_of(record.body) | accounts_of(body)
         self._swap(
             accounts={**self.book.accounts, **_bumped(self.book.accounts, touched)},
@@ -625,9 +582,11 @@ class Store:
         )
         return revised
 
-    def _new_record(self, body: Body, provenance: Provenance) -> Record:
+    def _new_record(
+        self, body: Body, provenance: Provenance, records: Mapping[str, Record]
+    ) -> Record:
         revision = Revision(body, self.clock(), provenance, recorded_by=self.actor)
-        return Record(self._id("rec"), (revision,))
+        return Record(self._id("rec"), len(records) + 1, (revision,))
 
     def _id(self, prefix: str) -> str:
         return f"{prefix}-{next(self._ids)}"
@@ -640,17 +599,54 @@ class Store:
             raise IdempotencyConflict(key[1])
         return seen[1]
 
-    def _swap(self, *, accounts=None, records=None, drafts=None, replay=None) -> None:
+    def _swap(
+        self,
+        *,
+        accounts=None,
+        records=None,
+        drafts=None,
+        categories=None,
+        expectations=None,
+        replay=None,
+    ) -> None:
         state = self.state
         replays = dict(state.replays)
         if replay is not None:
             key, request, result = replay
             replays[key] = (fingerprint(request), result)
-        book = Book(
-            state.book.accounts if accounts is None else accounts,
-            state.book.records if records is None else records,
-        )
+        changes = {
+            name: value
+            for name, value in (
+                ("accounts", accounts),
+                ("records", records),
+                ("categories", categories),
+                ("expectations", expectations),
+            )
+            if value is not None
+        }
+        book = replace(state.book, **changes)
         self.state = State(book, state.drafts if drafts is None else drafts, replays)
+
+
+def _merged_answers(current: Answers, answers: Mapping[str, str]) -> Answers:
+    for answer in answers.values():
+        if answer not in ("included", "not_included"):
+            raise InvalidInput("choice_invalid", answer)
+    return tuple(sorted({**dict(current), **answers}.items()))
+
+
+def _nickname(text: Optional[str]) -> Optional[str]:
+    trimmed = (text or "").strip()
+    if len(trimmed) > NICKNAME_MAX:
+        raise InvalidInput("nickname_invalid", repr(text))
+    return trimmed or None
+
+
+def _label(text: str) -> str:
+    trimmed = text.strip()
+    if not 1 <= len(trimmed) <= CUSTOM_CATEGORY_MAX:
+        raise InvalidInput("category_label_invalid", repr(text))
+    return trimmed
 
 
 def _bumped(accounts: Mapping[str, Account], touched: set[str]) -> dict[str, Account]:

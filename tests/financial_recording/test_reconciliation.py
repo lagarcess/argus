@@ -1,103 +1,138 @@
 from tests.financial_recording import scenarios
 
-OBSERVED_7500 = {
-    "state": "known",
-    "amount": 750_000,
-    "as_of": "2026-09-05T18:00:00-04:00",
-    "basis": "user_check",
-}
+UNEXPLAINED = "unexplained"
 
 
-def test_observation_leaves_an_unexplained_gap_outside_spending():
+def test_a_check_keeps_what_it_showed_and_stays_outside_spending():
     assert scenarios.observation_gap() == {
-        "balance": OBSERVED_7500,
-        "gaps": [[-50_000, "unexplained"]],
+        "balance": 750_000,
+        "gaps": [[-50_000, -50_000, UNEXPLAINED]],
         "spending": 200_000,
         "income": 0,
+        "shown_at_confirmation": [800_000, -50_000],
     }
 
 
-def test_late_explanation_closes_the_gap_without_moving_the_balance():
-    assert scenarios.late_explanation() == {
-        "balance": OBSERVED_7500,
-        "gaps": [[0, "unexplained"]],
+def test_late_activity_before_a_check_is_asked_and_counted_once():
+    result = scenarios.late_explanation()
+    assert result["asked_about_the_check"] is True
+    assert result["confirm_unanswered"] == "ReviewRequired:inclusion_unanswered"
+    assert result["explained_by_late_record"] is True
+    assert (result["balance"], result["spending"], result["income"]) == (
+        750_000,
+        250_000,
+        0,
+    )
+    assert result["gaps"] == [[-50_000, 0, UNEXPLAINED]]
+    assert result["answered_not_included"] == {
+        "balance": 700_000,
+        "gaps": [[-50_000, -50_000, UNEXPLAINED]],
         "spending": 250_000,
+        "income": 0,
+        "explained_by_late_record": False,
+    }
+
+
+def test_new_activity_after_a_check_moves_the_balance_without_a_question():
+    assert scenarios.new_expense_after_observation() == {
+        "questions": [],
+        "balance": 700_000,
+        "gaps": [[-50_000, 0, UNEXPLAINED]],
+        "spending": 300_000,
         "income": 0,
     }
 
 
-def test_expense_after_the_observation_moves_the_balance():
-    result = scenarios.new_expense_after_observation()
-    assert result["balance"]["amount"] == 700_000
-    assert result["spending"] == 300_000
-    assert result["gaps"] == [[0, "unexplained"]]
-
-
-def test_partial_explanation_shrinks_the_gap():
+def test_partial_explanation_keeps_the_remaining_difference():
     assert scenarios.partial_reconciliation() == {
-        "gaps_before": [[-50_000, "unexplained"]],
-        "gaps_after": [[-20_000, "unexplained"]],
+        "gaps_before": [[-50_000, -50_000, UNEXPLAINED]],
+        "gaps_after": [[-50_000, -20_000, UNEXPLAINED]],
         "balance": 950_000,
     }
 
 
-def test_backdated_correction_moves_the_gap_and_keeps_history():
+def test_backdated_correction_moves_the_remainder_not_the_recorded_difference():
     result = scenarios.backdated_correction()
-    assert result["gaps_before"] == [[-50_000, "unexplained"]]
-    assert result["gaps"] == [[-40_000, "unexplained"]]
-    assert result["balance"] == OBSERVED_7500
-    assert result["spending"] == 210_000
-    assert result["revisions"] == [[200_000, None], [210_000, "receipt shows 2,100"]]
+    assert result["gaps_before"] == [[-50_000, -50_000, UNEXPLAINED]]
+    assert result["gaps"] == [[-50_000, -40_000, UNEXPLAINED]]
+    assert (result["balance"], result["spending"]) == (750_000, 210_000)
+    assert result["revisions"] == [
+        [200_000, None, "person-1"],
+        [210_000, "receipt shows 2,100", "person-1"],
+    ]
     assert result["stale_correction"] == "StaleVersion"
 
 
-def test_each_gap_is_measured_from_the_previous_anchor_only():
+def test_each_check_is_measured_from_the_one_before_it():
     assert scenarios.two_observations() == {
-        "gaps_before": [[-100_000, "unexplained"], [-20_000, "unexplained"]],
-        "gaps_after": [[-100_000, "unexplained"], [0, "unexplained"]],
+        "gaps_before": [
+            [-100_000, -100_000, UNEXPLAINED],
+            [-20_000, -20_000, UNEXPLAINED],
+        ],
+        "asked_only_the_later_check": True,
+        "gaps_after": [[-100_000, -100_000, UNEXPLAINED], [-20_000, 0, UNEXPLAINED]],
         "balance": 850_000,
     }
 
 
-def test_same_day_order_blocks_until_placed_and_each_placement_differs():
-    result = scenarios.same_day_order()
-    assert result["unresolved"] == {
-        "issues": {"observation_order_unknown": "blocking"},
-        "confirm": "ReviewRequired:observation_order_unknown",
-        "gaps": [[-100_000, "unexplained"]],
+def test_inclusion_answers_cover_older_activity_legs_and_sources():
+    result = scenarios.older_activity_inclusion()
+    same_day = result["same_day_after_timed_check"]
+    assert same_day["included"] == {
+        "asked": True,
+        "gaps": [[-100_000, 0, UNEXPLAINED]],
         "balance": 900_000,
     }
-    assert result["before"] == {
-        "issues": {},
-        "confirm": "ok",
-        "gaps": [[0, "unexplained"]],
-        "balance": 900_000,
-    }
-    assert result["after"] == {
-        "issues": {},
-        "confirm": "ok",
-        "gaps": [[-100_000, "unexplained"]],
+    assert same_day["not_included"] == {
+        "asked": True,
+        "gaps": [[-100_000, -100_000, UNEXPLAINED]],
         "balance": 800_000,
     }
-
-
-def test_same_day_answers_belong_to_one_anchor():
-    result = scenarios.same_day_order()
-    zero_gap_at_9000 = {"confirm": "ok", "gaps": [[0, "unexplained"]], "balance": 900_000}
-    assert result["statement_close_covers_its_day"] == {"issues": {}, **zero_gap_at_9000}
-    assert result["check_recorded_after_logging"] == {
-        "unresolved": {"observation_order_unknown": "blocking"},
-        **zero_gap_at_9000,
-    }
-    two = result["two_checks_same_day"]
-    assert len(two["unresolved"]) == 2
-    assert (two["confirm"], two["gaps"], two["balance"]) == (
-        "ok",
-        [[0, "unexplained"], [0, "unexplained"]],
-        900_000,
-    )
-    assert result["opening_same_day_stays_first"] == {
+    assert result["older_than_two_checks"] == {
+        "questions_in_date_order": True,
         "confirm": "ok",
-        "gaps": [[-50_000, "unexplained"]],
-        "balance": 750_000,
+        "gaps": [[0, 0, UNEXPLAINED], [-100_000, 0, UNEXPLAINED]],
+        "balance": 900_000,
+    }
+    assert result["transfer_answers_each_leg"] == {
+        "one_question_per_leg": True,
+        "balances": [900_000, 600_000],
+        "gaps": [[[-100_000, 0, UNEXPLAINED]], [[0, 0, UNEXPLAINED]]],
+    }
+    assert result["statement_rows_answer_from_source"] == {
+        "row_issues": {},
+        "confirm": "ok",
+        "gaps": [[-50_000, 0, UNEXPLAINED]],
+        "balance": 950_000,
+    }
+    assert result["same_day_as_opening"] == {
+        "asked": True,
+        "balance": 100_000,
+        "spending": 20_000,
+    }
+
+
+def test_revaluation_is_not_income_and_share_weights_asset_and_debt_alike():
+    assert scenarios.asset_revaluation_and_share() == {
+        "estimate_basis": "value_estimate",
+        "gaps": [[-10_000_000, -10_000_000, "revaluation"]],
+        "totals": {
+            "DOP": {
+                "income": 0,
+                "income_by_category": {},
+                "moved_in_from_outside_scope": 0,
+                "moved_out_of_scope": 0,
+                "purchases": 0,
+                "refunds": 0,
+                "spending": 0,
+                "spending_by_category": {},
+            }
+        },
+        "full": {"assets": 90_000_000, "liabilities": -40_000_000, "net": 50_000_000},
+        "owner_share": {
+            "assets": 45_000_000,
+            "liabilities": -20_000_000,
+            "net": 25_000_000,
+        },
+        "loan_linked_to": True,
     }

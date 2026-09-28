@@ -1,63 +1,40 @@
 """Recorded facts and the pure reads over them (proposed contract, test-only).
 
-Balances, gaps, totals and positions are recomputed from current revisions on
-every read and never stored, so a fact supplied later explains an earlier
-observation without a compensating write. A scope is a caller-supplied set of
-account ids; this model has no permission logic.
+Balances, remaining differences, totals and positions are recomputed from the
+current revisions on every read and never stored, so a fact supplied later
+explains an earlier balance check without a compensating write. What a check
+showed when it was confirmed is kept on its revision and never recomputed. A
+scope is a caller-supplied set of account ids; this model has no permission
+logic.
 """
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from fractions import Fraction
 from typing import Literal, Optional, Union
 from zoneinfo import ZoneInfo
 
+from tests.financial_recording.catalog import (
+    DEFAULT_CATEGORIES,
+    ESTIMATED_TYPES,
+    LEG_SIGNS,
+    NATURE,
+    TOTAL_BUCKET,
+    AccountType,
+    Category,
+    Kind,
+)
 from tests.financial_recording.money import round_half_up
 
 DEFAULT_TZ = ZoneInfo("America/Santo_Domingo")
+INCLUDED, NOT_INCLUDED = "included", "not_included"
 
-AccountType = Literal[
-    "cash",
-    "checking",
-    "savings",
-    "investment",
-    "property",
-    "credit_card",
-    "loan",
-    "other_debt",
-]
-Nature = Literal["asset", "liability"]
-Kind = Literal["expense", "income", "refund", "transfer", "debt_payment"]
 Basis = Literal["user_check", "statement", "value_estimate"]
-SameDayOrder = Literal["before", "after"]
+Inclusion = Literal["included", "not_included"]
 Weighting = Literal["full", "owner_share"]
-Placements = tuple[tuple[str, SameDayOrder], ...]
+Answers = tuple[tuple[str, Inclusion], ...]
 
-NATURE: Mapping[str, Nature] = {
-    "cash": "asset",
-    "checking": "asset",
-    "savings": "asset",
-    "investment": "asset",
-    "property": "asset",
-    "credit_card": "liability",
-    "loan": "liability",
-    "other_debt": "liability",
-}
-LEG_SIGNS: Mapping[str, tuple[int, Optional[int]]] = {
-    "expense": (-1, None),
-    "income": (1, None),
-    "refund": (1, None),
-    "transfer": (-1, 1),
-    "debt_payment": (-1, 1),
-}
-TOTAL_BUCKET: Mapping[str, Optional[tuple[str, int]]] = {
-    "expense": ("spending", 1),
-    "refund": ("spending", -1),
-    "income": ("income", 1),
-    "transfer": None,
-    "debt_payment": None,
-}
 GAP_LABEL: Mapping[str, str] = {
     "user_check": "unexplained",
     "statement": "unexplained",
@@ -68,13 +45,15 @@ GAP_LABEL: Mapping[str, str] = {
 @dataclass(frozen=True)
 class Account:
     id: str
-    nickname: str
+    nickname: Optional[str]
     type: AccountType
     currency: str
     ownership_share_bps: int
     created_at: datetime
+    space_id: str = "personal"
     archived: bool = False
     version: int = 1
+    linked_asset_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -90,7 +69,7 @@ class Observation:
     amount: int
     as_of: datetime
     basis: Basis
-    placements: Placements = ()
+    note: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -102,7 +81,10 @@ class Activity:
     occurred_at: Optional[datetime] = None
     category: Optional[str] = None
     counter_account_id: Optional[str] = None
-    placements: Placements = ()
+    answers: Answers = ()
+    note: Optional[str] = None
+    refund_of: Optional[str] = None
+    fulfills: Optional[str] = None
 
 
 Anchor = Union[Opening, Observation]
@@ -124,11 +106,14 @@ class Revision:
     reason: Optional[str] = None
     removed: bool = False
     recorded_by: Optional[str] = None
+    confirmed_expected: Optional[int] = None
+    confirmed_difference: Optional[int] = None
 
 
 @dataclass(frozen=True)
 class Record:
     id: str
+    seq: int
     revisions: tuple[Revision, ...]
     linked: tuple[Provenance, ...] = ()
 
@@ -142,9 +127,22 @@ class Record:
 
 
 @dataclass(frozen=True)
+class Expectation:
+    id: str
+    account_id: str
+    direction: Literal["in", "out"]
+    amount: int
+    due_on: date
+
+
+@dataclass(frozen=True)
 class Book:
     accounts: Mapping[str, Account]
     records: Mapping[str, Record]
+    categories: Mapping[str, Category] = field(
+        default_factory=lambda: dict(DEFAULT_CATEGORIES)
+    )
+    expectations: Mapping[str, Expectation] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -169,14 +167,18 @@ class Gap:
     record_id: str
     account_id: str
     as_of: datetime
-    amount: Optional[int]
+    recorded: Optional[int]
+    remaining: Optional[int]
     label: Optional[str]
+    explained_by: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class Totals:
     spending: int
     income: int
+    purchases: int
+    refunds: int
     moved_in_from_outside_scope: int
     moved_out_of_scope: int
     spending_by_category: Mapping[str, int]
@@ -187,7 +189,7 @@ class Totals:
 class Coverage:
     accounts_known: tuple[str, ...]
     accounts_unknown: tuple[str, ...]
-    archived_excluded: tuple[str, ...]
+    archived_included: tuple[str, ...]
     oldest_anchor_as_of: Optional[datetime]
     unexplained_gaps: tuple[Gap, ...]
 
@@ -198,6 +200,10 @@ class Position:
     liabilities: Optional[int]
     net: Optional[int]
     coverage: Coverage
+
+
+class Unanswered(ValueError):
+    pass
 
 
 def legs(activity: Activity) -> dict[str, int]:
@@ -212,49 +218,76 @@ def accounts_of(body: Body) -> set[str]:
     return set(legs(body)) if isinstance(body, Activity) else {body.account_id}
 
 
-def order(
-    activity: Activity,
-    anchor: Anchor,
-    tz: ZoneInfo,
-    activity_id: Optional[str] = None,
-    anchor_id: Optional[str] = None,
-) -> Optional[SameDayOrder]:
-    """Where the activity falls relative to the anchor; None means ask the person.
+def placement(
+    activity_record: Record, anchor_record: Record, tz: ZoneInfo
+) -> Optional[Inclusion]:
+    """Whether an anchor's balance already contains the activity; None means ask.
 
-    A same-day answer belongs to one (activity, anchor) pair and is stored on
-    whichever of the two was confirmed later.
+    Activity dated after the anchor never is. Otherwise an explicit answer
+    wins; activity that existed when a check was confirmed, or that came from
+    the same source document, is included; anything else is asked.
     """
-    if activity.occurred_at is not None:
-        return "before" if activity.occurred_at <= anchor.as_of else "after"
+    activity, anchor = activity_record.body, anchor_record.body
     anchor_day = anchor.as_of.astimezone(tz).date()
-    if activity.occurred_on != anchor_day:
-        return "before" if activity.occurred_on < anchor_day else "after"
+    if activity.occurred_at is not None:
+        if activity.occurred_at > anchor.as_of:
+            return NOT_INCLUDED
+        earlier_day = True
+    else:
+        if activity.occurred_on > anchor_day:
+            return NOT_INCLUDED
+        earlier_day = activity.occurred_on < anchor_day
+    answer = dict(activity.answers).get(anchor_record.id)
+    if answer is not None:
+        return answer
     if isinstance(anchor, Opening):
-        return "after"
-    if anchor.basis == "statement":
-        return "before"
-    from_activity = dict(activity.placements).get(anchor_id) if anchor_id else None
-    from_anchor = dict(anchor.placements).get(activity_id) if activity_id else None
-    return from_activity or from_anchor
+        return INCLUDED if earlier_day else None
+    if activity_record.seq < anchor_record.seq or _same_source(
+        activity_record, anchor_record
+    ):
+        return INCLUDED
+    return None
+
+
+def landing(record: Record, ordered: list[Record], tz: ZoneInfo) -> int:
+    """Index of the first anchor that already contains the activity.
+
+    Once a balance contains an activity, every later balance does too, so an
+    activity lands in exactly one interval and is counted once.
+    """
+    for index, anchor in enumerate(ordered):
+        answer = placement(record, anchor, tz)
+        if answer is None:
+            raise Unanswered(anchor.id)
+        if answer == INCLUDED:
+            return index
+    return len(ordered)
+
+
+def unanswered(record: Record, ordered: list[Record], tz: ZoneInfo) -> Optional[str]:
+    try:
+        landing(record, ordered, tz)
+    except Unanswered as error:
+        return str(error)
+    return None
 
 
 def live_records(book: Book) -> list[Record]:
     return [record for record in book.records.values() if not record.removed]
 
 
-def anchors(book: Book, account_id: str) -> list[tuple[str, Anchor]]:
+def anchors(book: Book, account_id: str) -> list[Record]:
     found = [
-        (index, record.id, record.body)
-        for index, record in enumerate(live_records(book))
+        record
+        for record in live_records(book)
         if not isinstance(record.body, Activity) and record.body.account_id == account_id
     ]
-    found.sort(key=lambda item: (item[2].as_of, item[0]))
-    return [(record_id, anchor) for _, record_id, anchor in found]
+    return sorted(found, key=lambda record: (record.body.as_of, record.seq))
 
 
-def activities(book: Book, account_id: str) -> list[tuple[str, Activity]]:
+def activities(book: Book, account_id: str) -> list[Record]:
     return [
-        (record.id, record.body)
+        record
         for record in live_records(book)
         if isinstance(record.body, Activity) and account_id in legs(record.body)
     ]
@@ -263,50 +296,56 @@ def activities(book: Book, account_id: str) -> list[tuple[str, Activity]]:
 def balance(
     book: Book, account_id: str, at: Optional[datetime] = None, tz: ZoneInfo = DEFAULT_TZ
 ) -> Balance:
-    known = [
-        item for item in anchors(book, account_id) if at is None or item[1].as_of <= at
+    ordered = [
+        record
+        for record in anchors(book, account_id)
+        if at is None or record.body.as_of <= at
     ]
-    included = [
-        (activity_id, activity)
-        for activity_id, activity in activities(book, account_id)
-        if at is None or _on_or_before(activity, at, tz)
+    moves = [
+        record
+        for record in activities(book, account_id)
+        if at is None or _on_or_before(record.body, at, tz)
     ]
-    if not known:
-        return Unknown(sum(legs(activity)[account_id] for _, activity in included))
-    anchor_id, anchor = known[-1]
+    if not ordered:
+        return Unknown(sum(legs(record.body)[account_id] for record in moves))
     later = sum(
-        legs(activity)[account_id]
-        for activity_id, activity in included
-        if _placed(activity, anchor, tz, activity_id, anchor_id) == "after"
+        legs(record.body)[account_id]
+        for record in moves
+        if landing(record, ordered, tz) == len(ordered)
     )
-    return Known(anchor.amount + later, anchor.as_of, _basis(anchor))
+    last = ordered[-1]
+    return Known(
+        last.body.amount + later,
+        last.body.as_of,
+        _basis(last.body, book.accounts[account_id]),
+    )
 
 
 def observation_gaps(book: Book, account_id: str, tz: ZoneInfo = DEFAULT_TZ) -> list[Gap]:
     ordered = anchors(book, account_id)
     moves = activities(book, account_id)
+    landed = {record.id: landing(record, ordered, tz) for record in moves}
     gaps = []
-    for position, (record_id, anchor) in enumerate(ordered):
+    for index, record in enumerate(ordered):
+        anchor = record.body
         if not isinstance(anchor, Observation):
             continue
-        if position == 0:
-            gaps.append(Gap(record_id, account_id, anchor.as_of, None, None))
+        if index == 0:
+            gaps.append(Gap(record.id, account_id, anchor.as_of, None, None, None, ()))
             continue
-        previous_id, previous = ordered[position - 1]
-        between = sum(
-            legs(activity)[account_id]
-            for activity_id, activity in moves
-            if _placed(activity, previous, tz, activity_id, previous_id) == "after"
-            and _placed(activity, anchor, tz, activity_id, record_id) == "before"
+        between = [move for move in moves if landed[move.id] == index]
+        expected = ordered[index - 1].body.amount + sum(
+            legs(move.body)[account_id] for move in between
         )
-        expected = previous.amount + between
         gaps.append(
             Gap(
-                record_id,
+                record.id,
                 account_id,
                 anchor.as_of,
+                record.revisions[-1].confirmed_difference,
                 anchor.amount - expected,
                 GAP_LABEL[anchor.basis],
+                tuple(move.id for move in between if move.seq > record.seq),
             )
         )
     return gaps
@@ -337,16 +376,26 @@ def activity_totals(
             continue
         if bucket is not None and source_in:
             name, sign = bucket
-            category = activity.category or "uncategorized"
+            category = category_of(book, activity) or "uncategorized"
             by_category = target[f"{name}_by_category"]
             target[name] += sign * activity.amount
             by_category[category] = by_category.get(category, 0) + sign * activity.amount
+            gross = {"expense": "purchases", "refund": "refunds"}.get(activity.kind)
+            if gross:
+                target[gross] += activity.amount
         elif bucket is None and source_in != counter_in:
             direction = (
                 "moved_out_of_scope" if source_in else "moved_in_from_outside_scope"
             )
             target[direction] += activity.amount
     return {currency: Totals(**values) for currency, values in sorted(sums.items())}
+
+
+def category_of(book: Book, activity: Activity) -> Optional[str]:
+    if activity.category or activity.refund_of is None:
+        return activity.category
+    purchase = book.records.get(activity.refund_of)
+    return purchase.body.category if purchase is not None else None
 
 
 def position(
@@ -362,7 +411,6 @@ def position(
         group = groups.setdefault(account.currency, _blank_group())
         if account.archived:
             group["archived"].append(account_id)
-            continue
         side = "assets" if NATURE[account.type] == "asset" else "liabilities"
         current = balance(book, account_id, at, tz)
         if isinstance(current, Unknown):
@@ -381,7 +429,7 @@ def position(
         group["gaps"].extend(
             gap
             for gap in observation_gaps(book, account_id, tz)
-            if gap.label == "unexplained" and gap.amount
+            if gap.label == "unexplained" and gap.remaining
         )
     return {
         currency: Position(
@@ -391,13 +439,85 @@ def position(
             coverage=Coverage(
                 accounts_known=tuple(group["known"]),
                 accounts_unknown=tuple(group["unknown"]),
-                archived_excluded=tuple(group["archived"]),
+                archived_included=tuple(group["archived"]),
                 oldest_anchor_as_of=min(group["as_of"], default=None),
                 unexplained_gaps=tuple(group["gaps"]),
             ),
         )
         for currency, group in sorted(groups.items())
     }
+
+
+def standing(account: Account, current: Balance) -> str:
+    if isinstance(current, Unknown):
+        return "unknown"
+    if NATURE[account.type] == "asset":
+        return "overdrawn" if current.amount < 0 else "held"
+    if current.amount == 0:
+        return "settled"
+    return "owed" if current.amount < 0 else "credit_in_your_favor"
+
+
+def space_scope(book: Book, space_id: str) -> list[str]:
+    return sorted(
+        account.id for account in book.accounts.values() if account.space_id == space_id
+    )
+
+
+FULFILLING_KINDS: Mapping[str, frozenset] = {
+    "out": frozenset({"expense", "debt_payment", "transfer"}),
+    "in": frozenset({"income"}),
+}
+
+
+def fulfills(activity: Activity, expectation: Expectation) -> bool:
+    """Derived on every read, so a changed account or kind reopens the occurrence."""
+    return (
+        activity.fulfills == expectation.id
+        and activity.account_id == expectation.account_id
+        and activity.kind in FULFILLING_KINDS[expectation.direction]
+    )
+
+
+def expectation_status(book: Book, expectation_id: str) -> str:
+    expectation = book.expectations[expectation_id]
+    fulfilled = any(
+        isinstance(record.body, Activity) and fulfills(record.body, expectation)
+        for record in live_records(book)
+    )
+    return "completed" if fulfilled else "planned"
+
+
+def forecast(book: Book, scope: Iterable[str]) -> dict[str, int]:
+    members = set(scope)
+    totals: dict[str, int] = {}
+    for expectation in book.expectations.values():
+        if expectation.account_id not in members:
+            continue
+        if expectation_status(book, expectation.id) == "completed":
+            continue
+        currency = book.accounts[expectation.account_id].currency
+        sign = 1 if expectation.direction == "in" else -1
+        totals[currency] = totals.get(currency, 0) + sign * expectation.amount
+    return dict(sorted(totals.items()))
+
+
+def _same_source(first: Record, second: Record) -> bool:
+    digest = (first.revisions[0].provenance.source_ref or {}).get("digest")
+    other = (second.revisions[0].provenance.source_ref or {}).get("digest")
+    return digest is not None and digest == other
+
+
+def _on_or_before(activity: Activity, at: datetime, tz: ZoneInfo) -> bool:
+    if activity.occurred_at is not None:
+        return activity.occurred_at <= at
+    return activity.occurred_on <= at.astimezone(tz).date()
+
+
+def _basis(anchor: Anchor, account: Account) -> str:
+    if isinstance(anchor, Observation):
+        return anchor.basis
+    return "value_estimate" if account.type in ESTIMATED_TYPES else "opening"
 
 
 def _side_total(group: dict, side: str) -> Optional[int]:
@@ -413,33 +533,12 @@ def _net_total(group: dict) -> Optional[int]:
     return round_half_up(group["assets"] + group["liabilities"])
 
 
-def _placed(
-    activity: Activity,
-    anchor: Anchor,
-    tz: ZoneInfo,
-    activity_id: str,
-    anchor_id: str,
-) -> SameDayOrder:
-    placed = order(activity, anchor, tz, activity_id, anchor_id)
-    if placed is None:
-        raise ValueError("observation_order_unknown must be resolved at review")
-    return placed
-
-
-def _on_or_before(activity: Activity, at: datetime, tz: ZoneInfo) -> bool:
-    if activity.occurred_at is not None:
-        return activity.occurred_at <= at
-    return activity.occurred_on <= at.astimezone(tz).date()
-
-
-def _basis(anchor: Anchor) -> str:
-    return anchor.basis if isinstance(anchor, Observation) else "opening"
-
-
 def _blank_sums() -> dict:
     return {
         "spending": 0,
         "income": 0,
+        "purchases": 0,
+        "refunds": 0,
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
         "spending_by_category": {},

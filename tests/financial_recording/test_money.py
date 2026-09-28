@@ -2,7 +2,6 @@ from fractions import Fraction
 
 import pytest
 
-from tests.financial_recording import scenarios
 from tests.financial_recording.money import (
     InvalidInput,
     exponent,
@@ -69,14 +68,3 @@ def test_unknown_code_is_refused_not_defaulted_to_two_digits():
 )
 def test_round_half_up_rounds_ties_away_from_zero(value, rounded):
     assert round_half_up(value) == rounded
-
-
-def test_multiple_precisions_scenario():
-    assert scenarios.multiple_precisions() == {
-        "yen_balance": 1500,
-        "dinar_balance": 1234,
-        "yen_fraction_issues": {"amount_precision": "blocking"},
-        "yen_fraction_opening": "InvalidInput:amount_precision",
-        "unknown_currency": "InvalidInput:currency_unsupported",
-        "positions": {"DOP": 1000, "JPY": 1500, "KWD": 1234},
-    }
