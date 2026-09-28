@@ -1,0 +1,15 @@
+{
+  "test": "sample account creation remains an unsaved draft and leaves sample balances unchanged",
+  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
+  "recordedAt": "2026-09-28T20:55:57.310Z",
+  "status": "passed",
+  "elapsedMs": 2285,
+  "browser": "147.0.7727.15",
+  "baseURL": "http://127.0.0.1:3197",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 62,
+    "pageErrors": []
+  },
+  "errors": []
+}

@@ -1,0 +1,29 @@
+{
+  "name": "tablet-en-dca-confirmation",
+  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
+  "surfaceChanges": null,
+  "capturedAt": "2026-09-28T20:55:22.883Z",
+  "url": "http://127.0.0.1:3197/dev/ecosystem?view=argus&audience=sample&state=sample",
+  "viewport": {
+    "width": 834,
+    "height": 1112
+  },
+  "browser": "147.0.7727.15",
+  "platform": "darwin 27.0.0 arm64",
+  "node": "v26.10.0",
+  "timezone": "America/Santo_Domingo",
+  "reducedMotion": "reduce",
+  "deviceScaleFactor": 1,
+  "captureOnlyMask": "Next.js development indicator (nextjs-portal) hidden during screenshot capture only",
+  "language": "en",
+  "resolvedTheme": "antialiased h-full light",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 31,
+    "pageErrors": []
+  },
+  "limitations": [
+    "Local authored fixtures only",
+    "No model, provider, authentication or financial persistence exercised"
+  ]
+}

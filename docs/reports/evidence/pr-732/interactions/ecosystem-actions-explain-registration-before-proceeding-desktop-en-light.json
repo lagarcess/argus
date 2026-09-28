@@ -1,0 +1,15 @@
+{
+  "test": "ecosystem actions explain registration before proceeding: desktop-en-light",
+  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
+  "recordedAt": "2026-09-28T20:55:46.656Z",
+  "status": "passed",
+  "elapsedMs": 1433,
+  "browser": "147.0.7727.15",
+  "baseURL": "http://127.0.0.1:3197",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 31,
+    "pageErrors": []
+  },
+  "errors": []
+}

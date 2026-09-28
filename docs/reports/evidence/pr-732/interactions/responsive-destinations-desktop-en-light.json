@@ -1,0 +1,15 @@
+{
+  "test": "responsive destinations: desktop-en-light",
+  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
+  "recordedAt": "2026-09-28T20:55:26.252Z",
+  "status": "passed",
+  "elapsedMs": 2234,
+  "browser": "147.0.7727.15",
+  "baseURL": "http://127.0.0.1:3197",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 31,
+    "pageErrors": []
+  },
+  "errors": []
+}

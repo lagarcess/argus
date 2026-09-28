@@ -114,16 +114,69 @@ contracts remain with the backend owner.
 - Keep preference persistence with the root providers. Only theme and browser
   language persist here; entered financial values and chat drafts do not.
 
-## Verification status
+## Integration and evidence identity
 
-Implementation and browser acceptance are in progress. The terminal evidence
-record will link exact-head captures, interaction results, CI and final review.
-This document does not yet claim readiness.
+| Item | Full SHA |
+| --- | --- |
+| Original fetched integration base | `4b84e054a0d8079b21f38784335ad3241809b4cd` |
+| Fetched integration at reconciliation | `3fa0dd92167791d82ce81c167c490396358c4316` |
+| One-way reconciliation merge | `2b3e6cf2589d87c1bc206e8a93511e4c32b95005` |
+| Committed browser evidence head | `356720b044133a69da2889314d4f3571813f2968` |
 
-Existing frontend baseline: `cd web && bun test`, 2,193 passed across 204 files,
-zero failures. This predates the completed preview and is not its acceptance
-evidence. Runtime versions: macOS 27.0 arm64, Bun 1.4.2, Node v26.10.0,
-Next 16.2.4 and Playwright 1.59.1. CI uses its repository-pinned Bun version.
+The intervening integration changes are Supabase server-client isolation, Render
+hostname/benchmark configuration, and the mobile design publication. Runtime
+and API ownership changes are backend-only; no shared web state owner, component,
+package, route contract or migration changed. Render's hostname setting does not
+control this local preview. Affected integration tests are backend/auth/release
+checks. The design-authority overlap was inspected: the merged publication
+retains the exact archive already used here. The combined tree passes the
+modularity budget. No rebase or worker-to-integration merge was performed.
+
+The [evidence index](evidence/pr-732/README.md) contains 33 screenshots, their
+metadata and 29 interaction records. Capture-only hiding of the Next development
+indicator is disclosed. Images and metadata are committed together. Local
+source/build checks at the reconciliation merge remain applicable to the evidence
+head: the two intervening commits alter only the focused production/browser tests.
+The terminal PR audit records the final PR head and explicitly revalidates any
+later documentation/evidence-only delta. It is written after the final review.
+
+## Verification
+
+- Full fixture browser suite: **29 passed**. Every destination at desktop,
+  tablet and narrow widths; English/es-419; Light/Dark/System persistence;
+  keyboard/focus/history; draft, correction, Recents and recovery behavior;
+  long labels and 200% text. Zero API/external requests or browser exceptions.
+- Production gate: **5 passed**. Preview produces the server not-found result;
+  existing root/login/signup render and unauthenticated chat keeps its sign-in
+  redirect. Inert localhost Supabase configuration avoids live services.
+- Frontend suite: **2,193 passed**, 204 files, zero failures.
+- Frontend lint: zero errors; eight existing warnings in shared production
+  components, none added by this lane.
+- Production build and TypeScript: passed. Only Next-generated custom-dist
+  additions to `tsconfig.json` were restored; no shared config change is in the PR.
+- Changed documentation links, whitespace and combined-tree modularity: passed.
+- Independent latest-delta review: clean after fixing overlay handoff and
+  empty/no-match Recents recovery. Hosted CI and the final Codex review are
+  recorded in [PR #732](https://github.com/lagarcess/argus/pull/732).
+
+Runtime: macOS 27.0 arm64, Bun 1.4.2, Node v26.10.0, Next 16.2.4,
+Playwright 1.59.1 / Chromium 147.0.7727.15. CI uses repository-pinned Bun 1.3.14.
+This is Chromium acceptance, not a Safari/Firefox or native-device claim.
+
+With the development server running, reproduce from `web`:
+
+```sh
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3197 \
+  node node_modules/@playwright/test/cli.js test \
+  --config e2e/ecosystem-preview.playwright.config.ts
+```
+
+For production isolation, build into `.next-ecosystem-production`, start it on
+3198 with `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:3999` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY=preview-only-unused`, then use the same command
+with `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3198` and
+`--config e2e/ecosystem-preview-production.playwright.config.ts`. Do not point
+these checks at a live backend or reuse authenticated browser state.
 
 The prescribed free mocked backend harness was attempted at the spec head.
 Collection of `test_chat_runtime_trajectory_harness.py` failed while importing

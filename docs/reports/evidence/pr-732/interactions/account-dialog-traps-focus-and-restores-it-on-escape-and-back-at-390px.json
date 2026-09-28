@@ -1,0 +1,15 @@
+{
+  "test": "account dialog traps focus and restores it on Escape and Back at 390px",
+  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
+  "recordedAt": "2026-09-28T20:55:41.125Z",
+  "status": "passed",
+  "elapsedMs": 1011,
+  "browser": "147.0.7727.15",
+  "baseURL": "http://127.0.0.1:3197",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 31,
+    "pageErrors": []
+  },
+  "errors": []
+}
