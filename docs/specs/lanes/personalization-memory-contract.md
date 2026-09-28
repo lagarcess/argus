@@ -16,6 +16,15 @@ and disposable local Supabase proof. It does not authorize a merge, integration
 mutation, hosted database write, live provider call, deployment, tester
 exposure, or work in the later API, runtime, UI, or analytics slices.
 
+## Current status (2026-09-25)
+
+This contract described incubation. Memory has since shipped. Current
+production availability and the approved widening transition are owned by
+[PRODUCT.md Current production availability and planned changes](../../PRODUCT.md#current-production-availability-and-planned-changes).
+When `ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL` is off, the API keeps canonical
+token-match recall (`semantic_recall_enabled()` in
+`src/argus/api/personalization_memory.py`).
+
 ## Goal
 
 Build cumulative production-intent personalization memory for registered
@@ -441,7 +450,10 @@ the `argus-qa` stack remain untouched.
 - **Retrieval provider decision (locked):** the semantic-recall/retrieval layer
   behind the existing `MemoryProvider` protocol (`src/argus/memory/provider.py`)
   will be **Mem0** (OSS/self-hosted), not a hand-built Supabase pgvector +
-  Perplexity embeddings pipeline. Mem0 owns fact extraction, deduplication,
+  Perplexity embeddings pipeline. Whether semantic recall is on in production
+  is owned by
+  [PRODUCT.md availability](../../PRODUCT.md#current-production-availability-and-planned-changes).
+  Mem0 owns fact extraction, deduplication,
   conflict resolution, embedding generation (default OpenAI, swappable), and
   user/agent/session-scoped retrieval internally; Argus is only responsible for
   calling `.add()` on new confirmed content and `.search()`/`.get()` at
