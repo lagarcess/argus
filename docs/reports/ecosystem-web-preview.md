@@ -5,7 +5,7 @@ layout. It is not a production financial application or an authentication proof.
 The [bounded spec](../superpowers/specs/2026-09-28-responsive-ecosystem-preview.md)
 was committed first as `265adac5`.
 
-**Refinement in progress, September 28:** the earlier READY claim is withdrawn.
+**Refined preview, September 28:** the earlier READY claim remains withdrawn.
 The founder has not given visual acceptance or authorized landing. The existing
 web application governs desktop/tablet composition; the mobile archive governs
 shared identity, ecosystem experience and narrow layouts. Earlier checks and
@@ -38,13 +38,72 @@ parallel production design system. `SidebarHeader` currently has English-only
 collapse labels; the preview uses its visual pattern with local bilingual
 labels instead of changing a shared owner.
 
+## Current refinement evidence
+
+The [before/after comparison](evidence/pr-732/web-refinement/README.md) contains
+31 existing-web/before captures and 48 fresh after captures. The after run
+records **46 passing interaction cases**, zero API/external requests and zero
+browser exceptions. Its [verification record](evidence/pr-732/web-refinement/after/verification.json)
+and per-case JSON bind the evidence to the code below.
+
+| Identity | Full SHA |
+| --- | --- |
+| Original integration base | `4b84e054a0d8079b21f38784335ad3241809b4cd` |
+| Current reconciled integration | `19550f28e344c1004dd3ea366625c25fae4b3355` |
+| Latest one-way reconciliation merge | `f2eacef631d87fdca2b763ef5100d7980933300b` |
+| After evidence code head | `53029f5d7c18827adba9daf79197936086ea0188` |
+| After evidence full web tree | `6f8fd6c501fd48e8af8e35688bbe227a98d988bc` |
+| After evidence preview-source tree | `906080f3045c87c1708ee6206a03625eaf11ff03` |
+
+The refined preview inherits the existing web rail, reading widths, starting
+chat composition, active transcript/composer separation and settings density.
+Accounts and Search retain their lists beside account details on desktop. An
+already selected URL remains one nonmodal panel across resize, stacked above
+the list below 1024px; new smaller-screen opens use the shared sheet. This avoids
+creating duplicate history during a presentation change. Selecting a lower row
+reveals the detail heading; closing returns focus to a visible source row.
+Narrow navigation owns its height in the shell, including enlarged labels, so
+content and composer controls remain above it without a second height rule.
+
+The full matrix covers 1440/1024/1023/834/390/360px widths, English and es-419,
+Light/Dark/System persistence, all seven destinations, guest handoff, local
+empty/sample/loading/error states, account create/edit/correction, Recents,
+unsent drafts, keyboard/dialog focus, browser history, scrolling and 200% text.
+The DCA fixture retains an explicit recurring contribution and its monthly
+cadence in both languages; its existing confirmation controls stay inert.
+
+Additional local checks at the evidence head: **2,205 frontend tests** across
+205 files; **5 production-entry checks**; production build/TypeScript; lint
+with zero errors and eight pre-existing shared-component warnings; changed
+documentation links; and the modularity budget on the reconciled tree. The
+first full refinement run exposed narrow navigation covering an account
+action; its incomplete captures are not accepted evidence. The fresh full run
+above follows the layout correction. Final GitHub CI, review outcome and
+unresolved-thread count belong to the terminal PR audit written after review.
+
+Integration advances since the earlier checkpoint add the #672 landing
+register, the separately owned #733 chart prototype and its #737 landing
+register. They do not change this lane's runtime or UI state owners, API/data
+contract, migrations, environment variables or directly affected tests. The
+prototype is not imported. Reconciliation is a normal one-way merge with no
+rebase. Original/before evidence remains historical; the after run replaces
+all affected behavioral evidence. Later documentation/evidence-only commits
+must explicitly revalidate the recorded web tree in the terminal audit.
+
+This is local Chromium fixture evidence on macOS arm64. It does not exercise
+real authentication, server authorization, persistence, model/provider turns,
+physical devices or other browser engines. It does not grant founder visual
+acceptance, landing, deployment or financial API wiring authority.
+
 ## Launch and inspect
 
 From the repository root:
 
 ```sh
 cd web
-NEXT_PUBLIC_ENABLE_SPANISH=true NEXT_DIST_DIR=.next-ecosystem-preview \
+NEXT_PUBLIC_ENABLE_SPANISH=true \
+  NEXT_PUBLIC_ARGUS_API_URL=http://127.0.0.1:3999/api/v1 \
+  NEXT_DIST_DIR=.next-ecosystem-preview \
   bun run dev -- --hostname 127.0.0.1 --port 3197
 ```
 

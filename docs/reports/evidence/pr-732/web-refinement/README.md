@@ -4,6 +4,51 @@ The previous READY claim is withdrawn. This checkpoint compares the preview
 with the existing Argus web application and records a bounded refinement in
 the same PR. It is not founder visual acceptance or landing authorization.
 
+## Refined preview and comparison
+
+The [after run](after/browser-run.txt) passes all **46 cases**, with **48 PNGs**
+and one interaction record per case. All records name code head
+`53029f5d7c18827adba9daf79197936086ea0188` and report zero API/external requests
+and zero browser exceptions. The [verification record](after/verification.json)
+also records the full web tree, environment and the other local gates.
+
+| Surface | Before/reference | Refined preview |
+| --- | --- | --- |
+| Desktop starting chat | [Existing web](before/integration-1440-cold-chat-expanded-rail.png), [before](before/preview-before-1440-argus.png) | [Centered greeting and composer](after/desktop-en-light-argus.png) |
+| Desktop active chat | [Existing web](before/integration-1440-active-chat-fixture.png) | [Stable header and docked composer](after/desktop-en-light-active-chat-docked.png), [200% text and independent scrolling](after/desktop-en-light-active-chat-text-200-scroll.png) |
+| Home | [Desktop before](before/preview-before-1440-home.png), [narrow before](before/preview-before-390-home.png) | [Desktop](after/desktop-en-light-home.png), [Spanish/Dark](after/desktop-es-dark-home.png), [narrow Coming up priority](after/narrow-home-upcoming-priority.png) |
+| Tablet navigation | [Existing collapsed rail](before/integration-834-cold-chat-collapsed-rail.png), [before](before/preview-before-834-argus.png) | [Collapsed rail with Accounts](after/tablet-es-light-accounts.png), [local rail choice across preferences](after/tablet-es-light-rail-preferences-local-state.png) |
+| Account inspection | Earlier preview used dialogs at every width | [Accounts side pane](after/accounts-desktop-account-inspector.png), [Search side pane](after/search-desktop-account-inspector.png), [selected URL after resize](after/tablet-account-inspector-stacked-after-resize.png), [fresh tablet sheet](after/tablet-account-detail-after-resize.png) |
+| Settings | [Existing web](before/integration-1440-settings-open.png), [before](before/preview-before-1440-settings.png) | [Desktop grouped rows](after/desktop-en-light-settings.png), [narrow Spanish/Dark](after/narrow-es-dark-settings.png), [System persistence](after/settings-spanish-system-dark-persistence.png) |
+| Narrow reading area | [Before starting chat](before/preview-before-390-argus.png) | [Starting chat](after/narrow-en-light-argus.png), [active chat at 200% text](after/narrow-en-light-active-chat-text-200-scroll.png), [360px long label](after/compact-es-light-enlarged-text-long-label.png) |
+| Fixture truth and recovery | Same approved local sample boundaries | [Guest handoff](after/desktop-en-light-guest-registration-handoff.png), [unsaved draft](after/account-create-unsaved-review.png), [correction review](after/account-correction-review.png), [empty](after/home-empty-state.png), [loading](after/home-loading-state.png), [error](after/home-error-state.png) |
+
+Desktop/tablet composition follows the existing web owners. The five-destination
+narrow navigation keeps the mobile identity and participates in shell layout,
+so its actual height reserves the reading area. A selected account URL keeps
+its same nonmodal detail on resize; new tablet/narrow opens use the existing
+sheet. No shared production component, token or backend contract changed.
+
+Additional proof: [5 production checks](after/production-run.txt),
+[2,205 frontend tests](after/unit-run.txt), [build/TypeScript](after/build-run.txt),
+[lint](after/lint-run.txt) and [combined-tree modularity](after/modularity-run.txt).
+Lint reports eight existing shared-component warnings and no errors. The first
+full run at `f2eacef6` found narrow navigation covering an account action; that
+incomplete run is excluded. All after captures were refreshed after the fix.
+
+Environment: Chromium 147.0.7727.15, Node 26.10.0, macOS 27 arm64, local Next.js
+development route, reduced motion and America/Santo_Domingo timezone. Each PNG
+has adjacent metadata with dimensions, language, theme, time and source SHA.
+Starting greeting text may vary with the existing guest greeting's local time.
+Capture-only masking hides the Next.js development indicator. Real auth,
+server authorization, financial persistence, physical devices and other browser
+engines are not exercised. The production not-found result may use HTTP 200
+streaming with an explicit Next.js 404 marker; it contains no preview markup.
+
+The final PR audit must bind later publication heads to the recorded web tree
+`6f8fd6c501fd48e8af8e35688bbe227a98d988bc` and state the terminal CI/review
+outcome. Technical proof does not grant founder visual acceptance.
+
 ## Before and web references
 
 The [reference run](before/run.txt) passed all nine cells and captured 31 PNGs
