@@ -93,9 +93,15 @@ replacing production auth or the chat runtime.
 
 ### Ownership
 
+After the current foundations land, the **Project delivery lead** and the **VM
+serial captain** jointly own create/reopen/edit financial-account journey
+coordination across iPhone, Android, and web. They coordinate owners and
+sequencing; they do not take exclusive write away from the foundation lanes
+below, and they do not replace production auth or the chat runtime.
+
 | Surface | Owner | Boundary |
 | --- | --- | --- |
-| Integration landing / merges to `codex/private-alpha-next` | VM integration orchestrator | Only landing executor under the founder's existing bounded merge authorization. Product-lead coordination does not push to integration or edit branches another lane already owns. |
+| Integration landing / merges to `codex/private-alpha-next` | VM serial captain (integration orchestrator) | Only landing executor under the founder's existing bounded merge authorization. The Project delivery lead coordinates but does not push to integration or edit branches another lane already owns. |
 | Account domain, API, persistence; `API_CONTRACT` / `DATA_MODEL` amendments | Existing VM account-backend worker | Sole backend owner for this batch. No competing backend worker. Clients bind to its accepted first-slice payload contract once published. |
 | `ios/` continuation | Existing iPhone owner (Build iPhone iOS foundation) | Maps real sessions; continuation branches after foundations/dependencies land. Does not rewrite #729/#730 during their landing. |
 | `mobile/android/` continuation and pending #726 probe validation | Existing Android owner (Android phone foundation) | Same continuation rules as iPhone. Does not rewrite #729/#730 during their landing. |
