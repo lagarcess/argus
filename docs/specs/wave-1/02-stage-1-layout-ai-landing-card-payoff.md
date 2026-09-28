@@ -207,8 +207,8 @@ The code check 1C-4 is agreed. Every chip must pass it, now and later.
 4. The chip audience carried on the chat request so `first_answer_shown`
    gets `chip_audience`.
 5. The manifest name and description.
-6. The `card_payoff` calculation (12th in the registry) with a pure Decimal
-   engine, one side per currency, the 25% comparison row, and the edge cases.
+6. The `card_payoff` calculation with a pure Decimal engine, one side per
+   currency, the 25% comparison row, and the edge cases.
 7. "Antes de impuestos" / "Before taxes" on every calculated result.
 8. Field-specific missing-input questions, asked one at a time for card
    payoff.
