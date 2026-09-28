@@ -353,6 +353,15 @@
       "status": "blocked"
     },
     {
+      "case": "cancelling_a_second_selection_keeps_the_first_review",
+      "claim": "Cancelling a second selection of a file already in review leaves the first review, its drafts, and its file untouched.",
+      "group": "cancellation",
+      "observed": {
+        "reason": "requires the recording contract's reference model (pull request 724)"
+      },
+      "status": "blocked"
+    },
+    {
       "case": "retry_with_same_key",
       "claim": "Retrying a confirmation with the same key returns the same records and writes nothing new.",
       "group": "retry",
@@ -399,7 +408,7 @@
     }
   ],
   "counts": {
-    "blocked": 23,
+    "blocked": 24,
     "failed": 0,
     "passed": 15
   },

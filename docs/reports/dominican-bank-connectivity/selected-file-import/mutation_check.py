@@ -109,7 +109,7 @@ def cancel_without_reject(original):
 
 def cancel_keeps_file(original):
     def cancel(self, session):
-        for item in self.pending(session.intake.digest):
+        for item in self.pending(session.id):
             self.store.reject(item)
         self.selections.pop(session.id, None)
         session.status = "cancelled"
@@ -117,13 +117,25 @@ def cancel_keeps_file(original):
     return cancel
 
 
+def cancel_by_file(original):
+    def cancel(self, session):
+        for draft in self.store.state.drafts.values():
+            reference = draft.provenance.source_ref or {}
+            if (
+                draft.status == "proposed"
+                and reference.get("digest") == session.intake.digest
+            ):
+                self.store.reject(draft.id)
+        self.selections.pop(session.id, None)
+        self.sweep()
+        session.status = "cancelled"
+
+    return cancel
+
+
 def completion_keeps_file(original):
     def confirm_ready(self, session, key):
-        previews = [
-            self.store.preview(item) for item in self.pending(session.intake.digest)
-        ]
-        ready = [item for item in previews if not proof.blocking(item)]
-        return self.store.confirm_batch(ready, key) if ready else []
+        return self._confirm_in_order(session, key)
 
     return confirm_ready
 
@@ -140,7 +152,7 @@ def start_without_sweep(original):
 
 def remember_reviews(original):
     def review(self, session, account_map, stub=None):
-        self.__dict__.setdefault("seen", set()).add(session.intake.digest)
+        self.__dict__.setdefault("seen", set()).add(session.id)
         return original(self, session, account_map, stub)
 
     return review
@@ -149,7 +161,7 @@ def remember_reviews(original):
 def only_remembered_reviews(original):
     def open_reviews(self):
         seen = self.__dict__.get("seen", set())
-        return {digest: ids for digest, ids in original(self).items() if digest in seen}
+        return {review: ids for review, ids in original(self).items() if review in seen}
 
     return open_reviews
 
@@ -217,6 +229,11 @@ def mutations():
             "cancel keeps the stored file",
             [(proof.Importer, "cancel", cancel_keeps_file)],
             {"cancel_during_review", "cancel_after_partial_confirmation"},
+        ),
+        (
+            "cancel rejects every draft of the file",
+            [(proof.Importer, "cancel", cancel_by_file)],
+            {"cancelling_a_second_selection_keeps_the_first_review"},
         ),
         (
             "completed review keeps the stored file",

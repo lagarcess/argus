@@ -322,6 +322,7 @@
           "entry",
           "external_id",
           "file",
+          "review",
           "row"
         ]
       },
@@ -507,6 +508,18 @@
       "status": "passed"
     },
     {
+      "case": "cancelling_a_second_selection_keeps_the_first_review",
+      "claim": "Cancelling a second selection of a file already in review leaves the first review, its drafts, and its file untouched.",
+      "group": "cancellation",
+      "observed": {
+        "files": 1,
+        "first_drafts": 11,
+        "first_still_in_review": true,
+        "second_drafts": 0
+      },
+      "status": "passed"
+    },
+    {
       "case": "retry_with_same_key",
       "claim": "Retrying a confirmation with the same key returns the same records and writes nothing new.",
       "group": "retry",
@@ -564,13 +577,13 @@
   "counts": {
     "blocked": 0,
     "failed": 0,
-    "passed": 38
+    "passed": 39
   },
   "fictional": true,
   "format": "selected-file-import-proof-v2",
   "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
   "recording_model": {
-    "digest": "27300e3b9945a6b16888ef528fac9c51a5185519070cb6c6b14e14c7556255fa",
-    "ref": "lagarcess/argus#724 at 6f8fc4421f34c1a2979c1f9fb232ce45cb9155d3"
+    "digest": "88baa7c40f813d6b6350faf4b2c73623d1575bd36b44d65be6a4cb1b6423f3c8",
+    "ref": "lagarcess/argus#724 at d081bfcdf5c7c2bee767d873f232752432098c39"
   }
 }

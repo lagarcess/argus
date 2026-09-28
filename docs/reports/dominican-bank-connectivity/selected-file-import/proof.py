@@ -40,7 +40,16 @@ RECOVERY = {
     "unsupported_type": "choose_csv_pdf_or_image",
 }
 SUFFIX = {"pdf": ".pdf", "csv": ".csv", "png": ".png", "jpeg": ".jpg", "heic": ".heic"}
-REFERENCE_KEYS = {"digest", "file", "row", "page", "external_id", "entry", "stub_digest"}
+REFERENCE_KEYS = {
+    "digest",
+    "file",
+    "row",
+    "page",
+    "external_id",
+    "entry",
+    "review",
+    "stub_digest",
+}
 HOUSEHOLD = "household"
 ASSUMPTIONS = {
     "status": "Experimental choices made to run the proof. Unresolved, and not approved production defaults.",
@@ -154,8 +163,18 @@ class Importer:
         self.store = store
         self.sources = workdir / "sources"
         self.selections: dict[str, Selection] = {}
-        self._ids = itertools.count(1)
+        self._ids = itertools.count(self._next_review())
         self.sweep()
+
+    def _next_review(self) -> int:
+        if self.store is None:
+            return 1
+        numbers = [
+            int(reference["review"].rsplit("-", 1)[1])
+            for draft in self.store.state.drafts.values()
+            if (reference := draft.provenance.source_ref or {}).get("review")
+        ]
+        return max(numbers, default=0) + 1
 
     def select(self, selection: Selection) -> Session:
         intake = check(selection)
@@ -226,7 +245,7 @@ class Importer:
 
     def _add(self, session: Session, label: str, fields: dict, reference: dict) -> None:
         provenance = derive.Provenance(
-            "document", CLOCK, {**reference, "entry": session.entry}
+            "document", CLOCK, {**reference, "entry": session.entry, "review": session.id}
         )
         draft = self.store.draft(fields, provenance)
         if "already_recorded" in blocking(self.store.preview(draft.id)):
@@ -238,25 +257,39 @@ class Importer:
     def open_reviews(self) -> dict[str, list[str]]:
         found: dict[str, list[str]] = {}
         for draft in self.store.state.drafts.values():
-            digest = (draft.provenance.source_ref or {}).get("digest")
-            if draft.status == "proposed" and digest:
-                found.setdefault(digest, []).append(draft.id)
+            review = (draft.provenance.source_ref or {}).get("review")
+            if draft.status == "proposed" and review:
+                found.setdefault(review, []).append(draft.id)
         return found
 
-    def pending(self, digest: str) -> list[str]:
-        return self.open_reviews().get(digest, [])
+    def pending(self, review: str) -> list[str]:
+        return self.open_reviews().get(review, [])
 
     def confirm_ready(self, session: Session, key: str) -> list:
-        previews = [
-            self.store.preview(item) for item in self.pending(session.intake.digest)
-        ]
-        ready = [item for item in previews if not blocking(item)]
-        confirmed = self.store.confirm_batch(ready, key) if ready else []
+        confirmed = self._confirm_in_order(session, key)
         self.sweep()
         return confirmed
 
+    def _confirm_in_order(self, session: Session, key: str) -> list:
+        confirmed = []
+        for step, checks in (("activity", False), ("checks", True)):
+            previews = [self.store.preview(item) for item in self.pending(session.id)]
+            ready = [
+                item
+                for item in previews
+                if not blocking(item)
+                and (
+                    self.store.state.drafts[item.draft_id].fields.get("kind")
+                    == "balance_observation"
+                )
+                == checks
+            ]
+            if ready:
+                confirmed += self.store.confirm_batch(ready, f"{key}:{step}")
+        return confirmed
+
     def cancel(self, session: Session) -> None:
-        for item in self.pending(session.intake.digest):
+        for item in self.pending(session.id):
             self.store.reject(item)
         self.selections.pop(session.id, None)
         self.sweep()
@@ -264,7 +297,16 @@ class Importer:
 
     def sweep(self) -> None:
         stored = list(self.sources.glob("*"))
-        keep = {digest[:16] for digest in self.open_reviews()} if stored else set()
+        keep = (
+            {
+                reference["digest"][:16]
+                for draft in self.store.state.drafts.values()
+                if draft.status == "proposed"
+                and (reference := draft.provenance.source_ref or {}).get("digest")
+            }
+            if stored
+            else set()
+        )
         for path in stored:
             if path.stem not in keep:
                 path.unlink()
@@ -1172,15 +1214,14 @@ def cancel_after_partial(fx, workdir):
 def pause_resume(fx, workdir):
     env = make_env(workdir)
     session = _csv_session(env)
-    digest = session.intake.digest
-    pending_before = env.importer.pending(digest)
+    pending_before = env.importer.pending(session.id)
     env.importer = Importer(env.store, workdir)
     found_after_restart = env.importer.open_reviews()
     files_after_restart = len(env.importer.held()["on_disk"])
     reopened = _csv_session(env, "share_extension")
     observed = {
         "pending_before_restart": len(pending_before),
-        "found_after_restart": found_after_restart == {digest: pending_before},
+        "found_after_restart": found_after_restart == {session.id: pending_before},
         "files_after_restart": files_after_restart,
         "second_copy_drafts": len(reopened.drafts),
         "already_imported": len(reopened.already_imported),
@@ -1220,6 +1261,33 @@ def interrupted_review(fx, workdir):
 
 
 @case(
+    "cancelling_a_second_selection_keeps_the_first_review",
+    "cancellation",
+    "Cancelling a second selection of a file already in review leaves the first review, its drafts, and its file untouched.",
+)
+def cancel_second_selection(fx, workdir):
+    env = make_env(workdir)
+    first = _csv_session(env)
+    second = _csv_session(env, "share_extension")
+    env.importer.cancel(second)
+    drafts = env.store.state.drafts
+    observed = {
+        "second_drafts": len(second.drafts),
+        "first_still_in_review": all(
+            drafts[d].status == "proposed" for d in first.drafts
+        ),
+        "first_drafts": len(first.drafts),
+        "files": len(env.importer.held()["on_disk"]),
+    }
+    return observed == {
+        "second_drafts": 0,
+        "first_still_in_review": True,
+        "first_drafts": 11,
+        "files": 1,
+    }, observed
+
+
+@case(
     "retry_with_same_key",
     "retry",
     "Retrying a confirmation with the same key returns the same records and writes nothing new.",
@@ -1229,9 +1297,7 @@ def retry_same_key(fx, workdir):
     session = _csv_session(env)
     ready = [
         p
-        for p in (
-            env.store.preview(i) for i in env.importer.pending(session.intake.digest)
-        )
+        for p in (env.store.preview(i) for i in env.importer.pending(session.id))
         if not blocking(p)
     ]
     first = env.store.confirm_batch(ready, "batch-1")
