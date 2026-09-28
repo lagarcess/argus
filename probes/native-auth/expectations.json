@@ -1,0 +1,61 @@
+{
+  "documented_failures": {
+    "A14": "F1: the API's shared Supabase Auth client refreshes sessions it returned. Fixed by PR #728, which this branch does not contain.",
+    "I11": "F5: supabase-swift logs raw tokens when given a logger, and Session's description contains tokens. SDK behavior; not fixed by any PR."
+  },
+  "automated": {
+    "http-session.json": ["A1", "A2", "A3", "A4", "A5a", "A5b", "A6", "A14", "A7", "A8", "A9", "A10", "A11", "A12", "A13"],
+    "http-guest.json": ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10"],
+    "http-guest-adapter.json": ["S1", "S2", "S3", "S4", "S5", "S6", "S7"],
+    "http-callbacks.json": ["D1", "D2", "D3", "D4", "D5", "D6", "D7"],
+    "http-captcha-turnstile-pass.json": ["B1", "B2"],
+    "http-captcha-turnstile-fail.json": ["B3"],
+    "http-captcha-turnstile-spent.json": ["B4"],
+    "ios-simulator.json": ["I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11"]
+  },
+  "app": {
+    "app/turnstile-test-pass.json": {
+      "id": "T1",
+      "screenshots": ["app/turnstile-test-pass.png"],
+      "steps": [
+        {"step": "turnstile.open", "observed": {"sitekey": "1x00000000000000000000AA"}},
+        {"step": "turnstile.token", "observed": {"token_received": "true"}},
+        {"step": "guest.start", "observed": {"result": "ok", "me_status": "200"}}
+      ],
+      "forbidden_steps": ["turnstile.error", "turnstile.cancelled"]
+    },
+    "app/turnstile-test-fail.json": {
+      "id": "T2",
+      "screenshots": ["app/turnstile-test-fail.png"],
+      "steps": [
+        {"step": "turnstile.open", "observed": {"sitekey": "2x00000000000000000000AB"}},
+        {"step": "turnstile.error", "observed": {"token_received": "false"}}
+      ],
+      "forbidden_steps": ["turnstile.token", "guest.start"]
+    },
+    "app/turnstile-cancelled.json": {
+      "id": "T3, T4",
+      "screenshots": ["app/turnstile-test-interactive.png", "app/turnstile-cancelled.png"],
+      "steps": [
+        {"step": "turnstile.open", "observed": {"sitekey": "3x00000000000000000000FF"}},
+        {"step": "turnstile.cancelled", "observed": {"request_sent": "false"}}
+      ],
+      "forbidden_steps": ["turnstile.token", "guest.start"]
+    },
+    "app/callback-delivery.json": {
+      "id": "T5",
+      "screenshots": ["app/callback-delivery.png"],
+      "steps": [
+        {"step": "turnstile.token", "observed": {"token_received": "true"}},
+        {"step": "recovery.requested", "observed": {"result": "ok"}},
+        {"step": "callback.received", "observed": {"code_kind": "issued", "scheme": "argusnativeproof"}},
+        {"step": "callback.completed", "observed": {"result": "session", "me_status": "200"}},
+        {"step": "callback.received", "observed": {"code_kind": "issued"}},
+        {"step": "callback.completed", "observed": {"result": "refused"}},
+        {"step": "callback.received", "observed": {"code_kind": "forged"}},
+        {"step": "callback.completed", "observed": {"result": "refused"}}
+      ],
+      "forbidden_steps": []
+    }
+  }
+}

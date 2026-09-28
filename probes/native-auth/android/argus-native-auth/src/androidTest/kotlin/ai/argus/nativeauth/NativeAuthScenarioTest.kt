@@ -2,10 +2,12 @@ package ai.argus.nativeauth
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -45,7 +47,7 @@ class NativeAuthScenarioTest {
     private fun client(name: String, transport: HandoffTransport = HandoffTransport.SCOPED_COOKIES, base: String = arg("argusApi")) =
         ArgusNativeClient(context, arg("supabaseUrl"), arg("anonKey"), base, "$run-$name", transport, "10.${net.first}.${net.second}.${++ipCounter}")
 
-    private fun user(label: String): Pair<String, String> {
+    private suspend fun user(label: String): Pair<String, String> = withContext(Dispatchers.IO) {
         val email = "native-android-$label-$run@proof.argus.local"
         val password = UUID.randomUUID().toString() + "x9"
         val service = arg("serviceKey")
@@ -57,7 +59,7 @@ class NativeAuthScenarioTest {
             """{"email":"$email","password":"$password","email_confirm":true}""")).execute().use { assertEquals(200, it.code) }
         http.newCall(post("${arg("supabaseUrl")}/rest/v1/private_alpha_allowlist", """{"email":"$email"}""",
             "resolution=ignore-duplicates")).execute().close()
-        return email to password
+        email to password
     }
 
     private fun result(id: String, scenario: String, ok: Boolean, observed: Map<String, Any?>) {
@@ -111,10 +113,10 @@ class NativeAuthScenarioTest {
         val conversation = c.request("POST", "/conversations", buildJsonObject { put("title", JsonNull) })
             .body["conversation"]!!.jsonObject["id"]!!.jsonPrimitive.content
         c.createHandoff(email, conversation)
-        assertNotNull(c.handoffs.current)
+        assertNotNull(c.handoffs.current())
         val outcome = c.signIn(email, password, captcha)
         val owned = c.request("GET", "/conversations").body["items"]!!.jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
-        assertNull(c.handoffs.current)
+        assertNull(c.handoffs.current())
         result("K7", "Guest converts with Keystore-held handoff cookies", outcome.claimedConversationId == conversation && conversation in owned,
             mapOf("claimed" to (outcome.claimedConversationId == conversation)))
     }

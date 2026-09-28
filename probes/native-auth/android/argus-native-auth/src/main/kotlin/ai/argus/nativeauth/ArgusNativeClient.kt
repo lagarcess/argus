@@ -11,6 +11,8 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.handleDeeplinks
 import io.github.jan.supabase.auth.user.UserSession
 import io.github.jan.supabase.createSupabaseClient
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -50,9 +52,10 @@ class ArgusNativeClient(
     storeName: String,
     handoffTransport: HandoffTransport = HandoffTransport.SCOPED_COOKIES,
     deviceIp: String? = null,
+    io: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    val secureStore = SecureStore(context, storeName)
-    val transport = BearerTransport(argusBase, deviceIp)
+    val secureStore = SecureStore(context, storeName, io)
+    val transport = BearerTransport(argusBase, deviceIp, io)
     val handoffs = HandoffStore(secureStore, handoffTransport)
     val boundary = AccountBoundary()
     private val json = Json { ignoreUnknownKeys = true }
@@ -161,7 +164,7 @@ class ArgusNativeClient(
         return supabase.auth.currentAccessTokenOrNull() ?: throw ArgusAuthException.SignedOut()
     }
 
-    private fun authCall(path: String, bearer: String?, body: JsonElement): ApiResponse {
+    private suspend fun authCall(path: String, bearer: String?, body: JsonElement): ApiResponse {
         val response = transport.send("POST", path, bearer, body, handoffs.headers(path))
         handoffs.absorb(response)
         return response

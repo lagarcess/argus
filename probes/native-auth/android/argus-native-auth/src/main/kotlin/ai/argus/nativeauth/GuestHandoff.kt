@@ -15,12 +15,11 @@ class HandoffStore(private val store: SecureStore, val transport: HandoffTranspo
     private val key = "guest-handoff"
     private val cookieNames = setOf("argus-guest-handoff", "argus-guest-handoff-id")
 
-    val current: StoredHandoff?
-        get() = store.get(key)?.let { Json.decodeFromString<StoredHandoff>(it) }
+    suspend fun current(): StoredHandoff? = store.get(key)?.let { Json.decodeFromString<StoredHandoff>(it) }
 
-    fun headers(path: String): Map<String, String> {
+    suspend fun headers(path: String): Map<String, String> {
         if (!path.startsWith("/auth/")) return emptyMap()
-        val handoff = current
+        val handoff = current()
         return when (transport) {
             HandoffTransport.SCOPED_COOKIES ->
                 handoff?.let { mapOf("Cookie" to "argus-guest-handoff=${it.secret}; argus-guest-handoff-id=${it.id}") }
@@ -35,7 +34,7 @@ class HandoffStore(private val store: SecureStore, val transport: HandoffTranspo
         }
     }
 
-    fun absorb(response: ApiResponse) {
+    suspend fun absorb(response: ApiResponse) {
         when (transport) {
             HandoffTransport.SCOPED_COOKIES -> {
                 val cookies = response.setCookies.filter { it.name in cookieNames }
@@ -56,7 +55,7 @@ class HandoffStore(private val store: SecureStore, val transport: HandoffTranspo
         }
     }
 
-    fun clear() = store.remove(key)
+    suspend fun clear() = store.remove(key)
 
-    private fun save(handoff: StoredHandoff) = store.put(key, Json.encodeToString(handoff))
+    private suspend fun save(handoff: StoredHandoff) = store.put(key, Json.encodeToString(handoff))
 }

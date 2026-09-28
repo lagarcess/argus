@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from harness import Identities, Recorder, Stack, run_id
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import evidence_gate  # noqa: E402
+from harness import Identities, Recorder, Stack, run_id  # noqa: E402
 
 SUITES = {
     "session": "session_suite",
@@ -17,13 +20,6 @@ SUITES = {
     "captcha": "captcha_suite",
     "callbacks": "callback_suite",
 }
-REPO = Path(__file__).resolve().parents[3]
-
-
-def git_head() -> str:
-    return subprocess.run(
-        ["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True, check=True
-    ).stdout.strip()
 
 
 def main() -> None:
@@ -53,12 +49,16 @@ def main() -> None:
         {
             "suite": args.suite,
             "captured_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "argus_source_head": git_head(),
+            **evidence_gate.capture_identity(),
             "environment": "local lane Supabase stack argus-native-auth-proof (jwt_expiry=60, confirmations on) + unchanged Argus API",
         },
     )
     failed = [r.id for r in rec.results if r.verdict == "fail"]
     print(f"{len(rec.results)} checks, {len(failed)} failed {failed}")
+    problems = evidence_gate.verify(args.out.parent, "automated", [args.out.name])
+    for problem in problems:
+        print(f"EVIDENCE GATE: {problem}", file=sys.stderr)
+    sys.exit(1 if problems else 0)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,8 @@ unchanged Argus API.
 | `ios/ArgusAuthProbeApp/` | Host app: hosts the XCTests, runs Turnstile in `WKWebView`, receives callback URLs | 4 on the simulator |
 | `ios/turnstile/` | Local page that renders the Turnstile widget (port 57462) | 4 with test keys |
 | `android/` | Kotlin probe source. Never compiled here | Unverified |
+| `expectations.json`, `evidence_gate.py` | The declared check list per suite, the only documented failures, and the gate every runner exits through | Gate |
+| `tests/` | Regression tests for the gate | Unit |
 
 ## Safety properties
 
@@ -32,6 +34,24 @@ unchanged Argus API.
   iOS collector refuses any JWT-shaped value.
 - Captcha runs use Cloudflare's published test secrets and test sitekeys only.
 
+## Evidence gate
+
+Every runner exits with the verdict of `evidence_gate.py`, not with the raw
+tool status. The gate compares each evidence file with `expectations.json` and
+fails on a missing, repeated, or undeclared check, on any failure other than
+the documented ones (A14 and I11), on a documented failure that now passes, on
+an iOS run whose xcodebuild counts disagree, on an app log that departs from
+the declared steps, and on a capture taken from a dirty tree or from runtime
+code that differs from HEAD. Markdown changes do not make evidence stale.
+
+```bash
+python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-session-proof
+```
+
+```bash
+.venv/bin/python -m pytest probes/native-auth/tests -q --no-cov -c /dev/null --rootdir probes/native-auth
+```
+
 ## Reproduce
 
 Requirements: Docker, Supabase CLI 2.117 or later, Poetry environment for this
@@ -45,14 +65,16 @@ bash probes/native-auth/stack/up.sh off
 bash probes/native-auth/run-all.sh temp/native-auth-proof/final
 ```
 
-`run-all.sh` runs these in order: session, guest, and adapter suites; callbacks;
+`run-all.sh` runs these in order, stops at the first failing gate, and ends
+with the gate over the whole directory: session, guest, and adapter suites; callbacks;
 captcha in three test-secret modes, restarting the API after each switch; then
 the iOS XCTests hosted in the probe app on a simulator named
 "Argus Native Auth Proof", which it creates if missing.
 
 App-level demos (Turnstile in the web view and callback delivery) need the
-pass-mode test secret, the page server, and a person to tap Open on iOS's
-custom-scheme prompt:
+pass-mode test secret, the page server, and a person at the simulator. The
+script tells that person when to tap Cancel on the interactive check (never to
+complete it) and to tap Open if iOS asks before delivering a callback:
 
 ```bash
 bash probes/native-auth/stack/restart-auth.sh turnstile-pass
@@ -63,7 +85,7 @@ python3 -m http.server 57462 --bind 127.0.0.1 --directory probes/native-auth/ios
 ```
 
 ```bash
-bash probes/native-auth/ios/run-app-demos.sh temp/native-auth-proof/final/app
+bash probes/native-auth/ios/run-app-demos.sh temp/native-auth-proof/final
 ```
 
 Restart the API after `restart-auth.sh`: the switch also restarts Postgres, and

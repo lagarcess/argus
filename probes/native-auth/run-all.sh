@@ -37,4 +37,5 @@ for mode in turnstile-pass turnstile-fail turnstile-spent; do
   bash "$HERE/http_probe/run.sh" captcha --captcha-mode "$mode" --out "$OUT/http-captcha-$mode.json"
 done
 captcha_mode off
-bash "$HERE/ios/run-simulator-tests.sh" "$OUT/ios-simulator.json" || echo "iOS suite reported failures (see ios-simulator.json)"
+bash "$HERE/ios/run-simulator-tests.sh" "$OUT/ios-simulator.json"
+python3 "$HERE/evidence_gate.py" "$OUT" --scope automated

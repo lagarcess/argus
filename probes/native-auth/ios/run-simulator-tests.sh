@@ -31,7 +31,7 @@ set +e
 # Hosted in the probe app: Keychain writes fail in an unhosted test bundle.
 xcodebuild test -project ArgusAuthProbeApp.xcodeproj -scheme ArgusAuthProbeApp -destination "id=$UDID" \
   -derivedDataPath "$NATIVE_AUTH_WORK/DerivedData" -collect-test-diagnostics never "$@" > "$LOG" 2>&1
-STATUS=$?
 set -e
-python3 "$HERE/collect_results.py" "$LOG" "$OUT" "$UDID"
-exit $STATUS
+# xcodebuild exits nonzero for the documented I11 failure, so the collector's
+# evidence gate, which also checks xcodebuild's own counts, decides the result.
+exec python3 "$HERE/collect_results.py" "$LOG" "$OUT" "$UDID"

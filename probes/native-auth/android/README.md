@@ -12,15 +12,23 @@ someone completes the steps below and commits the result.
   app-owned mutex, revokes with `signOut(SignOutScope.LOCAL)`, and handles
   PKCE recovery callbacks.
 - `Transport.kt` uses OkHttp with `CookieJar.NO_COOKIES`, so Argus's `sb-*`
-  cookies are never stored.
+  cookies are never stored. `send` is a suspend function that runs the whole
+  exchange on an injected I/O dispatcher (default `Dispatchers.IO`), so a call
+  from `Dispatchers.Main` cannot block the UI thread.
 - `SecureStore.kt` encrypts values with a non-exportable Android Keystore AES
-  key. It stores both the Supabase session and the guest handoff.
+  key. It stores both the Supabase session and the guest handoff. Its Keystore
+  and preference I/O also run on the injected I/O dispatcher.
 - `GuestHandoff.kt` implements the scoped-cookie transport (unchanged Argus)
   and the header transport (the synthetic adapter).
 - `AccountBoundary.kt` drops responses that arrive after sign-out or an
   account switch.
 - `NativeAuthScenarioTest.kt` holds instrumented tests K1, K3, K4, K6, K7, and
   K8. They match iOS I1, I3, I4, I6, I7, and I8.
+- `MainThreadSafetyTest.kt` (instrumented) calls the transport and the secure
+  store from the main thread with StrictMode set to crash on network or disk
+  access.
+- `TransportDispatcherTest.kt` (JVM unit test, MockWebServer) proves `send`
+  runs on the injected dispatcher, not the caller's thread.
 
 ## Prerequisites
 
@@ -51,7 +59,13 @@ someone completes the steps below and commits the result.
    emulator -avd <name> -no-snapshot
    ```
 
-3. Run the instrumented tests. Pass the local stack's public keys from
+3. Run the JVM unit tests (needs the SDK to compile, not a device):
+
+   ```bash
+   cd probes/native-auth/android && ./gradlew :argus-native-auth:testDebugUnitTest
+   ```
+
+4. Run the instrumented tests. Pass the local stack's public keys from
    `supabase status` as instrumentation arguments:
 
    ```bash
@@ -60,7 +74,7 @@ someone completes the steps below and commits the result.
      -Pandroid.testInstrumentationRunnerArguments.serviceKey="$SERVICE_ROLE_KEY"
    ```
 
-4. Collect the `NATIVE_PROBE_RESULT` lines from `adb logcat` or the Gradle test
+5. Collect the `NATIVE_PROBE_RESULT` lines from `adb logcat` or the Gradle test
    report. Commit them under
    `docs/reports/evidence/native-auth-session-proof/android-emulator.json`.
 
