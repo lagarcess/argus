@@ -28,10 +28,11 @@ PORTS = {
 # identifier; a hosted allowlist entry needs the real bundle id or domain.
 NATIVE_CALLBACK = "argusnativeproof://auth-callback"
 # Cloudflare's published Turnstile test secrets. They are public test values:
-# 1x... always passes, 2x... always fails. See the report for the source.
+# 1x... always passes, 2x... always fails, 3x... reports a spent token. See the report for the source.
 TURNSTILE_TEST_SECRETS = {
     "turnstile-pass": "1x0000000000000000000000000000000AA",
     "turnstile-fail": "2x0000000000000000000000000000000AA",
+    "turnstile-spent": "3x0000000000000000000000000000000AA",
 }
 AUTH_OVERRIDES = {
     ("auth", "jwt_expiry"): "60",
