@@ -12,7 +12,7 @@ The contract serves MVEE sections 4.4, 4.5, 4.7, 5, and 12. The documentation au
 
 - Freshly fetched `origin/codex/private-alpha-next`. Record its SHA as the lane base.
 - `AGENTS.md`, `docs/DOCUMENTATION_AUTHORITY.md`, the MVEE, `docs/ARCHITECTURE.md`, `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`, and `.agent/designs/argus/DESIGN.md`.
-- This lane's [integration map](integration-map.md), [connector lifecycle experiment](connector-lifecycle-experiment.md), and [legal and regulatory matrix](legal-regulatory-matrix.md).
+- This lane's [integration map](integration-map.md), [connector lifecycle findings](connector-lifecycle-experiment.md), and [legal and regulatory matrix](legal-regulatory-matrix.md).
 - `tests/synthetic_ingestion/` and its evaluation in `docs/reports/synthetic-ingestion-evaluation.md`.
 - `docs/reports/payment-ledger-reuse-assessment.md` for money rules.
 
@@ -28,13 +28,13 @@ One documentation-only pull request to `codex/private-alpha-next` that adds a co
 6. **Field ownership.** Which fields a source may revise and which fields become owner-owned after an edit.
 7. **Source documents.** Storage location, visibility, retention period, and purge on deletion.
 8. **Privacy.** Record content stays out of logs, analytics, the shared research cache, sharing snapshots, and model prompts until a separate decision says otherwise. Name the test or lint that enforces each rule.
-9. **Connections, reserved.** The connection states, consent record, vault handle, and refresh health from the experiment, marked as reserved for a later lane and not built now.
+9. **Connections, reserved.** The connection states, consent record, vault handle, and refresh health from the connector lifecycle findings, marked as reserved for a later lane and not built now.
 10. **Decision 8.** A proposed reconciliation of archived decision 8 with MVEE section 4, marked for founder approval. Do not settle it silently.
-11. **Acceptance tests.** One behavior test per check in the experiment's committed report, stated so an implementation lane can write them first.
+11. **Acceptance tests.** Behavior tests the contract lane writes itself, informed by the connector lifecycle findings. The removed experiment's checks are research input, not gates.
 
 ## Acceptance criteria
 
-- Every check in the experiment's committed report maps to a contract rule and an acceptance test.
+- Every connector lifecycle finding maps to a contract rule or to an explicit decision to drop it.
 - Every item in the integration map's unresolved contracts has a proposed rule or a named open question for the founder.
 - The contract changes no runtime code, schema, migration, prompt, model-facing text, analytics event, or dependency.
 - The contract proposes, and does not apply, any change to `docs/API_CONTRACT.md` or `docs/DATA_MODEL.md`.

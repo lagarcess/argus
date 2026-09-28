@@ -18,7 +18,7 @@ Build the bridge on files people download from their own bank, starting with the
 
 **What requires institutional access or Dominican legal advice?** Legal advice is needed for credential-based access, including through Bridge, for extraction inside the person's own session, for the consent form and transfer basis under Ley 172-13 when data is stored in the United States, for article 30 of Ley 172-13 and the 2026 credit-information instructivo, and for access-log duties under Ley 53-07. Institutional access is needed for any bank API, any bank push of statements to Argus, any tokenized access, and any pilot under Circular SB 004/23. The [legal and regulatory matrix](legal-regulatory-matrix.md) lists the questions in priority order.
 
-**What architecture can later accept bank APIs cleanly?** A connection boundary where the retrieval method is the only replaceable part. Observations become proposals, the person confirms them, and confirmed records keep a provenance list. The [connector lifecycle experiment](connector-lifecycle-experiment.md) passes every synthetic check in its committed report, including a move of a card account from CSV files to an aggregator feed that ends with the same 4 records. The [integration map](integration-map.md) proposes the boundaries and maps the existing code that can carry them.
+**What architecture can later accept bank APIs cleanly?** A connection boundary where the retrieval method is the only replaceable part. Observations become proposals, the person confirms them, and confirmed records keep a provenance list. The [connector lifecycle findings](connector-lifecycle-experiment.md) record what a synthetic experiment showed, including a move of a card account from CSV files to an aggregator feed that ended with the same 4 records. The executable experiment is not part of this delivery. The [integration map](integration-map.md) proposes the boundaries and maps the existing code that can carry them.
 
 **Does the connectivity business have supporting evidence?** No. Argus has no bank agreement, no connector, and no demand data. A local credential-based competitor exists. The European Union, the United Kingdom, Australia, Brazil, Chile, and Canada register or accredit whoever receives account data, so a future Dominican framework may do the same. The [partnership evidence proposal](partnership-evidence.md) keeps the idea separate and names the conditions to revisit it.
 
@@ -30,7 +30,7 @@ Build the bridge on files people download from their own bank, starting with the
 | Do the candidate banks offer consumer account APIs? | No. Popular's API Portal returns reference data and a true-or-false account check. | [Bank matrix](bank-access-matrix.md) |
 | Does any aggregator confirm Dominican coverage? | No provider's own pages name a Dominican bank today. Bridge claims coverage without names, and Prometeo lists the country as planned. Salt Edge listed screen-scraping connectors for Popular and Banreservas from 2017 and for BHD by 2019, and had dropped every Dominican connector by July 2022. | [Bank matrix](bank-access-matrix.md) |
 | What did Plaid's history show? | Credential access was a bootstrap that took about a decade to leave. Liability followed interface design and data scope. | [Plaid lessons](plaid-lessons.md) |
-| Can the lifecycle absorb retries, pending holds, revisions, and a method change? | Yes in synthetic form. Weekly batch review needs 12 owner actions in 60 days, against 88 for confirming each row alone. | [Experiment](connector-lifecycle-experiment.md) |
+| Can the lifecycle absorb retries, pending holds, revisions, and a method change? | Yes in synthetic form. Weekly batch review needed 12 owner actions in 60 days, against 88 for confirming each row alone. | [Findings](connector-lifecycle-experiment.md) |
 | Can Rexi supply product facts? | No. Its terms require written authorization for any reuse. Official tariffs contradicted Rexi on 5 of 14 firm fields. | [Rexi appendix](rexi-product-discovery-appendix.md) |
 | Is Scrapling relevant? | Only its HTML parser, which `lxml` already covers. Its distinguishing features are out of bounds. | [Options comparison](options-comparison.md) |
 
@@ -61,7 +61,7 @@ The [next assignment](next-assignment.md) is independent of all seven and can st
 - Public sources only. Nobody signed in, enrolled, submitted a form, installed an app, or contacted a bank, Bridge, or Rexi. No credential, one-time code, session cookie, or customer record was requested, entered, or stored.
 - Popular's websites refuse non-browser clients. Its public pages were read in an ordinary browser session, and no verification challenge was solved.
 - Rexi's robots file and terms were read first. The inspection covered 9 distinct product pages, serially, at least 10 seconds apart.
-- The experiment uses fictional data from the synthetic ingestion kit and Faker. It makes no network call and imports nothing from `src/argus`.
+- The connector experiment used fictional data from the synthetic ingestion kit and Faker, made no network call, and imported nothing from `src/argus`. Its code is not part of this delivery. It remains readable at `66eb4e21496db9653bb936f2196c19a645a2835f`.
 - No paid service, no paid evaluation, and no broad runtime suite ran.
 - The session's shared web-search allowance ran out partway through. Later research used direct fetches of known official pages.
 - The assignment names a balance-reconciliation handoff. It was not on the inspected base. It now exists as `docs/specs/argus-account-balance-reconciliation-handoff.md` in pull request 727, and the [selected-file import proof](selected-file-import/README.md) uses its rule for activity dated behind a balance check. At the time of the report the closest material is the "Decisions exposed, not settled" section of `tests/synthetic_ingestion/README.md` and the two reports merged on 2026-09-27, [synthetic-ingestion-evaluation.md](../synthetic-ingestion-evaluation.md) and [payment-ledger-reuse-assessment.md](../payment-ledger-reuse-assessment.md).
@@ -74,9 +74,7 @@ The [next assignment](next-assignment.md) is independent of all seven and can st
 | [legal-regulatory-matrix.md](legal-regulatory-matrix.md) | Dated Dominican legal and regulatory matrix and questions for counsel |
 | [bank-access-matrix.md](bank-access-matrix.md) | Five institutions and the aggregators, every finding labelled |
 | [options-comparison.md](options-comparison.md) | Options A to G, the decision matrix, Scrapling, and the cost model |
-| [connector-lifecycle-experiment.md](connector-lifecycle-experiment.md) | Synthetic experiment results and rerun instructions |
-| [connector_lifecycle.py](connector_lifecycle.py) | The experiment script |
-| [connector-lifecycle-report.json](connector-lifecycle-report.json) | The committed experiment output |
+| [connector-lifecycle-experiment.md](connector-lifecycle-experiment.md) | Findings from a synthetic connector experiment, with the historical commit that holds its code |
 | [integration-map.md](integration-map.md) | Journey, diagram, proposed boundaries, code reuse map, and unresolved contracts |
 | [partnership-evidence.md](partnership-evidence.md) | Bank partnership evidence and the connectivity-business question |
 | [rexi-product-discovery-appendix.md](rexi-product-discovery-appendix.md) | Rexi and official product-fact sources |

@@ -58,7 +58,7 @@ Manual, chat, voice, and document records feed the matcher so that a bank row ca
 
 ## Proposed boundaries
 
-The [connector lifecycle experiment](connector-lifecycle-experiment.md) exercises each boundary below with synthetic data.
+The [connector lifecycle findings](connector-lifecycle-experiment.md) record how a synthetic experiment exercised each boundary below. Its code is not part of this delivery.
 
 | Boundary | Owns | Must never |
 | --- | --- | --- |
@@ -91,7 +91,7 @@ A joint bank account raises a separate question. If both partners connect the sa
 
 Every input produces a proposal. The matcher compares each proposal with confirmed records of the same owner, account, currency, and amount within a few days, and surfaces candidates instead of merging silently. A confirmed record keeps a provenance list, so one purchase can carry a manual entry, a statement row, and a later API row without being counted three times. Owner edits mark fields as owner-owned, and source revisions skip those fields.
 
-The experiment demonstrates each rule: `manual_cash_overlap`, `retrieval_method_migration`, `source_revision`, and `kit_contract_and_totals`.
+The experiment's findings illustrate each rule: `manual_cash_overlap`, `retrieval_method_migration`, `source_revision`, and `kit_contract_and_totals`.
 
 ## A bank API can replace the retrieval method without replacing records
 
@@ -156,9 +156,9 @@ These contracts must exist before a statement import or a connection ships. The 
 
 1. **Storage of typed figures.** Archived decision 8, approved 2026-09-08, keeps a salary, expense, or debt the person types in the conversation only, with no new storage ([archived roadmap](/docs/archive/2026-09-17-argus-grounded-finance-roadmap.md) lines 1791 to 1797). MVEE section 4, approved 2026-09-26, makes the confirmed record the durable fact. No document reconciles the two. Three other documents reuse the label "decision 8" for a different rule about stated country and currency.
 2. **Financial-record schema and money arithmetic.** Accounts, transactions, balances, import batches, draft and confirmed states, revision history, and an amount type in minor units or `Decimal`.
-3. **Import identity.** Observation identity with and without institution ids, cross-file overlap, transfer pairing, pending holds, reversals, and source revisions. The experiment in this lane proposes one design.
+3. **Import identity.** Observation identity with and without institution ids, cross-file overlap, transfer pairing, pending holds, reversals, and source revisions. The connector lifecycle findings describe one design.
 4. **Source documents.** Where files live, who can see them, how long they stay, and how deletion purges them.
 5. **Permissions.** An import capability, guest imports, per-record ownership, visibility, and edit rights, and household RLS.
 6. **Connections.** Consent records, connection states, secret custody, refresh jobs, and re-authentication prompts. None exists.
 7. **Privacy of record content.** A sink-level log rule, the record facts a model prompt may see, whether imported text may ever reach a research provider, and a sharing refusal for record-derived turns.
-8. **Automatic acceptance.** Whether any trusted feed may skip review, per MVEE section 4.7. The experiment measures the effect and decides nothing.
+8. **Automatic acceptance.** Whether any trusted feed may skip review, per MVEE section 4.7. The historical experiment measured the effect and decided nothing.

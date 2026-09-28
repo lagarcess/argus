@@ -38,7 +38,7 @@ Ratings are relative within this table. "Unknown" means the evidence does not ex
 
 ## What the matrix says
 
-Options B and C are the bridge Argus can build now. They need no credential, no bank agreement, and no provider. They fit the approved ingestion flow, the synthetic kit, and the connector lifecycle experiment. Their weakness is freshness. A monthly statement cannot tell a person what they spent yesterday, so they complement manual and chat entry rather than replace it.
+Options B and C are the bridge Argus can build now. They need no credential, no bank agreement, and no provider. They fit the approved ingestion flow, the synthetic kit, and the connector lifecycle findings. Their weakness is freshness. A monthly statement cannot tell a person what they spent yesterday, so they complement manual and chat entry rather than replace it.
 
 Option D is a convenience on top of C, not a separate strategy. Treat alerts as drafts only.
 
@@ -100,6 +100,6 @@ Monthly running cost is roughly `N × R × c + N × p + N × R × s ÷ 100 × su
 
 The model makes three points without any price.
 
-1. Refresh frequency multiplies compute and support, not review. The experiment shows that daily refresh with weekly review costs the person the same 12 actions over 60 days as weekly refresh.
+1. Refresh frequency multiplies compute and support, not review. The historical connector experiment showed that daily refresh with weekly review cost the person the same 12 actions over 60 days as weekly refresh.
 2. For B, C, and D, the dominant cost is `I × L × Δ × d`, parser upkeep per format. Start with one institution and its most structured export.
 3. For F, the same term applies to login flows and MFA, and `K`, `G`, and support for lockouts come on top. Plaid's history, summarized in the Plaid lessons, shows that this term does not shrink with scale. Institutional APIs replaced it.

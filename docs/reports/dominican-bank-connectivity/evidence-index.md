@@ -59,11 +59,14 @@ The [research notes](research-notes/README.md) hold every other source, each wit
 
 | Evidence | Command | Result |
 | --- | --- | --- |
-| Connector lifecycle experiment | `poetry run python docs/reports/dominican-bank-connectivity/connector_lifecycle.py --report temp/connector-lifecycle-report.json` | Every check in the committed [report](connector-lifecycle-report.json) passes, and repeated runs write it byte for byte. Automated reviews of `54a359dea`, `47f7dbe68`, `0d1da19e8`, and `81f76d0b2` found malformed or conflicting provider input written or escaping, deletion leaving proposals behind, stale or partial source revisions, account references to another currency or another owner, owner decisions shared across connections, derived identities that shifted with batch order, and balance snapshots stored without their identity. Each class now has one owner in the code and a check that failed before its fix. The timeline and the 60-day workload did not change. |
 | Selected-file import proof | `selected-file-import/proof.py` with and without pull request 724's reference model at `d081bfcdf` on the path, as its [rerun steps](selected-file-import/README.md#rerun) list | With the model, every case passes. Without it, the intake cases pass and the cases that need the model report blocked, which is not a pass. Both runs write their committed reports, [with](selected-file-import/proof-report.json) and [without](selected-file-import/proof-report-without-724.json), byte for byte. Each deliberate breakage in the committed [breakage check](selected-file-import/mutation_check.py) fails its target cases. |
 | Synthetic ingestion kit | `poetry run pytest tests/synthetic_ingestion --confcutdir=tests/synthetic_ingestion --no-cov -q` | 46 passed |
 | Tests that walk the docs, source, or evidence trees | `poetry run pytest tests/test_private_alpha_release_docs.py tests/test_backtest_job_scopes.py tests/test_spine_guardrails.py tests/research/test_evidence_driver_calls.py -q --no-cov` | 72 passed |
 | Docs gates | `git diff --check`, `scripts/check_docs_links.py --base origin/codex/private-alpha-next`, `.github/docs-only-changes.sh --from-git origin/codex/private-alpha-next` | Clean, `docs_only=true` |
+
+## Removed from this delivery
+
+The executable connector lifecycle experiment was removed on 2026-09-28 at the founder's direction, together with its committed report and the acceptance gates it claimed. Its research conclusions and findings stay in [connector-lifecycle-experiment.md](connector-lifecycle-experiment.md). Its code and report remain readable at `66eb4e21496db9653bb936f2196c19a645a2835f`, the last head that contains them. It was first added in `41cea419783b7dbf10288a2152374c7c7803fb7a` and last changed in `9587b9f5c8f2b70fe77b2e2d9450166ebc7d266c`. Before removal, the selected-file proof was run with the connector files taken out of the tree, and both of its reports came out byte-identical, so nothing retained depends on the experiment. The experiment's last automated review found three gaps in its code that were not fixed, and the findings page names them as open.
 
 ## Repository evidence
 
