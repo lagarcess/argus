@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from common import JS_VAR, squash
 from normalize import text_facts
 
-LISTING_PATH = re.compile(r"^/[^/]+/\d+/?$")
+DETAIL_PATH = re.compile(r"/[a-z0-9,-]+/\d+/")
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 HEADING = '<h1 class="content-block"'
 LISTS = ("feature-list", "spec-list", "component-list")
@@ -38,7 +38,8 @@ LISTING_VARS = frozenset(
 SELLER_KINDS = frozenset({"Vendedor", "Inmobiliaria", "Particular"})
 PLACE = re.compile(r"[^\W\d_](?:[^\W\d_]|[ .'-]){1,39}")
 CONTACT = re.compile(
-    r"(?<!\d)(?:\+?1[\s.-]?)?\(?8[024]9\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"
+    r"(?<!\d)\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)"
+    r"|\+\d{1,3}[\s.-]?(?:\d[\s.-]?){7,12}\d"
     r"|[\w.+-]+@[\w-]+\.[A-Za-z]{2,}"
     r"|wa\.me/|tel:|mailto:|data-cfemail"
     r"|-?\d{1,3}\.\d{5,}\s*,\s*-?\d{1,3}\.\d{5,}"
@@ -82,7 +83,7 @@ def listing_sitemap(body: bytes) -> bytes | None:
     rows = ['<?xml version="1.0" encoding="UTF-8"?>', f'<urlset xmlns="{SITEMAP_NS}">']
     for entry in root.findall(f"{{{SITEMAP_NS}}}url"):
         loc = (entry.findtext(f"{{{SITEMAP_NS}}}loc") or "").strip()
-        if not LISTING_PATH.match(urlsplit(loc).path):
+        if not DETAIL_PATH.fullmatch(urlsplit(loc).path):
             continue
         lastmod = (entry.findtext(f"{{{SITEMAP_NS}}}lastmod") or "").strip()
         dated = f"<lastmod>{html.escape(lastmod)}</lastmod>" if lastmod else ""

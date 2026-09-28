@@ -23,7 +23,7 @@ import retention  # noqa: E402
 HOST = "https://m.supercarros.com"
 ROBOTS = (
     b"# questions: webmaster@example.invalid\n"
-    b"User-agent: *\nDisallow: /buscar/\nDisallow: /carros/\n\n"
+    b"User-agent: *\nDisallow: /buscar/\nDisallow: /carros/\nDisallow: /Motos/\n\n"
     b"Sitemap: https://m.supercarros.com/sitemap.xml\n"
 )
 SITEMAP = (
@@ -43,24 +43,56 @@ PHONE_IN_TITLE = DETAIL.replace(
     b"2021 Marca Ejemplo Modelo X EX</h1>",
     b"2021 Marca Ejemplo Modelo X EX 809-000-0000</h1>",
 )
+PHONE_IN_SPEC = DETAIL.replace(
+    b"<br>4 cilindros</li>", b"<br>4 cilindros, llamar 305-555-0000</li>"
+)
 PAGES = {
     f"{HOST}/robots.txt": ROBOTS,
     f"{HOST}/sitemap.xml": SITEMAP,
-    f"{HOST}/assets/js/searchvalues.js?build=fixture": SEARCH_VALUES,
+    f"{HOST}/assets/js/searchvalues.js?20260927053": SEARCH_VALUES,
     f"{HOST}/marca-ejemplo-modelo-x/0000001/": DETAIL,
     f"{HOST}/marca-ejemplo-modelo-x/0000002/": NO_SELLER_BOUNDARY,
     f"{HOST}/marca-ejemplo-modelo-x/0000003/": PHONE_IN_TITLE,
+    f"{HOST}/marca-ejemplo-modelo-x/0000004/": PHONE_IN_SPEC,
 }
+PHONE_SHAPES = (
+    "8090000000",
+    "(809) 000-0000",
+    "+1 (829) 000 0000",
+    "1-849-000-0000",
+    "809.000.0000",
+    "305-555-0000",
+    "+52 55 0000 0000",
+)
+LISTING_VALUES = (
+    "US$ 43,900",
+    "RD$ 1,695,000",
+    "US$ 1,500/Mes",
+    "#1632511",
+    "var adPriceMainCurrency = '2638390.0000';",
+    "var adKey = '639238608000000000';",
+    "<lastmod>2026-09-20</lastmod>",
+    "2026-09-28T21:32:19.123456+00:00",
+)
 REFUSED_AFTER_ROBOTS = {
     "robots.txt disallows the path": f"{HOST}/carros/0000009/",
     "a case variant of a disallowed path": f"{HOST}/CARROS/0000009/",
     "a percent-encoded disallowed path": f"{HOST}/%63arros/0000009/",
+    "a double percent-encoded disallowed path": f"{HOST}/%2563arros/0000009/",
+    "a semicolon path parameter": f"{HOST}/carros;jsessionid=x/0000009/",
+    "a mixed-case robots rule": f"{HOST}/motos/0000009/",
+    "an uppercase listing slug": f"{HOST}/Marca-Ejemplo-Modelo-X/0000001/",
     "dot segments": f"{HOST}/robots.txt/../carros/0000009/",
     "percent-encoded dot segments": f"{HOST}/x/%2E%2E/carros/0000009/",
     "a backslash": f"{HOST}/x%5C..%5Ccarros/0000009/",
     "robots.txt with a query": f"{HOST}/robots.txt?next=/carros/0000009/",
+    "a search values query that is not a build number": (
+        f"{HOST}/assets/js/searchvalues.js?redirect=//evil.invalid/x"
+    ),
     "plain http": "http://m.supercarros.com/marca-ejemplo-modelo-x/0000001/",
     "an explicit port": "https://m.supercarros.com:8443/marca-ejemplo-modelo-x/0000001/",
+    "an explicit default port": "https://m.supercarros.com:443/marca-ejemplo-modelo-x/0000001/",
+    "a malformed port": "https://m.supercarros.com:abc/marca-ejemplo-modelo-x/0000001/",
     "userinfo": "https://user@m.supercarros.com/marca-ejemplo-modelo-x/0000001/",
     "the home page": f"{HOST}/",
     "a dealer page": f"{HOST}/dealers/vendedor-ficticio/",
@@ -70,8 +102,8 @@ REFUSED_AFTER_ROBOTS = {
 
 
 class FakeResponse:
-    def __init__(self, body):
-        self.status, self.headers, self._body = 200, {}, body
+    def __init__(self, status, body):
+        self.status, self.headers, self._body = status, {}, body
 
     def read(self):
         return self._body
@@ -84,8 +116,8 @@ class FakeOpener:
     def open(self, request, timeout):
         self.calls.append(request.full_url)
         if request.full_url not in PAGES:
-            raise AssertionError(f"unexpected request to {request.full_url}")
-        return FakeResponse(PAGES[request.full_url])
+            return FakeResponse(404, b"")
+        return FakeResponse(200, PAGES[request.full_url])
 
 
 def refused(call):
@@ -97,6 +129,8 @@ def refused(call):
             call()
     except SystemExit:
         return True
+    except Exception:
+        return False
     return False
 
 
@@ -111,6 +145,10 @@ def main():
     previous = Path.cwd()
     os.chdir(SCRIPTS)
     check(refused(fetch_ledger.study_root), "the fetcher ran inside the repository")
+    for shape in PHONE_SHAPES:
+        check(retention.CONTACT.search(shape), f"the contact guard missed {shape}")
+    for value in LISTING_VALUES:
+        check(not retention.CONTACT.search(value), f"the contact guard flagged {value}")
     with tempfile.TemporaryDirectory() as scratch:
         os.chdir(scratch)
         try:
@@ -164,7 +202,7 @@ def main():
                 body is not None and b"0000001" in body and b"dealers" not in body,
                 "the sitemap kept more than listing URLs",
             )
-            body, _ = kept(f"{HOST}/assets/js/searchvalues.js?build=fixture")
+            body, _ = kept(f"{HOST}/assets/js/searchvalues.js?20260927053")
             check(body == SEARCH_VALUES, "the search values script was not kept whole")
             body, _ = kept(f"{HOST}/marca-ejemplo-modelo-x/0000001/")
             check(
@@ -180,6 +218,10 @@ def main():
                 (
                     f"{HOST}/marca-ejemplo-modelo-x/0000003/",
                     "a page with a phone in its title",
+                ),
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000004/",
+                    "a page with a foreign phone number in a specification",
                 ),
             ):
                 body, note = kept(url)

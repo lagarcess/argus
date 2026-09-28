@@ -13,6 +13,7 @@ import argparse
 import gzip
 import hashlib
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -22,9 +23,9 @@ import urllib.robotparser
 import zlib
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import unquote, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
-from retention import LISTING_PATH, retain
+from retention import DETAIL_PATH, retain
 
 USER_AGENT = (
     "ArgusFeasibilityAudit/0.1 "
@@ -76,27 +77,29 @@ def site_of(url: str) -> str:
 
 def classify(url: str) -> tuple[str, str]:
     parts = urlsplit(url)
+    try:
+        port = parts.port
+    except ValueError:
+        port = -1
     if (
         parts.scheme != "https"
         or parts.username
         or parts.password
-        or parts.port
+        or port is not None
         or parts.fragment
     ):
         raise SystemExit(f"refused: {url} is not a plain https URL")
     site = site_of(url)
-    decoded = unquote(parts.path)
-    if "\\" in decoded or any(part in {".", ".."} for part in decoded.split("/")):
-        raise SystemExit(f"refused: {url} has a dot segment or a backslash")
-    if parts.path == "/robots.txt" and not parts.query:
+    path, query = parts.path, parts.query
+    if path == "/robots.txt" and not query:
         return site, "robots"
-    if parts.path == "/sitemap.xml" and not parts.query:
+    if path == "/sitemap.xml" and not query:
         return site, "sitemap"
-    if parts.path == "/assets/js/searchvalues.js":
+    if path == "/assets/js/searchvalues.js" and re.fullmatch(r"\d*", query):
         return site, "search-values"
-    if LISTING_PATH.match(parts.path) and not parts.query:
+    if DETAIL_PATH.fullmatch(path) and not query:
         return site, "detail"
-    raise SystemExit(f"refused: {url} is not a page kind this fetcher may keep")
+    raise SystemExit(f"refused: {url} is not a URL shape this fetcher may request")
 
 
 def cache_paths(url: str) -> tuple[Path, Path]:
@@ -138,12 +141,17 @@ def robots_verdict(url: str) -> tuple[bool, float | None, str]:
         return True, None, f"robots.txt returned {status}; no rules"
     if status != 200 or not body_path.exists():
         return False, None, f"robots.txt returned {status} or was not kept; disallow all"
-    parser = urllib.robotparser.RobotFileParser()
-    parser.parse(body_path.read_bytes().decode("utf-8", "replace").splitlines())
+    rules = body_path.read_bytes().decode("utf-8", "replace")
+    strict, folded = (
+        urllib.robotparser.RobotFileParser(),
+        urllib.robotparser.RobotFileParser(),
+    )
+    strict.parse(rules.splitlines())
+    folded.parse(rules.lower().splitlines())
     parts = urlsplit(url)
     lowered = urlunsplit(parts._replace(path=parts.path.lower()))
-    allowed = parser.can_fetch(USER_AGENT, url) and parser.can_fetch(USER_AGENT, lowered)
-    delay = parser.crawl_delay(USER_AGENT)
+    allowed = strict.can_fetch(USER_AGENT, url) and folded.can_fetch(USER_AGENT, lowered)
+    delay = strict.crawl_delay(USER_AGENT)
     return allowed, float(delay) if delay else None, "robots.txt parsed"
 
 
@@ -158,7 +166,7 @@ def decode(raw: bytes, encoding: str | None) -> bytes:
 def wait_for_slot(spacing: float) -> None:
     clock = study_root() / "last_request.txt"
     if clock.exists():
-        elapsed = time.time() - float(clock.read_text())
+        elapsed = time.time() - datetime.fromisoformat(clock.read_text()).timestamp()
         if elapsed < spacing:
             time.sleep(spacing - elapsed)
 
@@ -204,7 +212,7 @@ def fetch(url: str) -> dict:
     except (urllib.error.URLError, TimeoutError) as error:
         status, headers, raw = 0, {}, str(error).encode()
     elapsed_ms = round((time.perf_counter() - started) * 1000)
-    (study_root() / "last_request.txt").write_text(str(time.time()))
+    (study_root() / "last_request.txt").write_text(datetime.now(timezone.utc).isoformat())
 
     get = headers.get if hasattr(headers, "get") else (lambda *_: None)
     body = decode(raw, get("Content-Encoding"))

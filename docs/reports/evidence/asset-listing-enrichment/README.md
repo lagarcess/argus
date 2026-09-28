@@ -17,9 +17,10 @@ These rules describe `scripts/fetch_ledger.py` at this commit. A 2026-09-28 revi
 
 - It sends at most 20 requests per site. The count covers every host of the brand and includes `robots.txt`.
 - It sends one request at a time, at least 4 seconds after the previous one. The assignment's floor was 3 seconds.
-- It decides the page kind and the robots exemption from the URL alone. It takes no caller label. It fetches only four kinds: `robots.txt`, `sitemap.xml`, the search values script, and listing detail pages. It refuses every other URL.
-- It refuses a URL that is not plain https, or that carries a port, userinfo, or a fragment. It refuses a URL with a dot segment or a backslash, including percent-encoded ones.
-- It fetches `robots.txt` for a host before any other page on that host. It refuses any URL that file disallows, checking both the URL as given and its lowercase path, because these sites serve paths in any case.
+- It decides the page kind and the robots exemption from the URL alone. It takes no caller label.
+- It accepts exactly four URL shapes. They are `/robots.txt` and `/sitemap.xml` with no query, `/assets/js/searchvalues.js` with an optional numeric build query, and detail pages shaped `/<slug>/<digits>/`. The slug may use only lowercase letters, digits, commas, and hyphens. Any other shape is refused, including percent-encoding, dot segments, backslashes, semicolon parameters, and uppercase letters.
+- It refuses a URL that is not plain https, or that carries a port, userinfo, or a fragment.
+- It fetches `robots.txt` for a host before any other page on that host. It refuses any URL that file disallows. It checks the rules as written, and again with both rules and path lowercased, because these sites serve paths in any case.
 - It follows no redirect by itself.
 - It stops a site after a 401, 403, 407, 429, or 503 status, or after a known bot-check page marker. The stop is a file that later calls respect.
 - It replays a cached URL instead of fetching it again.
@@ -69,7 +70,7 @@ The committed sample evidence came from the audit's first pipeline. That pipelin
 - A detail page keeps its title, price and feature list, specification list, accessories list, meta description, and listing page variables. It also keeps keyword flags and numbers computed from the free text, the seller heading word such as "Vendedor" or "Inmobiliaria", a location reduced to its last comma-separated part when that part is plain place text, and whether a dealer link exists.
 - A detail page drops the seller block, the free text, photos, maps, and the page variables that identify the seller.
 
-A page the rules cannot project keeps nothing, and so does a projection that still holds a phone number, an email address, a WhatsApp, tel, or mailto link, map coordinates, or a dealer name in a link.
+A page the rules cannot project keeps nothing. So does a projection that still holds a phone-shaped digit group from any country, an email address, a WhatsApp, tel, or mailto link, map coordinates, or a dealer name in a link.
 
 - No later script writes a raw page, free text, or a seller field. `run_parse.py` writes normalized records, timings, and versions. The resilience scripts mutate kept pages in memory, and Scrapling's adaptive storage lives in a temporary directory.
 - The committed sample files hold aggregates and value shapes, where every digit prints as `9`. They hold no per-listing row.
@@ -100,8 +101,9 @@ Each command prints `all checks pass` and exits 0.
 
 `check_fetch_policy.py` runs the real fetcher against a fake network in a temporary directory. It asserts these results:
 
-- A caller label, a disallowed path, its uppercase and percent-encoded spellings, dot segments, backslashes, `robots.txt` with a query, plain http, a port, userinfo, the home page, a dealer page, a search page, and an unaudited host are each refused, and none of them sends a request.
-- Each kind keeps only its projection. A page without a seller boundary and a page with a phone number in its title keep nothing.
+- Each crafted URL is refused, and none of them sends a request. The list covers a caller label and a disallowed path. It also covers the path's uppercase, percent-encoded, and double-encoded spellings, a semicolon parameter, and a lowercase request against a mixed-case rule. Dot segments, backslashes, an uppercase slug, `robots.txt` with a query, and a non-numeric search values query are refused too. So are plain http, explicit, default, and malformed ports, userinfo, the home page, a dealer page, a search page, and an unaudited host.
+- Each kind keeps only its projection. Three pages keep nothing. They are a page without a seller boundary, a page with a phone number in its title, and a page with a foreign phone number in a specification.
+- The contact guard matches seven phone shapes, including Miami and Mexico numbers, and flags none of eight normal listing values such as prices, IDs, and timestamps.
 - No file the fetcher writes holds a placeholder seller value or a contact pattern.
 
 `check_fixtures.py` asserts these results for each fixture:
@@ -112,7 +114,7 @@ Each command prints `all checks pass` and exits 0.
 - Scrapling's adaptive mode recovers no value and relocates to the accessories list.
 - `run_parse.py` and the resilience script, run on kept projections in a temporary directory, write no file that holds seller data.
 
-Run against the fetcher before the review fix, the same invariants fail. That fetcher requested a disallowed path when called with `--label robots`, and its cache held 13 of the placeholder seller values. The fixture check also fails when retention keeps raw pages, when an expected value changes, when the normalizer leaks the seller location line, and when a parser returns no specifications.
+Run against the fetcher before the review fix, the same invariants fail. That fetcher requested a disallowed path when called with `--label robots`, and its cache held 13 of the placeholder seller values. Against the first version of the fix, the fetch-policy check reports 11 failures. Those are the cases an adversarial review reproduced before this version. The fixture check also fails when retention keeps raw pages, when an expected value changes, when the normalizer leaks the seller location line, and when a parser returns no specifications.
 
 The fixtures do not reproduce every real-page result. On real pages, Scrapling's adaptive mode sometimes relocated to the seller contact list. On the fixtures it relocated only to the accessories list. The fixtures cannot reproduce the sample's counts, dates, or prices.
 
