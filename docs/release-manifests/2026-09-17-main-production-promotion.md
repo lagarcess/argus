@@ -182,7 +182,8 @@ Preproduction checkpoint, written after final review returned: `docs/reports/evi
 No production conversation, user, run or job rows were read. No production
 backup or browser transcript has been published. The disposable local sharing
 walk retains privacy-safe aggregates and redacted screenshots only — not full
-guest transcript dumps, Auth UUIDs, or raw receipt slugs (see
+guest transcript dumps, accessibility-tree YAML captures, Auth UUIDs, or raw
+receipt slugs (see
 `docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/`). Native
 eval evidence contains authored fixture scenarios and the harness's
 retained/redacted output, not customer conversations. Credentials remain in
