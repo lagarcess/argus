@@ -19,11 +19,11 @@
             "maxRegression" : 0,
             "maxStandardDeviation" : 10,
             "measurements" : [
-              1.369309923,
-              1.311199967,
-              1.3170522660000001,
-              1.226342021,
-              1.174153695
+              1.065992702,
+              1.261525802,
+              1.2130395710000001,
+              1.233069916,
+              1.071476739
             ],
             "polarity" : "prefers smaller",
             "unitOfMeasurement" : "s"
@@ -38,11 +38,11 @@
             "maxRegression" : 0,
             "maxStandardDeviation" : 10,
             "measurements" : [
-              53922.048,
-              53430.528,
-              50940.16,
-              49236.224,
-              48957.696
+              41601.256,
+              47220.968,
+              46450.92,
+              49793.256,
+              51661.032
             ],
             "polarity" : "prefers smaller",
             "unitOfMeasurement" : "kB"
@@ -57,11 +57,11 @@
             "maxRegression" : 0,
             "maxStandardDeviation" : 10,
             "measurements" : [
-              2464936.186,
-              2439876.596,
-              2454626.045,
-              2466551.55,
-              2420788.01
+              2604987.197,
+              3266365.828,
+              3304224.559,
+              3288831.897,
+              2620623.466
             ],
             "polarity" : "prefers smaller",
             "unitOfMeasurement" : "kC"
@@ -76,11 +76,11 @@
             "maxRegression" : 0,
             "maxStandardDeviation" : 10,
             "measurements" : [
-              51480.832,
-              48204.032,
-              48662.784,
-              48613.632,
-              48662.784
+              41502.952,
+              45877.48,
+              46188.776,
+              46483.688,
+              47466.728
             ],
             "polarity" : "prefers smaller",
             "unitOfMeasurement" : "kB"
@@ -95,11 +95,11 @@
             "maxRegression" : 0,
             "maxStandardDeviation" : 10,
             "measurements" : [
-              4030.464,
-              -3211.264,
-              524.288,
-              16.384,
-              114.688
+              65.536,
+              966.656,
+              376.832,
+              360.448,
+              0
             ],
             "polarity" : "prefers smaller",
             "unitOfMeasurement" : "kB"
@@ -114,11 +114,11 @@
             "maxRegression" : 0,
             "maxStandardDeviation" : 10,
             "measurements" : [
-              1.0574843,
-              1.04584399,
-              1.017303767,
-              0.986979347,
-              0.9392772
+              0.8762622090000001,
+              1.069269094,
+              1.017225826,
+              1.039066403,
+              0.8774688390000001
             ],
             "polarity" : "prefers smaller",
             "unitOfMeasurement" : "s"
@@ -133,11 +133,11 @@
             "maxRegression" : 0,
             "maxStandardDeviation" : 10,
             "measurements" : [
-              10605892.446,
-              10627521.184,
-              10598686.213,
-              10624070.188,
-              10603938.945
+              11303003.369,
+              14471573.342,
+              14490350.432,
+              14479784.35,
+              11336268.142
             ],
             "polarity" : "prefers smaller",
             "unitOfMeasurement" : "kI"

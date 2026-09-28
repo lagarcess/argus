@@ -4,7 +4,7 @@ Platform evidence is complete. Terminal PR review and CI are recorded in the
 PR closeout comment. See the [recommendations report](../../chart-validation-prototype.md).
 
 - [iPhone](ios/README.md): adopt Swift Charts direction; simulator limits apply.
-- [Android](android/README.md): change dependency alignment and long-series
+- [Android](android/visual-revision/README.md): change dependency alignment and long-series
   performance before adoption.
 - [Web](../../../../prototypes/chart-validation/web/README.md): adopt Lightweight Charts direction; WebKit touch remains
   unverified.
@@ -21,8 +21,9 @@ history. Re-run any acceptance whose source changed.
 ## Common checks
 
 `python3 -m unittest discover -s prototypes/chart-validation/scripts -p 'test_*.py' -v`
-passes four fixture-contract tests: dates/units/values, coverage matrix,
-contribution jumps, rejection of ambiguous/invalid values.
+passes five fixture/presentation tests: dates/units/values, coverage matrix,
+contribution jumps, rejection of ambiguous/invalid values, and shared series
+contrast on light/dark backgrounds.
 
 The required local mocked backend harness was attempted September 28, 2026:
 237 items collected, then collection failed in

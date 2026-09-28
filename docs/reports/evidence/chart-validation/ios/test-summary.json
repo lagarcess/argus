@@ -12,7 +12,7 @@
       },
       "expectedFailures" : 0,
       "failedTests" : 0,
-      "passedTests" : 6,
+      "passedTests" : 8,
       "skippedTests" : 0,
       "testPlanConfiguration" : {
         "configurationId" : "1",
@@ -23,14 +23,14 @@
   "environmentDescription" : "ChartPrototype · Built with macOS 27.0",
   "expectedFailures" : 0,
   "failedTests" : 0,
-  "finishTime" : 1790627481.041,
-  "passedTests" : 6,
+  "finishTime" : 1790629225.836,
+  "passedTests" : 8,
   "result" : "Passed",
   "runtimeWarnings" : [
 
   ],
   "skippedTests" : 0,
-  "startTime" : 1790627393.129,
+  "startTime" : 1790629131.789,
   "statistics" : [
     {
       "subtitle" : "1 test run",
@@ -44,5 +44,5 @@
   "topInsights" : [
 
   ],
-  "totalTestCount" : 6
+  "totalTestCount" : 8
 }

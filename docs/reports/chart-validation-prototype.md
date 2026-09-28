@@ -28,20 +28,22 @@ All references were inspected as OPEN/unmerged:
 | #729 | `b422d986bcf068b56e07283481de373ba8e30dc0` | Simulator-only Xcode setup and iOS 17 configured floor |
 | #730 | `edc43cb7961b68e7ca699a4101510a79667d1a7f` | AGP 9.1.1 / Gradle 9.3.1 / Compose 2.2.10 setup; API 26 configured floor |
 
-These PRs are references, not merged dependencies. No foundation shell or shared
+These were inspected references, not assumed merged dependencies. #727 later
+landed in integration and was reconciled as described below. No foundation shell or shared
 build configuration changes. Installed Xcode is 27.0 (27A266a). Web retains the
 repository's Lightweight Charts 5.2.0. Platform reports own verified dependency
 versions, official documentation citations and compatibility limitations.
 
 ## Evidence and recommendations
 
-See [durable evidence](evidence/chart-validation/README.md).
+See [durable evidence](evidence/chart-validation/README.md) and the
+[bounded visual acceptance audit](evidence/chart-validation/visual-acceptance.md).
 
 | Platform | Recommendation | Proof and limitations |
 | --- | --- | --- |
-| iPhone / Swift Charts | **Adopt direction** | Build, six UI tests, fixture model checks, eleven screenshots on iPhone 17e / iOS 26.5. iOS 17 minimum runtime, physical devices and full VoiceOver remain unverified; hitch samples unavailable. |
-| Android / Vico 2.5.1 | **Change before adoption** | Build, lint, two unit tests and five emulator tests pass; fifteen screenshots. The app-only long-series sample has substantial jank. Isolated resolution raises Compose UI/runtime/foundation to 1.11.1, Material3 to 1.4.0, core-ktx to 1.18.0 and Kotlin stdlib to 2.3.21 while the Compose compiler plugin remains 2.2.10. Coordinate this convergence with the Android foundation owner before any shared build/product integration. API 26 and physical TalkBack/performance remain unverified. |
-| Web / Lightweight Charts 5.2.0 | **Adopt direction** | Three model tests plus Chromium 147 and WebKit 26.4 browser suites, ten screenshots. Chromium real browser touch events prove cancel/release/vertical scrolling. WebKit touch gestures, physical devices and screen-reader use remain unverified. |
+| iPhone / Swift Charts | **Adopt direction** | Build, eight UI tests, fixture model checks, thirteen screenshots plus motion recording on iPhone 17e / iOS 26.5. iOS 17 minimum runtime, physical devices and full VoiceOver remain unverified; hitch samples unavailable. |
+| Android / Vico 2.5.1 | **Change before adoption** | Build, lint, two unit tests and seven emulator tests pass; seventeen revised screenshots plus motion recording. The app-only long-series sample has substantial jank. Isolated resolution raises Compose UI/runtime/foundation to 1.11.1, Material3 to 1.4.0, core-ktx to 1.18.0 and Kotlin stdlib to 2.3.21 while the Compose compiler plugin remains 2.2.10. Coordinate this convergence with the Android foundation owner before any shared build/product integration. API 26 and physical TalkBack/performance remain unverified. |
+| Web / Lightweight Charts 5.2.0 | **Adopt direction** | Three model tests plus Chromium 147 and WebKit 26.4 browser suites, sixteen screenshots plus touch recording. Chromium real browser touch events prove cancel/release/vertical scrolling. WebKit touch gestures, physical devices and screen-reader use remain unverified. |
 
 Each recommendation retains explicit segment splitting, accessible point controls
 and selection lifecycle. No library's default behavior alone supplies these facts.
@@ -51,15 +53,15 @@ authored date/value. Neither spacing choice invents intermediate observations.
 
 Measured performance, on the shared arm64 Mac rather than physical phones:
 
-- iPhone simulator: five 2,000-point scrubs average 1.280 seconds including touch
-  injection/XCTest, 1.009 seconds application CPU, 51,297 kB peak memory. No frame
+- iPhone simulator: five 2,000-point scrubs average 1.169 seconds including touch
+  injection/XCTest, 0.976 seconds application CPU, 47,345 kB peak memory. No frame
   rate or zero-hitch claim follows from missing hitch samples.
-- Web: 2,000-point construction through two animation callbacks takes 26.5–37 ms
-  in Chromium and 51–77 ms in WebKit. Readout formatting/DOM p95 is 0.4/1 ms.
+- Web: 2,000-point construction through two animation callbacks takes 17.3–22 ms
+  in Chromium and 33–51 ms in WebKit. Readout formatting/DOM p95 is 0.4/1 ms.
   These exclude input delivery and GPU completion; idle frame timing is not FPS.
-- Android: the app-only 2,000-point sample records 92 frames, 97.83% jank and
-  frame p95 101 ms; the instrumented sample records 41 frames, 26.83% jank and
-  p95 48 ms. Both are retained. SwiftShader software rendering and a debug APK
+- Android: the app-only 2,000-point sample records 101 frames, 100% jank and
+  frame p95 101 ms; the instrumented sample records 12 frames, 100% jank and
+  p95 121 ms. Both are retained. SwiftShader software rendering and a debug APK
   limit transfer to physical devices. Improve and remeasure before adoption.
 
 These different instruments are not a cross-platform speed ranking or a production
@@ -90,9 +92,18 @@ environment variable or directly affected chart test. Merge commit:
 `f93e11d7e639b77b5ffd82ec9d04076bdb6dd713`. Chart acceptance is retained by explicit
 source/fixture equality, not merely the absence of Git conflicts.
 
-iPhone/web captures identify `27a0b4e756057dadfc9c3ab6f1b4733fca683293`.
-Android's final capture is `f93e11d7e639b77b5ffd82ec9d04076bdb6dd713`, using
-its simplified explicit-install test runner.
+Integration then advanced to `3fa0dd92167791d82ce81c167c490396358c4316` with
+#727's design publication. This has semantic overlap in design authority, so its
+DESIGN/ARCHITECTURE changes were audited against the prototype refinement. Those
+two files are byte-identical to inspected `origin/reference-727`; the refined
+palette, fonts, quiet controls and accessible hit areas follow that direction.
+No runtime, API/data, migration or native build owner changed. One-way merge:
+`b6aecdfdaf964f81aeb411110c003d9662bd5e68`. Final visual captures cover the affected
+presentation; original pre-refinement screenshots are superseded, not reused.
+
+The initial captures were superseded where the visual refinement changed sources.
+Platform provenance identifies the final capture heads; original source identities
+remain in Git history. Android uses the explicit-install test runner.
 Evidence history keeps original capture heads; the final revalidation record
 compares tested files to the final PR source. The local latest-delta review is
 clean. GitHub review/CI remains a separate terminal gate recorded in closeout.

@@ -1,30 +1,31 @@
 {
-  "verified_at": "2026-09-28T20:35:47.415613+00:00",
-  "verified_against_source_head": "f93e11d7e639b77b5ffd82ec9d04076bdb6dd713",
-  "current_integration": "25015963600fa9dd9290080bf641238693509a37",
+  "verified_at": "2026-09-28T21:05:05.513336+00:00",
+  "verified_against_source_head": "f5f4f4467fe53c3a1990cda9574b353c8b72d83f",
+  "current_integration": "c978927e167f57369f27391ac65995a3d6e5520a",
   "fixture_sha256": "a12a24634763f951f6daad7d200614dd777e83785d9ed4da9907720e5bdf418f",
+  "visual_style_sha256": "d1ab2aee8e20f5fe032759114e271d998406926e352d879b3b468aebe59ede72",
   "platforms": [
     {
       "platform": "ios",
-      "capture_head": "27a0b4e756057dadfc9c3ab6f1b4733fca683293",
+      "capture_head": "f5f4f4467fe53c3a1990cda9574b353c8b72d83f",
       "source_and_fixture_changed_paths": [],
       "source_hash_mismatches": [],
       "retained": true
     },
     {
       "platform": "android",
-      "capture_head": "f93e11d7e639b77b5ffd82ec9d04076bdb6dd713",
+      "capture_head": "b6aecdfdaf964f81aeb411110c003d9662bd5e68",
       "source_and_fixture_changed_paths": [],
       "source_hash_mismatches": [],
       "retained": true
     },
     {
       "platform": "web",
-      "capture_head": "27a0b4e756057dadfc9c3ab6f1b4733fca683293",
+      "capture_head": "49b0495bd0217b94be57b00d8ae96ba6a98b8830",
       "source_and_fixture_changed_paths": [],
       "source_hash_mismatches": [],
       "retained": true
     }
   ],
-  "scope": "After this source head, evidence and report commits require the same source comparison; original capture heads must never be rewritten."
+  "scope": "Final visual captures supersede pre-refinement screenshots. Evidence-only commits require the same source comparison; original capture heads remain unchanged."
 }

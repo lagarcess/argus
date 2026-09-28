@@ -1,5 +1,11 @@
 # Android Vico prototype evidence
 
+**Prior-layout evidence.** Current visual and performance acceptance is in
+[visual-revision/README.md](visual-revision/README.md). The files below remain
+unchanged for provenance. In particular, prior OS-theme screenshots captured a
+previous compositor frame; revised captures supersede those visual theme claims.
+
+
 Capture head: `f93e11d7e639b77b5ffd82ec9d04076bdb6dd713`.
 Capture date: September 28, 2026. Local emulator evidence only.
 `provenance.json` records every Android source hash, shared fixture hash and both
