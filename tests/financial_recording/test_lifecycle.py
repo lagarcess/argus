@@ -204,4 +204,19 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "balance": 90_000,
         },
         "restore_needs_a_reason": {"blank": "InvalidInput:reason_required"},
+        "stale_duplicate_resolve_is_refused": {
+            "stale_revision": "StaleVersion",
+            "edited_away": "ReviewRequired:duplicate_target_invalid",
+            "target_removed": "ReviewRequired:duplicate_target_invalid",
+        },
+        "future_anchors_are_refused": {
+            "future_opening": "InvalidInput:date_in_future",
+            "future_check": "ReviewRequired:date_in_future",
+            "future_opening_correction": "ReviewRequired:date_in_future",
+        },
+        "type_edits_preserve_linked_asset_rules": {
+            "debt_to_asset_keeps_link": "InvalidInput:linked_asset_invalid",
+            "asset_to_debt_while_linked": "InvalidInput:linked_asset_invalid",
+            "link_still_set": True,
+        },
     }

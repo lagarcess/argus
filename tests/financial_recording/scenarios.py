@@ -351,6 +351,7 @@ def _statement_source() -> dict:
     scene = Scene()
     checking = scene.account("Corriente", "checking", "DOP", "10000.00")
     statement = {"digest": "synthetic-statement-1"}
+    scene.now = local(5, 23, 59)
     close = scene.draft(
         "document",
         {**statement, "row": 0},
@@ -395,6 +396,7 @@ def opening_date_correction() -> dict:
     opening_id = anchors(scene.store.book, cash.id)[0].id
     scene.record("expense", cash, "100.00", 6)
     before = scene.amount(cash)
+    scene.now = local(7)
     unreviewed = outcome(
         lambda: scene.store.correct(
             opening_id, 1, "balance was on the 7th", as_of=local(7)

@@ -30,6 +30,7 @@ from tests.financial_recording.derive import (
     Book,
     Known,
     Observation,
+    Opening,
     Provenance,
     Record,
     Revision,
@@ -45,6 +46,17 @@ from tests.financial_recording.derive import (
     unanswered,
 )
 from tests.financial_recording.money import InvalidInput, exponent, parse_minor
+
+
+def is_future_anchor(as_of: datetime, now: datetime) -> bool:
+    """True when an opening or check timestamp is after the store/server clock."""
+    return as_of > now
+
+
+def ensure_anchor_not_future(as_of: datetime, now: datetime) -> None:
+    if is_future_anchor(as_of, now):
+        raise InvalidInput("date_in_future", as_of.isoformat())
+
 
 NOTICE_CODES = frozenset({"negative_asset_balance", "account_archived"})
 ACTIVITY_FIELDS = ("account_id", "amount", "occurred_on")
@@ -123,6 +135,7 @@ def validate(
     tz: ZoneInfo,
     record_id: Optional[str] = None,
     provenance: Optional[Provenance] = None,
+    now: Optional[datetime] = None,
 ) -> list[Issue]:
     """Issues for `body` as a new record, or as the next revision of `record_id`."""
     missing = sorted(item for item in accounts_of(body) if item not in book.accounts)
@@ -136,6 +149,12 @@ def validate(
     note = getattr(body, "note", None)
     if note is not None and len(note) > NOTE_MAX:
         found.append(issue("note_too_long", str(len(note))))
+    if (
+        now is not None
+        and isinstance(body, (Opening, Observation))
+        and is_future_anchor(body.as_of, now)
+    ):
+        found.append(issue("date_in_future"))
     if isinstance(body, Activity):
         found.extend(_activity_issues(book, body, record_id))
     trial = with_trial(book, body, record_id, tz, provenance)

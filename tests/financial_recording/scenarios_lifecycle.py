@@ -5,6 +5,7 @@ share the driver in scenes.py and feed the same evidence file as scenarios.py.
 """
 
 from tests.financial_recording.derive import (
+    DEFAULT_TZ,
     anchors,
     balance,
     expectation_status,
@@ -13,6 +14,7 @@ from tests.financial_recording.derive import (
     space_scope,
     standing,
 )
+from tests.financial_recording.model import Store
 from tests.financial_recording.scenes import Scene, local, outcome
 
 
@@ -241,6 +243,95 @@ def edits_that_move_money_need_review() -> dict:
         "contradicting_answers_stop_for_review": _contradicting_answers(),
         "redated_check_restamps_its_contents": _redated_check_restamps(),
         "restore_needs_a_reason": _restore_needs_reason(),
+        "stale_duplicate_resolve_is_refused": _stale_duplicate_resolve(),
+        "future_anchors_are_refused": _future_anchors_are_refused(),
+        "type_edits_preserve_linked_asset_rules": _type_edits_preserve_links(),
+    }
+
+
+def _stale_duplicate_resolve() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "5000.00")
+    original = scene.record("expense", cash, "500.00", 3)
+    twin = scene.act("expense", cash, "500.00", 3, method="chat")
+    scene.store.edit_draft(twin.id, amount="600.00")
+    stale_revision = outcome(
+        lambda: scene.store.resolve(
+            twin.id, duplicate_of=original.id, expected_revision=1
+        )
+    )
+    edited_away = outcome(lambda: scene.store.resolve(twin.id, duplicate_of=original.id))
+    removed = Scene()
+    cash = removed.account("Efectivo", "cash", "DOP", "5000.00")
+    original = removed.record("expense", cash, "500.00", 3)
+    twin = removed.act("expense", cash, "500.00", 3, method="chat")
+    removed.store.remove(original.id, 1, "gone")
+    after_remove = outcome(
+        lambda: removed.store.resolve(twin.id, duplicate_of=original.id)
+    )
+    return {
+        "stale_revision": stale_revision,
+        "edited_away": edited_away,
+        "target_removed": after_remove,
+    }
+
+
+def _future_anchors_are_refused() -> dict:
+    # Fixed clock: Scene helpers advance `now` to the balance instant, so this
+    # probe uses Store directly against a clock that does not move.
+    now = local(1)
+    store = Store(lambda: now, tz=DEFAULT_TZ)
+    future = local(2)
+    opening = outcome(
+        lambda: store.create_account(
+            "cash",
+            "DOP",
+            "100.00",
+            nickname="Futuro",
+            as_of=future,
+            idempotency_key="future-opening",
+        )
+    )
+    cash = store.create_account(
+        "cash", "DOP", "1000.00", nickname="Efectivo", idempotency_key="cash"
+    )
+    from tests.financial_recording.derive import Provenance
+
+    draft = store.draft(
+        {
+            "kind": "balance_observation",
+            "account_id": cash.id,
+            "amount": "1000.00",
+            "as_of": future.isoformat(),
+            "basis": "user_check",
+        },
+        Provenance("manual", now),
+    )
+    check = outcome(lambda: store.confirm(store.preview(draft.id), "future-check"))
+    opening_id = anchors(store.book, cash.id)[0].id
+    correction = outcome(lambda: store.correct(opening_id, 1, "tomorrow", as_of=future))
+    return {
+        "future_opening": opening,
+        "future_check": check,
+        "future_opening_correction": correction,
+    }
+
+
+def _type_edits_preserve_links() -> dict:
+    scene = Scene()
+    car = scene.account("Carro", "vehicle", "DOP")
+    loan = scene.account("Prestamo", "other_debt", "DOP")
+    linked = scene.store.edit_account(loan.id, 1, linked_asset_id=car.id)
+    debt_to_asset = outcome(
+        lambda: scene.store.edit_account(loan.id, linked.version, type="checking")
+    )
+    asset_to_debt = outcome(
+        lambda: scene.store.edit_account(car.id, 1, type="credit_card")
+    )
+    return {
+        "debt_to_asset_keeps_link": debt_to_asset,
+        "asset_to_debt_while_linked": asset_to_debt,
+        "link_still_set": scene.store.book.accounts[loan.id].linked_asset_id == car.id,
     }
 
 
@@ -248,7 +339,7 @@ def _redated_check_restamps() -> dict:
     scene = Scene()
     cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
     check = scene.observe(cash, "1000.00", 5)
-    scene.now = local(9)
+    scene.now = local(9, 18)
     expense = scene.record("expense", cash, "100.00", 8)
     redate = {"as_of": local(9, 18), "amount": "900.00"}
     unanswered = outcome(lambda: scene.store.correct(check.id, 1, "9th", **redate))

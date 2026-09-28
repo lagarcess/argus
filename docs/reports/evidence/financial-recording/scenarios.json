@@ -386,6 +386,11 @@
     "custom_category_blocks_a_move": {
       "move": "ReviewRequired:account_has_links"
     },
+    "future_anchors_are_refused": {
+      "future_check": "ReviewRequired:date_in_future",
+      "future_opening": "InvalidInput:date_in_future",
+      "future_opening_correction": "ReviewRequired:date_in_future"
+    },
     "note_only_correction_keeps_evidence": {
       "after": [
         [
@@ -478,6 +483,16 @@
         ]
       ],
       "unanswered": "ReviewRequired:inclusion_unanswered"
+    },
+    "stale_duplicate_resolve_is_refused": {
+      "edited_away": "ReviewRequired:duplicate_target_invalid",
+      "stale_revision": "StaleVersion",
+      "target_removed": "ReviewRequired:duplicate_target_invalid"
+    },
+    "type_edits_preserve_linked_asset_rules": {
+      "asset_to_debt_while_linked": "InvalidInput:linked_asset_invalid",
+      "debt_to_asset_keeps_link": "InvalidInput:linked_asset_invalid",
+      "link_still_set": true
     }
   },
   "equal_amount_not_a_match": {

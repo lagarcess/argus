@@ -50,6 +50,7 @@ from tests.financial_recording.review import (
     ReviewRequired,
     blocking,
     duplicates,
+    ensure_anchor_not_future,
     inclusion_issues,
     issue,
     notices,
@@ -118,13 +119,13 @@ def fingerprint(value: object) -> str:
 
 
 def review(
-    state: State, draft: Draft, tz: ZoneInfo
+    state: State, draft: Draft, tz: ZoneInfo, now: Optional[datetime] = None
 ) -> tuple[Optional[Body], tuple[Issue, ...]]:
     book = state.book
     body, parsed = parse_fields(draft.fields, book, draft.answers)
     found = list(parsed)
     if body is not None:
-        found.extend(validate(book, body, tz, provenance=draft.provenance))
+        found.extend(validate(book, body, tz, provenance=draft.provenance, now=now))
     order = list(state.drafts)
     earlier = [
         (other.id, other.fields, other.provenance)
@@ -203,9 +204,11 @@ class Store:
         )
         records = dict(self.book.records)
         if entered is not None and entered.strip():
+            stamp = as_of or now
+            ensure_anchor_not_future(stamp, now)
             amount = parse_minor(entered, currency)
             signed = -amount if NATURE[type] == "liability" else amount
-            opening = Opening(account.id, signed, as_of or now)
+            opening = Opening(account.id, signed, stamp)
             record = self._new_record(opening, Provenance("manual", now), records)
             records[record.id] = record
         self._swap(
@@ -259,6 +262,7 @@ class Store:
         if linked_asset_id is not UNSET:
             changes["linked_asset_id"] = self._linked_asset(account, linked_asset_id)
         edited = replace(account, **changes)
+        self._assert_link_natures(edited)
         self._swap(accounts={**self.book.accounts, account_id: edited})
         return edited
 
@@ -326,14 +330,24 @@ class Store:
         distinct: bool = False,
         duplicate_of: Optional[str] = None,
         answers: Optional[Mapping[str, str]] = None,
+        expected_revision: Optional[int] = None,
     ) -> Draft:
         draft = self._proposed(draft_id)
+        if expected_revision is not None and draft.revision != expected_revision:
+            raise StaleVersion(draft_id)
         changes: dict = {
             "revision": draft.revision + 1,
             "distinct": draft.distinct or distinct,
         }
         records = self.book.records
         if duplicate_of is not None:
+            matches = self._live_duplicate_matches(draft)
+            if duplicate_of not in matches:
+                raise ReviewRequired(
+                    [issue("possible_duplicate", *matches)]
+                    if matches
+                    else [issue("duplicate_target_invalid", duplicate_of)]
+                )
             target = records[duplicate_of]
             records = {
                 **records,
@@ -348,7 +362,7 @@ class Store:
 
     def preview(self, draft_id: str) -> Preview:
         draft = self.state.drafts[draft_id]
-        body, found = review(self.state, draft, self.tz)
+        body, found = review(self.state, draft, self.tz, now=self.clock())
         touched = sorted(accounts_of(body)) if body is not None else []
         return Preview(
             draft_id=draft.id,
@@ -389,7 +403,7 @@ class Store:
                 for account_id, version in preview.basis.items()
             ):
                 raise StalePreview(self.preview(preview.draft_id))
-            body, found = review(working, draft, self.tz)
+            body, found = review(working, draft, self.tz, now=self.clock())
             if blocking(found):
                 raise ReviewRequired(blocking(found))
             records = dict(working.book.records)
@@ -441,7 +455,7 @@ class Store:
             raise InvalidInput("currency_mismatch", body.account_id)
         if not isinstance(body, Activity) and body.account_id != record.body.account_id:
             raise InvalidInput("anchor_account_immutable", body.account_id)
-        found = blocking(validate(self.book, body, self.tz, record_id))
+        found = blocking(validate(self.book, body, self.tz, record_id, now=self.clock()))
         left = accounts_of(record.body) - accounts_of(body)
         trial = with_trial(self.book, body, record_id, self.tz)
         found.extend(inclusion_issues(trial, left, self.tz))
@@ -496,10 +510,28 @@ class Store:
             raise InvalidInput("answers_not_applicable", record_id)
         if answers:
             body = replace(body, answers=_merged_answers(body.answers, answers))
-        found = blocking(validate(self.book, body, self.tz, record_id))
+        found = blocking(validate(self.book, body, self.tz, record_id, now=self.clock()))
         if found:
             raise ReviewRequired(found)
         return self._revise(record, body, reason, removed=False)
+
+    def _live_duplicate_matches(self, draft: Draft) -> tuple[str, ...]:
+        """Current possible_duplicate targets for this draft revision."""
+        _, found = review(self.state, draft, self.tz, now=self.clock())
+        for item in found:
+            if item.code == "possible_duplicate":
+                return item.refs
+        return ()
+
+    def _assert_link_natures(self, account: Account) -> None:
+        """Debt→asset links must hold after type edits in both directions."""
+        if account.linked_asset_id is not None:
+            self._linked_asset(account, account.linked_asset_id)
+        for other in self.book.accounts.values():
+            if other.id == account.id or other.linked_asset_id != account.id:
+                continue
+            if NATURE[account.type] != "asset":
+                raise InvalidInput("linked_asset_invalid", account.id)
 
     def _linked_refund_issues(self, record_id: str, body: Body) -> list[Issue]:
         """A corrected purchase is re-checked through the same refund rule."""

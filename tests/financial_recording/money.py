@@ -1,13 +1,38 @@
 """Currency authority adapter and exact decimal parsing into integer minor units.
 
-babel (CLDR) is the currency authority. Amounts never pass through float.
+Accepted currencies come from the same tender set as
+`src/argus/domain/home_country.currency_codes()`. Exponents come from babel
+(CLDR). Amounts never pass through float.
 """
 
+from __future__ import annotations
+
+import importlib.util
 from fractions import Fraction
+from functools import cache
+from pathlib import Path
 
-from babel.numbers import get_currency_precision, list_currencies
+from babel.numbers import get_currency_precision
 
-KNOWN_CURRENCIES = frozenset(list_currencies())
+_HOME_COUNTRY = (
+    Path(__file__).resolve().parents[2] / "src" / "argus" / "domain" / "home_country.py"
+)
+
+
+@cache
+def _tender_currencies() -> frozenset[str]:
+    """Load the production tender set without importing the `argus` package."""
+    spec = importlib.util.spec_from_file_location(
+        "_recording_currency_authority", _HOME_COUNTRY
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load currency authority from {_HOME_COUNTRY}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.currency_codes()
+
+
+KNOWN_CURRENCIES = _tender_currencies()
 
 
 class InvalidInput(ValueError):

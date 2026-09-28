@@ -55,6 +55,21 @@ def test_unknown_code_is_refused_not_defaulted_to_two_digits():
     assert refused.value.code == "currency_unsupported"
 
 
+def test_historic_tender_codes_follow_home_country_not_babel_list():
+    """HRK is in babel.list_currencies() but not home_country.currency_codes()."""
+    from argus.domain.home_country import currency_codes
+    from babel.numbers import list_currencies
+
+    from tests.financial_recording.money import KNOWN_CURRENCIES
+
+    assert "HRK" in list_currencies()
+    assert "HRK" not in currency_codes()
+    assert KNOWN_CURRENCIES == currency_codes()
+    with pytest.raises(InvalidInput) as refused:
+        exponent("HRK")
+    assert refused.value.code == "currency_unsupported"
+
+
 @pytest.mark.parametrize(
     ("value", "rounded"),
     [

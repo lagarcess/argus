@@ -79,6 +79,10 @@ class Scene:
         entered: Optional[str] = None,
         **options,
     ) -> Account:
+        as_of = options.get("as_of")
+        if isinstance(as_of, datetime) and as_of > self.now:
+            # Recording happens at or after the balance instant the person chose.
+            self.now = as_of
         return self.store.create_account(
             type,
             currency,
@@ -121,11 +125,14 @@ class Scene:
         hour: int = 18,
         **fields,
     ) -> Draft:
+        as_of = local(day, hour)
+        if as_of > self.now:
+            self.now = as_of
         return self.draft(
             kind="balance_observation",
             account_id=account.id,
             amount=amount,
-            as_of=local(day, hour).isoformat(),
+            as_of=as_of.isoformat(),
             basis=basis,
             **fields,
         )
