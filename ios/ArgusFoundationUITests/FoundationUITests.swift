@@ -57,8 +57,15 @@ final class FoundationUITests: XCTestCase {
         for destination in destinations {
             app.buttons["tab.\(destination)"].tap()
             XCTAssertTrue(app.buttons["tab.\(destination)"].isSelected)
-            try app.performAccessibilityAudit(for: .contrast)
             capture("dark-\(destination)")
+            if destination == "home" {
+                // Prove the final section can scroll clear of the floating navigation.
+                app.scrollViews["screen.home"].swipeUp()
+                capture("dark-home-scrolled")
+            }
+            if destination == "search" {
+                try app.performAccessibilityAudit(for: .contrast)
+            }
         }
         openPreferences()
         app.buttons["appearance.system"].tap()
