@@ -479,7 +479,7 @@ already allowed figures inside conversation messages; “unconfirmed” must not
 misread as “never persisted in chat history.” Financial-record access follows
 the [registered-account boundary](#guest-access-and-registration).
 
-The input methods below are part of the experience direction. Their technical readiness differs. Wallet integrations and bank access are experiments, not promises of universal support or prerequisites for a useful ecosystem. Provider selection is not locked.
+The input methods below are part of the experience direction. Their technical readiness differs. Wallet integrations and bank access are experiments, not promises of universal support or prerequisites for a useful ecosystem. Provider selection for wallet, OCR/document, and banking paths is not locked. Voice provider direction is locked separately under [ARCHITECTURE.md](../ARCHITECTURE.md#voice-and-chart-direction) and section 4.3.
 
 ### 4.1 Direct manual entry and editing
 
