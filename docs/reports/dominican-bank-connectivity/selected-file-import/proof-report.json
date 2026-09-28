@@ -558,7 +558,7 @@
   "format": "selected-file-import-proof-v2",
   "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
   "recording_model": {
-    "digest": "f27de4c44915f322e2bea4177f8b20a44aac45c693022bebb3452985f48862f2",
-    "ref": "lagarcess/argus#724 at 8cdfc6a09e2fb1001b6a7c8694b67e3bd08fa491"
+    "digest": "db2f71ef1bdc8d85b5c6531b3b44da59c1f2b6b1c10ae1a8286d1e210e4d07ae",
+    "ref": "lagarcess/argus#724 at 71f6d27b3343c133785bf969005876d1eab583b3"
   }
 }

@@ -27,7 +27,7 @@ except ImportError:
 
 SIZE_LIMIT = 10 * 1024 * 1024
 AST = timezone(timedelta(hours=-4))
-CLOCK = datetime(2026, 9, 28, 12, 0, tzinfo=AST)
+CLOCK = datetime(2026, 10, 1, 12, 0, tzinfo=AST)
 FIXTURE_PASSWORD = "synthetic-only"
 PDF_PAD = bytes.fromhex(
     "28BF4E5E4E758A4164004E56FFFA01082E2E00B6D0683E802F0CA9FE6453697A"
@@ -281,6 +281,10 @@ class Env:
 
     def by_label(self, session: Session) -> dict[str, str]:
         return {self.label(item): item for item in session.drafts}
+
+    def decide(self, draft_id: str, **decision):
+        reviewed = self.store.preview(draft_id).draft_revision
+        return self.store.resolve(draft_id, expected_revision=reviewed, **decision)
 
     def scope(self, space: str) -> list[str]:
         return derive.space_scope(self.store.book, space)
@@ -694,7 +698,7 @@ def identical_rows(fx, workdir):
     rows = env.by_label(session)
     first = blocking(env.store.preview(rows["tx-dop-02"]))
     second = blocking(env.store.preview(rows["tx-dop-03"]))
-    env.store.resolve(rows["tx-dop-03"], distinct=True)
+    env.decide(rows["tx-dop-03"], distinct=True)
     env.importer.confirm_ready(session, "batch-1")
     states = [env.store.state.drafts[rows[k]].status for k in ("tx-dop-02", "tx-dop-03")]
     observed = {"first": first, "second": second, "after_resolution": states}
@@ -714,7 +718,7 @@ def statement_balance(fx, workdir):
     session = _statement_session(env)
     rows = env.by_label(session)
     closing_codes = blocking(env.store.preview(rows["closing"]))
-    env.store.resolve(rows["statement-03"], distinct=True)
+    env.decide(rows["statement-03"], distinct=True)
     env.store.edit_draft(rows["closing"], as_of="2026-09-30T23:59:59-04:00")
     env.importer.confirm_ready(session, "batch-1")
     gap = derive.observation_gaps(env.store.book, env.ids["Cuenta corriente"])[-1]
@@ -855,7 +859,7 @@ def completed_review(fx, workdir):
     env = make_env(workdir)
     session = _statement_session(env)
     rows = env.by_label(session)
-    env.store.resolve(rows["statement-03"], distinct=True)
+    env.decide(rows["statement-03"], distinct=True)
     env.store.edit_draft(rows["closing"], as_of="2026-09-30T23:59:59-04:00")
     files_in_review = len(env.importer.held()["on_disk"])
     confirmed = env.importer.confirm_ready(session, "batch-1")
@@ -910,7 +914,7 @@ def overlapping_statement(fx, workdir):
     env = make_env(workdir)
     first = _statement_session(env)
     rows = env.by_label(first)
-    env.store.resolve(rows["statement-03"], distinct=True)
+    env.decide(rows["statement-03"], distinct=True)
     env.store.edit_draft(rows["closing"], as_of="2026-09-30T23:59:59-04:00")
     env.importer.confirm_ready(first, "batch-1")
     second = _statement_session(env, "statement-overlap.pdf")
@@ -946,8 +950,8 @@ def manual_then_import(fx, workdir):
     session = _csv_session(env)
     rows = env.by_label(session)
     codes = blocking(env.store.preview(rows["tx-dop-02"]))
-    env.store.resolve(rows["tx-dop-02"], duplicate_of=record.id)
-    env.store.resolve(rows["tx-dop-03"], distinct=True)
+    env.decide(rows["tx-dop-02"], duplicate_of=record.id)
+    env.decide(rows["tx-dop-03"], distinct=True)
     env.importer.confirm_ready(session, "batch-1")
     purchases = [
         r
@@ -1007,7 +1011,7 @@ def earlier_day_check(fx, workdir):
     except model.ReviewRequired:
         direct = "refused"
     written_directly = len(env.store.book.records) - records_before
-    env.store.resolve(rows["statement-03"], distinct=True)
+    env.decide(rows["statement-03"], distinct=True)
     for item in rows.values():
         env.store.resolve(item, answers={check_id: "included"})
     confirmed_answered = env.importer.confirm_ready(session, "batch-2")
