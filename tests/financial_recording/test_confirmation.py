@@ -24,6 +24,9 @@ def test_duplicate_submission_writes_once():
         "same_key_different_body": "IdempotencyConflict",
         "activity_records": 1,
         "balance": 90_000,
+        "create_replay_keeps_original_nickname": "Efectivo",
+        "confirm_replay_keeps_original_amount": 10_000,
+        "confirm_replay_after_remove_not_tombstone": False,
     }
 
 

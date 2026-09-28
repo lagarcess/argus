@@ -191,7 +191,8 @@ class Store:
         ]
         replayed = self._replayed(("create_account", idempotency_key), request)
         if replayed is not None:
-            return self.book.accounts[replayed]
+            # Replay returns the create-time account, not a later edit.
+            return replayed
         if type not in NATURE:
             raise InvalidInput("account_type_unsupported", type)
         if not 1 <= ownership_share_bps <= FULL_SHARE_BPS:
@@ -218,7 +219,7 @@ class Store:
         self._swap(
             accounts={**self.book.accounts, account.id: account},
             records=records,
-            replay=(("create_account", idempotency_key), request, account.id),
+            replay=(("create_account", idempotency_key), request, account),
         )
         return account
 
@@ -254,7 +255,13 @@ class Store:
             changes["type"] = type
         if currency is not None and currency != account.currency:
             exponent(currency)
-            if records:
+            # Expectations store minor units only; forecast reads the account's
+            # currency, so a plan locks currency the same way a record does.
+            has_plan = any(
+                expectation.account_id == account_id
+                for expectation in self.book.expectations.values()
+            )
+            if records or has_plan:
                 raise InvalidInput("currency_locked", currency)
             changes["currency"] = currency
         if archived is not None:
@@ -302,11 +309,15 @@ class Store:
         if direction not in FULFILLING_KINDS:
             raise InvalidInput("direction_unsupported", direction)
         account = self.book.accounts[account_id]
+        # Direction owns the forecast sign; the typed amount must be positive.
+        minor = parse_minor(amount, account.currency)
+        if minor <= 0:
+            raise InvalidInput("amount_not_positive", amount)
         expectation = Expectation(
             self._id("exp"),
             account_id,
             direction,
-            parse_minor(amount, account.currency),
+            minor,
             due_on,
         )
         self._swap(expectations={**self.book.expectations, expectation.id: expectation})
@@ -432,13 +443,14 @@ class Store:
         ]
         replayed = self._replayed(("confirm", idempotency_key), request)
         if replayed is not None:
-            return [self.book.records[record_id] for record_id in replayed]
+            # Replay returns the confirmation-time records, not later revisions.
+            return list(replayed)
         working = start
-        confirmed = []
+        confirmed: list[Record] = []
         for preview in previews:
             draft = working.drafts[preview.draft_id]
             if draft.status == "confirmed":
-                confirmed.append(draft.record_id)
+                confirmed.append(working.book.records[draft.record_id])
                 continue
             if draft.status != "proposed":
                 raise InvalidInput("draft_not_proposed", draft.id)
@@ -484,10 +496,10 @@ class Store:
                 draft.id: replace(draft, status="confirmed", record_id=record.id),
             }
             working = State(book, drafts, working.replays)
-            confirmed.append(record.id)
+            confirmed.append(stamped)
         self.state = working
         self._swap(replay=(("confirm", idempotency_key), request, tuple(confirmed)))
-        return [self.book.records[record_id] for record_id in confirmed]
+        return list(confirmed)
 
     def correct(
         self,

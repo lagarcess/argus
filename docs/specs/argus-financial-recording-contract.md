@@ -37,7 +37,7 @@ Argus stores **accounts** and **confirmed records**. A record is either an **anc
 | `id` | Server-assigned and stable. Nickname, space and archive changes never change it. |
 | `type` | `cash`, `checking`, `savings`, `investment`, `credit_card`, `other_debt`, `property`, `vehicle` or `other_asset` (MVEE quick setup). |
 | `nature` | Derived from `type` by one table. `credit_card` and `other_debt` are liabilities. The rest are assets. Never stored. |
-| `currency` | One ISO 4217 code (section 4). Locked once the account has any record. |
+| `currency` | One ISO 4217 code (section 4). Locked once the account has any record or plan expectation. |
 | `nickname` | Optional. Trimmed. Up to 60 characters. Blank means no nickname, and the client shows the type's localized name. A nickname changes the display name only. |
 | `space_id` | The private space that holds the account: Personal by default, or a named Business or Custom space. Household sharing is a separate visibility fact, not a space move. |
 | `archived` | Organizational only (section 3.2). |
@@ -45,7 +45,7 @@ Argus stores **accounts** and **confirmed records**. A record is either an **anc
 | `linked_asset_id` | On a debt only. Names the asset it finances. Display only. The debt stays its own account and is counted once. |
 | `version` | Increments on every write that touches the account or its records. Used for stale previews and edits (section 8). |
 
-**Type and currency locks.** Currency locks once the account has any record. Type locks once activity touches the account, as the final baseline does ("Keep the currency and account type with their recorded activity"). With only an opening balance, a type change inside the same nature is allowed. A change that flips nature is refused, because it would reverse the meaning of the stored sign.
+**Type and currency locks.** Currency locks once the account has any record or plan expectation. Expectations store minor units only and take their currency from the account on read, so changing currency under an open plan would silently rescale the forecast. Type locks once activity touches the account, as the final baseline does ("Keep the currency and account type with their recorded activity"). With only an opening balance, a type change inside the same nature is allowed. A change that flips nature is refused, because it would reverse the meaning of the stored sign.
 
 **Unknown is not zero.** An account has a known balance only after it has an anchor. With no anchor, Argus reports its activity since tracking began instead ("−RD$850 recorded since you started tracking"). Totals follow the same rule. When every asset in a currency is unknown, that currency's assets total is unknown, not RD$0, and so is its net. Liabilities follow the same rule. Unknown accounts are listed in coverage (section 12).
 
@@ -198,7 +198,7 @@ Notices inform and never block. `negative_asset_balance` flags cash or a bank ac
 
 **Manual saves and batches.** A manual form save runs draft, preview and confirm in one call. It adds no separate AI approval. A statement batch confirms the rows the person selects in one all-or-nothing call. Flagged rows stay held as drafts with their progress. A batch re-reviews each row against the rows confirmed before it. A row that becomes ambiguous inside the batch stops the batch and writes nothing.
 
-**Idempotent confirmation.** Confirm and create carry an idempotency key. The server fingerprints the request with SHA-256 over canonical JSON of the draft ids and reviewed fields. The same key and fingerprint return the original result without a second write. The same key with a different fingerprint is `idempotency_conflict`. An already-confirmed draft returns its record. This reuses the API contract's [idempotency section](../API_CONTRACT.md#contract-idempotency-admission) and the replay-or-conflict pattern in `supabase/migrations/20260722000002_atomic_backtest_admission.sql`.
+**Idempotent confirmation.** Confirm and create carry an idempotency key. The server fingerprints the request with SHA-256 over canonical JSON of the draft ids and reviewed fields. The same key and fingerprint return the original confirmation-time or create-time result without a second write, even after a later correction, removal, or account edit. The same key with a different fingerprint is `idempotency_conflict`. An already-confirmed draft returns its record. This reuses the API contract's [idempotency section](../API_CONTRACT.md#contract-idempotency-admission) and the replay-or-conflict pattern in `supabase/migrations/20260722000002_atomic_backtest_admission.sql`.
 
 **Stale previews.** Confirmation succeeds only if the preview's basis still holds. Otherwise it writes nothing and returns `stale_preview` with a refreshed preview. The draft and the person's edits are kept. The person sees the changed effects and confirms again. Two confirmations of one stale preview both fail.
 

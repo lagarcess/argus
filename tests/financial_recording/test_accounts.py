@@ -43,6 +43,7 @@ def test_account_edit_rules_follow_the_final_baseline():
         "blank_clears_nickname": None,
         "long_nickname": "InvalidInput:nickname_invalid",
         "currency_on_empty": "USD",
+        "currency_on_planned": "InvalidInput:currency_locked",
         "currency_on_opened": "InvalidInput:currency_locked",
         "nature_flip_on_opened": "InvalidInput:nature_change_requires_empty_account",
         "same_nature_on_opened": "savings",

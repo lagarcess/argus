@@ -344,6 +344,8 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
         },
         "expectation_direction_is_canonical": {
             "bogus_direction": "InvalidInput:direction_unsupported",
+            "negative_amount": "InvalidInput:amount_not_positive",
+            "zero_amount": "InvalidInput:amount_not_positive",
             "accepted": True,
         },
     }

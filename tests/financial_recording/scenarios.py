@@ -463,14 +463,29 @@ def duplicate_submission() -> dict:
     second = scene.store.confirm(preview, "k1")
     other_key = scene.store.confirm(preview, "k2")
     different = scene.store.preview(scene.act("expense", cash, "200.00", 2).id)
-    return {
+    conflict = outcome(lambda: scene.store.confirm(different, "k1"))
+    before_later_edits = {
         "accounts": len(scene.store.book.accounts),
         "same_account_returned": again.id == cash.id,
         "create_changed_body": changed,
         "one_record_for_three_confirms": len({first.id, second.id, other_key.id}) == 1,
-        "same_key_different_body": outcome(lambda: scene.store.confirm(different, "k1")),
+        "same_key_different_body": conflict,
         "activity_records": scene.activity_count(),
         "balance": scene.amount(cash),
+    }
+    # Later edits must not change what an exact-key replay returns.
+    live = scene.store.book.accounts[cash.id]
+    scene.store.edit_account(live.id, live.version, nickname="Renamed")
+    create_replay = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    scene.store.correct(first.id, 1, "typo", amount="50.00")
+    after_correct = scene.store.confirm(preview, "k1")
+    scene.store.remove(first.id, 2, "undo", accept_reordering=True)
+    after_remove = scene.store.confirm(preview, "k1")
+    return {
+        **before_later_edits,
+        "create_replay_keeps_original_nickname": create_replay.nickname,
+        "confirm_replay_keeps_original_amount": after_correct.body.amount,
+        "confirm_replay_after_remove_not_tombstone": after_remove.removed,
     }
 
 
@@ -693,9 +708,11 @@ def account_edit_rules() -> dict:
     scene = Scene()
     store = scene.store
     empty = scene.account("  Clavito  ", "savings", "DOP")
+    planned = scene.account("Planificado", "checking", "DOP")
     opened = scene.account("Solo apertura", "checking", "DOP", "100.00")
     used = scene.account("Corriente", "checking", "DOP", "100.00")
     scene.record("expense", used, "10.00", 2)
+    store.expect(planned.id, "out", "100.00", local(10).date())
     cleared = store.edit_account(empty.id, 1, nickname="   ")
     results = {
         "trimmed": empty.nickname,
@@ -704,6 +721,9 @@ def account_edit_rules() -> dict:
             lambda: store.edit_account(empty.id, 2, nickname="x" * 61)
         ),
         "currency_on_empty": store.edit_account(empty.id, 2, currency="USD").currency,
+        "currency_on_planned": outcome(
+            lambda: store.edit_account(planned.id, 1, currency="USD")
+        ),
         "currency_on_opened": outcome(
             lambda: store.edit_account(opened.id, 1, currency="USD")
         ),

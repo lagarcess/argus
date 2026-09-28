@@ -899,9 +899,17 @@ def _expectation_direction_canonical() -> dict:
     refused = outcome(
         lambda: scene.store.expect(cash.id, "sideways", "100.00", local(10).date())
     )
+    negative = outcome(
+        lambda: scene.store.expect(cash.id, "out", "-100.00", local(10).date())
+    )
+    zero = outcome(
+        lambda: scene.store.expect(cash.id, "in", "0.00", local(10).date())
+    )
     ok = scene.store.expect(cash.id, "out", "100.00", local(10).date())
     return {
         "bogus_direction": refused,
+        "negative_amount": negative,
+        "zero_amount": zero,
         "accepted": ok in scene.store.book.expectations,
     }
 

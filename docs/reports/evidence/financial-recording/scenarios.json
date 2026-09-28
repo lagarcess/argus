@@ -10,6 +10,7 @@
     "correct_on_archived": "ok",
     "currency_on_empty": "USD",
     "currency_on_opened": "InvalidInput:currency_locked",
+    "currency_on_planned": "InvalidInput:currency_locked",
     "long_nickname": "InvalidInput:nickname_invalid",
     "nature_flip_on_opened": "InvalidInput:nature_change_requires_empty_account",
     "same_nature_on_opened": "savings",
@@ -351,7 +352,10 @@
     "accounts": 1,
     "activity_records": 1,
     "balance": 90000,
+    "confirm_replay_after_remove_not_tombstone": false,
+    "confirm_replay_keeps_original_amount": 10000,
     "create_changed_body": "IdempotencyConflict",
+    "create_replay_keeps_original_nickname": "Efectivo",
     "one_record_for_three_confirms": true,
     "same_account_returned": true,
     "same_key_different_body": "IdempotencyConflict"
@@ -460,7 +464,9 @@
     },
     "expectation_direction_is_canonical": {
       "accepted": true,
-      "bogus_direction": "InvalidInput:direction_unsupported"
+      "bogus_direction": "InvalidInput:direction_unsupported",
+      "negative_amount": "InvalidInput:amount_not_positive",
+      "zero_amount": "InvalidInput:amount_not_positive"
     },
     "external_id_bound_to_confirm_account": {
       "bound_account": "acct-1",
