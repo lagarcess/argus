@@ -4,7 +4,7 @@ This report answers one question. Can SuperCarros and SuperCasas listings help a
 
 The audit read `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963` on 2026-09-27. The run record, sanitized evidence, synthetic fixtures, and scripts live in [the evidence folder](evidence/asset-listing-enrichment/README.md).
 
-**Status.** Closed on 2026-09-28. [PR #727](https://github.com/lagarcess/argus/pull/727) publishes the account decision this report depended on. Licensed access and asking-price ranges remain founder decisions. No further work is authorized under this assignment. Review rounds on 2026-09-28 hardened the proof's fetch tooling and changed no finding.
+**Status.** Closed on 2026-09-28. [PR #727](https://github.com/lagarcess/argus/pull/727), merged on 2026-09-28 as `3fa0dd921`, publishes the account decision this report depended on. Licensed access and asking-price ranges remain founder decisions. No further work is authorized under this assignment. Review rounds on 2026-09-28 hardened the proof's fetch tooling and changed no finding.
 
 ## Recommendation
 
@@ -21,11 +21,11 @@ Three facts drive that verdict.
 
 ### PR #727 publishes the account decision
 
-The founder approved vehicle and home records on 2026-09-27, independently of listing enrichment. [PR #727](https://github.com/lagarcess/argus/pull/727), an open draft at `a1c294319`, publishes that decision. Its decision log entry for 2026-09-27 approves unknown balances and optional property, vehicle, and other asset tracking, and locks the estimate, ownership, and linked-debt boundaries. Its MVEE section "Quick account setup and optional assets" owns the details. A user records an estimated whole-asset value or leaves it unknown, and may add the estimate's date and basis, an ownership share, and a linked debt.
+The founder approved vehicle and home records on 2026-09-27, independently of listing enrichment. [PR #727](https://github.com/lagarcess/argus/pull/727) publishes that decision. It merged into `codex/private-alpha-next` on 2026-09-28 as `3fa0dd921`. Its decision log entry for 2026-09-27 approves unknown balances and optional property, vehicle, and other asset tracking, and locks the estimate, ownership, and linked-debt boundaries. Its MVEE section "Quick account setup and optional assets" owns the details. A user records an estimated whole-asset value or leaves it unknown, and may add the estimate's date and basis, an ownership share, and a linked debt.
 
 The same section keeps listing-based valuation as a future candidate capability. It names SuperCarros and SuperCasas as candidate sources and calls asking prices comparison evidence, not verified sale prices or an appraisal. This report is evidence for that future work. It approves none of it.
 
-At the audited commit `f0a90763b`, the decision was not yet published. The MVEE minimum account list there reads "cash, checking, savings, investments, credit cards, and other debts". The exact-commit findings in this report and in [the canon map](evidence/asset-listing-enrichment/canon-map.md) stay as historical evidence. When #727 merges, the decision becomes canon on `codex/private-alpha-next`.
+At the audited commit `f0a90763b`, the decision was not yet published. The MVEE minimum account list there reads "cash, checking, savings, investments, credit cards, and other debts". The exact-commit findings in this report and in [the canon map](evidence/asset-listing-enrichment/canon-map.md) stay as historical evidence. With #727 merged, the decision is canon on `codex/private-alpha-next`.
 
 ## What was tested and what was inferred
 
@@ -302,7 +302,7 @@ This is a proposal for the founder to assign or discard. It does not assign work
 
 **Stop conditions.** Stop on any 401, 403, 429, bot check, or login wall. Stop if robots.txt or the terms change against the authorization. Stop if pages fail to parse because the template changed. Stop and delete the output if any seller name, phone, or email reaches a file.
 
-**Dependencies.** The measurement is independent of the financial contracts. It needs only the authorization. A product prototype would depend on the two founder decisions above, on #727 merging, and on the account, revision, household, and notification contracts. Residential property gets no experiment until vehicles show that the range survives this test.
+**Dependencies.** The measurement is independent of the financial contracts. It needs only the authorization. A product prototype would depend on the two founder decisions above and on the account, revision, household, and notification contracts. Residential property gets no experiment until vehicles show that the range survives this test.
 
 ## Verification and limits
 
@@ -314,4 +314,4 @@ This is a proposal for the founder to assign or discard. It does not assign work
 - Twenty pages cannot show market coverage, the meaning of the hidden dates, or valuation accuracy. The density figures count listings by model or sector, not by model year.
 - The legal notes restate statutes and terms read on 2026-09-27. They are not legal advice.
 - A public GitHub scraper fetches SuperCasas search pages every day, which robots.txt disallows. Its logs show no blocking. That shows technical reach, not permission.
-- The account decision is cited from PR #727 at `a1c294319`, an open draft. If #727 changes before it merges, these citations need a recheck.
+- The account decision is cited from #727 as merged in `3fa0dd921`. Its decision log entry, its MVEE section on quick account setup and optional assets, its passage on future valuation assistance, and its Decision 8 supersession were rechecked against that commit.
