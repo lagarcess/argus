@@ -1,0 +1,30 @@
+{
+  "verified_at": "2026-09-28T20:35:47.415613+00:00",
+  "verified_against_source_head": "f93e11d7e639b77b5ffd82ec9d04076bdb6dd713",
+  "current_integration": "25015963600fa9dd9290080bf641238693509a37",
+  "fixture_sha256": "a12a24634763f951f6daad7d200614dd777e83785d9ed4da9907720e5bdf418f",
+  "platforms": [
+    {
+      "platform": "ios",
+      "capture_head": "27a0b4e756057dadfc9c3ab6f1b4733fca683293",
+      "source_and_fixture_changed_paths": [],
+      "source_hash_mismatches": [],
+      "retained": true
+    },
+    {
+      "platform": "android",
+      "capture_head": "f93e11d7e639b77b5ffd82ec9d04076bdb6dd713",
+      "source_and_fixture_changed_paths": [],
+      "source_hash_mismatches": [],
+      "retained": true
+    },
+    {
+      "platform": "web",
+      "capture_head": "27a0b4e756057dadfc9c3ab6f1b4733fca683293",
+      "source_and_fixture_changed_paths": [],
+      "source_hash_mismatches": [],
+      "retained": true
+    }
+  ],
+  "scope": "After this source head, evidence and report commits require the same source comparison; original capture heads must never be rewritten."
+}

@@ -1,0 +1,153 @@
+[
+  {
+    "testIdentifier" : "ChartUITests/testLongSeriesInteractionPerformance()",
+    "testIdentifierURL" : "test://com.apple.xcode/ChartPrototype/ChartPrototypeUITests/ChartUITests/testLongSeriesInteractionPerformance",
+    "testRuns" : [
+      {
+        "device" : {
+          "deviceId" : "AAC78F82-61C2-4E51-A14C-4F341CD19A79",
+          "deviceName" : "Argus Chart Validation 17e"
+        },
+        "metrics" : [
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Clock Monotonic Time",
+            "identifier" : "com.apple.dt.XCTMetric_Clock.time.monotonic",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              1.369309923,
+              1.311199967,
+              1.3170522660000001,
+              1.226342021,
+              1.174153695
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "s"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Memory Peak Physical (chartprototype)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-ai.argus.chartprototype.physical_peak",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              53922.048,
+              53430.528,
+              50940.16,
+              49236.224,
+              48957.696
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Cycles (chartprototype)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-ai.argus.chartprototype.cycles",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              2464936.186,
+              2439876.596,
+              2454626.045,
+              2466551.55,
+              2420788.01
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kC"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Absolute Memory Physical (chartprototype)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-ai.argus.chartprototype.physical_absolute",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              51480.832,
+              48204.032,
+              48662.784,
+              48613.632,
+              48662.784
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "Memory Physical (chartprototype)",
+            "identifier" : "com.apple.dt.XCTMetric_Memory-ai.argus.chartprototype.physical",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              4030.464,
+              -3211.264,
+              524.288,
+              16.384,
+              114.688
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kB"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Time (chartprototype)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-ai.argus.chartprototype.time",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              1.0574843,
+              1.04584399,
+              1.017303767,
+              0.986979347,
+              0.9392772
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "s"
+          },
+          {
+            "baselineAverage" : 0,
+            "baselineName" : "",
+            "displayName" : "CPU Instructions Retired (chartprototype)",
+            "identifier" : "com.apple.dt.XCTMetric_CPU-ai.argus.chartprototype.instructions_retired",
+            "maxPercentRegression" : 10,
+            "maxPercentRelativeStandardDeviation" : 10,
+            "maxRegression" : 0,
+            "maxStandardDeviation" : 10,
+            "measurements" : [
+              10605892.446,
+              10627521.184,
+              10598686.213,
+              10624070.188,
+              10603938.945
+            ],
+            "polarity" : "prefers smaller",
+            "unitOfMeasurement" : "kI"
+          }
+        ],
+        "testPlanConfiguration" : {
+          "configurationId" : "1",
+          "configurationName" : "Test Scheme Action"
+        }
+      }
+    ]
+  }
+]

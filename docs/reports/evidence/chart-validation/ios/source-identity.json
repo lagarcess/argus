@@ -1,0 +1,16 @@
+{
+  "head": "27a0b4e756057dadfc9c3ab6f1b4733fca683293",
+  "files": {
+    "prototypes/chart-validation/ios/ChartPrototype/ChartData.swift": "c5741382a201a22662fd5d0e5bfd571ef566d54c3b3542bb56dbe16633c12d18",
+    "prototypes/chart-validation/ios/ChartPrototype/ChartPrototypeApp.swift": "a688ccf56800720075410ceeb3eb7b06476a7eb1fa3d19d2dbad61ecb8c293d5",
+    "prototypes/chart-validation/ios/ChartPrototype/HorizontalScrubber.swift": "9666e641fe716744c2ae5ce29eb59a20be28bf1b2ee4a29b378b2de2bf6f0903",
+    "prototypes/chart-validation/ios/ChartPrototype.xcodeproj/project.pbxproj": "74e88af202ccae51577435ad4f323b040593e579eb8ac92f624f410bb1ed93d8",
+    "prototypes/chart-validation/ios/ChartPrototype.xcodeproj/xcshareddata/xcschemes/ChartPrototype.xcscheme": "3cf06d3b60321bf757f6a172eda71b7fa277bbf42a4b2ee93935a5d7f6acd407",
+    "prototypes/chart-validation/ios/ChartPrototypeUITests/ChartUITests.swift": "82da97e5ba0dd79fc557b86b1ce9428a18bef0ee5da1ede5ed1fae85527d667c",
+    "prototypes/chart-validation/ios/Prototype.xcconfig": "a9a094a12f59b3bf270b72bb64fc71fadff5fda8bd33ae81f7c6c6fe81e83460",
+    "prototypes/chart-validation/ios/README.md": "5a4790e02de54fa6b4c6dbc5bb07eb0188fd9ba082d1f78c73b839a833ce8697",
+    "prototypes/chart-validation/ios/capture-evidence.sh": "7917c0cd9235e8d9b2c855bc763295fc7492743f7a44daef80e1db9fb13476bd",
+    "prototypes/chart-validation/ios/verify-model.swift": "6be4ea0b76a70b72013be41b59994aaf4b33eb35ad2c716012a7b92c25aa4d5a",
+    "prototypes/chart-validation/fixtures/series.json": "a12a24634763f951f6daad7d200614dd777e83785d9ed4da9907720e5bdf418f"
+  }
+}

@@ -1,6 +1,13 @@
 # Cross-platform chart evidence
 
-Status: in progress; this is not a READY or adoption claim.
+Platform evidence is complete. Terminal PR review and CI are recorded in the
+PR closeout comment. See the [recommendations report](../../chart-validation-prototype.md).
+
+- [iPhone](ios/README.md): adopt Swift Charts direction; simulator limits apply.
+- [Android](android/README.md): change dependency alignment and long-series
+  performance before adoption.
+- [Web](web/README.md): adopt Lightweight Charts direction; WebKit touch remains
+  unverified.
 
 All data comes from the synthetic fixture bundle under
 `prototypes/chart-validation/fixtures/series.json`. No market/provider request,

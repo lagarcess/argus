@@ -1,0 +1,87 @@
+{
+  "sourceHead": "27a0b4e756057dadfc9c3ab6f1b4733fca683293",
+  "timestamp": "2026-09-28T20:30:13.312Z",
+  "host": "darwin 27.0.0 arm64",
+  "node": "v26.10.0",
+  "library": "5.2.0",
+  "fixtureSha256": "a12a24634763f951f6daad7d200614dd777e83785d9ed4da9907720e5bdf418f",
+  "device": "Desktop browser and touch-enabled viewport emulation; no physical device",
+  "browsers": [
+    {
+      "name": "chromium",
+      "version": "147.0.7727.15",
+      "viewport": "390x844 @2x",
+      "results": [
+        "stress: endpoints, reset, independent values, segment structure, formatting pass",
+        "empty: endpoints, reset, independent values, segment structure, formatting pass",
+        "single: endpoints, reset, independent values, segment structure, formatting pass",
+        "buy-and-hold: endpoints, reset, independent values, segment structure, formatting pass",
+        "recurring-contributions: endpoints, reset, independent values, segment structure, formatting pass",
+        "long: endpoints, reset, independent values, segment structure, formatting pass",
+        "mouse release retains; horizontal endpoints clamp; every stress row accessible including gaps",
+        "CDP touch: horizontal release retained; cancellation restored; vertical scroll 486 -> 668px preserved selection"
+      ],
+      "renderLongMs": [
+        37,
+        31.299999952316284,
+        30.700000047683716,
+        28.5,
+        28.399999976158142,
+        29.5,
+        26.899999976158142,
+        28.799999952316284,
+        26.5
+      ],
+      "readoutMs": {
+        "samples": 196,
+        "p50": 0.2999999523162842,
+        "p95": 0.40000009536743164,
+        "max": 1.100000023841858
+      },
+      "idleFrameMs": {
+        "samples": 120,
+        "p50": 8.300000000000182,
+        "p95": 9
+      },
+      "pageErrors": []
+    },
+    {
+      "name": "webkit",
+      "version": "26.4",
+      "viewport": "390x844 @2x",
+      "results": [
+        "stress: endpoints, reset, independent values, segment structure, formatting pass",
+        "empty: endpoints, reset, independent values, segment structure, formatting pass",
+        "single: endpoints, reset, independent values, segment structure, formatting pass",
+        "buy-and-hold: endpoints, reset, independent values, segment structure, formatting pass",
+        "recurring-contributions: endpoints, reset, independent values, segment structure, formatting pass",
+        "long: endpoints, reset, independent values, segment structure, formatting pass",
+        "mouse release retains; horizontal endpoints clamp; every stress row accessible including gaps",
+        "WebKit touch cancellation/vertical gestures not automated: Chromium touch evidence only"
+      ],
+      "renderLongMs": [
+        71,
+        67,
+        56,
+        52,
+        51,
+        53,
+        77,
+        61,
+        66
+      ],
+      "readoutMs": {
+        "samples": 190,
+        "p50": 0.9999999999990905,
+        "p95": 1.0000000000002274,
+        "max": 1.0000000000009095
+      },
+      "idleFrameMs": {
+        "samples": 120,
+        "p50": 17,
+        "p95": 18
+      },
+      "pageErrors": []
+    }
+  ]
+}
