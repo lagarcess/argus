@@ -59,6 +59,8 @@ ENCODED_DEALER_REDIRECT = "/%44ealers/Vendedor-Ficticio/"
 ENCODED_EMAIL_REDIRECT = "/contacto/vendedor%40example.invalid"
 DOUBLE_ENCODED_DEALER_REDIRECT = "/%2544ealers/Vendedor-Ficticio/"
 DOUBLE_ENCODED_EMAIL_REDIRECT = "/contacto/vendedor%2540example.invalid"
+# Nine encoding layers of "D" so eight unquote rounds leave "%44" behind.
+OVER_BOUND_DEALER_REDIRECT = "/%252525252525252544ealers/Vendedor-Ficticio/"
 SAFE_ROBOTS_REDIRECT = "https://m.supercarros.com/robots.txt"
 PAGES = {
     f"{HOST}/robots.txt": ROBOTS,
@@ -83,6 +85,11 @@ REDIRECTS = {
     f"{HOST}/marca-ejemplo-modelo-x/0000011/": (
         302,
         DOUBLE_ENCODED_EMAIL_REDIRECT,
+        b"",
+    ),
+    f"{HOST}/marca-ejemplo-modelo-x/0000012/": (
+        302,
+        OVER_BOUND_DEALER_REDIRECT,
         b"",
     ),
 }
@@ -212,6 +219,14 @@ def main():
         "a double-encoded email Location was allowed through sanitize_location",
     )
     check(
+        retention.fully_decode(OVER_BOUND_DEALER_REDIRECT) is None,
+        "an over-bound encoded Location was treated as fully decoded",
+    )
+    check(
+        retention.sanitize_location(OVER_BOUND_DEALER_REDIRECT) is None,
+        "an over-bound encoded dealer Location was allowed through sanitize_location",
+    )
+    check(
         retention.sanitize_location(SAFE_ROBOTS_REDIRECT) == SAFE_ROBOTS_REDIRECT,
         "a safe robots Location was dropped",
     )
@@ -335,6 +350,10 @@ def main():
                 (
                     f"{HOST}/marca-ejemplo-modelo-x/0000011/",
                     DOUBLE_ENCODED_EMAIL_REDIRECT,
+                ),
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000012/",
+                    OVER_BOUND_DEALER_REDIRECT,
                 ),
             ):
                 meta = fetch_ledger.fetch(url)

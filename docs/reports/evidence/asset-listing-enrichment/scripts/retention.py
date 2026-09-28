@@ -77,12 +77,13 @@ def holds_contact(text: str) -> bool:
     return bool(CONTACT.search(contact_surfaces(text)))
 
 
-def fully_decode(text: str, *, bound: int = 8) -> str:
+def fully_decode(text: str, *, bound: int = 8) -> str | None:
     """Percent- and HTML-decode until the value stops changing.
 
-    A single `unquote` leaves `%44` / `%40` behind when the server double-
-    encodes a redirect (`%2544`, `%2540`). Bound the loop so a pathological
-    input cannot spin forever; eight rounds cover any realistic Location.
+    Returns None when the value is still changing after `bound` rounds, so a
+    multiply-encoded Location cannot be treated as safe merely because the
+    loop gave up. Eight rounds cover any realistic Location; anything deeper
+    is refused by `sanitize_location`.
     """
     current = text
     for _ in range(bound):
@@ -90,19 +91,21 @@ def fully_decode(text: str, *, bound: int = 8) -> str:
         if nxt == current:
             return current
         current = nxt
-    return current
+    return None
 
 
 def sanitize_location(location: str | None) -> str | None:
     """Persist only Locations that do not carry seller or contact shapes.
 
-    Percent-encoding is fully normalized before the contact filter so
-    `/%44ealers/...`, `/%2544ealers/...`, and `/contacto/vendedor%2540...`
-    cannot bypass the same guard that catches the literal forms.
+    Encoding is fully normalized before the contact filter. A value that
+    does not stabilize under decode is refused, so deeper nesting cannot
+    bypass by exhausting the bound. Safe robots Locations remain kept.
     """
     if not location:
         return None
     decoded = fully_decode(location)
+    if decoded is None:
+        return None
     if holds_contact(location) or holds_contact(decoded):
         return None
     return location
