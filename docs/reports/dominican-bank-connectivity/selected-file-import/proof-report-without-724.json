@@ -426,11 +426,12 @@
   ],
   "counts": {
     "blocked": 24,
+    "error": 0,
     "failed": 0,
     "passed": 16
   },
   "fictional": true,
-  "format": "selected-file-import-proof-v2",
+  "format": "selected-file-import-proof-v3",
   "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
   "recording_model": null
 }

@@ -595,11 +595,12 @@
   ],
   "counts": {
     "blocked": 0,
+    "error": 0,
     "failed": 0,
     "passed": 40
   },
   "fictional": true,
-  "format": "selected-file-import-proof-v2",
+  "format": "selected-file-import-proof-v3",
   "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
   "recording_model": {
     "digest": "88baa7c40f813d6b6350faf4b2c73623d1575bd36b44d65be6a4cb1b6423f3c8",

@@ -16,7 +16,7 @@ sys.modules["proof"] = proof
 spec.loader.exec_module(proof)
 
 
-def run(case_ids: set[str]) -> dict[str, tuple[bool, dict]]:
+def run(case_ids: set[str]) -> dict[str, str]:
     results = {}
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
@@ -26,7 +26,7 @@ def run(case_ids: set[str]) -> dict[str, tuple[bool, dict]]:
             if case_id in case_ids:
                 workdir = root / case_id
                 workdir.mkdir()
-                results[case_id] = proof.run_case(function, workdir)
+                results[case_id] = proof.run_case(function, workdir)[0]
     return results
 
 
@@ -69,6 +69,13 @@ def reader_failure_escapes(original):
         return "locked", ""
 
     return pdf_open
+
+
+def drop_extraction_errors(original):
+    def load(*args, **kwargs):
+        return {**original(*args, **kwargs), "errors": []}
+
+    return load
 
 
 def keep_duplicates(original):
@@ -240,6 +247,17 @@ def mutations():
             {"unreadable_pdf_refused"},
         ),
         (
+            "extraction errors dropped",
+            [(proof, "load_input", drop_extraction_errors)],
+            {
+                "image_without_ocr",
+                "heic_photo_without_ocr",
+                "pdf_in_unknown_layout",
+                "pdf_without_text_layer",
+                "csv_with_unknown_header",
+            },
+        ),
+        (
             "duplicates kept",
             [(proof.Importer, "_add", keep_duplicates)],
             {
@@ -321,8 +339,8 @@ def main() -> int:
     for label, changes, case_ids in mutations():
         with patched(changes):
             results = run(case_ids)
-        crashed = sorted(case for case, (_, seen) in results.items() if "error" in seen)
-        caught = not crashed and not any(passed for passed, _ in results.values())
+        crashed = sorted(case for case, status in results.items() if status == "error")
+        caught = all(status == "failed" for status in results.values())
         ok &= caught
         verdict = (
             "caught"
@@ -333,7 +351,7 @@ def main() -> int:
         )
         print(f"{verdict}: {label} {sorted(results)}")
     baseline = run({case_id for case_id, *_ in proof.CASES})
-    clean = all(passed for passed, _ in baseline.values())
+    clean = all(status == "passed" for status in baseline.values())
     ok &= clean
     print(f"unbroken: {len(baseline)} cases, all pass {clean}")
     return 0 if ok else 1

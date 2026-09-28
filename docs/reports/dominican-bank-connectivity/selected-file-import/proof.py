@@ -1466,12 +1466,12 @@ def nothing_posts(fx, workdir):
 FIXTURES: dict[str, bytes] = {}
 
 
-def run_case(function, workdir: Path) -> tuple[bool, dict]:
+def run_case(function, workdir: Path) -> tuple[str, dict]:
     try:
         passed, observed = function(FIXTURES, workdir)
     except Exception as error:
-        return False, {"error": f"{type(error).__name__}: {error}"}
-    return bool(passed), observed
+        return "error", {"exception": f"{type(error).__name__}: {error}"}
+    return ("passed" if passed else "failed"), observed
 
 
 def _digest(paths: list[Path]) -> str:
@@ -1514,8 +1514,7 @@ def main() -> int:
                     },
                 )
             else:
-                passed, observed = run_case(function, workdir)
-                status = "passed" if passed else "failed"
+                status, observed = run_case(function, workdir)
             results.append(
                 {
                     "case": case_id,
@@ -1526,14 +1525,14 @@ def main() -> int:
                 }
             )
     report = {
-        "format": "selected-file-import-proof-v2",
+        "format": "selected-file-import-proof-v3",
         "fictional": True,
         "assumptions": ASSUMPTIONS,
         "recording_model": recording,
         "kit_digest": _digest(sorted(kit.glob("*.py"))),
         "counts": {
             s: sum(r["status"] == s for r in results)
-            for s in ("passed", "failed", "blocked")
+            for s in ("passed", "failed", "error", "blocked")
         },
         "cases": results,
     }
@@ -1549,7 +1548,7 @@ def main() -> int:
     for item in results:
         if item["status"] != "passed":
             print(f"{item['status'].upper()}: {item['case']}")
-    return 1 if counts["failed"] else 0
+    return 1 if counts["failed"] or counts["error"] else 0
 
 
 if __name__ == "__main__":
