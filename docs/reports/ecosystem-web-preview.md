@@ -135,8 +135,9 @@ contracts remain with the backend owner.
 | First one-way reconciliation merge | `2b3e6cf2589d87c1bc206e8a93511e4c32b95005` |
 | iOS reconciliation merge | `9baf573c992a47a16e3cb3132ae723d30c20ffa3` |
 | Android reconciliation merge | `7785b252a2ba487e5bb545a3e8e4804cf08c301c` |
-| Latest reconciled integration | `acf6639a23be368dbf3848a2b873f4a69d7579c4` |
-| Latest one-way reconciliation merge | `524d9d45711c852914992a833de1422266230a1b` |
+| Landing-register reconciliation merge | `524d9d45711c852914992a833de1422266230a1b` |
+| Latest reconciled integration | `86df1ee95cc3c88d713efa6a24538c6217b2ea29` |
+| Latest one-way reconciliation merge | `120c8f8522de222e576b1976137a6ba0a8a09cde` |
 | Committed browser evidence head | `efe2ec66631ad43395de5746b578528bf432c4a6` |
 
 The intervening integration changes are Supabase server-client isolation, Render
@@ -156,8 +157,14 @@ inspected #729/#730 heads are empty; their newer heads reconcile integration.
 The mobile archive remains unchanged. The final native reconciliation preserves
 the entire web tree `a28f139399b28d053491be3e609c7c34a3c1b2ee`, so all
 browser, production and build evidence is retained. The last integration
-advance, #734, only records the already-landed #695 outcome in two documents.
-It has no runtime, contract, UI, migration, environment or test overlap. No rebase or worker-to-integration merge
+advance #734 records the already-landed #695 outcome in two documents.
+The subsequent #672 reconciliation updates product availability, documentation
+authority, calculation-catalog pointers and historical promotion evidence. Its
+authority map explicitly preserves this owner and requires finishing the isolated
+preview before later accepted-contract wiring. The memory/share availability
+clarifications do not change this preview's mounted controls or calls. Neither
+advance changes runtime, API payloads, UI state owners, migrations, environment
+configuration or tests. Review and acceptance evidence are retained. No rebase or worker-to-integration merge
 was performed.
 
 The [evidence index](evidence/pr-732/README.md) contains 35 screenshots, their
@@ -193,7 +200,7 @@ later documentation/evidence-only delta. It is written after the final review.
   localized accessible errors; no shared dependency or financial rule was added.
   The [final code-delta review](https://github.com/lagarcess/argus/pull/732#issuecomment-5879242797)
   returned clean at `3b7c3f9ac3383ffe695c49f4eacf0456e5b224e0`, with zero
-  unresolved threads. The later #734 reconciliation and proposed-backend
+  unresolved threads. The later #734/#672 reconciliations and proposed-backend
   reference only change documentation; the reviewed web tree is identical.
   Exact final-head CI is recorded in the terminal PR audit.
 
