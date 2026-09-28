@@ -170,12 +170,10 @@ def app_problems(root: Path, name: str, spec: dict) -> list[str]:
 
 
 def app_run_problems(doc: dict) -> list[str]:
-    """The report relies on a numeric scheme-prompt count from the UI test."""
+    """The report relies on a JSON-integer scheme-prompt count from the UI test."""
     raw = doc.get("scheme_prompts_accepted")
-    if isinstance(raw, bool) or not isinstance(raw, (str, int)):
-        return [f"{APP_RUN_RECORD}: scheme_prompts_accepted is missing or not numeric"]
-    text = str(raw).strip()
-    if not text.isdigit():
+    # bool is a subclass of int; accept only a real non-negative JSON integer.
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
         return [
             f"{APP_RUN_RECORD}: scheme_prompts_accepted={raw!r} is not a non-negative integer"
         ]

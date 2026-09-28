@@ -197,7 +197,7 @@ def test_allowed_incidental_launch_step_is_not_a_problem(complete: Path) -> None
     assert problems(complete, scope="app") == []
 
 
-@pytest.mark.parametrize("value", [None, "unknown", "", "1.5", True, []])
+@pytest.mark.parametrize("value", [None, "unknown", "", "0", "1.5", True, [], -1])
 def test_missing_or_nonnumeric_scheme_prompt_count_is_refused(
     complete: Path, value
 ) -> None:
