@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from tests.financial_recording.catalog import (
     CUSTOM_CATEGORY_MAX,
+    ESTIMATED_TYPES,
     NATURE,
     NICKNAME_MAX,
     PERSONAL_SPACE,
@@ -123,7 +124,7 @@ def review(
     state: State, draft: Draft, tz: ZoneInfo, now: Optional[datetime] = None
 ) -> tuple[Optional[Body], tuple[Issue, ...]]:
     book = state.book
-    body, parsed = parse_fields(draft.fields, book, draft.answers)
+    body, parsed = parse_fields(draft.fields, book, draft.answers, tz=tz)
     found = list(parsed)
     if body is not None:
         found.extend(validate(book, body, tz, provenance=draft.provenance, now=now))
@@ -208,7 +209,7 @@ class Store:
             stamp = as_of or now
             ensure_anchor_not_future(stamp, now)
             amount = signed_to_owner(parse_minor(entered, currency), type)
-            opening = Opening(account.id, amount, stamp)
+            opening = Opening(account.id, amount, stamp, zone=str(self.tz))
             record = self._new_record(opening, Provenance("manual", now), records)
             records[record.id] = record
         self._swap(
@@ -263,6 +264,7 @@ class Store:
             changes["linked_asset_id"] = self._linked_asset(account, linked_asset_id)
         edited = replace(account, **changes)
         self._assert_link_natures(edited)
+        self._assert_anchors_fit_type(edited)
         self._swap(accounts={**self.book.accounts, account_id: edited})
         return edited
 
@@ -313,7 +315,10 @@ class Store:
     def edit_draft(self, draft_id: str, **fields: Optional[str]) -> Draft:
         draft = self._proposed(draft_id)
         edited = replace(
-            draft, fields={**draft.fields, **fields}, revision=draft.revision + 1
+            draft,
+            fields={**draft.fields, **fields},
+            revision=draft.revision + 1,
+            distinct=False,
         )
         self._swap(drafts={**self.state.drafts, draft_id: edited})
         return edited
@@ -335,11 +340,15 @@ class Store:
         draft = self._proposed(draft_id)
         if expected_revision is not None and draft.revision != expected_revision:
             raise StaleVersion(draft_id)
-        changes: dict = {
-            "revision": draft.revision + 1,
-            "distinct": draft.distinct or distinct,
-        }
+        changes: dict = {"revision": draft.revision + 1}
         records = self.book.records
+        if distinct:
+            matches = self._live_duplicate_matches(draft)
+            if not matches:
+                raise InvalidInput("distinct_not_applicable", draft_id)
+            changes["distinct"] = True
+        else:
+            changes["distinct"] = draft.distinct
         if duplicate_of is not None:
             matches = self._live_duplicate_matches(draft)
             if duplicate_of not in matches:
@@ -450,6 +459,8 @@ class Store:
         for name, parser in TEXT_FIELDS.items():
             if isinstance(changes.get(name), str):
                 changes[name] = parser(changes[name])
+        if "as_of" in changes and isinstance(record.body, (Opening, Observation)):
+            changes["zone"] = str(self.tz)
         if answers and not isinstance(record.body, Activity):
             raise InvalidInput("answers_not_applicable", record_id)
         if answers:
@@ -536,6 +547,18 @@ class Store:
                 continue
             if NATURE[account.type] != "asset":
                 raise InvalidInput("linked_asset_invalid", account.id)
+
+    def _assert_anchors_fit_type(self, account: Account) -> None:
+        """Existing openings/checks must stay valid under the account's new type."""
+        for record in live_records(self.book):
+            body = record.body
+            if not isinstance(body, (Opening, Observation)):
+                continue
+            if body.account_id != account.id:
+                continue
+            if isinstance(body, Observation) and body.basis == "value_estimate":
+                if account.type not in ESTIMATED_TYPES:
+                    raise InvalidInput("basis_not_applicable", account.type)
 
     def _linked_refund_issues(self, record_id: str, body: Body) -> list[Issue]:
         """A corrected purchase is re-checked through the same refund rule."""

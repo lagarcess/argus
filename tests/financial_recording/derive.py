@@ -61,6 +61,7 @@ class Opening:
     account_id: str
     amount: int
     as_of: datetime
+    zone: str
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,7 @@ class Observation:
     amount: int
     as_of: datetime
     basis: Basis
+    zone: str
     note: Optional[str] = None
 
 
@@ -219,6 +221,15 @@ def accounts_of(body: Body) -> set[str]:
     return set(legs(body)) if isinstance(body, Activity) else {body.account_id}
 
 
+def anchor_zone(anchor: Anchor) -> ZoneInfo:
+    """Zone stored with the balance date; later reader-zone changes never rewrite it."""
+    return ZoneInfo(anchor.zone)
+
+
+def anchor_day(anchor: Anchor) -> date:
+    return anchor.as_of.astimezone(anchor_zone(anchor)).date()
+
+
 def placement(
     activity_record: Record, anchor_record: Record, tz: ZoneInfo
 ) -> Optional[Inclusion]:
@@ -228,17 +239,19 @@ def placement(
     wins; activity the check stored as contained when it was confirmed, or
     that came from the same source document, is included; anything else is
     asked. The stored set, not recording order, is what the person saw.
+    Local days for the anchor use the zone stored on that anchor, not `tz`.
     """
     activity, anchor = activity_record.body, anchor_record.body
-    anchor_day = anchor.as_of.astimezone(tz).date()
+    day = anchor_day(anchor)
+    _ = tz
     if activity.occurred_at is not None:
         if activity.occurred_at > anchor.as_of:
             return NOT_INCLUDED
         earlier_day = True
     else:
-        if activity.occurred_on > anchor_day:
+        if activity.occurred_on > day:
             return NOT_INCLUDED
-        earlier_day = activity.occurred_on < anchor_day
+        earlier_day = activity.occurred_on < day
     answer = dict(activity.answers).get(anchor_record.id)
     if answer is not None:
         return answer
@@ -251,9 +264,10 @@ def placement(
 
 
 def dated_after(activity: Activity, anchor: Anchor, tz: ZoneInfo) -> bool:
+    _ = tz
     if activity.occurred_at is not None:
         return activity.occurred_at > anchor.as_of
-    return activity.occurred_on > anchor.as_of.astimezone(tz).date()
+    return activity.occurred_on > anchor_day(anchor)
 
 
 def contained_at_confirmation(

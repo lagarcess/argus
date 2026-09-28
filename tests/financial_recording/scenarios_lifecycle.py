@@ -250,6 +250,9 @@ def edits_that_move_money_need_review() -> dict:
         "moving_activity_across_accounts_needs_reordering": _move_across_accounts(),
         "occurred_on_and_at_must_agree": _occurred_on_at_agree(),
         "value_estimate_only_on_estimated_assets": _value_estimate_restricted(),
+        "anchor_zone_survives_reader_tz_change": _anchor_zone_stable(),
+        "type_edit_revalidates_existing_anchors": _type_edit_revalidates_anchors(),
+        "distinct_bound_to_reviewed_revision": _distinct_bound_to_revision(),
     }
 
 
@@ -409,6 +412,64 @@ def _value_estimate_restricted() -> dict:
     )
     on_car = outcome(lambda: scene.observe(car, "90000.00", 5, basis="value_estimate"))
     return {"on_checking": on_checking, "on_vehicle": on_car}
+
+
+def _anchor_zone_stable() -> dict:
+    from zoneinfo import ZoneInfo
+
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00", as_of=local(5, 0, 30))
+    scene.record("expense", cash, "100.00", 4)
+    before = scene.amount(cash)
+    opening = anchors(scene.store.book, cash.id)[0].body
+    scene.store.tz = ZoneInfo("America/Los_Angeles")
+    try:
+        after = scene.amount(cash)
+        readable = True
+    except Exception:
+        after = None
+        readable = False
+    return {
+        "readable_after_tz_change": readable,
+        "balance_stable": before == after,
+        "opening_zone": opening.zone,
+    }
+
+
+def _type_edit_revalidates_anchors() -> dict:
+    scene = Scene()
+    car = scene.account("Carro", "vehicle", "DOP", "100000.00")
+    scene.observe(car, "90000.00", 5, basis="value_estimate")
+    version = scene.store.book.accounts[car.id].version
+    refused = outcome(
+        lambda: scene.store.edit_account(car.id, version, type="checking")
+    )
+    cash = scene.account("Efectivo", "cash", "DOP", "100.00")
+    allowed = outcome(lambda: scene.store.edit_account(cash.id, 1, type="checking"))
+    return {
+        "value_estimate_blocks_type_edit": refused,
+        "opening_only_same_nature": allowed,
+    }
+
+
+def _distinct_bound_to_revision() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "5000.00")
+    scene.record("expense", cash, "500.00", 3)
+    other = scene.record("expense", cash, "400.00", 4)
+    twin = scene.act("expense", cash, "500.00", 3, method="chat")
+    scene.store.resolve(twin.id, distinct=True)
+    scene.store.edit_draft(
+        twin.id, amount="400.00", occurred_on=local(4).date().isoformat()
+    )
+    after_edit = scene.issues(twin)
+    unique = scene.act("expense", cash, "123.00", 5, method="chat")
+    without_match = outcome(lambda: scene.store.resolve(unique.id, distinct=True))
+    return {
+        "after_edit_possible_duplicate": after_edit,
+        "matches_the_other_expense": scene.refs(twin, "possible_duplicate") == [other.id],
+        "distinct_without_match": without_match,
+    }
 
 
 def _redated_check_restamps() -> dict:

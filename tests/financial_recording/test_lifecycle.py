@@ -237,4 +237,18 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "on_checking": {"basis_not_applicable": "blocking"},
             "on_vehicle": "ok",
         },
+        "anchor_zone_survives_reader_tz_change": {
+            "readable_after_tz_change": True,
+            "balance_stable": True,
+            "opening_zone": "America/Santo_Domingo",
+        },
+        "type_edit_revalidates_existing_anchors": {
+            "value_estimate_blocks_type_edit": "InvalidInput:basis_not_applicable",
+            "opening_only_same_nature": "ok",
+        },
+        "distinct_bound_to_reviewed_revision": {
+            "after_edit_possible_duplicate": {"possible_duplicate": "blocking"},
+            "matches_the_other_expense": True,
+            "distinct_without_match": "InvalidInput:distinct_not_applicable",
+        },
     }

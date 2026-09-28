@@ -357,6 +357,11 @@
     "same_key_different_body": "IdempotencyConflict"
   },
   "edits_that_move_money_need_review": {
+    "anchor_zone_survives_reader_tz_change": {
+      "balance_stable": true,
+      "opening_zone": "America/Santo_Domingo",
+      "readable_after_tz_change": true
+    },
     "anchors_keep_their_account": {
       "answers_on_a_check_restore": "InvalidInput:answers_not_applicable",
       "balance_after_flip": 600000,
@@ -385,6 +390,13 @@
     },
     "custom_category_blocks_a_move": {
       "move": "ReviewRequired:account_has_links"
+    },
+    "distinct_bound_to_reviewed_revision": {
+      "after_edit_possible_duplicate": {
+        "possible_duplicate": "blocking"
+      },
+      "distinct_without_match": "InvalidInput:distinct_not_applicable",
+      "matches_the_other_expense": true
     },
     "future_anchors_are_refused": {
       "future_check": "ReviewRequired:date_in_future",
@@ -513,6 +525,10 @@
       "edited_away": "ReviewRequired:duplicate_target_invalid",
       "stale_revision": "StaleVersion",
       "target_removed": "ReviewRequired:duplicate_target_invalid"
+    },
+    "type_edit_revalidates_existing_anchors": {
+      "opening_only_same_nature": "ok",
+      "value_estimate_blocks_type_edit": "InvalidInput:basis_not_applicable"
     },
     "type_edits_preserve_linked_asset_rules": {
       "asset_to_debt_while_linked": "InvalidInput:linked_asset_invalid",

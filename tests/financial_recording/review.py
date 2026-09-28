@@ -24,6 +24,7 @@ from tests.financial_recording.catalog import (
     signed_to_owner,
 )
 from tests.financial_recording.derive import (
+    DEFAULT_TZ,
     GAP_LABEL,
     Account,
     Activity,
@@ -92,7 +93,10 @@ def blocking(found: Sequence[Issue]) -> list[Issue]:
 
 
 def parse_fields(
-    fields: Mapping[str, Optional[str]], book: Book, answers: Answers = ()
+    fields: Mapping[str, Optional[str]],
+    book: Book,
+    answers: Answers = (),
+    tz: ZoneInfo = DEFAULT_TZ,
 ) -> tuple[Optional[Body], tuple[Issue, ...]]:
     kind = fields.get("kind") or ""
     if kind not in REQUIRED_FIELDS:
@@ -117,6 +121,7 @@ def parse_fields(
     if kind == "balance_observation":
         values["as_of"] = _parsed(found, parse_instant, text["as_of"])
         values["basis"] = _parsed(found, _choice, text["basis"], GAP_LABEL)
+        values["zone"] = str(tz)
         if values["amount"] is not None:
             values["amount"] = signed_to_owner(values["amount"], account.type)
         if values["basis"] == "value_estimate" and account.type not in ESTIMATED_TYPES:
