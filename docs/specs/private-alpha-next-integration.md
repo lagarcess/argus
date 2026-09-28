@@ -12,7 +12,7 @@ Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
 
-- September 27, 2026: [PR #711 / issue #689 integration landing](../reports/2026-09-27-issue-689-integration-landing.md), merged as `ed6d9b2b53bbb5366bfe5a452249ba2cd7e2bbb1`. Shared research-cache isolation is landed; discovery's current-turn provenance/cache-reuse follow-up remains open as [#712](https://github.com/lagarcess/argus/issues/712). No deployment or main promotion.
+- September 27, 2026: [PR #711 / issue #689 integration landing](../reports/2026-09-27-issue-689-integration-landing.md), merged as `ed6d9b2b53bbb5366bfe5a452249ba2cd7e2bbb1`. Shared research-cache isolation is landed. At that landing, discovery's current-turn provenance/cache-reuse follow-up remained open as [#712](https://github.com/lagarcess/argus/issues/712); [#712](https://github.com/lagarcess/argus/issues/712) was later closed as completed through merged [#715](https://github.com/lagarcess/argus/pull/715) (`f0a90763b79e5625ac0a4789cdfa171cda023963`). No deployment or main promotion.
 
 ## Historical product ledger through August 2, 2026
 

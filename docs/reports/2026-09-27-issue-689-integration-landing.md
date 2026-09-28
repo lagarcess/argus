@@ -28,12 +28,12 @@ Issue [#689](https://github.com/lagarcess/argus/issues/689)'s cross-user answer
 reuse defect is delivered. The chosen bypass addresses omitted dimensions
 without treating hashed private text as public data.
 
-Issue [#712](https://github.com/lagarcess/argus/issues/712) remains open as
-separate, founder-retained work: current-turn provenance can unnecessarily
-bypass public discovery caching, increasing cost and latency. It was confirmed
-and tracked after the terminal clean review under AGENTS.md's late-finding
-rule; it is not repaired or hidden by this landing. No #710 logging work was
-incorporated.
+At landing time, issue [#712](https://github.com/lagarcess/argus/issues/712)
+remained open as separate, founder-retained work: current-turn provenance can
+unnecessarily bypass public discovery caching, increasing cost and latency. It
+was confirmed and tracked after the terminal clean review under AGENTS.md's
+late-finding rule; it is not repaired or hidden by this landing. No #710
+logging work was incorporated.
 
 ## Accepted evidence and exception
 
