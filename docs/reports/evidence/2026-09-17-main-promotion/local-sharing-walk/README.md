@@ -40,6 +40,12 @@ After readback: 79/79 match, zero missing, unexpected, name or content drift. `p
 - Build passed with Node `module.register()` deprecation warning. CLI startup first required network access outside the sandbox; one browser run-code syntax error was corrected before signup, without repeating either model question.
 - The material product failure is the follow-up's investing clarification instead of savings recalculation. This run does not establish root cause or recurrence rate.
 
-Screenshots: `01-money-answer.png`, `02-link-created.png`, `03-signed-out-english.png`, `04-follow-up-failure.png`, `05-signed-out-spanish.png`. Text snapshots and all console logs are retained beside them. No tokens, cookies, auth storage, local passwords, or provider keys are included.
+Screenshots: `01-money-answer.png`, `02-link-created.png` (receipt slug
+redacted to `/r/<redacted-receipt-slug>`), `03-signed-out-english.png`,
+`04-follow-up-failure.png`, `05-signed-out-spanish.png`. Full browser
+transcript dumps are not retained; privacy-safe aggregates are
+`follow-up-aggregate.txt` and `spanish-aggregate.txt`. Console logs beside
+them keep only aggregate HTTP/font noise. No tokens, cookies, auth storage,
+local passwords, provider keys, Auth UUIDs, or raw receipt slugs are included.
 
 Cleanup confirmation is recorded in `cleanup.json`. Production remains unchanged and promotion is stopped per the latest founder instruction.

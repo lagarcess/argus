@@ -179,4 +179,13 @@ Preproduction checkpoint, written after final review returned: `docs/reports/evi
 
 ## Privacy Notes
 
-No production conversation, user, run or job rows were read. No production backup or browser transcript has been published. Native eval evidence contains authored fixture scenarios and the harness's retained/redacted output, not customer conversations. Credentials remain in ignored local files; the evidence directory was scanned against operator credential values with zero matches. Backup contents, tokens, cookies and auth storage must never be committed.
+No production conversation, user, run or job rows were read. No production
+backup or browser transcript has been published. The disposable local sharing
+walk retains privacy-safe aggregates and redacted screenshots only — not full
+guest transcript dumps, Auth UUIDs, or raw receipt slugs (see
+`docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/`). Native
+eval evidence contains authored fixture scenarios and the harness's
+retained/redacted output, not customer conversations. Credentials remain in
+ignored local files; the evidence directory was scanned against operator
+credential values with zero matches. Backup contents, tokens, cookies and auth
+storage must never be committed.
