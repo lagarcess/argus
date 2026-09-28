@@ -1,7 +1,7 @@
 # Dominican bank connectivity feasibility
 
 **Date.** 2026-09-27.
-**Inspected base.** `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963`. Integration later advanced to `3b9313f3dcf80e3ff9eddfcce8818a829a081225` with pull request 721, a logging fix that touches no file this report depends on except one test it cites by name.
+**Inspected base.** `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963`. Integration later advanced to `3b9313f3dcf80e3ff9eddfcce8818a829a081225` with pull request 721, a logging fix that touches no file this report depends on except one test it cites by name. Later integration merges are listed in the [evidence index](evidence-index.md#provenance).
 **Status.** Research report for founder review. It is not a product decision, not a legal opinion, and not an implementation. It serves sections 4.4 to 4.7, 5, 9, and 12 of the [minimum viable ecosystem experience](../../specs/argus-minimum-viable-ecosystem-experience.md) (MVEE), the founder-approved product direction.
 
 ## Recommendation

@@ -6,13 +6,13 @@ This file lets a reviewer verify where every finding in this report comes from. 
 
 | Item | Value |
 | --- | --- |
-| Pull request | [lagarcess/argus#725](https://github.com/lagarcess/argus/pull/725), draft, base `codex/private-alpha-next` |
+| Pull request | [lagarcess/argus#725](https://github.com/lagarcess/argus/pull/725), base `codex/private-alpha-next`. Its state is on the pull request. |
 | Branch | `claude/dominican-bank-data-feasibility-214280` |
 | Lane base | `f0a90763b79e5625ac0a4789cdfa171cda023963`, fetched 2026-09-27 |
-| Integration at last reconciliation | `3b9313f3dcf80e3ff9eddfcce8818a829a081225`. The unpublished branch fast-forwarded to it before the first commit. |
+| Integration merges | The unpublished branch fast-forwarded to `3b9313f3dcf80e3ff9eddfcce8818a829a081225` before the first commit. Every later reconciliation merges `codex/private-alpha-next` one way in a commit titled `merge(integration): bring codex/private-alpha-next <commit> into the Dominican bank-data lane`, which `git log --merges --first-parent f0a90763b..HEAD` lists. Each has a `merge` row in the [decision trail](decision-trail.tsv) with the files it brought that this delivery depends on. |
 | Head before the selected-file proof | `7a262986c4b02ec5d14a9e0caf24963d4228cb13` |
 | Head the first automated review covered | `54a359dea7f332da3da80e81ef28a33e6b304a14` |
-| Recording model the proof runs against | Pull request 724 at `d081bfcdf5c7c2bee767d873f232752432098c39`, fetched 2026-09-28. Its technical contract is proposed, not approved, so this is the last head checked during review, not an accepted contract. A read-only check at `e2a9ad6b879ddff0fab88ff0c5090566c53cc6c9` also passed every case. The proof is reconciled once more when pull request 724 is accepted. The same observations held at `6f8fc4421f34c1a2979c1f9fb232ce45cb9155d3`, `2c9ae114b5f8d260992fabb598288cb788b79a61`, `71f6d27b3343c133785bf969005876d1eab583b3`, `8cdfc6a09e2fb1001b6a7c8694b67e3bd08fa491`, and `0df86aa8c7f4171331ec8319b8b771a577de42da`, the head the lane named. The proof first ran at `720aad3fdee1357e3dbe5c928176a6e458b01b0d`. |
+| Recording model the proof runs against | Pull request 724 at `d081bfcdf5c7c2bee767d873f232752432098c39`, fetched 2026-09-28. Its technical contract is proposed, not approved, so this is the last head checked during review, not an accepted contract. A read-only check at `e2a9ad6b879ddff0fab88ff0c5090566c53cc6c9` also passed every case. Later read-only checks are `verify` rows in the [decision trail](decision-trail.tsv), and none is a pin. The proof is reconciled once more when pull request 724 is accepted. The same observations held at `6f8fc4421f34c1a2979c1f9fb232ce45cb9155d3`, `2c9ae114b5f8d260992fabb598288cb788b79a61`, `71f6d27b3343c133785bf969005876d1eab583b3`, `8cdfc6a09e2fb1001b6a7c8694b67e3bd08fa491`, and `0df86aa8c7f4171331ec8319b8b771a577de42da`, the head the lane named. The proof first ran at `720aad3fdee1357e3dbe5c928176a6e458b01b0d`. |
 | Current head | Reported on the pull request. Every commit after `7a262986c` is listed there. |
 
 Commits up to `7a262986c`, oldest first:
