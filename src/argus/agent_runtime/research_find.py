@@ -12,6 +12,7 @@ unchanged; the user-visible experience is the same or better.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -28,28 +29,39 @@ from argus.domain.research.cache import SearchPacketCache
 from argus.domain.research.contracts import CapabilityClass
 
 
-def _public_anchor_search(request: AssetDiscoveryRequest, state: RunState) -> bool:
-    """Certify only existing provider-owned identities, never classify prose.
+def _public_anchor_search(request: AssetDiscoveryRequest) -> bool:
+    """Share only anchors the asset catalog has already validated.
 
-    No resolver calls are made to qualify a cache hit. Unknown provenance costs
-    a fresh search; a client mention or typed model string is not public proof.
+    Discovery turns leave the strategy draft empty, so decision and state
+    provenance are not proof. Each anchor is resolved through the same
+    catalog check a strategy symbol uses. A category, a private description,
+    an unresolved symbol, or a class that conflicts with the request stays
+    uncached. This does not search.
     """
-    if (request.category_description or "").strip():
+    if request.relationship == "category" or (request.category_description or "").strip():
         return False
-    anchors = [
-        symbol.strip().upper() for symbol in request.anchor_symbols if symbol.strip()
-    ]
-    if not anchors or request.relationship == "category":
+    anchors = [symbol.strip() for symbol in request.anchor_symbols if symbol.strip()]
+    if not anchors:
         return False
-    public_symbols = {
-        item.canonical_symbol
-        for item in state.resolution_provenance
-        if item.candidate_kind == "asset"
-        and item.resolution_status == "resolved"
-        and item.validated_by == "provider_catalog"
-        and item.asset_class == (request.asset_class_hint or "equity")
-    }
-    return all(symbol in public_symbols for symbol in anchors)
+    expected_class = request.asset_class_hint or "equity"
+    from argus.agent_runtime.resolution import resolve_asset_candidate
+
+    for index, anchor in enumerate(anchors):
+        resolution = resolve_asset_candidate(
+            anchor,
+            field=f"asset_discovery.anchor_symbols[{index}]",
+            source="llm_extraction",
+            asset_class_hint=expected_class,
+        )
+        asset = resolution.asset
+        if (
+            resolution.status != "resolved"
+            or asset is None
+            or resolution.provenance.validated_by != "provider_catalog"
+            or asset.asset_class != expected_class
+        ):
+            return False
+    return True
 
 
 async def find_assets_stage_result(
@@ -77,12 +89,10 @@ async def find_assets_stage_result(
         interpretation, user, f"research_answer_{capability_class}"
     )
     packet_cache = None
-    if (
-        request is not None
-        and request.needs_current_facts
-        and _public_anchor_search(request, state)
-    ):
-        packet_cache = SearchPacketCache
+    if request is not None and request.needs_current_facts:
+        # Sync catalog lookups: off the loop, or one anchor stalls every stream.
+        if await asyncio.to_thread(_public_anchor_search, request):
+            packet_cache = SearchPacketCache
     result = await discovery_operation_result(
         decision=effective_decision,
         request=request,
