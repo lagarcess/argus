@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Budgeted, serial, cached page fetcher for the listing feasibility audit.
 
-Stdlib only. Every network request is appended to ledger.jsonl before the
-response is used. A URL already in the cache is replayed and never refetched.
+Stdlib only. The URL alone decides the page kind and the robots check. Every
+network request is appended to ledger.jsonl, and only what retention.retain
+keeps reaches the cache. A URL already in the cache is replayed and never
+refetched.
 """
 
 from __future__ import annotations
@@ -20,14 +22,9 @@ import urllib.robotparser
 import zlib
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 
-ROOT = Path.cwd()
-if (ROOT / ".git").exists() or "docs" in ROOT.parts:
-    raise SystemExit("run from a scratch directory outside the repository")
-CACHE = ROOT / "cache"
-LEDGER = ROOT / "ledger.jsonl"
-CLOCK = ROOT / "last_request.txt"
+from retention import LISTING_PATH, retain
 
 USER_AGENT = (
     "ArgusFeasibilityAudit/0.1 "
@@ -62,6 +59,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 OPENER = urllib.request.build_opener(NoRedirect)
 
 
+def study_root() -> Path:
+    root = Path.cwd()
+    if (root / ".git").exists() or "docs" in root.parts:
+        raise SystemExit("run from a scratch directory outside the repository")
+    return root
+
+
 def site_of(url: str) -> str:
     host = (urlsplit(url).hostname or "").lower()
     for key, domain in SITES.items():
@@ -70,21 +74,47 @@ def site_of(url: str) -> str:
     raise SystemExit(f"refused: {host} is not an audited site")
 
 
+def classify(url: str) -> tuple[str, str]:
+    parts = urlsplit(url)
+    if (
+        parts.scheme != "https"
+        or parts.username
+        or parts.password
+        or parts.port
+        or parts.fragment
+    ):
+        raise SystemExit(f"refused: {url} is not a plain https URL")
+    site = site_of(url)
+    decoded = unquote(parts.path)
+    if "\\" in decoded or any(part in {".", ".."} for part in decoded.split("/")):
+        raise SystemExit(f"refused: {url} has a dot segment or a backslash")
+    if parts.path == "/robots.txt" and not parts.query:
+        return site, "robots"
+    if parts.path == "/sitemap.xml" and not parts.query:
+        return site, "sitemap"
+    if parts.path == "/assets/js/searchvalues.js":
+        return site, "search-values"
+    if LISTING_PATH.match(parts.path) and not parts.query:
+        return site, "detail"
+    raise SystemExit(f"refused: {url} is not a page kind this fetcher may keep")
+
+
 def cache_paths(url: str) -> tuple[Path, Path]:
     key = hashlib.sha256(url.encode()).hexdigest()[:24]
-    folder = CACHE / site_of(url)
+    folder = study_root() / "cache" / site_of(url)
     return folder / f"{key}.body", folder / f"{key}.json"
 
 
 def ledger_rows(site: str) -> list[dict]:
-    if not LEDGER.exists():
+    ledger = study_root() / "ledger.jsonl"
+    if not ledger.exists():
         return []
-    rows = [json.loads(line) for line in LEDGER.read_text().splitlines() if line]
+    rows = [json.loads(line) for line in ledger.read_text().splitlines() if line]
     return [row for row in rows if row["site"] == site]
 
 
 def stop_file(site: str) -> Path:
-    return ROOT / f"STOP_{site}.txt"
+    return study_root() / f"STOP_{site}.txt"
 
 
 def robots_url(url: str) -> str:
@@ -106,11 +136,13 @@ def robots_verdict(url: str) -> tuple[bool, float | None, str]:
     status = meta["status"]
     if status in (404, 410):
         return True, None, f"robots.txt returned {status}; no rules"
-    if status != 200:
-        return False, None, f"robots.txt returned {status}; treated as disallow all"
+    if status != 200 or not body_path.exists():
+        return False, None, f"robots.txt returned {status} or was not kept; disallow all"
     parser = urllib.robotparser.RobotFileParser()
     parser.parse(body_path.read_bytes().decode("utf-8", "replace").splitlines())
-    allowed = parser.can_fetch(USER_AGENT, url)
+    parts = urlsplit(url)
+    lowered = urlunsplit(parts._replace(path=parts.path.lower()))
+    allowed = parser.can_fetch(USER_AGENT, url) and parser.can_fetch(USER_AGENT, lowered)
     delay = parser.crawl_delay(USER_AGENT)
     return allowed, float(delay) if delay else None, "robots.txt parsed"
 
@@ -124,14 +156,15 @@ def decode(raw: bytes, encoding: str | None) -> bytes:
 
 
 def wait_for_slot(spacing: float) -> None:
-    if CLOCK.exists():
-        elapsed = time.time() - float(CLOCK.read_text())
+    clock = study_root() / "last_request.txt"
+    if clock.exists():
+        elapsed = time.time() - float(clock.read_text())
         if elapsed < spacing:
             time.sleep(spacing - elapsed)
 
 
-def fetch(url: str, label: str) -> dict:
-    site = site_of(url)
+def fetch(url: str) -> dict:
+    site, kind = classify(url)
     body_path, meta_path = cache_paths(url)
     if meta_path.exists():
         meta = json.loads(meta_path.read_text())
@@ -144,7 +177,7 @@ def fetch(url: str, label: str) -> dict:
 
     spacing = MIN_SPACING_S
     robots_note = "robots.txt request"
-    if label != "robots":
+    if kind != "robots":
         allowed, delay, robots_note = robots_verdict(url)
         if not allowed:
             raise SystemExit(f"refused by robots gate: {robots_note}")
@@ -171,15 +204,16 @@ def fetch(url: str, label: str) -> dict:
     except (urllib.error.URLError, TimeoutError) as error:
         status, headers, raw = 0, {}, str(error).encode()
     elapsed_ms = round((time.perf_counter() - started) * 1000)
-    CLOCK.write_text(str(time.time()))
+    (study_root() / "last_request.txt").write_text(str(time.time()))
 
     get = headers.get if hasattr(headers, "get") else (lambda *_: None)
     body = decode(raw, get("Content-Encoding"))
     lowered = body[:200_000].decode("utf-8", "replace").lower()
     wall = [marker for marker in WALL_MARKERS if marker in lowered]
+    kept, retention = retain(kind, status, body)
     meta = {
         "site": site,
-        "label": label,
+        "label": kind,
         "url": url,
         "fetched_at": fetched_at,
         "status": status,
@@ -196,11 +230,14 @@ def fetch(url: str, label: str) -> dict:
         "captcha_mentions": lowered.count("captcha"),
         "robots_note": robots_note,
         "spacing_s": spacing,
+        "retention": retention,
+        "kept_bytes": len(kept) if kept else 0,
     }
-    with LEDGER.open("a") as ledger:
+    with (study_root() / "ledger.jsonl").open("a") as ledger:
         ledger.write(json.dumps(meta) + "\n")
     body_path.parent.mkdir(parents=True, exist_ok=True)
-    body_path.write_bytes(body)
+    if kept:
+        body_path.write_bytes(kept)
     meta_path.write_text(json.dumps(meta, indent=2))
 
     if status in STOP_STATUSES or wall:
@@ -211,12 +248,11 @@ def fetch(url: str, label: str) -> dict:
     return meta
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("url")
-    parser.add_argument("--label", required=True)
-    args = parser.parse_args()
-    meta = fetch(args.url, args.label)
+    args = parser.parse_args(argv)
+    meta = fetch(args.url)
     json.dump(meta, sys.stdout, indent=2)
     print()
 

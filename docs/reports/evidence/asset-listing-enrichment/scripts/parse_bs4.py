@@ -1,3 +1,5 @@
+import json
+
 from bs4 import BeautifulSoup
 from common import VISITS, js_vars, squash
 
@@ -51,6 +53,9 @@ def extract(html: str, site: str) -> dict:
         ],
         "visits": visits,
         "ad_text": ad_text.get_text("\n") if ad_text else None,
+        "ad_text_facts": json.loads(ad_text["data-text-facts"])
+        if ad_text and ad_text.has_attr("data-text-facts")
+        else None,
         "meta_description": meta.get("content") if meta else None,
         "js": js,
         "seller_city": city,

@@ -8,7 +8,7 @@ from fetch_ledger import fetch
 for site, rows in json.loads(Path("sample.json").read_text()).items():
     for row in rows:
         try:
-            meta = fetch(row["url"], "detail")
+            meta = fetch(row["url"])
         except SystemExit as refusal:
             print(site, "stopped:", refusal)
             break

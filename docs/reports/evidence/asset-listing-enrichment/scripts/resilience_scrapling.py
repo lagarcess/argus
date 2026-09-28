@@ -1,8 +1,11 @@
-import hashlib
 import json
+import tempfile
 from pathlib import Path
 
-from common import squash
+import parse_scrapling
+from common import recovered, squash
+from mutate import MUTATIONS
+from run_parse import kept_page
 from scrapling.parser import Selector
 
 PERCENTAGES = [0, 20, 40, 60, 80]
@@ -35,31 +38,32 @@ def adaptive_relocation(original, mutated, url, storage_file):
 
 
 def main():
-    db = str(Path("adaptive.db").resolve())
     sample = json.loads(Path("sample.json").read_text())
-    baseline = json.loads(Path("out/bs4.raw.local.json").read_text())
     result = {}
-    idx = 0
-    for site, rows in sample.items():
-        for i, row in enumerate(rows):
-            base = baseline[idx]["specs"]
-            idx += 1
-            key = hashlib.sha256(row["url"].encode()).hexdigest()[:24]
-            original = Path("cache", site, key + ".body").read_text("utf-8", "replace")
-            for m in ("m1", "m2"):
-                mutated = Path("mutated", f"{site}-{i}-{m}.html").read_text()
-                got, relocated = adaptive_relocation(original, mutated, row["url"], db)
-                ok = sum(1 for k, v in base.items() if got.get(k) == v)
-                entry = result.setdefault(
-                    m, {"recovered": 0, "total": 0, "relocated_to": set()}
-                )
-                entry["recovered"] += ok
-                entry["total"] += len(base)
-                entry["relocated_to"].update(relocated)
+    with tempfile.TemporaryDirectory() as scratch:
+        db = str(Path(scratch, "adaptive.db"))
+        for site, rows in sample.items():
+            for row in rows:
+                page = kept_page(site, row["url"])
+                if page is None:
+                    continue
+                base = parse_scrapling.extract(page, site)["specs"]
+                for name, mutate in MUTATIONS.items():
+                    got, relocated = adaptive_relocation(
+                        page, mutate(page), row["url"], db
+                    )
+                    entry = result.setdefault(
+                        name, {"recovered": 0, "total": 0, "relocated_to": set()}
+                    )
+                    hits, total = recovered(base, got)
+                    entry["recovered"] += hits
+                    entry["total"] += total
+                    entry["relocated_to"].update(relocated)
     report = {
         m: {**v, "relocated_to": sorted(v["relocated_to"]), "percentages": PERCENTAGES}
         for m, v in result.items()
     }
+    Path("out").mkdir(exist_ok=True)
     Path("out/resilience_scrapling.json").write_text(json.dumps(report, indent=1) + "\n")
     print(json.dumps(report))
 

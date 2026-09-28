@@ -3,7 +3,9 @@ from pathlib import Path
 
 import parse_bs4
 from bs4 import BeautifulSoup
-from common import squash
+from common import recovered, squash
+from mutate import MUTATIONS
+from run_parse import kept_page
 
 
 def label_anchored_specs(html):
@@ -17,28 +19,24 @@ def label_anchored_specs(html):
     return specs
 
 
-def recovered(base, got):
-    return [sum(1 for k, v in base.items() if got.get(k) == v), len(base)]
-
-
 def main():
     sample = json.loads(Path("sample.json").read_text())
-    baseline = json.loads(Path("out/bs4.raw.local.json").read_text())
     result = {}
-    idx = 0
     for site, rows in sample.items():
-        for i, _ in enumerate(rows):
-            base = baseline[idx]["specs"]
-            idx += 1
-            for m in ("m1", "m2"):
-                html = Path("mutated", f"{site}-{i}-{m}.html").read_text()
-                class_specs = parse_bs4.extract(html, site)["specs"]
-                for name, got in (
-                    ("bs4_class", class_specs),
-                    ("bs4_label", label_anchored_specs(html)),
+        for row in rows:
+            page = kept_page(site, row["url"])
+            if page is None:
+                continue
+            base = parse_bs4.extract(page, site)["specs"]
+            for name, mutate in MUTATIONS.items():
+                mutated = mutate(page)
+                for label, got in (
+                    ("bs4_class", parse_bs4.extract(mutated, site)["specs"]),
+                    ("bs4_label", label_anchored_specs(mutated)),
                 ):
-                    result.setdefault(f"{name}:{m}", []).append(recovered(base, got))
+                    result.setdefault(f"{label}:{name}", []).append(recovered(base, got))
     totals = {k: [sum(a for a, _ in v), sum(b for _, b in v)] for k, v in result.items()}
+    Path("out").mkdir(exist_ok=True)
     Path("out/resilience_bs4.json").write_text(json.dumps(totals, indent=1) + "\n")
     print(json.dumps(totals))
 

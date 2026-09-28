@@ -6,8 +6,18 @@
   "000-000-0000",
   "Sector Ficticio",
   "Ciudad Ficticia",
+  "Calle Ficticia",
   "424242",
-  "434343"
+  "434343",
+  "809-000-0000",
+  "829-000-0000",
+  "Llamar al",
+  "Contacto:",
+  "wa.me",
+  "example.invalid",
+  "cfemail",
+  "18.0000000",
+  "vendedor-ficticio"
  ],
  "normalized": {
   "supercarros": {

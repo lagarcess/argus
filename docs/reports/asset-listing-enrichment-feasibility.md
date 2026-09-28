@@ -4,7 +4,7 @@ This report answers one question. Can SuperCarros and SuperCasas listings help a
 
 The audit read `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963` on 2026-09-27. The run record, sanitized evidence, synthetic fixtures, and scripts live in [the evidence folder](evidence/asset-listing-enrichment/README.md).
 
-**Status.** Closed on 2026-09-28. [PR #727](https://github.com/lagarcess/argus/pull/727) publishes the account decision this report depended on. Licensed access and asking-price ranges remain founder decisions. No further work is authorized under this assignment.
+**Status.** Closed on 2026-09-28. [PR #727](https://github.com/lagarcess/argus/pull/727) publishes the account decision this report depended on. Licensed access and asking-price ranges remain founder decisions. No further work is authorized under this assignment. A review round on 2026-09-28 hardened the proof's fetch tooling and changed no finding.
 
 ## Recommendation
 
@@ -75,7 +75,7 @@ Argus holds no authorization.
 - Ley 53-07 on high-technology crimes, from the text hosted by the OAS. Article 6 penalizes access that exceeds an authorization. Do terms of use or robots.txt define that authorization for public pages?
 - Ley 65-00 on copyright, from the text hosted by the customs agency. Article 2 protects photographs and databases whose selection or arrangement is creative, but not the underlying data. The research found no separate database right in the text. Does Cibermercado's compilation qualify?
 
-**This audit's risk assessment.** This is not a legal conclusion. Seller data carries the most risk, so any future fetch must drop seller fields before storage. The committed evidence holds none. [The web research record](evidence/asset-listing-enrichment/web-research.md) links each source.
+**This audit's risk assessment.** This is not a legal conclusion. Seller data carries the most risk, so any future fetch must drop seller fields before storage. The committed fetcher now does this in memory, before anything is written, and the committed evidence holds none. [The web research record](evidence/asset-listing-enrichment/web-research.md) links each source.
 
 Public reference values exist, but none is a market price. DGII publishes a vehicle value in RD$ per make, model, and year as the base for the transfer tax, with no API or export. The Catastro publishes land values per m² by municipality. Bank appraisals and insured values are private documents the owner holds. Each can become a manual source kind with its own date. Corotos, another large Dominican classifieds site, prohibits scraping and crawling in its legal page.
 
@@ -288,7 +288,7 @@ This is a proposal for the founder to assign or discard. It does not assign work
 **Method.**
 
 1. Collect each detail page once, or read the export, at the agreed rate. At 4 seconds per page, the 2,617 pages take about 2.9 hours.
-2. Parse with label lookup inside the listing block, reusing the committed scripts. Drop seller fields before storage.
+2. Reuse the committed fetcher, which keeps only listing projections and drops seller fields in memory. Parse with label lookup inside the listing block.
 3. Apply the comparability requirements above. Record every exclusion with its reason: missing price, unit conflict, likely monthly or down-payment price, stale ad, and duplicate candidate.
 4. Report per model year and currency the count, mileage completeness, the dealer share, the `lastmod` age spread, and the 25th, 50th, and 75th percentile prices.
 5. For cells with at least 5 qualifying ads, remove each ad in turn and record how far the median and the middle half move.
@@ -307,8 +307,8 @@ This is a proposal for the founder to assign or discard. It does not assign work
 ## Verification and limits
 
 - The live sample ran on 2026-09-27 within the assignment limits: 16 and 17 requests, 4-second spacing, and a robots gate. No request was blocked or rate-limited.
-- Before deleting the raw page cache, the audit replayed the committed scripts on it. That replay regenerated the ledger, sitemap profile, field summary, and parser outputs byte for byte. Only parse timings varied.
-- A reviewer cannot repeat that replay. The raw pages held seller data and were deleted, and a new fetch needs a new authorization and would sample a different day. A reviewer can run `scripts/check_fixtures.py` on the two synthetic fixtures. It checks both parsers, normalization, the seller-data exclusion, and the markup-change results, and it fails on injected defects.
+- Before deleting the raw page cache, the audit replayed the scripts as first committed on it. That replay regenerated the ledger, sitemap profile, field summary, and parser outputs byte for byte. Only parse timings varied.
+- A reviewer cannot repeat that replay. The raw pages held seller data and were deleted, and a new fetch needs a new authorization and would sample a different day. A reviewer can run `scripts/check_fetch_policy.py` with any Python 3.10 or later, and `scripts/check_fixtures.py` in the two parser environments. Together they check that no caller input bypasses the robots gate, that only listing projections reach disk, both parsers, normalization, and the markup-change results. Both fail on injected defects, and the fetch-policy invariants fail on the fetcher before the review fix.
 - The fixtures reproduce the class-rename and label-lookup results and Scrapling's relocation to the accessories list. They do not reproduce the relocation to the seller contact list, which appeared only on real pages.
 - Twenty pages cannot show market coverage, the meaning of the hidden dates, or valuation accuracy. The density figures count listings by model or sector, not by model year.
 - The legal notes restate statutes and terms read on 2026-09-27. They are not legal advice.

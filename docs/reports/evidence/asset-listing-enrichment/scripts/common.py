@@ -16,3 +16,7 @@ def js_vars(script_texts):
 
 def squash(text):
     return re.sub(r"\s+", " ", text or "").strip()
+
+
+def recovered(base, got):
+    return [sum(1 for key, value in base.items() if got.get(key) == value), len(base)]

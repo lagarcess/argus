@@ -13,13 +13,19 @@ This folder is the run record for [the listing enrichment feasibility report](..
 
 ## Rules the fetcher enforces
 
+These rules describe `scripts/fetch_ledger.py` at this commit. A 2026-09-28 review round added the URL and retention rules after the sample ran.
+
 - It sends at most 20 requests per site. The count covers every host of the brand and includes `robots.txt`.
 - It sends one request at a time, at least 4 seconds after the previous one. The assignment's floor was 3 seconds.
-- It fetches `robots.txt` for a host before any other page on that host, and refuses any URL that file disallows.
+- It decides the page kind and the robots exemption from the URL alone. It takes no caller label. It fetches only four kinds: `robots.txt`, `sitemap.xml`, the search values script, and listing detail pages. It refuses every other URL.
+- It refuses a URL that is not plain https, or that carries a port, userinfo, or a fragment. It refuses a URL with a dot segment or a backslash, including percent-encoded ones.
+- It fetches `robots.txt` for a host before any other page on that host. It refuses any URL that file disallows, checking both the URL as given and its lowercase path, because these sites serve paths in any case.
 - It follows no redirect by itself.
 - It stops a site after a 401, 403, 407, 429, or 503 status, or after a known bot-check page marker. The stop is a file that later calls respect.
 - It replays a cached URL instead of fetching it again.
 - It never logs in, reuses cookies, rotates proxies, imitates a browser, or runs JavaScript.
+- It holds each response in memory and writes only what `scripts/retention.py` keeps. The rules are described under Sanitization.
+- Its ledger, cache, budget, and stop files live in the directory it runs from. A new directory starts a new budget and needs its own authorization.
 
 A robots.txt allowance only lets the fetcher read a page. It grants no right to reuse what the page contains. The report treats reuse under the sites' terms as a separate question.
 
@@ -39,7 +45,7 @@ All 33 responses were HTTP 200. None met a stop condition. The smallest gap betw
 - `field-summary.json` counts field completeness and value shapes over the 20 detail pages, per site. It holds counts, not rows.
 - `parser-comparison.json` holds parse times, the output comparison, and the markup-change test.
 - `fixtures/` holds two synthetic detail pages and `expected.json`, the hand-reviewed output that `scripts/check_fixtures.py` asserts.
-- `scripts/` holds the code that produced the files above and the fixture checks.
+- `scripts/` holds the code that produced the files above, the retention rules, and the offline checks.
 - `canon-map.md` maps the canon on assets, ownership, valuation, currency, evidence, and open decisions at the audited commit. Its quote-check script reads that commit with `git show` and matched all 272 quotes to their cited lines.
 - `code-reuse-map.md` maps reusable code with a path and line for each claim.
 - `web-research.md` records public facts about both sites, Dominican law, Scrapling, and other value sources. It lists every URL it read. None was on either site.
@@ -55,23 +61,33 @@ All 33 responses were HTTP 200. None met a stop condition. The smallest gap betw
 
 ## Sanitization
 
-- The extraction reads the listing block. From the seller block it reads three things. It keeps the location line's last comma-separated part, the heading word such as "Vendedor" or "Inmobiliaria", and whether a dealer inventory link exists. The page variables that identify the seller are dropped.
-- Free text is reduced to keyword flags, numbers, and a count of lost characters. No sentence leaves the parser.
+The committed sample evidence came from the audit's first pipeline. That pipeline cached whole pages, and the cache was deleted after the evidence was written. The current fetcher keeps these projections instead, built in memory before any write:
+
+- `robots.txt` keeps its rules without comments.
+- `sitemap.xml` keeps listing URLs and their `lastmod` dates. Dealer, agency, and directory URLs are dropped.
+- The search values script is kept whole. It holds site configuration, not seller data.
+- A detail page keeps its title, price and feature list, specification list, accessories list, meta description, and listing page variables. It also keeps keyword flags and numbers computed from the free text, the seller heading word such as "Vendedor" or "Inmobiliaria", a location reduced to its last comma-separated part when that part is plain place text, and whether a dealer link exists.
+- A detail page drops the seller block, the free text, photos, maps, and the page variables that identify the seller.
+
+A page the rules cannot project keeps nothing, and so does a projection that still holds a phone number, an email address, a WhatsApp, tel, or mailto link, map coordinates, or a dealer name in a link.
+
+- No later script writes a raw page, free text, or a seller field. `run_parse.py` writes normalized records, timings, and versions. The resilience scripts mutate kept pages in memory, and Scrapling's adaptive storage lives in a temporary directory.
 - The committed sample files hold aggregates and value shapes, where every digit prints as `9`. They hold no per-listing row.
-- The fixtures are synthetic. Their markup follows the structure the audit observed, with class names and field labels, but every value is invented. Their seller fields are placeholders such as `Vendedor Ficticio` and `000-000-0000`.
+- The fixtures are synthetic. Their markup follows the structure the audit observed, with class names and field labels, but every value is invented. Their seller fields are placeholders such as `Vendedor Ficticio`, `000-000-0000`, and `vendedor@example.invalid`.
 - During manual markup inspection, a phone-number mask missed the `+1809` format. One dealer name and two contact names appeared in the audit session's terminal output. None of it was written to this folder or to the report.
 
 ## What was replayed and what a reviewer can rerun
 
 ### The audit's replay, before cleanup
 
-Before deleting the raw page cache, the audit copied the committed scripts to a clean scratch directory and ran them against that cache. The run regenerated `request-ledger.json`, `sitemap-profile.json`, `field-summary.json`, and both parsers' normalized output byte for byte. Only parse timings changed. The cache was then deleted because it held seller data. Nobody can repeat that replay now.
+Before deleting the raw page cache, the audit copied the scripts as first committed to a clean scratch directory and ran them against that cache. The run regenerated `request-ledger.json`, `sitemap-profile.json`, `field-summary.json`, and both parsers' normalized output byte for byte. Only parse timings changed. The cache was then deleted because it held seller data. Nobody can repeat that replay now.
 
-### Rerun the fixture checks
+### Rerun the offline checks
 
-These checks need no site access. The only network use is installing two pinned packages. From the repository root, run:
+These checks need no site access. The fetch-policy check needs only Python 3.10 or later. The fixture checks also need two pinned packages. From the repository root, run:
 
 ```bash
+python3 docs/reports/evidence/asset-listing-enrichment/scripts/check_fetch_policy.py
 uv venv --python 3.10 /tmp/listing-fixtures/venv-simple
 uv pip install --python /tmp/listing-fixtures/venv-simple/bin/python beautifulsoup4==4.15.0 lxml==6.1.3
 uv venv --python 3.10 /tmp/listing-fixtures/venv-scrapling
@@ -80,30 +96,39 @@ uv pip install --python /tmp/listing-fixtures/venv-scrapling/bin/python scraplin
 /tmp/listing-fixtures/venv-scrapling/bin/python docs/reports/evidence/asset-listing-enrichment/scripts/check_fixtures.py scrapling
 ```
 
-Each command prints `2 of 2 fixtures pass` and exits 0. For each fixture, the check asserts four results:
+Each command prints `all checks pass` and exits 0.
 
-- The parser's normalized record equals `fixtures/expected.json`.
-- No placeholder seller value and no seller page variable reaches that record.
+`check_fetch_policy.py` runs the real fetcher against a fake network in a temporary directory. It asserts these results:
+
+- A caller label, a disallowed path, its uppercase and percent-encoded spellings, dot segments, backslashes, `robots.txt` with a query, plain http, a port, userinfo, the home page, a dealer page, a search page, and an unaudited host are each refused, and none of them sends a request.
+- Each kind keeps only its projection. A page without a seller boundary and a page with a phone number in its title keep nothing.
+- No file the fetcher writes holds a placeholder seller value or a contact pattern.
+
+`check_fixtures.py` asserts these results for each fixture:
+
+- The raw page and the kept projection give the same normalized record, equal to `fixtures/expected.json`.
+- No placeholder seller value, contact pattern, or seller page variable reaches that record or the projection.
 - After the class rename and after the restructure, class selectors recover no specification value. Label lookup recovers 14 of 14 on the vehicle page and 9 of 10 on the property page, where the search form repeats `Condición:`.
 - Scrapling's adaptive mode recovers no value and relocates to the accessories list.
+- `run_parse.py` and the resilience script, run on kept projections in a temporary directory, write no file that holds seller data.
 
-The audit broke the code three ways and the check failed each time. The three breaks were a changed expected value, a normalizer that leaked the seller location line, and a parser that returned no specifications.
+Run against the fetcher before the review fix, the same invariants fail. That fetcher requested a disallowed path when called with `--label robots`, and its cache held 13 of the placeholder seller values. The fixture check also fails when retention keeps raw pages, when an expected value changes, when the normalizer leaks the seller location line, and when a parser returns no specifications.
 
 The fixtures do not reproduce every real-page result. On real pages, Scrapling's adaptive mode sometimes relocated to the seller contact list. On the fixtures it relocated only to the accessories list. The fixtures cannot reproduce the sample's counts, dates, or prices.
 
 ### Collect a new sample
 
-`scripts/fetch_ledger.py` and `scripts/fetch_sample.py` send real requests. Run them only under an assignment that authorizes live sampling, and read each site's current `robots.txt` and terms first. Every other script replays the local cache and sends nothing. A new run samples the listings of its own day, so its numbers differ from the committed files.
+`scripts/fetch_ledger.py` and `scripts/fetch_sample.py` send real requests. Run them only under an assignment that authorizes live sampling, and read each site's current `robots.txt` and terms first. Every other script reads the local cache and sends nothing. A new run samples the listings of its own day, so its numbers differ from the committed files. Its markup-change results also differ, because kept projections drop the search form that caused the label collision.
 
 Run these from a scratch directory outside the repository. The fetcher refuses to run inside the repository. The first command assumes the repository root is in `REPO`.
 
 ```bash
 mkdir -p ~/listing-audit && cp "$REPO"/docs/reports/evidence/asset-listing-enrichment/scripts/*.py ~/listing-audit/ && cd ~/listing-audit
-python3 fetch_ledger.py https://m.supercarros.com/robots.txt --label robots
-python3 fetch_ledger.py https://m.supercasas.com/robots.txt --label robots
-python3 fetch_ledger.py https://m.supercarros.com/sitemap.xml --label sitemap
-python3 fetch_ledger.py https://m.supercasas.com/sitemap.xml --label sitemap
-python3 fetch_ledger.py "https://m.supercarros.com/assets/js/searchvalues.js?20260927053" --label taxonomy
+python3 fetch_ledger.py https://m.supercarros.com/robots.txt
+python3 fetch_ledger.py https://m.supercasas.com/robots.txt
+python3 fetch_ledger.py https://m.supercarros.com/sitemap.xml
+python3 fetch_ledger.py https://m.supercasas.com/sitemap.xml
+python3 fetch_ledger.py "https://m.supercarros.com/assets/js/searchvalues.js?20260927053"
 python3 select_sample.py
 python3 fetch_sample.py
 uv venv --python 3.10 venv-simple
@@ -112,7 +137,6 @@ uv venv --python 3.10 venv-scrapling
 uv pip install --python venv-scrapling/bin/python scrapling==0.4.15
 venv-simple/bin/python run_parse.py bs4
 venv-scrapling/bin/python run_parse.py scrapling
-python3 mutate.py
 venv-simple/bin/python resilience_bs4.py
 venv-scrapling/bin/python resilience_scrapling.py
 python3 summarize.py
@@ -120,10 +144,8 @@ python3 density.py
 python3 compare.py
 ```
 
-The `?20260927053` suffix on the search values script was the build string on 2026-09-27. Copy the current one from the home page. The audit also fetched both home pages, both terms pages, and `https://m.supercasas.com/apartamentos/` once each with `fetch_ledger.py`.
-
-`run_parse.py` writes a local `out/*.raw.local.json` file that holds free text and the seller location line. Never commit that file.
+The `?20260927053` suffix on the search values script was the build string on 2026-09-27. Read the current one from the home page in a browser. The audit also fetched both home pages, both terms pages, and `https://m.supercasas.com/apartamentos/` once each. The current fetcher refuses those pages, because it has no rule for keeping them.
 
 ## Cleanup
 
-The raw page cache, the per-listing extraction, the listing salt, both environments, and the `uv` cache stayed in a local scratch directory. They were deleted after the evidence in this folder was written. The environments used for the fixture checks were recreated in scratch and deleted after the checks.
+The raw page cache, the per-listing extraction, the listing salt, both environments, and the `uv` cache stayed in a local scratch directory. They were deleted after the evidence in this folder was written. The environments used for the offline checks were recreated in scratch and deleted after the checks.

@@ -1,3 +1,5 @@
+import json
+
 from common import VISITS, js_vars, squash
 from scrapling.parser import Selector
 
@@ -53,6 +55,9 @@ def extract(html: str, site: str, page: Selector | None = None) -> dict:
         ],
         "visits": visits,
         "ad_text": ad_text[0].get_all_text("\n") if ad_text else None,
+        "ad_text_facts": json.loads(ad_text[0].attrib["data-text-facts"])
+        if ad_text and "data-text-facts" in ad_text[0].attrib
+        else None,
         "meta_description": meta[0].attrib.get("content") if meta else None,
         "js": js,
         "seller_city": city,

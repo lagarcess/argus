@@ -111,7 +111,6 @@ for site in ("supercarros", "supercasas"):
 )
 
 recs = json.loads(Path("out/bs4.normalized.json").read_text())
-raws = json.loads(Path("out/bs4.raw.local.json").read_text())
 brands = {}
 tax = body(
     "supercarros", "https://m.supercarros.com/assets/js/searchvalues.js?20260927053"

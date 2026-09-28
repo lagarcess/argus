@@ -143,7 +143,7 @@ def normalize(raw: dict, salt: str) -> dict:
         "features": raw["features"],
         "amenity_count": len(raw["amenities"]),
         "visits": raw["visits"],
-        "text": text_facts(raw["ad_text"]),
+        "text": raw.get("ad_text_facts") or text_facts(raw["ad_text"]),
         "meta_description_present": bool(raw["meta_description"]),
     }
     if site == "supercarros":
