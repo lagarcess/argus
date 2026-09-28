@@ -49,7 +49,17 @@ fun position(points: List<Sample>, index: Int): Float {
     val range = points.last().time.toEpochDay() - first
     return if (range == 0L) .5f else (points[index].time.toEpochDay() - first).toFloat() / range
 }
+// Major-currency presentation policy shared by axis ticks and the precise readout.
+fun numberFormat(locale: Locale, value: Double): NumberFormat = NumberFormat.getNumberInstance(locale).apply {
+    minimumFractionDigits = 2
+    maximumFractionDigits = maxOf(2, java.math.BigDecimal.valueOf(value).stripTrailingZeros().scale())
+}
 fun amount(value: Double?, currency: String, locale: Locale): String =
-    value?.let { "$currency " + NumberFormat.getNumberInstance(locale).apply { minimumFractionDigits = 2; maximumFractionDigits = 2 }.format(it) }
+    value?.let { "$currency " + numberFormat(locale, it).format(it) }
         ?: if (locale.language == "es") "Sin datos" else "No data"
 fun date(value: LocalDate, locale: Locale): String = value.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
+
+// Decimal midpoint is scale geometry; avoid binary arithmetic inventing tick digits.
+fun axisTicks(min: Double, max: Double): List<Double> = listOf(max,
+    java.math.BigDecimal.valueOf(min).add(java.math.BigDecimal.valueOf(max))
+        .divide(java.math.BigDecimal.valueOf(2)).toDouble(), min)

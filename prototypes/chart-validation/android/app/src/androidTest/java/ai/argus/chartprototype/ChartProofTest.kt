@@ -43,6 +43,19 @@ class ChartProofTest {
         assertEquals("Capture must show resolved appearance, not the prior frame", expected, bitmap.getPixel(10, bitmap.height / 2))
         File(context.getExternalFilesDir(null), "$name.png").outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
     }
+    @Test fun axisCentsUseReadoutPrecision() {
+        val single = cases.first { it.id == "single" }
+        val point = single.points.single()
+        choose(single.id)
+        compose.onNodeWithTag("next").performClick()
+        compose.onNodeWithText(numberFormat(Locale.US, point.actual!!).format(point.actual)).assertIsDisplayed()
+        assertTrue(readout().contains(amount(point.actual, single.currency, Locale.US)))
+        screenshot("axis-cents-single")
+        compose.onNodeWithTag("locale").performScrollTo().performClick()
+        compose.onNodeWithText("Argus").performScrollTo()
+        compose.onNodeWithText(numberFormat(Locale.forLanguageTag("es-419"), point.actual!!).format(point.actual)).assertIsDisplayed()
+        screenshot("axis-cents-single-es")
+    }
     @Test fun fixturesAndSegmentsPreserveEveryFact() {
         cases.forEach { case ->
             listOf(false, true).forEach { projected ->

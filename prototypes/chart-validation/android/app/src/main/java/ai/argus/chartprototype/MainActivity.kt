@@ -132,12 +132,10 @@ fun FinancialChart(scenario: Scenario, selection: Int?, onSelect: (Int?) -> Unit
     val values = remember(scenario) { scenario.points.flatMap { listOfNotNull(it.actual, it.projected) } }
     val minY = (values.minOrNull() ?: 0.0).coerceAtMost(0.0)
     val maxY = (values.maxOrNull() ?: 1.0).coerceAtLeast(0.0).let { if(it == minY) it + 1 else it }
-    val middleY = (minY + maxY) / 2
-    val ticks = listOf(maxY, middleY, minY)
-    val axisFormat = remember(locale) { java.text.NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 0 } }
+    val ticks = remember(minY, maxY) { axisTicks(minY, maxY) }
     Row(Modifier.fillMaxWidth()) {
         if(values.isNotEmpty()) Column(Modifier.width((52 * androidx.compose.ui.platform.LocalDensity.current.fontScale).dp).height(220.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            ticks.forEach { Text(axisFormat.format(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            ticks.forEach { Text(numberFormat(locale, it).format(it), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         Box(Modifier.weight(1f).height(220.dp).testTag("chart")) {
         if(values.isNotEmpty()) Canvas(Modifier.fillMaxSize()) {
