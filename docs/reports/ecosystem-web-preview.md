@@ -159,7 +159,7 @@ contracts remain with the backend owner.
 - Keep preference persistence with the root providers. Only theme and browser
   language persist here; entered financial values and chat drafts do not.
 
-## Integration and evidence identity
+## Historical initial checkpoint: integration and evidence identity
 
 | Item | Full SHA |
 | --- | --- |
@@ -211,7 +211,7 @@ staged/untracked files, and output-path bypass attempts.
 The terminal PR audit records the final PR head and explicitly revalidates any
 later documentation/evidence-only delta. It is written after the final review.
 
-## Verification
+## Historical initial checkpoint: verification
 
 - Full fixture browser suite: **33 passed**. Every destination at desktop,
   tablet and narrow widths; English/es-419; Light/Dark/System persistence;

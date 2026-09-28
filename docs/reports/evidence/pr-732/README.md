@@ -1,5 +1,10 @@
 # PR #732: responsive ecosystem preview evidence
 
+**Historical initial checkpoint.** These captures remain intact for comparison.
+The initial READY claim was withdrawn after visual feedback. Follow the
+[web refinement evidence](web-refinement/README.md) for the current comparison
+and acceptance record. Neither checkpoint establishes founder visual approval.
+
 Code and test head: `efe2ec66631ad43395de5746b578528bf432c4a6`.
 Every PNG has a sibling JSON file with its exact head, URL, viewport, language,
 theme, browser and capture time. `interactions/` records every acceptance case
