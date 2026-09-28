@@ -577,6 +577,10 @@
       "observed": 95000,
       "revisions": 2
     },
+    "observation_preview_requires_check": {
+      "missing_check": "StalePreview",
+      "with_check": "ok"
+    },
     "occurred_on_and_at_must_agree": {
       "confirm": "ReviewRequired:date_mismatch",
       "issues": {
@@ -661,6 +665,13 @@
       "exposed_answer_ok": "ok",
       "foreign_unchanged": 490000,
       "off_account_answer": "InvalidInput:answer_target_invalid"
+    },
+    "remove_rejects_empty_answer_map": {
+      "check_still_present": true,
+      "empty_nested_map": "InvalidInput:answer_target_invalid",
+      "exposed_still_works": "ok",
+      "foreign_revisions_unchanged": true,
+      "still_needs_real_answer": "ReviewRequired:inclusion_unanswered"
     },
     "removing_a_check_others_depend_on": {
       "accepted_reordering": "ok",

@@ -390,4 +390,15 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "exposed_answer_ok": "ok",
             "foreign_unchanged": 490_000,
         },
+        "observation_preview_requires_check": {
+            "missing_check": "StalePreview",
+            "with_check": "ok",
+        },
+        "remove_rejects_empty_answer_map": {
+            "empty_nested_map": "InvalidInput:answer_target_invalid",
+            "foreign_revisions_unchanged": True,
+            "still_needs_real_answer": "ReviewRequired:inclusion_unanswered",
+            "check_still_present": True,
+            "exposed_still_works": "ok",
+        },
     }

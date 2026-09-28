@@ -503,7 +503,11 @@ class Store:
             records = dict(working.book.records)
             record = self._new_record(body, draft.provenance, records)
             stamped = self._stamped(working.book, record)
-            if isinstance(body, Observation) and preview.check is not None:
+            if isinstance(body, Observation):
+                # Observation confirms must carry the previewed check evidence;
+                # omitting it bypasses the batch prior/difference bind.
+                if preview.check is None:
+                    raise StalePreview(self.preview(preview.draft_id))
                 last = stamped.revisions[-1]
                 shown = preview.check
                 if (
@@ -656,6 +660,7 @@ class Store:
                     target is None
                     or target.removed
                     or not isinstance(target.body, Activity)
+                    or not activity_answers
                 ):
                     raise InvalidInput("answer_target_invalid", activity_id)
                 for check_id in activity_answers:

@@ -290,6 +290,8 @@ def edits_that_move_money_need_review() -> dict:
         "distinct_bound_to_reviewed_matches": _distinct_bound_to_reviewed_matches(),
         "preview_basis_requires_touched_accounts": _preview_basis_requires_touched(),
         "remove_answers_limited_to_exposed": _remove_answers_limited_to_exposed(),
+        "observation_preview_requires_check": _observation_preview_requires_check(),
+        "remove_rejects_empty_answer_map": _remove_rejects_empty_answer_map(),
     }
 
 
@@ -1417,6 +1419,63 @@ def _remove_answers_limited_to_exposed() -> dict:
         "off_account_answer": off_account,
         "exposed_answer_ok": accepted,
         "foreign_unchanged": scene.amount(other),
+    }
+
+
+def _observation_preview_requires_check() -> dict:
+    """An observation confirm without Preview.check is stale, not a silent write."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    draft = scene.observation(cash, "1000.00", 5)
+    preview = scene.store.preview(draft.id)
+    stripped = replace(preview, check=None)
+    return {
+        "missing_check": outcome(lambda: scene.store.confirm(stripped, "no-check")),
+        "with_check": outcome(lambda: scene.store.confirm(preview, "with-check")),
+    }
+
+
+def _remove_rejects_empty_answer_map() -> dict:
+    """Empty nested answer maps must not revise unrelated activities."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    other = scene.account("Ahorros", "savings", "DOP", "5000.00")
+    first = scene.observe(cash, "8000.00", 5)
+    second = scene.observe(cash, "8000.00", 10)
+    scene.now = local(11)
+    late = scene.act("expense", cash, "2000.00", 3)
+    scene.store.resolve(
+        late.id,
+        answers={first.id: "included"},
+        expected_revision=scene.store.state.drafts[late.id].revision,
+    )
+    record = scene.confirm(late)
+    foreign = scene.record("expense", other, "100.00", 11)
+    foreign_rev = len(scene.store.book.records[foreign.id].revisions)
+    empty_map = outcome(
+        lambda: scene.store.remove(
+            first.id,
+            1,
+            "typo",
+            answers={foreign.id: {}},
+        )
+    )
+    return {
+        "empty_nested_map": empty_map,
+        "foreign_revisions_unchanged": len(scene.store.book.records[foreign.id].revisions)
+        == foreign_rev,
+        "still_needs_real_answer": outcome(lambda: scene.store.remove(first.id, 1, "typo")),
+        "check_still_present": first.id in scene.store.book.records
+        and not scene.store.book.records[first.id].removed,
+        "exposed_still_works": outcome(
+            lambda: scene.store.remove(
+                first.id,
+                1,
+                "typo",
+                accept_reordering=True,
+                answers={record.id: {second.id: "included"}},
+            )
+        ),
     }
 
 
