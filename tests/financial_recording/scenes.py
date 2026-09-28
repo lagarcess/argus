@@ -95,6 +95,29 @@ class Scene:
     def draft(
         self, method: str = "manual", source_ref: Optional[dict] = None, **fields
     ) -> Draft:
+        # Scene helpers date activity relative to the story day. Advance the
+        # clock so those dates are not future relative to the store.
+        occurred_on = fields.get("occurred_on")
+        if occurred_on:
+            try:
+                day = date.fromisoformat(str(occurred_on)[:10])
+            except ValueError:
+                day = None
+            if day is not None:
+                stamp = datetime(day.year, day.month, day.day, 9, 0, tzinfo=DEFAULT_TZ)
+                if stamp > self.now:
+                    self.now = stamp
+        as_of = fields.get("as_of")
+        if as_of:
+            try:
+                stamp = datetime.fromisoformat(as_of)
+            except ValueError:
+                stamp = None
+            if stamp is not None:
+                if stamp.tzinfo is None:
+                    stamp = stamp.replace(tzinfo=DEFAULT_TZ)
+                if stamp > self.now:
+                    self.now = stamp
         return self.store.draft(fields, Provenance(method, self.now, source_ref))
 
     def act(

@@ -4,6 +4,9 @@ These scenarios cover the September 28 mobile baseline's recording rules. They
 share the driver in scenes.py and feed the same evidence file as scenarios.py.
 """
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from tests.financial_recording.derive import (
     DEFAULT_TZ,
     Provenance,
@@ -272,6 +275,8 @@ def edits_that_move_money_need_review() -> dict:
         "external_id_bound_to_confirm_account": _external_id_bound_account(),
         "restore_reviews_placement": _restore_reviews_placement(),
         "position_gaps_honor_as_of": _position_gaps_honor_as_of(),
+        "future_activity_is_refused": _future_activity_is_refused(),
+        "activity_zone_survives_reader_tz_change": _activity_zone_stable(),
     }
 
 
@@ -813,6 +818,60 @@ def _position_gaps_honor_as_of() -> dict:
     }
 
 
+def _future_activity_is_refused() -> dict:
+    """Actual activity after the store clock stays out of the ledger."""
+    now = local(1)
+    store = Store(lambda: now, tz=DEFAULT_TZ)
+    cash = store.create_account(
+        "cash", "DOP", "1000.00", nickname="Efectivo", idempotency_key="cash"
+    )
+    draft = store.draft(
+        {
+            "kind": "expense",
+            "account_id": cash.id,
+            "amount": "50.00",
+            "occurred_on": local(2).date().isoformat(),
+        },
+        Provenance("manual", now),
+    )
+    preview = store.preview(draft.id)
+    return {
+        "issues": {
+            item.code: item.severity
+            for item in preview.issues
+            if item.code == "date_in_future"
+        },
+        "confirm": outcome(lambda: store.confirm(preview, "future-exp")),
+    }
+
+
+def _activity_zone_stable() -> dict:
+    """Note-only edits keep occurred_on/at agreement after the reader zone changes."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    # 2026-09-04 01:00 UTC == 2026-09-03 21:00 in America/Santo_Domingo.
+    instant = datetime(2026, 9, 4, 1, 0, tzinfo=ZoneInfo("UTC"))
+    scene.now = local(4)
+    local_day = instant.astimezone(DEFAULT_TZ).date()
+    expense = scene.confirm(
+        scene.draft(
+            kind="expense",
+            account_id=cash.id,
+            amount="50.00",
+            occurred_on=local_day.isoformat(),
+            occurred_at=instant.isoformat(),
+        )
+    )
+    scene.store.tz = ZoneInfo("UTC")
+    note_only = outcome(
+        lambda: scene.store.correct(expense.id, 1, "add note", note="almuerzo")
+    )
+    return {
+        "note_edit_after_tz_change": note_only,
+        "activity_zone": scene.store.book.records[expense.id].body.zone,
+    }
+
+
 def _redated_check_restamps() -> dict:
     scene = Scene()
     cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
@@ -1035,6 +1094,8 @@ def _purchase_edits_recheck_refunds() -> dict:
     cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
     purchase = scene.record("expense", cash, "100.00", 3, category="shopping")
     scene.record("refund", cash, "40.00", 5, refund_of=purchase.id, category="shopping")
+    # Correction is reviewed on day 9, so the new purchase date is not future.
+    scene.now = local(9)
     return {
         "later_date": outcome(
             lambda: scene.store.correct(

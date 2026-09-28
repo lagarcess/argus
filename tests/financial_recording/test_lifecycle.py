@@ -330,4 +330,12 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "historic_gap_count": 1,
             "historic_as_of_days": ["2026-09-05"],
         },
+        "future_activity_is_refused": {
+            "issues": {"date_in_future": BLOCKING},
+            "confirm": "ReviewRequired:date_in_future",
+        },
+        "activity_zone_survives_reader_tz_change": {
+            "note_edit_after_tz_change": "ok",
+            "activity_zone": "America/Santo_Domingo",
+        },
     }

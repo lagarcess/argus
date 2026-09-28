@@ -80,6 +80,7 @@ class Activity:
     account_id: str
     amount: int
     occurred_on: date
+    zone: str
     occurred_at: Optional[datetime] = None
     category: Optional[str] = None
     counter_account_id: Optional[str] = None
@@ -229,6 +230,11 @@ def accounts_of(body: Body) -> set[str]:
 def anchor_zone(anchor: Anchor) -> ZoneInfo:
     """Zone stored with the balance date; later reader-zone changes never rewrite it."""
     return ZoneInfo(anchor.zone)
+
+
+def activity_zone(activity: Activity) -> ZoneInfo:
+    """Zone stored with the activity date; later reader-zone changes never rewrite it."""
+    return ZoneInfo(activity.zone)
 
 
 def anchor_day(anchor: Anchor) -> date:

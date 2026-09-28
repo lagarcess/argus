@@ -39,6 +39,7 @@ from tests.financial_recording.derive import (
     Revision,
     accounts_of,
     activities,
+    activity_zone,
     anchors,
     balance,
     contained_at_confirmation,
@@ -59,6 +60,13 @@ def is_future_anchor(as_of: datetime, now: datetime) -> bool:
 def ensure_anchor_not_future(as_of: datetime, now: datetime) -> None:
     if is_future_anchor(as_of, now):
         raise InvalidInput("date_in_future", as_of.isoformat())
+
+
+def _activity_is_future(body: Activity, now: datetime, tz: ZoneInfo) -> bool:
+    """Actual activity cannot land after the store clock; plans own the future."""
+    if body.occurred_at is not None:
+        return body.occurred_at > now
+    return body.occurred_on > now.astimezone(tz).date()
 
 
 NOTICE_CODES = frozenset({"negative_asset_balance", "account_archived"})
@@ -131,6 +139,7 @@ def parse_fields(
         kind=kind,
         occurred_on=_parsed(found, parse_date, text["occurred_on"]),
         occurred_at=_parsed(found, parse_instant, text.get("occurred_at")),
+        zone=str(tz),
         category=text.get("category") or None,
         counter_account_id=text.get("counter_account_id") or None,
         refund_of=text.get("refund_of") or None,
@@ -162,12 +171,9 @@ def validate(
     note = getattr(body, "note", None)
     if note is not None and len(note) > NOTE_MAX:
         found.append(issue("note_too_long", str(len(note))))
-    if (
-        now is not None
-        and isinstance(body, (Opening, Observation))
-        and is_future_anchor(body.as_of, now)
-    ):
-        found.append(issue("date_in_future"))
+    if now is not None and isinstance(body, (Opening, Observation)):
+        if is_future_anchor(body.as_of, now):
+            found.append(issue("date_in_future"))
     if isinstance(body, Observation):
         if body.basis not in GAP_LABEL:
             found.append(issue("choice_invalid", body.basis))
@@ -176,8 +182,11 @@ def validate(
             if account.type not in ESTIMATED_TYPES:
                 found.append(issue("basis_not_applicable", account.type))
     if isinstance(body, Activity):
+        entry_tz = activity_zone(body) if body.zone else tz
+        if now is not None and _activity_is_future(body, now, entry_tz):
+            found.append(issue("date_in_future"))
         if body.occurred_at is not None:
-            local_day = body.occurred_at.astimezone(tz).date()
+            local_day = body.occurred_at.astimezone(entry_tz).date()
             if body.occurred_on != local_day:
                 found.append(issue("date_mismatch"))
         found.extend(_activity_issues(book, body, record_id))

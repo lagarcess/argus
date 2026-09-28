@@ -8,7 +8,10 @@ from tests.financial_recording.derive import DEFAULT_TZ, Provenance, balance
 from tests.financial_recording.model import StalePreview, Store
 from tests.financial_recording.review import ReviewRequired
 
-NOW = datetime(2026, 9, 2, 10, tzinfo=DEFAULT_TZ)
+# Clock is after sample activity dates so future-date refusal does not fire.
+# Opening is earlier so Sep 3 activity does not ask inclusion against it.
+NOW = datetime(2026, 9, 5, 10, tzinfo=DEFAULT_TZ)
+OPENING = datetime(2026, 9, 1, 9, tzinfo=DEFAULT_TZ)
 BLOCKING = "blocking"
 
 
@@ -40,7 +43,12 @@ def test_batch_confirm_is_all_or_nothing():
     fake.seed_instance(20260902)
     store = Store(lambda: NOW)
     cash = store.create_account(
-        "cash", "DOP", "100.00", nickname=fake.first_name(), idempotency_key="create"
+        "cash",
+        "DOP",
+        "100.00",
+        nickname=fake.first_name(),
+        as_of=OPENING,
+        idempotency_key="create",
     )
     source = Provenance("manual", NOW)
     fields = {"kind": "expense", "account_id": cash.id, "occurred_on": "2026-09-03"}
@@ -60,7 +68,9 @@ def test_batch_confirm_is_all_or_nothing():
 
 def test_a_rejected_draft_frees_its_source_and_an_edited_draft_needs_a_new_preview():
     store = Store(lambda: NOW)
-    cash = store.create_account("cash", "DOP", "100.00", idempotency_key="c")
+    cash = store.create_account(
+        "cash", "DOP", "100.00", as_of=OPENING, idempotency_key="c"
+    )
     source = Provenance("document", NOW, {"digest": "d1", "row": 1})
     fields = {
         "kind": "expense",

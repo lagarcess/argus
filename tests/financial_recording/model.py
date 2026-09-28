@@ -511,6 +511,10 @@ class Store:
                 changes[name] = parser(changes[name])
         if "as_of" in changes and isinstance(record.body, (Opening, Observation)):
             changes["zone"] = str(self.tz)
+        if isinstance(record.body, Activity) and (
+            "occurred_on" in changes or "occurred_at" in changes
+        ):
+            changes["zone"] = str(self.tz)
         if answers and not isinstance(record.body, Activity):
             raise InvalidInput("answers_not_applicable", record_id)
         if answers:

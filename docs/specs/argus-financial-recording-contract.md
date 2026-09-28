@@ -8,7 +8,7 @@
 
 This document recommends one contract for recording money facts. It approves no schema, migration, API route, permission model or chat change. API_CONTRACT, DATA_MODEL and ARCHITECTURE stay authoritative until an approved change amends them.
 
-**Sources and their state.** PR #727 (`codex/native-interface-decision`, head `a1c294319`) publishes the final September 28 mobile baseline, the MVEE sections above, the reconciliation handoff and the [recording decision response](lanes/financial-recording-decision-response.md). It was an open draft when this revision was written. The founder restated the same answers in the lane conversation on September 28, again marking duplicate rows, stale previews and localized categories as recommendations and guest persistence as pending. A later published guest policy states registered accounts for ecosystem features and leaves existing guest chat and quotas unchanged; that is intended direction only. The MVEE, documentation authority and decision log still leave guest/ecosystem access open, so this proposed contract does not close G1 and does not treat that policy as derived from those authorities. Where this document says "approved", it cites the MVEE text published by #727. PR #714's older September 27 sketch is superseded by #727 and is no longer a source here.
+**Sources and their state.** PR #727 (`codex/native-interface-decision`, head `3fa0dd921`) publishes the final September 28 mobile baseline, the MVEE sections above, the reconciliation handoff and the [recording decision response](lanes/financial-recording-decision-response.md). It is merged into the integration branch this contract reconciles against. The MVEE locks the [guest access boundary](argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration): registered accounts before creating accounts or recording activity; existing guest chat and quotas unchanged. [Documentation authority](../DOCUMENTATION_AUTHORITY.md) records that guest financial persistence is no longer an open product choice; what remains open is registration/conversion mechanics and server-side enforcement. This contract therefore treats G1 as closed on product authority and keeps only those enforcement mechanics as first-assignment dependencies. Where this document says "approved", it cites the MVEE text published by #727. PR #714's older September 27 sketch is superseded by #727 and is no longer a source here.
 
 ## 1. What a person must be able to observe
 
@@ -158,11 +158,14 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 | `occurred_on` | Local date the activity happened |
 | `occurred_at` | Optional instant, when the source gives one |
 | `as_of` | Instant an anchor describes |
+| `zone` | Time zone stored with the local date (anchors and activity), so a later reader zone never reinterprets it |
 | `captured_at` | When the source was captured |
 | `recorded_at` | Server instant of each revision |
 | `recorded_by` | Who made each revision, so either partner can see who recorded or corrected an entry. It grants nothing. |
 
 **Balance date.** The baseline offers "Balance as of", defaulting to today and never in the future. Today means the creation instant. A chosen earlier date means the end of that local day. The person's time zone decides local days. The recommended default is `America/Santo_Domingo`, which has no daylight-saving shift. This is not the New York market clock, which stays unchanged. The zone used is stored with the date, so a later zone change never reinterprets it.
+
+**Actual activity dates.** Confirmed expenses, income, refunds, transfers and payments are facts that already happened. `occurred_on` / `occurred_at` must not be after the store clock; future money belongs to plan expectations, not the actual ledger. When `occurred_at` is present, it must agree with `occurred_on` in the stored activity zone.
 
 **Changing the balance date, and any edit that moves money.** Editing the opening date is a correction with a new revision and a reason. The same review applies to every correction: an opening date, a check's date, an activity's date or legs. If any activity would move between a balance and a difference, the correction returns `inclusion_changed` with those records. It saves nothing until the person accepts the change after seeing the affected history. If the edit would leave an inclusion question open, on any account it touches or leaves, it returns `inclusion_unanswered` and takes the answer in the same call. A correction that only changes the person's own inclusion answer needs no second acknowledgement. Inclusion answers belong to activity, so a correction or restore of an opening or a check refuses them with `answers_not_applicable`. An opening or a check keeps its account. Recording it on the wrong account is fixed by removing it and recording a new one, so its stored contents always belong to its account. Removing a check that other activity depends on, or restoring a record a later check never saw, follows the same rule. A date change never silently reinterprets existing activity.
 
@@ -290,7 +293,7 @@ Creating an account uses no category. A first slice without activity has no cate
 | Plan occurrences counted once, with derived status | MVEE connected plan status |
 | Restore returns the original record into its original space and account, with both legs together | MVEE account activity (recovery) |
 
-**Historical Decision 8, corrected.** An earlier version of this contract said Decision 8 kept typed personal figures out of storage. That was wrong. Decision 8 (September 8, 2026, archived grounded-finance roadmap) left typed figures inside conversation messages and put them on the never-store list for personalization memory. The MVEE published by #727 supersedes its prohibition on a new personal-figure storage surface only for explicit financial-record confirmation. Unconfirmed figures keep the existing conversation policy. They are not deleted from chat history, and nothing new enters personalization memory. Guest financial-record persistence remains a separate open decision in the authority docs (G1).
+**Historical Decision 8, corrected.** An earlier version of this contract said Decision 8 kept typed personal figures out of storage. That was wrong. Decision 8 (September 8, 2026, archived grounded-finance roadmap) left typed figures inside conversation messages and put them on the never-store list for personalization memory. The MVEE published by #727 supersedes its prohibition on a new personal-figure storage surface only for explicit financial-record confirmation. Unconfirmed figures keep the existing conversation policy. They are not deleted from chat history, and nothing new enters personalization memory. Guest financial-record persistence is closed by the MVEE guest-access boundary and documentation authority; only registration/enforcement mechanics remain open for the first assignment.
 
 ### Recommended engineering choices
 
@@ -309,11 +312,16 @@ Creating an account uses no category. A first slice without activity has no cate
 | Categories | One owner, stable ids, localized defaults, space-owned custom labels | Fixed-only list |
 | Note length | Unicode code points, server authoritative | Each client's native count |
 
+### Closed on authority (not open here)
+
+| # | Decision | Authority | What remains for implementers |
+| --- | --- | --- | --- |
+| G1 | Durable guest financial records / ecosystem access | MVEE guest-access boundary; documentation authority | Registration/conversion flow and a real server/database guest rejection with an acceptance test. Product choice is closed: registered accounts only. |
+
 ### Still open
 
 | # | Decision | Owner | Recommendation |
 | --- | --- | --- | --- |
-| G1 | Durable guest financial records / ecosystem access | Founder, pending in MVEE, documentation authority and decision log | Intended direction only: registered accounts for ecosystem features; existing guest chat and quotas unchanged; guests see no accounts surface. Not closed here. |
 | G2 | Recovery period, retention and purge for removed entries and accounts | Founder with the data-retention contract | Session-level restore in the baseline only. No invented deadline. |
 | G3 | Cross-currency transfer contract (actual amounts on both sides) | Founder, later | Keep blocked. It is separate from unlinked foreign refunds. |
 | G4 | Household authorization, RLS, sharing links during moves | Household contract | Unproved here. Do not infer it from ownership. |
@@ -354,7 +362,7 @@ PR #727's reconciliation contract also names a "recovery destination" as a found
 
 **Dependencies to bind in the assignment, before code.**
 
-1. **Guest policy (G1).** Still open in the authority docs. Intended direction is registered accounts for ecosystem features, with existing guest chat and quotas unchanged and guests seeing no accounts surface. The assignment waits for those authorities to close G1. It does not build the registered-only path before that close. Guests are authenticated Supabase users (`PRODUCT.md`), so hiding Accounts in the client and owner RLS via `auth.uid()` alone are not enforceable; a guest can still call the API. The assignment also waits on a real server/database anonymous (or guest) rejection with an acceptance test. Do not invent guest financial-record persistence.
+1. **Guest enforcement (G1 closed on authority).** Product authority requires registered accounts before creating accounts or recording activity; existing guest chat and quotas stay unchanged. The assignment builds the registered-only path and waits only on binding the still-open mechanics: registration/conversion / return-to-action, and a real server/database guest rejection with an acceptance test. Guests are authenticated Supabase users (`PRODUCT.md`), so hiding Accounts in the client and owner RLS via `auth.uid()` alone are not enforceable. Do not invent guest financial-record persistence.
 2. **API and data ownership.** Amend API_CONTRACT and DATA_MODEL first (Never-Violate 1). Audit SQL and RLS against `postgres-best-practices` (Never-Violate 10).
 3. **Opening-date correction behavior.** Adopt section 7. With no activity yet, a date correction reorders nothing, but the revision and reason are still stored.
 4. **A database acceptance gate.** Postgres tests for confirm-or-replay, version checks, owner-only RLS, and the anonymous (or guest) rejection required by dependency 1, in the `tests/test_*_postgres.py` family CI already gates.
@@ -368,7 +376,7 @@ PR #727's reconciliation contract also names a "recovery destination" as a found
 | Opening anchor, revisions, balance derivation | `src/argus/domain/recording/records.py` |
 | Persistence | One migration: `financial_accounts` (with `space_id` defaulting to Personal, `archived`, `ownership_share_bps`, `version`) and `financial_records` with `financial_record_revisions`, plus one create-or-replay SQL function. Owner-only RLS on `auth.uid()`. No household columns. |
 | HTTP | `src/argus/api/routers/financial_accounts.py`: create with `Idempotency-Key`, read, edit with `expected_version`, and correct the opening with `expected_revision`. OpenAPI regenerated. |
-| Client | Per the ARCHITECTURE platform decision. No Accounts surface ships until dependency 1 is bound: authority-closed G1 and a real server/database anonymous (or guest) rejection with its acceptance test. |
+| Client | Per the ARCHITECTURE platform decision. No Accounts surface ships until dependency 1's enforcement and return-to-action mechanics are bound, including a real server/database guest rejection with its acceptance test. |
 
 **Acceptance.** Run `clavito_large_opening`, `blank_opening_unknown`, `first_slice_create_reopen_edit` (including its opening-date edit with no activity), `multiple_precisions` and the create part of `duplicate_submission` through a production driver, using the literal outcomes already committed. Add the Postgres gate above. A double-submitted create makes one account. A stale edit returns 409 and changes nothing. An unknown balance never reads as RD$0. An archived account stays in totals.
 
