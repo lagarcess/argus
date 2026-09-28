@@ -9,6 +9,7 @@ from tests.financial_recording.derive import (
     balance,
     expectation_status,
     forecast,
+    observation_gaps,
     space_scope,
     standing,
 )
@@ -237,6 +238,71 @@ def edits_that_move_money_need_review() -> dict:
         "purchase_edits_recheck_refunds": _purchase_edits_recheck_refunds(),
         "custom_category_blocks_a_move": _custom_category_blocks_move(),
         "anchors_keep_their_account": _anchor_account_fixed(),
+        "contradicting_answers_stop_for_review": _contradicting_answers(),
+        "redated_check_restamps_its_contents": _redated_check_restamps(),
+        "restore_needs_a_reason": _restore_needs_reason(),
+    }
+
+
+def _redated_check_restamps() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    check = scene.observe(cash, "1000.00", 5)
+    scene.now = local(9)
+    expense = scene.record("expense", cash, "100.00", 8)
+    redate = {"as_of": local(9, 18), "amount": "900.00"}
+    unanswered = outcome(lambda: scene.store.correct(check.id, 1, "9th", **redate))
+    scene.store.correct(expense.id, 1, "seen on the 9th", answers={check.id: "included"})
+    unaccepted = outcome(lambda: scene.store.correct(check.id, 1, "9th", **redate))
+    scene.store.correct(check.id, 1, "9th", accept_reordering=True, **redate)
+    gap = observation_gaps(scene.store.book, cash.id, scene.store.tz)[0]
+    return {
+        "unanswered": unanswered,
+        "unaccepted": unaccepted,
+        "recorded_and_remaining": [gap.recorded, gap.remaining],
+        "explained_by": list(gap.explained_by),
+        "balance": scene.amount(cash),
+    }
+
+
+def _restore_needs_reason() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    expense = scene.record("expense", cash, "100.00", 2)
+    scene.store.remove(expense.id, 1, "typo")
+    return {"blank": outcome(lambda: scene.store.restore(expense.id, 2, "  "))}
+
+
+def _contradicting_answers() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    later = scene.observe(cash, "1000.00", 15)
+    scene.now = local(20)
+    pending = scene.act("expense", cash, "200.00", 5)
+    scene.store.resolve(pending.id, answers={later.id: "not_included"})
+    expense = scene.confirm(pending)
+    before = scene.amount(cash)
+    earlier = scene.observation(cash, "800.00", 10)
+    blocked = outcome(lambda: scene.confirm(earlier))
+    scene.store.correct(expense.id, 1, "the bank had it", answers={later.id: "included"})
+    confirmed = outcome(lambda: scene.confirm(earlier))
+    flip_back = outcome(
+        lambda: scene.store.correct(
+            expense.id, 2, "not by the 15th", answers={later.id: "not_included"}
+        )
+    )
+    return {
+        "balance_before": before,
+        "earlier_check_contradicts_answer": blocked,
+        "after_correcting_the_answer": confirmed,
+        "answer_contradicts_earlier_check": flip_back,
+        "anchor_answers": outcome(
+            lambda: scene.store.correct(
+                later.id, 1, "x", answers={expense.id: "included"}
+            )
+        ),
+        "balance_after": scene.amount(cash),
+        "gaps": scene.gaps(cash),
     }
 
 

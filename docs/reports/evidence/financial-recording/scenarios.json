@@ -363,6 +363,26 @@
       "check_to_other_account": "InvalidInput:anchor_account_immutable",
       "own_answer_flip": "ok"
     },
+    "contradicting_answers_stop_for_review": {
+      "after_correcting_the_answer": "ok",
+      "anchor_answers": "InvalidInput:answers_not_applicable",
+      "answer_contradicts_earlier_check": "ReviewRequired:inclusion_conflict",
+      "balance_after": 100000,
+      "balance_before": 80000,
+      "earlier_check_contradicts_answer": "ReviewRequired:inclusion_conflict",
+      "gaps": [
+        [
+          0,
+          0,
+          "unexplained"
+        ],
+        [
+          0,
+          20000,
+          "unexplained"
+        ]
+      ]
+    },
     "custom_category_blocks_a_move": {
       "move": "ReviewRequired:account_has_links"
     },
@@ -385,6 +405,16 @@
     "purchase_edits_recheck_refunds": {
       "later_date": "ReviewRequired:refund_before_purchase",
       "other_category": "ReviewRequired:refund_category_mismatch"
+    },
+    "redated_check_restamps_its_contents": {
+      "balance": 90000,
+      "explained_by": [],
+      "recorded_and_remaining": [
+        0,
+        0
+      ],
+      "unaccepted": "ReviewRequired:inclusion_changed",
+      "unanswered": "ReviewRequired:inclusion_unanswered"
     },
     "redating_a_check": {
       "balance": 900000,
@@ -434,6 +464,9 @@
           "unexplained"
         ]
       ]
+    },
+    "restore_needs_a_reason": {
+      "blank": "InvalidInput:reason_required"
     },
     "restoring_activity_the_check_never_saw": {
       "balance": 950000,

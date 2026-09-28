@@ -187,4 +187,21 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "balance_after_flip": 600_000,
             "answers_on_a_check_restore": "InvalidInput:answers_not_applicable",
         },
+        "contradicting_answers_stop_for_review": {
+            "balance_before": 80_000,
+            "earlier_check_contradicts_answer": "ReviewRequired:inclusion_conflict",
+            "after_correcting_the_answer": "ok",
+            "answer_contradicts_earlier_check": "ReviewRequired:inclusion_conflict",
+            "anchor_answers": "InvalidInput:answers_not_applicable",
+            "balance_after": 100_000,
+            "gaps": [[0, 0, "unexplained"], [0, 20_000, "unexplained"]],
+        },
+        "redated_check_restamps_its_contents": {
+            "unanswered": "ReviewRequired:inclusion_unanswered",
+            "unaccepted": "ReviewRequired:inclusion_changed",
+            "recorded_and_remaining": [0, 0],
+            "explained_by": [],
+            "balance": 90_000,
+        },
+        "restore_needs_a_reason": {"blank": "InvalidInput:reason_required"},
     }

@@ -43,7 +43,6 @@ from tests.financial_recording.derive import (
     legs,
     live_records,
     observation_gaps,
-    unanswered,
 )
 from tests.financial_recording.money import InvalidInput, exponent, parse_minor
 from tests.financial_recording.review import (
@@ -51,6 +50,7 @@ from tests.financial_recording.review import (
     ReviewRequired,
     blocking,
     duplicates,
+    inclusion_issues,
     issue,
     notices,
     parse_date,
@@ -432,6 +432,8 @@ class Store:
         for name, parser in TEXT_FIELDS.items():
             if isinstance(changes.get(name), str):
                 changes[name] = parser(changes[name])
+        if answers and not isinstance(record.body, Activity):
+            raise InvalidInput("answers_not_applicable", record_id)
         if answers:
             changes["answers"] = _merged_answers(record.body.answers, answers)
         body = replace(record.body, **changes)
@@ -442,7 +444,7 @@ class Store:
         found = blocking(validate(self.book, body, self.tz, record_id))
         left = accounts_of(record.body) - accounts_of(body)
         trial = with_trial(self.book, body, record_id, self.tz)
-        found.extend(_open_questions(trial, left, self.tz))
+        found.extend(inclusion_issues(trial, left, self.tz))
         found.extend(self._linked_refund_issues(record_id, body))
         only_answers = set(changes) == {"answers"}
         if not found and not accept_reordering and not only_answers:
@@ -468,7 +470,7 @@ class Store:
                 record_id: replace(record, revisions=(*record.revisions, tombstone)),
             },
         )
-        questions = _open_questions(after, accounts_of(record.body), self.tz)
+        questions = inclusion_issues(after, accounts_of(record.body), self.tz)
         if questions:
             raise ReviewRequired(questions)
         return self._revise(record, record.body, reason, removed=True)
@@ -487,6 +489,8 @@ class Store:
             raise StaleVersion(record_id)
         if not record.removed:
             raise InvalidInput("record_not_removed", record_id)
+        if not reason.strip():
+            raise InvalidInput("reason_required", record_id)
         body = record.body
         if answers and not isinstance(body, Activity):
             raise InvalidInput("answers_not_applicable", record_id)
@@ -639,7 +643,10 @@ class Store:
             previous.body.amount,
             previous.body.as_of,
         ):
-            revised = self._stamped(self.book, revised)
+            reconfirmed = replace(revised.revisions[-1], contained=None)
+            revised = self._stamped(
+                self.book, replace(revised, revisions=(*record.revisions, reconfirmed))
+            )
         touched = accounts_of(record.body) | accounts_of(body)
         self._swap(
             accounts={**self.book.accounts, **_bumped(self.book.accounts, touched)},
@@ -721,14 +728,3 @@ def _bumped(accounts: Mapping[str, Account], touched: set[str]) -> dict[str, Acc
         )
         for account_id in touched
     }
-
-
-def _open_questions(book: Book, account_ids: set[str], tz: ZoneInfo) -> list[Issue]:
-    found = []
-    for account_id in sorted(account_ids):
-        ordered = anchors(book, account_id)
-        for move in activities(book, account_id):
-            anchor_id = unanswered(move, ordered, tz)
-            if anchor_id is not None:
-                found.append(issue("inclusion_unanswered", anchor_id, move.id))
-    return found

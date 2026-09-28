@@ -38,6 +38,7 @@ from tests.financial_recording.derive import (
     anchors,
     balance,
     contained_at_confirmation,
+    contradicted,
     fulfills,
     legs,
     live_records,
@@ -138,7 +139,7 @@ def validate(
     if isinstance(body, Activity):
         found.extend(_activity_issues(book, body, record_id))
     trial = with_trial(book, body, record_id, tz, provenance)
-    found.extend(_inclusion_issues(trial, body, record_id or TRIAL_ID, tz))
+    found.extend(inclusion_issues(trial, accounts_of(body), tz))
     return found
 
 
@@ -329,16 +330,20 @@ def _expectation_issues(
     return [issue("expectation_already_fulfilled", *taken)] if taken else []
 
 
-def _inclusion_issues(
-    trial: Book, body: Body, record_id: str, tz: ZoneInfo
-) -> list[Issue]:
+def inclusion_issues(book: Book, account_ids: set[str], tz: ZoneInfo) -> list[Issue]:
+    """Every open or contradictory inclusion answer on the given accounts."""
     found = []
-    for account_id in sorted(accounts_of(body)):
-        ordered = anchors(trial, account_id)
-        for record in activities(trial, account_id):
+    for account_id in sorted(account_ids):
+        ordered = anchors(book, account_id)
+        for record in activities(book, account_id):
             anchor_id = unanswered(record, ordered, tz)
             if anchor_id is not None:
                 found.append(issue("inclusion_unanswered", anchor_id, record.id))
+                continue
+            found.extend(
+                issue("inclusion_conflict", conflict, record.id)
+                for conflict in contradicted(record, ordered, tz)
+            )
     return found
 
 

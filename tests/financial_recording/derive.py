@@ -295,6 +295,18 @@ def unanswered(record: Record, ordered: list[Record], tz: ZoneInfo) -> Optional[
     return None
 
 
+def contradicted(record: Record, ordered: list[Record], tz: ZoneInfo) -> list[str]:
+    """Later anchors the person said did not include an activity an earlier
+    anchor already contains. Both facts cannot hold, so neither may win silently."""
+    answers = dict(record.body.answers)
+    first = landing(record, ordered, tz)
+    return [
+        anchor.id
+        for anchor in ordered[first + 1 :]
+        if answers.get(anchor.id) == NOT_INCLUDED
+    ]
+
+
 def live_records(book: Book) -> list[Record]:
     return [record for record in book.records.values() if not record.removed]
 
