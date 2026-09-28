@@ -70,7 +70,7 @@ The executable connector lifecycle experiment was removed on 2026-09-28 at the f
 
 ## Repository evidence
 
-The selected-file proof follows the lane text, the recording decision response, and the balance reconciliation handoff in pull request 727 at `a1c294319`, read on 2026-09-28. With pull request 724's model at `720aad3fd`, statement rows dated the day before a confirmed balance check confirmed without review. At every later head through `d081bfcdf` they wait for the person's answer, and the proof now asserts that behavior as a regression case. At `802b82306`, two of the three documents changed only to settle guest access. Lane 4, the handoff, and the cited recording questions are unchanged.
+The selected-file proof follows the lane text, the [recording decision response](../../specs/lanes/financial-recording-decision-response.md), and the [balance reconciliation handoff](../../specs/argus-account-balance-reconciliation-handoff.md) that pull request 727 published. They were first read at `a1c294319` on 2026-09-28. Pull request 727 has since merged into `codex/private-alpha-next` as `3fa0dd921`, and in the merged documents lane 4, the handoff, and the cited recording questions are identical to that first reading. With pull request 724's model at `720aad3fd`, statement rows dated the day before a confirmed balance check confirmed without review. At every later head checked they wait for the person's answer, and the proof now asserts that behavior as a regression case.
 
 The integration map's 34 code links resolve at `f0a90763b`. Their cited line ranges are unchanged at `3b9313f3d`. Pull request 721 changed only the log-privacy test among the cited files, and the map's sentence about it was updated.
 

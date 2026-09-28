@@ -1,6 +1,6 @@
 # Selected-file import proof
 
-This proof answers lane 4 of the [mobile baseline reconciliation contract](https://github.com/lagarcess/argus/blob/a1c294319a2c047623b9bbe5bedd36155d2e931d/docs/specs/lanes/mobile-baseline-reconciliation-contract.md) in pull request 727. It shows what a person can import by choosing a file, what happens to every other file, and what must exist before a production import lane starts. Everything in it is synthetic. No inbox, bank, real statement, credential, provider, or production system was touched.
+This proof answers lane 4 of the [mobile baseline reconciliation contract](../../../specs/lanes/mobile-baseline-reconciliation-contract.md), which pull request 727 published and which is now on `codex/private-alpha-next`. It shows what a person can import by choosing a file, what happens to every other file, and what must exist before a production import lane starts. Everything in it is synthetic. No inbox, bank, real statement, credential, provider, or production system was touched.
 
 It reuses two things and adds nothing to either:
 
@@ -22,7 +22,7 @@ Blocked means a case needs the recording model and could not run. It is not a pa
 
 ## Reconciliation with pull request 724
 
-This proof first ran against pull request 724 at `720aad3fd`. There, statement rows dated the day before a confirmed balance check confirmed without review. The [recording decision response](https://github.com/lagarcess/argus/blob/a1c294319a2c047623b9bbe5bedd36155d2e931d/docs/specs/lanes/financial-recording-decision-response.md) in pull request 727 settles question 3 the other way, and the [reconciliation handoff](https://github.com/lagarcess/argus/blob/a1c294319a2c047623b9bbe5bedd36155d2e931d/docs/specs/argus-account-balance-reconciliation-handoff.md) says document import must hand off to account review. The proof recorded this as an expected failure.
+This proof first ran against pull request 724 at `720aad3fd`. There, statement rows dated the day before a confirmed balance check confirmed without review. The [recording decision response](../../../specs/lanes/financial-recording-decision-response.md) in pull request 727 settles question 3 the other way, and the [reconciliation handoff](../../../specs/argus-account-balance-reconciliation-handoff.md) says document import must hand off to account review. The proof recorded this as an expected failure.
 
 The lane named the revised model at `0df86aa8c`, which asks about activity dated on or before a confirmed check, unless the check contained it when confirmed or it came from the same document. The proof reproduced the scenario against it, and all four rows are asked about the check. The expected-failure case is now a regression assertion, `earlier_day_rows_behind_a_balance_check`. It passes only when each row names the check it waits on, nothing confirms the rows before the person answers, a direct confirmation of the unanswered rows is refused and writes nothing, and the answer reaches the check. After the answer, the check still shows its DOP 1,000.00 difference from confirmation time, and DOP 25.50 remains, which is 2,000.00 less 1,974.50. The case fails if the importer answers for the person or the model stops asking. Two of the breakages do exactly that.
 
@@ -182,7 +182,7 @@ The matrix covers each item the lane names:
 | --- | --- | --- |
 | Ingestion kit, pull request 709 | Merged | Nothing. Fixtures and parsers are in place. |
 | Recording contract, [pull request 724](https://github.com/lagarcess/argus/pull/724) | Proposed, not approved. Last checked at `d081bfcdf`, with a read-only check at `e2a9ad6b8` that also passed. | Every case that needs the model, which reports blocked without it, and the one reconciliation against the accepted contract |
-| Recording decisions and reconciliation handoff, [pull request 727](https://github.com/lagarcess/argus/pull/727) | Open at `f0a64ffb9`. Lane 4, the reconciliation handoff, and questions 3, 4, 7, 8, and 9 are unchanged since `a1c294319`. Its later edits settle guest access and update other lanes' status, which this proof does not touch. | Questions 3, 4, 7, 8, and 9, the balance-date rule, and the document-import handoff |
+| Recording decisions and reconciliation handoff, [pull request 727](https://github.com/lagarcess/argus/pull/727) | Merged into `codex/private-alpha-next` as `3fa0dd921`. In the merged documents, lane 4, the reconciliation handoff, and questions 3, 4, 7, 8, and 9 are identical to the version this proof first cited, `a1c294319`. | Questions 3, 4, 7, 8, and 9, the balance-date rule, and the document-import handoff |
 | Household permission contract | Absent | Who may see imported records and source files |
 | Retention of source files | Unresolved | Whether a file outlives its review |
 | Password entry | Unresolved | A recovery path easier than an unlocked copy |
