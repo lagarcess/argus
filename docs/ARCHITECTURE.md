@@ -601,6 +601,22 @@ backtest run, a job, an evidence artifact or a strategy. The only paid read is
 a refresh of cited inputs the user starts, which goes through the research
 allowance and the cost ledger like a turn.
 
+### Registered in-process calculations
+
+`get_calculation_declarations()` in
+`src/argus/domain/calculations/__init__.py` is the only catalog of free
+calculations. Do not restate that inventory here: names, count, and modules
+belong to that owner. Each registered calculation is local, never confirmed,
+and recomputes in process through its own compute function. CI derives the
+live set from the same owner (for example
+`tests/test_calculation_kernels.py` parametrizes over
+`get_calculation_declarations()`), so a new registration cannot leave a
+hand-maintained doc table behind.
+
+Open product work that is not yet registered in that catalog, including
+candidates under PR #634, is out of scope for this architecture summary until
+it lands in `get_calculation_declarations()`.
+
 Recovery preserves the current question's ownership. When interpreter candidates
 fail, focused strategy repair requires a typed strategy read from that same turn;
 an outage, a ticker, or a pending test cannot supply that intent. An unread turn
@@ -819,10 +835,12 @@ Semantic retrieval (Vector embeddings) is deferred from Alpha.
 
 P2 continuity comes from owner-scoped `Idea`, `IdeaVersion`,
 `EvidenceArtifact`, `DecisionNote`, conversation, and run records in Supabase.
-That structured recall is not memory. A future `MemoryRecord`
-or equivalent cross-conversation preference layer remains post-PMF and requires
-earned opt-in plus inspect/edit/delete/reset/disable/"why was this used?"
-controls before activation.
+That structured recall is not memory. Current production availability for
+personalization memory (flag, role gate, semantic recall) and its approved
+transition are owned by
+[PRODUCT.md Current production availability and planned changes](PRODUCT.md#current-production-availability-and-planned-changes).
+Other docs link there rather than restate rollout state. Memory must not be
+required for the idea/evidence/comparison loop.
 
 # 15. Deletion / Archival Model
 

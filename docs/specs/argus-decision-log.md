@@ -10,6 +10,8 @@ supersession rules. These decisions do not assert implementation completion.
 
 | Date | Decision | Locked by |
 | --- | --- | --- |
+| 2026-09-14 | Sharing is shareable by default; refuse only what is private. The privacy boundary is owner selection of turns, an exact preview, and no Argus ids or account enrichment. Earlier refusals for memory use, degraded answers, missing sources, unlisted URLs, credential-shape and value-marker scanning, and length caps were removed in [#632](https://github.com/lagarcess/argus/pull/632) (commit `6054acba`, merge `c8e05b4f`). That reversed the 2026-09-09 filter built in [#574](https://github.com/lagarcess/argus/pull/574) after [#604](https://github.com/lagarcess/argus/issues/604), whose promotion walk found zero selectable answers. A Codex P1 review comment on #632 asking to restore value-marker scanning was declined because it would re-block public company names and URLs. See [conversation-sharing.md](conversation-sharing.md). | Lucas |
+| 2026-09-14 | Receiver fork: a person who opens a shared `/r/<id>` link and sends a follow-up gets the frozen shared turns copied into their own new chat. The copy carries no owner note, memory, or profile. Decision commit `675c1f94` reversed the earlier no-fork stance. Built in [#643](https://github.com/lagarcess/argus/pull/643), merged at `0044d79a` on 2026-09-15. See [conversation-sharing.md](conversation-sharing.md). | Lucas |
 | 2026-09-24 | The first user is people living in the Dominican Republic, not the diaspora. | Lucas |
 | 2026-09-24 | Argus keeps all its existing grounded chat and calculation capability. The pivot adds features around it so Argus isn't just an AI chat, building toward an ecosystem. | Lucas |
 | 2026-09-26 | Approve one connected minimum viable ecosystem carrying forward existing Argus capabilities. The earlier one-product-versus-two question is resolved for this experience. Detailed owner: [MVEE sections 1–3 and 7](argus-minimum-viable-ecosystem-experience.md). | Lucas |
@@ -25,6 +27,18 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-27 | Lock distinct account setup, new activity and balance-check actions; require an explicit discrepancy review and traceable adjustment without invented income/spending. Reuse the existing destructive confirmation for removal. Experience owner: [MVEE balance checks](argus-minimum-viable-ecosystem-experience.md#account-activity-and-balance-checks); technical follow-up: [backend handoff](argus-account-balance-reconciliation-handoff.md). | Lucas |
 | 2026-09-27 | Lock simplified populated Home, bounded account previews, and inherited Recents/Omnisearch growing-list behavior. Preserve currency-separated net worth; combined conversion remains undefined. Owners: [MVEE Home summary](argus-minimum-viable-ecosystem-experience.md#populated-home-summary-and-list-boundary) and [DESIGN growing lists](../../.agent/designs/argus/DESIGN.md#growing-lists-across-ecosystem-surfaces). | Lucas |
 | 2026-09-27 | Lock copy-link household invitations, user-shared WhatsApp links, do-blitz as the short-link integration direction, and Resend email delivery; no incentives. Detailed owner: [MVEE invitation delivery](argus-minimum-viable-ecosystem-experience.md#invitation-delivery-founder-locked-september-27-2026). Contact discovery and implementation contracts are not implied. | Lucas |
+| 2026-09-28 | After foundations land, the Project delivery lead and the VM serial captain jointly own create/reopen/edit financial-account journey coordination across iPhone, Android, and web. Named surface owners (account-backend / iPhone / Android / web / chart) keep exclusive write; exclusive write on #723/#725/#726/#724 is preserved. Owner: [documentation authority — current implementation batch](../DOCUMENTATION_AUTHORITY.md#current-implementation-batch-september-28-2026). Source: [PR #727 handoff](https://github.com/lagarcess/argus/pull/727#issuecomment-5878051744). | Lucas |
+| 2026-09-28 | Park revenue, pricing, paywalls, billing integrations, and user trials while core journeys become functional; keep existing usage and cost safeguards. Owner: [documentation authority — founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral). | Lucas |
+| 2026-09-28 | Hold [#725](https://github.com/lagarcess/argus/pull/725) landing for a narrowed research / selected-file-import scope; the hold does not block account creation, native auth, or client wiring. Owner: [documentation authority — #725 hold](../DOCUMENTATION_AUTHORITY.md#current-implementation-batch-september-28-2026). | Lucas |
+
+## Wave 1 package-era constraints (not current locks)
+
+These are dated shipping assumptions from the Wave 1 package. They do not
+override later MVEE or PRODUCT owners.
+
+| Date | Constraint | Note |
+| --- | --- | --- |
+| 2026-09-25 | Three-step setup checklist: get a first answer; save a card or create a goal (sign-in at that step); then turn on reminders. | Wave 1 package-era onboarding sketch. [MVEE](argus-minimum-viable-ecosystem-experience.md) leaves account onboarding and exact guest-to-account conversion undecided; [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes) owns current availability. Do not invent conversion timing from this row. |
 
 ## Open (not locked)
 
