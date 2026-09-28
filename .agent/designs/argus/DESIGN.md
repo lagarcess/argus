@@ -19,12 +19,16 @@ the muted palette below. The implemented shared colors are owned by
 failure treatments have their own shared owners listed below. Do not introduce
 bright alternate values or assume every reference color has a global CSS token.
 
-Argus uses pill-shaped action buttons. Primary and secondary action buttons use 9999px radius — primary dark (`#191c1f`), secondary light (`#f4f4f4`), outlined (`transparent + 2px solid`), and ghost on dark (`rgba(244,244,244,0.1) + 2px solid`). The padding is generous (14px 32px–34px), creating large, confident touch targets. Combined with Inter for body text at various weights and positive letter-spacing (0.16px–0.24px), the result is a design that feels both premium and accessible — banking for the modern era.
+Argus pairs pill-shaped actions with quiet text and icon navigation. The
+[Buttons section](#buttons) owns their distinct visual sizing; the
+[mobile hit-area baseline](#17-mobile--web-behavior) applies to both. A compact
+visible control must still be easy to tap. Inter body text and restrained
+letter-spacing support a calm, readable financial experience.
 
 **Key Characteristics:**
 - Space Grotesk weight 500; 136px is a large marketing-hero example, not a mobile default
 - Near-black (`#191c1f`) + white, with restrained semantic color
-- Pill action buttons (9999px radius) with generous padding (14px 32px); quiet text controls for navigation
+- Pill action buttons and quiet navigation controls, sized by the [component styles](#buttons)
 - Inter for body text with positive letter-spacing (0.16px–0.24px)
 - Muted financial, informational, attention, and failure treatments
 - Flat content surfaces with depth through contrast; glass mobile navigation follows the MVEE
@@ -109,6 +113,15 @@ theme still require design; this reconciliation does not define those contracts.
 ## 4. Component Stylings
 
 ### Buttons
+
+The pill variants below specify primary and secondary actions. Their padding
+does not apply to quiet navigation, disclosure controls, or icon-only controls.
+Preserve those controls' compact visible text or icon, without adding a pill
+background or the action variants' horizontal padding. Extend the invisible hit
+area as needed to meet the [mobile target baseline](#17-mobile--web-behavior),
+without overlapping adjacent targets. Keep accessible names, visible focus and
+selected/expanded states appropriate to the control. Visual size and tap area
+are separate requirements.
 
 **Primary Dark Pill**
 - Background: `#191c1f`
@@ -222,14 +235,13 @@ The MVEE owns the pivot navigation and header behavior; retain the following as 
 ### Do
 - Use Space Grotesk weight 500 for all display headings
 - Follow the [component button styles](#buttons); preserve each surface's quiet text and icon navigation controls.
-- Use generous button padding (14px 32px)
 - Keep the palette to near-black + white for marketing surfaces
 - Apply positive letter-spacing on Inter body text
 
 ### Don't
 - Keep content surfaces flat; the approved mobile navigation may use a glass material and appropriate elevation.
 - Don't use bold (700) for Space Grotesk headings — 500 is the weight
-- Don't use small buttons — the generous padding is intentional
+- Don't confuse compact visible controls with small hit areas; follow the [mobile target baseline](#17-mobile--web-behavior).
 - Don't apply semantic colors to marketing surfaces — they're for the product
 
 ## 8. Responsive Behavior
