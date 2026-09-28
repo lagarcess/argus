@@ -31,7 +31,7 @@ targets. Chart marks here use arrays and `ForEach`; no conditional ChartContent.
 
 ## Behavior
 
-Actual solid indigo and projected dashed teal series have independent contiguous
+Actual solid and projected dashed series have independent contiguous
 segment IDs. Explicit nulls split paths and remain selectable. Points make isolated
 samples visible. Lines are linear; values/contributions come only from JSON.
 Dates use a Gregorian UTC civil-date parser and formatter; numbers use en-US or
@@ -82,3 +82,29 @@ Clock includes injected touch duration and test automation, not just renderer ti
 There is no physical-device FPS claim or regression baseline.
 
 Evidence and measured performance: `docs/reports/evidence/chart-validation/ios/`.
+
+
+## Visual prototype acceptance
+
+The chart is the primary surface; scenario/language/appearance and UTC/unit
+provenance sit in a labeled Chart lab below it. Flat neutral backgrounds,
+Space Grotesk Medium headings, Inter body/readout text, capsule point-navigation
+controls with a 44pt minimum, and sparse horizontal grid lines derive from
+DESIGN.md and the approved #727 reference. Licensed native font bytes and OFL
+licenses are copied unchanged from read-only #729 at
+`b422d986bcf068b56e07283481de373ba8e30dc0`; no dependency on its shell is created.
+
+The chart directly packages `../fixtures/visual-style.json` as its one series
+palette owner. Actual/projected describe observation kind, not gains or losses.
+Light-theme stroke contrast against white is 3.78:1 actual / 3.66:1 projected;
+dark-theme contrast against #191c1f is 6.11:1 / 6.32:1. Small legend/readout text
+uses neutral ink, not muted stroke colors. Solid/dashed paths and distinct point
+shapes preserve non-color meaning.
+
+A fixed-height primary amount slot and monospaced digits keep the readout stable.
+Dynamic Type scales bundled fonts; navigation buttons stack at accessibility
+sizes. The focused enlarged-text test checks readout/chart relative geometry and
+44pt touch targets. There are no custom tweening, flashing, smoothing or implicit
+chart animations; selection follows touch directly, so there is no app-owned
+animation to disable under Reduce Motion. Native control transitions remain OS
+owned. These checks do not claim all text sizes, all devices or physical readiness.

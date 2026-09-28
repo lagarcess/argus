@@ -49,7 +49,7 @@ xcrun simctl ui "$chart_device" appearance light
 python3 - "$chart_evidence" <<'PY'
 import hashlib, json, pathlib, subprocess, sys
 files = sorted(p for p in pathlib.Path('prototypes/chart-validation/ios').rglob('*') if p.is_file() and 'xcuserdata' not in str(p))
-files += [pathlib.Path('prototypes/chart-validation/fixtures/series.json')]
+files += [pathlib.Path('prototypes/chart-validation/fixtures') / name for name in ('series.json', 'visual-style.json')]
 content = {'head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(), 'files': {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}}
 (pathlib.Path(sys.argv[1]) / 'source-identity.json').write_text(json.dumps(content, indent=2) + '\n')
 PY

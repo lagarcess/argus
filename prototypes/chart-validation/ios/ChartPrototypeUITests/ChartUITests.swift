@@ -2,9 +2,10 @@ import XCTest
 
 final class ChartUITests: XCTestCase {
     override func setUpWithError() throws { continueAfterFailure = false }
-    func launch(_ scenario: String = "stress", locale: String = "en", theme: String = "light", cancelDrag: Bool = false) -> XCUIApplication {
+    func launch(_ scenario: String = "stress", locale: String = "en", theme: String = "light", cancelDrag: Bool = false, largeText: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchEnvironment = ["CHART_CASE": scenario, "CHART_LOCALE": locale, "CHART_THEME": theme, "CHART_CANCEL_DRAG": cancelDrag ? "1" : "0"]
+        if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"] }
         app.launch()
         XCTAssertTrue(app.staticTexts["selectedDate"].waitForExistence(timeout: 15))
         return app
@@ -37,6 +38,8 @@ final class ChartUITests: XCTestCase {
         app.switches["locale"].tap()
         XCTAssertTrue(app.staticTexts["projectedValue"].label.contains("Proyectada"))
         app.buttons["Oscuro"].tap()
+        app.swipeDown(velocity: .fast)
+        app.swipeDown(velocity: .fast)
         capture("dark-es-endpoint")
     }
     func testHorizontalReleaseAndVerticalScroll() {
@@ -72,9 +75,44 @@ final class ChartUITests: XCTestCase {
         let app = launch()
         app.buttons["next"].tap()
         app.buttons["scenario"].tap()
-        app.buttons["empty"].tap()
+        app.buttons["scenario-option-empty"].tap()
         XCTAssertEqual(app.staticTexts["selectedDate"].label, "Select a date")
         XCTAssertFalse(app.buttons["next"].isEnabled)
+    }
+    func testScenarioPickerUsesLocalizedFixtureTitles() throws {
+        let url = Bundle(for: Self.self).url(forResource: "series", withExtension: "json")!
+        let fixtures = try JSONDecoder().decode(FixtureBundle.self, from: Data(contentsOf: url))
+        let target = fixtures.cases.first { $0.id == "recurring-contributions" }!
+        let app = launch(locale: "es-419")
+        app.buttons["scenario"].tap()
+        let option = app.buttons["scenario-option-" + target.id]
+        XCTAssertEqual(option.label, target.title["es-419"])
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label == %@", target.id)).firstMatch.exists)
+        option.tap()
+        XCTAssertTrue(app.buttons["scenario"].label.contains(target.title["es-419"]!))
+        app.switches["locale"].tap()
+        app.buttons["scenario"].tap()
+        XCTAssertEqual(app.buttons["scenario-option-" + target.id].label, target.title["en"])
+        app.buttons["scenario-option-" + target.id].tap()
+        app.swipeDown(velocity: .fast)
+        app.swipeDown(velocity: .fast)
+        capture("localized-scenario")
+    }
+    func testEnlargedTextReadoutAndTouchTargets() {
+        let app = launch(locale: "es-419", largeText: true)
+        let chart = app.otherElements["financialChart"]
+        let date = app.staticTexts["selectedDate"]
+        let relativeY = chart.frame.minY - date.frame.minY
+        app.buttons["next"].tap()
+        XCTAssertEqual(chart.frame.minY - date.frame.minY, relativeY, accuracy: 2)
+        for id in ["previous", "next", "reset"] {
+            XCTAssertGreaterThanOrEqual(app.buttons[id].frame.height, 44)
+        }
+        let value = app.staticTexts["actualValue"]
+        XCTAssertLessThanOrEqual(value.frame.maxX, app.frame.maxX)
+        app.swipeDown(velocity: .fast)
+        app.swipeDown(velocity: .fast)
+        capture("enlarged-text-es")
     }
     func testEmptySingleAndContribution() {
         let empty = launch("empty")

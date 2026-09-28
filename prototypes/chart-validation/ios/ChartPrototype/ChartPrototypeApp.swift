@@ -3,6 +3,7 @@ import Charts
 
 @main
 struct ChartPrototypeApp: App {
+    init() { ChartStyle.registerFonts() }
     var body: some Scene { WindowGroup { PrototypeView() } }
 }
 
@@ -28,75 +29,112 @@ struct ChartPage: View {
     @State private var theme = ProcessInfo.processInfo.environment["CHART_THEME"] ?? "system"
     @State private var selection = Selection()
     @Environment(\.scenePhase) private var phase
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .title) private var amountHeight = 40
     private var scenario: Scenario { scenarios.first { $0.id == scenarioID } ?? scenarios[0] }
     private var presentation: Presentation { Presentation(spanish: spanish) }
     private var selected: Sample? { selection.index.flatMap { scenario.points.indices.contains($0) ? scenario.points[$0] : nil } }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Argus · Chart Lab").font(.title2.weight(.medium))
-                Text(presentation.text("Synthetic data · rendering prototype", "Datos sintéticos · prototipo visual"))
-                    .font(.subheadline).foregroundStyle(.secondary)
-                controls
-                VStack(alignment: .leading, spacing: 16) {
-                    Text(scenario.title[spanish ? "es-419" : "en"] ?? scenario.id).font(.headline)
-                    Text("\(scenario.currency) · UTC · \(presentation.text("major units", "unidades mayores"))").font(.caption)
-                    FinancialChart(scenario: scenario, selection: $selection, presentation: presentation, data: plots[scenario.id]!)
-                        .equatable().frame(height: 240)
-                        .accessibilityIdentifier("financialChart")
-                    HStack {
-                        Label(presentation.text("Actual (solid)", "Real (continua)"), systemImage: "line.diagonal").foregroundStyle(.indigo)
-                        Label(presentation.text("Projected (dashed)", "Proyectada (discontinua)"), systemImage: "ellipsis").foregroundStyle(.teal)
-                    }.font(.caption)
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(presentation.text("Explore the picture", "Explora el panorama")).font(ChartStyle.display())
+                    Text(presentation.text("Synthetic data · chart prototype", "Datos sintéticos · prototipo de gráfico"))
+                        .font(ChartStyle.body(13, relativeTo: .caption)).foregroundStyle(ChartStyle.secondary)
+                }
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(scenario.title[spanish ? "es-419" : "en"] ?? scenario.id)
+                        .font(ChartStyle.display(20, relativeTo: .headline))
                     readout
-                    HStack {
+                    FinancialChart(scenario: scenario, selection: $selection, presentation: presentation, data: plots[scenario.id]!)
+                        .equatable().frame(height: 220)
+                        .accessibilityIdentifier("financialChart")
+                    HStack(spacing: 20) {
+                        legend(presentation.text("Actual", "Real"), color: ChartStyle.actual, dashed: false)
+                        legend(presentation.text("Projected", "Proyectada"), color: ChartStyle.projected, dashed: true)
+                    }
+                    buttonLayout {
                         Button(presentation.text("Previous", "Anterior")) { selection.step(-1, count: scenario.points.count) }
                             .accessibilityIdentifier("previous").disabled(scenario.points.isEmpty)
                         Button(presentation.text("Next", "Siguiente")) { selection.step(1, count: scenario.points.count) }
                             .accessibilityIdentifier("next").disabled(scenario.points.isEmpty)
                         Button(presentation.text("Reset", "Restablecer")) { selection.reset() }
                             .accessibilityIdentifier("reset")
-                    }.buttonStyle(.bordered).controlSize(.regular)
-                    Text(presentation.text("Drag sideways to inspect. Swipe up to scroll. Release keeps selection.", "Arrastra de lado para explorar. Desliza arriba para desplazar. Al soltar se conserva la selección."))
-                        .font(.caption).foregroundStyle(.secondary)
-                }.padding(16).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-                Text(presentation.text("About these examples", "Acerca de estos ejemplos")).font(.headline)
-                Text(presentation.text("Every amount comes from the shared synthetic fixture. Dashed lines are authored projections, not forecasts. Missing samples remain missing; no line connects across a missing interval.", "Cada importe proviene del conjunto sintético compartido. Las líneas discontinuas son proyecciones de ejemplo, no pronósticos. Los datos faltantes siguen faltando; ninguna línea conecta a través de esos intervalos."))
-                Text(presentation.text("Contributions are dated facts, not returns. USD and DOP stay separate. Dates are civil days shown in UTC.", "Los aportes son datos fechados, no rendimientos. USD y DOP permanecen separados. Las fechas son días civiles mostrados en UTC."))
-                Text(presentation.text("End of scroll proof", "Fin de prueba de desplazamiento"))
-                    .accessibilityIdentifier("scrollEnd").padding(.top, 160)
-            }.padding(20)
+                    }.buttonStyle(ChartPillStyle())
+                    Text(presentation.text("Drag sideways to explore, or use the buttons. Swipe up to scroll.", "Arrastra de lado para explorar o usa los botones. Desliza arriba para desplazar."))
+                        .font(ChartStyle.body(13, relativeTo: .caption)).foregroundStyle(ChartStyle.secondary)
+                }
+                Divider().overlay(ChartStyle.grid)
+                VStack(alignment: .leading, spacing: 16) {
+                    Text(presentation.text("Chart lab", "Laboratorio de gráficos")).font(ChartStyle.display(20, relativeTo: .headline))
+                    Text(presentation.text("Change the sample, language and appearance below.", "Cambia el ejemplo, el idioma y la apariencia aquí."))
+                        .font(ChartStyle.body(14, relativeTo: .subheadline)).foregroundStyle(ChartStyle.secondary)
+                    controls
+                    Text("\(scenario.currency) · UTC · \(presentation.text("major currency units", "unidades monetarias mayores"))")
+                        .font(ChartStyle.body(13, relativeTo: .caption)).foregroundStyle(ChartStyle.secondary)
+                    Text(presentation.text("Every amount comes from the shared synthetic fixture. Dashed lines are authored projections, not forecasts. Missing samples remain missing; no line connects across a missing interval.", "Cada importe proviene del conjunto sintético compartido. Las líneas discontinuas son proyecciones de ejemplo, no pronósticos. Los datos faltantes siguen faltando; ninguna línea conecta a través de esos intervalos."))
+                    Text(presentation.text("Contributions are dated facts, not returns. USD and DOP stay separate. Dates are civil days shown in UTC.", "Los aportes son datos fechados, no rendimientos. USD y DOP permanecen separados. Las fechas son días civiles mostrados en UTC."))
+                    Text(presentation.text("End of scroll proof", "Fin de prueba de desplazamiento"))
+                        .font(ChartStyle.body(13, relativeTo: .caption)).foregroundStyle(ChartStyle.secondary)
+                        .accessibilityIdentifier("scrollEnd")
+                }.font(ChartStyle.body(14, relativeTo: .subheadline))
+            }.padding(24)
         }
+        .font(ChartStyle.body()).foregroundStyle(ChartStyle.ink)
+        .background(ChartStyle.background).tint(ChartStyle.ink)
         .environment(\.locale, presentation.locale)
         .preferredColorScheme(theme == "system" ? nil : (theme == "dark" ? .dark : .light))
         .onChange(of: scenarioID) { _, _ in selection.reset() }
         .onChange(of: phase) { _, value in if value != .active { selection.cancel() } }
     }
+    private var buttonLayout: AnyLayout {
+        typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+    }
+    private func legend(_ label: String, color: Color, dashed: Bool) -> some View {
+        HStack(spacing: 6) {
+            Path { path in path.move(to: .zero); path.addLine(to: CGPoint(x: 24, y: 0)) }
+                .stroke(color, style: StrokeStyle(lineWidth: 2.5, dash: dashed ? [5, 3] : []))
+                .frame(width: 24, height: 2)
+            Text(label).font(ChartStyle.body(13, relativeTo: .caption))
+        }.accessibilityElement(children: .combine)
+    }
     private var controls: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 16) {
             Picker(presentation.text("Scenario", "Escenario"), selection: $scenarioID) {
-                ForEach(scenarios) { scenario in Text(scenario.id).tag(scenario.id) }
-            }.accessibilityIdentifier("scenario")
+                ForEach(scenarios) { scenario in
+                    Text(scenario.title[spanish ? "es-419" : "en"] ?? scenario.id)
+                        .tag(scenario.id).accessibilityIdentifier("scenario-option-" + scenario.id)
+                }
+            }.accessibilityIdentifier("scenario").frame(minHeight: 44)
             Toggle("Español (Latinoamérica)", isOn: $spanish).accessibilityIdentifier("locale")
             Picker(presentation.text("Appearance", "Apariencia"), selection: $theme) {
                 Text(presentation.text("System", "Sistema")).tag("system")
                 Text(presentation.text("Light", "Claro")).tag("light")
                 Text(presentation.text("Dark", "Oscuro")).tag("dark")
-            }.pickerStyle(.segmented).accessibilityIdentifier("theme")
+            }.pickerStyle(.segmented).accessibilityIdentifier("theme").frame(minHeight: 44)
         }
     }
     private var readout: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(selected.map { presentation.date($0.date) } ?? presentation.text("Select a date", "Elige una fecha"))
-                .font(.headline).accessibilityIdentifier("selectedDate")
-            Text("\(presentation.text("Actual", "Real")): \(presentation.amount(selected?.actual, currency: scenario.currency))")
+                .font(ChartStyle.body(14, relativeTo: .subheadline)).foregroundStyle(ChartStyle.secondary)
+                .accessibilityIdentifier("selectedDate")
+            Text(presentation.amount(selected?.actual, currency: scenario.currency))
+                .font(ChartStyle.display(30, relativeTo: .title)).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.65).frame(height: amountHeight, alignment: .leading)
+                .accessibilityLabel("\(presentation.text("Actual", "Real")): \(presentation.amount(selected?.actual, currency: scenario.currency))")
                 .accessibilityIdentifier("actualValue")
+            HStack {
+                Text(presentation.text("Actual", "Real")).foregroundStyle(ChartStyle.secondary)
+                Spacer()
+            }.font(ChartStyle.body(13, relativeTo: .caption))
             Text("\(presentation.text("Projected", "Proyectada")): \(presentation.amount(selected?.projected, currency: scenario.currency))")
                 .accessibilityIdentifier("projectedValue")
             Text("\(presentation.text("Contribution", "Aporte")): \(presentation.amount(selected?.contribution, currency: scenario.currency))")
                 .accessibilityIdentifier("contributionValue")
-        }.font(.subheadline.monospacedDigit()).frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        }.font(ChartStyle.body(14, relativeTo: .subheadline).monospacedDigit())
+            .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
     }
 }
 
@@ -112,29 +150,33 @@ struct FinancialChart: View, Equatable {
         Chart {
             ForEach(data.actual) { point in
                 LineMark(x: .value("Date", point.date), y: .value("Actual", point.value), series: .value("Segment", point.segment))
-                    .interpolationMethod(.linear).foregroundStyle(.indigo).lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.linear).foregroundStyle(ChartStyle.actual).lineStyle(StrokeStyle(lineWidth: 2.5))
             }
             ForEach(data.projected) { point in
                 LineMark(x: .value("Date", point.date), y: .value("Projected", point.value), series: .value("Segment", point.segment))
-                    .interpolationMethod(.linear).foregroundStyle(.teal).lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .interpolationMethod(.linear).foregroundStyle(ChartStyle.projected).lineStyle(StrokeStyle(lineWidth: 2.5, dash: [6, 4]))
             }
             ForEach(data.actual) { point in
                 PointMark(x: .value("Date", point.date), y: .value("Actual", point.value))
-                    .foregroundStyle(.indigo).symbolSize(data.actual.count > 100 ? 2 : 16)
+                    .foregroundStyle(ChartStyle.actual).symbolSize(data.actual.count > 100 ? 2 : 16)
             }
             ForEach(data.projected) { point in
                 PointMark(x: .value("Date", point.date), y: .value("Projected", point.value))
-                    .foregroundStyle(.teal).symbol(.diamond).symbolSize(data.projected.count > 100 ? 2 : 20)
+                    .foregroundStyle(ChartStyle.projected).symbol(.diamond).symbolSize(data.projected.count > 100 ? 2 : 20)
             }
         }
         .chartXScale(domain: data.domain)
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 3)) { value in
-                AxisGridLine()
-                AxisValueLabel { if let date = value.as(Date.self) { Text(presentation.date(date, compact: true)).font(.caption2) } }
+                AxisValueLabel { if let date = value.as(Date.self) { Text(presentation.date(date, compact: true)).font(ChartStyle.body(11, relativeTo: .caption2)) } }
             }
         }
-        .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) }
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) {
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5)).foregroundStyle(ChartStyle.grid)
+                AxisValueLabel().font(ChartStyle.body(11, relativeTo: .caption2))
+            }
+        }
         .chartXAxis(scenario.points.isEmpty ? .hidden : .automatic)
         .chartYAxis(scenario.points.isEmpty ? .hidden : .automatic)
         .chartOverlay { proxy in
