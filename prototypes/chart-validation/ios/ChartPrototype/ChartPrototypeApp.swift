@@ -146,6 +146,7 @@ struct FinancialChart: View, Equatable {
     @Binding var selection: Selection
     let presentation: Presentation
     let data: PlotData
+    @ScaledMetric(relativeTo: .caption2) private var axisEdgePadding = 18
     var body: some View {
         Chart {
             ForEach(data.actual) { point in
@@ -166,9 +167,15 @@ struct FinancialChart: View, Equatable {
             }
         }
         .chartXScale(domain: data.domain)
+        .chartXScale(range: .plotDimension(padding: axisEdgePadding))
         .chartXAxis {
             AxisMarks(values: .automatic(desiredCount: 3)) { value in
-                AxisValueLabel { if let date = value.as(Date.self) { Text(presentation.date(date, compact: true)).font(ChartStyle.body(11, relativeTo: .caption2)) } }
+                AxisValueLabel(collisionResolution: .greedy) {
+                    if let date = value.as(Date.self) {
+                        Text(presentation.date(date, compact: true))
+                            .font(ChartStyle.body(11, relativeTo: .caption2)).fixedSize()
+                    }
+                }
             }
         }
         .chartYAxis {
