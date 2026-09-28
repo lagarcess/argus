@@ -221,7 +221,10 @@ class FoundationTest {
     }
 
     private fun screenshot(name: String) {
+        // Let the native press ripple settle before retaining visual evidence.
+        compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
+        device.waitForIdle()
         val output = File(context.getExternalFilesDir("evidence"), "${device.displayWidth}x${device.displayHeight}")
         assertTrue("Could not create evidence directory", output.isDirectory || output.mkdirs())
         assertTrue("Screenshot failed: $name", device.takeScreenshot(File(output, "$name.png")))

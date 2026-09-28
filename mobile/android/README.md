@@ -21,7 +21,10 @@ mobile/android/scripts/verify.sh
 
 # With a booted emulator; ANDROID_SERIAL selects one device when several run.
 cd mobile/android
-ANDROID_SERIAL=emulator-5580 ./gradlew :app:connectedDebugAndroidTest
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
+ANDROID_SERIAL=emulator-5580 scripts/device-test.sh /tmp/argus-android-evidence
+# Or use :app:connectedDebugAndroidTest for Gradle reports; AGP uninstalls
+# the app afterward, removing app-scoped screenshots. The script retains them.
 "$ANDROID_HOME/platform-tools/adb" -s emulator-5580 install -r app/build/outputs/apk/debug/app-debug.apk
 "$ANDROID_HOME/platform-tools/adb" -s emulator-5580 shell am start -n ai.argus.foundation.sample/ai.argus.foundation.MainActivity
 ```
