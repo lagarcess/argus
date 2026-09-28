@@ -1,1 +1,1 @@
-PLACEHOLDER
+@file:/tmp/695-ledger.md
