@@ -9,11 +9,13 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 from html import unescape
-from threading import Event
+from threading import Barrier, Event
 from typing import Any
 from unittest.mock import patch
 from uuid import uuid4
 
+import httpx
+import jwt
 import psycopg
 import pytest
 from argus.agent_runtime.stages.confirm import _coverage_preflight
@@ -731,6 +733,7 @@ def test_cleanup_deletes_real_anonymous_auth_user_through_admin() -> None:
                         (aggregate_id,),
                     )
 
+
 def test_signup_taken_username_creates_no_auth_user_or_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1311,3 +1314,54 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
         if source_user_id:
             with suppress(Exception):
                 gateway.delete_auth_user(source_user_id)
+
+
+def test_concurrent_logins_keep_identities_and_leave_refresh_to_the_client() -> None:
+    gateway = _gateway()
+    suffix = secrets.token_hex(6)
+    password = f"Isolation-{secrets.token_urlsafe(18)}"
+    user_ids: dict[str, str] = {}
+    try:
+        for index in range(6):
+            email = f"session-isolation-{index}-{suffix}@example.test"
+            created = gateway.client.auth.admin.create_user(
+                {"email": email, "password": password, "email_confirm": True}
+            )
+            user_ids[email] = created.user.id
+
+        def login(email: str) -> dict[str, Any]:
+            return gateway.login(
+                email=email, password=password, captcha_token="local-captcha-proof"
+            )
+
+        earlier = login(next(iter(user_ids)))
+        start = Barrier(len(user_ids))
+
+        def concurrent_login(email: str) -> tuple[str, dict[str, Any]]:
+            start.wait(timeout=10)
+            return email, login(email)
+
+        with ThreadPoolExecutor(max_workers=len(user_ids)) as pool:
+            results = dict(pool.map(concurrent_login, user_ids))
+
+        subjects = {
+            email: jwt.decode(
+                result["session"]["access_token"], options={"verify_signature": False}
+            )["sub"]
+            for email, result in results.items()
+        }
+        assert subjects == user_ids
+
+        refreshed = httpx.post(
+            f"{LOCAL_URL}/auth/v1/token",
+            params={"grant_type": "refresh_token"},
+            json={"refresh_token": earlier["session"]["refresh_token"]},
+            headers={"apikey": LOCAL_ANON_KEY},
+            timeout=30,
+        )
+        assert refreshed.status_code == 200
+        assert refreshed.json()["user"]["id"] == user_ids[next(iter(user_ids))]
+    finally:
+        for user_id in user_ids.values():
+            with suppress(Exception):
+                gateway.client.auth.admin.delete_user(user_id)

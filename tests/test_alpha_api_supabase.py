@@ -205,14 +205,16 @@ def test_gateway_auth_flows_use_separate_auth_client():
     signup_response = MagicMock()
     signup_response.user = object()
     signup_response.model_dump.return_value = {"user": {"id": "auth-user"}}
-    auth_client.auth.sign_up.return_value = signup_response
+    auth_client.sign_up.return_value = signup_response
 
     login_response = MagicMock()
     login_response.session = object()
     login_response.model_dump.return_value = {"session": {"access_token": "token"}}
-    auth_client.auth.sign_in_with_password.return_value = login_response
+    auth_client.sign_in_with_password.return_value = login_response
 
-    gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
+    gateway = SupabaseGateway(
+        client=service_client, auth_client_factory=lambda: auth_client
+    )
 
     assert gateway.signup(
         email="alpha@example.com",
@@ -229,7 +231,7 @@ def test_gateway_auth_flows_use_separate_auth_client():
         "session": {"access_token": "token"}
     }
 
-    auth_client.auth.sign_up.assert_called_once_with(
+    auth_client.sign_up.assert_called_once_with(
         {
             "email": "alpha@example.com",
             "password": "password",
@@ -243,7 +245,7 @@ def test_gateway_auth_flows_use_separate_auth_client():
             },
         }
     )
-    auth_client.auth.sign_in_with_password.assert_called_once_with(
+    auth_client.sign_in_with_password.assert_called_once_with(
         {
             "email": "alpha@example.com",
             "password": "password",
@@ -260,8 +262,10 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
     signup_response = MagicMock()
     signup_response.user = object()
     signup_response.model_dump.return_value = {"user": {"id": "auth-user"}}
-    auth_client.auth.sign_up.return_value = signup_response
-    gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
+    auth_client.sign_up.return_value = signup_response
+    gateway = SupabaseGateway(
+        client=service_client, auth_client_factory=lambda: auth_client
+    )
 
     gateway.signup(
         email="alpha@example.com",
@@ -270,7 +274,7 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
         language="es-419",
     )
 
-    auth_client.auth.sign_up.assert_called_once_with(
+    auth_client.sign_up.assert_called_once_with(
         {
             "email": "alpha@example.com",
             "password": "password",
