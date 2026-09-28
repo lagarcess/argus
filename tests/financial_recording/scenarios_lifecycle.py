@@ -246,6 +246,10 @@ def edits_that_move_money_need_review() -> dict:
         "stale_duplicate_resolve_is_refused": _stale_duplicate_resolve(),
         "future_anchors_are_refused": _future_anchors_are_refused(),
         "type_edits_preserve_linked_asset_rules": _type_edits_preserve_links(),
+        "liability_anchors_use_owner_sign": _liability_anchor_sign(),
+        "moving_activity_across_accounts_needs_reordering": _move_across_accounts(),
+        "occurred_on_and_at_must_agree": _occurred_on_at_agree(),
+        "value_estimate_only_on_estimated_assets": _value_estimate_restricted(),
     }
 
 
@@ -333,6 +337,78 @@ def _type_edits_preserve_links() -> dict:
         "asset_to_debt_while_linked": asset_to_debt,
         "link_still_set": scene.store.book.accounts[loan.id].linked_asset_id == car.id,
     }
+
+
+def _liability_anchor_sign() -> dict:
+    scene = Scene()
+    card = scene.account("Tarjeta", "credit_card", "DOP", "2000.00")
+    opening_id = anchors(scene.store.book, card.id)[0].id
+    scene.store.correct(opening_id, 1, "was 2500 owed", amount="2500.00")
+    after_correct = scene.amount(card)
+    scene.observe(card, "2200.00", 5)
+    return {
+        "opening_after_correction": after_correct,
+        "after_check": scene.amount(card),
+        "still_owed": scene.amount(card) < 0,
+    }
+
+
+def _move_across_accounts() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+    savings = scene.account("Ahorros", "savings", "DOP", "5000.00")
+    expense = scene.record("expense", checking, "500.00", 3)
+    check = scene.observe(savings, "5000.00", 5)
+    scene.now = local(6)
+    blocked = outcome(
+        lambda: scene.store.correct(
+            expense.id,
+            1,
+            "paid from savings",
+            account_id=savings.id,
+            answers={check.id: "included"},
+        )
+    )
+    scene.store.correct(
+        expense.id,
+        1,
+        "paid from savings",
+        account_id=savings.id,
+        answers={check.id: "included"},
+        accept_reordering=True,
+    )
+    return {
+        "unaccepted_move": blocked,
+        "balances": [scene.amount(checking), scene.amount(savings)],
+        "savings_gaps": scene.gaps(savings),
+    }
+
+
+def _occurred_on_at_agree() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    draft = scene.draft(
+        kind="expense",
+        account_id=cash.id,
+        amount="50.00",
+        occurred_on=local(10).date().isoformat(),
+        occurred_at=local(3, 12).isoformat(),
+    )
+    return {
+        "issues": scene.issues(draft),
+        "confirm": outcome(lambda: scene.confirm(draft)),
+    }
+
+
+def _value_estimate_restricted() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "1000.00")
+    car = scene.account("Carro", "vehicle", "DOP", "100000.00")
+    on_checking = scene.issues(
+        scene.observation(checking, "900.00", 5, basis="value_estimate")
+    )
+    on_car = outcome(lambda: scene.observe(car, "90000.00", 5, basis="value_estimate"))
+    return {"on_checking": on_checking, "on_vehicle": on_car}
 
 
 def _redated_check_restamps() -> dict:

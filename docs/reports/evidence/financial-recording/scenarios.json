@@ -391,6 +391,25 @@
       "future_opening": "InvalidInput:date_in_future",
       "future_opening_correction": "ReviewRequired:date_in_future"
     },
+    "liability_anchors_use_owner_sign": {
+      "after_check": -220000,
+      "opening_after_correction": -250000,
+      "still_owed": true
+    },
+    "moving_activity_across_accounts_needs_reordering": {
+      "balances": [
+        1000000,
+        500000
+      ],
+      "savings_gaps": [
+        [
+          0,
+          50000,
+          "unexplained"
+        ]
+      ],
+      "unaccepted_move": "ReviewRequired:inclusion_changed"
+    },
     "note_only_correction_keeps_evidence": {
       "after": [
         [
@@ -406,6 +425,12 @@
           "unexplained"
         ]
       ]
+    },
+    "occurred_on_and_at_must_agree": {
+      "confirm": "ReviewRequired:date_mismatch",
+      "issues": {
+        "date_mismatch": "blocking"
+      }
     },
     "purchase_edits_recheck_refunds": {
       "later_date": "ReviewRequired:refund_before_purchase",
@@ -493,6 +518,12 @@
       "asset_to_debt_while_linked": "InvalidInput:linked_asset_invalid",
       "debt_to_asset_keeps_link": "InvalidInput:linked_asset_invalid",
       "link_still_set": true
+    },
+    "value_estimate_only_on_estimated_assets": {
+      "on_checking": {
+        "basis_not_applicable": "blocking"
+      },
+      "on_vehicle": "ok"
     }
   },
   "equal_amount_not_a_match": {

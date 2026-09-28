@@ -14,12 +14,14 @@ from zoneinfo import ZoneInfo
 
 from tests.financial_recording.catalog import (
     COUNTER_NATURE,
+    ESTIMATED_TYPES,
     KIND_FAMILY,
     LEG_SIGNS,
     LIQUID_TYPES,
     NATURE,
     NOTE_MAX,
     REFUNDABLE_TYPES,
+    signed_to_owner,
 )
 from tests.financial_recording.derive import (
     GAP_LABEL,
@@ -115,6 +117,10 @@ def parse_fields(
     if kind == "balance_observation":
         values["as_of"] = _parsed(found, parse_instant, text["as_of"])
         values["basis"] = _parsed(found, _choice, text["basis"], GAP_LABEL)
+        if values["amount"] is not None:
+            values["amount"] = signed_to_owner(values["amount"], account.type)
+        if values["basis"] == "value_estimate" and account.type not in ESTIMATED_TYPES:
+            found.append(issue("basis_not_applicable", account.type))
         return (None if found else Observation(**values)), tuple(found)
     values.update(
         kind=kind,
@@ -155,7 +161,15 @@ def validate(
         and is_future_anchor(body.as_of, now)
     ):
         found.append(issue("date_in_future"))
+    if isinstance(body, Observation) and body.basis == "value_estimate":
+        account = book.accounts[body.account_id]
+        if account.type not in ESTIMATED_TYPES:
+            found.append(issue("basis_not_applicable", account.type))
     if isinstance(body, Activity):
+        if body.occurred_at is not None:
+            local_day = body.occurred_at.astimezone(tz).date()
+            if body.occurred_on != local_day:
+                found.append(issue("date_mismatch"))
         found.extend(_activity_issues(book, body, record_id))
     trial = with_trial(book, body, record_id, tz, provenance)
     found.extend(inclusion_issues(trial, accounts_of(body), tz))

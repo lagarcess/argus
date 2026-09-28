@@ -38,6 +38,15 @@ ESTIMATED_TYPES = frozenset({"property", "vehicle", "other_asset"})
 LIQUID_TYPES = frozenset({"cash", "checking", "savings"})
 REFUNDABLE_TYPES = frozenset({"cash", "checking", "savings", "credit_card"})
 
+
+def signed_to_owner(typed_minor: int, account_type: str) -> int:
+    """Project a typed amount owed/held into the owner-signed balance.
+
+    The person types a debt as a positive amount owed; the server flips once.
+    """
+    return -typed_minor if NATURE[account_type] == "liability" else typed_minor
+
+
 LEG_SIGNS: Mapping[str, tuple[int, Optional[int]]] = {
     "expense": (-1, None),
     "income": (1, None),

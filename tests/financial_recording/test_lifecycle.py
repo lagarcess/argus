@@ -219,4 +219,22 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "asset_to_debt_while_linked": "InvalidInput:linked_asset_invalid",
             "link_still_set": True,
         },
+        "liability_anchors_use_owner_sign": {
+            "opening_after_correction": -250_000,
+            "after_check": -220_000,
+            "still_owed": True,
+        },
+        "moving_activity_across_accounts_needs_reordering": {
+            "unaccepted_move": "ReviewRequired:inclusion_changed",
+            "balances": [1_000_000, 500_000],
+            "savings_gaps": [[0, 50_000, "unexplained"]],
+        },
+        "occurred_on_and_at_must_agree": {
+            "issues": {"date_mismatch": "blocking"},
+            "confirm": "ReviewRequired:date_mismatch",
+        },
+        "value_estimate_only_on_estimated_assets": {
+            "on_checking": {"basis_not_applicable": "blocking"},
+            "on_vehicle": "ok",
+        },
     }

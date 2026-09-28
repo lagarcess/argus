@@ -21,6 +21,7 @@ from tests.financial_recording.catalog import (
     NICKNAME_MAX,
     PERSONAL_SPACE,
     Category,
+    signed_to_owner,
 )
 from tests.financial_recording.derive import (
     DEFAULT_TZ,
@@ -206,9 +207,8 @@ class Store:
         if entered is not None and entered.strip():
             stamp = as_of or now
             ensure_anchor_not_future(stamp, now)
-            amount = parse_minor(entered, currency)
-            signed = -amount if NATURE[type] == "liability" else amount
-            opening = Opening(account.id, signed, stamp)
+            amount = signed_to_owner(parse_minor(entered, currency), type)
+            opening = Opening(account.id, amount, stamp)
             record = self._new_record(opening, Provenance("manual", now), records)
             records[record.id] = record
         self._swap(
@@ -442,7 +442,11 @@ class Store:
         record = self._current(record_id, expected_revision, reason)
         currency = self.book.accounts[record.body.account_id].currency
         if "amount" in changes:
-            changes["amount"] = parse_minor(changes["amount"], currency)
+            typed = parse_minor(changes["amount"], currency)
+            if isinstance(record.body, (Opening, Observation)):
+                account = self.book.accounts[record.body.account_id]
+                typed = signed_to_owner(typed, account.type)
+            changes["amount"] = typed
         for name, parser in TEXT_FIELDS.items():
             if isinstance(changes.get(name), str):
                 changes[name] = parser(changes[name])
@@ -545,18 +549,32 @@ class Store:
         return found
 
     def _placement_changes(self, record: Record, body: Body) -> list[Issue]:
+        """Any activity whose landing relative to an account's anchors changes.
+
+        Includes activity that leaves one account or enters another, so a
+        same-currency move cannot silently rewrite a destination check.
+        """
         after = with_trial(self.book, body, record.id, self.tz)
-        moved = []
+        moved = set()
         for account_id in sorted(accounts_of(record.body) | accounts_of(body)):
             before_anchors = anchors(self.book, account_id)
             after_anchors = anchors(after, account_id)
-            before = {move.id: move for move in activities(self.book, account_id)}
-            for move in activities(after, account_id):
-                if move.id in before and landed_at(
-                    before[move.id], before_anchors, self.tz
-                ) != landed_at(move, after_anchors, self.tz):
-                    moved.append(move.id)
-        return [issue("inclusion_changed", *sorted(set(moved)))] if moved else []
+            before = {item.id: item for item in activities(self.book, account_id)}
+            later = {item.id: item for item in activities(after, account_id)}
+            for move_id in set(before) | set(later):
+                before_land = (
+                    landed_at(before[move_id], before_anchors, self.tz)
+                    if move_id in before
+                    else None
+                )
+                after_land = (
+                    landed_at(later[move_id], after_anchors, self.tz)
+                    if move_id in later
+                    else None
+                )
+                if before_land != after_land:
+                    moved.add(move_id)
+        return [issue("inclusion_changed", *sorted(moved))] if moved else []
 
     def _stamped(self, book: Book, record: Record) -> Record:
         """Stores what a balance check showed when confirmed: its contents,
