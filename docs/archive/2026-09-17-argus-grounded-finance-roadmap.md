@@ -2,8 +2,9 @@
 
 Status: **ARCHIVED 2026-09-18.** Opened 2026-09-05; every item shipped to production `a9286b21` on 2026-09-17, with sharing on. The active board is [`docs/specs/argus-answers-that-stay-true-roadmap.md`](../specs/argus-answers-that-stay-true-roadmap.md), which carries this board's open ends.
 
-Supersedes [`argus-active-roadmap.md`](argus-active-roadmap.md), whose landed
-work and secondary tracker state remain valid history. Read
+Supersedes
+[`2026-09-05-argus-active-roadmap.md`](2026-09-05-argus-active-roadmap.md),
+whose landed work and secondary tracker state remain valid history. Read
 [`docs/PRODUCT.md`](../PRODUCT.md) first; nothing here changes its locked scope
 or its audience.
 
@@ -925,13 +926,14 @@ send does not distribute, and the receipt is a retrofit across every card once
 they exist.
 
 **Decided 2026-09-09, and written into
-[`conversation-sharing.md`](conversation-sharing.md) section 4.5.** This
-extends the sharing feature that exists; a parallel conversation-sharing system
-has been built wrong. A link glyph sits in the chat header beside the existing
-`MoreVertical`, never inside it, and opens per-turn selection. **The selection
-screen is the work no competitor has done for us:** they offer "select all"
-because every turn is shareable and ours are not, so an ineligible turn renders
-unselectable with a reason the owner can read, and "select all" means all
+[`conversation-sharing.md`](../specs/conversation-sharing.md) section 4.5.**
+This extends the sharing feature that exists; a parallel conversation-sharing
+system has been built wrong. A link glyph sits in the chat header beside the
+existing `MoreVertical`, never inside it, and opens per-turn selection. **The
+selection screen is the work no competitor has done for us:** they offer
+"select all" because every turn is shareable and ours are not, so an
+ineligible turn renders unselectable with a reason the owner can read, and
+"select all" means all
 eligible. The header is the only entry point: no message pill, overflow share
 item or visible result-card share control remains. A single answer is one ticked
 turn in that same selection screen, using the existing creation logic and record.
@@ -1982,7 +1984,8 @@ Resolved:
 ## Carried forward from the previous board
 
 - Landed work and the secondary tracker state in
-  [`argus-active-roadmap.md`](argus-active-roadmap.md) remain valid history.
+  [`2026-09-05-argus-active-roadmap.md`](2026-09-05-argus-active-roadmap.md)
+  remain valid history.
 - **Mobile shipped**, 2026-08-08, and is not a gate. It becomes a verification
   dependency of sharing.
 - **Sharing is built and dark**, and is promoted from retrieval on that board to
