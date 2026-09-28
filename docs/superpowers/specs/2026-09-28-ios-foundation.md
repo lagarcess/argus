@@ -12,6 +12,10 @@ implement the entire ecosystem.
 - Experience reference: [PR #727](https://github.com/lagarcess/argus/pull/727),
   open/non-draft and under review when inspected, exact commit
   `a1c294319a2c047623b9bbe5bedd36155d2e931d`.
+- Review-follow-up reference: `d7faac770369242436a5e108bb557ba0bae893d3`.
+  Inspected during implementation: its only delta removes the contradictory
+  universal-pill instruction. The frozen archive and locked interactions are
+  unchanged; quiet navigation controls already follow that archive.
 - Frozen archive: `mobile-2026-09-28`, SHA-256
   `c55e565aa142e38eec61b570510af1c4c2cb9629c24f3ce2d01387639f0ea0e6`.
   Its HTML, CSS and images are experience references; its JavaScript financial
