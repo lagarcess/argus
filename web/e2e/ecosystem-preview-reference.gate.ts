@@ -65,9 +65,10 @@ async function guardNetwork(page: Page, origin: string, audit: Audit, fixture: b
   await page.context().routeWebSocket("**/*", (socket) => {
     const url = new URL(socket.url());
     const localHmr = url.host === new URL(origin).host && url.pathname.startsWith("/_next/");
-    audit.requests.push({ method: "WEBSOCKET", url: socket.url(), disposition: "blocked-before-connect" });
-    if (!localHmr) audit.violations.push(`Unexpected websocket: ${socket.url()}`);
-    socket.close({ code: 1000, reason: "Reference capture forbids websocket traffic" });
+    audit.requests.push({ method: "WEBSOCKET", url: socket.url(), disposition: localHmr ? "local-development-hmr" : "blocked-before-connect" });
+    if (localHmr) return void socket.connectToServer();
+    audit.violations.push(`Unexpected websocket: ${socket.url()}`);
+    socket.close({ code: 1000, reason: "Reference capture forbids application websocket traffic" });
   });
   // This final boundary handles every request the fixture does not fulfill.
   await page.context().route("**/*", async (route) => {
@@ -128,7 +129,7 @@ async function runCell(page: Page, testInfo: TestInfo, name: string, origin: str
     const evidence = { name, ...identity, source, origin, captures, audit,
       environment: { browser: page.context().browser()?.version(), node: process.version, platform: os.platform(), release: os.release(),
         viewport: page.viewportSize(), deviceScaleFactor: 1, timezone: "America/Santo_Domingo", locale: "en-US",
-        appearance: "light", reducedMotion: "reduce", serviceWorkers: "blocked", websockets: "blocked", retries: 0 },
+        appearance: "light", reducedMotion: "reduce", serviceWorkers: "blocked", websockets: "only same-origin Next development HMR", retries: 0 },
       limitations: ["Local source reference, not hosted-deployment verification or founder visual approval.",
         "Registered identity and financial/chat readouts are local fixtures; no real authorization, model turn, write or provider call is exercised.",
         "Only named rendered source owners are byte-verified; the pinned full web Git tree is recorded for context.",
