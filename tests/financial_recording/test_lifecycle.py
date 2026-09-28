@@ -342,4 +342,8 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "balance_stable_across_reader_tz": True,
             "historic_balance": 100_000,
         },
+        "expectation_direction_is_canonical": {
+            "bogus_direction": "InvalidInput:direction_unsupported",
+            "accepted": True,
+        },
     }

@@ -458,6 +458,10 @@
       "distinct_without_match": "InvalidInput:distinct_not_applicable",
       "matches_the_other_expense": true
     },
+    "expectation_direction_is_canonical": {
+      "accepted": true,
+      "bogus_direction": "InvalidInput:direction_unsupported"
+    },
     "external_id_bound_to_confirm_account": {
       "bound_account": "acct-1",
       "confirm": "ReviewRequired:already_recorded",

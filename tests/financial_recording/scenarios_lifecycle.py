@@ -280,6 +280,7 @@ def edits_that_move_money_need_review() -> dict:
         "future_activity_is_refused": _future_activity_is_refused(),
         "activity_zone_survives_reader_tz_change": _activity_zone_stable(),
         "activity_zone_honors_historical_as_of": _activity_zone_honors_as_of(),
+        "expectation_direction_is_canonical": _expectation_direction_canonical(),
     }
 
 
@@ -888,6 +889,20 @@ def _activity_zone_honors_as_of() -> dict:
     return {
         "balance_stable_across_reader_tz": in_stored == in_utc,
         "historic_balance": in_stored,
+    }
+
+
+def _expectation_direction_canonical() -> dict:
+    """Plan expectations only accept the closed in/out direction table."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    refused = outcome(
+        lambda: scene.store.expect(cash.id, "sideways", "100.00", local(10).date())
+    )
+    ok = scene.store.expect(cash.id, "out", "100.00", local(10).date())
+    return {
+        "bogus_direction": refused,
+        "accepted": ok in scene.store.book.expectations,
     }
 
 

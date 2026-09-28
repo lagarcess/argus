@@ -26,6 +26,7 @@ from tests.financial_recording.catalog import (
 )
 from tests.financial_recording.derive import (
     DEFAULT_TZ,
+    FULFILLING_KINDS,
     Account,
     Activity,
     Answers,
@@ -298,6 +299,8 @@ class Store:
         return renamed
 
     def expect(self, account_id: str, direction: str, amount: str, due_on: date) -> str:
+        if direction not in FULFILLING_KINDS:
+            raise InvalidInput("direction_unsupported", direction)
         account = self.book.accounts[account_id]
         expectation = Expectation(
             self._id("exp"),
