@@ -5,7 +5,7 @@ This proof answers lane 4 of the [mobile baseline reconciliation contract](https
 It reuses two things and adds nothing to either:
 
 - The [synthetic ingestion kit](../../../../tests/synthetic_ingestion/) from pull request 709, merged into `codex/private-alpha-next`. It supplies the fixtures and the parsers.
-- The recording contract's reference model from [pull request 724](https://github.com/lagarcess/argus/pull/724), at head `d081bfcdf5c7c2bee767d873f232752432098c39`. It supplies the draft, review, and confirm boundary. The proof writes only through the model's `create_account`, `draft`, `edit_draft`, `resolve`, `reject`, `preview`, and `confirm_batch`. It reads the model's stored drafts and records, and it computes totals and balance differences only through the model's `derive` module. It has no rules of its own about money, duplicates, or balance checks. It reports the issues the model raises.
+- The recording contract's reference model from [pull request 724](https://github.com/lagarcess/argus/pull/724), last checked at head `d081bfcdf5c7c2bee767d873f232752432098c39`, which is not an accepted contract. It supplies the draft, review, and confirm boundary. The proof writes only through the model's `create_account`, `draft`, `edit_draft`, `resolve`, `reject`, `preview`, and `confirm_batch`. It reads the model's stored drafts and records, and it computes totals and balance differences only through the model's `derive` module. It has no rules of its own about money, duplicates, or balance checks. It reports the issues the model raises.
 
 The evidence behind the wider bank report is listed in the [evidence index](../evidence-index.md).
 
@@ -17,18 +17,18 @@ Blocked means a case needs the recording model and could not run. It is not a pa
 
 - The committed [report with pull request 724](proof-report.json) and [report without it](proof-report-without-724.json) are those runs. A second run of each writes the same bytes.
 - The first report records the model's head as given to the runner, a digest of every Python file in that package (`88baa7c4...3f3c8`), and a digest of the ingestion kit (`48c40767...9925c`), so a reader can tell which versions it proves.
-- Each deliberate breakage in [`mutation_check.py`](mutation_check.py) makes its target cases fail. The breakages ignore encryption, refuse every encrypted PDF, keep duplicate rows, answer balance-check questions for the person, stop the model from asking them, cancel without discarding drafts, cancel without deleting the file, keep the file after a completed review, track open reviews only in memory, skip clearing an interrupted review's file at start, store a file under its original name, and hold a refused file.
+- Each deliberate breakage in [`mutation_check.py`](mutation_check.py) makes its target cases fail. The breakages ignore encryption, refuse every encrypted PDF, treat a PDF reader failure as a password or let it stop the import, keep duplicate rows, answer balance-check questions for the person, stop the model from asking them, cancel without discarding drafts, cancel without deleting the file, keep the file after a completed review, track open reviews only in memory, skip clearing an interrupted review's file at start, store a file under its original name, and hold a refused file.
 - A case that raises an error is recorded as failed, with the error in the report, instead of stopping the run.
 
-## Refresh against the revised recording model
+## Reconciliation with pull request 724
 
 This proof first ran against pull request 724 at `720aad3fd`. There, statement rows dated the day before a confirmed balance check confirmed without review. The [recording decision response](https://github.com/lagarcess/argus/blob/a1c294319a2c047623b9bbe5bedd36155d2e931d/docs/specs/lanes/financial-recording-decision-response.md) in pull request 727 settles question 3 the other way, and the [reconciliation handoff](https://github.com/lagarcess/argus/blob/a1c294319a2c047623b9bbe5bedd36155d2e931d/docs/specs/argus-account-balance-reconciliation-handoff.md) says document import must hand off to account review. The proof recorded this as an expected failure.
 
 The lane named the revised model at `0df86aa8c`, which asks about activity dated on or before a confirmed check, unless the check contained it when confirmed or it came from the same document. The proof reproduced the scenario against it, and all four rows are asked about the check. The expected-failure case is now a regression assertion, `earlier_day_rows_behind_a_balance_check`. It passes only when each row names the check it waits on, nothing confirms the rows before the person answers, a direct confirmation of the unanswered rows is refused and writes nothing, and the answer reaches the check. After the answer, the check still shows its DOP 1,000.00 difference from confirmation time, and DOP 25.50 remains, which is 2,000.00 less 1,974.50. The case fails if the importer answers for the person or the model stops asking. Two of the breakages do exactly that.
 
-Pull request 724 kept moving during the refresh, through `8cdfc6a09`, `71f6d27b3`, `2c9ae114b`, `6f8fc4421`, and `d081bfcdf`. Along the way it began refusing contradictory answers, asking for the draft revision the person reviewed before a row is marked distinct or a duplicate and before a balance-check answer, reading accepted currencies from the repository's `src/argus/domain/home_country.py`, refusing a balance dated after the import day, and confirming a balance check only against the difference its preview showed. The proof uses what it needs through the same integration boundary, so the importer now confirms a statement's rows before its closing balance. Every case observed the same values on every head. The committed report pins `d081bfcdf`.
+Pull request 724's technical contract is proposed, not approved, and it kept moving during review. The proof was adapted to each head only at its integration boundary, and every case observed the same values at each head it was checked against. The committed report was produced at `d081bfcdf`, the last head checked during review, which is not an accepted contract. A read-only check at `e2a9ad6b8`, the head when this delivery's scope was reduced, also passed every case with the same observations and was not committed. Once pull request 724 is accepted, rerun the proof once against the accepted head with the [steps below](#rerun) and commit that report. No intermediate head is pinned before then.
 
-The refresh changed only the proof's integration boundary:
+The adaptations changed only the proof's integration boundary:
 
 - Accounts are created with the model's new signature and carry the model's own space. The proof no longer keeps its own map of accounts to spaces. It reads membership through `derive.space_scope`.
 - Balance-check questions are read from the model's `inclusion_unanswered` issue, which replaced `observation_order_unknown`.
@@ -36,8 +36,9 @@ The refresh changed only the proof's integration boundary:
 - The model digest covers every Python file in the package, because the model now spans more modules.
 - Marking a row distinct or a duplicate, or answering a balance-check question, passes the draft revision from the preview the person reviewed.
 - The proof's clock is October 1, after the synthetic statement closes on September 30. At September 28 the model refused the closing balance as dated in the future, which is right, because a statement is imported after it closes.
+- A statement's rows are confirmed before its closing balance, because the model confirms a balance check only against the difference its preview showed.
 
-An automated review of `54a359dea` found two gaps in the proof's own importer, and both are fixed. Open reviews are found again from stored drafts after a restart, and a stored file is deleted once no row from it is left in review, not only when the person cancels. A review of `0d1da19e8` found that a review stopping between writing the file and creating drafts would leave the file behind, so the importer reconciles its stored files with open reviews after every step and when it starts. A review of `81f76d0b2` found that grouping reviews by file digest let cancelling a second selection of the same file cancel the first review. Each draft now stores its review's id, review numbers continue past any found at start, and cancel and resume act on that id. The file digest only decides which stored files to keep.
+An automated review of `54a359dea` found two gaps in the proof's own importer, and both are fixed. Open reviews are found again from stored drafts after a restart, and a stored file is deleted once no row from it is left in review, not only when the person cancels. A review of `0d1da19e8` found that a review stopping between writing the file and creating drafts would leave the file behind, so the importer reconciles its stored files with open reviews after every step and when it starts. A review of `81f76d0b2` found that grouping reviews by file digest let cancelling a second selection of the same file cancel the first review. Each draft now stores its review's id, review numbers continue past any found at start, and cancel and resume act on that id. The file digest only decides which stored files to keep. A review of `66eb4e214` found that an encrypted PDF the reader could not open in time stopped intake with an exception. Intake now gives the reader a time limit, and a damaged file or one that does not open in time is refused as unreadable with a recovery step. The same change stopped a damaged encrypted PDF from being reported as password-protected.
 
 ## What Argus can claim
 
@@ -68,6 +69,7 @@ The proof decides by content, never by the file name.
 | PDF in the kit's text layout | Rows and one closing balance proposed | Review, confirm the balance date, confirm |
 | PDF that opens without a password but forbids copying | Read like any other PDF | Review and confirm |
 | PDF that needs a password to open | Refused. Nothing stored or held. | Save an unlocked copy and choose that |
+| Encrypted PDF the reader cannot open, because it is damaged or does not open within the time limit | Refused as unreadable. Nothing stored or held. | Download the statement again |
 | PDF in another layout, or with no text layer | Accepted, no rows, explicit error | Enter amounts by hand |
 | PNG, JPEG, or HEIC photo | Accepted, no rows, no OCR | Enter amounts by hand |
 | CSV with another header | Accepted, no rows, explicit error | Enter amounts by hand |
@@ -76,7 +78,7 @@ The proof decides by content, never by the file name.
 | Empty file | Refused | Choose another file |
 | Larger than 10 MiB | Refused. Nothing stored or held. | Choose a smaller file |
 
-The size limit and the unlocked-copy recovery are experimental assumptions, listed with the other unresolved questions [below](#experimental-assumptions-still-unresolved).
+The size limit, the time limit for opening a PDF, and the unlocked-copy recovery are experimental assumptions, listed with the other unresolved questions [below](#experimental-assumptions-still-unresolved).
 
 Saving an unlocked copy means opening the file with its password and exporting or printing it again as a PDF, which some people will not know how to do. A file password can itself be sensitive, for example if a bank derives it from an identity number. Whether any candidate bank protects its statements with a password is unverified.
 
@@ -102,6 +104,7 @@ The proof's importer makes these choices so the cases can run. None is an approv
 | Retention of source files | A stored file is deleted once no row from it is left in review, whether the review ends by confirming, by cancelling, or by stopping before any draft. The importer checks after every step and when it starts. Records keep the file's digest, its stored name, and the row. | Unresolved |
 | Password entry | None. A file that needs a password is refused, and the person is asked for an unlocked copy. The alternative is to let a person type the password once so the server opens the file in memory and keeps nothing. | Unresolved |
 | Upload limit | 10 MiB | Unresolved |
+| Time limit for opening a PDF | 20 seconds for the reader to open an encrypted PDF before it is refused as unreadable | Unresolved |
 | Household visibility of source files | Not modeled. A record confirmed into a household account carries a reference to the file, never the file or its original name. Whether a household member may ever open the file is undecided. | Unresolved |
 
 The importer's other choices are equally experimental. It sniffs content to classify files, stores a file under a digest-based name, leaves the account blank unless the file marks a row as personal, and asks the person for the closing balance date because the kit does not read the statement period.
@@ -126,6 +129,7 @@ Rendered from the two committed reports in the same commit that regenerates them
 | `csv_with_unknown_header` | intake | A CSV without the supported header yields no rows and an explicit error. | Passed | Passed |
 | `too_large` | intake | A file over the size limit is refused, and nothing from it is stored or held. | Passed | Passed |
 | `password_protected_pdf` | intake | A PDF that needs a password to open is refused with a recovery step, and nothing from it is stored or held. | Passed | Passed |
+| `unreadable_pdf_refused` | intake | An encrypted PDF the reader cannot open, because it is damaged or does not open within the time limit, is refused as unreadable with a recovery step instead of stopping the import. | Passed | Passed |
 | `pdf_with_copy_restriction_only` | intake | An encrypted PDF that opens without a password but forbids copying is accepted and read. | Passed | Passed |
 | `uncertain_rows_stay_drafts` | review | Clean rows confirm in one batch, and each uncertain row stays a draft with a named reason. | Passed | Blocked, needs 724 |
 | `identical_rows_asked_once` | review | Two identical rows in one file are asked about once, then both confirm as distinct purchases. | Passed | Blocked, needs 724 |
@@ -154,7 +158,7 @@ Rendered from the two committed reports in the same commit that regenerates them
 
 The matrix covers each item the lane names:
 
-- Unsupported and encrypted documents: the intake group and `unlocked_copy_after_refusal`.
+- Unsupported, encrypted, and unreadable documents: the intake group and `unlocked_copy_after_refusal`.
 - Uncertain rows: `uncertain_rows_stay_drafts`, `scanned_image_with_stub`, and the two balance-check cases.
 - Duplicates: the duplicates group, `identical_rows_asked_once`, `pause_and_resume`, and `reimport_after_partial_confirmation`.
 - Destination account and space: `destination_space_chosen_before_confirming` and `currency_mismatch_destination`.
@@ -177,7 +181,7 @@ The matrix covers each item the lane names:
 | Dependency | State on 2026-09-28 | What waits on it |
 | --- | --- | --- |
 | Ingestion kit, pull request 709 | Merged | Nothing. Fixtures and parsers are in place. |
-| Recording contract, [pull request 724](https://github.com/lagarcess/argus/pull/724) | Open and out of draft at `d081bfcdf` | Every case that needs the model, each of which reports blocked without it |
+| Recording contract, [pull request 724](https://github.com/lagarcess/argus/pull/724) | Proposed, not approved. Last checked at `d081bfcdf`, with a read-only check at `e2a9ad6b8` that also passed. | Every case that needs the model, which reports blocked without it, and the one reconciliation against the accepted contract |
 | Recording decisions and reconciliation handoff, [pull request 727](https://github.com/lagarcess/argus/pull/727) | Open at `f0a64ffb9`. Lane 4, the reconciliation handoff, and questions 3, 4, 7, 8, and 9 are unchanged since `a1c294319`. Its later edits settle guest access and update other lanes' status, which this proof does not touch. | Questions 3, 4, 7, 8, and 9, the balance-date rule, and the document-import handoff |
 | Household permission contract | Absent | Who may see imported records and source files |
 | Retention of source files | Unresolved | Whether a file outlives its review |

@@ -26,6 +26,7 @@ except ImportError:
     catalog = derive = model = None
 
 SIZE_LIMIT = 10 * 1024 * 1024
+PDF_TIMEOUT_SECONDS = 20
 AST = timezone(timedelta(hours=-4))
 CLOCK = datetime(2026, 10, 1, 12, 0, tzinfo=AST)
 FIXTURE_PASSWORD = "synthetic-only"
@@ -38,6 +39,7 @@ RECOVERY = {
     "password_protected": "save_unlocked_copy",
     "not_a_statement": "download_statement_file",
     "unsupported_type": "choose_csv_pdf_or_image",
+    "unreadable": "download_again",
 }
 SUFFIX = {"pdf": ".pdf", "csv": ".csv", "png": ".png", "jpeg": ".jpg", "heic": ".heic"}
 REFERENCE_KEYS = {
@@ -56,6 +58,7 @@ ASSUMPTIONS = {
     "source_file_retention": "A stored file is deleted once no row from it is left in review, checked after every importer step and when the importer starts.",
     "password_entry": "None. A file that needs a password is refused, and the person is asked for an unlocked copy.",
     "upload_limit_bytes": SIZE_LIMIT,
+    "pdf_open_time_limit_seconds": PDF_TIMEOUT_SECONDS,
     "household_source_file_visibility": "Not modeled. Records carry a reference to the file, never the file.",
 }
 
@@ -76,20 +79,21 @@ class Intake:
     recovery: str | None
 
 
-def check(selection: Selection) -> Intake:
-    status, kind, subtype = _classify(selection.data)
+def check(selection: Selection, pdf_timeout: float = PDF_TIMEOUT_SECONDS) -> Intake:
+    status, kind, subtype = _classify(selection.data, pdf_timeout)
     digest = hashlib.sha256(selection.data).hexdigest()
     return Intake(status, kind, subtype, digest, RECOVERY.get(status))
 
 
-def _classify(data: bytes) -> tuple[str, str | None, str | None]:
+def _classify(data: bytes, pdf_timeout: float) -> tuple[str, str | None, str | None]:
     if not data:
         return "empty", None, None
     if len(data) > SIZE_LIMIT:
         return "too_large", None, None
     if data.startswith(b"%PDF-"):
-        locked = b"/Encrypt" in data and pdf_text(data) is None
-        return ("password_protected" if locked else "accepted"), "pdf", "pdf"
+        access = pdf_open(data, pdf_timeout)[0] if b"/Encrypt" in data else "open"
+        status = {"open": "accepted", "locked": "password_protected"}.get(access, access)
+        return status, "pdf", "pdf"
     image = _image_subtype(data)
     if image:
         return "accepted", "image", image
@@ -123,10 +127,17 @@ def _is_email(text: str) -> bool:
     return {"from", "subject"} <= names or "mime-version" in names
 
 
-def pdf_text(data: bytes, password: str | None = None) -> str | None:
+def pdf_open(
+    data: bytes, timeout: float = PDF_TIMEOUT_SECONDS, password: str | None = None
+) -> tuple[str, str]:
     command = ["pdftotext", *(["-upw", password] if password else []), "-", "-"]
-    result = subprocess.run(command, input=data, capture_output=True, timeout=20)
-    return result.stdout.decode("utf-8", "replace") if result.returncode == 0 else None
+    try:
+        result = subprocess.run(command, input=data, capture_output=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return "unreadable", ""
+    if result.returncode == 0:
+        return "open", result.stdout.decode("utf-8", "replace")
+    return ("locked" if b"password" in result.stderr.lower() else "unreadable"), ""
 
 
 def stored_path(directory: Path, intake: Intake) -> Path:
@@ -648,7 +659,7 @@ def password_protected(fx, workdir):
     session = importer.select(
         Selection("file_picker", "encrypted-statement.pdf", fx["encrypted-statement.pdf"])
     )
-    unlocked = pdf_text(fx["encrypted-statement.pdf"], FIXTURE_PASSWORD) or ""
+    unlocked = pdf_open(fx["encrypted-statement.pdf"], password=FIXTURE_PASSWORD)[1]
     observed = {
         "status": session.intake.status,
         "recovery": session.intake.recovery,
@@ -662,6 +673,30 @@ def password_protected(fx, workdir):
         "held": NOTHING_HELD,
         "fixture_opens_with_its_synthetic_password": True,
     }, observed
+
+
+@case(
+    "unreadable_pdf_refused",
+    "intake",
+    "An encrypted PDF the reader cannot open, because it is damaged or does not open within the time limit, is refused as unreadable with a recovery step instead of stopping the import.",
+    recording=False,
+)
+def unreadable_pdf(fx, workdir):
+    attempts = {
+        "damaged": (b"%PDF-1.4\n/Encrypt 5 0 R\n%%EOF\n", PDF_TIMEOUT_SECONDS),
+        "too_slow": (fx["encrypted-statement.pdf"], 0.001),
+    }
+    observed = {}
+    for name, (data, budget) in attempts.items():
+        try:
+            result = check(
+                Selection("file_picker", f"{name}.pdf", data), pdf_timeout=budget
+            )
+            observed[name] = {"status": result.status, "recovery": result.recovery}
+        except Exception as error:
+            observed[name] = {"raised": type(error).__name__}
+    expected = {"status": "unreadable", "recovery": "download_again"}
+    return observed == {"damaged": expected, "too_slow": expected}, observed
 
 
 @case(

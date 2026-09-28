@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import importlib.util
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -57,6 +58,17 @@ def refuse_every_encrypted_pdf(original):
         return original(data)
 
     return classify
+
+
+def reader_failure_escapes(original):
+    def pdf_open(data, timeout=proof.PDF_TIMEOUT_SECONDS, password=None):
+        command = ["pdftotext", *(["-upw", password] if password else []), "-", "-"]
+        result = subprocess.run(command, input=data, capture_output=True, timeout=timeout)
+        if result.returncode == 0:
+            return "open", result.stdout.decode("utf-8", "replace")
+        return "locked", ""
+
+    return pdf_open
 
 
 def keep_duplicates(original):
@@ -199,6 +211,11 @@ def mutations():
             "every encrypted PDF refused",
             [(proof, "_classify", refuse_every_encrypted_pdf)],
             {"pdf_with_copy_restriction_only"},
+        ),
+        (
+            "PDF reader failure treated as a password or left to stop the import",
+            [(proof, "pdf_open", reader_failure_escapes)],
+            {"unreadable_pdf_refused"},
         ),
         (
             "duplicates kept",
