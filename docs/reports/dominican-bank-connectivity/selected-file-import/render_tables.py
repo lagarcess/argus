@@ -28,7 +28,7 @@ UNITS = {
 
 
 def matrix(with_model: dict, without_model: dict) -> list[str]:
-    head = with_model["recording_model"]["ref"].rsplit(" ", 1)[-1][:9]
+    head = with_model["provenance"]["recording_model"]["commit"][:9]
     without = {case["case"]: case["status"] for case in without_model["cases"]}
     lines = [
         f"| Case | Group | Claim | With 724 at `{head}` | Without 724 |",

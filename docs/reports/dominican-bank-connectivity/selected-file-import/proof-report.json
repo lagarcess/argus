@@ -602,58 +602,66 @@
     "failed": 0,
     "passed": 40
   },
-  "environment": {
-    "packages": {
-      "Faker": "30.10.0",
-      "babel": "2.18.0",
-      "pillow": "12.2.0",
-      "python-dateutil": "2.9.0.post0",
-      "six": "1.17.0",
-      "tzdata": "2025.3"
-    },
-    "pdftotext": "pdftotext version 26.09.0",
-    "python": "3.10.20"
-  },
   "fictional": true,
-  "format": "selected-file-import-proof-v4",
-  "kit": {
-    "digest": "deb590ad45887051fc2974608d1461a201529d0fcc31793c83cd0f27cb9d499a",
-    "files": [
-      "__init__.py",
-      "__main__.py",
-      "conftest.py",
-      "extract.py",
-      "factories.py",
-      "generate.py",
-      "harness.py",
-      "renderers.py",
-      "test_fixtures.py",
-      "test_lifecycle.py",
-      "test_reextraction.py"
-    ]
-  },
-  "recording_model": {
-    "digest": "e37920eb9eba88e1b8303a8fa1fccbf3cb5fc1d6a8cda2ea843af804e4471e32",
-    "files": [
-      "src/argus/domain/home_country.py",
-      "tests/financial_recording/__init__.py",
-      "tests/financial_recording/catalog.py",
-      "tests/financial_recording/derive.py",
-      "tests/financial_recording/model.py",
-      "tests/financial_recording/money.py",
-      "tests/financial_recording/review.py",
-      "tests/financial_recording/scenarios.py",
-      "tests/financial_recording/scenarios_lifecycle.py",
-      "tests/financial_recording/scenes.py",
-      "tests/financial_recording/test_accounts.py",
-      "tests/financial_recording/test_activity.py",
-      "tests/financial_recording/test_confirmation.py",
-      "tests/financial_recording/test_evidence.py",
-      "tests/financial_recording/test_isolation.py",
-      "tests/financial_recording/test_lifecycle.py",
-      "tests/financial_recording/test_money.py",
-      "tests/financial_recording/test_reconciliation.py"
-    ],
-    "ref": "lagarcess/argus#724 at d081bfcdf5c7c2bee767d873f232752432098c39"
+  "format": "selected-file-import-proof-v5",
+  "provenance": {
+    "digest": "554fc853b212d8442841ed2e277c4e54f5c0bfb0dc6d9656e8f9c5fc03602886",
+    "environment": {
+      "packages": {
+        "Faker": "30.10.0",
+        "babel": "2.18.0",
+        "pillow": "12.2.0",
+        "python-dateutil": "2.9.0.post0",
+        "six": "1.17.0",
+        "tzdata": "2025.3"
+      },
+      "pdftotext": "pdftotext version 26.09.0",
+      "python": "3.10.20"
+    },
+    "kit": {
+      "digest": "deb590ad45887051fc2974608d1461a201529d0fcc31793c83cd0f27cb9d499a",
+      "files": [
+        "__init__.py",
+        "__main__.py",
+        "conftest.py",
+        "extract.py",
+        "factories.py",
+        "generate.py",
+        "harness.py",
+        "renderers.py",
+        "test_fixtures.py",
+        "test_lifecycle.py",
+        "test_reextraction.py"
+      ]
+    },
+    "recording_model": {
+      "commit": "d081bfcdf5c7c2bee767d873f232752432098c39",
+      "digest": "e37920eb9eba88e1b8303a8fa1fccbf3cb5fc1d6a8cda2ea843af804e4471e32",
+      "files": [
+        "src/argus/domain/home_country.py",
+        "tests/financial_recording/__init__.py",
+        "tests/financial_recording/catalog.py",
+        "tests/financial_recording/derive.py",
+        "tests/financial_recording/model.py",
+        "tests/financial_recording/money.py",
+        "tests/financial_recording/review.py",
+        "tests/financial_recording/scenarios.py",
+        "tests/financial_recording/scenarios_lifecycle.py",
+        "tests/financial_recording/scenes.py",
+        "tests/financial_recording/test_accounts.py",
+        "tests/financial_recording/test_activity.py",
+        "tests/financial_recording/test_confirmation.py",
+        "tests/financial_recording/test_evidence.py",
+        "tests/financial_recording/test_isolation.py",
+        "tests/financial_recording/test_lifecycle.py",
+        "tests/financial_recording/test_money.py",
+        "tests/financial_recording/test_reconciliation.py"
+      ],
+      "pull_request": "lagarcess/argus#724"
+    },
+    "runner": {
+      "digest": "57860c7ee0fce3a5b3be4371b18910653b56075d1f0968d2af7912691436c6b2",
+      "file": "docs/reports/dominican-bank-connectivity/selected-file-import/proof.py"
+    }
   }
 }

@@ -16,7 +16,7 @@ With pull request 724's model at `d081bfcdf5c7c2bee767d873f232752432098c39` on t
 Blocked means a case needs the recording model and could not run. It is not a pass, and the proof exits with status 0 only when every case passes.
 
 - The committed [report with pull request 724](proof-report.json) and [report without it](proof-report-without-724.json) are those runs. A second run of each in the same environment writes the same bytes.
-- Each report lists every Python file of the ingestion kit and, with the model, of the extracted model tree, with a digest over each set. The model tree includes `src/argus/domain/home_country.py`, which the model loads for its accepted currencies. Each report also records the Python, Poppler, and package versions the run loaded, and the model's head as given to the runner, so a reader can tell which versions it proves. A rerun under other versions shows them in the `environment` field.
+- Each report carries one `provenance` block with its own digest. It names the runner file with its digest and lists every Python file of the ingestion kit. With the model, it names the pull request 724 commit and lists every file of the extracted model tree, including `src/argus/domain/home_country.py`, which the model loads for its accepted currencies. It also records the Python, Poppler, and package versions the run loaded, so a reader can tell which code and versions a report proves. A rerun under other versions shows them in the `environment` field.
 - Each deliberate breakage in [`mutation_check.py`](mutation_check.py) makes its target cases fail. The breakages ignore encryption, refuse every encrypted PDF, treat a PDF reader failure as a password or let it stop the import, drop the recovery steps, drop the ingestion kit's extraction errors, keep duplicate rows, answer balance-check questions for the person, stop the model from asking them, cancel without discarding drafts, cancel without deleting the file, cancel every draft from the same file instead of one review's, rebuild a retried confirmation instead of replaying it, keep the file after a completed review, track open reviews only in memory, skip clearing an interrupted review's file at start, store a file under its original name, and hold a refused file.
 - A case that raises an exception is recorded with status `error` and the exception in the report, instead of stopping the run. An error is not a failed check, so the breakage check does not count it as catching a breakage, because the exception may come from the breakage itself. Each target case has to run to its check and fail it.
 
@@ -219,7 +219,7 @@ poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/
 cmp temp/selected-file-import-without-724.json docs/reports/dominican-bank-connectivity/selected-file-import/proof-report-without-724.json
 ```
 
-To run every case, fetch pull request 724 and extract the reference model at the head this proof records. The model reads accepted currencies from the repository's `src/argus/domain/home_country.py`, so the archive includes that file. The proof refuses a model imported from a git checkout, because the report's identity is the extracted tree.
+To run every case, fetch pull request 724 and extract the reference model at the head this proof records. The model reads accepted currencies from the repository's `src/argus/domain/home_country.py`, so the archive includes that file. The proof refuses to run the model without `--recording-commit`, with a commit this repository does not have, or with an extracted tree whose files differ from that commit's. It also refuses a model imported from a git checkout, because the report's identity is the extracted tree.
 
 ```bash
 git fetch origin pull/724/head
@@ -230,7 +230,7 @@ mkdir -p temp/recording-724 && git archive d081bfcdf5c7c2bee767d873f232752432098
 ```
 
 ```bash
-PYTHONPATH=temp/recording-724 poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/proof.py --report temp/selected-file-import-report.json --recording-ref "lagarcess/argus#724 at d081bfcdf5c7c2bee767d873f232752432098c39"
+PYTHONPATH=temp/recording-724 poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/proof.py --report temp/selected-file-import-report.json --recording-commit d081bfcdf5c7c2bee767d873f232752432098c39
 ```
 
 ```bash

@@ -27,6 +27,7 @@ try:
 except ImportError:
     catalog = derive = model = None
 
+REPOSITORY = Path(__file__).resolve().parents[4]
 SIZE_LIMIT = 10 * 1024 * 1024
 PDF_TIMEOUT_SECONDS = 20
 AST = timezone(timedelta(hours=-4))
@@ -1513,6 +1514,47 @@ def _tree(root: Path) -> dict:
     }
 
 
+def _model_at(commit: str, tree: Path) -> dict:
+    resolved = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{commit}^{{commit}}"],
+        cwd=REPOSITORY,
+        capture_output=True,
+        text=True,
+    )
+    if resolved.returncode:
+        raise ValueError(
+            f"commit {commit} is not in this repository, fetch pull request 724 first"
+        )
+    sha = resolved.stdout.strip()
+    identity = _tree(tree)
+    differ = [
+        name
+        for name in identity["files"]
+        if subprocess.run(
+            ["git", "show", f"{sha}:{name}"], cwd=REPOSITORY, capture_output=True
+        ).stdout
+        != (tree / name).read_bytes()
+    ]
+    if differ:
+        raise ValueError(f"the model on the path differs from {sha} in {differ}")
+    return {"pull_request": "lagarcess/argus#724", "commit": sha, **identity}
+
+
+def _provenance(recording: dict | None, kit: Path) -> dict:
+    runner = Path(__file__).resolve()
+    parts = {
+        "runner": {
+            "file": str(runner.relative_to(REPOSITORY)),
+            "digest": hashlib.sha256(runner.read_bytes()).hexdigest(),
+        },
+        "kit": _tree(kit),
+        "recording_model": recording,
+        "environment": _environment(),
+    }
+    encoded = json.dumps(parts, sort_keys=True).encode()
+    return {**parts, "digest": hashlib.sha256(encoded).hexdigest()}
+
+
 def _environment() -> dict:
     distributions = importlib.metadata.packages_distributions()
     loaded = {name.partition(".")[0] for name in sys.modules}
@@ -1531,21 +1573,29 @@ def main() -> int:
     )
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument(
-        "--recording-ref",
-        default="",
-        help="Where the recording model came from, recorded as given.",
+        "--recording-commit",
+        help="the pull request 724 commit the model on PYTHONPATH was extracted from",
     )
     args = parser.parse_args()
     if not shutil.which("pdftotext"):
         parser.error("pdftotext from poppler is required, as in the ingestion kit")
     recording = None
+    if model is None and args.recording_commit:
+        parser.error("--recording-commit names a model that is not on PYTHONPATH")
     if model is not None:
         tree = Path(model.__file__).resolve().parents[2]
+        if not args.recording_commit:
+            parser.error(
+                "name the commit the model was extracted from with --recording-commit"
+            )
         if (tree / ".git").exists():
             parser.error(
                 "extract pull request 724's model with git archive, as the README's rerun steps show"
             )
-        recording = {"ref": args.recording_ref, **_tree(tree)}
+        try:
+            recording = _model_at(args.recording_commit, tree)
+        except ValueError as error:
+            parser.error(str(error))
     kit = Path(load_input.__code__.co_filename).parent
     results = []
     with tempfile.TemporaryDirectory() as folder:
@@ -1573,12 +1623,10 @@ def main() -> int:
                 }
             )
     report = {
-        "format": "selected-file-import-proof-v4",
+        "format": "selected-file-import-proof-v5",
         "fictional": True,
         "assumptions": ASSUMPTIONS,
-        "recording_model": recording,
-        "kit": _tree(kit),
-        "environment": _environment(),
+        "provenance": _provenance(recording, kit),
         "counts": {
             s: sum(r["status"] == s for r in results)
             for s in ("passed", "failed", "error", "blocked")

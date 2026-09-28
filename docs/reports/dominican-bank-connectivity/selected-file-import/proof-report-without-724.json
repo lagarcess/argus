@@ -431,33 +431,40 @@
     "failed": 0,
     "passed": 16
   },
-  "environment": {
-    "packages": {
-      "Faker": "30.10.0",
-      "pillow": "12.2.0",
-      "python-dateutil": "2.9.0.post0",
-      "six": "1.17.0"
-    },
-    "pdftotext": "pdftotext version 26.09.0",
-    "python": "3.10.20"
-  },
   "fictional": true,
-  "format": "selected-file-import-proof-v4",
-  "kit": {
-    "digest": "deb590ad45887051fc2974608d1461a201529d0fcc31793c83cd0f27cb9d499a",
-    "files": [
-      "__init__.py",
-      "__main__.py",
-      "conftest.py",
-      "extract.py",
-      "factories.py",
-      "generate.py",
-      "harness.py",
-      "renderers.py",
-      "test_fixtures.py",
-      "test_lifecycle.py",
-      "test_reextraction.py"
-    ]
-  },
-  "recording_model": null
+  "format": "selected-file-import-proof-v5",
+  "provenance": {
+    "digest": "cf96cba6ba7696def406dba5fe2cb0ce7a8c206399f6634f097db6f772f723bc",
+    "environment": {
+      "packages": {
+        "Faker": "30.10.0",
+        "pillow": "12.2.0",
+        "python-dateutil": "2.9.0.post0",
+        "six": "1.17.0"
+      },
+      "pdftotext": "pdftotext version 26.09.0",
+      "python": "3.10.20"
+    },
+    "kit": {
+      "digest": "deb590ad45887051fc2974608d1461a201529d0fcc31793c83cd0f27cb9d499a",
+      "files": [
+        "__init__.py",
+        "__main__.py",
+        "conftest.py",
+        "extract.py",
+        "factories.py",
+        "generate.py",
+        "harness.py",
+        "renderers.py",
+        "test_fixtures.py",
+        "test_lifecycle.py",
+        "test_reextraction.py"
+      ]
+    },
+    "recording_model": null,
+    "runner": {
+      "digest": "57860c7ee0fce3a5b3be4371b18910653b56075d1f0968d2af7912691436c6b2",
+      "file": "docs/reports/dominican-bank-connectivity/selected-file-import/proof.py"
+    }
+  }
 }
