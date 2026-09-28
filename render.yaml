@@ -11,6 +11,7 @@ services:
     buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
     startCommand: poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
+    renderSubdomainPolicy: disabled
     envVars:
       - key: APP_ENV
         value: production

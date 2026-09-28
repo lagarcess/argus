@@ -818,12 +818,19 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     assert "prefer a forward fix" in evidence_text.lower()
     assert "out-of-band Render control-plane readback" in evidence_text
     assert "serviceDetails.maintenanceMode.enabled=true" in evidence_text
-    assert "https://argus-ohr5.onrender.com/api/v1/auth/access-requests" in evidence_text
+    assert "https://api.arguschat.ai/api/v1/auth/access-requests" in evidence_text
     assert "every configured custom API domain" in evidence_text
     assert "exact HTTP `503` maintenance-mode status" in evidence_text
     assert "configured maintenance page marker or SHA-256 fingerprint" in evidence_text
     assert "An arbitrary `403`, `429`, or `503` is not maintenance proof." in (
         evidence_text
+    )
+    assert (
+        "`https://argus-ohr5.onrender.com` must return HTTP `404` and is not a "
+        "maintenance probe surface" in evidence_text
+    )
+    assert (
+        "do not require `503` from that hostname" in evidence_text
     )
     assert "must not return HTTP `202`" not in evidence_text
     assert (
@@ -859,6 +866,13 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     )
     assert "Disable maintenance last" in evidence_text
     assert "public invalid-body readback" in evidence_text
+    assert (
+        "that hostname remains excluded from the maintenance fingerprint surface"
+        in evidence_text
+    )
+    assert (
+        "is not an application route-absence probe surface" in evidence_text
+    )
     assert "Do not execute this SQL as part of repository verification." in evidence_text
     for official_reference in (
         "https://render.com/docs/maintenance-mode",
@@ -915,6 +929,9 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     assert "061ba50e" in runbook_text
     assert "serviceDetails.maintenanceMode.enabled=true" in runbook_text
     assert "exact maintenance status and page fingerprint" in runbook_text
+    assert "`argus-app` onrender URL" in runbook_text
+    assert "https://argus-ohr5.onrender.com` must return HTTP `404`" in runbook_text
+    assert "Never front the API with a Cloudflare Worker" in runbook_text
     assert "same-SHA restart" in runbook_text
     assert "old-instance shutdown/drain" in runbook_text
     assert "ACCESS EXCLUSIVE" in runbook_text
