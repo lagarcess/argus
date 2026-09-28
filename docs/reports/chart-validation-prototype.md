@@ -131,6 +131,15 @@ presentation policy now serves axis/readout values, with exact decimal midpoint
 geometry. Its affected Android evidence is refreshed in `android/axis-precision/`;
 unchanged iPhone/web sources and captured evidence remain valid.
 
+The next fetch found #672 at `86df1ee95cc3c88d713efa6a24538c6217b2ea29`.
+Its documentation clarifies shipped memory/sharing and the calculation registry,
+adds historical release evidence, and explicitly preserves this chart lane's
+isolated ownership. The voice/chart direction and DESIGN are unchanged. There is
+no chart runtime, API/data contract, UI state, migration, environment or test
+owner overlap. One-way merge: `83d63d81a639609757d27fcdde52d7720b3d3bdd`.
+Source/hash equality retains final platform evidence and the scoped precision
+review; final merged-tree checks and CI run again.
+
 The initial captures were superseded where the visual refinement changed sources.
 Platform provenance identifies the final capture heads; original source identities
 remain in Git history. Android uses the explicit-install test runner.
