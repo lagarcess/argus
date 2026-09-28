@@ -19,7 +19,7 @@ The evidence behind the wider bank report is listed in the [evidence index](../e
 - The committed [proof report](proof-report.json) is the first run. A second run writes it byte for byte.
 - The report records the digest of the recording model it ran against (`ca97f379...c6d3b`) and of the ingestion kit (`48c40767...9925c`), so a reader can tell which versions it proves.
 - Without pull request 724, only the 15 intake cases can run. The other 21 report `blocked` instead of passing.
-- Seven deliberate breakages each made their target cases fail: ignoring encryption, refusing every encrypted PDF, keeping duplicate rows, cancelling without discarding drafts, cancelling without deleting the file, storing a file under its original name, and holding a refused file.
+- Seven deliberate breakages in [`mutation_check.py`](mutation_check.py) each made their target cases fail: ignoring encryption, refusing every encrypted PDF, keeping duplicate rows, cancelling without discarding drafts, cancelling without deleting the file, storing a file under its original name, and holding a refused file.
 - The known gap is explained [below](#known-gap). If pull request 724 closes it, the run reports an unexpected pass and exits with an error until this matrix is updated.
 
 ## What Argus can claim
@@ -189,4 +189,10 @@ PYTHONPATH=temp/recording-724 poetry run python docs/reports/dominican-bank-conn
 
 ```bash
 cmp temp/selected-file-import-report.json docs/reports/dominican-bank-connectivity/selected-file-import/proof-report.json
+```
+
+To confirm that the cases can fail, run the breakage check with the same path. It exits with an error if any breakage goes unnoticed.
+
+```bash
+PYTHONPATH=temp/recording-724 poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/mutation_check.py
 ```
