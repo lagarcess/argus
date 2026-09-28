@@ -185,7 +185,7 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 - **Input:** `field_missing`, `kind_unsupported`, `amount_invalid`, `amount_precision`, `amount_not_positive`, `currency_unsupported`, `currency_mismatch`, `date_invalid`, `choice_invalid`, `note_too_long`.
 - **Accounts:** `account_unknown`.
 - **Categories:** `category_unknown`, `category_kind_mismatch`, `category_not_applicable`, `category_other_space`.
-- **Linked activity:** `counter_account_missing`, `counter_account_same`, `counter_account_unexpected`, `counter_not_liability`, `cross_currency_unresolved`.
+- **Linked activity:** `counter_account_missing`, `counter_account_same`, `counter_account_unexpected`, `counter_not_liability`, `cross_currency_unresolved`, `cross_space_unresolved`.
 - **Refunds:** `refund_account_unsupported`, `refund_target_invalid`, `refund_purchase_removed`, `refund_link_currency`, `refund_before_purchase`, `refund_category_mismatch`, `refund_exceeds_purchase`, `refund_link_unexpected`, `linked_refunds_present`.
 - **Plans:** `expectation_unknown`, `expectation_mismatch`, `expectation_already_fulfilled`.
 - **Ordering and repeats:** `inclusion_unanswered`, `inclusion_conflict`, `inclusion_changed`, `already_recorded`, `possible_duplicate`.

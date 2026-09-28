@@ -252,7 +252,8 @@ def duplicates(
         if any(
             mine
             & _identities(
-                source, source.account_id if source.account_id is not None else item_account
+                source,
+                source.account_id if source.account_id is not None else item_account,
             )
             for source in sources
         )
@@ -312,6 +313,8 @@ def _counter_issues(book: Book, body: Activity, account: Account) -> list[Issue]
     found = []
     if counter.currency != account.currency:
         found.append(issue("cross_currency_unresolved", counter.id))
+    if counter.space_id != account.space_id:
+        found.append(issue("cross_space_unresolved", counter.id))
     wanted = COUNTER_NATURE[body.kind]
     if wanted is not None and NATURE[counter.type] != wanted:
         found.append(issue("counter_not_liability", counter.id))
@@ -342,6 +345,11 @@ def refund_issues(
         found.append(issue("refund_before_purchase", purchase.id))
     if body.category is not None and body.category != original.category:
         found.append(issue("refund_category_mismatch", purchase.id))
+    inherited = original.category if body.category is None else None
+    if inherited is not None:
+        category = book.categories.get(inherited)
+        if category is not None and category.space_id not in (None, account.space_id):
+            found.append(issue("category_other_space", inherited))
     refunded = sum(
         record.body.amount
         for record in live_records(book)

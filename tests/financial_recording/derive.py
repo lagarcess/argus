@@ -381,7 +381,17 @@ def observation_gaps(book: Book, account_id: str, tz: ZoneInfo = DEFAULT_TZ) -> 
         if not isinstance(anchor, Observation):
             continue
         if index == 0:
-            gaps.append(Gap(record.id, account_id, anchor.as_of, None, None, None, ()))
+            gaps.append(
+                Gap(
+                    record.id,
+                    account_id,
+                    anchor.as_of,
+                    record.revisions[-1].confirmed_difference,
+                    None,
+                    None,
+                    (),
+                )
+            )
             continue
         between = [move for move in moves if landed[move.id] == index]
         expected = ordered[index - 1].body.amount + sum(

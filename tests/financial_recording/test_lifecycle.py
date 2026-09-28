@@ -275,4 +275,17 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "unknown_anchor_account": "ReviewRequired:account_unknown",
             "anchor_keeps_account": "InvalidInput:anchor_account_immutable",
         },
+        "first_observation_keeps_recorded_difference": {
+            "before": [[-5000, -5000, "unexplained"]],
+            "after_opening_removed": [-5000, None, None],
+            "stored_difference": -5000,
+        },
+        "cross_space_transfer_stays_unresolved": {
+            "issues": {"cross_space_unresolved": BLOCKING},
+            "confirm": "ReviewRequired:cross_space_unresolved",
+        },
+        "refund_inherits_category_space": {
+            "issues": {"category_other_space": BLOCKING},
+            "confirm": "ReviewRequired:category_other_space",
+        },
     }

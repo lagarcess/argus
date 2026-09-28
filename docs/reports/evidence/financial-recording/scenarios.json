@@ -393,6 +393,12 @@
       "unknown_activity_account": "ReviewRequired:account_unknown",
       "unknown_anchor_account": "ReviewRequired:account_unknown"
     },
+    "cross_space_transfer_stays_unresolved": {
+      "confirm": "ReviewRequired:cross_space_unresolved",
+      "issues": {
+        "cross_space_unresolved": "blocking"
+      }
+    },
     "custom_category_blocks_a_move": {
       "move": "ReviewRequired:account_has_links"
     },
@@ -403,6 +409,21 @@
       "distinct_requires_revision": "InvalidInput:revision_required",
       "distinct_without_match": "InvalidInput:distinct_not_applicable",
       "matches_the_other_expense": true
+    },
+    "first_observation_keeps_recorded_difference": {
+      "after_opening_removed": [
+        -5000,
+        null,
+        null
+      ],
+      "before": [
+        [
+          -5000,
+          -5000,
+          "unexplained"
+        ]
+      ],
+      "stored_difference": -5000
     },
     "future_anchors_are_refused": {
       "future_check": "ReviewRequired:date_in_future",
@@ -515,6 +536,12 @@
     },
     "redating_the_opening_onto_untimed_activity": {
       "result": "ReviewRequired:inclusion_unanswered"
+    },
+    "refund_inherits_category_space": {
+      "confirm": "ReviewRequired:category_other_space",
+      "issues": {
+        "category_other_space": "blocking"
+      }
     },
     "rejected_draft_cannot_confirm": {
       "confirm_rejected": "InvalidInput:draft_not_proposed"

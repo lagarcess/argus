@@ -259,6 +259,9 @@ def edits_that_move_money_need_review() -> dict:
         "rejected_draft_cannot_confirm": _rejected_draft_cannot_confirm(),
         "inclusion_answers_bound_to_revision": _answers_bound_to_revision(),
         "correction_unknown_account_is_structured": _correction_unknown_account(),
+        "first_observation_keeps_recorded_difference": _first_obs_keeps_difference(),
+        "cross_space_transfer_stays_unresolved": _cross_space_transfer(),
+        "refund_inherits_category_space": _refund_inherits_category_space(),
     }
 
 
@@ -586,18 +589,56 @@ def _correction_unknown_account() -> dict:
     opening = anchors(scene.store.book, cash.id)[0]
     return {
         "unknown_activity_account": outcome(
-            lambda: scene.store.correct(
-                expense.id, 1, "typo", account_id="acct-missing"
-            )
+            lambda: scene.store.correct(expense.id, 1, "typo", account_id="acct-missing")
         ),
         "unknown_anchor_account": outcome(
-            lambda: scene.store.correct(
-                opening.id, 1, "typo", account_id="acct-missing"
-            )
+            lambda: scene.store.correct(opening.id, 1, "typo", account_id="acct-missing")
         ),
         "anchor_keeps_account": outcome(
             lambda: scene.store.correct(opening.id, 1, "wrong", account_id=other.id)
         ),
+    }
+
+
+def _first_obs_keeps_difference() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    scene.record("expense", cash, "100.00", 3)
+    scene.observe(cash, "850.00", 5)
+    before = scene.gaps(cash)
+    opening = anchors(scene.store.book, cash.id)[0]
+    scene.store.remove(opening.id, 1, "wrong start")
+    gap = observation_gaps(scene.store.book, cash.id, scene.store.tz)[0]
+    return {
+        "before": before,
+        "after_opening_removed": [gap.recorded, gap.remaining, gap.label],
+        "stored_difference": scene.store.book.records[gap.record_id]
+        .revisions[-1]
+        .confirmed_difference,
+    }
+
+
+def _cross_space_transfer() -> dict:
+    scene = Scene()
+    personal = scene.account("Casa", "checking", "DOP", "5000.00")
+    business = scene.account("Negocio", "checking", "DOP", "5000.00", space_id="business")
+    draft = scene.act("transfer", personal, "100.00", 3, counter=business)
+    return {
+        "issues": scene.issues(draft),
+        "confirm": outcome(lambda: scene.confirm(draft)),
+    }
+
+
+def _refund_inherits_category_space() -> dict:
+    scene = Scene()
+    shop = scene.account("Negocio", "checking", "DOP", "5000.00", space_id="business")
+    home = scene.account("Casa", "checking", "DOP", "5000.00")
+    materials = scene.store.create_category("business", "Materiales", "spending")
+    purchase = scene.record("expense", shop, "700.00", 2, category=materials.id)
+    draft = scene.act("refund", home, "100.00", 5, refund_of=purchase.id)
+    return {
+        "issues": scene.issues(draft),
+        "confirm": outcome(lambda: scene.confirm(draft)),
     }
 
 
