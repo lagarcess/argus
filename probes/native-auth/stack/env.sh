@@ -1,6 +1,9 @@
 # Sourced by the stack scripts. Every path is lane-owned and gitignored.
 NATIVE_AUTH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 NATIVE_AUTH_WORK="${NATIVE_AUTH_WORK:-$NATIVE_AUTH_ROOT/temp/native-auth-proof}"
+# The Argus checkout the API runs from. Defaults to this one; point it at
+# another tree (for example a fix branch) to test that API with these probes.
+export NATIVE_AUTH_API_ROOT="${NATIVE_AUTH_API_ROOT:-$NATIVE_AUTH_ROOT}"
 NATIVE_AUTH_STACK_DIR="$NATIVE_AUTH_WORK/stack"
 # A scratch HOME avoids the user's ~/.supabase/profile, which the CLI misreads.
 NATIVE_AUTH_CLI_HOME="$NATIVE_AUTH_WORK/cli-home"

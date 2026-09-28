@@ -5,8 +5,8 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 eval "$(native_auth_supabase status -o env)"
 case "$API_URL" in http://127.0.0.1:*|http://localhost:*) ;; *) echo "non-loopback stack" >&2; exit 1;; esac
-cd "$NATIVE_AUTH_ROOT"
-exec env \
+cd "$NATIVE_AUTH_API_ROOT"
+exec env PYTHONPATH="$NATIVE_AUTH_API_ROOT/src:$NATIVE_AUTH_API_ROOT/web" \
   SUPABASE_PROJECT_URL="$API_URL" SUPABASE_URL="$API_URL" \
   SUPABASE_ANON_PUBLIC_KEY="$ANON_KEY" SUPABASE_ANON_KEY="$ANON_KEY" \
   SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" SUPABASE_JWT_SECRET="$JWT_SECRET" \
@@ -19,4 +19,4 @@ exec env \
   ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED=false \
   ARGUS_GUEST_ACCESS_ENABLED=true ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=false \
   NEXT_PUBLIC_MOCK_AUTH=false ARGUS_MOCK_AUTH=false \
-  poetry run uvicorn argus.api.main:app --host 127.0.0.1 --port "$NATIVE_AUTH_API_PORT"
+  "$NATIVE_AUTH_ROOT/.venv/bin/uvicorn" argus.api.main:app --host 127.0.0.1 --port "$NATIVE_AUTH_API_PORT"

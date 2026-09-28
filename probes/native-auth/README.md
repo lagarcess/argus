@@ -10,7 +10,7 @@ unchanged Argus API.
 
 | Path | What it is | Evidence level |
 | --- | --- | --- |
-| `stack/` | Lane-owned Supabase stack (`argus-native-auth-proof`, ports 57450 to 57459) and the Argus API launcher (port 57460) | Environment |
+| `stack/` | Lane-owned Supabase stack (`argus-native-auth-proof`, ports 57450 to 57459) and the Argus API launcher (port 57460; `NATIVE_AUTH_API_ROOT` selects the checkout) | Environment |
 | `http_probe/` | Language-neutral Python probe. It is not a native client | 3, against unchanged Argus |
 | `adapter/` | SYNTHETIC reverse proxy that adds the proposed handoff header transport (port 57461) | 2 |
 | `ios/ArgusNativeAuth/` | Swift package: the client under test, plus XCTest scenarios | 4 on the simulator |
@@ -38,11 +38,25 @@ unchanged Argus API.
 
 Every runner exits with the verdict of `evidence_gate.py`, not with the raw
 tool status. The gate compares each evidence file with `expectations.json` and
-fails on a missing, repeated, or undeclared check, on any failure other than
-the documented ones (A14 and I11), on a documented failure that now passes, on
-an iOS run whose xcodebuild counts disagree, on an app log that departs from
-the declared steps, and on a capture taken from a dirty tree or from runtime
-code that differs from HEAD. Markdown changes do not make evidence stale.
+fails on a missing, repeated, or undeclared check, on any unexpected failure,
+on an expected failure that now passes, on an iOS run whose xcodebuild counts
+disagree, on an app log that departs from the declared steps, on an API
+version it cannot determine, and on a capture taken from a dirty tree or from
+runtime code that differs from HEAD. Markdown changes do not make evidence
+stale.
+
+Expected failures depend on the API that served the requests. Every capture
+records `argus_api_head`. I11 (an SDK logging finding) is always expected. A14
+is expected only when the API source lacks the #728 fix, and must pass when it
+contains it. The gate reads the tested API's source to decide, so the rule
+follows integration automatically: once this branch includes #728, A14 must
+pass here too.
+
+To test another checkout's API with these probes, for example the #728 branch:
+
+```bash
+bash probes/native-auth/run-against-api.sh <argus-checkout> temp/native-auth-proof/final
+```
 
 ```bash
 python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-session-proof

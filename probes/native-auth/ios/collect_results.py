@@ -63,7 +63,7 @@ for r in sorted(results, key=lambda r: r["id"]):
     if r["verdict"] != "pass":
         print(f"       observed={r['observed']}")
 print(summary[-1] if summary else "no xcodebuild summary")
-problems = evidence_gate.verify(Path(out_path).parent, "automated", [Path(out_path).name])
+problems = evidence_gate.verify(Path(out_path).parent, "suites", [Path(out_path).name])
 for problem in problems:
     print(f"EVIDENCE GATE: {problem}", file=sys.stderr)
 sys.exit(1 if problems else 0)

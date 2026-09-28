@@ -55,7 +55,7 @@ def main() -> None:
     )
     failed = [r.id for r in rec.results if r.verdict == "fail"]
     print(f"{len(rec.results)} checks, {len(failed)} failed {failed}")
-    problems = evidence_gate.verify(args.out.parent, "automated", [args.out.name])
+    problems = evidence_gate.verify(args.out.parent, "suites", [args.out.name])
     for problem in problems:
         print(f"EVIDENCE GATE: {problem}", file=sys.stderr)
     sys.exit(1 if problems else 0)

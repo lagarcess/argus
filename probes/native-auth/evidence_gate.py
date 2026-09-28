@@ -1,18 +1,23 @@
 """Decide whether native-auth evidence is complete, expected, and current.
 
 `expectations.json` declares every check a suite must produce and the only
-failures that are documented. Anything it does not describe fails the gate: a
-missing, extra, or repeated check; an unexpected failure; a documented failure
-that now passes; a partial iOS run; an app log that departs from the declared
-steps; or a capture taken from a dirty tree or from code that differs from HEAD.
+failures that are expected. A conditional failure is expected only against an
+API whose source lacks the named fix, and must pass against one that has it.
+Anything the declaration does not describe fails the gate: a missing, extra,
+or repeated check; an unexpected failure; an expected failure that now passes;
+a partial iOS run; an app log that departs from the declared steps; an API
+version the gate cannot determine; or a capture taken from a dirty tree or
+from code that differs from HEAD.
 
-Usage: evidence_gate.py <evidence-dir> [--scope automated|app|all] [--only FILE ...]
+Usage: evidence_gate.py <evidence-dir> [--scope automated|cross|suites|app|all] [--only FILE ...]
+(`suites` is automated plus cross.)
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -34,20 +39,46 @@ RUNTIME_PATHS = (
     "poetry.lock",
     ":(exclude,glob)**/*.md",
 )
+API_PATHS = (
+    "src",
+    "supabase",
+    "web/argus_display_contract",
+    "pyproject.toml",
+    "poetry.lock",
+)
 APP_RUN_RECORD = "app/run.json"
 
 ChangedSince = Callable[[str], list[str]]
+# (api head, path, text) -> whether that file at that head contains the text,
+# or None when the head or the file cannot be read.
+ApiContains = Callable[[str, str, str], "bool | None"]
 
 
-def git(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True)
+def git(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["git", *args], cwd=cwd or REPO, capture_output=True, text=True)
 
 
 def capture_identity() -> dict[str, object]:
-    """Head and cleanliness to record in every evidence file at capture time."""
-    head = git("rev-parse", "HEAD").stdout.strip()
-    dirty = git("status", "--porcelain", "--", *RUNTIME_PATHS).stdout.strip()
-    return {"argus_source_head": head, "source_dirty": bool(dirty)}
+    """Probe and API identity to record in every evidence file at capture time.
+
+    The API tree comes from NATIVE_AUTH_API_ROOT, which stack/api.sh also uses.
+    """
+    api_root = Path(os.environ.get("NATIVE_AUTH_API_ROOT") or REPO)
+    source_dirty = git("status", "--porcelain", "--", *RUNTIME_PATHS).stdout.strip()
+    api_dirty = git(
+        "status", "--porcelain", "--", *API_PATHS, cwd=api_root
+    ).stdout.strip()
+    return {
+        "argus_source_head": git("rev-parse", "HEAD").stdout.strip(),
+        "source_dirty": bool(source_dirty),
+        "argus_api_head": git("rev-parse", "HEAD", cwd=api_root).stdout.strip(),
+        "api_dirty": bool(api_dirty),
+    }
+
+
+def api_contains(head: str, path: str, text: str) -> bool | None:
+    shown = git("show", f"{head}:{path}")
+    return None if shown.returncode != 0 else text in shown.stdout
 
 
 def runtime_changes_since(head: str) -> list[str]:
@@ -76,8 +107,33 @@ def capture_problems(name: str, doc: dict, changed_since: ChangedSince) -> list[
     return problems
 
 
+def expected_failures(
+    name: str, doc: dict, spec: dict, contains: ApiContains
+) -> tuple[set[str], list[str]]:
+    """Failures this file must show, derived from the API version it tested."""
+    expected = set(spec["documented_failures"])
+    head = str(doc.get("argus_api_head") or "")
+    if not head:
+        return expected, [
+            f"{name}: no argus_api_head recorded, so the API version is unknown"
+        ]
+    problems = []
+    if doc.get("api_dirty") is not False:
+        problems.append(f"{name}: API captured from a dirty or unrecorded tree")
+    for check, condition in spec.get("conditional_failures", {}).items():
+        marker = condition["fails_unless_api_contains"]
+        present = contains(head, marker["path"], marker["text"])
+        if present is None:
+            problems.append(
+                f"{name}: cannot read {marker['path']} at API head {head[:9]}"
+            )
+        elif not present:
+            expected.add(check)
+    return expected, problems
+
+
 def suite_problems(
-    name: str, doc: dict, checks: list[str], documented: set[str]
+    name: str, doc: dict, checks: list[str], expected: set[str]
 ) -> list[str]:
     results = doc.get("results")
     if not isinstance(results, list):
@@ -95,31 +151,32 @@ def suite_problems(
         problems.append(f"{name}: undeclared checks {extra}")
     for result in results:
         check, verdict = str(result.get("id")), result.get("verdict")
-        if check in documented and verdict == "pass":
+        if check in expected and verdict == "pass":
             problems.append(
-                f"{name}: documented failure {check} now passes; update expectations and the report"
+                f"{name}: expected failure {check} passes against this API; "
+                "update expectations and the report"
             )
-        elif check in documented and verdict != "fail":
+        elif check in expected and verdict != "fail":
             problems.append(f"{name}: {check} has verdict {verdict!r}")
-        elif check not in documented and verdict != "pass":
+        elif check not in expected and verdict != "pass":
             problems.append(f"{name}: unexpected {verdict!r} for {check}")
     return problems
 
 
 def ios_run_problems(
-    name: str, doc: dict, checks: list[str], documented: set[str]
+    name: str, doc: dict, checks: list[str], expected: set[str]
 ) -> list[str]:
     """xcodebuild's own count must agree, so a crashed or partial run cannot pass."""
-    expected_failures = len([c for c in checks if c in documented])
+    failures_expected = len([c for c in checks if c in expected])
     summary = str(doc.get("xcodebuild_summary") or "")
     match = re.search(r"Executed (\d+) tests?, with (\d+) failures?", summary)
     if not match:
         return [f"{name}: no xcodebuild summary"]
     executed, failures = int(match.group(1)), int(match.group(2))
-    if (executed, failures) != (len(checks), expected_failures):
+    if (executed, failures) != (len(checks), failures_expected):
         return [
             f"{name}: xcodebuild executed {executed} with {failures} failures, "
-            f"expected {len(checks)} with {expected_failures}"
+            f"expected {len(checks)} with {failures_expected}"
         ]
     return []
 
@@ -138,14 +195,16 @@ def app_problems(root: Path, name: str, spec: dict) -> list[str]:
     relevant = [e for e in log if e.get("step") in set(declared)]
     if [e["step"] for e in relevant] != declared:
         problems.append(
-            f"{spec['id']} {name}: steps {[e['step'] for e in relevant]} differ from declared {declared}"
+            f"{spec['id']} {name}: steps {[e['step'] for e in relevant]} "
+            f"differ from declared {declared}"
         )
     else:
         for want, got in zip(spec["steps"], relevant, strict=True):
             for key, value in want["observed"].items():
-                if got.get("observed", {}).get(key) != value:
+                seen = got.get("observed", {}).get(key)
+                if seen != value:
                     problems.append(
-                        f"{spec['id']} {name}: {want['step']} {key}={got.get('observed', {}).get(key)!r}, expected {value!r}"
+                        f"{spec['id']} {name}: {want['step']} {key}={seen!r}, expected {value!r}"
                     )
     forbidden = sorted({e.get("step") for e in log} & set(spec["forbidden_steps"]))
     if forbidden:
@@ -159,26 +218,40 @@ def verify(
     only: Iterable[str] = (),
     expectations: dict | None = None,
     changed_since: ChangedSince = runtime_changes_since,
+    contains: ApiContains = api_contains,
 ) -> list[str]:
     spec = expectations or load_expectations()
-    documented = set(spec["documented_failures"])
+    cross = spec.get("cross_version", {})
     only = set(only)
     problems: list[str] = []
-    if scope in ("automated", "all"):
-        for name, checks in spec["automated"].items():
-            if only and name not in only:
-                continue
-            path = root / name
-            if not path.is_file():
-                problems.append(f"{name}: missing")
-                continue
-            doc = json.loads(path.read_text())
-            problems += capture_problems(name, doc, changed_since)
-            problems += suite_problems(name, doc, checks, documented)
-            if name == "ios-simulator.json":
-                problems += ios_run_problems(name, doc, checks, documented)
-        unknown = only - set(spec["automated"])
-        problems += [f"{name}: no declared expectations" for name in sorted(unknown)]
+    suites: dict[str, list[str]] = {}
+    if scope in ("automated", "suites", "all"):
+        suites.update(spec["automated"])
+    if scope in ("cross", "suites", "all"):
+        suites.update({name: entry["checks"] for name, entry in cross.items()})
+    for name, checks in suites.items():
+        if only and name not in only:
+            continue
+        path = root / name
+        if not path.is_file():
+            problems.append(f"{name}: missing")
+            continue
+        doc = json.loads(path.read_text())
+        problems += capture_problems(name, doc, changed_since)
+        expected, api_problems = expected_failures(name, doc, spec, contains)
+        problems += api_problems
+        fix = cross.get(name, {}).get("api_must_contain_fix_for")
+        if fix and fix in expected:
+            problems.append(
+                f"{name}: the API it tested does not contain the fix for {fix}"
+            )
+        problems += suite_problems(name, doc, checks, expected)
+        if name == "ios-simulator.json":
+            problems += ios_run_problems(name, doc, checks, expected)
+    if scope in ("automated", "cross", "suites", "all"):
+        problems += [
+            f"{name}: no declared expectations" for name in sorted(only - set(suites))
+        ]
     if scope in ("app", "all"):
         record = root / APP_RUN_RECORD
         if not record.is_file():
@@ -195,7 +268,9 @@ def verify(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
-    parser.add_argument("--scope", choices=("automated", "app", "all"), default="all")
+    parser.add_argument(
+        "--scope", choices=("automated", "cross", "suites", "app", "all"), default="all"
+    )
     parser.add_argument("--only", nargs="*", default=[])
     args = parser.parse_args()
     problems = verify(args.root, args.scope, args.only)

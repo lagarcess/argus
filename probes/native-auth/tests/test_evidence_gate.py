@@ -11,7 +11,10 @@ import evidence_gate
 import pytest
 
 SPEC = evidence_gate.load_expectations()
-DOCUMENTED = set(SPEC["documented_failures"])
+UNFIXED_API = "b" * 40
+FIXED_API = "c" * 40
+# Against an API without the A14 fix, A14 joins the unconditional failures.
+DOCUMENTED = set(SPEC["documented_failures"]) | set(SPEC["conditional_failures"])
 HEAD = "a" * 40
 CLEAN = {"argus_source_head": HEAD, "source_dirty": False}
 
@@ -20,17 +23,24 @@ def unchanged(_: str) -> list[str]:
     return []
 
 
+def fix_only_in_fixed_api(head: str, path: str, text: str) -> bool | None:
+    return {UNFIXED_API: False, FIXED_API: True}.get(head)
+
+
 def write(root: Path, name: str, doc: object) -> None:
     path = root / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(doc))
 
 
-def suite_doc(name: str, checks: list[str]) -> dict:
+def suite_doc(name: str, checks: list[str], fixed: bool = False) -> dict:
+    expected = set(SPEC["documented_failures"]) if fixed else DOCUMENTED
     doc = {
         **CLEAN,
+        "argus_api_head": FIXED_API if fixed else UNFIXED_API,
+        "api_dirty": False,
         "results": [
-            {"id": c, "verdict": "fail" if c in DOCUMENTED else "pass"} for c in checks
+            {"id": c, "verdict": "fail" if c in expected else "pass"} for c in checks
         ],
     }
     if name == "ios-simulator.json":
@@ -49,6 +59,8 @@ def app_log(spec: dict) -> list[dict]:
 def complete(tmp_path: Path) -> Path:
     for name, checks in SPEC["automated"].items():
         write(tmp_path, name, suite_doc(name, checks))
+    for name, entry in SPEC["cross_version"].items():
+        write(tmp_path, name, suite_doc(name, entry["checks"], fixed=True))
     write(tmp_path, evidence_gate.APP_RUN_RECORD, CLEAN)
     for name, spec in SPEC["app"].items():
         write(tmp_path, name, app_log(spec))
@@ -58,7 +70,9 @@ def complete(tmp_path: Path) -> Path:
 
 
 def problems(root: Path, **kwargs) -> list[str]:
-    return evidence_gate.verify(root, changed_since=unchanged, **kwargs)
+    return evidence_gate.verify(
+        root, changed_since=unchanged, contains=fix_only_in_fixed_api, **kwargs
+    )
 
 
 def test_complete_expected_current_evidence_passes(complete: Path) -> None:
@@ -89,7 +103,7 @@ def edit_session(root: Path, change) -> None:
             lambda d: next(r for r in d["results"] if r["id"] == "A14").update(
                 verdict="pass"
             ),
-            "documented failure A14 now passes",
+            "expected failure A14 passes against this API",
         ),
         (lambda d: d.update(source_dirty=True), "dirty"),
         (lambda d: d.pop("argus_source_head"), "no argus_source_head"),
@@ -111,6 +125,7 @@ def test_capture_from_code_that_changed_since_is_refused(complete: Path) -> None
         complete,
         "automated",
         changed_since=lambda head: ["src/argus/api/routers/auth.py"],
+        contains=fix_only_in_fixed_api,
     )
     assert any("runtime changed since capture" in p for p in found)
 
@@ -215,3 +230,93 @@ def test_staleness_follows_runtime_code_not_prose(tmp_path: Path, monkeypatch) -
     assert evidence_gate.runtime_changes_since(captured) == [
         "probes/native-auth/probe.py"
     ]
+
+
+def edit(root: Path, name: str, change) -> None:
+    path = root / name
+    doc = json.loads(path.read_text())
+    change(doc)
+    path.write_text(json.dumps(doc))
+
+
+def a14(doc: dict) -> dict:
+    return next(r for r in doc["results"] if r["id"] == "A14")
+
+
+@pytest.mark.parametrize(
+    ("name", "api", "a14_verdict", "expected"),
+    [
+        ("http-session.json", FIXED_API, "fail", "unexpected 'fail' for A14"),
+        ("http-session.json", UNFIXED_API, "pass", "expected failure A14 passes"),
+        ("http-session-fixed-api.json", FIXED_API, "fail", "unexpected 'fail' for A14"),
+        (
+            "http-session-fixed-api.json",
+            UNFIXED_API,
+            "fail",
+            "does not contain the fix for A14",
+        ),
+    ],
+)
+def test_a14_expectation_follows_the_api_version_tested(
+    complete: Path, name: str, api: str, a14_verdict: str, expected: str
+) -> None:
+    def change(doc: dict) -> None:
+        doc["argus_api_head"] = api
+        a14(doc)["verdict"] = a14_verdict
+
+    edit(complete, name, change)
+    assert any(expected in p for p in problems(complete, scope="suites"))
+
+
+def test_session_suite_is_clean_against_a_fixed_api_when_a14_passes(
+    complete: Path,
+) -> None:
+    def fixed(doc: dict) -> None:
+        doc["argus_api_head"] = FIXED_API
+        a14(doc)["verdict"] = "pass"
+
+    edit(complete, "http-session.json", fixed)
+    assert problems(complete, scope="suites") == []
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        (lambda d: d.pop("argus_api_head"), "API version is unknown"),
+        (
+            lambda d: d.update(argus_api_head="d" * 40),
+            "cannot read src/argus/domain/supabase_gateway.py",
+        ),
+        (lambda d: d.update(api_dirty=True), "API captured from a dirty"),
+    ],
+)
+def test_unknown_or_dirty_api_is_refused(complete: Path, change, expected: str) -> None:
+    edit(complete, "http-guest.json", change)
+    assert any(expected in p for p in problems(complete, scope="suites"))
+
+
+def test_fix_marker_is_read_from_the_api_head(tmp_path: Path, monkeypatch) -> None:
+    marker = SPEC["conditional_failures"]["A14"]["fails_unless_api_contains"]
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=tmp_path, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "gate@example.test")
+    git("config", "user.name", "gate")
+    source = tmp_path / marker["path"]
+    source.parent.mkdir(parents=True)
+    source.write_text("auth_client=create_client(url, key)\n")
+    git("add", ".")
+    git("commit", "-qm", "unfixed")
+    unfixed = git("rev-parse", "HEAD")
+    source.write_text(f"{marker['text']}url, key):\n")
+    git("commit", "-qam", "fixed")
+    fixed = git("rev-parse", "HEAD")
+    monkeypatch.setattr(evidence_gate, "REPO", tmp_path)
+
+    assert evidence_gate.api_contains(unfixed, marker["path"], marker["text"]) is False
+    assert evidence_gate.api_contains(fixed, marker["path"], marker["text"]) is True
+    assert evidence_gate.api_contains("e" * 40, marker["path"], marker["text"]) is None
