@@ -574,9 +574,10 @@ amounts in log fields.
 (any table, event property, or retention change), `docs/ARCHITECTURE.md`
 (registered calculations table, analytics), `docs/PRODUCT.md`,
 `.agent/designs/argus/DESIGN.md` (navigation), `docs/BREAKPOINTS.md`
-(layout). Decision log: `docs/specs/argus-decision-log.md`. Wave 1 roadmap
-draft: `docs/specs/argus-wave-1-roadmap.md` on PR #672 only, marked "Draft,
-not approved by Lucas".
+(layout). Decision log: `docs/specs/argus-decision-log.md`. Wave 1 package
+authority: `docs/specs/wave-1/README.md` and this directory's stage specs.
+The earlier draft Wave 1 roadmap file proposed on PR #672 was dropped; do
+not revive it.
 
 ### RM-18. Browser storage registry
 
