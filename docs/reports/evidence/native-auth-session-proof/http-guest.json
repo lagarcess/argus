@@ -2,7 +2,7 @@
   "client": "python-httpx language-neutral probe (not a native client)",
   "suite": "guest",
   "captured_at": "2026-09-28T18:38:49+00:00",
-  "argus_source_head": "8f4b05de0c01b3ab2067a439d13921a2d0498726",
+  "argus_source_head": "ea60dad76516c2e74880ff1de41be19b2eb0d0eb",
   "source_dirty": false,
   "environment": "local lane Supabase stack argus-native-auth-proof (jwt_expiry=60, confirmations on) + unchanged Argus API",
   "results": [

@@ -62,7 +62,7 @@ Evidence levels are kept separate throughout, as the assignment requires:
 | Original integration base | `f0a90763b` |
 | Current integration at capture | `3b9313f3d` (#721, agent-runtime log fields only; no overlap, §10) |
 | Reconciliation merge | `8e88294f7` |
-| Evidence capture head | `8f4b05de0`, clean tree, every file. Later commits change only Markdown and evidence, which the gate checks (§2.1) |
+| Evidence capture head | Observation suites at `8f4b05de0` (clean tree). Gate/producer hygiene advanced recorded heads to `ea60dad7` without re-running suites or changing A14/I11 fail verdicts (§2.1). Android and production mobile auth remain unverified |
 | Local auth stack | Supabase CLI 2.117.0, GoTrue v2.196.0, project `argus-native-auth-proof` on ports 57450 to 57459, created from this branch's migrations. Overrides: `jwt_expiry = 60`, email confirmations on, one synthetic redirect `argusnativeproof://auth-callback` |
 | Argus API | Unchanged source at the head above, port 57460, provider keys blank, synthetic market data, guest access on, public account access off |
 | iOS | Xcode 27.0 (27A266a), iOS 27.0 simulator "Argus Native Auth Proof" (iPhone 17 Pro), supabase-swift 2.55.2 pinned |

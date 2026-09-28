@@ -7,13 +7,17 @@ password, handoff secret, PKCE verifier, or email link.
 
 ## Current acceptance
 
-Every file here was captured at `8f4b05de0` from a clean tree, and each
-records that head and `source_dirty: false`. The evidence gate verifies the
-set against `probes/native-auth/expectations.json`. It fails on a missing,
-repeated, or undeclared check, on any failure other than the documented ones,
-on a documented failure that now passes, on an iOS run whose xcodebuild
-counts disagree, on an app log that departs from the declared steps, and on
-runtime code that changed after the capture. Re-verify at any later head:
+Observation suites were captured at `8f4b05de0` from a clean tree. Each
+current evidence file now records head `ea60dad7` after a gate/producer
+hygiene pass that did not re-run HTTP, iOS, or app demos and did not change
+any check verdict: A14 and I11 remain documented failures. The evidence gate
+verifies the set against `probes/native-auth/expectations.json`. It fails on a
+missing, repeated, or undeclared check, on any failure other than the
+documented ones, on a documented failure that now passes, on an iOS run whose
+xcodebuild counts disagree, on an app log that departs from the declared steps
+or includes an undeclared step (only `launch` is an allowed incidental), on a
+missing or nonnumeric `scheme_prompts_accepted` count, and on runtime producer
+code that changed after the capture. Re-verify at any later head:
 
 ```bash
 python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-session-proof
@@ -22,9 +26,15 @@ python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-se
 Documented failures, and only these, are expected:
 
 - **A14.** The API's shared Supabase Auth client refreshes sessions it
-  returned. PR #728 fixes it; this branch does not contain that fix.
+  returned. Separate fix: [PR #728](https://github.com/lagarcess/argus/pull/728).
+  This branch does not contain that fix.
 - **I11.** supabase-swift logs tokens when given a logger, and a `Session`
   description contains them.
+
+Android remains unverified (never compiled here). Production mobile auth
+remains unverified until #728 lands and Android probe verification on this
+follow-up is solid. Android probe work tracked here must not block #730
+sample landing.
 
 | File | Client | Level | Checks |
 | --- | --- | --- | --- |
