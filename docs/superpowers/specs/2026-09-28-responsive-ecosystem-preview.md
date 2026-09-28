@@ -166,7 +166,12 @@ Any necessary shared change requires coordination before editing that surface.
   both languages, light/dark/system persistence and system changes, keyboard,
   focus/dialog/back behavior, scroll reachability, long labels and 200% text.
   Observe network requests and fail on preview API/provider traffic. Verify the
-  route is 404 in a production build and existing entry points still render.
+  route renders the server not-found result in a production build and existing
+  entry points still render. Measured Next.js 16 streaming behavior sends HTTP
+  200 with an explicit not-found marker for this existing dev-route pattern;
+  the gate must reject preview markup and require that marker for a 200 response.
+  A transport-level 404 would require the shared proxy owner and is outside this
+  route-local lane.
 - Commit screenshots and interaction evidence under
   `docs/reports/evidence/ecosystem-web-preview/`. Record exact code head,
   environment, fixtures and limitations. Later docs/evidence-only commits may
