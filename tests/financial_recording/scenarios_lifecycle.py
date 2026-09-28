@@ -4,6 +4,7 @@ These scenarios cover the September 28 mobile baseline's recording rules. They
 share the driver in scenes.py and feed the same evidence file as scenarios.py.
 """
 
+from dataclasses import replace
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -287,6 +288,8 @@ def edits_that_move_money_need_review() -> dict:
         "check_correction_bound_to_account_state": _check_correction_bound_to_account(),
         "observation_basis_and_restamp_together": _observation_basis_and_restamp_together(),
         "distinct_bound_to_reviewed_matches": _distinct_bound_to_reviewed_matches(),
+        "preview_basis_requires_touched_accounts": _preview_basis_requires_touched(),
+        "remove_answers_limited_to_exposed": _remove_answers_limited_to_exposed(),
     }
 
 
@@ -1358,6 +1361,62 @@ def _distinct_bound_to_reviewed_matches() -> dict:
         "reopens_for_new_match": after_new_match,
         "lists_both": sorted(scene.refs(twin, "possible_duplicate"))
         == sorted([first.id, other.id]),
+    }
+
+
+def _preview_basis_requires_touched() -> dict:
+    """An empty or partial Preview.basis cannot bypass account-version staleness."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    draft = scene.observation(cash, "1000.00", 5)
+    preview = scene.store.preview(draft.id)
+    empty = replace(preview, basis={})
+    return {
+        "empty_basis": outcome(lambda: scene.store.confirm(empty, "empty-basis")),
+        "full_basis_still_works": outcome(
+            lambda: scene.store.confirm(preview, "full-basis")
+        ),
+    }
+
+
+def _remove_answers_limited_to_exposed() -> dict:
+    """Removal answers may only name questions the trial removal exposes."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    other = scene.account("Ahorros", "savings", "DOP", "5000.00")
+    first = scene.observe(cash, "8000.00", 5)
+    second = scene.observe(cash, "8000.00", 10)
+    scene.now = local(11)
+    late = scene.act("expense", cash, "2000.00", 3)
+    scene.store.resolve(
+        late.id,
+        answers={first.id: "included"},
+        expected_revision=scene.store.state.drafts[late.id].revision,
+    )
+    record = scene.confirm(late)
+    # Foreign activity on another account: not exposed by removing `first`.
+    foreign = scene.record("expense", other, "100.00", 11)
+    off_account = outcome(
+        lambda: scene.store.remove(
+            first.id,
+            1,
+            "typo",
+            answers={foreign.id: {second.id: "included"}},
+        )
+    )
+    accepted = outcome(
+        lambda: scene.store.remove(
+            first.id,
+            1,
+            "typo",
+            accept_reordering=True,
+            answers={record.id: {second.id: "included"}},
+        )
+    )
+    return {
+        "off_account_answer": off_account,
+        "exposed_answer_ok": accepted,
+        "foreign_unchanged": scene.amount(other),
     }
 
 

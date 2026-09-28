@@ -381,4 +381,13 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "reopens_for_new_match": {"possible_duplicate": "blocking"},
             "lists_both": True,
         },
+        "preview_basis_requires_touched_accounts": {
+            "empty_basis": "StalePreview",
+            "full_basis_still_works": "ok",
+        },
+        "remove_answers_limited_to_exposed": {
+            "off_account_answer": "InvalidInput:answer_target_invalid",
+            "exposed_answer_ok": "ok",
+            "foreign_unchanged": 490_000,
+        },
     }

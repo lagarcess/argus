@@ -484,14 +484,20 @@ class Store:
                 continue
             if draft.status != "proposed":
                 raise InvalidInput("draft_not_proposed", draft.id)
-            # Staleness is judged against the batch's starting state, so one
-            # batch may carry several activity previews of the same account.
-            if draft.revision != preview.draft_revision or any(
-                start.book.accounts[account_id].version != version
-                for account_id, version in preview.basis.items()
-            ):
+            if draft.revision != preview.draft_revision:
                 raise StalePreview(self.preview(preview.draft_id))
             body, found = review(working, draft, self.tz, now=self.clock())
+            # Require every touched account version from the batch's starting
+            # state; an empty or partial basis must not bypass staleness.
+            required = (
+                accounts_of(body) & set(start.book.accounts) if body is not None else set()
+            )
+            if any(
+                account_id not in preview.basis
+                or start.book.accounts[account_id].version != preview.basis[account_id]
+                for account_id in required
+            ):
+                raise StalePreview(self.preview(preview.draft_id))
             if blocking(found):
                 raise ReviewRequired(blocking(found))
             records = dict(working.book.records)
@@ -612,8 +618,8 @@ class Store:
         answers: Optional[Mapping[str, Mapping[str, str]]] = None,
     ) -> Record:
         """Remove a record. When removing a check, `answers` carries
-        activity_id → {check_id: included|not_included} for questions the removal
-        would expose against later checks."""
+        activity_id → {check_id: included|not_included} only for questions the
+        trial removal exposes against later checks."""
         record = self._current(record_id, expected_revision, reason)
         refunds = [
             other.id
@@ -625,8 +631,24 @@ class Store:
         if answers and isinstance(record.body, Activity):
             raise InvalidInput("answers_not_applicable", record_id)
         now = self.clock()
+        scope = set(accounts_of(record.body))
+        trial_tombstone = replace(record.revisions[-1], removed=True)
+        trial = replace(
+            self.book,
+            records={
+                **self.book.records,
+                record_id: replace(
+                    record, revisions=(*record.revisions, trial_tombstone)
+                ),
+            },
+        )
+        exposed = {
+            (item.refs[1], item.refs[0])
+            for item in inclusion_issues(trial, scope, self.tz)
+            if item.code == "inclusion_unanswered" and len(item.refs) >= 2
+        }
         records = dict(self.book.records)
-        touched = set(accounts_of(record.body))
+        touched = set(scope)
         if answers:
             for activity_id, activity_answers in answers.items():
                 target = records.get(activity_id)
@@ -636,6 +658,9 @@ class Store:
                     or not isinstance(target.body, Activity)
                 ):
                     raise InvalidInput("answer_target_invalid", activity_id)
+                for check_id in activity_answers:
+                    if (activity_id, check_id) not in exposed:
+                        raise InvalidInput("answer_target_invalid", activity_id)
                 new_body = replace(
                     target.body,
                     answers=_merged_answers(target.body.answers, activity_answers),
@@ -668,11 +693,12 @@ class Store:
         removed = replace(record, revisions=(*record.revisions, tombstone))
         records[record_id] = removed
         after = replace(self.book, records=records)
-        questions = inclusion_issues(after, accounts_of(record.body), self.tz)
+        # Validate every account the write touches, not only the removed check's.
+        questions = inclusion_issues(after, touched, self.tz)
         if questions:
             raise ReviewRequired(questions)
         if not accept_reordering:
-            moved = self._placement_changes_against(after, accounts_of(record.body))
+            moved = self._placement_changes_against(after, touched)
             if moved:
                 raise ReviewRequired(moved)
         self._swap(

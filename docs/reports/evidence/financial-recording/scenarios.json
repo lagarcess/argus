@@ -593,6 +593,10 @@
       ],
       "historic_gap_count": 1
     },
+    "preview_basis_requires_touched_accounts": {
+      "empty_basis": "StalePreview",
+      "full_basis_still_works": "ok"
+    },
     "purchase_edits_recheck_refunds": {
       "later_date": "ReviewRequired:refund_before_purchase",
       "other_category": "ReviewRequired:refund_category_mismatch"
@@ -652,6 +656,11 @@
     },
     "rejected_draft_cannot_confirm": {
       "confirm_rejected": "InvalidInput:draft_not_proposed"
+    },
+    "remove_answers_limited_to_exposed": {
+      "exposed_answer_ok": "ok",
+      "foreign_unchanged": 490000,
+      "off_account_answer": "InvalidInput:answer_target_invalid"
     },
     "removing_a_check_others_depend_on": {
       "accepted_reordering": "ok",
