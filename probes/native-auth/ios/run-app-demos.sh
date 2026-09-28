@@ -16,6 +16,11 @@ import json,sys
 print(next(d['udid'] for ds in json.load(sys.stdin)['devices'].values() for d in ds if d['name']=='Argus Native Auth Proof'))")"
 xcodebuild build -project "$HERE/ArgusAuthProbeApp/ArgusAuthProbeApp.xcodeproj" -scheme ArgusAuthProbeApp \
   -destination "id=$UDID" -derivedDataPath "$NATIVE_AUTH_WORK/DerivedData" -quiet
+# A reboot clears any system prompt left by an earlier run, so an old
+# callback cannot reach this run.
+xcrun simctl shutdown "$UDID" 2> /dev/null || true
+xcrun simctl boot "$UDID"
+xcrun simctl bootstatus "$UDID" -b > /dev/null
 xcrun simctl install "$UDID" "$APP"
 python3 - "$OUT/run.json" "$UDID" "$HERE/.." <<'PY'
 import json, subprocess, sys
@@ -67,6 +72,7 @@ rm -f "$(app_log)"
   TEST_RUNNER_NATIVE_AUTH_SUPABASE_URL="$API_URL" \
   TEST_RUNNER_NATIVE_AUTH_ARGUS_API="http://127.0.0.1:$NATIVE_AUTH_API_PORT" \
   xcodebuild test -project ArgusAuthProbeApp.xcodeproj -scheme ArgusAuthProbeUITests \
+    -only-testing:ArgusAuthProbeUITests/CancelSecurityCheckUITests \
     -destination "id=$UDID" -derivedDataPath "$NATIVE_AUTH_WORK/DerivedData" \
     -collect-test-diagnostics never > "$UI_LOG" 2>&1) &
 UI_TEST=$!
@@ -92,22 +98,41 @@ CALLBACK="$(cd "$HERE/../http_probe" && API_URL="$API_URL" ANON_KEY="$ANON_KEY" 
 from harness import GoTrue, Mailpit, Stack
 s = Stack.from_env()
 print(GoTrue(s).verify_link(Mailpit(s).latest_link('$EMAIL', after=$SENT)).headers['location'])")"
-# iOS may ask "Open in ArgusAuthProbeApp?" before delivering a custom-scheme
-# URL. Each delivery waits for the app to log its outcome before the next.
+# iOS asks "Open in ArgusAuthProbeApp?" on the first custom-scheme delivery to
+# a new install. A UI test accepts every such prompt, as a user would.
+PROMPT_LOG="$NATIVE_AUTH_WORK/ui-prompt.log"
+(cd "$HERE/ArgusAuthProbeApp" && xcodebuild test -project ArgusAuthProbeApp.xcodeproj \
+  -scheme ArgusAuthProbeUITests -only-testing:ArgusAuthProbeUITests/CustomSchemePromptUITests \
+  -destination "id=$UDID" -derivedDataPath "$NATIVE_AUTH_WORK/DerivedData" \
+  -collect-test-diagnostics never > "$PROMPT_LOG" 2>&1) &
+PROMPTS=$!
+sleep 45
 deliver() {
   local before log
   log="$(app_log)"
   before="$({ grep -o callback.completed "$log" || true; } | wc -l)"
   xcrun simctl openurl "$UDID" "$1"
-  echo "If iOS asks \"Open in ArgusAuthProbeApp?\", tap Open ($2)."
-  for _ in $(seq 1 90); do
+  sleep 2
+  xcrun simctl io "$UDID" screenshot "$OUT/callback-delivery-$3.png" > /dev/null 2>&1
+  for _ in $(seq 1 150); do
     if [ "$({ grep -o callback.completed "$log" || true; } | wc -l)" -gt "$before" ]; then return; fi
     sleep 1
   done
   echo "no callback outcome for $2" >&2; exit 1
 }
-deliver "$CALLBACK" "issued code"
-deliver "$CALLBACK" "same code again"
-deliver "argusnativeproof://auth-callback?code=00000000-0000-0000-0000-000000000000" "forged code"
+deliver "$CALLBACK" "issued code" 1
+deliver "$CALLBACK" "same code again" 2
+deliver "argusnativeproof://auth-callback?code=00000000-0000-0000-0000-000000000000" "forged code" 3
+if ! wait "$PROMPTS" || ! grep -q "Executed 1 test, with 0 failures" "$PROMPT_LOG"; then
+  echo "scheme prompt UI test failed; see $PROMPT_LOG" >&2; exit 1
+fi
+ACCEPTED="$(sed -n 's/.*SCHEME_PROMPTS_ACCEPTED \([0-9][0-9]*\).*/\1/p' "$PROMPT_LOG" | tail -1)"
+python3 - "$OUT/run.json" "${ACCEPTED:-unknown}" <<'PY'
+import json, sys
+path, accepted = sys.argv[1:3]
+record = json.load(open(path))
+record["scheme_prompts_accepted"] = accepted
+open(path, "w").write(json.dumps(record, indent=2) + "\n")
+PY
 capture callback-delivery 2
 exec python3 "$HERE/../evidence_gate.py" "$ROOT" --scope app
