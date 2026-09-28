@@ -194,6 +194,9 @@
         "last_error": "parse_error",
         "result": {
           "applied": false,
+          "invalid": [
+            "balances[0].amount"
+          ],
           "state": "degraded"
         }
       },
@@ -315,6 +318,125 @@
         ]
       },
       "passed": true
+    },
+    {
+      "case": "provider_input_boundary",
+      "claim": "Every provider field is checked once before anything is written. Each malformed field rejects the whole batch by name and writes only the connection's error state, while well-formed batches, including edge values, still apply",
+      "observed": {
+        "accepted": {
+          "baseline": {
+            "applied": true,
+            "proposals": 1,
+            "snapshots": 1
+          },
+          "edge_values": {
+            "applied": true,
+            "proposals": 1,
+            "snapshots": 2
+          }
+        },
+        "rejected": {
+          "accounts[0].currency": {
+            "applied": false,
+            "invalid": [
+              "accounts[0].currency"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "accounts[0].source_id": {
+            "applied": false,
+            "invalid": [
+              "accounts[0].source_id"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "at": {
+            "applied": false,
+            "invalid": [
+              "at"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "balances[0].account": {
+            "applied": false,
+            "invalid": [
+              "balances[0].account"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "balances[0].amount": {
+            "applied": false,
+            "invalid": [
+              "balances[0].amount"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "balances[0].as_of": {
+            "applied": false,
+            "invalid": [
+              "balances[0].as_of"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "balances[0].currency": {
+            "applied": false,
+            "invalid": [
+              "balances[0].currency"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "coverage": {
+            "applied": false,
+            "invalid": [
+              "coverage"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "failure": {
+            "applied": false,
+            "invalid": [
+              "failure"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "txns[0].amount": {
+            "applied": false,
+            "invalid": [
+              "txns[0].amount"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "txns[0].booked": {
+            "applied": false,
+            "invalid": [
+              "txns[0].booked"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "txns[0].description": {
+            "applied": false,
+            "invalid": [
+              "txns[0].description"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "txns[0].direction": {
+            "applied": false,
+            "invalid": [
+              "txns[0].direction"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "txns[0].pending": {
+            "applied": false,
+            "invalid": [
+              "txns[0].pending"
+            ],
+            "writes_only_the_rejection": true
+          }
+        }
+      },
+      "passed": true
     }
   ],
   "failed": [],
@@ -362,7 +484,7 @@
       "rows_in_export": 52
     }
   ],
-  "passed": 25,
+  "passed": 26,
   "review_workload": [
     {
       "actions_if_clean_rows_were_auto_accepted": 3,

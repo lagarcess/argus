@@ -16,7 +16,7 @@ poetry run python docs/reports/dominican-bank-connectivity/connector_lifecycle.p
 cmp temp/connector-lifecycle-report.json docs/reports/dominican-bank-connectivity/connector-lifecycle-report.json
 ```
 
-The script prints `25/25 checks passed` and exits with code 0. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
+The script prints `26/26 checks passed` and exits with code 0. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
 
 The run used Python 3.10.20 and Faker 30.10.0, which match `poetry.lock`. The kit's own 46 checks passed in the same environment before the experiment reused them.
 
@@ -63,7 +63,7 @@ stateDiagram-v2
 
 ## Results
 
-All 25 checks passed. Each row names the assignment's failure case and the behavior the script asserts.
+All 26 checks passed. Each row names the assignment's failure case and the behavior the script asserts.
 
 | Check | Assignment case | Asserted behavior |
 | --- | --- | --- |
@@ -92,6 +92,7 @@ All 25 checks passed. Each row names the assignment's failure case and the behav
 | `privacy_boundaries` | Private data boundaries | Events carry codes and counts only. The synthetic secret appears nowhere outside the vault. The partner account cannot refresh the owner's connection. |
 | `stale_revision_superseded` | Revised transactions | Three source changes before review leave one pending revision, built from the latest observation. Accepting it gives DOP 60.00 with the newer description. Accepting a superseded revision is refused, so a stale value cannot return. |
 | `currency_mismatch_held` | Multiple accounts and currencies | A USD source account chosen for a DOP account is not mapped and becomes an owner decision. A USD balance reported for a DOP account is not stored. A USD row on a DOP account waits with `currency_mismatch`. The DOP row and balance proceed. |
+| `provider_input_boundary` | Source failure without erasing data | Every field of a provider batch is checked in one place before anything is written, covering the attempt time, the failure code, source accounts, balances, transactions, and coverage dates. Each of 14 malformed fields rejects the whole batch by name and writes only the connection's error state and one event. A baseline batch, and one with a negative balance, a zero balance, an empty description, and no institution id, still apply. |
 
 ## Review workload for recurring sync
 
@@ -137,7 +138,7 @@ The script makes each choice below so that it can run. None of these choices is 
 3. **Transfer pairing.** The script pairs automatically only with a shared bank reference. It holds amount-and-date look-alikes for review. The threshold for inferred pairs is open.
 4. **Field ownership.** Source revisions change only source-owned fields and never overwrite owner edits. A newer source change replaces an unreviewed one. The split between source-owned and owner-owned fields needs a contract.
 5. **Deletion scope.** Deleting imported data removes records whose only provenance is the connection, including owner corrections on those records, and every proposal the connection created. Records with manual or other provenance stay. Product and privacy owners must confirm that rule.
-6. **Batch rejection.** A connector refresh applies all rows or none. The kit keeps row-level issues for file uploads. The right unit depends on the retrieval method and needs a stated rule.
+6. **Batch rejection.** A connector refresh applies all rows or none. Every provider field is checked in one place before anything is written. A rejected batch writes only the connection's error state and one event, and not even its attempt time, which comes from the batch. The kit keeps row-level issues for file uploads. The right unit depends on the retrieval method and needs a stated rule.
 7. **Cross-currency transfers.** The script keeps two linked records in their own currencies and applies no rate. Any later conversion must show its rate, date, and source per MVEE section 2. A source account, balance, or row in another currency than the chosen Argus account waits for the owner. A card that carries both pesos and dollars needs a rule the script does not make.
 8. **Household scope.** Every proposal lands in the owner's personal context. Sharing an account with a household shares records, not the connection. Cross-person account identity for a joint account imported by both partners is untested.
 
@@ -146,5 +147,4 @@ The script makes each choice below so that it can run. None of these choices is 
 - It does not show that any Dominican bank, aggregator, or file format supplies these fields. The bank access matrix owns that evidence.
 - It does not show secure credential handling. The vault is a Python dictionary that stands for a secret manager.
 - It does not model Postgres, row-level security, concurrency, or retention timers.
-- It does not validate a balance's timestamp. A malformed as-of time is accepted and can distort freshness and reconciliation. An automated review raised it as a second finding on balance validation, so it waits for a decision instead of another fix.
 - It does not test parsing of real bank files. The kit's README lists the consented-document evaluation that must come first.

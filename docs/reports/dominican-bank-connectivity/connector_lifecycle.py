@@ -4,13 +4,14 @@ import argparse
 import csv
 import json
 import random
+import re
 import sys
 import tempfile
 import unicodedata
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
-from datetime import date, timedelta
-from decimal import Decimal, InvalidOperation
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
@@ -24,6 +25,9 @@ from tests.synthetic_ingestion.harness import Harness, field_issues
 SECRET = "synthetic-session-token-not-a-real-secret"
 MATCH_WINDOW_DAYS = 3
 INFORMATIONAL = ("identity_derived", "reversal_linked")
+CURRENCIES = ("DOP", "USD")
+FAILURES = ("source_failed", "session_expired", "mfa_challenge")
+TIMESTAMP = "%Y-%m-%dT%H:%M"
 OPEN = ("proposed", "pending", "revision")
 
 PENDING_CONSENT = "pending_consent"
@@ -55,10 +59,6 @@ TRANSITIONS = {
 
 
 class IllegalTransition(Exception):
-    pass
-
-
-class BatchRejected(Exception):
     pass
 
 
@@ -228,6 +228,19 @@ def refresh(store: Store, actor: str, connection_id: str, result: Refresh) -> di
     connection = _owned(store, actor, connection_id)
     if connection["state"] not in (ACTIVE, DEGRADED):
         raise IllegalTransition(f"{connection['state']} cannot refresh")
+    invalid = input_problems(result)
+    if invalid:
+        _move(connection, "parse_error")
+        connection["last_error"] = "parse_error"
+        store.events.append(
+            {
+                "code": "batch_rejected",
+                "connection": connection_id,
+                "applied": False,
+                "invalid_fields": len(invalid),
+            }
+        )
+        return {"applied": False, "state": connection["state"], "invalid": invalid}
     connection["last_attempt_at"] = result.at
     if result.failure:
         _move(connection, result.failure)
@@ -237,15 +250,7 @@ def refresh(store: Store, actor: str, connection_id: str, result: Refresh) -> di
         )
         return {"applied": False, "state": connection["state"]}
     staged = deepcopy(store)
-    try:
-        summary = _apply(staged, staged.connections[connection_id], result)
-    except BatchRejected:
-        _move(connection, "parse_error")
-        connection["last_error"] = "parse_error"
-        store.events.append(
-            {"code": "batch_rejected", "connection": connection_id, "applied": False}
-        )
-        return {"applied": False, "state": connection["state"]}
+    summary = _apply(staged, staged.connections[connection_id], result)
     store.__dict__.update(staged.__dict__)
     connection = store.connections[connection_id]
     _move(connection, "refresh_ok")
@@ -255,31 +260,114 @@ def refresh(store: Store, actor: str, connection_id: str, result: Refresh) -> di
     return {"applied": True, "state": connection["state"], **summary}
 
 
-def _parse(result: Refresh) -> None:
-    for txn in result.txns:
-        probe = {
-            "source_id": "boundary-probe",
-            "date": txn.booked,
-            "description": txn.description or "-",
-            "amount": txn.amount,
-            "currency": txn.currency,
-            "kind": "expense",
-            "account": txn.account,
-            "destination": "personal",
-        }
-        if field_issues(probe) or txn.direction not in ("debit", "credit"):
-            raise BatchRejected("parse_error")
-    for balance in result.balances:
-        try:
-            finite = Decimal(balance.amount).is_finite()
-        except InvalidOperation:
-            finite = False
-        if balance.currency not in ("DOP", "USD") or not finite:
-            raise BatchRejected("parse_error")
+def input_problems(result: Refresh) -> list[str]:
+    problems = []
+    if not _timestamp(result.at):
+        problems.append("at")
+    if result.failure is not None and result.failure not in FAILURES:
+        problems.append("failure")
+    for index, account in enumerate(result.accounts):
+        problems += _record_problems(
+            f"accounts[{index}]",
+            account,
+            SourceAccount,
+            {
+                "source_id": _text(getattr(account, "source_id", None)),
+                "name": isinstance(getattr(account, "name", None), str),
+                "currency": getattr(account, "currency", None) in CURRENCIES,
+            },
+        )
+    for index, balance in enumerate(result.balances):
+        problems += _record_problems(
+            f"balances[{index}]",
+            balance,
+            Balance,
+            {
+                "account": _text(getattr(balance, "account", None)),
+                "as_of": _timestamp(getattr(balance, "as_of", None)),
+                "amount": _balance_amount(getattr(balance, "amount", None)),
+                "currency": getattr(balance, "currency", None) in CURRENCIES,
+            },
+        )
+    for index, txn in enumerate(result.txns):
+        if not isinstance(txn, Txn):
+            problems.append(f"txns[{index}]")
+            continue
+        kit = field_issues(
+            {
+                "source_id": "boundary-probe",
+                "date": txn.booked,
+                "description": "-",
+                "amount": txn.amount,
+                "currency": txn.currency,
+                "kind": "expense",
+                "account": txn.account,
+                "destination": "personal",
+            }
+        )
+        problems += _record_problems(
+            f"txns[{index}]",
+            txn,
+            Txn,
+            {
+                "account": "account" not in kit,
+                "booked": "date" not in kit,
+                "amount": "amount" not in kit,
+                "direction": txn.direction in ("debit", "credit"),
+                "currency": "currency" not in kit,
+                "description": isinstance(txn.description, str),
+                "institution_id": _optional_text(txn.institution_id),
+                "pending": isinstance(txn.pending, bool),
+                "pending_ref": _optional_text(txn.pending_ref),
+                "reverses_ref": _optional_text(txn.reverses_ref),
+                "reference": _optional_text(txn.reference),
+            },
+        )
+    if result.coverage is not None and not (
+        isinstance(result.coverage, tuple)
+        and len(result.coverage) == 2
+        and all(_day(value) for value in result.coverage)
+        and result.coverage[0] <= result.coverage[1]
+    ):
+        problems.append("coverage")
+    return problems
+
+
+def _record_problems(path: str, item, kind: type, fields: dict[str, bool]) -> list[str]:
+    if not isinstance(item, kind):
+        return [path]
+    return [f"{path}.{name}" for name, ok in fields.items() if not ok]
+
+
+def _text(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _optional_text(value) -> bool:
+    return value is None or _text(value)
+
+
+def _timestamp(value) -> bool:
+    try:
+        return datetime.strptime(value, TIMESTAMP).strftime(TIMESTAMP) == value
+    except (TypeError, ValueError):
+        return False
+
+
+def _day(value) -> bool:
+    try:
+        return date.fromisoformat(value).isoformat() == value
+    except (TypeError, ValueError):
+        return False
+
+
+def _balance_amount(value) -> bool:
+    return isinstance(value, str) and bool(
+        re.fullmatch(r"-?[0-9]+(?:\.[0-9]{1,2})?", value)
+    )
 
 
 def _apply(store: Store, connection: dict, result: Refresh) -> dict:
-    _parse(result)
     summary = {
         "new_proposals": 0,
         "seen": 0,
@@ -1555,7 +1643,8 @@ def scenario(checks: Checks) -> dict:
     checks.add(
         "unreadable_balance_rejected",
         "A balance that is not a number rejects the whole batch like a malformed row",
-        unreadable_balance == {"applied": False, "state": DEGRADED}
+        unreadable_balance
+        == {"applied": False, "state": DEGRADED, "invalid": ["balances[0].amount"]}
         and store.connections[bank]["last_error"] == "parse_error"
         and len(store.observations) == observations_before
         and len(store.records) == records_after_second,
@@ -1831,6 +1920,113 @@ def edge_cases(checks: Checks) -> None:
         ),
         snapshots=[(s["account"], s["currency"]) for s in store.snapshots],
         held=held,
+    )
+    input_boundary(checks)
+
+
+def input_boundary(checks: Checks) -> None:
+    owner = "user-a"
+    at = "2026-09-10T06:00"
+    source = SourceAccount("src-chk", "Cuenta", "DOP")
+    balance = Balance("src-chk", at, "1500.00", "DOP")
+    row = tx("src-chk", "2026-09-09", "300.00", "debit", "SUPERMERCADO", "B-0001")
+    valid = Refresh(
+        at=at,
+        accounts=(source,),
+        balances=(balance,),
+        txns=(row,),
+        coverage=("2026-09-01", "2026-09-10"),
+    )
+    malformed = {
+        "at": replace(valid, at="N/A"),
+        "failure": Refresh(at=at, failure="exploded"),
+        "accounts[0].source_id": replace(
+            valid, accounts=(replace(source, source_id=""),)
+        ),
+        "accounts[0].currency": replace(
+            valid, accounts=(replace(source, currency="EUR"),)
+        ),
+        "balances[0].account": replace(valid, balances=(replace(balance, account=None),)),
+        "balances[0].as_of": replace(valid, balances=(replace(balance, as_of="N/A"),)),
+        "balances[0].amount": replace(valid, balances=(replace(balance, amount=None),)),
+        "balances[0].currency": replace(
+            valid, balances=(replace(balance, currency="$"),)
+        ),
+        "txns[0].booked": replace(valid, txns=(replace(row, booked="09/09/2026"),)),
+        "txns[0].amount": replace(valid, txns=(replace(row, amount="1.234,56"),)),
+        "txns[0].direction": replace(valid, txns=(replace(row, direction="sideways"),)),
+        "txns[0].description": replace(valid, txns=(replace(row, description=None),)),
+        "txns[0].pending": replace(valid, txns=(replace(row, pending="yes"),)),
+        "coverage": replace(valid, coverage=("2026-09-10", "2026-09-01")),
+    }
+
+    def attempt(batch: Refresh) -> tuple[dict, dict, Store]:
+        store = Store()
+        store.accounts["acct-chk-dop"] = {
+            "owner": owner,
+            "name": "Cuenta",
+            "currency": "DOP",
+        }
+        conn = connect(store, owner, "aggregator_api", {"src-chk": "acct-chk-dop"})
+        authenticate(store, owner, conn, "authenticated")
+        before = deepcopy(store.without_vault())
+        try:
+            result = refresh(store, owner, conn, batch)
+        except Exception as error:
+            result = {"raised": type(error).__name__}
+        after = store.without_vault()
+        changes = {
+            "store": sorted(k for k in after if after[k] != before[k]),
+            "connection": sorted(
+                k
+                for k, v in after["connections"][conn].items()
+                if v != before["connections"][conn][k]
+            ),
+            "new_events": [e["code"] for e in after["events"][len(before["events"]) :]],
+        }
+        return result, changes, store
+
+    untouched = {
+        "store": ["connections", "events"],
+        "connection": ["last_error", "state"],
+        "new_events": ["batch_rejected"],
+    }
+    rejected = {}
+    for field, batch in malformed.items():
+        result, changes, _ = attempt(batch)
+        rejected[field] = {
+            "applied": result.get("applied"),
+            "invalid": result.get("invalid", result.get("raised")),
+            "writes_only_the_rejection": changes == untouched,
+        }
+    edge = replace(
+        valid,
+        balances=(replace(balance, amount="-35.20"), replace(balance, amount="0.00")),
+        txns=(replace(row, description="", institution_id=None),),
+    )
+    accepted = {}
+    for name, batch in (("baseline", valid), ("edge_values", edge)):
+        result, _, store = attempt(batch)
+        accepted[name] = {
+            "applied": result.get("applied"),
+            "proposals": len(store.proposals),
+            "snapshots": len(store.snapshots),
+        }
+    checks.add(
+        "provider_input_boundary",
+        "Every provider field is checked once before anything is written. Each malformed field rejects the whole batch by name and writes only the connection's error state, while well-formed batches, including edge values, still apply",
+        all(
+            value
+            == {"applied": False, "invalid": [field], "writes_only_the_rejection": True}
+            for field, value in rejected.items()
+        )
+        and accepted
+        == {
+            "baseline": {"applied": True, "proposals": 1, "snapshots": 1},
+            "edge_values": {"applied": True, "proposals": 1, "snapshots": 2},
+        },
+        rejected=rejected,
+        accepted=accepted,
     )
 
 
