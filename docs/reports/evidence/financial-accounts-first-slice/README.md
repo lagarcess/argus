@@ -2,7 +2,13 @@
 
 Lane spec: [`docs/specs/lanes/financial-accounts-first-slice.md`](../../../specs/lanes/financial-accounts-first-slice.md).
 Integration base: `4b84e054a0d8079b21f38784335ad3241809b4cd`
-(`origin/codex/private-alpha-next`, fetched 2026-09-28).
+(`origin/codex/private-alpha-next`, fetched 2026-09-28). Before publication
+integration had advanced to `c978927e167f57369f27391ac65995a3d6e5520a` (#727,
+#728, #695, #713 landed) and was merged one way into the lane. The only shared
+file was `render.yaml` (an unrelated hostname policy line); #728 changed the
+server's sign-in client, which the real-stack gate exercises, so the lane's
+deterministic, Postgres, real-stack, freeze, OpenAPI, release-doc, render
+contract and modularity gates were rerun on the merged tree and passed.
 
 ## Environment
 

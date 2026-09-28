@@ -2,11 +2,14 @@
 
 **Status:** Bounded implementation spec for one lane. Ships default-off.
 **Date:** September 28, 2026.
-**Serves:** MVEE "Quick account setup and optional assets", "Archiving
-accounts" and "Guest access and registration" as published by PR #727, and
-section 18 of the proposed financial recording contract (PR #724).
+**Serves:** [MVEE](../argus-minimum-viable-ecosystem-experience.md) "Quick
+account setup and optional assets", "Archiving accounts" and "Guest access and
+registration" (published by PR #727, now on integration), and section 18 of
+the proposed financial recording contract (PR #724, open at the time of
+writing).
 **Integration base:** `origin/codex/private-alpha-next` at
-`4b84e054a0d8079b21f38784335ad3241809b4cd`.
+`4b84e054a0d8079b21f38784335ad3241809b4cd`; reconciled one way with
+`c978927e167f57369f27391ac65995a3d6e5520a` before publication.
 
 This document binds the four dependencies section 18 of the recording contract
 names before code: the guest answer, the API_CONTRACT and DATA_MODEL
