@@ -3,7 +3,8 @@
 Open this directory in Android Studio. This is a native Kotlin/Compose **sample
 application**, package `ai.argus.foundation.sample`. It has no network permission,
 backend connection, authentication, financial calculations or record storage.
-Only the Light/Dark/System preference is saved locally. All other content is
+Only the Light/Dark/System preference uses local app storage. The unsent sample
+draft uses Android saved UI state to survive activity recreation. Other content is
 explicitly illustrative. A UI registration notice is not server authorization.
 
 ## Build and test

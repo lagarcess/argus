@@ -116,6 +116,7 @@ class FoundationTest {
         compose.onNodeWithTag("composer").performScrollTo().performTextInput(message)
         compose.onNodeWithTag("composer").assertTextContains(message)
         device.pressBack() // Dismiss the IME, retaining the draft.
+        compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("composer").assertTextContains(message)
         compose.onNodeWithContentDescription(context.getString(R.string.send_message))
             .performScrollTo().performClick()

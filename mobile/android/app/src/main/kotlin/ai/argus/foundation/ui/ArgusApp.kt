@@ -68,7 +68,7 @@ fun ArgusApp(appearance: Appearance, onAppearanceChange: (Appearance) -> Unit) {
     var page by rememberSaveable { mutableStateOf(Page.ROOT) }
     var settingsSource by rememberSaveable { mutableStateOf(Page.ROOT) }
     var dialog by rememberSaveable { mutableStateOf<Int?>(null) }
-    var composer by remember { mutableStateOf("") }
+    var composer by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     var compactNavigation by remember(destination) { mutableStateOf(false) }
