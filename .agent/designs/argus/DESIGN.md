@@ -221,7 +221,7 @@ The MVEE owns the pivot navigation and header behavior; retain the following as 
 
 ### Do
 - Use Space Grotesk weight 500 for all display headings
-- Apply 9999px radius to all buttons — pill shape is universal
+- Follow the [component button styles](#buttons); preserve each surface's quiet text and icon navigation controls.
 - Use generous button padding (14px 32px)
 - Keep the palette to near-black + white for marketing surfaces
 - Apply positive letter-spacing on Inter body text
