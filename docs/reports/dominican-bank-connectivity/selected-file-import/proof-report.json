@@ -602,11 +602,58 @@
     "failed": 0,
     "passed": 40
   },
+  "environment": {
+    "packages": {
+      "Faker": "30.10.0",
+      "babel": "2.18.0",
+      "pillow": "12.2.0",
+      "python-dateutil": "2.9.0.post0",
+      "six": "1.17.0",
+      "tzdata": "2025.3"
+    },
+    "pdftotext": "pdftotext version 26.09.0",
+    "python": "3.10.20"
+  },
   "fictional": true,
-  "format": "selected-file-import-proof-v3",
-  "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
+  "format": "selected-file-import-proof-v4",
+  "kit": {
+    "digest": "deb590ad45887051fc2974608d1461a201529d0fcc31793c83cd0f27cb9d499a",
+    "files": [
+      "__init__.py",
+      "__main__.py",
+      "conftest.py",
+      "extract.py",
+      "factories.py",
+      "generate.py",
+      "harness.py",
+      "renderers.py",
+      "test_fixtures.py",
+      "test_lifecycle.py",
+      "test_reextraction.py"
+    ]
+  },
   "recording_model": {
-    "digest": "88baa7c40f813d6b6350faf4b2c73623d1575bd36b44d65be6a4cb1b6423f3c8",
+    "digest": "e37920eb9eba88e1b8303a8fa1fccbf3cb5fc1d6a8cda2ea843af804e4471e32",
+    "files": [
+      "src/argus/domain/home_country.py",
+      "tests/financial_recording/__init__.py",
+      "tests/financial_recording/catalog.py",
+      "tests/financial_recording/derive.py",
+      "tests/financial_recording/model.py",
+      "tests/financial_recording/money.py",
+      "tests/financial_recording/review.py",
+      "tests/financial_recording/scenarios.py",
+      "tests/financial_recording/scenarios_lifecycle.py",
+      "tests/financial_recording/scenes.py",
+      "tests/financial_recording/test_accounts.py",
+      "tests/financial_recording/test_activity.py",
+      "tests/financial_recording/test_confirmation.py",
+      "tests/financial_recording/test_evidence.py",
+      "tests/financial_recording/test_isolation.py",
+      "tests/financial_recording/test_lifecycle.py",
+      "tests/financial_recording/test_money.py",
+      "tests/financial_recording/test_reconciliation.py"
+    ],
     "ref": "lagarcess/argus#724 at d081bfcdf5c7c2bee767d873f232752432098c39"
   }
 }

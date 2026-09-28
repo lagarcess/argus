@@ -431,8 +431,33 @@
     "failed": 0,
     "passed": 16
   },
+  "environment": {
+    "packages": {
+      "Faker": "30.10.0",
+      "pillow": "12.2.0",
+      "python-dateutil": "2.9.0.post0",
+      "six": "1.17.0"
+    },
+    "pdftotext": "pdftotext version 26.09.0",
+    "python": "3.10.20"
+  },
   "fictional": true,
-  "format": "selected-file-import-proof-v3",
-  "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
+  "format": "selected-file-import-proof-v4",
+  "kit": {
+    "digest": "deb590ad45887051fc2974608d1461a201529d0fcc31793c83cd0f27cb9d499a",
+    "files": [
+      "__init__.py",
+      "__main__.py",
+      "conftest.py",
+      "extract.py",
+      "factories.py",
+      "generate.py",
+      "harness.py",
+      "renderers.py",
+      "test_fixtures.py",
+      "test_lifecycle.py",
+      "test_reextraction.py"
+    ]
+  },
   "recording_model": null
 }

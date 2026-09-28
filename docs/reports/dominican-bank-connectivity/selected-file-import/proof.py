@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.metadata
 import io
 import itertools
 import json
+import platform
 import shutil
 import struct
 import subprocess
@@ -1500,8 +1502,27 @@ def run_case(function, workdir: Path) -> tuple[str, dict]:
     return ("passed" if passed else "failed"), observed
 
 
-def _digest(paths: list[Path]) -> str:
-    return hashlib.sha256(b"".join(path.read_bytes() for path in paths)).hexdigest()
+def _tree(root: Path) -> dict:
+    paths = sorted(p for p in root.rglob("*.py") if "__pycache__" not in p.parts)
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(f"{path.relative_to(root)}\0".encode() + path.read_bytes())
+    return {
+        "files": [str(path.relative_to(root)) for path in paths],
+        "digest": digest.hexdigest(),
+    }
+
+
+def _environment() -> dict:
+    distributions = importlib.metadata.packages_distributions()
+    loaded = {name.partition(".")[0] for name in sys.modules}
+    used = sorted({dist for name in loaded for dist in distributions.get(name, [])})
+    reader = subprocess.run(["pdftotext", "-v"], capture_output=True, text=True)
+    return {
+        "python": platform.python_version(),
+        "pdftotext": (reader.stderr or reader.stdout).splitlines()[0],
+        "packages": {dist: importlib.metadata.version(dist) for dist in used},
+    }
 
 
 def main() -> int:
@@ -1519,11 +1540,12 @@ def main() -> int:
         parser.error("pdftotext from poppler is required, as in the ingestion kit")
     recording = None
     if model is not None:
-        package = Path(model.__file__).parent
-        recording = {
-            "ref": args.recording_ref,
-            "digest": _digest(sorted(package.glob("*.py"))),
-        }
+        tree = Path(model.__file__).resolve().parents[2]
+        if (tree / ".git").exists():
+            parser.error(
+                "extract pull request 724's model with git archive, as the README's rerun steps show"
+            )
+        recording = {"ref": args.recording_ref, **_tree(tree)}
     kit = Path(load_input.__code__.co_filename).parent
     results = []
     with tempfile.TemporaryDirectory() as folder:
@@ -1551,11 +1573,12 @@ def main() -> int:
                 }
             )
     report = {
-        "format": "selected-file-import-proof-v3",
+        "format": "selected-file-import-proof-v4",
         "fictional": True,
         "assumptions": ASSUMPTIONS,
         "recording_model": recording,
-        "kit_digest": _digest(sorted(kit.glob("*.py"))),
+        "kit": _tree(kit),
+        "environment": _environment(),
         "counts": {
             s: sum(r["status"] == s for r in results)
             for s in ("passed", "failed", "error", "blocked")

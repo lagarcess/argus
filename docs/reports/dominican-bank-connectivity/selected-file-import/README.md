@@ -15,8 +15,8 @@ With pull request 724's model at `d081bfcdf5c7c2bee767d873f232752432098c39` on t
 
 Blocked means a case needs the recording model and could not run. It is not a pass, and the proof exits with status 0 only when every case passes.
 
-- The committed [report with pull request 724](proof-report.json) and [report without it](proof-report-without-724.json) are those runs. A second run of each writes the same bytes.
-- The first report records the model's head as given to the runner, a digest of every Python file in that package, and a digest of the ingestion kit, so a reader can tell which versions it proves.
+- The committed [report with pull request 724](proof-report.json) and [report without it](proof-report-without-724.json) are those runs. A second run of each in the same environment writes the same bytes.
+- Each report lists every Python file of the ingestion kit and, with the model, of the extracted model tree, with a digest over each set. The model tree includes `src/argus/domain/home_country.py`, which the model loads for its accepted currencies. Each report also records the Python, Poppler, and package versions the run loaded, and the model's head as given to the runner, so a reader can tell which versions it proves. A rerun under other versions shows them in the `environment` field.
 - Each deliberate breakage in [`mutation_check.py`](mutation_check.py) makes its target cases fail. The breakages ignore encryption, refuse every encrypted PDF, treat a PDF reader failure as a password or let it stop the import, drop the recovery steps, drop the ingestion kit's extraction errors, keep duplicate rows, answer balance-check questions for the person, stop the model from asking them, cancel without discarding drafts, cancel without deleting the file, cancel every draft from the same file instead of one review's, rebuild a retried confirmation instead of replaying it, keep the file after a completed review, track open reviews only in memory, skip clearing an interrupted review's file at start, store a file under its original name, and hold a refused file.
 - A case that raises an exception is recorded with status `error` and the exception in the report, instead of stopping the run. An error is not a failed check, so the breakage check does not count it as catching a breakage, because the exception may come from the breakage itself. Each target case has to run to its check and fail it.
 
@@ -33,7 +33,7 @@ The adaptations changed only the proof's integration boundary:
 - Accounts are created with the model's new signature and carry the model's own space. The proof no longer keeps its own map of accounts to spaces. It reads membership through `derive.space_scope`.
 - Balance-check questions are read from the model's `inclusion_unanswered` issue, which replaced `observation_order_unknown`.
 - A check's result is read as the two differences the model now keeps apart, the one recorded at confirmation and the one remaining.
-- The model digest covers every Python file in the package, because the model now spans more modules.
+- The model's recorded identity covers every Python file in the extracted tree, because the model spans several modules and loads `src/argus/domain/home_country.py` by path.
 - Marking a row distinct or a duplicate, or answering a balance-check question, passes the draft revision from the preview the person reviewed.
 - The proof's clock is October 1, after the synthetic statement closes on September 30. At September 28 the model refused the closing balance as dated in the future, which is right, because a statement is imported after it closes.
 - A statement's rows are confirmed before its closing balance, because the model confirms a balance check only against the difference its preview showed.
@@ -219,7 +219,7 @@ poetry run python docs/reports/dominican-bank-connectivity/selected-file-import/
 cmp temp/selected-file-import-without-724.json docs/reports/dominican-bank-connectivity/selected-file-import/proof-report-without-724.json
 ```
 
-To run every case, fetch pull request 724 and extract the reference model at the head this proof records. The model reads accepted currencies from the repository's `src/argus/domain/home_country.py`, so the archive includes that file.
+To run every case, fetch pull request 724 and extract the reference model at the head this proof records. The model reads accepted currencies from the repository's `src/argus/domain/home_country.py`, so the archive includes that file. The proof refuses a model imported from a git checkout, because the report's identity is the extracted tree.
 
 ```bash
 git fetch origin pull/724/head
