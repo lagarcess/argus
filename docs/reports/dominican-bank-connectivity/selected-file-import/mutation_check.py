@@ -71,6 +71,10 @@ def reader_failure_escapes(original):
     return pdf_open
 
 
+def drop_recovery_steps(original):
+    return {}
+
+
 def drop_extraction_errors(original):
     def load(*args, **kwargs):
         return {**original(*args, **kwargs), "errors": []}
@@ -245,6 +249,20 @@ def mutations():
             "PDF reader failure treated as a password or left to stop the import",
             [(proof, "pdf_open", reader_failure_escapes)],
             {"unreadable_pdf_refused"},
+        ),
+        (
+            "recovery steps dropped",
+            [(proof, "RECOVERY", drop_recovery_steps)],
+            {
+                "empty_file",
+                "email_with_login_link",
+                "html_named_as_pdf",
+                "excel_workbook",
+                "ofx_file",
+                "too_large",
+                "password_protected_pdf",
+                "unreadable_pdf_refused",
+            },
         ),
         (
             "extraction errors dropped",

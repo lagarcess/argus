@@ -159,8 +159,9 @@
           "in_memory": [],
           "on_disk": []
         },
-        "limit_bytes": 10485760,
-        "status": "too_large"
+        "recovery": "choose_smaller_file",
+        "status": "too_large",
+        "status_at_the_limit": "accepted"
       },
       "status": "passed"
     },

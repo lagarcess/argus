@@ -17,7 +17,7 @@ Blocked means a case needs the recording model and could not run. It is not a pa
 
 - The committed [report with pull request 724](proof-report.json) and [report without it](proof-report-without-724.json) are those runs. A second run of each writes the same bytes.
 - The first report records the model's head as given to the runner, a digest of every Python file in that package (`88baa7c4...3f3c8`), and a digest of the ingestion kit (`48c40767...9925c`), so a reader can tell which versions it proves.
-- Each deliberate breakage in [`mutation_check.py`](mutation_check.py) makes its target cases fail. The breakages ignore encryption, refuse every encrypted PDF, treat a PDF reader failure as a password or let it stop the import, drop the ingestion kit's extraction errors, keep duplicate rows, answer balance-check questions for the person, stop the model from asking them, cancel without discarding drafts, cancel without deleting the file, cancel every draft from the same file instead of one review's, rebuild a retried confirmation instead of replaying it, keep the file after a completed review, track open reviews only in memory, skip clearing an interrupted review's file at start, store a file under its original name, and hold a refused file.
+- Each deliberate breakage in [`mutation_check.py`](mutation_check.py) makes its target cases fail. The breakages ignore encryption, refuse every encrypted PDF, treat a PDF reader failure as a password or let it stop the import, drop the recovery steps, drop the ingestion kit's extraction errors, keep duplicate rows, answer balance-check questions for the person, stop the model from asking them, cancel without discarding drafts, cancel without deleting the file, cancel every draft from the same file instead of one review's, rebuild a retried confirmation instead of replaying it, keep the file after a completed review, track open reviews only in memory, skip clearing an interrupted review's file at start, store a file under its original name, and hold a refused file.
 - A case that raises an exception is recorded with status `error` and the exception in the report, instead of stopping the run. An error is not a failed check, so the breakage check does not count it as catching a breakage, because the exception may come from the breakage itself. Each target case has to run to its check and fail it.
 
 ## Reconciliation with pull request 724
@@ -76,9 +76,9 @@ The proof decides by content, never by the file name.
 | Excel workbook or OFX file | Refused as unsupported | Choose a CSV, PDF, or image |
 | Email with only a sign-in link, or a saved sign-in page | Refused as not a statement | Download the statement file itself |
 | Empty file | Refused | Choose another file |
-| Larger than 10 MiB | Refused. Nothing stored or held. | Choose a smaller file |
+| Larger than the upload limit | Refused. Nothing stored or held. | Choose a smaller file |
 
-The size limit, the time limit for opening a PDF, and the unlocked-copy recovery are experimental assumptions, listed with the other unresolved questions [below](#experimental-assumptions-still-unresolved).
+Every case compares its whole observation with literal expected values, so each refusal's recovery step is checked. For a file accepted with no rows, the cases check the explicit error. The suggestion to enter amounts by hand is not modeled. The size limit, the time limit for opening a PDF, and the unlocked-copy recovery are experimental assumptions, listed with the other unresolved questions [below](#experimental-assumptions-still-unresolved).
 
 Saving an unlocked copy means opening the file with its password and exporting or printing it again as a PDF, which some people will not know how to do. A file password can itself be sensitive, for example if a bank derives it from an identity number. Whether any candidate bank protects its statements with a password is unverified.
 

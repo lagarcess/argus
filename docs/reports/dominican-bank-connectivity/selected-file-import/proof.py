@@ -42,16 +42,6 @@ RECOVERY = {
     "unreadable": "download_again",
 }
 SUFFIX = {"pdf": ".pdf", "csv": ".csv", "png": ".png", "jpeg": ".jpg", "heic": ".heic"}
-REFERENCE_KEYS = {
-    "digest",
-    "file",
-    "row",
-    "page",
-    "external_id",
-    "entry",
-    "review",
-    "stub_digest",
-}
 HOUSEHOLD = "household"
 ASSUMPTIONS = {
     "status": "Experimental choices made to run the proof. Unresolved, and not approved production defaults.",
@@ -501,7 +491,7 @@ def case(case_id: str, group: str, claim: str, recording: bool = True):
     return register
 
 
-def intake_case(name: str, entry: str, status: str, kind: str | None = None):
+def intake_case(name: str, entry: str, expected: dict):
     def run(fx: dict, workdir: Path):
         result = check(Selection(entry, name, fx[name]))
         observed = {
@@ -509,26 +499,30 @@ def intake_case(name: str, entry: str, status: str, kind: str | None = None):
             "kind": result.kind,
             "recovery": result.recovery,
         }
-        return result.status == status and result.kind == kind, observed
+        return observed == expected, observed
 
     return run
 
 
-def zero_rows_case(name: str, subtype: str):
+def zero_rows_case(name: str, subtype: str, error: str):
     def run(fx: dict, workdir: Path):
         selection = Selection("file_picker", name, fx[name])
         result = check(selection)
-        if result.status != "accepted" or result.subtype != subtype:
-            return False, {"status": result.status, "subtype": result.subtype}
-        _, loaded = extract(workdir, selection, result)
-        observed = {
-            "status": result.status,
-            "subtype": result.subtype,
-            "mode": loaded["mode"],
-            "rows": len(loaded["proposals"]),
-            "error": (loaded["errors"] or [""])[0][:80],
-        }
-        return not loaded["proposals"] and bool(loaded["errors"]), observed
+        observed = {"status": result.status, "subtype": result.subtype}
+        if result.status == "accepted":
+            _, loaded = extract(workdir, selection, result)
+            observed |= {
+                "mode": loaded["mode"],
+                "rows": len(loaded["proposals"]),
+                "error": (loaded["errors"] or [""])[0][:80],
+            }
+        return observed == {
+            "status": "accepted",
+            "subtype": subtype,
+            "mode": "unsupported",
+            "rows": 0,
+            "error": error,
+        }, observed
 
     return run
 
@@ -538,98 +532,110 @@ for spec in (
         "csv_accepted",
         "transactions.csv",
         "file_picker",
-        "accepted",
-        "csv",
+        {"status": "accepted", "kind": "csv", "recovery": None},
         "A CSV selected with the file picker is accepted by content.",
     ),
     (
         "pdf_accepted_from_share_extension",
         "statement.pdf",
         "share_extension",
-        "accepted",
-        "pdf",
+        {"status": "accepted", "kind": "pdf", "recovery": None},
         "A PDF arriving from a future share extension takes the same intake path.",
     ),
     (
         "empty_file",
         "empty.csv",
         "file_picker",
-        "empty",
-        None,
+        {"status": "empty", "kind": None, "recovery": "choose_another_file"},
         "An empty file is refused with a recovery step.",
     ),
     (
         "email_with_login_link",
         "statement-link.eml",
         "file_picker",
-        "not_a_statement",
-        None,
+        {
+            "status": "not_a_statement",
+            "kind": None,
+            "recovery": "download_statement_file",
+        },
         "An email that only links to the bank's sign-in page is not an importable statement.",
     ),
     (
         "html_named_as_pdf",
         "login-page.pdf",
         "file_picker",
-        "not_a_statement",
-        None,
+        {
+            "status": "not_a_statement",
+            "kind": None,
+            "recovery": "download_statement_file",
+        },
         "A saved sign-in page named .pdf is judged by content, not by its name.",
     ),
     (
         "excel_workbook",
         "movements.xlsx",
         "file_picker",
-        "unsupported_type",
-        None,
+        {
+            "status": "unsupported_type",
+            "kind": None,
+            "recovery": "choose_csv_pdf_or_image",
+        },
         "An Excel workbook is unsupported today and says so.",
     ),
     (
         "ofx_file",
         "movements.ofx",
         "file_picker",
-        "unsupported_type",
-        None,
+        {
+            "status": "unsupported_type",
+            "kind": None,
+            "recovery": "choose_csv_pdf_or_image",
+        },
         "An OFX file is unsupported today and says so.",
     ),
 ):
-    case_id, name, entry, status, kind, claim = spec
-    case(case_id, "intake", claim, recording=False)(
-        intake_case(name, entry, status, kind)
-    )
+    case_id, name, entry, expected, claim = spec
+    case(case_id, "intake", claim, recording=False)(intake_case(name, entry, expected))
 
 for spec in (
     (
         "image_without_ocr",
         "receipt.png",
         "png",
+        "Extraction unavailable; OCR/STT and natural-language interpretation are untested",
         "A photo is accepted, but no OCR runs, so it reaches review with no rows.",
     ),
     (
         "heic_photo_without_ocr",
         "photo.heic",
         "heic",
+        "Extraction unavailable; OCR/STT and natural-language interpretation are untested",
         "An iPhone HEIC photo is recognized as an image and yields no rows.",
     ),
     (
         "pdf_in_unknown_layout",
         "unknown-layout.pdf",
         "pdf",
+        "ValueError: Unsupported PDF layout: synthetic table marker missing",
         "A text PDF in an unknown layout yields no rows and an explicit error.",
     ),
     (
         "pdf_without_text_layer",
         "image-only.pdf",
         "pdf",
+        "ValueError: Unsupported PDF layout: synthetic table marker missing",
         "A PDF with no text layer yields no rows and an explicit error.",
     ),
     (
         "csv_with_unknown_header",
         "wrong-header.csv",
         "csv",
+        "ValueError: CSV header missing required structural fields",
         "A CSV without the supported header yields no rows and an explicit error.",
     ),
 ):
-    case_id, name, subtype, claim = spec
-    case(case_id, "intake", claim, recording=False)(zero_rows_case(name, subtype))
+    case_id, name, subtype, error, claim = spec
+    case(case_id, "intake", claim, recording=False)(zero_rows_case(name, subtype, error))
 
 
 NOTHING_HELD = {"in_memory": [], "on_disk": []}
@@ -646,15 +652,18 @@ def too_large(fx, workdir):
     session = importer.select(
         Selection("file_picker", "big.csv", b"a" * (SIZE_LIMIT + 1))
     )
+    at_the_limit = check(Selection("file_picker", "big.csv", b"a" * SIZE_LIMIT))
     observed = {
         "status": session.intake.status,
-        "limit_bytes": SIZE_LIMIT,
+        "recovery": session.intake.recovery,
         "held": importer.held(),
+        "status_at_the_limit": at_the_limit.status,
     }
     return observed == {
         "status": "too_large",
-        "limit_bytes": SIZE_LIMIT,
+        "recovery": "choose_smaller_file",
         "held": NOTHING_HELD,
+        "status_at_the_limit": "accepted",
     }, observed
 
 
@@ -765,23 +774,22 @@ def uncertain_rows(fx, workdir):
     confirmed = env.importer.confirm_ready(session, "batch-1")
     observed = {
         "blocking": {k: v for k, v in sorted(codes.items()) if v},
+        "confirmed": len(confirmed),
         "summary": env.importer.summary(session),
     }
-    expected_blocked = {
-        "tx-dop-03": ["possible_duplicate"],
-        "tx-dop-05": ["counter_account_missing"],
-        "tx-currency": ["currency_unsupported"],
-        "tx-date": ["date_invalid"],
-        "tx-number": ["amount_invalid"],
-        "tx-missing": ["field_missing"],
-        "tx-household": ["field_missing"],
-    }
-    return (
-        observed["blocking"] == expected_blocked
-        and len(confirmed) == 4
-        and observed["summary"]
-        == {"added": 4, "already_imported": 0, "unresolved": 7, "discarded": 0}
-    ), observed
+    return observed == {
+        "blocking": {
+            "tx-dop-03": ["possible_duplicate"],
+            "tx-dop-05": ["counter_account_missing"],
+            "tx-currency": ["currency_unsupported"],
+            "tx-date": ["date_invalid"],
+            "tx-number": ["amount_invalid"],
+            "tx-missing": ["field_missing"],
+            "tx-household": ["field_missing"],
+        },
+        "confirmed": 4,
+        "summary": {"added": 4, "already_imported": 0, "unresolved": 7, "discarded": 0},
+    }, observed
 
 
 @case(
@@ -799,10 +807,11 @@ def identical_rows(fx, workdir):
     env.importer.confirm_ready(session, "batch-1")
     states = [env.store.state.drafts[rows[k]].status for k in ("tx-dop-02", "tx-dop-03")]
     observed = {"first": first, "second": second, "after_resolution": states}
-    return first == [] and second == ["possible_duplicate"] and states == [
-        "confirmed",
-        "confirmed",
-    ], observed
+    return observed == {
+        "first": [],
+        "second": ["possible_duplicate"],
+        "after_resolution": ["confirmed", "confirmed"],
+    }, observed
 
 
 @case(
@@ -819,26 +828,29 @@ def statement_balance(fx, workdir):
     env.store.edit_draft(rows["closing"], as_of="2026-09-30T23:59:59-04:00")
     env.importer.confirm_ready(session, "batch-1")
     gap = derive.observation_gaps(env.store.book, env.ids["Cuenta corriente"])[-1]
-    activity = [
-        r
-        for r in derive.live_records(env.store.book)
-        if isinstance(r.body, derive.Activity)
-    ]
+    bodies = [r.body for r in derive.live_records(env.store.book)]
     observed = {
         "closing_before_date": closing_codes,
         "statement_balances": session.balances,
         "difference_at_confirmation": gap.recorded,
         "difference_remaining": gap.remaining,
-        "activity_records": len(activity),
+        "activity_records": sum(isinstance(b, derive.Activity) for b in bodies),
+        "balance_observations": sum(isinstance(b, derive.Observation) for b in bodies),
         "summary": env.importer.summary(session),
     }
-    return (
-        closing_codes == ["field_missing"]
-        and gap.recorded == 0
-        and gap.remaining == 0
-        and len(activity) == 4
-        and observed["summary"]["unresolved"] == 0
-    ), observed
+    return observed == {
+        "closing_before_date": ["field_missing"],
+        "statement_balances": {
+            "closing": "1974.50",
+            "currency": "DOP",
+            "opening": "1000.00",
+        },
+        "difference_at_confirmation": 0,
+        "difference_remaining": 0,
+        "activity_records": 4,
+        "balance_observations": 1,
+        "summary": {"added": 5, "already_imported": 0, "unresolved": 0, "discarded": 0},
+    }, observed
 
 
 @case(
@@ -861,9 +873,10 @@ def scanned_image(fx, workdir):
         env.label(item): blocking(env.store.preview(item)) for item in session.drafts
     }
     observed = {"mode": session.mode, "blocking": codes}
-    return session.mode == "stub" and codes.get("scan-01") == [] and codes.get(
-        "scan-02"
-    ) == ["field_missing"], observed
+    return observed == {
+        "mode": "stub",
+        "blocking": {"scan-01": [], "scan-02": ["field_missing"]},
+    }, observed
 
 
 @case(
@@ -889,9 +902,11 @@ def destination_space(fx, workdir):
         "personal_dop_spending": personal,
         "household_dop_spending": household,
     }
-    return before == [
-        "field_missing"
-    ] and household == 70000 and personal == 10000, observed
+    return observed == {
+        "before": ["field_missing"],
+        "personal_dop_spending": 10000,
+        "household_dop_spending": 70000,
+    }, observed
 
 
 @case(
@@ -909,10 +924,8 @@ def currency_mismatch(fx, workdir):
     before = blocking(env.store.preview(row))
     env.store.edit_draft(row, account_id=env.ids["Dolares"])
     after = blocking(env.store.preview(row))
-    return before == ["currency_mismatch"] and after == [], {
-        "before": before,
-        "after": after,
-    }
+    observed = {"before": before, "after": after}
+    return observed == {"before": ["currency_mismatch"], "after": []}, observed
 
 
 @case(
@@ -940,11 +953,18 @@ def source_visibility(fx, workdir):
         "original_name_in_records": any("ana-perez" in value for value in values),
         "household_rows": household_rows,
     }
-    return (
-        keys <= REFERENCE_KEYS
-        and not observed["original_name_in_records"]
-        and household_rows == ["tx-household"]
-    ), observed
+    return observed == {
+        "record_reference_keys": [
+            "digest",
+            "entry",
+            "external_id",
+            "file",
+            "review",
+            "row",
+        ],
+        "original_name_in_records": False,
+        "household_rows": ["tx-household"],
+    }, observed
 
 
 @case(
@@ -1019,11 +1039,15 @@ def overlapping_statement(fx, workdir):
         "already_imported": sorted(second.already_imported),
         "new": sorted(env.label(item) for item in second.drafts),
     }
-    return (
-        observed["already_imported"]
-        == ["statement-01", "statement-02", "statement-03", "statement-04"]
-        and observed["new"] == ["closing", "statement-05"]
-    ), observed
+    return observed == {
+        "already_imported": [
+            "statement-01",
+            "statement-02",
+            "statement-03",
+            "statement-04",
+        ],
+        "new": ["closing", "statement-05"],
+    }, observed
 
 
 @case(
@@ -1063,9 +1087,11 @@ def manual_then_import(fx, workdir):
         "purchases_of_125_50": len(purchases),
         "links_on_manual_record": linked,
     }
-    return codes == ["possible_duplicate"] and len(
-        purchases
-    ) == 2 and linked == 1, observed
+    return observed == {
+        "import_row_codes": ["possible_duplicate"],
+        "purchases_of_125_50": 2,
+        "links_on_manual_record": 1,
+    }, observed
 
 
 STATEMENT_ROWS = ["statement-01", "statement-02", "statement-03", "statement-04"]

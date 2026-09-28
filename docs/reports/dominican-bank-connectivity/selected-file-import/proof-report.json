@@ -159,8 +159,9 @@
           "in_memory": [],
           "on_disk": []
         },
-        "limit_bytes": 10485760,
-        "status": "too_large"
+        "recovery": "choose_smaller_file",
+        "status": "too_large",
+        "status_at_the_limit": "accepted"
       },
       "status": "passed"
     },
@@ -235,6 +236,7 @@
             "amount_invalid"
           ]
         },
+        "confirmed": 4,
         "summary": {
           "added": 4,
           "already_imported": 0,
@@ -266,6 +268,7 @@
       "group": "review",
       "observed": {
         "activity_records": 4,
+        "balance_observations": 1,
         "closing_before_date": [
           "field_missing"
         ],
