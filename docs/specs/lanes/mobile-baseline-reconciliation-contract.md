@@ -44,11 +44,11 @@ not rerun or independently certified in this intake.
 
 | Input | Verified remote state | Head / evidence boundary |
 | --- | --- | --- |
-| Native auth #726 | Open draft | de61fd3e7d299fcd0c7fda24f3c95f5427822271; 10/11 iOS reported, deliberate I11 logging failure; A14 server refresh defect remains; Android uncompiled |
+| Native auth #726 | Open; A14 server isolation landed via #728 (`4e024a4e`) | de61fd3e… historical probe head; A14 production fix is on integration — validate rather than re-implement; Android uncompiled |
 | Asset listing #723 | Open draft | 7b91278526bb880629cc1a395dd5ae581fc50a20; synthetic checks reproducible, deleted real sample cannot be replayed |
 | Recording #724 | Open draft | 720aad3fdee1357e3dbe5c928176a6e458b01b0d; 105 focused tests reported, reference model only, production contracts unapproved |
 | Bank-data report | User-supplied narrative only | No PR/head/evidence index supplied; bank-format and mail-permission claims not independently reverified here |
-| Message-contract agent #722 | Open, non-draft; founder says review fix remains active | f1a8942fdbf283fa2203c34c6f7a9ef265879f5e; parser-only types derived from parser comparisons minus emitted types; not a completed merge |
+| Message-contract agent #722 | Merged into `codex/private-alpha-next` as `b65f2f08` | published `docs/message-and-stream-shapes.md` + API_CONTRACT pointer; use landed contract for native message/stream work |
 
 ## Mode Decision
 
@@ -229,13 +229,13 @@ to the resulting SHA. This intake is not a substitute for that audit.
 ## Reconciliation
 
 Publication belongs to the release captain: mobile lock, vehicle/property/share
-decisions, reconciliation handoff, voice/chart direction. #722 remains active;
-read its final head and review/CI outcome before any native message/stream work.
-Its current description already derives parser-only types; do not infer terminal
-review or merge completion from that description. Serialize shared API/data doc
-edits, including its API_CONTRACT pointer. Keep all inspected PRs unchanged
-during this intake. Auth A14 diagnosis and recording-domain reconciliation need
-not wait on a message-contract documentation fix unless new overlap is found.
+decisions, reconciliation handoff, voice/chart direction. #722 is merged into
+`codex/private-alpha-next` as `b65f2f08`; use the published
+`docs/message-and-stream-shapes.md` and the API_CONTRACT pointer there for
+native message/stream work. Serialize further shared API/data doc edits against
+that landed contract. Keep other inspected PRs unchanged during this intake.
+Auth A14 diagnosis and recording-domain reconciliation need not wait on the
+message-contract documentation lane unless new overlap is found.
 
 ## Promotion
 
@@ -269,7 +269,7 @@ Continue independent preparation; do not re-ask settled mobile decisions.
 - [Documentation authority](../../DOCUMENTATION_AUTHORITY.md), [MVEE](../argus-minimum-viable-ecosystem-experience.md), [decision log](../argus-decision-log.md).
 - [Mobile handoff](../../reports/mobile-design-lock-2026-09-28.md), [balance reconciliation](../argus-account-balance-reconciliation-handoff.md).
 - [Auth #726](https://github.com/lagarcess/argus/pull/726), [recording #724](https://github.com/lagarcess/argus/pull/724), [listings #723](https://github.com/lagarcess/argus/pull/723), read September 28.
-- [Message/stream contract #722](https://github.com/lagarcess/argus/pull/722), read at f1a8942fdbf283fa2203c34c6f7a9ef265879f5e; founder's follow-up identifies ongoing review work.
+- [Message/stream contract #722](https://github.com/lagarcess/argus/pull/722), merged as `b65f2f08`; published shapes in `docs/message-and-stream-shapes.md`.
 - Base MVEE read from GitHub at the exact base SHA above; local unpublished additions separately inspected.
 
 ### External guidance
