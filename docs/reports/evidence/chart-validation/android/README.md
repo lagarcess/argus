@@ -1,7 +1,7 @@
 # Android Vico prototype evidence
 
 **Prior-layout evidence.** Current visual and performance acceptance is in
-[visual-revision/README.md](visual-revision/README.md). The files below remain
+[axis-precision/README.md](axis-precision/README.md). The files below remain
 unchanged for provenance. In particular, prior OS-theme screenshots captured a
 previous compositor frame; revised captures supersede those visual theme claims.
 

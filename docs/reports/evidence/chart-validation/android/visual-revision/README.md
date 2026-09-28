@@ -1,5 +1,9 @@
 # Revised Android chart evidence
 
+**Superseded for axis rendering and current measurements:** see
+[../axis-precision/README.md](../axis-precision/README.md). This directory preserves
+the prior visual revision and its original measurements/provenance.
+
 Capture began September 28, 2026 at **b6aecdfdaf964f81aeb411110c003d9662bd5e68**.
 The parent advanced HEAD during capture; recorder/export metadata observed
 **f5f4f4467fe53c3a1990cda9574b353c8b72d83f**. Both SHAs are retained in

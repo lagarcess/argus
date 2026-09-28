@@ -4,7 +4,7 @@ Platform evidence is complete. Terminal PR review and CI are recorded in the
 PR closeout comment. See the [recommendations report](../../chart-validation-prototype.md).
 
 - [iPhone](ios/README.md): adopt Swift Charts direction; simulator limits apply.
-- [Android](android/visual-revision/README.md): change dependency alignment and long-series
+- [Android](android/axis-precision/README.md): change dependency alignment and long-series
   performance before adoption.
 - [Web](../../../../prototypes/chart-validation/web/README.md): adopt Lightweight Charts direction; WebKit touch remains
   unverified.

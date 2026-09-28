@@ -1,7 +1,7 @@
 {
-  "verified_at": "2026-09-28T21:25:03.322651+00:00",
-  "verified_against_source_head": "dd59bde8b1c458a6f8bf061d61d11addb25ba425",
-  "current_integration": "a8e09b72339c7bc676715dabf8a9cceaac81cf03",
+  "verified_at": "2026-09-28T21:36:20.053851+00:00",
+  "verified_against_source_head": "62c6e674cb16576c25f71e90377826d3ac21b3e8",
+  "current_integration": "acf6639a23be368dbf3848a2b873f4a69d7579c4",
   "fixture_sha256": "a12a24634763f951f6daad7d200614dd777e83785d9ed4da9907720e5bdf418f",
   "visual_style_sha256": "d1ab2aee8e20f5fe032759114e271d998406926e352d879b3b468aebe59ede72",
   "platforms": [
@@ -14,7 +14,7 @@
     },
     {
       "platform": "android",
-      "capture_head": "b6aecdfdaf964f81aeb411110c003d9662bd5e68",
+      "capture_head": "81d8c2182fa4c8fa0d859b7278b7250df9dad1b2",
       "source_and_fixture_changed_paths": [],
       "source_hash_mismatches": [],
       "retained": true

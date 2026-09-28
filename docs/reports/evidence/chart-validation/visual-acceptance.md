@@ -17,6 +17,8 @@ The rendering library alone does not supply the required Argus presentation.
   in supporting detail; the web retains required TradingView attribution.
 - Quiet grids/ticks preserve gaps and jumps. Web singleton segments are dots,
   not short flat lines. iOS date ticks avoid truncation at plot edges.
+- Android fractional scale ticks and precise readouts share one numeric
+  presentation policy; decimal midpoint geometry avoids spurious or rounded digits.
 - Android screenshots now wait for the rendered theme; earlier System captures
   could lag OS changes. Its standalone host fixes system-bar icon contrast.
 

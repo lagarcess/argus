@@ -43,7 +43,7 @@ See [durable evidence](evidence/chart-validation/README.md) and the
 | Platform | Recommendation | Proof and limitations |
 | --- | --- | --- |
 | iPhone / Swift Charts | **Adopt direction** | Build, eight UI tests, fixture model checks, thirteen screenshots plus motion recording on iPhone 17e / iOS 26.5. iOS 17 minimum runtime, physical devices and full VoiceOver remain unverified; hitch samples unavailable. |
-| Android / Vico 2.5.1 | **Change before adoption** | Build, lint, two unit tests and seven emulator tests pass; seventeen revised screenshots plus motion recording. The app-only long-series sample has substantial jank. Isolated resolution raises Compose UI/runtime/foundation to 1.11.1, Material3 to 1.4.0, core-ktx to 1.18.0 and Kotlin stdlib to 2.3.21 while the Compose compiler plugin remains 2.2.10. Coordinate this convergence with the Android foundation owner before any shared build/product integration. API 26 and physical TalkBack/performance remain unverified. |
+| Android / Vico 2.5.1 | **Change before adoption** | Build, lint, three unit tests and eight emulator tests pass; twenty revised screenshots plus motion recording. The app-only long-series sample has substantial jank. Isolated resolution raises Compose UI/runtime/foundation to 1.11.1, Material3 to 1.4.0, core-ktx to 1.18.0 and Kotlin stdlib to 2.3.21 while the Compose compiler plugin remains 2.2.10. Coordinate this convergence with the Android foundation owner before any shared build/product integration. API 26 and physical TalkBack/performance remain unverified. |
 | Web / Lightweight Charts 5.2.0 | **Adopt direction** | Three model tests plus Chromium 147 and WebKit 26.4 browser suites, sixteen screenshots plus touch recording. Chromium real browser touch events prove cancel/release/vertical scrolling. WebKit touch gestures, physical devices and screen-reader use remain unverified. |
 
 Each recommendation retains explicit segment splitting, accessible point controls
@@ -60,9 +60,9 @@ Measured performance, on the shared arm64 Mac rather than physical phones:
 - Web: 2,000-point construction through two animation callbacks takes 17.3–22 ms
   in Chromium and 33–51 ms in WebKit. Readout formatting/DOM p95 is 0.4/1 ms.
   These exclude input delivery and GPU completion; idle frame timing is not FPS.
-- Android: the app-only 2,000-point sample records 101 frames, 100% jank and
-  frame p95 101 ms; the instrumented sample records 12 frames, 100% jank and
-  p95 121 ms. Both are retained. SwiftShader software rendering and a debug APK
+- Android: the app-only 2,000-point sample records 99 frames, 100% jank and
+  frame p95 101 ms; the instrumented sample records 36 frames, 33.33% jank and
+  p95 65 ms. Both are retained. SwiftShader software rendering and a debug APK
   limit transfer to physical devices. Improve and remeasure before adoption.
 
 These different instruments are not a cross-platform speed ranking or a production
@@ -121,6 +121,15 @@ inspected reference. The Vico dependency uplift remains a separate adoption
 condition. No chart sources, shared fixtures, presentation tokens, web fonts or
 lockfile changed; preserve visual/performance evidence and the reviewed worker
 source delta. Run normal final-head CI and merged-tree modularity again.
+
+A later fetch found only #734's #695 landing report at
+`acf6639a23be368dbf3848a2b873f4a69d7579c4`; merged one way as
+`62c6e674cb16576c25f71e90377826d3ac21b3e8`. This changes documentation only, with
+no prototype runtime, contract, state, migration, environment or test overlap.
+The Android review then identified rounded fractional scale labels. One numeric
+presentation policy now serves axis/readout values, with exact decimal midpoint
+geometry. Its affected Android evidence is refreshed in `android/axis-precision/`;
+unchanged iPhone/web sources and captured evidence remain valid.
 
 The initial captures were superseded where the visual refinement changed sources.
 Platform provenance identifies the final capture heads; original source identities
