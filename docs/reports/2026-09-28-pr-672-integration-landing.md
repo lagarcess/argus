@@ -23,12 +23,13 @@ No deployment or `main` promotion. No linked issue auto-close.
 
 ## Accepted evidence
 
-- Exact-head CI on `0b534d00` before merge (`docs-checks`, ownership/docs
-  gates, aggregate `ci` success; backend/frontend/guest/local-smoke skipped
-  as docs-only).
-- Codex clean on `0b534d00` at 21:38:48Z; 0 unresolved review threads;
-  0 commits behind integration; `mergeable_state: clean`.
-- Clearer READY handoff naming tip `0b534d00`.
+- Pre-merge worker gates on `0b534d00`: `docs-checks` + ownership/docs gates +
+  aggregate `ci` success (backend/frontend/guest/local-smoke skipped as
+  docs-only); Codex clean at 21:38:48Z; 0 unresolved threads; behind_by 0;
+  `mergeable_state: clean`; clearer READY naming that tip.
+- Post-squash product tip `86df1ee9`: [CI](https://github.com/lagarcess/argus/actions/runs/36488798095)
+  and [Private Alpha Local Smoke](https://github.com/lagarcess/argus/actions/runs/36488798007)
+  both `success`.
 
 ## Documentation and environment audit
 
@@ -36,6 +37,12 @@ This landing adds the integration register entry and this report. Product
 docs and board text already shipped inside #672. `.env.example` /
 `web/.env.local.example` / `render.yaml` unchanged. No secrets inspected or
 rewritten. `git diff --check` clean for the squash vs parent.
+
+Direct push to integration was rejected (branch protection), so this register
+ships through a docs-only PR. The housekeeping tip's final SHA, clean
+local/remote parity, and exact-head CI/smoke after that merge are recorded in
+the #672 landing-completion comment once those checks reach terminal state;
+this report does not anticipate those results.
 
 ## Authority boundary
 
