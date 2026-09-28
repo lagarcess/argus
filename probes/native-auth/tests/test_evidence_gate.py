@@ -274,6 +274,7 @@ def test_app_logs_allow_only_declared_and_incidental_steps(
     ("change", "expected"),
     [
         (lambda r: r.update(scheme_prompts_accepted="unknown"), "is not count"),
+        (lambda r: r.update(scheme_prompts_accepted="0"), "is not count"),
         (lambda r: r.update(scheme_prompts_accepted=-1), "is not count"),
         (lambda r: r.update(scheme_prompts_accepted=True), "is not count"),
         (
