@@ -99,7 +99,7 @@ class OpeningRevisionResponse(BaseModel):
     as_of: datetime
     time_zone: str
     reason: str | None
-    recorded_by: str
+    recorded_by: str | None
     recorded_at: datetime
 
 

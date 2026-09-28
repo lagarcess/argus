@@ -202,7 +202,7 @@ class PostgresFinancialAccountRepository:
                     as_of=as_of,
                     time_zone=zone,
                     reason=reason,
-                    recorded_by=str(by),
+                    recorded_by=str(by) if by is not None else None,
                     recorded_at=at,
                 )
             )

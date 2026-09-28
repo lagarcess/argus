@@ -60,7 +60,9 @@ create table if not exists public.financial_record_revisions (
     as_of_zone text not null,
     reason text check (reason is null or char_length(reason) between 1 and 200),
     capture_method text not null default 'manual' check (capture_method in ('manual')),
-    recorded_by uuid not null references auth.users(id),
+    -- Who made the revision. Kept when that user is later deleted, the way
+    -- guest_workspaces.claimed_by is, so history never loses a row.
+    recorded_by uuid references auth.users(id) on delete set null,
     recorded_at timestamptz not null default now(),
     foreign key (record_id, user_id)
         references public.financial_records (id, user_id) on delete cascade,
