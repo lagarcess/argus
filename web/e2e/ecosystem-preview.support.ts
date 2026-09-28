@@ -1,10 +1,10 @@
-import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { expect, test as base, type Page, type TestInfo } from "@playwright/test";
 import { LANGUAGE_STORAGE_KEY, THEME_STORAGE_KEY } from "../lib/browser-storage";
 import type { PreviewAudience, PreviewState, PreviewView } from "../app/dev/ecosystem/preview-content";
+import { previewCodeIdentity } from "./ecosystem-preview-evidence";
 
 export type Language = "en" | "es-419";
 export type Theme = "light" | "dark" | "system";
@@ -30,6 +30,7 @@ function forbiddenRequest(url: URL, origin: string) {
 export const test = base.extend<{ networkAudit: NetworkAudit }>({
   networkAudit: [async ({ context, baseURL }, use, testInfo) => {
     if (!baseURL) throw new Error("The preview network guard requires a base URL.");
+    if (process.env.ARGUS_PREVIEW_EVIDENCE_DIR) codeIdentity();
     const origin = new URL(baseURL).origin;
     const startedAt = Date.now();
     const audit: NetworkAudit = { forbidden: [], allowedRequests: 0, pageErrors: [] };
@@ -61,8 +62,7 @@ export const test = base.extend<{ networkAudit: NetworkAudit }>({
     });
     if (process.env.ARGUS_PREVIEW_EVIDENCE_DIR) {
       const outputDir = path.resolve(process.env.ARGUS_PREVIEW_EVIDENCE_DIR, "interactions");
-      const { codeHead, surfaceChanges } = codeIdentity();
-      if (surfaceChanges) throw new Error("Commit the preview surface before recording durable interaction evidence.");
+      const { codeHead } = codeIdentity();
       mkdirSync(outputDir, { recursive: true });
       const name = testInfo.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       writeFileSync(path.join(outputDir, `${name}.json`), `${JSON.stringify({
@@ -220,17 +220,13 @@ export async function enlargeText(page: Page) {
 const repositoryRoot = path.resolve(__dirname, "../..");
 
 function codeIdentity() {
-  return {
-    codeHead: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repositoryRoot, encoding: "utf8" }).trim(),
-    surfaceChanges: execFileSync("git", ["status", "--porcelain", "--untracked-files=normal", "--", "web/app/dev/ecosystem"], { cwd: repositoryRoot, encoding: "utf8" }).trim(),
-  };
+  return previewCodeIdentity(repositoryRoot, process.env.ARGUS_PREVIEW_EVIDENCE_DIR);
 }
 
 export async function capture(page: Page, testInfo: TestInfo, audit: NetworkAudit, name: string) {
   const evidenceDir = process.env.ARGUS_PREVIEW_EVIDENCE_DIR;
   const outputDir = evidenceDir ? path.resolve(evidenceDir) : testInfo.outputPath("captures");
-  const { codeHead, surfaceChanges } = codeIdentity();
-  if (evidenceDir && surfaceChanges) throw new Error("Commit the preview surface before capturing durable exact-head evidence.");
+  const { codeHead, worktreeChanges } = codeIdentity();
   mkdirSync(outputDir, { recursive: true });
   await page.evaluate(() => document.fonts.ready);
   const filename = path.join(outputDir, `${name}.png`);
@@ -241,7 +237,7 @@ export async function capture(page: Page, testInfo: TestInfo, audit: NetworkAudi
   const metadata = {
     name,
     codeHead,
-    surfaceChanges: surfaceChanges || null,
+    worktreeChanges: worktreeChanges || null,
     capturedAt: new Date().toISOString(),
     url: page.url(),
     viewport: page.viewportSize(),
