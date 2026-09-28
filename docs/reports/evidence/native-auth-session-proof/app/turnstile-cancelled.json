@@ -1,0 +1,1 @@
+[{"observed":{"configured":"true"},"id":"B7A12DAA-BFA2-430C-B815-180DA2B9C4AA","step":"launch"},{"observed":{"sitekey":"3x00000000000000000000FF","page_host":"127.0.0.1"},"id":"E7DAE589-DC7A-4D61-A2CC-08EA06E6CB32","step":"turnstile.open"},{"observed":{"request_sent":"false"},"id":"7C9DF4A3-7690-41AC-B231-9D4DAA77D4CB","step":"turnstile.cancelled"}]

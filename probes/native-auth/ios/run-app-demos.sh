@@ -47,8 +47,23 @@ CALLBACK="$(cd "$HERE/../http_probe" && API_URL="$API_URL" ANON_KEY="$ANON_KEY" 
 from harness import GoTrue, Mailpit, Stack
 s = Stack.from_env()
 print(GoTrue(s).verify_link(Mailpit(s).latest_link('$EMAIL', after=$SENT)).headers['location'])")"
-xcrun simctl openurl "$UDID" "$CALLBACK"; sleep 5
-xcrun simctl openurl "$UDID" "$CALLBACK"; sleep 4
-xcrun simctl openurl "$UDID" "argusnativeproof://auth-callback?code=00000000-0000-0000-0000-000000000000"
-capture callback-delivery 5
+# iOS may ask "Open in ArgusAuthProbeApp?" before delivering a custom-scheme
+# URL. Each delivery waits for the app to log its outcome before the next.
+deliver() {
+  local log before
+  log="$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data)/Documents/probe-log.json"
+  count() { { grep -o callback.completed "$log" || true; } | wc -l; }
+  before="$(count)"
+  xcrun simctl openurl "$UDID" "$1"
+  echo "If iOS asks \"Open in ArgusAuthProbeApp?\", tap Open ($2)."
+  for _ in $(seq 1 90); do
+    if [ "$(count)" -gt "$before" ]; then return; fi
+    sleep 1
+  done
+  echo "no callback outcome for $2" >&2; exit 1
+}
+deliver "$CALLBACK" "issued code"
+deliver "$CALLBACK" "same code again"
+deliver "argusnativeproof://auth-callback?code=00000000-0000-0000-0000-000000000000" "forged code"
+capture callback-delivery 2
 echo "evidence in $OUT"

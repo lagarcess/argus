@@ -4,7 +4,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/../stack/env.sh"
-OUT="$(cd "$(dirname "$1")" 2>/dev/null && pwd || mkdir -p "$(dirname "$1")" && cd "$(dirname "$1")" && pwd)/$(basename "$1")"; shift
+mkdir -p "$(dirname "$1")"
+OUT="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; shift
 eval "$(native_auth_supabase status -o env 2>/dev/null)"
 DEVICE_NAME="Argus Native Auth Proof"
 UDID="$(xcrun simctl list devices -j | python3 -c "
@@ -29,7 +30,7 @@ cd "$HERE/ArgusAuthProbeApp"
 set +e
 # Hosted in the probe app: Keychain writes fail in an unhosted test bundle.
 xcodebuild test -project ArgusAuthProbeApp.xcodeproj -scheme ArgusAuthProbeApp -destination "id=$UDID" \
-  -derivedDataPath "$NATIVE_AUTH_WORK/DerivedData" "$@" > "$LOG" 2>&1
+  -derivedDataPath "$NATIVE_AUTH_WORK/DerivedData" -collect-test-diagnostics never "$@" > "$LOG" 2>&1
 STATUS=$?
 set -e
 python3 "$HERE/collect_results.py" "$LOG" "$OUT" "$UDID"

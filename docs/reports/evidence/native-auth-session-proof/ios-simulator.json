@@ -1,0 +1,192 @@
+{
+  "client": "Swift ArgusNativeAuth (supabase-swift 2.55.2) XCTest hosted in ArgusAuthProbeApp on iOS Simulator",
+  "environment": "Xcode 27.0; simulator 'Argus Native Auth Proof' (iPhone 17 Pro), iOS-27-0; lane stack argus-native-auth-proof",
+  "captured_at": "2026-09-28T03:42:53+00:00",
+  "argus_source_head": "8e88294f7f9748069c805517971e60729d944afd",
+  "xcodebuild_summary": "Executed 11 tests, with 1 failure (0 unexpected) in 35.366 (35.372) seconds",
+  "results": [
+    {
+      "area": "sign-in",
+      "evidence_level": 4,
+      "expected": "Relaunched client restores the session from Keychain and reaches GET /me; item is device-only",
+      "id": "I1",
+      "note": "Storage is the probe's KeychainStore. The SDK default KeychainLocalStorage uses AfterFirstUnlock, which migrates through backups.",
+      "observed": {
+        "keychain_accessibility_this_device_only": true,
+        "keychain_items": 1,
+        "me_status": 200,
+        "relaunch_has_session": true
+      },
+      "path": "unchanged-argus",
+      "scenario": "Sign in through Argus, hand the session to supabase-swift, relaunch with a new client",
+      "verdict": "pass"
+    },
+    {
+      "area": "cookie-hazard",
+      "evidence_level": 4,
+      "expected": "No Argus cookie stored anywhere; a request without the bearer is 401",
+      "id": "I2",
+      "note": "Contrast with HTTP probe A11, where a default cookie store authenticates a bearer-less request as the previous user.",
+      "observed": {
+        "no_bearer_status": 401,
+        "shared_cookie_names": []
+      },
+      "path": "unchanged-argus",
+      "scenario": "Argus sets sb-* cookies on sign-in; the app's transport refuses them",
+      "verdict": "pass"
+    },
+    {
+      "area": "refresh-race",
+      "evidence_level": 4,
+      "expected": "One refresh (one new access token shared by all), every request 200, rotated token persisted",
+      "id": "I3",
+      "note": "supabase-swift's SessionManager actor shares one in-flight refresh task.",
+      "observed": {
+        "distinct_access_tokens": 1,
+        "previous_refresh_token_status_after_window": 200,
+        "refresh_token_rotated": true,
+        "statuses": [
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200,
+          200
+        ]
+      },
+      "path": "unchanged-argus",
+      "scenario": "Eight concurrent requests start after the access token entered its refresh margin",
+      "verdict": "pass"
+    },
+    {
+      "area": "revoke",
+      "evidence_level": 4,
+      "expected": "401, one refresh attempt refused, local session cleared, app shows signed out",
+      "id": "I4",
+      "note": "",
+      "observed": {
+        "local_session_cleared": true,
+        "outcome": "signedOut"
+      },
+      "path": "unchanged-argus",
+      "scenario": "Another device signs out everywhere; this device makes its next request",
+      "verdict": "pass"
+    },
+    {
+      "area": "logout",
+      "evidence_level": 4,
+      "expected": "Forgotten refresh token still works server-side; after sign-out both tokens are dead",
+      "id": "I5",
+      "note": "supabase-swift removes the local session before the network revoke and does not retry it. An offline sign-out leaves the server session live (see report).",
+      "observed": {
+        "forgotten_refresh_status": 200,
+        "signout_local_session_cleared": true,
+        "signout_old_access_status": 401,
+        "signout_old_refresh_status": 400
+      },
+      "path": "unchanged-argus",
+      "scenario": "Clearing local state versus signOut(scope: .local)",
+      "verdict": "pass"
+    },
+    {
+      "area": "account-switch",
+      "evidence_level": 4,
+      "expected": "Alice's late response is dropped; Alice's cache is gone; Bob sees Bob",
+      "id": "I6",
+      "note": "The server cannot do this for the client. The web has the same rule in chat-request-session.ts and a known resend gap (#688).",
+      "observed": {
+        "alice_cache_survived": false,
+        "alice_data_delivered_after_switch": false,
+        "bob_is_bob": true,
+        "late_response_dropped": true
+      },
+      "path": "unchanged-argus",
+      "scenario": "Alice's request is in flight when the user switches to Bob",
+      "verdict": "pass"
+    },
+    {
+      "area": "scoped-jar-conversion",
+      "evidence_level": 4,
+      "expected": "Sign-in claims the guest conversation; handoff deleted; no other cookie kept",
+      "id": "I7",
+      "note": "",
+      "observed": {
+        "claimed_conversation_matches": true,
+        "conversation_owned_by_account": true,
+        "handoff_after_sign_in": false,
+        "handoff_held_before_sign_in": true,
+        "shared_cookie_store_empty": true
+      },
+      "path": "unchanged-argus",
+      "scenario": "Guest converts to an existing account; the app keeps only the two handoff cookies in Keychain",
+      "verdict": "pass"
+    },
+    {
+      "area": "bearer-only-conversion",
+      "evidence_level": 2,
+      "expected": "Claim succeeds with no cookies at all; wrong account gets wrong_destination and its session is revoked, not orphaned",
+      "id": "I8",
+      "note": "Runs on the simulator, but through the synthetic adapter, so it is level 2 for the Argus contract.",
+      "observed": {
+        "claimed_conversation_matches": true,
+        "handoff_after_sign_in": false,
+        "handoff_held_before_sign_in": true,
+        "wrong_account_code": "guest_handoff_wrong_destination",
+        "wrong_account_local_session": false
+      },
+      "path": "synthetic-header-adapter",
+      "scenario": "Same conversion over the proposed header transport, plus a wrong-account sign-in",
+      "verdict": "pass"
+    },
+    {
+      "area": "new-account-conversion",
+      "evidence_level": 4,
+      "expected": "Signup returns no session; the handoff survives relaunch in Keychain and claims on sign-in",
+      "id": "I9",
+      "note": "",
+      "observed": {
+        "claimed_conversation_matches": true,
+        "handoff_after_relaunch": true,
+        "signup_session_present": false
+      },
+      "path": "unchanged-argus",
+      "scenario": "Guest signs up, confirms by email outside the app, relaunches, signs in",
+      "verdict": "pass"
+    },
+    {
+      "area": "recovery",
+      "evidence_level": 4,
+      "expected": "Only the first valid callback on the requesting device yields a session",
+      "id": "I10",
+      "note": "Callback URLs are handed to the SDK in-process. Delivery of a custom-scheme URL to the app is shown separately with simctl openurl; universal links are not verified.",
+      "observed": {
+        "argus_me_status": 200,
+        "expired_link_error_callback": "AuthError",
+        "forged": "flow_state_not_found",
+        "other_device": "validation_failed",
+        "repeated": "validation_failed",
+        "valid_callback_session": true
+      },
+      "path": "unchanged-argus",
+      "scenario": "App callback handling for valid, repeated, foreign-device, forged, and expired recovery callbacks",
+      "verdict": "pass"
+    },
+    {
+      "area": "secrets",
+      "evidence_level": 4,
+      "expected": "No access or refresh token appears in log output",
+      "id": "I11",
+      "note": "Failed assumption when true. The SDK attaches the refresh token to its logger context during refresh, and Session has no redacting description. Ship with logger: nil and never interpolate Session.",
+      "observed": {
+        "sdk_log_lines": 8,
+        "sdk_logger_output_contains_token": true,
+        "session_description_contains_token": true
+      },
+      "path": "unchanged-argus",
+      "scenario": "An app passes a logger to supabase-swift, or logs a Session value",
+      "verdict": "fail"
+    }
+  ]
+}
