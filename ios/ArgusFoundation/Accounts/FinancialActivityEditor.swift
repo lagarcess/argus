@@ -10,6 +10,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     let id = UUID()
     let origin: FinancialAccount
     let correcting: FinancialActivityDetail?
+    let planOccurrence: FinancialPlanOccurrence?
     @Published private(set) var kind: FinancialActivityKind
     @Published var accountId: UUID? { didSet { changed(accountId != oldValue) } }
     @Published var sourceAccountId: UUID? { didSet { changed(sourceAccountId != oldValue) } }
@@ -40,13 +41,13 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     private let retired: (SessionSnapshot) -> Void
     private let completed: (FinancialActivityReceipt) async -> Void
 
-    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil,
+    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil, planOccurrence: FinancialPlanOccurrence? = nil,
          controller: SessionController, journal: FinancialWriteJournal, identity: SessionSnapshot,
          started: @escaping (PendingFinancialConfirmation) -> Void = { _ in },
          resolved: @escaping () -> Void = {},
          retired: @escaping (SessionSnapshot) -> Void = { _ in },
          completed: @escaping (FinancialActivityReceipt) async -> Void) {
-        self.origin = origin; self.correcting = correcting
+        self.origin = origin; self.correcting = correcting; self.planOccurrence = planOccurrence
         self.controller = controller; self.journal = journal; self.identity = identity
         self.started = started; self.resolved = resolved; self.retired = retired; self.completed = completed
         kind = correcting?.kind ?? (origin.type == "credit_card" ? .cardPayment : origin.type == "investment" ? .transfer : .expense)
@@ -62,7 +63,14 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
             answers = correcting.legs.flatMap { leg in
                 leg.coverage.map { .init(accountId: leg.accountId, observationId: $0.observationId, included: $0.included) }
             }
-        } else { setAccounts(for: kind) }
+        } else {
+            if let planOccurrence { kind = planOccurrence.kind == .income ? .income : .expense }
+            setAccounts(for: kind)
+            if let planOccurrence {
+                amount = AccountPresentation.amount(planOccurrence.amount, locale: .current)
+                note = planOccurrence.title
+            }
+        }
     }
 
     var isCorrection: Bool { correcting != nil }
@@ -78,7 +86,8 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     var availableKinds: [FinancialActivityKind] {
         guard let options else { return [] }
         return FinancialActivityKind.allCases.filter { kind in
-            options.eligibility[kind.rawValue]?.contains(origin.type) == true ||
+            if let planOccurrence { return kind == (planOccurrence.kind == .income ? .income : .expense) }
+            return options.eligibility[kind.rawValue]?.contains(origin.type) == true ||
             (kind.isPaired && options.destinationEligibility[kind.rawValue]?.contains(origin.type) == true)
         }
     }
@@ -127,7 +136,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
 
     private func choices(types: [String]?) -> [FinancialAccount] {
         guard let options, let types else { return [] }
-        return options.accounts.filter { !$0.archived && $0.currency == origin.currency && types.contains($0.type) }
+        return options.accounts.filter { (planOccurrence == nil || $0.id == planOccurrence?.accountId) && !$0.archived && $0.currency == origin.currency && types.contains($0.type) }
     }
 
     private func loadPurchases() async {
@@ -184,8 +193,13 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                 purchaseActivityId: kind == .refund ? purchaseActivityId : nil,
                 expectedRevision: correcting?.revision, reason: isCorrection ? reason : nil,
                 expectedVersions: versions, coverage: answers)
-            let next = try await controller.financialActivityPreview(command, activityId: correcting?.activityId,
-                                                                      expectedIdentity: identity)
+            let next: FinancialActivityPreview
+            if let occurrence = planOccurrence {
+                next = try await controller.financialPlanPreview(occurrenceId: occurrence.id,
+                    command: .init(expectedVersion: occurrence.expectationVersion, activity: command), expectedIdentity: identity).money
+            } else {
+                next = try await controller.financialActivityPreview(command, activityId: correcting?.activityId, expectedIdentity: identity)
+            }
             guard !(await retireIfNeeded()) else { return }
             preview = next
             if next.ready, var reviewed = next.reviewedRequest, let token = next.previewToken {
@@ -212,15 +226,23 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                     throw SessionFailure.invalidResponse
                 }
                 let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
-                write = .init(ownerId: owner, originAccountId: origin.id, route: "financial-activities",
-                              path: correcting.map { "/" + $0.activityId.uuidString } ?? "",
-                              method: correcting == nil ? "POST" : "PATCH",
-                              body: try encoder.encode(reviewedCommand), key: key)
+                if let occurrence = planOccurrence {
+                    let operation = FinancialPlanOperation.fulfill(occurrenceId: occurrence.id, version: occurrence.expectationVersion)
+                    write = .init(ownerId: owner, originAccountId: origin.id, route: "financial-plan", path: operation.path,
+                        method: operation.method, body: try encoder.encode(FinancialPlanFulfillmentCommand(
+                            expectedVersion: occurrence.expectationVersion, activity: reviewedCommand)), key: key, planOperation: operation)
+                } else {
+                    write = .init(ownerId: owner, originAccountId: origin.id, route: "financial-activities",
+                        path: correcting.map { "/" + $0.activityId.uuidString } ?? "", method: correcting == nil ? "POST" : "PATCH",
+                        body: try encoder.encode(reviewedCommand), key: key)
+                }
                 try journal.begin(write, for: identity)
                 pendingWrite = write
                 started(write)
             }
-            let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
+            let receipt = try await write.planOperation == nil
+                ? controller.sendFinancialConfirmation(write, expectedIdentity: identity)
+                : controller.sendPlanFulfillment(write, expectedIdentity: identity)
             guard !(await retireIfNeeded()) else { return }
             try journal.clear(write, for: identity)
             pendingWrite = nil
@@ -264,6 +286,9 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         guard case SessionFailure.rejected(_, let code) = error else { return "loop.error.connection" }
         guard let code else { return "loop.error.validation" }
         switch code {
+        case "plan_cutover_unsafe": return "plan.error.cutover"
+        case "occurrence_already_linked", "activity_already_linked": return "plan.error.stale"
+        case "fulfillment_mismatch": return "plan.error.account"
         case "accounts_invalid": return "loop.error.accounts_invalid"
         case "purchase_invalid": return "loop.error.purchase_not_found"
         case "refund_limit": return "loop.error.refund_exceeds_purchase"

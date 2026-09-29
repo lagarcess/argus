@@ -36,7 +36,7 @@ struct AccountsView: View {
                 PersonalContext()
                 if loop.pendingConfirmation != nil {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("loop.pending.title").font(ArgusStyle.body(15))
+                        Text(LocalizedStringKey(loop.pendingTitle)).font(ArgusStyle.body(15))
                         Text("loop.pending.body").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
                         Button("loop.pending.retry") { Task { await loop.retryPending() } }
                             .buttonStyle(PillButtonStyle()).disabled(loop.recovering)

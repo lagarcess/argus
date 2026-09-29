@@ -136,7 +136,7 @@ final class AccountsModel: ObservableObject {
         selected = account
     }
 
-    func accept(_ updated: [FinancialAccount], preserving originId: UUID) {
+    func accept(_ updated: [FinancialAccount], preserving originId: UUID?) {
         let selectedId = selected?.id ?? originId
         for account in updated {
             if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }

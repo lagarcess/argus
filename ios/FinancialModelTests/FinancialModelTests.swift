@@ -296,6 +296,7 @@ private actor PresentationServer {
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         let path = request.url!.path
         guard path.contains("/financial-") else { return try await auth.send(request) }
+        if path.contains("/financial-plan") { return try await plan(request) }
         if path.contains("/financial-activities") {
             return try canonical(request)
         }
@@ -326,6 +327,33 @@ private actor PresentationServer {
         } else { body = #"{"items":[],"next_cursor":null}"# }
         return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
     }
+    static let expectationId = UUID()
+    private(set) var planCommits: [URLRequest] = []
+    static var expectation: String {
+        #"{"id":"\#(expectationId)","version":1,"kind":"bill","title":"Synthetic rent","currency":"DOP","currency_fraction_digits":2,"amount_minor":2000,"amount":"20.00","account_id":"\#(id)","schedule":{"cadence":"monthly","start_date":"2026-01-31","end_date":null,"month_days":[]},"archived":false,"earliest_effective_date":"2026-09-29"}"#
+    }
+    static func planProjection(updated: Bool) -> String {
+        let amount = updated ? "8000" : "10000"
+        let home = #"{"currencies":[{"currency":"DOP","currency_fraction_digits":2,"assets_minor":"\#(amount)","cash_minor":"\#(amount)","other_assets_minor":"0","debts_minor":"0","net_worth_minor":"\#(amount)","recorded_spending_minor":"2000","known_accounts":1,"unknown_accounts":0,"as_of":null}],"recent_activity":[],"recorded_at":"2026-09-01T12:00:00Z"}"#
+        return #"{"home":\#(home),"selection":{"version":0,"account_ids":[],"time_zone":"America/Santo_Domingo"},"accounts":[\#(account(updated:false))],"expectations":[\#(expectation)],"occurrences":[],"currencies":[],"start_date":"2026-09-29","end_date":"2026-10-29","coverage":"recorded_and_expected","has_expectations":true}"#
+    }
+    private func plan(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        let body: String
+        var status = 200
+        if request.httpMethod == "GET" {
+            body = Self.planProjection(updated: updated)
+            if let gate = homeGate { homeGate = nil; await gate.enter() }
+        }
+        else {
+            planCommits.append(request)
+            status = nextStatus ?? 200; nextStatus = nil
+            if request.url!.path.hasSuffix("/selection") {
+                body = #"{"selection":{"version":1,"account_ids":[],"time_zone":"America/Santo_Domingo"},"replayed":true}"#
+            } else { body = #"{"expectation":\#(Self.expectation),"replayed":true}"# }
+        }
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+    }
+
     private func canonical(_ request: URLRequest) throws -> (Data, URLResponse) {
         let path = request.url!.path
         let body: String
@@ -379,5 +407,98 @@ private actor PresentationServer {
     }
     static func account(updated: Bool) -> String {
         #"{"id":"\#(id)","type":"checking","nature":"asset","currency":"DOP","currency_fraction_digits":2,"nickname":"Synthetic","archived":false,"ownership_share_bps":10000,"version":\#(updated ? 2 : 1),"created_at":"2026-09-01T12:00:00Z","updated_at":"2026-09-01T12:00:00Z","balance":\#(balance(updated)),"opening":null}"#
+    }
+}
+
+@MainActor
+extension FinancialModelTests {
+    func testPlanTitleAndAmountEditDoesNotRewritePastSchedule() throws {
+        let expectation = try JSONDecoder().decode(FinancialExpectation.self, from: Data(PresentationServer.expectation.utf8))
+        let draft = FinancialExpectationDraft(expectation: expectation)
+        draft.title = "Revised rent"; draft.amount = "25.50"
+        XCTAssertFalse(draft.structuralChange)
+        let command = try draft.command(locale: Locale(identifier: "en_US"))
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(command)) as? [String: Any])
+        XCTAssertNil(payload["schedule"])
+        XCTAssertNil(payload["effective_date"])
+        XCTAssertNil(payload["kind"])
+        XCTAssertNil(payload["account_id"], "Omitting an unchanged account preserves pending occurrence identity")
+        XCTAssertEqual(payload["amount"] as? String, "25.50")
+        XCTAssertEqual(payload["expected_version"] as? Int, expectation.version)
+        draft.accountId = nil
+        XCTAssertTrue(draft.structuralChange)
+        let moved = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(draft.command(locale: Locale(identifier: "en_US")))) as? [String: Any])
+        XCTAssertNil(moved["schedule"], "An account-only edit must let the server choose the next safe scheduled date")
+        XCTAssertTrue(moved["account_id"] is NSNull)
+        XCTAssertEqual(moved["effective_date"] as? String, expectation.earliestEffectiveDate)
+    }
+
+    func testPlanConfirmationSurvivesRelaunchAndDifferentOwnerCannotReplay() async throws {
+        let fixture = try PresentationFixture()
+        let alice = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(alice); loop.bind(alice)
+        await loop.plan.refresh()
+        XCTAssertNotNil(loop.plan.projection)
+        loop.plan.create()
+        let draft = try XCTUnwrap(loop.plan.draft)
+        draft.title = "Test bill"; draft.amount = "12.34"
+        await fixture.server.failNextCommit(500)
+        await loop.plan.save(locale: Locale(identifier: "en_US"))
+        let pending = try XCTUnwrap(loop.pendingConfirmation)
+        XCTAssertEqual(pending.planOperation, .createExpectation)
+        XCTAssertNotNil(try fixture.journal.pending(for: alice))
+        let reopened = try fixture.reopened()
+        let restored = try await reopened.restore()
+        let reopenedAccounts = AccountsModel(controller: reopened)
+        let reopenedLoop = FinancialLoopModel(controller: reopened, accounts: reopenedAccounts, journal: fixture.journal)
+        reopenedAccounts.bind(restored); reopenedLoop.bind(restored)
+        XCTAssertEqual(reopenedLoop.pendingConfirmation, pending)
+        let beforeRetry = await fixture.server.planCommits.count
+        XCTAssertEqual(beforeRetry, 1)
+        _ = try await reopened.signOut()
+        let bob = try await reopened.login(email: "bob@example.test", password: "synthetic", captchaToken: "synthetic")
+        reopenedAccounts.bind(bob); reopenedLoop.bind(bob)
+        XCTAssertNil(reopenedLoop.plan.projection)
+        XCTAssertNil(reopenedLoop.plan.draft)
+        XCTAssertNil(reopenedLoop.pendingConfirmation)
+        await reopenedLoop.retryPending()
+        let bobCount = await fixture.server.planCommits.count
+        XCTAssertEqual(bobCount, 1)
+        _ = try await reopened.signOut()
+        let aliceAgain = try await reopened.login(email: "alice@example.test", password: "synthetic", captchaToken: "synthetic")
+        reopenedAccounts.bind(aliceAgain); reopenedLoop.bind(aliceAgain)
+        await reopenedLoop.retryPending()
+        XCTAssertNil(reopenedLoop.pendingConfirmation)
+        XCTAssertNotNil(reopenedLoop.home)
+        XCTAssertNotNil(reopenedLoop.plan.projection)
+        XCTAssertEqual(reopenedLoop.home?.currencies.first?.netWorthMinor,
+                       reopenedLoop.plan.projection?.home.currencies.first?.netWorthMinor)
+        let commits = await fixture.server.planCommits
+        XCTAssertEqual(commits.count, 2)
+        XCTAssertEqual(commits.first?.httpBody, commits.last?.httpBody)
+        XCTAssertEqual(commits.first?.value(forHTTPHeaderField: "Idempotency-Key"), commits.last?.value(forHTTPHeaderField: "Idempotency-Key"))
+    }
+
+    func testEmptyPlanSelectionIsAnExplicitJournaledPut() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity)
+        await loop.plan.refresh()
+        await fixture.server.failNextCommit(500)
+        let saved = await loop.plan.selectAccounts([], timeZone: "America/Santo_Domingo")
+        XCTAssertFalse(saved)
+        let pending = try XCTUnwrap(loop.pendingConfirmation)
+        XCTAssertEqual(pending.method, "PUT")
+        XCTAssertEqual(pending.planOperation, .selection(version: 0))
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: pending.body) as? [String: Any])
+        XCTAssertEqual(payload["account_ids"] as? [String], [])
+        await loop.retryPending()
+        XCTAssertNil(loop.pendingConfirmation)
+        let commits = await fixture.server.planCommits
+        XCTAssertEqual(commits.first?.httpBody, commits.last?.httpBody)
     }
 }

@@ -10,7 +10,6 @@ final class FinancialLoopModel: ObservableObject {
     @Published private(set) var checksCursor: String?
     @Published private(set) var loadingMore = false
     @Published private(set) var errorKey: String?
-    @Published private(set) var loading = false
     @Published var editor: FinancialEditor?
     @Published var activityEditor: FinancialActivityEditor?
     @Published private(set) var pendingConfirmation: PendingFinancialConfirmation?
@@ -21,9 +20,9 @@ final class FinancialLoopModel: ObservableObject {
     private let journal: FinancialWriteJournal
     private var identity: SessionSnapshot?
     private var generation = UUID()
-    private var homeRequest = UUID()
     private var detailRequest = UUID()
     var sessionChanged: ((SessionSnapshot) -> Void)?
+    lazy var plan = FinancialPlanModel(controller: controller, accounts: accounts, loop: self)
 
     init(controller: SessionController, accounts: AccountsModel, journal: FinancialWriteJournal) {
         self.controller = controller; self.accounts = accounts; self.journal = journal
@@ -33,25 +32,20 @@ final class FinancialLoopModel: ObservableObject {
         guard identity?.revision != snapshot?.revision || identity?.profile?.id != snapshot?.profile?.id || identity?.phase != snapshot?.phase else { return }
         generation = UUID(); identity = snapshot?.phase == .authenticated ? snapshot : nil
         home = nil; activity = []; checks = []; activityCursor = nil; checksCursor = nil; loadingMore = false
-        editor = nil; activityEditor = nil; errorKey = nil; loading = false; recovering = false; recoveryErrorKey = nil
+        editor = nil; activityEditor = nil; errorKey = nil; recovering = false; recoveryErrorKey = nil
         if let identity {
             do { pendingConfirmation = try journal.pending(for: identity) }
             catch { pendingConfirmation = nil; recoveryErrorKey = "auth.error.storage" }
         } else { pendingConfirmation = nil }
+        plan.bind(snapshot)
     }
 
     func refresh() async {
-        guard let identity else { return }
-        let ticket = generation
-        let request = UUID(); homeRequest = request
-        loading = true; errorKey = nil
-        defer { if generation == ticket && homeRequest == request { loading = false } }
-        do {
-            let next = try await controller.financialHome(expectedIdentity: identity)
-            guard generation == ticket, homeRequest == request else { return }
-            home = next
-        } catch { if homeRequest == request { await handle(error, ticket: ticket) } }
+        guard identity != nil else { return }
+        await plan.refresh()
     }
+
+    func acceptPlanHome(_ home: FinancialHome) { self.home = home }
 
     func open(_ account: FinancialAccount) async {
         guard let identity else { return }
@@ -128,10 +122,10 @@ final class FinancialLoopModel: ObservableObject {
         return account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")
     }
 
-    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil) {
+    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil) {
         guard let identity, pendingConfirmation == nil else { return }
         let ticket = generation
-        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, controller: controller,
+        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, controller: controller,
             journal: journal, identity: identity, started: { [weak self] write in
                 guard let self, self.generation == ticket else { return }
                 self.pendingConfirmation = write
@@ -154,11 +148,26 @@ final class FinancialLoopModel: ObservableObject {
         do {
             let current = await controller.snapshot()
             guard generation == ticket, current == identity else { throw SessionFailure.staleOperation }
-            let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
-            guard generation == ticket else { return }
-            try journal.clear(write, for: identity)
-            pendingConfirmation = nil
-            await accepted(receipt, originId: write.originAccountId, ticket: ticket)
+            if let operation = write.planOperation {
+                if case .fulfill = operation {
+                    let receipt = try await controller.sendPlanFulfillment(write, expectedIdentity: identity)
+                    guard generation == ticket else { return }
+                    try journal.clear(write, for: identity); pendingConfirmation = nil
+                    await accepted(receipt, originId: write.originAccountId, ticket: ticket)
+                } else {
+                    try await controller.sendPlanConfirmation(write, expectedIdentity: identity)
+                    guard generation == ticket else { return }
+                    try journal.clear(write, for: identity); pendingConfirmation = nil
+                    await accounts.load(); await refresh()
+                    guard generation == ticket else { return }
+                    plan.confirmed(operation)
+                }
+            } else {
+                let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
+                guard generation == ticket else { return }
+                try journal.clear(write, for: identity); pendingConfirmation = nil
+                await accepted(receipt, originId: write.originAccountId, ticket: ticket)
+            }
         } catch {
             guard generation == ticket else { return }
             let current = await controller.snapshot()
@@ -173,7 +182,46 @@ final class FinancialLoopModel: ObservableObject {
         }
     }
 
-    private func accepted(_ receipt: FinancialActivityReceipt, originId: UUID, ticket: UUID) async {
+    func confirmPlan<Command: Encodable>(_ operation: FinancialPlanOperation, command: Command, originAccountId: UUID?) async throws {
+        guard let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), pendingConfirmation == nil else {
+            throw FinancialWriteJournalError.pendingConfirmation
+        }
+        let ticket = generation
+        let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
+        let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: originAccountId,
+            route: "financial-plan", path: operation.path, method: operation.method,
+            body: try encoder.encode(command), key: UUID(), planOperation: operation)
+        try journal.begin(write, for: identity)
+        pendingConfirmation = write
+        do {
+            try await controller.sendPlanConfirmation(write, expectedIdentity: identity)
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            try journal.clear(write, for: identity); pendingConfirmation = nil
+            await accounts.load(); await refresh()
+        } catch {
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            let current = await controller.snapshot()
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            if current != identity { bind(current); sessionChanged?(current); throw error }
+            if case SessionFailure.rejected(let status, _) = error, (400..<500).contains(status), status != 408 {
+                try journal.clear(write, for: identity); pendingConfirmation = nil
+                await refresh()
+            }
+            throw error
+        }
+    }
+
+    var pendingTitle: String {
+        guard let operation = pendingConfirmation?.planOperation else { return "loop.pending.title" }
+        switch operation {
+        case .createExpectation, .editExpectation: return "plan.pending.expectation"
+        case .selection: return "plan.pending.selection"
+        case .link: return "plan.pending.link"
+        case .fulfill: return "plan.pending.fulfillment"
+        }
+    }
+
+    private func accepted(_ receipt: FinancialActivityReceipt, originId: UUID?, ticket: UUID) async {
         guard generation == ticket, identity != nil else { return }
         pendingConfirmation = nil
         accounts.accept(receipt.accounts, preserving: originId)
