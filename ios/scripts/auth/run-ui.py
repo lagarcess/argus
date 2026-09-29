@@ -23,6 +23,11 @@ parser.add_argument("--accounts", action="store_true")
 parser.add_argument("--language", choices=["en", "es-419"], default="en")
 parser.add_argument("--appearance", choices=["light", "dark", "system"], default="light")
 parser.add_argument("--port-base", type=int, default=58400)
+parser.add_argument(
+    "--response-loss-proxy",
+    action="store_true",
+    help="Opt in to local committed-response-loss acceptance; requires API58512 build",
+)
 args = parser.parse_args()
 allocation = Allocation(args.accounts, args.port_base)
 WORK = allocation.work
@@ -77,6 +82,7 @@ for target in targets:
             "ARGUS_TEST_ACCOUNTS_UI_ENABLED": str(args.accounts).lower(),
             "ARGUS_TEST_LANGUAGE": args.language,
             "ARGUS_TEST_APPEARANCE": args.appearance,
+            "ARGUS_TEST_RESPONSE_LOSS_PROXY": str(args.response_loss_proxy).lower(),
             "ARGUS_TEST_EMAIL_B": cfg["users"][1]["email"],
             "ARGUS_TEST_PASSWORD_B": cfg["users"][1]["password"],
             "ARGUS_TEST_EMAIL": cfg["users"][0]["email"],

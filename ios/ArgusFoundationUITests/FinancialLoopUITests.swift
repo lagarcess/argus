@@ -3,7 +3,7 @@ import UIKit
 import UniformTypeIdentifiers
 
 final class FinancialLoopUITests: XCTestCase {
-    private let app = XCUIApplication()
+    let app = XCUIApplication()
 
     func testArchiveManagementRestoresSameAccount() throws {
         try signIn(fresh: true)
@@ -166,7 +166,7 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["Cancelar"].tap()
     }
 
-    private func record(amount: String, note: String, included: Bool = false) {
+    func record(amount: String, note: String, included: Bool = false) {
         tapVisible(app.buttons["accounts.record"])
         XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 5))
         app.textFields["loop.amount"].tap(); app.textFields["loop.amount"].typeText(amount)
@@ -175,7 +175,7 @@ final class FinancialLoopUITests: XCTestCase {
         reviewAndConfirm(included: included)
     }
 
-    private func reviewAndConfirm(included: Bool = false) {
+    func reviewAndConfirm(included: Bool = false) {
         tapVisible(app.buttons["loop.review"])
         for _ in 0..<4 {
             if app.buttons["loop.confirm"].waitForExistence(timeout: 2) { break }
@@ -189,7 +189,7 @@ final class FinancialLoopUITests: XCTestCase {
         tapVisible(app.buttons["loop.confirm"])
     }
 
-    private func assertHome(_ expected: Decimal) {
+    func assertHome(_ expected: Decimal) {
         app.buttons["tab.home"].tap()
         let value = app.staticTexts["home.netWorth.DOP"]
         let predicate = NSPredicate { _, _ in
@@ -200,7 +200,7 @@ final class FinancialLoopUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: nil)], timeout: 12), .completed)
     }
 
-    private func homeValue() -> Decimal {
+    func homeValue() -> Decimal {
         app.buttons["tab.home"].tap()
         let value = app.staticTexts["home.netWorth.DOP"]
         XCTAssertTrue(value.waitForExistence(timeout: 10))
@@ -209,17 +209,33 @@ final class FinancialLoopUITests: XCTestCase {
         return parsed
     }
 
-    private func assertText(_ value: String) {
+    func assertText(_ value: String) {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch.waitForExistence(timeout: 12))
     }
-    private func tapVisible(_ element: XCUIElement) {
+    func tapVisible(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
-        for _ in 0..<7 { if element.isHittable { break }; app.swipeUp() }
+        var scrolled = false
+        for _ in 0..<12 {
+            if element.isHittable && element.frame.midY > 115 && element.frame.midY < app.frame.height - 130 { break }
+            if element.frame.midY < 115 { app.swipeDown() } else { app.swipeUp() }
+            scrolled = true
+        }
+        if scrolled {
+        var previous = element.frame
+        var lastMovement = Date()
+        let settled = NSPredicate { _, _ in
+            let frame = element.frame
+            if frame != previous { previous = frame; lastMovement = Date() }
+            return Date().timeIntervalSince(lastMovement) > 0.5
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 5), .completed)
+        }
         element.tap()
     }
-    private func signIn(fresh: Bool = false) throws {
+    func signIn(fresh: Bool = false, user: String = "A") throws {
         let environment = ProcessInfo.processInfo.environment
-        guard let email = environment["ARGUS_TEST_EMAIL"], let password = environment["ARGUS_TEST_PASSWORD"] else {
+        let suffix = user == "B" ? "_B" : ""
+        guard let email = environment["ARGUS_TEST_EMAIL" + suffix], let password = environment["ARGUS_TEST_PASSWORD" + suffix] else {
             throw XCTSkip("Requires isolated synthetic API and registered identity.")
         }
         continueAfterFailure = false
@@ -248,8 +264,14 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["sheet.close"].tap()
     }
 
-    private func capture(_ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+    func capture(_ name: String) {
+        let screenshot = app.screenshot()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("argus-personal-money", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try screenshot.pngRepresentation.write(to: directory.appendingPathComponent(name + ".png"))
+        } catch { XCTFail("Could not retain screenshot evidence") }
+        let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name; attachment.lifetime = .keepAlways
         add(attachment)
     }
