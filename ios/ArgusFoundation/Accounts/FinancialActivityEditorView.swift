@@ -11,8 +11,10 @@ struct FinancialActivityEditorView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    Text(model.origin.nickname ?? NSLocalizedString("accounts.type." + model.origin.type, comment: ""))
-                        .font(ArgusStyle.body(14, relativeTo: .subheadline)).foregroundStyle(ArgusStyle.secondary)
+                    if model.kind != .transfer {
+                        Text(model.origin.nickname ?? NSLocalizedString("accounts.type." + model.origin.type, comment: ""))
+                            .font(ArgusStyle.body(14, relativeTo: .subheadline)).foregroundStyle(ArgusStyle.secondary)
+                    }
                     if model.options == nil && model.phase == .editing {
                         if model.errorKey == nil { ProgressView("accounts.loading") }
                         else { Button("accounts.retry") { Task { await model.load() } }.frame(minHeight: 44) }
@@ -88,10 +90,10 @@ struct FinancialActivityEditorView: View {
             }
             if model.kind.isPaired {
                 accountPicker("loop.activity.from", value: $model.sourceAccountId,
-                              choices: model.sourceChoices, identifier: "loop.source")
+                              choices: model.sourceChoices, identifier: "loop.source", showLabel: model.kind == .transfer)
                 accountPicker(model.kind == .cardPayment ? "loop.activity.card" : "loop.activity.to",
                               value: $model.destinationAccountId, choices: model.destinationChoices,
-                              identifier: "loop.destination")
+                              identifier: "loop.destination", showLabel: model.kind == .transfer)
             } else {
                 accountPicker(model.kind == .refund ? "loop.activity.refundTo" : "loop.activity.account",
                               value: $model.accountId, choices: model.singleChoices, identifier: "loop.account")
@@ -157,14 +159,18 @@ struct FinancialActivityEditorView: View {
     }
 
     private func accountPicker(_ title: LocalizedStringKey, value: Binding<UUID?>,
-                               choices: [FinancialAccount], identifier: String) -> some View {
-        Picker(title, selection: value) {
-            Text("loop.activity.chooseAccount").tag(nil as UUID?)
-            ForEach(choices) { account in
-                Text(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: ""))
-                    .tag(Optional(account.id))
-            }
-        }.accessibilityIdentifier(identifier)
+                               choices: [FinancialAccount], identifier: String, showLabel: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if showLabel { Text(title).accessibilityIdentifier(identifier + ".label") }
+            Picker(title, selection: value) {
+                Text("loop.activity.chooseAccount").tag(nil as UUID?)
+                ForEach(choices) { account in
+                    Text(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: ""))
+                        .tag(Optional(account.id))
+                }
+            }.accessibilityIdentifier(identifier)
+                .labelsHidden()
+        }
     }
 
     private func review(_ preview: FinancialActivityPreview) -> some View {
