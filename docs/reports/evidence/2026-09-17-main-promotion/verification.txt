@@ -1,0 +1,106 @@
+
+## backend
+tests/test_auth_sessions.py::test_auth_session_timeout_maps_to_verification_unavailable
+  /Users/garces/.codex/worktrees/7e84/private-alpha-next/.venv/lib/python3.10/site-packages/jwt/api_jwt.py:147: InsecureKeyLengthWarning: The HMAC key is 11 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence
+===== 1 failed, 8958 passed, 614 skipped, 5 warnings in 253.36s (0:04:13) ======
+
+## frontend-lint
+  49:10  warning  'inlineFailureTextClass' is defined but never used      @typescript-eslint/no-unused-vars
+
+/Users/garces/.codex/worktrees/7e84/private-alpha-next/web/components/sidebar/ChatSidebar.tsx
+  147:3  warning  'currentView' is defined but never used  @typescript-eslint/no-unused-vars
+  158:3  warning  'onNavigate' is defined but never used   @typescript-eslint/no-unused-vars
+
+✖ 8 problems (0 errors, 8 warnings)
+
+
+## frontend-tests
+
+__tests__/dev-mode-badge-placement.test.ts:
+(pass) dev mode badge placement > keeps mock auth controls away from chat header and composer hit targets [0.03ms]
+
+ 2061 pass
+ 0 fail
+ 16860 expect() calls
+Ran 2061 tests across 197 files. [3.25s]
+
+## frontend-build
+└ ○ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+## mocked-evals
+tests/evals/test_measurement_availability.py ..........                  [ 44%]
+tests/evals/test_measurement_delivery.py ............................... [ 56%]
+.................................................                        [ 74%]
+tests/evals/test_measurement_outcome.py .............                    [ 79%]
+tests/evals/test_prose_evidence.py ..................................... [ 92%]
+....................                                                     [100%]
+
+============================= 272 passed in 9.73s ==============================
+
+## migration-postgres-pinned
+collected 49 items
+
+scripts/ops/tests/test_production_migration_gate.py .................... [ 40%]
+.............................                                            [100%]
+
+- generated xml file: /Users/garces/.codex/worktrees/7e84/private-alpha-next/temp/release-evidence/migration-postgres-pinned.xml -
+============================== 49 passed in 1.96s ==============================
+required pytest gate passed: 49 tests, zero skips
+
+## postgres-pinned
+tests/test_search_computed_answers_postgres.py ....                      [ 89%]
+tests/test_search_decision_attachment_postgres.py .....                  [ 91%]
+tests/test_search_postgres.py ................................           [ 99%]
+tests/test_workflow_proof_jobs_postgres.py ...                           [100%]
+
+- generated xml file: /Users/garces/.codex/worktrees/7e84/private-alpha-next/temp/release-evidence/postgres-pinned.xml -
+======================= 395 passed in 101.59s (0:01:41) ========================
+required pytest gate passed: 395 tests, zero skips
+
+## auth-pinned
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 12 items
+
+tests/test_guest_auth_local_supabase.py ............                     [100%]
+
+- generated xml file: /Users/garces/.codex/worktrees/7e84/private-alpha-next/temp/release-evidence/auth-pinned.xml -
+============================== 12 passed in 4.56s ==============================
+required pytest gate passed: 12 tests, zero skips
+
+## browser-storage
+[2m[WebServer] [22m(node:8108) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[2m[WebServer] [22m(node:8185) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:8185) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+  ✓  1 [chromium] › e2e/browser-storage-disclosure.spec.ts:114:5 › every cookie a real session leaves is a disclosed cookie (2.5s)
+  ✓  2 [chromium] › e2e/browser-storage-disclosure.spec.ts:28:5 › every key a real session keeps is a disclosed key (3.0s)
+
+  2 passed (3.9s)
+
+## local-smoke
+curl: (7) Failed to connect to 127.0.0.1 port 8100 after 0 ms: Couldn't connect to server
+  waiting for api_health... attempt 1
+api_health=ready
+readiness_status=degraded
+api_smoke=ready
+Checking web: http://127.0.0.1:3100
+web=ready
+verification_status=ready
+
+Final focused release-document and evidence tests: 162 passed in 35.46 seconds.
+Actual new manifest identity/configuration validation: passed.
+Explicit ten-pair prose artifact validation: passed.
+Credential scan: 21 evidence files, zero secret values matched; public model IDs excluded from secret classification.
+Founder explicitly accepted both candidate-only typed failures after comparison.

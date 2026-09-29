@@ -1,0 +1,4 @@
+// Copy to Local.xcconfig only if a separate simulator installation is needed.
+// This identifier is a placeholder, not a production bundle identity.
+ARGUS_LOCAL_BUNDLE_IDENTIFIER = local.argus.foundation
+// No API, Supabase, provider, signing or account credentials belong in this app.

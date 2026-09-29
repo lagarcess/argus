@@ -3,9 +3,9 @@
 # Argus Active Roadmap
 
 Status: **SUPERSEDED 2026-09-05** by
-[`argus-grounded-finance-roadmap.md`](argus-grounded-finance-roadmap.md). Landed
-work and the secondary tracker state below remain valid history; the ranked
-items are no longer the board. Opened 2026-08-06.
+[`2026-09-17-argus-grounded-finance-roadmap.md`](2026-09-17-argus-grounded-finance-roadmap.md).
+Landed work and the secondary tracker state below remain valid history; the
+ranked items are no longer the board. Opened 2026-08-06.
 
 Supersedes the two short-lived next-cycle boards and the completed interim
 roadmap. `docs/specs/private-alpha-next-roadmap.md` remains as P2 history and
@@ -49,6 +49,11 @@ live and gating shipped code, so renaming it moves the release contract
 (`.env.example`, `render.yaml`, `argus-env.sh`, the release profile, canary, and
 QA scripts) together. Do it when something else touches that surface, not as a
 standalone edit.
+
+> Correction 2026-09-25: The "default-off flag" wording below is the
+> landing-time state, not the current production state. Current memory
+> availability is owned by
+> [PRODUCT.md Current production availability and planned changes](../PRODUCT.md#current-production-availability-and-planned-changes).
 
 ## Operating rules (founder-locked 2026-08-06)
 
@@ -972,6 +977,9 @@ profile and fall back to the nameless pool.
   scoped to `admin` and `developer` allowlist roles. Propose, confirm, inspect,
   explain, edit, delete, disable, reset, export, and temporary chat. Guests
   denied before any side effect.
+
+  Correction 2026-09-25: current production memory availability is owned by
+  [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes).
 
   **Follow-up is specced and ready to dispatch, not pending decisions.** The
   recall loop is locked in

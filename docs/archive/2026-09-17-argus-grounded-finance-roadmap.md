@@ -2,8 +2,9 @@
 
 Status: **ARCHIVED 2026-09-18.** Opened 2026-09-05; every item shipped to production `a9286b21` on 2026-09-17, with sharing on. The active board is [`docs/specs/argus-answers-that-stay-true-roadmap.md`](../specs/argus-answers-that-stay-true-roadmap.md), which carries this board's open ends.
 
-Supersedes [`argus-active-roadmap.md`](argus-active-roadmap.md), whose landed
-work and secondary tracker state remain valid history. Read
+Supersedes
+[`2026-09-05-argus-active-roadmap.md`](2026-09-05-argus-active-roadmap.md),
+whose landed work and secondary tracker state remain valid history. Read
 [`docs/PRODUCT.md`](../PRODUCT.md) first; nothing here changes its locked scope
 or its audience.
 
@@ -391,7 +392,7 @@ stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. One checklist command must name the new budget setting first. |
+| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. One checklist command must name the new budget setting first. Correction 2026-09-25: `historical_drawdown` is parked in open, unmerged PR #634 and is not shipped. `get_calculation_declarations()` does not register it. The same open PR also adds `scaled_amount`, which is likewise unregistered. |
 | One list of next steps under a result follow-up | #606. The composer asked for a prose plan and structured next steps; the fix gives next steps sole ownership. Model-facing, so its measurement ($12.50 cap) waits its turn after the two lanes above that change model-facing text. |
 | Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
 
@@ -920,13 +921,14 @@ send does not distribute, and the receipt is a retrofit across every card once
 they exist.
 
 **Decided 2026-09-09, and written into
-[`conversation-sharing.md`](conversation-sharing.md) section 4.5.** This
-extends the sharing feature that exists; a parallel conversation-sharing system
-has been built wrong. A link glyph sits in the chat header beside the existing
-`MoreVertical`, never inside it, and opens per-turn selection. **The selection
-screen is the work no competitor has done for us:** they offer "select all"
-because every turn is shareable and ours are not, so an ineligible turn renders
-unselectable with a reason the owner can read, and "select all" means all
+[`conversation-sharing.md`](../specs/conversation-sharing.md) section 4.5.**
+This extends the sharing feature that exists; a parallel conversation-sharing
+system has been built wrong. A link glyph sits in the chat header beside the
+existing `MoreVertical`, never inside it, and opens per-turn selection. **The
+selection screen is the work no competitor has done for us:** they offer
+"select all" because every turn is shareable and ours are not, so an
+ineligible turn renders unselectable with a reason the owner can read, and
+"select all" means all
 eligible. The header is the only entry point: no message pill, overflow share
 item or visible result-card share control remains. A single answer is one ticked
 turn in that same selection screen, using the existing creation logic and record.
@@ -1538,7 +1540,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Decisions | Plumbing | **Landed** `67facaf5`. |
 | Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569, answered by PR #571: a turn now reports what it paid rather than what it published, so a discarded packet, a retry either kept or thrown away, and a response rejected after its invoice all reach the ledger. Eleven inline degraded turns between 2026-08-13 and 2026-09-02 recorded zero spend, under about $1.50 and not worth a backfill; the three thorough `missing_public_sources` turns on 2026-09-08 were already correct, and no research job has ever failed in production. |
 | Sharing on | Sharing | **LANDED, switched off** `c8e05b4f`, PR #632, closing #604. Answers are shareable by default: selection happens inside the conversation, a question and its final answer are one unit, and the owner's choice and exact preview are the privacy boundary. Argus's own ids and account data never reach the page. The founder turns the flags on at promotion, and migration `20260914120000_share_plain_answer_receipts.sql` runs then. |
-| Share the answer | The calculations | **LANDED** `ba5a9fb7`, PR #574, 2026-09-09. Answers are shared from a header turn selection, behind `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, which is off in production. Calculations become eligible turns in Any grounded math. |
+| Share the answer | The calculations | **LANDED** `ba5a9fb7`, PR #574, 2026-09-09. Answers are shared from a header turn selection, behind `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, which is off in production. Calculations become eligible turns in Any grounded math. Correction 2026-09-25: that "off in production" wording is the landing-time state, not the current production state. Current sharing availability is owned by [PRODUCT.md Current production availability and planned changes](../PRODUCT.md#current-production-availability-and-planned-changes). |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
@@ -1972,7 +1974,8 @@ Resolved:
 ## Carried forward from the previous board
 
 - Landed work and the secondary tracker state in
-  [`argus-active-roadmap.md`](argus-active-roadmap.md) remain valid history.
+  [`2026-09-05-argus-active-roadmap.md`](2026-09-05-argus-active-roadmap.md)
+  remain valid history.
 - **Mobile shipped**, 2026-08-08, and is not a gate. It becomes a verification
   dependency of sharing.
 - **Sharing is built and dark**, and is promoted from retrieval on that board to
