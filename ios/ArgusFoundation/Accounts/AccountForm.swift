@@ -93,12 +93,12 @@ struct AccountForm: View {
                 VStack(alignment: .leading, spacing: 8) {
                     if let note = activity.note, !note.isEmpty { Text(verbatim: note) }
                     Text(verbatim: (model.draft?.currency ?? "") + " " + AccountPresentation.amount(activity.amount, locale: locale))
-                    if !preview.ready && activity.included == nil {
+                    if !model.openingUncertain {
                         HStack {
                             Button("loop.coverage.yes") { Task { await model.answerOpening(activity.activityId, included: true, locale: locale) } }
-                                .buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("opening.coverage.yes")
+                                .buttonStyle(PillButtonStyle(primary: activity.included == true)).accessibilityIdentifier(activity.included == nil ? "opening.coverage.yes" : "opening.coverage.change.yes")
                             Button("loop.coverage.no") { Task { await model.answerOpening(activity.activityId, included: false, locale: locale) } }
-                                .buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("opening.coverage.no")
+                                .buttonStyle(PillButtonStyle(primary: activity.included == false)).accessibilityIdentifier(activity.included == nil ? "opening.coverage.no" : "opening.coverage.change.no")
                         }.disabled(model.busy)
                     } else { Text(activity.included == true ? "loop.coverage.included" : "loop.coverage.excluded") }
                 }
@@ -123,6 +123,7 @@ struct AccountForm: View {
                 Button {
                     guard !locked else { return }
                     let value = model.draft?.amount ?? ""
+                    model.changedOpeningInput()
                     model.draft?.amount = value.hasPrefix("-") ? String(value.dropFirst()) : "-" + value
                 } label: {
                     Image(systemName: "plus.forwardslash.minus").frame(width: 44, height: 44)
@@ -226,6 +227,7 @@ struct AccountForm: View {
             guard !locked else { return }
             let formatter = ISO8601DateFormatter()
             formatter.timeZone = TimeZone(identifier: model.draft?.timeZone ?? "") ?? .gmt
+            model.changedOpeningInput()
             model.draft?.asOf = formatter.string(from: date)
         })
     }
@@ -233,6 +235,7 @@ struct AccountForm: View {
     private func binding(_ path: WritableKeyPath<AccountDraft, String>) -> Binding<String> {
         Binding(get: { model.draft?[keyPath: path] ?? "" }, set: { value in
             guard !locked else { return }
+            model.changedOpeningInput()
             model.draft?[keyPath: path] = value
         })
     }

@@ -53,6 +53,19 @@ final class FinancialLoopTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(components?.queryItems?.first?.value, "opaque+/=value")
     }
 
+    func testForegroundProfileReadDoesNotBlockFinancialHome() async throws {
+        let fixture = try LoopFixture()
+        let identity = try await fixture.login()
+        let gate = RequestGate()
+        await fixture.server.auth.holdMe(gate)
+        let foreground = Task { try await fixture.client.profile() }
+        await gate.waitUntilStarted()
+        let home = try await fixture.client.financialHome(expectedIdentity: identity)
+        XCTAssertTrue(home.currencies.isEmpty)
+        await gate.release()
+        _ = try await foreground.value
+    }
+
     func testOldFinancialHomeResponseCannotEnterNewOwnerSession() async throws {
         let fixture = try LoopFixture()
         let identity = try await fixture.login()

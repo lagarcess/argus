@@ -103,6 +103,7 @@ final class AccountsModel: ObservableObject {
     }
 
     var openingIsReviewed: Bool { pendingOpening != nil }
+    func changedOpeningInput() { if draft?.mode == .opening && !openingUncertain { clearOpening() } }
     func editOpening() { guard !openingUncertain else { return }; clearOpening() }
     func answerOpening(_ id: UUID, included: Bool, locale: Locale) async {
         guard !busy, !openingUncertain else { return }
@@ -149,6 +150,7 @@ final class AccountsModel: ObservableObject {
                 bind(snapshot); sessionChanged?(snapshot); return
             }
             errorKey = Self.message(error)
+            if case SessionFailure.rejected(_, let code) = error, code == "coverage_invalid" || code == "coverage_conflict" { clearOpening() }
             if pendingOpening != nil {
                 if case SessionFailure.rejected(let status, _) = error, (400..<500).contains(status), status != 408 {
                     clearOpening()

@@ -30,6 +30,49 @@ final class FinancialModelTests: XCTestCase {
         }
     }
 
+    func testDateChangeDropsObsoleteCoverageAndPriorAnswerCanBeCorrected() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let observation = UUID()
+        let raw = #"{"record_id":"\#(UUID())","revision":1,"kind":"expense","amount_minor":2000,"amount":"20.00","balance_movement_minor":-2000,"occurred_at":"2026-09-01T12:00:00Z","time_zone":"UTC","recorded_at":"2026-09-01T12:00:00Z","coverage":[{"observation_id":"\#(observation)","included":true}]}"#
+        let activity = try JSONDecoder().decode(FinancialActivity.self, from: Data(raw.utf8))
+        let editor = FinancialEditor(account: try fixture.account(), kind: .expense(activity), controller: fixture.client, identity: identity) { _ in }
+        editor.reason = "Date correction"
+        editor.date = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-09-02T12:00:00Z"))
+        await editor.review(locale: Locale(identifier: "en_US"))
+        var previews = await fixture.server.previews
+        var payload = try JSONDecoder().decode(ExpenseRequest.self, from: XCTUnwrap(previews.last?.httpBody))
+        XCTAssertTrue(payload.coverage.isEmpty)
+        editor.answer(observation, included: false)
+        await editor.review(locale: Locale(identifier: "en_US"))
+        previews = await fixture.server.previews
+        payload = try JSONDecoder().decode(ExpenseRequest.self, from: XCTUnwrap(previews.last?.httpBody))
+        XCTAssertEqual(payload.coverage, [.init(observationId: observation, included: false)])
+    }
+
+    func testExpiredIdentityDuringConfirmReturnsToSignIn() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts)
+        accounts.bind(identity); loop.bind(identity)
+        var returnedToSignIn = false
+        loop.sessionChanged = { snapshot in
+            accounts.bind(snapshot)
+            returnedToSignIn = snapshot.phase != .authenticated
+        }
+        loop.expense(try fixture.account())
+        let editor = try XCTUnwrap(loop.editor)
+        editor.amount = "20.00"; await editor.review(locale: Locale(identifier: "en_US"))
+        await fixture.server.expireIdentity()
+        await editor.confirm()
+        XCTAssertTrue(returnedToSignIn)
+        XCTAssertEqual(editor.phase, .retired)
+        XCTAssertNil(loop.editor)
+        XCTAssertNil(accounts.identity)
+        XCTAssertFalse(editor.canConfirm)
+    }
+
     func testPostSaveHomeWinsOverEarlierRead() async throws {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()
@@ -93,9 +136,12 @@ private actor PresentationServer {
     static let activityID = UUID()
     private var updated = false
     private var nextStatus: Int?
+    private var expired = false
     private var homeGate: RequestGate?
     private var commitGate: RequestGate?
     private(set) var commits: [URLRequest] = []
+    private(set) var previews: [URLRequest] = []
+    func expireIdentity() { expired = true }
     func failNextCommit(_ status: Int) { nextStatus = status }
     func holdNextHome(_ gate: RequestGate) { homeGate = gate }
     func holdCommit(_ gate: RequestGate) { commitGate = gate }
@@ -109,11 +155,12 @@ private actor PresentationServer {
             body = #"{"currencies":[{"currency":"DOP","currency_fraction_digits":2,"assets_minor":"\#(amount)","cash_minor":"\#(amount)","other_assets_minor":"0","debts_minor":"0","net_worth_minor":"\#(amount)","recorded_spending_minor":"2000","known_accounts":1,"unknown_accounts":0,"as_of":null}],"recent_activity":[],"recorded_at":"2026-09-01T12:00:00Z"}"#
             if let gate = homeGate { homeGate = nil; await gate.enter() }
         } else if path.hasSuffix("/preview") {
+            previews.append(request)
             body = #"{"account_version":1,"ready":true,"observations":[],"before":\#(Self.balance(false)),"after":\#(Self.balance(true)),"preview_token":"reviewed"}"#
         } else if request.httpMethod == "POST" {
             commits.append(request); updated = true
             if let gate = commitGate { commitGate = nil; await gate.enter() }
-            status = nextStatus ?? 200; nextStatus = nil
+            status = expired ? 401 : nextStatus ?? 200; nextStatus = nil
             body = #"{"account":\#(Self.account(updated:true)),"activity":{"record_id":"\#(Self.activityID)","revision":1,"kind":"expense","amount_minor":2000,"amount":"20.00","balance_movement_minor":-2000,"occurred_at":"2026-09-01T12:00:00Z","time_zone":"UTC","recorded_at":"2026-09-01T12:00:00Z","coverage":[]},"replayed":true}"#
         } else { body = #"{"items":[],"next_cursor":null}"# }
         return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)

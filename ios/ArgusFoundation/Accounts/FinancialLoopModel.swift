@@ -90,7 +90,10 @@ final class FinancialLoopModel: ObservableObject {
     func expense(_ account: FinancialAccount, correcting activity: FinancialActivity? = nil) {
         guard let identity else { return }
         let ticket = generation
-        editor = FinancialEditor(account: account, kind: .expense(activity), controller: controller, identity: identity) { [weak self] account in
+        editor = FinancialEditor(account: account, kind: .expense(activity), controller: controller, identity: identity, retired: { [weak self] snapshot in
+            guard let self, self.generation == ticket else { return }
+            self.bind(snapshot); self.sessionChanged?(snapshot)
+        }) { [weak self] account in
             await self?.accepted(account, ticket: ticket)
         }
     }
@@ -98,7 +101,10 @@ final class FinancialLoopModel: ObservableObject {
     func check(_ account: FinancialAccount) {
         guard let identity else { return }
         let ticket = generation
-        editor = FinancialEditor(account: account, kind: .check, controller: controller, identity: identity) { [weak self] account in
+        editor = FinancialEditor(account: account, kind: .check, controller: controller, identity: identity, retired: { [weak self] snapshot in
+            guard let self, self.generation == ticket else { return }
+            self.bind(snapshot); self.sessionChanged?(snapshot)
+        }) { [weak self] account in
             await self?.accepted(account, ticket: ticket)
         }
     }
@@ -124,14 +130,14 @@ final class FinancialLoopModel: ObservableObject {
 @MainActor
 final class FinancialEditor: ObservableObject, Identifiable {
     enum Kind { case expense(FinancialActivity?), check }
-    enum Phase { case editing, loading, review, saving, uncertain, conflict, saved }
+    enum Phase { case editing, loading, review, saving, uncertain, conflict, retired, saved }
     let id = UUID()
     let account: FinancialAccount
     let kind: Kind
-    @Published var amount = ""
+    @Published var amount = "" { didSet { if amount != oldValue { invalidatePlacement() } } }
     @Published var note = ""
     @Published var reason = ""
-    @Published var date = Date()
+    @Published var date = Date() { didSet { if date != oldValue { invalidatePlacement() } } }
     @Published private(set) var categories: [FinancialCategory] = []
     @Published var categoryId: String?
     @Published private(set) var phase = Phase.editing
@@ -144,13 +150,14 @@ final class FinancialEditor: ObservableObject, Identifiable {
     private var key = UUID()
     private let controller: SessionController
     private let identity: SessionSnapshot
+    private let retired: (SessionSnapshot) -> Void
     private let completed: (FinancialAccount) async -> Void
     private let timeZone: String
 
-    init(account: FinancialAccount, kind: Kind, controller: SessionController, identity: SessionSnapshot,
+    init(account: FinancialAccount, kind: Kind, controller: SessionController, identity: SessionSnapshot, retired: @escaping (SessionSnapshot) -> Void = { _ in },
          completed: @escaping (FinancialAccount) async -> Void) {
         self.account = account; self.kind = kind; self.controller = controller
-        self.identity = identity; self.completed = completed
+        self.identity = identity; self.retired = retired; self.completed = completed
         if case .expense(let activity) = kind, let activity {
             amount = AccountPresentation.amount(activity.amount, locale: .current)
             note = activity.note ?? ""; categoryId = activity.categoryId; coverage = activity.coverage
@@ -170,6 +177,11 @@ final class FinancialEditor: ObservableObject, Identifiable {
         guard !isCheck else { return }
         do { categories = try await controller.financialCategories(expectedIdentity: identity).categories }
         catch { /* Optional categorization must not block recording. */ }
+    }
+
+    private func invalidatePlacement() {
+        guard canEdit, !busy else { return }
+        coverage = []; expensePreview = nil; expenseRequest = nil
     }
 
     func edit() {
@@ -209,6 +221,8 @@ final class FinancialEditor: ObservableObject, Identifiable {
             }
             phase = .review
         } catch {
+            if await retireIfNeeded() { return }
+            resetRejectedPlacement(error)
             errorKey = Self.message(error)
             phase = Self.isConflict(error) ? .conflict : .editing
         }
@@ -232,11 +246,27 @@ final class FinancialEditor: ObservableObject, Identifiable {
             phase = .saved
             await completed(account)
         } catch {
+            if await retireIfNeeded() { return }
+            resetRejectedPlacement(error)
             errorKey = Self.message(error)
             if Self.isConflict(error) { phase = .conflict }
             else if case SessionFailure.rejected(let status, _) = error, (400..<500).contains(status), status != 408 { phase = .editing }
             else { phase = .uncertain }
         }
+    }
+
+    private func resetRejectedPlacement(_ error: Error) {
+        guard case SessionFailure.rejected(_, let code) = error,
+              code == "coverage_invalid" || code == "coverage_conflict" else { return }
+        coverage = []; expensePreview = nil; expenseRequest = nil
+    }
+
+    private func retireIfNeeded() async -> Bool {
+        let current = await controller.snapshot()
+        guard current.phase != .authenticated || current.revision != identity.revision || current.profile?.id != identity.profile?.id else { return false }
+        phase = .retired
+        retired(current)
+        return true
     }
 
     private static func isConflict(_ error: Error) -> Bool {

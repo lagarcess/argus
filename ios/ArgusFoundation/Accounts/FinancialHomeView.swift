@@ -99,17 +99,21 @@ struct FinancialHomeView: View {
                 if summary.knownAccounts > 0 {
                     Text(verbatim: money(summary.netWorthMinor, summary)).font(ArgusStyle.display(36)).monospacedDigit()
                         .accessibilityIdentifier("home.netWorth." + summary.currency)
-                } else { Text("accounts.unknown").font(ArgusStyle.display(30)) }
-                Text("loop.home.source").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                } else { Text("accounts.unknown").font(ArgusStyle.display(22)) }
+                if summary.knownAccounts > 0 {
+                    Text("loop.home.source").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                }
                 if summary.unknownAccounts > 0 {
                     Text(verbatim: String(format: NSLocalizedString("loop.home.unknownCount", comment: ""), summary.unknownAccounts))
                         .font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
                 }
             }
             VStack(spacing: 12) {
-                summaryRow("loop.home.cash", value: money(summary.cashMinor, summary))
-                if summary.otherAssetsMinor != "0" { summaryRow("loop.home.other", value: money(summary.otherAssetsMinor, summary)) }
-                summaryRow("loop.home.debt", value: money(summary.debtsMinor, summary))
+                if summary.knownAccounts > 0 {
+                    summaryRow("loop.home.cash", value: money(summary.cashMinor, summary))
+                    if summary.otherAssetsMinor != "0" { summaryRow("loop.home.other", value: money(summary.otherAssetsMinor, summary)) }
+                    summaryRow("loop.home.debt", value: money(summary.debtsMinor, summary))
+                }
                 summaryRow("loop.home.spending", value: money(summary.recordedSpendingMinor, summary))
             }.padding(.top, 6)
         }

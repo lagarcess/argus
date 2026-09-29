@@ -29,8 +29,8 @@ struct FinancialEditorView: View {
                     if model.phase == .uncertain {
                         Text("loop.retry.same").font(ArgusStyle.body(13, relativeTo: .caption))
                     }
-                    if model.phase == .conflict {
-                        Text("loop.conflict.review")
+                    if model.phase == .conflict || model.phase == .retired {
+                        Text(model.phase == .retired ? "auth.error.unauthorized" : "loop.conflict.review")
                         Button("action.close") { dismiss() }.buttonStyle(PillButtonStyle())
                     } else if model.canConfirm {
                         Button {
@@ -134,16 +134,16 @@ struct FinancialEditorView: View {
                     Text(verbatim: AccountPresentation.date(observation.asOf, zone: model.account.opening?.timeZone ?? TimeZone.current.identifier, locale: locale))
                         .font(ArgusStyle.body(13, relativeTo: .caption))
                     Text(verbatim: model.account.currency + " " + AccountPresentation.amount(observation.amount, locale: locale)).monospacedDigit()
-                    if !preview.ready && observation.included == nil {
+                    if model.phase != .uncertain {
                         HStack {
                             Button("loop.coverage.yes") {
                                 model.answer(observation.observationId, included: true)
                                 Task { await model.review(locale: locale) }
-                            }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("loop.coverage.yes." + observation.kind + "." + observation.observationId.uuidString)
+                            }.buttonStyle(PillButtonStyle(primary: observation.included == true)).accessibilityIdentifier((observation.included == nil ? "loop.coverage.yes." : "loop.coverage.change.yes.") + observation.kind + "." + observation.observationId.uuidString)
                             Button("loop.coverage.no") {
                                 model.answer(observation.observationId, included: false)
                                 Task { await model.review(locale: locale) }
-                            }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("loop.coverage.no." + observation.kind + "." + observation.observationId.uuidString)
+                            }.buttonStyle(PillButtonStyle(primary: observation.included == false)).accessibilityIdentifier((observation.included == nil ? "loop.coverage.no." : "loop.coverage.change.no.") + observation.kind + "." + observation.observationId.uuidString)
                         }.disabled(model.busy)
                     } else {
                         Text(observation.included == true ? "loop.coverage.included" : "loop.coverage.excluded")

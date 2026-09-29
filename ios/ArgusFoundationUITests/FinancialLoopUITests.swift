@@ -62,6 +62,8 @@ final class FinancialLoopUITests: XCTestCase {
         assertText("DOP 8,000.00")
         capture("expense-updated-account")
         assertHome(baseline + 8000)
+        XCUIDevice.shared.press(.home); app.activate()
+        assertHome(baseline + 8000)
         assertText("Loop groceries")
         capture("connected-home-after-expense")
         app.buttons["tab.accounts"].tap()
@@ -102,6 +104,8 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func testSpanishConnectedCheckReview() throws {
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_EMAIL"] != nil else { throw XCTSkip("Requires isolated financial stack.") }
+        continueAfterFailure = false
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "dark"]
         app.launch()
         XCTAssertTrue(app.staticTexts["home.netWorth.DOP"].waitForExistence(timeout: 15))

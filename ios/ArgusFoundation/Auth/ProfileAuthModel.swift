@@ -52,7 +52,10 @@ final class ProfileAuthModel: ObservableObject {
 
     func restore() async {
         guard let controller, !busy else { return }
-        await perform { try await controller.restore() }
+        await perform {
+            if state == .authenticated { return try await controller.profile() }
+            return try await controller.restore()
+        }
     }
 
     func authenticate(email: String, password: String, captchaToken: String, signup: Bool, language: String, displayName: String) async {
