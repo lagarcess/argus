@@ -48,12 +48,13 @@ service in this publication. No private iPhone completion is claimed.
 | Research/proofs | [#723](https://github.com/lagarcess/argus/pull/723), [#724](https://github.com/lagarcess/argus/pull/724), [#725](https://github.com/lagarcess/argus/pull/725), [#726](https://github.com/lagarcess/argus/pull/726) closed unmerged | Live work queues. Carry useful evidence selectively; do not restart their review loops |
 
 Stopped client work must be inspected and salvaged before replacement work is
-assigned. These are local recovery pointers, not portable delivery artifacts:
+assigned. These recovery checkpoints are not accepted deliveries. Remote
+preservation is identified per row; retain worktrees and local-only artifacts.
 
 | Branch | Last inspected commit | State at stop |
 | --- | --- | --- |
-| `codex/ios-financial-accounts` | `a0424297e5559af641bfc4b8181fced662d428e2` | Spec commit plus uncommitted client work. Native UI acceptance incomplete; prior build approval rejection remains unresolved |
-| `codex/android-financial-accounts` | `3aed3d2266f8ed5a31c87b8083ef114a33d905cd` | Implementation committed locally; owner reported local UI/API acceptance, but final restart proof, durable publication and PR delivery incomplete |
+| `codex/ios-financial-accounts` | `671ee6b0ff24115232eaac9204fd03da3b5cd55d` (remote checkpoint) | Unfinished client source and [recovery note with verification limits](https://github.com/lagarcess/argus/blob/671ee6b0ff24115232eaac9204fd03da3b5cd55d/docs/reports/evidence/ios-financial-accounts/README.md) preserved remotely; worktree and ignored local state retained. Native build/UI acceptance unverified; known form defects, missing setup guide and prior build approval rejection remain unresolved. No implementation PR; implementation stopped |
+| `codex/android-financial-accounts` | `fb6e4d9455aec7abbf0d16d74e00be896804d472` (remote checkpoint) | Implementation remains `3aed3d2266f8ed5a31c87b8083ef114a33d905cd`; preservation commit publishes [recovery note and 16 synthetic screenshots](https://github.com/lagarcess/argus/blob/fb6e4d9455aec7abbf0d16d74e00be896804d472/docs/reports/evidence/android-financial-accounts/README.md). Worktree retained. Final restart proof, integration reconciliation, PR delivery, CI and terminal review incomplete; implementation stopped |
 | `codex/web-financial-accounts` | `1b0c80d208ad6e73409c72ccba13407fbfb2ee34` | Spec commit plus uncommitted client work. Preserve only; no continuation now |
 
 A replacement coordinator must locate the branches and working changes before
