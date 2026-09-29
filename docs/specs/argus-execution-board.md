@@ -1,9 +1,14 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** STOPPED. Documentation publication only is authorized.
+**Execution state:** PLANNING ONLY. Implementation remains STOPPED. No worker dispatch or hosted changes are authorized.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
+
+**Preservation authorization:** The founder accepted this expanded plan for
+commit and push on September 29, 2026. This authorizes documentation preservation
+only, not implementation, worker dispatch, merge, deployment or hosted changes.
+Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
 ## Outcome and completion
 
@@ -23,18 +28,29 @@ owns sequencing and checkpoints; PRs, CI and acceptance artifacts own evidence.
 A release manifest under `docs/release-manifests/` remains the evidence for one
 specific deployment, not a competing product plan.
 
-No item below is a new assignment. Restart, owner acceptance and technical
-contracts must be recorded before implementation. No 24-hour delivery promise
-has been made. Everything previously stopped remains stopped.
+The founder assigns the full MVEE private iPhone outcome to this delivery captain.
+Execution remains stopped until the one restart authorization. That authorization
+covers continuous delivery across the full non-deferred scope below, not only the
+first demonstration. Record named owners and each consumed technical contract
+before implementation of that dependency. Routine progression does not require
+new batch approvals. No 24-hour delivery promise has been made.
 
 ## Verified starting point
 
-Read-only snapshot on September 29. Integration base is
-`de8729843b726a3fd03210cebcedede5e44227c8`, the #742 landing documentation commit.
+Refreshed by fetch on September 29. Current integration is
+`12bccd4d6e173a5d8805e495fd30b7ead36741c6`, the #743 merge. The original
+publication inspected `de8729843b726a3fd03210cebcedede5e44227c8`.
 The account product commit is `296195e86c972e846c251d256b3cc211975bfd57`.
 GitHub merge/closure state and the linked repository documents were inspected.
 Existing production behavior is documented, not freshly exercised on a hosted
 service in this publication. No private iPhone completion is claimed.
+
+Post-merge [CI](https://github.com/lagarcess/argus/actions/runs/36528607001)
+and [Private Alpha Local Smoke](https://github.com/lagarcess/argus/actions/runs/36528606830)
+both completed successfully at `12bccd4d6`. These checks do not establish hosted
+or physical-phone acceptance. Local commit `44dd019f908024ff0a7733091ca1d37edf6d529f`
+remains preserved by `codex/preserved-pr743-landing`; its landing-ledger entry is
+carried into this documentation change without restarting its publication work.
 
 | Existing work | Evidence and scope | What it does not establish |
 | --- | --- | --- |
@@ -61,113 +77,397 @@ A replacement coordinator must locate the branches and working changes before
 using those pointers. Missing local artifacts are a recovery issue, not evidence
 that their work landed. Do not copy secrets or real user data into handoffs.
 
+### Recovery refresh for the proposed restart
+
+Both mobile remote branches were fetched again on September 29 and still point
+to the checkpoints above. Read-only source inspection found the following.
+
+- The iPhone checkpoint contains account creation, list/detail, metadata editing,
+  opening corrections/history, archive/restore, localization and typed API calls
+  through the existing session owner. Preserve this implementation. Its recorded
+  worktree at `/Users/garces/.codex/worktrees/8be2/private-alpha-next` is now absent.
+  Committed source remains recoverable; ignored local state has not been located.
+- The iPhone source has concrete draft-freeze, local-validation/error handling and
+  signed-amount entry gaps. Its historical package/API checks do not prove that
+  the native app builds or works. The account setup guide is missing.
+- The Android worktree at `/Users/garces/.codex/worktrees/611c/private-alpha-next`
+  exists and is clean at `fb6e4d945`. Its retry/reconciliation implementation and
+  synthetic evidence are useful references. Android implementation stays stopped.
+- [iPhone configuration](../../ios/Config/Development.xcconfig) is simulator-only,
+  uses a placeholder bundle identity and disables auth. Xcode is installed, but
+  local inspection found zero valid signing identities. Apple membership, team
+  access and a usable private installation route have not been established.
+- [Existing auth](../../ios/AUTH_SETUP.md) provides reusable registered sessions,
+  refresh and Keychain storage. Production CAPTCHA bridging and remaining access
+  flows need work. Existing browser recovery is reusable. A successful first
+  login cannot close the full D01 acceptance list.
+- Hosted API revision, applied financial-account migration, feature flag and
+  available capacity remain unverified. Checked-in Render configuration is not
+  a hosted readback. No hosted settings, real account records or providers were
+  changed during this recovery.
+
+The recovery agents were read-only investigators, not implementation owners.
+Confirm prior worker ownership and process state before assigning a writer.
+
+## Reconciliation findings for founder review
+
+The planning update corrects these omissions without changing MVEE scope.
+
+- The published manifest proposed D01/D02 first and D03 contract preparation.
+  That is too narrow for this assignment. The full coverage map now governs;
+  D01-D05's first financial loop is only the first demonstration.
+- Earlier dependencies could read as requiring completed upstream pillars.
+  The plan now identifies the specific consumed contracts so independent work
+  can proceed. Signing does not block finance; posting does not block previews.
+- Native quality, charts, Temporary chat and profile controls were implicit in
+  broad D rows. The work map now links these source areas to delivery owners and evidence.
+- Native auth is reusable, but the current shell's financial destinations are
+  samples. No source claim, old screenshot or merged PR is phone acceptance.
+- The iOS recovery row describes the historical stop. Its once-retained worktree
+  is now missing; the recovery refresh above is the current observation.
+- MVEE section 1.2 explicitly defers the ecosystem runtime despite sections 4
+  and 6 describing typed/spoken financial actions. D14 preserves that named
+  exception only. Dictation/spoken conversation, permitted financial questions,
+  household, ingestion and manual planning remain delivery work.
+- Technical policy gaps are not deferrals. File, audio and recovery retention,
+  household departure and notification choices now have owners and decisions
+  below. The captain may not silently move them outside private delivery.
+
+### Current code inheritance anchors
+
+These sources support the coverage table's reuse claims. They are code/contract
+inspection, not a new hosted verification.
+
+- [Native shell](../../ios/ArgusFoundation/FoundationShell.swift) selects
+  [sample destinations](../../ios/ArgusFoundation/SampleDestinations.swift).
+  [SessionController](../../ios/Packages/ArgusSession/Sources/ArgusSession/SessionController.swift)
+  and [auth setup](../../ios/AUTH_SETUP.md) own the reusable session boundary.
+- [Financial service](../../src/argus/domain/recording/service.py),
+  [balance read](../../src/argus/domain/recording/records.py) and
+  [account router](../../src/argus/api/routers/financial_accounts.py) implement
+  openings/accounts only. The database migration is
+  [the landed first slice](../../supabase/migrations/20260928200000_financial_accounts_first_slice.sql).
+  It is not an activity ledger, household or planning implementation.
+- [Agent API](../../src/argus/api/routers/agent.py),
+  [conversation API](../../src/argus/api/routers/conversations.py),
+  [search API](../../src/argus/api/routers/search.py),
+  [profile API](../../src/argus/api/routers/profile.py) and
+  [personalization API](../../src/argus/api/routers/personalization_memory.py)
+  anchor inherited services. Existing web settings are behavioral references,
+  not permission to resume the web remake.
+- [Architecture voice/chart direction](../ARCHITECTURE.md#voice-and-chart-direction)
+  selects xAI and Swift Charts. It does not supply implemented production voice,
+  financial chart series or provider/spending authority. Existing notification
+  availability in PRODUCT is not proof of an ecosystem inbox or scheduler.
+
+## Full-scope execution and early demonstration
+
+**State remains stopped pending one explicit founder restart.** The first usable
+outcome is a complete financial loop on the physical iPhone over the internet,
+using the founder's existing user. Establish an account balance, record an
+expense, see Accounts and Home reflect it, correct it, reconcile a checked
+balance without double-counting, and reopen the app with everything preserved.
+Unknown balances remain unknown. This spans D01/D02, D03 and D05; account CRUD
+and installed login are intermediate checkpoints. This loop is an early
+demonstration within the full assignment, not the ecosystem finish line.
+
+Run three connected responsibilities in parallel. Names, exclusive paths,
+branch/worktree and owner acceptance are filled at dispatch after restart.
+The roles below are not live assignments. Independent acceptance accompanies
+the assembled loop throughout implementation.
+
+| Responsibility | First demonstration contribution | Ownership boundary |
+| --- | --- | --- |
+| Device and hosted access owner | Signing, installation, existing-user authentication integration and the minimum compatible deployment, including backup/restore verification and rollback | Own signing/project configuration, deployment files and the narrow hosted auth bridge. The iPhone owner writes session/UI code against the agreed auth contract. No replacement web work or new paid infrastructure |
+| Financial backend owner | Implement durable expense activity, corrections, balance reconciliation and canonical account/Home reads; resolve API/data contracts and additive migrations within this implementation | One owner for financial contracts, posting, money rules, reconciliation and their backend tests/migrations. No competing ledger or standalone research/proof deliverable |
+| iPhone experience owner | Recover the preserved client and connect Accounts, recording, corrections, balance checks and Home to the shared contracts; preserve the locked design | Own native feature, session and navigation code; exclude signing/project files assigned to the device owner. Reconcile current integration by merge, never rebase the evidenced branch |
+
+The delivery captain owns this manifest, cross-owner decisions and integration
+sequencing. Domain owners remain accountable until their assigned journey is
+verified in the assembled app; a component handoff does not close the outcome.
+An independent acceptance owner exercises each integrated increment and returns
+defects to its writer. Separate test/evidence files prevent competing edits.
+
+### Deliver the early demonstration while full-scope work progresses
+
+1. Recover iPhone source and locate or account for missing local configuration.
+   Inspect previous worker/process ownership. Record the fresh integration base,
+   exclusive worktree, allowed files, commands and stop conditions before dispatch.
+2. Start device access, backend implementation and native experience together.
+   Resolve signing/team access and the shortest supported private installation
+   route while the financial owner defines and implements the shared write/read
+   contract. Agree each consumed contract before wiring its client; do not wait
+   for a separate research project or all financial contracts to finish.
+3. Install the connected shell as soon as its auth path is ready, with a stable
+   app identity and update path. Demonstrate existing-user login and reopening
+   away from the Mac. Backend and native financial work continue while device
+   access is blocked. Simulator/local evidence is intermediate, not acceptance.
+4. Integrate balance establishment, expense recording, Home/account reads,
+   correction and reconciliation as working increments of the same loop. The
+   backend owns arithmetic and financial facts. Clients render canonical reads.
+   Verify exact money, unknown/zero distinction, atomic writes, identity isolation,
+   retry idempotency, stale-edit handling and persistence as each increment lands.
+5. Prepare one concrete hosted approval packet. Name the candidate SHA, current
+   deployed revision, existing Supabase project, migration status, exact settings,
+   production-web compatibility, backup/restore evidence and rollback. Prefer
+   existing compatible Render capacity; justify any alternative and its cost.
+   Use an auth-only release first if it speeds installation, without pausing
+   backend or native financial implementation behind that release.
+6. After the required signing/install and hosted grants, exercise the full loop
+   using deliberate founder-entered records on the physical phone. Close and
+   reopen the app, interrupt a write and retry, and verify Accounts/Home agreement.
+   Use authorized test identities for isolation; redact committed evidence.
+7. Replay the existing [balance handoff](argus-account-balance-reconciliation-handoff.md)
+   cases on the assembled candidate. Compare observed results to that source and
+   record the source revision with the phone/database evidence.
+
+Do not wait for every registration, confirmation/resend, recovery/reset, guest
+return-to-action or account-management case before advancing this loop. Keep
+security and money correctness necessary for the connected path mandatory.
+Sequence remaining access/account completeness and other D03/D05 acceptance in
+the work map; accepting this loop does not mark those entire rows accepted.
+
+Prepare builds, tests, source changes, draft PRs and the deployment packet under
+the restart grant. Merges, deployment, hosted mutations, signing/account access
+and paid-provider use require explicit authority. A routine build or scoped bug
+fix does not need a repeated restart question. No paid model run is needed for
+this manual financial loop. Do not bypass an earlier denied action through a VM
+or another agent; request the correctly scoped access when needed.
+
+### Allocate resources to accepted dependencies
+
+Keep the iPhone writer and physical-device verification on an authorized Mac.
+Use available VMs for isolated backend/Postgres tests and contract verification
+when an assignment benefits from them. Direct VM coordination is not configured;
+establish an authorized channel before promising unattended remote ownership.
+Additional capacity earns a lane only when it has independent files, accepted
+inputs and an observable user outcome. Keep one writer for each shared iPhone file and one financial-domain owner even
+when more machines are available. Independent feature modules can have separate
+writers under the team allocation below.
+
+During execution, inspect active agents at completion, dependency changes and
+at least every 30 minutes. Check actual process/build/commit/test evidence.
+Re-scope stalled work, preserve unique changes and stop the old writer before
+replacement. Do not retry an unchanged failure indefinitely. Publish useful
+branch checkpoints so a lost VM does not erase work. No scheduler is armed by
+this proposal.
+
+Show a short interaction recording or live demonstration at first installation,
+first recorded expense reflected on Home, correction/reconciliation and each
+added connected journey. Include relaunch and a
+failure/recovery case, not screenshots alone. Record build number, app SHA,
+backend revision, environment, evidence and remaining gaps in this manifest.
+Check concise copy, icons, locked navigation and native interaction quality
+before repeating a pattern across screens.
+
 ## Work map
 
-Every row is currently unassigned and stopped. Owner columns name the required
-responsibility, not a dispatched person. Inspect existing owners before assigning
-someone new. Dependencies are accepted behavior/contracts, not a requirement to
-wait for every feature in an upstream row before any useful work can begin.
+### Complete MVEE coverage
 
-| ID | User outcome | Reuse and dependency | Responsible role after restart | Initial disposition |
-| --- | --- | --- | --- | --- |
-| D01 | Open the installed app on the physical iPhone, log in with the existing account and reopen it over the internet | Native shells/auth; existing Render/Supabase; explicit signing and hosted-change approvals | iPhone owner with deployment owner | First integration checkpoint; setup and hosted verification missing |
-| D02 | Create, reopen, correct, archive and restore real financial accounts | Landed #735 contract; salvage stopped iPhone work; D01 for hosted/device proof | Account journey owner, coordinating iPhone and existing backend owner | API implemented; full device journey incomplete |
-| D03 | Record and correct activity, reconcile balances, recover mistakes | D02 account identity; technical recording contract from approved MVEE and selected prior proof cases | One financial-domain owner with iPhone implementation partner | Production activity/reconciliation missing |
-| D04 | Organize private spaces and optional assets without losing history or links | D02; D03 semantics for linked activity; explicit space/asset contracts | Financial-domain owner delegates bounded space work | Complete private-space and asset lifecycle missing |
-| D05 | Understand real position, changes and upcoming cash needs on Home | D02/D03 accepted projections; D06 expectations; D04 ownership; chart prototype | Home journey owner consuming canonical projections | Sample experience; connected result missing |
-| D06 | Create budgets, goals and debt plans, then link actual progress | D03 activity; inherited calculators; one allocation/expectation contract | Plan journey owner | Production planning missing |
-| D07 | Invite a partner and use shared finances without exposing private data | Auth identities; explicit membership/permissions contract; D02-D06 shared queries/actions | Household owner with shared permission-contract ownership | Membership and shared journeys missing |
-| D08 | Import a supported document/photo, preview, review, confirm and resume | Synthetic ingestion kit; D03 confirmed-record boundary; file policy decisions | Intake owner | Production intake missing |
-| D09 | Ask existing finance questions and revisit answers/analyses on iPhone | Existing chat/runtime/SSE/search contracts; D01 session; preserve supported behavior | Native conversation owner | Backend reuse exists; native connected journey incomplete |
-| D10 | Find a record or document and return to the same search context | Existing Omnisearch; D02-D09 authorized records; native preview/navigation | Retrieval journey owner | Financial/native coverage and tester defects incomplete |
-| D11 | Receive useful updates and open their source | D03/D06 facts; D07 permissions; selected scheduling/delivery contract | Updates owner | Ecosystem inbox and delivery incomplete |
-| D12 | Control preferences, security, privacy and financial data | Existing settings; D01 identity; each domain's export/delete/recovery rules | Native controls owner with domain/security owners | Partial reuse; complete native controls missing |
-| D13 | Dictate and converse by voice without losing context or saving accidentally | D09; selected xAI direction; consent/retention; D14 for financial actions | Voice owner | Integration missing; financial-action completion waits for D14 |
-| D14 | Perform supported app actions through text/voice using the same rules | Stable manual D02-D12 services; explicit single-runtime redesign assignment | Conversational-runtime owner | Explicitly deferred from first private delivery |
-| D15 | Complete all private-delivery journeys on one reliable phone build | D01-D13 applicable scope; full household and document journeys; D14 gap stated | Delivery captain with independent acceptance owner | Not achieved |
+The [MVEE scope checklist](argus-minimum-viable-ecosystem-experience.md#13-complete-scope-checklist)
+is the requirement index. Read each linked source for the user outcome and its
+expected behavior; this table stores execution metadata only. D01-D15 are work
+identifiers, not a second specification. A row's next integration task and planned
+evidence are not an exhaustive scope or a substitute for the linked requirement.
 
-### Acceptance for each work item
+**Current phone evidence:** none of the assembled outcomes is verified on the
+founder's physical iPhone. Reuse and gaps below are the September 29 inspection
+snapshot. Every implementation row is stopped until restart. Proposed owners
+must be bound to named workers at dispatch. D14 follows the linked runtime
+sequence rather than a separate deferral policy in this document.
 
-Acceptance derives from the [complete MVEE scope](argus-minimum-viable-ecosystem-experience.md#13-complete-scope-checklist).
-These checks define the user result, not new endpoints or schema decisions.
+| Canonical user outcome / work ID | Inspected reuse | Next integration task | Proposed owner | Execution dependencies | Evidence to collect against the linked source |
+| --- | --- | --- | --- | --- | --- |
+| [Access][mvee-access], D01 | Argus auth/recovery; Swift session/Keychain | Finish native/hosted auth adapter and guest conversion | Native continuity + Device/release | Identity API; signing/hosted access for phone proof | Physical-device auth recordings and session/identity test results |
+| [iPhone experience][mvee-platforms], D15 | Native shell; localization; design archive | Replace sample destinations with connected modules | Native continuity | Domain reads per destination | Device navigation/accessibility recordings against [native quality][mvee-quality] |
+| [Accounts and assets][mvee-accounts], D02/D04 | Landed account/opening backend; unfinished iOS client | Recover account client and extend saved-item data model | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
+| [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | Recording domain currently supports openings only | Implement posting and connect native entry/history clients | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
+| [Reconciliation][mvee-activity], D03 | Opening revisions; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Implement observation lineage and balance reads with posting | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
+| [Home][mvee-home], D05 | Locked design; account facts; chart prototype | Connect Home's read model and domain destinations | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
+| [Plan][mvee-plan], D06 | Existing calculators; locked plan design | Implement plan persistence and actual-activity adapters | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
+| [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
+| [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
+| [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
+| [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |
+| [Search][mvee-search] and [conversation continuity][mvee-continuity], D09/D10 | Omnisearch/history and recovery contracts | Add domain search adapters and native destination/lifecycle wiring | Native continuity + Conversation/voice | Authorized domain reads; Temporary policy for that behavior | Search-to-destination/back recordings, draft/history readbacks and Temporary retention evidence |
+| [Updates][mvee-updates], D11 | Existing operational infrastructure; notification contracts | Implement inbox, domain triggers and delivery jobs | Planning/Home | Trigger facts; permissions; channel/schedule decisions | Trigger/job receipts paired with phone inbox/source recordings |
+| [Profile and control][mvee-profile], D12 | Existing profile/usage/data-control contracts | Connect native controls to existing and new domain adapters | Native continuity | Identity/settings; domain lifecycle policy; approved personalization rollout | Phone settings/control recordings and authorized export/recovery readbacks |
+| [Charts][mvee-quality], D05/D06/D09/D15 | Selected chart direction and prototype | Connect canonical series to native chart components | Native continuity + domain series owners | Each domain's canonical series | Series-to-display checks, gesture/accessibility recordings and device performance receipts |
+| [Operational delivery][mvee-infrastructure], D01/D15 | Existing hosting, CI and release safeguards | Prepare and execute authorized signed candidate rollout | Device/release + Captain + independent acceptance | Candidate and explicit access/merge/hosted grants | Exact app/backend release manifest and [connected-journey][mvee-acceptance] evidence |
+| [Agentic financial actions / runtime sequence][mvee-runtime], D14 | Existing single runtime; no ecosystem action integration | Await the separate activation required by the source | Conversation/voice when activated | Manual contracts/UI; runtime assignment and eval gates | Source-linked action acceptance evidence after activation; no completion claim before it |
 
-- **D01:** the physical phone works away from the Mac with the existing identity.
-  Verify login/relaunch/logout, registration/confirmation/resend, recovery/reset,
-  account switching and guest return-to-action. No secrets in the build.
-- **D02:** known/zero/unknown create, stable retry, list/reopen, metadata edit,
-  opening correction with current concurrency tokens, archive/restore, restart
-  persistence and owner isolation all work through the actual iPhone UI.
-- **D03:** expense/income/transfer/payment/refund and notes/categories work with
-  exact amounts. Exercise partial refunds, two-sided movements, earlier activity,
-  balance gaps, stale edits, duplicate retries and correction/removal/restoration.
-  Verify dependent records after every change. Do not manufacture balancing income.
-- **D04:** private-space creation and lifecycle, account moves and link conflicts,
-  unknown asset estimates, ownership shares and linked debt preserve identity and
-  history. Personal/household totals do not double-count a joint asset or loan.
-- **D05:** Home derives canonical values by currency with dates, source/freshness
-  and missing information. Expected income is not current cash. Exercise a
-  shortfall before an earlier bill even when end-period cash is positive.
-- **D06:** create/edit a budget, savings goal and debt plan; link an actual entry;
-  correct, refund, remove and restore it. Progress and forecasts update without
-  allocating or subtracting the same money twice. Recurring/occasional expectations
-  and variable income show dates and uncertainty.
-- **D07:** two real authorized users exercise link/email invitation, acceptance,
-  explicit sharing, contributions, joint records, editing, revocation and leaving.
-  Private facts remain absent from totals, chat, documents, search and updates.
-- **D08:** a declared supported sample passes file/photo intake, actual preview,
-  extraction, uncertainty/duplicate review, batch confirmation and interrupted
-  resume. Confirm again without duplicate records. Unsupported or unreadable files
-  fail clearly. Apply approved retention and source visibility; use consenting
-  real samples only under a specific data-handling authorization.
-- **D09:** existing supported questions, calculations, research and historical
-  simulations stream and reopen on the phone with the same evidence/assumptions.
-  Preserve conversation drafts, history, archive/recovery and defined Temporary
-  chat. Do not suggest unsupported financial actions are connected.
-- **D10:** query/filter results include authorized financial records, plans, files
-  and existing analyses. A result opens its real content. Back restores the query,
-  filters and scroll position; no detour through Settings.
-- **D11:** exercise a deadline, threshold, milestone, stale record and selected
-  changed condition. An update explains its basis, persists, opens its owner and
-  respects preferences, household access and private notification previews.
-- **D12:** preferences persist; security and usage reflect actual service state.
-  Export/delete/recovery and personalization follow their explicit permissions
-  and retention rules. Financial records never become arbitrary chat memory.
-- **D13:** verify dictation, transcription, spoken replies, interruption/cancel,
-  editable interpretation and return to text. Document permission, retention,
-  failure recovery, measured latency and cost. D14-dependent actions stay visibly
-  incomplete until tested; voice must not save without confirmation.
-- **D14:** every supported manual action is available through text and voice with
-  the same permission checks and confirmation. Test hypothetical/quoted/actual
-  distinctions, correction, ambiguity, interruption and recovery. Reuse the one
-  Argus runtime; satisfy the existing model-facing evaluation gates.
-- **D15:** run all [connected acceptance journeys](argus-minimum-viable-ecosystem-experience.md#15-connected-acceptance-and-delivery-discipline)
-  against the assembled deployed candidate and physical phone. Check English,
-  Spanish, themes, enlarged text, accessibility, charts/icons, file previews,
-  permissions, failed requests and relaunch. Verify backup restoration and rollback
-  in a safe environment. State the deferred-runtime gap explicitly.
+[mvee-access]: argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration
+[mvee-platforms]: argus-minimum-viable-ecosystem-experience.md#2-product-character-and-platforms
+[mvee-quality]: argus-minimum-viable-ecosystem-experience.md#native-quality-and-tester-feedback
+[mvee-accounts]: argus-minimum-viable-ecosystem-experience.md#accounts-organize-the-financial-facts
+[mvee-activity]: argus-minimum-viable-ecosystem-experience.md#account-activity-and-balance-checks
+[mvee-refunds]: argus-minimum-viable-ecosystem-experience.md#refunds-corrections-and-adjustments
+[mvee-home]: argus-minimum-viable-ecosystem-experience.md#home-understand-where-i-stand
+[mvee-plan]: argus-minimum-viable-ecosystem-experience.md#plan-decide-what-i-want-to-change
+[mvee-spaces]: argus-minimum-viable-ecosystem-experience.md#financial-spaces
+[mvee-moves]: argus-minimum-viable-ecosystem-experience.md#reassigning-accounts-between-spaces
+[mvee-household]: argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity
+[mvee-intake]: argus-minimum-viable-ecosystem-experience.md#4-information-ingestion-one-destination-several-entry-methods
+[mvee-argus]: argus-minimum-viable-ecosystem-experience.md#argus-ask-understand-and-get-things-done
+[mvee-voice]: argus-minimum-viable-ecosystem-experience.md#43-speak-to-argus
+[mvee-search]: argus-minimum-viable-ecosystem-experience.md#search-find-what-i-already-know
+[mvee-continuity]: argus-minimum-viable-ecosystem-experience.md#temporary-chat-and-conversation-recovery
+[mvee-updates]: argus-minimum-viable-ecosystem-experience.md#updates-tell-me-when-something-deserves-attention
+[mvee-profile]: argus-minimum-viable-ecosystem-experience.md#profile-control-argus
+[mvee-infrastructure]: argus-minimum-viable-ecosystem-experience.md#14-infrastructure-and-cost-constraints
+[mvee-acceptance]: argus-minimum-viable-ecosystem-experience.md#15-connected-acceptance-and-delivery-discipline
+[mvee-runtime]: argus-minimum-viable-ecosystem-experience.md#agentic-ecosystem-direction-and-sequence
 
-## Proposed order and safe parallel work
+### Acceptance source and evidence ownership
 
-After an explicit restart, inspect and assign D01 and D02 first. In parallel,
-prepare D03's accepted financial contract using the actual account backend. D01
-must expose signing/network/auth problems early, not at the end of development.
+Derive expected results from the linked MVEE sections, including their linked
+technical contracts, [shared trust requirements](argus-minimum-viable-ecosystem-experience.md#5-shared-ingestion-and-trust-requirements)
+and [connected acceptance journeys][mvee-acceptance]. This manifest owns who
+collects the evidence, when it is collected and where it is recorded. It does
+not own another editable list of expected product behavior. The table's evidence
+column selects verification methods, not a replacement acceptance specification.
 
-Once their consumed contracts are accepted, D06 planning, D07 membership and D08
-intake can have separate owners. One financial owner controls posting, money,
-reconciliation and account history. Household owns permission semantics; each
-consumer enforces that same contract. Extraction can advance independently,
-but intake is not done until it writes through D03's review/confirmation path.
+At dispatch and acceptance, read the current MVEE source and record its commit
+and section anchors with the task/evidence. If the source changes, assess the
+affected assignment and evidence against that source; do not update a copied
+requirement list here. A missing or renamed source anchor is a coverage gap to
+resolve before accepting that work, never permission to infer its behavior.
 
-D05, D10 and D11 consume the shared records/projections. D09 inherits existing
-conversation contracts without starting D14. D12 accompanies the records it
-controls. D13 can validate capture and existing conversation separately; its
-financial-action dependency stays explicit. D15 acceptance runs incrementally
-as features arrive, not only after all branches finish.
+The financial owner supplies the record/projection contract, the household
+owner the permission contract, and the native lead the shared navigation/session
+contract. Domain workers can own disjoint native files. The captain serializes
+shared integration and compares the work map to the current canonical scope
+index when allocating work; row count alone is not a completeness claim.
 
-Parallel capacity is limited by clear ownership and accepted dependencies, not
-available agent count. Do not split one domain's API, migration and money rules
-among competing writers. Reconcile shared contracts before dependent work.
-One accepted schema or endpoint change must reach every affected consumer.
+Dispositions derive from the [MVEE holds register](argus-minimum-viable-ecosystem-experience.md#16-holds-later-work-and-unresolved-decisions),
+[runtime sequence][mvee-runtime] and [product boundaries](argus-minimum-viable-ecosystem-experience.md#8-differentiation-and-boundaries).
+The decision register below tracks unresolved delivery inputs and owners; it
+cannot convert them into approved deferrals. Any new disposition requires a
+founder decision in the canonical product source before execution metadata changes.
+
+## Proposed team and shared ownership
+
+Use seven coherent delivery responsibilities plus the captain and independent
+acceptance. These are proposed assignments for review, not dispatched workers.
+Each lead owns a journey through native UI, service, persistence and integration,
+using the shared owners below. Pair a bounded native or backend implementer only
+when it shortens a ready task with exclusive files; do not create duplicate leads.
+
+- **Financial core** owns accounts/assets/spaces, posting, reconciliation, all
+  actual-money reads, their API/data contracts and migrations. The recovered
+  iPhone Accounts module belongs here. Other teams request changes to these
+  owners rather than writing balances or alternate storage.
+- **Planning/Home** owns budgets/goals/debt plans, recurrence, allocations,
+  expected-to-actual links, Home composition and Updates. This team consumes
+  financial position; it never maintains another actual balance. Its native
+  views, domain services and tests can progress together.
+- **Household** owns invitations, membership, consent, editing rights and
+  revocation, including do-blitz/Resend integration and household UI. Domain
+  owners implement adapters to this one permission contract.
+- **Intake** owns capture, sources, extraction/review, preview/resume and source
+  visibility through native UI and backend/storage. Confirmation calls the
+  financial owner. It does not implement its own transaction writer.
+- **Conversation/voice** owns inherited chat/cards/history/Temporary chat,
+  authorized context and spoken interaction. It preserves the single runtime
+  and existing eval gates. D14 redesign is held under its explicit sequence.
+- **Native continuity** owns access UI/session, shared navigation/design/chart
+  components, Search and Profile/data controls with their existing API owners.
+  It owns shared Swift types and localization files, not every feature screen.
+  Teams above own their separate feature modules after explicit file allocation.
+- **Device/release** owns signing/project configuration, private installation,
+  hosted inventory, compatible rollout/migrations execution, secret delivery,
+  jobs/operations and rollback. Financial schema design stays with Financial
+  core; applying a reviewed migration requires the hosted grant.
+
+The **captain** owns this manifest, dependency handoffs, integration order,
+review proportionality, usable builds and founder reporting. An **independent
+acceptance owner** runs cross-domain journeys and privacy/recovery checks against
+the assembled candidate, including physical-phone demonstrations. Verifiers
+return defects to writers. No team is complete merely because its PR merged.
+
+Start available independent work with bounded agents on separate branches.
+Use the Mac for Xcode/device work and available VMs for isolated backend/database
+work. A VM needs a verified communication channel and checkpoint persistence
+before autonomous assignment. Keep shared branches, migration execution and
+shared Swift files single-writer. Publish exact branch heads and durable evidence
+for handoff; stale chat status is not proof a writer is alive.
+
+## Parallel delivery across the full scope
+
+On the single restart authorization, activate full-scope ownership from the
+coverage table. Begin the device/hosted, financial backend and native core-loop
+responsibilities together. Also start independent household membership/invitation,
+intake capture/preview, inherited conversation, existing profile/settings and
+native navigation/chart work where ownership and inputs permit. These outcomes
+do not depend on a completed expense loop. Provider-dependent work proceeds only
+within its explicit authority; local implementation/testing continues separately.
+
+The financial owner defines and implements each posting/read contract with its
+first consumer. The planning owner can build plan lifecycle and expectations
+alongside that work, then connect actual progress when posting/link contracts
+are accepted. Household permission design proceeds before shared consumers;
+it does not wait for every personal feature. Intake extraction/review proceeds
+before financial posting is ready; confirmation must use that shared posting
+contract. Search adds one authorized record type at a time; Updates adds one
+accepted trigger at a time; controls accompany each domain's lifecycle. Voice
+can connect to existing conversation independently of deferred financial actions.
+
+A dependency applies to a specific read, write, permission or acceptance case,
+not an entire department. Signing gates phone installation, not backend work.
+Posting gates real financial confirmation, not document preview. Household rules
+gate sharing, not private records. Plans gate forecasts, not recorded net worth.
+No broad pillar-complete gate or new batch authorization is introduced.
+
+Each domain has one accountable owner, a separate writer branch/worktree and
+exclusive files. Backend API/data/migration ownership stays with the domain;
+consumers do not invent alternate contracts. Native feature writers may work in
+parallel on disjoint modules; the native lead alone changes shared session,
+navigation and common UI models, while device configuration has its named owner.
+Resolve overlapping writes by reassignment before dispatch. Integrate small
+working increments continuously through the existing review/merge boundaries.
+
+Independent acceptance starts with the first assembled behavior. Demonstrate
+installation, then the financial loop, while other scope continues. Subsequent
+builds add linked planning, imports, household and other completed journeys as
+their actual dependencies clear, not in a fixed pillar order. Each demo reports
+both the exact phone-proven behavior and remaining full-scope coverage. The
+captain continues until all non-deferred rows and all five MVEE connected journeys
+are accepted on the physical phone. The D14 gap stays visible at that milestone.
+
+## Demonstration checkpoints
+
+These are observable builds, not scope gates or successive authorization batches.
+After the early phone connection, order subsequent demonstrations by ready
+journeys. Other teams continue while a candidate awaits hosted access or review.
+
+1. **Connected installation.** Existing-user login, reopen and logout work on
+   the physical phone away from the Mac. Financial/backend and other independent
+   teams continue. This proves access only.
+2. **First financial loop.** Establish balance, expense, Account/Home change,
+   correction, reconciliation and persistent reopen. Demonstrate known/unknown,
+   retry and earlier-activity handling. Plans, household, intake, chat and controls
+   continue independently. This does not close the full D03/D05 rows.
+3. **Useful connected increments, in parallel.** Show a budget/goal/debt plan
+   with recorded progress and forecast; a statement/photo with actual preview,
+   reviewed import and resume; a two-person household with explicit sharing and
+   revocation; and inherited chat with evidence, Search return and voice. Each
+   reaches the same app when verified, without waiting for the other increments.
+4. **Complete private candidate.** Demonstrate all five MVEE journeys and all
+   non-deferred coverage rows together, including Updates, spaces/assets,
+   access completeness, Profile/data controls, Temporary chat, localization,
+   accessibility, charts, error recovery and safe app updates.
+
+For every demonstration, identify the app build/commit, backend revision and
+configured environment. Record a short live interaction or video showing the
+successful action, a failure/recovery and relaunch; use synthetic/redacted
+committed evidence. Real founder records are deliberate/authorized only.
+Phone acceptance uses the physical iPhone over HTTPS on cellular or another
+network with the Mac unavailable. Component tests, simulator runs and screenshots
+remain supporting evidence. Backup restoration/rollback are verified in a safe
+environment and linked to the deployment candidate, never exercised destructively
+on the founder's data. Full private completion requires every applicable row's
+acceptance, not merely completion of these demonstrations.
 
 ## Status, evidence and handoffs
 
@@ -185,7 +485,10 @@ acceptance checks/commands, timebox, stop conditions and cleanup/handoff duty.
 Unfilled fields mean the item is not ready to dispatch. Later changes need a
 recorded reason; they must not silently shrink the MVEE outcome.
 
-At each meaningful checkpoint, update the row and link its PR plus durable
+At each meaningful checkpoint, report two views: what the founder can actually
+do on the phone, and what remains across every coverage row, including blocked
+decisions and approved deferrals. The first loop never closes the ecosystem.
+Update the assigned row and link its PR plus durable
 acceptance artifact. Record the commit, app build, backend/environment revision,
 checks actually run, reviewer outcome, unresolved findings, next action and any
 required founder decision. Keep credentials and real personal documents out.
@@ -211,8 +514,10 @@ Their setup is future authorized work, not a claimed current capability.
 The delivery captain coordinates and verifies; domain owners implement; one
 integration owner lands only within the founder's explicit grant. The founder
 reviews usable builds and decides product choices, spending, credentials and
-hosted/deployment permissions. Routine testing, scoped bug fixes and review
-triage do not need repeated founder prompts once their assignment is authorized.
+hosted/deployment permissions. One execution authorization covers the full assignment. Routine sequencing,
+implementation, testing, scoped bug fixes and review triage do not need repeated
+founder prompts or successive batch approvals. Merges, hosted changes, deployment
+and spending still require the explicit grants recorded for those actions.
 Current VM communication still goes through the founder until a direct channel
 is explicitly established. Do not claim autonomous VM coordination exists.
 
@@ -222,21 +527,27 @@ Stop affected work for duplicate writers, contradictory contracts, repeated
 unproductive failures or scope expansion. Review genuine reachable defects at
 their shared cause; stop the review loop at the repository's clean-delta rule.
 
-### Decision gates
+### Decisions and access that materially affect delivery
 
-| Gate | Needed by | Current disposition |
+These are unresolved inputs, not requests for all answers before work starts.
+Recommendations are proposals for review, not approved policy. Owners resolve
+routine API/schema/locking choices themselves. They prepare a concrete decision
+only when a product choice, access grant or spending authority is necessary.
+
+| Decision or access | Owner and affected work | Recommendation for review; what can continue |
 | --- | --- | --- |
-| Restart and named ownership | Any implementation | Founder stopped all work; docs-only PR authorized |
-| Physical device/signing and hosted configuration | D01 | Inspect existing setup, then obtain necessary explicit authorization |
-| On-device deployment using current Supabase project/plan | D01 | Project reuse settled; exact Render configuration/capacity unverified |
-| File size, password handling, retention, supported formats/OCR | D08 | Unresolved; no experimental assumption becomes approval |
-| Household edits, departure, retention and recovery | D07 | Approved experience; technical policy details unresolved |
-| Notifications and schedules | D11 | Channels/defaults unresolved |
-| Audio/context/Temporary chat retention | D09/D13 | Explicit contracts required |
-| Agentic-runtime implementation | D14 | Deferred; requires a separate assignment |
+| Single execution restart and action authority | Captain; entire assignment | Authorize continuous implementation/build/test/review/branch publication across all non-deferred coverage once the plan is accepted. Merge, signing/install access, hosted mutation/deployment and paid-provider grants remain explicit; no per-pillar restart prompts |
+| Apple account/team, physical phone access, stable app identity, supported device/OS and private updates | Device/release; installation and phone acceptance | Inspect existing entitlement/team/device access and choose the shortest supported signed route with a stable identity and repeatable update path. Public App Store release is unnecessary. Device specifics remain unverified; backend and native implementation continue |
+| Existing Render/Supabase access, deployed revisions/migrations/capacity and production-compatible rollout | Device/release; hosted proof | Reuse existing project/current plan and compatible Render capacity. Prepare exact migration/settings/candidate, production-web regression evidence, backup/restore and rollback before the hosted grant. No new project or spending by default |
+| Financial/private-space recovery window, purge/export behavior and production limits | Financial core + Native continuity; lifecycle controls | Propose the unresolved limits under [account recovery][mvee-activity] and [space lifecycle][mvee-spaces] before release. Ordinary posting can progress |
+| Household editing, departure, joint-record custody and recovery | Household; shared writes and revocation | Recommend view-only sharing unless edit rights are explicitly granted; revoke future access promptly without silently deleting another person's records. Present joint custody/export/retention choices for approval. Private journeys and invitation mechanics can progress |
+| File formats/institutions, OCR, upload/page limits, encrypted files and retention | Intake; extraction/storage | Cover declared PDFs, structured exports and images/photos; select concrete supported samples. Recommend local type/readability checks, private source access and explicit sharing; do not accept unreviewed OCR as fact. Determine limits/provider from bounded synthetic evaluation, then seek any paid/data-handling grant. Do not drop photo/PDF intake because selection is unfinished |
+| Notifications, schedule defaults, time zones and monitored external conditions | Planning/Home; delivery and scheduled updates | Recommend a persistent inbox and opt-in private push previews; no financial details outside the authenticated app. Founder selects external channels/defaults. Use existing jobs and sourced conditions; trigger/inbox implementation can progress independently |
+| Audio and Temporary chat context/provider retention | Conversation/voice; Temporary behavior and live audio | Recommend no retained raw audio by default; verify provider feasibility and seek approval for unresolved retention under [voice][mvee-voice] and [Temporary chat][mvee-continuity]. Regular native chat can progress |
+| Provider credentials, spend caps and consenting data/test identities | Relevant domain + Device/release; live voice/OCR/research/backtest/invite acceptance | Use existing approved providers, server-held secrets and bounded cases/caps. Request credentials via secure configuration, not chat. Use synthetic documents/accounts until real samples and second-user participation are authorized; no broad production data copies |
+| VM access and direct coordination | Captain; remote workers | Verify secure connectivity, exact checkout, exclusive writer and pushed checkpoints before remote assignment. Use local agents for ready work until then; do not make additional machines a prerequisite |
+| D14 activation | Captain + Conversation/voice | Respect the founder-approved runtime sequence. Keep its unmet action parity visible and request the separate runtime assignment when its prerequisites are satisfied; do not use it to defer ordinary voice, manual workflows or financial read-context |
 
-Web remake, billing, new growth sharing and new ecosystem analytics are not
-current work. Android remains preserved pending explicit assignment. Plaid,
-wallet automation, bank access, valuations and watchlist ideas follow the
-[MVEE holds and later-work register](argus-minimum-viable-ecosystem-experience.md#16-holds-later-work-and-unresolved-decisions).
-Do not turn them into prerequisites for private iPhone delivery.
+
+Use the canonical disposition links above when assigning work. This documentation
+change does not activate implementation or any held integration.

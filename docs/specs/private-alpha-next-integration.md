@@ -6,13 +6,14 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-09-29 (PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-09-29 (PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
 
+- September 29, 2026: [PR #743](https://github.com/lagarcess/argus/pull/743) merged as `12bccd4d6e173a5d8805e495fd30b7ead36741c6`, from approved head `25a861b5ba70b404c93d99de91ad80b01b522729` onto `de8729843b726a3fd03210cebcedede5e44227c8`. Published the private iPhone MVEE lock and [execution manifest](argus-execution-board.md), linked through [documentation authority](../DOCUMENTATION_AUTHORITY.md), with superseded assignments marked historical and native recovery checkpoints preserved. PR CI passed; the Codex fix review was clean, zero threads remained open, and the later preservation-pointer delta was verified. No linked issues to close or environment/config changes. Implementation remains stopped; no deployment or main promotion. Exact integration CI is recorded in the merged PR landing audit.
 - September 29, 2026: [PR #735 integration landing](../reports/2026-09-29-pr-735-integration-landing.md), merged as `296195e86c972e846c251d256b3cc211975bfd57`. Financial accounts first slice behind `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` default-off; opening writes bind caller-visible `expected_version`. No hosted enablement, deployment, or main promotion.
 - September 29, 2026: [PR #739 integration landing](../reports/2026-09-29-pr-739-integration-landing.md), merged as `738e11a4813f85feff051e6bb4f3d05fc19453a1`. Android registered-session continuity behind local opt-in; default-off; financial features remain samples. No deployment or main promotion.
 - September 29, 2026: [PR #738 integration landing](../reports/2026-09-29-pr-738-integration-landing.md), merged as `00368a64658a106ee705db241a92d3b1aabce127`. Default-off iPhone registered sessions (Keychain + official Swift Auth SDK); financial destinations remain samples. No deployment or main promotion. [#739](https://github.com/lagarcess/argus/pull/739) squash-merged immediately afterward as `738e11a4813f85feff051e6bb4f3d05fc19453a1`.
