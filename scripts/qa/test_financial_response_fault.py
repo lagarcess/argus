@@ -1,7 +1,9 @@
 import http.client
+import json
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
+from time import monotonic
 
 import pytest
 from financial_response_fault import Fault, handler
@@ -79,4 +81,55 @@ def test_response_is_lost_only_after_upstream_accepts_the_write(method, path):
         response = client.getresponse()
         assert response.status == 201 and response.read() == b"{}"
         assert fault.dropped == 1 and not fault.armed
+        client.close()
+
+
+@pytest.mark.parametrize("status", [0, 404, 503])
+def test_read_fault_is_once_and_never_intercepts_a_write(status):
+    fault = Fault()
+    fault.arm_read("/api/v1/financial-search", status, 20)
+    assert fault.consume_read("POST", "/api/v1/financial-search") is None
+    assert fault.consume_read("GET", "/api/v1/auth/session") is None
+    assert fault.consume_read("GET", "/api/v1/financial-search") == (status, 20)
+    assert fault.consume_read("GET", "/api/v1/financial-search") is None
+    assert fault.read_consumed == 1
+
+
+@pytest.mark.parametrize("status", [0, 404, 503])
+def test_read_failure_retries_against_the_actual_upstream(status):
+    reads = []
+
+    class API(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            pass
+
+        def do_GET(self):
+            reads.append(self.path)
+            body = b'{"items":[{"id":"owned-record"}]}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    with running(API) as upstream, running(handler(upstream, Fault())) as proxy:
+        client = http.client.HTTPConnection("127.0.0.1", proxy, timeout=3)
+        body = json.dumps(
+            {"path_prefix": "/api/v1/financial-search", "status": status, "delay_ms": 25}
+        )
+        client.request("POST", "/__read_fault", body)
+        response = client.getresponse()
+        assert response.status == 200
+        assert json.loads(response.read())["armed"]
+        started = monotonic()
+        client.request("GET", "/api/v1/financial-search?q=owned")
+        response = client.getresponse()
+        assert response.status == (status or 200)
+        response.read()
+        assert monotonic() - started >= 0.025
+        assert reads == ([] if status else ["/api/v1/financial-search?q=owned"])
+        client.request("GET", "/api/v1/financial-search?q=owned")
+        response = client.getresponse()
+        assert response.status == 200
+        assert json.loads(response.read())["items"][0]["id"] == "owned-record"
+        assert reads == ["/api/v1/financial-search?q=owned"] * (1 if status else 2)
         client.close()

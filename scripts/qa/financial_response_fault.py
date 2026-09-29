@@ -1,4 +1,4 @@
-"""Drop a successful local financial write response to exercise native recovery."""
+"""Inject isolated local financial transport failures for native recovery checks."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import json
 import socket
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Lock
+from time import sleep
 from urllib.parse import urlsplit
 
 
@@ -16,6 +17,31 @@ class Fault:
         self.lock = Lock()
         self.armed = False
         self.dropped = 0
+        self.read_fault: tuple[str, int, int] | None = None
+        self.read_consumed = 0
+
+    def arm_read(self, path_prefix: str, status: int, delay_ms: int = 0) -> None:
+        if (
+            not path_prefix.startswith("/api/v1/financial-")
+            or status not in {0, 404, 503}
+            or not 0 <= delay_ms <= 10_000
+        ):
+            raise ValueError("Only bounded local financial read faults are supported.")
+        with self.lock:
+            self.read_fault = path_prefix, status, delay_ms
+
+    def consume_read(self, method: str, path: str) -> tuple[int, int] | None:
+        with self.lock:
+            if (
+                method != "GET"
+                or self.read_fault is None
+                or not path.startswith(self.read_fault[0])
+            ):
+                return None
+            _, status, delay_ms = self.read_fault
+            self.read_fault = None
+            self.read_consumed += 1
+            return status, delay_ms
 
     def arm(self) -> None:
         with self.lock:
@@ -45,7 +71,35 @@ def handler(upstream_port: int, fault: Fault) -> type[BaseHTTPRequestHandler]:
         def log_message(self, format: str, *args: object) -> None:
             pass
 
+        def json_response(self, status: int, payload: dict[str, object]) -> None:
+            body = json.dumps(payload).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def forward(self) -> None:
+            if self.path == "/__read_fault":
+                if self.command == "POST":
+                    try:
+                        size = int(self.headers.get("Content-Length", 0))
+                        if not 0 < size <= 1024:
+                            raise ValueError("Invalid fault payload size")
+                        body = json.loads(self.rfile.read(size))
+                        fault.arm_read(
+                            body["path_prefix"], body["status"], body.get("delay_ms", 0)
+                        )
+                    except (ValueError, KeyError, TypeError, AttributeError):
+                        self.json_response(400, {"detail": "Invalid read fault"})
+                        return
+                with fault.lock:
+                    payload = {
+                        "armed": fault.read_fault is not None,
+                        "consumed": fault.read_consumed,
+                    }
+                self.json_response(200, payload)
+                return
             if self.path == "/__fault":
                 if self.command == "POST":
                     fault.arm()
@@ -62,6 +116,13 @@ def handler(upstream_port: int, fault: Fault) -> type[BaseHTTPRequestHandler]:
             if not self.path.startswith("/api/v1/"):
                 self.send_error(404)
                 return
+            read_fault = fault.consume_read(self.command, urlsplit(self.path).path)
+            if read_fault:
+                status, delay_ms = read_fault
+                sleep(delay_ms / 1000)
+                if status:
+                    self.json_response(status, {"detail": {"code": "unavailable"}})
+                    return
             content = self.rfile.read(int(self.headers.get("Content-Length", 0)))
             excluded = {"host", "connection", "transfer-encoding", "content-length"}
             headers = {k: v for k, v in self.headers.items() if k.lower() not in excluded}
