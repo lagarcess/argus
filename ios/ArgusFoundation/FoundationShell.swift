@@ -105,7 +105,10 @@ struct FoundationShell: View {
             if auth.enabled { FinancialPlanDestination(showProfile: { sheet = .profile }) }
             else { PlanSampleView() }
         case .search:
-            if auth.enabled { FinancialSearchDestination(active: destination == .search, showProfile: { sheet = .profile }) }
+            if auth.enabled {
+                FinancialSearchDestination(active: destination == .search, showProfile: { sheet = .profile })
+                    .accessibilityElement(children: .contain)
+            }
             else { SearchSampleView(destination: $destination) }
         }
     }
