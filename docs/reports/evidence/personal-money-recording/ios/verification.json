@@ -63,7 +63,8 @@
       "uncommitted_test_draft": false,
       "terminal_case": "Test Case '-[ArgusFoundationUITests.FinancialLoopUITests testMoneyReconciliationCurrenciesAndIdentity]' passed (423.703 seconds).",
       "result_bundle_finalized": false,
-      "runner_exit": "completed case; stalled finalizer terminated"
+      "runner_exit": "completed case; stalled finalizer terminated",
+      "claim_limit": "Original identity-isolation absence assertions were insufficient and are superseded by review_delta; reconciliation/currency/Spanish observations retained."
     },
     {
       "log": "ui-20260929T135454Z.log",
@@ -205,6 +206,82 @@
     "linked-refund-correction-history.png": {
       "bytes": 218930,
       "sha256": "b97000fc18b2d20801ab6e43528afc2293bb085dd2bf696058eb9569f2682c0c"
+    }
+  },
+  "review_delta": {
+    "finding": "https://github.com/lagarcess/argus/pull/747#discussion_r4134599936",
+    "verified_at": "2026-09-29T14:36:04.484538+00:00",
+    "base_and_api_source": "5a982bc2b9df93c5015f20cc79b470d095d5b40f",
+    "native_source": "3106f2f6e1d91570f98239beb7ff2cafe31e7fd5",
+    "scope": "Only native pending-write identity isolation acceptance; no runtime changes",
+    "supersedes": "Native identity-isolation claims from ui-20260929T134706Z.log and second-identity-isolated.png; positive B load and pending A command were not established there",
+    "native_cases": [
+      {
+        "log": "ui-20260929T142849Z.log",
+        "terminal_case": "Test Case '-[ArgusFoundationUITests.FinancialLoopUITests testPendingMoneyWriteRemainsIsolatedAcrossIdentities]' passed (232.846 seconds).",
+        "source": "3106f2f6e1d91570f98239beb7ff2cafe31e7fd5",
+        "runner_exit": 0,
+        "result_bundle_finalized": true
+      },
+      {
+        "log": "ui-20260929T143325Z.log",
+        "terminal_case": "Test Case '-[ArgusFoundationUITests.FinancialLoopUITests testRetainedHomeSurvivesReopening]' passed (15.469 seconds).",
+        "source": "3106f2f6e1d91570f98239beb7ff2cafe31e7fd5",
+        "runner_exit": 0,
+        "result_bundle_finalized": true
+      }
+    ],
+    "proof": "isolation-review/README.md",
+    "canonical_readback": "isolation-review/readback.json",
+    "proxy": {
+      "port": 58512,
+      "committed_responses_dropped": 1,
+      "armed_at_stop": false,
+      "stopped": true
+    },
+    "final_demo": {
+      "api_port": 58500,
+      "signed_in_identity": "A",
+      "surface": "Home",
+      "data_preserved": true
+    },
+    "artifacts": {
+      "isolation-a-committed-response-lost.png": {
+        "bytes": 188266,
+        "sha256": "724dce53d8128b427576dbfe28e797eb27369802f93045e472d0cbc76a4379d9"
+      },
+      "isolation-b-own-account-loaded.png": {
+        "bytes": 284829,
+        "sha256": "491d1e98f82f53d4e5ff8fb3decc4360bbf79e8c697d960673568a6891df9d60"
+      },
+      "README.md": {
+        "bytes": 3807,
+        "sha256": "c1ed951199eb92277076fc5f909782c58bcfc13f1278fcc24ed57a9b0a797362"
+      },
+      "isolation-a-recovered-once-after-reopen.png": {
+        "bytes": 303227,
+        "sha256": "e6e262065a8d443d2272a2789ed1b34c2b02ee7920dab0a16882064240bac972"
+      },
+      "isolation-a-pending-before-switch.png": {
+        "bytes": 359119,
+        "sha256": "91c104d4f14b5504bbffab3042b2cfb2f45fb58d65a91a6744b08ada985e37e3"
+      },
+      "readback.json": {
+        "bytes": 1352,
+        "sha256": "ffe78e75ce38ec569e39cbca100add436c005c8cf18327b625bba1540a18c8c0"
+      },
+      "terminal-cases.txt": {
+        "bytes": 367,
+        "sha256": "587248d48c6424a6ef1c4cf14dd9ac4667d3959bbfdf3e76e98b0a25756fece1"
+      },
+      "isolation-a-pending-restored.png": {
+        "bytes": 359750,
+        "sha256": "ef03d6c0ab5427d1ab37fbaba3c9c51e06780993a6b105f98c2058a5b5dc57c8"
+      },
+      "isolation-b-home-without-a-pending.png": {
+        "bytes": 319105,
+        "sha256": "8bd6ce6bbb2e92de20e4da24ad74a68ab6236be6f830e50b1930f8c84e5deaf5"
+      }
     }
   }
 }

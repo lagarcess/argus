@@ -39,15 +39,22 @@ Passed native journeys:
 - A late transfer is included in the bank’s checked balance but applied separately
   to cash: bank stays 940 with unexplained difference 0; cash becomes 560. USD
   income 100 and refund 25 leave its account unknown and display monthly net
-  spending of -25. DOP totals remain unchanged. Both identities were exercised;
-  the second sees none of the first user’s selected accounts or pending request.
-  The app returns to the first identity, and Spanish/light input is verified.
+  spending of -25. DOP totals remain unchanged, and Spanish/light input is verified.
+  The original native identity assertions did not wait for B’s data and had no
+  pending A command; those claims are superseded by the dedicated review proof below.
 - The proxy drops exactly one response after income 25 has committed to a 100
   account. Reopening exposes pending recovery; retry preserves one record and
   balance 125. Another reopen finds the same record. Independent canonical
   [readback](native-record-readback.json) confirms all nine retained accounts.
 
-Seven selected native cases passed. Six have terminal case results with the
+The [identity-isolation review delta](isolation-review/README.md) now proves B’s
+own persisted account has loaded while A has a real pending committed write,
+then proves A can recover that command exactly once after switching back. It
+passed with a clean full Xcode exit, as did direct-API restoration afterward.
+The saved review accounts are `Pending A 6D519` (125) and `Isolated B 6D519` (321),
+visible only to their respective synthetic users.
+
+Seven original selected native cases passed. Six have terminal case results with the
 finalizer limitation below. The final direct-API Home/reopening smoke check has a
 clean `xcodebuild` exit 0. The launcher’s explicit fault opt-in tests passed 2/2.
 
@@ -125,7 +132,7 @@ python3 ios/scripts/auth/run-ui.py DD9EF306-EFED-41F1-9A8E-B42EBCEE07DA \
 
 The other personal-money cases are `testTransferAndWrongAccountCorrection`,
 `testCardPaymentRefundAndCreditBalance`,
-`testMoneyReconciliationCurrenciesAndIdentity`, and
+`testMoneyReconciliationCurrenciesAndSpanish`, and
 `testAccountAndActivityRowsOpenFromCenter`. They create uniquely named synthetic
 accounts and compare Home against its starting values; no empty database is
 assumed.
