@@ -1,7 +1,7 @@
 # Argus documentation authority
 
-**Updated:** September 28, 2026. Founder-approved documentation reconciliation,
-plus the September 28 implementation-batch ownership and deferral handoff.
+**Updated:** September 29, 2026. Founder-approved private iPhone delivery lock.
+Implementation remains stopped; this publication authorizes documentation only.
 **Purpose:** Help an agent distinguish approved product direction, existing technical contracts, historical rationale, and authorized implementation work.
 
 ## Start here
@@ -10,7 +10,9 @@ plus the September 28 implementation-batch ownership and deferral handoff.
 2. Read [PRODUCT.md](PRODUCT.md) for the product overview and the boundary between the existing Alpha and the approved pivot.
 3. Read the [minimum viable ecosystem experience (MVEE)](specs/argus-minimum-viable-ecosystem-experience.md) for the approved audience, surfaces, ingestion, loop, household collaboration, and open decisions.
 4. Read [ARCHITECTURE.md](ARCHITECTURE.md), [API_CONTRACT.md](API_CONTRACT.md), [DATA_MODEL.md](DATA_MODEL.md), and [DESIGN.md](../.agent/designs/argus/DESIGN.md) before relevant technical or UI work. Their existing contracts are not replaced by experience prose.
-5. Read the explicitly assigned package or slice. For a Wave 1 assignment, start with [its README](specs/wave-1/README.md) and the package's existing gates. A roadmap or brainstorm does not assign work by itself.
+5. Read the [private iPhone execution manifest](specs/argus-execution-board.md) for
+   the stopped delivery plan, dependencies, ownership requirements and acceptance.
+6. Read the explicitly assigned package or slice. For a Wave 1 assignment, start with [its README](specs/wave-1/README.md) and the package's existing gates. A roadmap or brainstorm does not assign work by itself.
 
 ## One owner per kind of decision
 
@@ -22,6 +24,7 @@ plus the September 28 implementation-batch ownership and deferral handoff.
 | What architecture, payloads, and persistence contracts apply? | Architecture, API contract, and data model docs above | Existing system contracts/technical intent and the [locked interface stacks](ARCHITECTURE.md#approved-platform-direction); some statements describe targets, not proof of implementation |
 | What visual and interaction conventions apply? | [DESIGN.md](../.agent/designs/argus/DESIGN.md) | Preserve current design system and chat detail; MVEE owns the pivot's surface structure and platform intent |
 | What is an agent authorized to build now? | Explicit assignment and its scoped package/spec | MVEE approval does not assign every feature, unlock stages, or authorize provider integrations |
+| What is next, who owns it, and what counts as done? | [Private iPhone execution manifest](specs/argus-execution-board.md) | One execution map; states and evidence links do not authorize a restart, merge or deployment |
 | How is work reviewed and released? | AGENTS.md, [CI/CD discipline](specs/private-alpha-ci-cd-sota.md), [launch runbook](PRIVATE_LAUNCH_RUNBOOK.md), [manifest template](release-manifests/TEMPLATE.md) | Existing evaluation, privacy, branch, merge, and deployment gates remain in force |
 | What evidence or thinking informed a direction? | Linked research and historical strategy docs | Inputs and provenance, not independent scope authority |
 
@@ -29,7 +32,7 @@ plus the September 28 implementation-batch ownership and deferral handoff.
 
 The MVEE is the single detailed owner of the approved ecosystem. Its section 1.1 locks the audience and near-term financial emphasis; section 12 includes partner invitations and personal/household views. Sections 3–5 define surfaces and information ingestion. Sections 8–9 distinguish boundaries and open decisions. Section 11 defines pain-point coverage and the reinforcing loop.
 
-The product remains one connected Argus experience that carries forward existing chat, calculations, research, and historical comparisons. These capabilities are not gated behind debt repayment. The design direction retains the Argus visual identity. Native iOS/Android plus web and their [interface stacks](ARCHITECTURE.md#approved-platform-direction) are approved. Detailed client architecture and sequencing remain open.
+The product remains one connected Argus experience that carries forward existing chat, calculations, research, and historical comparisons. These capabilities are not gated behind debt repayment. The design direction retains the Argus visual identity. Native iOS/Android plus web and their [interface stacks](ARCHITECTURE.md#approved-platform-direction) are approved. The latest [MVEE delivery lock](specs/argus-minimum-viable-ecosystem-experience.md#12-private-iphone-delivery-the-immediate-finish-line) prioritizes the physical iPhone over the internet, preserves the existing web, freezes the web remake, and records the deferred agentic runtime. The [execution manifest](specs/argus-execution-board.md) owns the proposed sequence and unassigned work. Detailed contracts still need their scoped implementation assignments.
 
 “Locked” means founder-approved direction. It does not mean implemented, validated market demand, a final schema, a model instruction change, or permission to deploy.
 
@@ -58,7 +61,7 @@ merely to make an experience specification read as if it has shipped.
 Do not infer these from a polished demo or the MVEE:
 
 - Registration/conversion mechanics and enforcement of the [locked guest access boundary](specs/argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration); guest financial persistence is no longer an open product choice.
-- Financial-record schema, balance/transaction reconciliation model, money arithmetic contracts, migrations, and historical-data conversion.
+- Financial activity, balance/transaction reconciliation, household extensions and historical-data conversion beyond the landed [account first slice](specs/lanes/financial-accounts-first-slice.md). Existing account APIs and money contracts remain authoritative; do not redesign them from vision prose.
 - Household membership lifecycle, permission enforcement/RLS, ownership, revocation, deletion, and retention implementation. The consent/visibility experience is settled; its technical realization is not.
 - API routes, action schemas, chat-to-record integration, runtime state ownership, jobs, and event contracts for the new surfaces.
 - Voice integration contracts under the [selected voice/chart direction](ARCHITECTURE.md#voice-and-chart-direction), OCR providers, supported file formats/institutions, secure bank-access design, wallet/device capabilities, and automatic-acceptance policies.
@@ -83,7 +86,7 @@ Retired strategy narratives now live in `docs/archive/`, with compatibility poin
 
 ## Wave 1 reconciliation boundary
 
-No replacement execution schedule is created by this PR. Wave 1's assigned packages and stage/review gates remain the execution reference for that work. Neither the old answers board nor the MVEE automatically starts a new lane.
+The private iPhone execution manifest supplies the current proposed delivery map. It does not restart Wave 1 or any stopped lane. Applicable technical and release gates still apply when a package is explicitly assigned; historical package sequencing does not override the latest founder stop or iPhone priority.
 
 In particular, Wave 1's two-audience landing, limited navigation, hidden account/upload/budget surfaces, and earlier onboarding assumptions are package-era choices, not permanent limits on the ecosystem. A temporary shipping subset may still be appropriate, but the assigned spec must say so explicitly. Before implementing a conflicting experience requirement, reconcile that package with the founder-approved MVEE and record what is retained, revised, or deferred. Do not expose unfinished surfaces just because they are approved in the vision.
 
@@ -91,61 +94,50 @@ Safety fixes, instrumentation, and existing calculator work are not discarded by
 
 ## Current implementation batch (September 28, 2026)
 
-Founder-authorized coordination while the founder steps away. Source handoff:
-[PR #727 comment](https://github.com/lagarcess/argus/pull/727#issuecomment-5878051744).
-Target: a real local create/reopen/edit financial-account journey on iPhone,
-Android, and web by reusing and connecting existing Argus capabilities, not by
-replacing production auth or the chat runtime.
+**Historical batch, stopped and superseded.** This heading remains as a stable
+link for earlier decisions. The founder subsequently stopped all lanes, froze
+web work, closed the research/proof PRs and requested the private iPhone plan.
+The current owner is the [execution manifest](specs/argus-execution-board.md).
+It does not dispatch work or carry forward an old merge grant to new PRs.
 
-### Ownership
+The prior [#727 coordination handoff](https://github.com/lagarcess/argus/pull/727#issuecomment-5878051744)
+assigned the account-backend, iPhone, Android, web and chart owners. Preserve their
+branches and changes for explicit salvage, not automatic resumption. Historical
+batch wording is retained in [integration before this lock](https://github.com/lagarcess/argus/blob/de8729843b726a3fd03210cebcedede5e44227c8/docs/DOCUMENTATION_AUTHORITY.md).
 
-After the current foundations land, the **Project delivery lead** and the **VM
-serial captain** jointly own create/reopen/edit financial-account journey
-coordination across iPhone, Android, and web. They coordinate owners and
-sequencing; they do not take exclusive write away from the foundation lanes
-below, and they do not replace production auth or the chat runtime.
+[#735](https://github.com/lagarcess/argus/pull/735) landed the default-off account
+backend. [#738](https://github.com/lagarcess/argus/pull/738) and
+[#739](https://github.com/lagarcess/argus/pull/739) landed local native session
+integration. Those are reusable components, not proof of the private iPhone
+outcome. The manifest records the inspected starting point and incomplete work.
 
-| Surface | Owner | Boundary |
-| --- | --- | --- |
-| Integration landing / merges to `codex/private-alpha-next` | VM serial captain (integration orchestrator) | Only landing executor under the founder's existing bounded merge authorization. The Project delivery lead coordinates but does not push to integration or edit branches another lane already owns. |
-| Account domain, API, persistence; `API_CONTRACT` / `DATA_MODEL` amendments | Existing VM account-backend worker | Sole backend owner for this batch. [#735](https://github.com/lagarcess/argus/pull/735) landed as `296195e8` (default-off; no hosted enablement). Clients bind to the accepted first-slice contract. |
-| `ios/` continuation | Existing iPhone owner (Build iPhone iOS foundation) | Maps real sessions; continuation after foundations. [#729](https://github.com/lagarcess/argus/pull/729) landed as `f61e47f1`. |
-| `mobile/android/` continuation and pending #726 probe validation | Existing Android owner (Android phone foundation) | Same continuation rules as iPhone. [#729](https://github.com/lagarcess/argus/pull/729) landed as `f61e47f1`; [#730](https://github.com/lagarcess/argus/pull/730) landed as `a8e09b72`; [#739](https://github.com/lagarcess/argus/pull/739) landed as `738e11a4` (registered session, local opt-in). |
-| Isolated responsive preview, then later account API wiring | Existing web owner (Build responsive Argus preview) | Finishes the isolated preview first; wires to the accepted backend contract afterward. No production-auth rewrite. |
-| Chart validation | Existing chart owner under `prototypes/chart-validation` | Remains isolated. Not a prerequisite for the account journey. |
-
-**Exclusive write ownership:** original lanes retain exclusive write on
 [#723](https://github.com/lagarcess/argus/pull/723),
-[#725](https://github.com/lagarcess/argus/pull/725),
-[#726](https://github.com/lagarcess/argus/pull/726), and
-[#724](https://github.com/lagarcess/argus/pull/724). Do not push concurrent
-fixes to those branches. [#729](https://github.com/lagarcess/argus/pull/729)
-landed as `f61e47f1`; [#730](https://github.com/lagarcess/argus/pull/730)
-landed as `a8e09b72`; [#739](https://github.com/lagarcess/argus/pull/739)
-landed as `738e11a4`. Continue gated landing of #724 as its applicable
-gates close. Do not hold independent ready foundations for unrelated
-research.
-
-**#725 hold:** Landing of [#725](https://github.com/lagarcess/argus/pull/725)
-is held for a narrowed research / selected-file-import scope. That hold does
-not block account creation, native auth, or client wiring to the accepted
-account contract. Do not expand #725 scope from this note.
-
-**Shared rules for this batch:** fetch current integration at start and before
-readiness; one-way reconciliation only (no rebase); one canonical server
-financial-rule owner; reuse existing Argus login/signup/resend/recovery/guest/
-profile behavior as the baseline; check browser recovery/PKCE/app return
-technically before any callback change; no new production app identities,
-hosted settings, paid calls, or deployments from this coordination; new
-continuation PRs are not implicitly added to the earlier bounded merge list.
+[#724](https://github.com/lagarcess/argus/pull/724),
+[#725](https://github.com/lagarcess/argus/pull/725) and
+[#726](https://github.com/lagarcess/argus/pull/726) are closed unmerged as of this
+publication. Earlier instructions to finish or land them are historical. Reuse
+relevant findings selectively; do not restart their review or implementation loops.
 
 ### Founder deferral
 
-Revenue, pricing, paywalls, billing integrations, and user trials are parked
-while core journeys become functional. Existing usage and cost safeguards
-remain in force. Do not open a separate status-only documentation PR for this
-handoff; record it here and in the [decision log](specs/argus-decision-log.md).
+The [MVEE holds](specs/argus-minimum-viable-ecosystem-experience.md#16-holds-later-work-and-unresolved-decisions)
+own deferred work. Revenue, pricing, billing, new growth sharing and new ecosystem
+analytics do not block core private delivery. Existing operational and cost
+safeguards remain. The prior pause on broad user trials does not prohibit the
+explicitly requested founder dogfooding and physical-phone demonstrations.
+
+### Infrastructure and publication boundary
+
+The [MVEE infrastructure decision](specs/argus-minimum-viable-ecosystem-experience.md#14-infrastructure-and-cost-constraints)
+locks reuse of Render, the current Supabase project and current plan, existing
+identity and a modular backend. It does not authorize hosted migrations, settings,
+paid providers or deployment. Existing API/data/security contracts remain in
+force; reconcile their concrete amendments within assigned implementation work.
+
+All product implementation remains stopped. Publishing these documents and
+opening their PR is authorized. Creating new implementation lanes, restarting
+workers, merging or deploying is not authorized by this publication.
 
 ## Handoff rule
 
-An implementation handoff should identify the MVEE section it serves, its bounded deliverable, current technical owners, unresolved decisions, allowed/no-touch files, and evidence required. It must not claim that this docs-only reconciliation selected a new architecture or completed the product pivot.
+An implementation handoff should identify the MVEE section it serves, its bounded deliverable, current technical owners, unresolved decisions, allowed/no-touch files, and evidence required. It must distinguish founder-locked direction from technical contracts and verified completion. Start from the manifest and link to MVEE requirements instead of copying another scope list.

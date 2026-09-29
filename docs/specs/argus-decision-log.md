@@ -124,3 +124,22 @@ Manual UI and future conversational actions must share the same canonical
 operations. The ecosystem runtime lane follows definition of the core workflows
 and UI. This is not permission to replace the existing runtime, change its
 model-facing instructions, or remove research and historical simulations now.
+
+## September 29, 2026: private iPhone delivery and execution lock
+
+The founder requested publication of the complete discussion in the MVEE and a
+single execution manifest. The [MVEE delivery lock](argus-minimum-viable-ecosystem-experience.md#12-private-iphone-delivery-the-immediate-finish-line)
+owns the real physical-iPhone/internet outcome, full scope, agent-first direction
+with explicit runtime deferral, tester feedback, current Supabase-project/plan
+reuse, modular backend and web-remake freeze. These are founder decisions from
+this delivery conversation, not claims that the capabilities are implemented.
+
+The [execution manifest](argus-execution-board.md) is the single delivery map,
+with dependencies, required ownership, acceptance, evidence and restart rules.
+[Documentation authority](../DOCUMENTATION_AUTHORITY.md) points agents to it and
+marks the earlier three-interface batch historical. This entry supersedes the
+September 28 active-batch and #725 landing-hold instructions: all implementation
+is stopped, #723/#724/#725/#726 are closed unmerged, and no prior coordination
+instruction restarts them. The founder authorized this documentation PR only.
+The manifest's proposed work order is the delivery lead's plan, not an already
+accepted technical contract or a new implementation/deployment grant.
