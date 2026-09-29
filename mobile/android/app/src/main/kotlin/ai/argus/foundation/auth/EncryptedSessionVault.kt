@@ -32,7 +32,15 @@ internal class EncryptedSessionVault(
         }
         val plain = SessionEnvelope.open(bytes, key(create = false))
         try {
-            SessionRecordCodec.decode(plain)
+            val record = SessionRecordCodec.decode(plain)
+            val minimal = SessionRecordCodec.encode(record)
+            try {
+                // Remove legacy profile fields before network work or an early-return state.
+                if (!plain.contentEquals(minimal)) writeEncrypted(minimal)
+            } finally {
+                minimal.fill(0)
+            }
+            record
         } finally {
             plain.fill(0)
         }
@@ -41,17 +49,21 @@ internal class EncryptedSessionVault(
     override suspend fun save(value: StoredSession) = storage {
         val plain = SessionRecordCodec.encode(value)
         try {
-            val encrypted = SessionEnvelope.seal(plain, key(create = true))
-            val output = file.startWrite()
-            try {
-                output.write(encrypted)
-                file.finishWrite(output)
-            } catch (error: Exception) {
-                file.failWrite(output)
-                throw error
-            }
+            writeEncrypted(plain)
         } finally {
             plain.fill(0)
+        }
+    }
+
+    private fun writeEncrypted(plain: ByteArray) {
+        val encrypted = SessionEnvelope.seal(plain, key(create = true))
+        val output = file.startWrite()
+        try {
+            output.write(encrypted)
+            file.finishWrite(output)
+        } catch (error: Exception) {
+            file.failWrite(output)
+            throw error
         }
     }
 

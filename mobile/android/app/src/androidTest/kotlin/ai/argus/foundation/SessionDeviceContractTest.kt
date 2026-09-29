@@ -6,6 +6,11 @@ import ai.argus.foundation.auth.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import java.security.KeyStore
+import javax.crypto.SecretKey
+import io.github.jan.supabase.auth.user.UserSession
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -42,6 +47,33 @@ class SessionDeviceContractTest {
         assertFalse("Access credential must not be plaintext on disk", disk.contains(first.session.accessToken))
         assertFalse("Refresh credential must not be plaintext on disk", disk.contains(first.session.refreshToken))
         assertFalse("Password must not be persisted", disk.contains(requireNotNull(args.getString("password"))))
+        val sessionFile = File(context.noBackupFilesDir, "argus-session-v1.enc")
+        val key = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            .getKey("argus-session-v1", null) as SecretKey
+        // Exercise migration before any /me call, including the early-return states.
+        listOf(first, first.withKind(AccountKind.GUEST), first.withRevocation(Revocation.PENDING)).forEach { record ->
+            val legacy = buildJsonObject {
+                put("session", sessionJson.encodeToJsonElement(UserSession.serializer(), record.session.copy(
+                    user = requireNotNull(record.session.user).copy(email = "legacy-profile@example.test",
+                        userMetadata = buildJsonObject { put("display_name", "Legacy Private Profile") }),
+                    providerToken = "legacy-provider-token",
+                )))
+                put("identity_id", record.identityId)
+                put("kind", record.kind.name)
+                put("revocation", record.revocation.name)
+            }.toString().toByteArray()
+            sessionFile.writeBytes(SessionEnvelope.seal(legacy, key))
+            val migrated = requireNotNull(vault.load())
+            assertEquals(record.kind, migrated.kind)
+            assertEquals(record.revocation, migrated.revocation)
+            assertNull(migrated.session.user?.email)
+            val persisted = SessionEnvelope.open(sessionFile.readBytes(), key)
+            assertTrue("Loading must replace legacy ciphertext with the minimal record",
+                persisted.contentEquals(SessionRecordCodec.encode(migrated)))
+            persisted.fill(0)
+            legacy.fill(0)
+        }
+        vault.save(first)
 
         // Stack uses 60-second JWTs; recreate the owner after expiry to force SDK refresh.
         delay(65_000)
