@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** Local financial loop LANDED through PR #745. Only bounded landing documentation/verification remains authorized, including founder-approved PR #746. Signing, physical-phone installation and deployment are deferred. Other MVEE work remains stopped.
+**Execution state:** Local financial loop LANDED through PR #745. The founder authorized bounded landing documentation/verification through PR #746; its terminal result is recorded in the linked landing comment below. Signing, physical-phone installation and deployment are deferred. Other MVEE work remains stopped.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -254,8 +254,10 @@ instructions; the landing checkpoint above owns current status.
 ### Current handoff
 
 The locally verified loop is merged through #745. Keep its
-simulator/local-backend demonstration runnable and finish only the authorized
-landing documentation/verification through #746. Physical-device signing,
+simulator/local-backend demonstration runnable. PR #746 carries the
+founder-authorized landing documentation; the [landing result](https://github.com/lagarcess/argus/pull/745#issuecomment-5889046424)
+records its publication and final verification. This record does not assign a
+repeat landing or another implementation batch. Physical-device signing,
 Render login and deployment are explicitly deferred. No functionality on the
 founder's phone is yet proved by this batch. When those actions are resumed, the
 [device preparation evidence](../reports/financial-loop-device-preparation.md)
