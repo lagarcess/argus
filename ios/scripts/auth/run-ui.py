@@ -102,6 +102,8 @@ try:
             [
                 "xcodebuild",
                 "test-without-building",
+                "-collect-test-diagnostics",
+                "never",
                 "-xctestrun",
                 str(runner),
                 *common,

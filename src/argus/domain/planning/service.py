@@ -120,7 +120,7 @@ class PlanService:
     def _occurrence(
         self, state: dict[str, Any], oid: str, version: int | None = None
     ) -> dict[str, Any]:
-        item = model.find_occurrence(state, oid)
+        item = model.find_occurrence(state, oid, self.today(state))
         if version is not None and item["expectation_version"] != version:
             raise StaleVersion()
         return item

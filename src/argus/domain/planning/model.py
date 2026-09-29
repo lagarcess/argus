@@ -211,13 +211,13 @@ def occurrences(state: dict[str, Any], until: date) -> dict[str, dict[str, Any]]
     return result
 
 
-def find_occurrence(state: dict[str, Any], oid: str) -> dict[str, Any]:
+def find_occurrence(state: dict[str, Any], oid: str, today: date) -> dict[str, Any]:
     ends = [
         date.fromisoformat(s["schedule"]["start_date"]) + timedelta(days=3660)
         for e in state["expectations"].values()
         for s in e["segments"]
     ]
-    found = occurrences(state, max([date.today() + timedelta(days=366), *ends])).get(oid)
+    found = occurrences(state, max([today + timedelta(days=366), *ends])).get(oid)
     if found is None:
         raise AccountNotFound()
     return found

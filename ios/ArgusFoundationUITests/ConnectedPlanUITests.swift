@@ -24,7 +24,7 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["plan.record"])
         XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.textFields["loop.amount"].value as? String, "200.00")
-        confirmMoney()
+        confirmPlanMoney()
         assertPlanProjected("DOP 400.00")
         openPlanOccurrence(bill)
         assertText("Recorded")
@@ -32,7 +32,7 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["plan.viewActivity"])
         replaceMoneyField("loop.amount", with: "180")
         fillMoneyField("loop.reason", with: "Correct electricity receipt")
-        dismissMoneyKeyboard(); confirmMoney()
+        dismissMoneyKeyboard(); confirmPlanMoney()
         assertPlanProjected("DOP 420.00")
         openMoneyAccount(bank)
         assertText("DOP -80.00")
@@ -153,6 +153,12 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["plan.selection.save"])
         XCTAssertTrue(app.buttons["plan.selection.save"].waitForNonExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
+    }
+
+    func confirmPlanMoney() {
+        reviewMoney()
+        tapVisible(app.buttons["loop.confirm"])
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
     }
 
     func addPlanExpectation(_ title: String, kind: String, amount: String, account: MoneyAccount,
