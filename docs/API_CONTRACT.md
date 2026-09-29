@@ -6600,7 +6600,9 @@ Transfers, refunds, ingestion, household and plans are separate assignments.
 This batch records expense only. `amount` must be positive; its balance movement
 is negative for both assets and liabilities. `note` is optional, at most 200
 Unicode code points. `category_id` is optional and accepts the server catalog IDs
-from `GET /financial-categories`; clients localize these IDs, never invent money
+from `GET /financial-categories`. Its envelope is `{categories:[{id,kind:"expense"}]}`
+with IDs `other`, `groceries`, `dining`, `transport`, `housing`, `health`, `shopping`,
+`interest_fees`, matching the locked design. Clients localize these IDs, never invent money
 meaning from labels. `occurred_at` requires an offset and cannot be in the future.
 The stored IANA zone is retained independently of the server zone.
 
@@ -6658,7 +6660,7 @@ page envelope for revisions, newest first. Account GET does not embed these list
 {
   "expected_version": 2, "amount": "7500.00",
   "as_of": "2026-09-03T12:00:00-04:00",
-  "time_zone": "America/Santo_Domingo", "source": "manual"
+  "time_zone": "America/Santo_Domingo", "source": "manual", "note": null
 }
 ```
 
@@ -6671,7 +6673,7 @@ and `Idempotency-Key`; it atomically stores expected/observed/difference, review
 account version, source, author, time and covered expense revisions. Response is
 `{account, check, replayed}`. A check has `{record_id, revision, kind, as_of,
 time_zone, source, expected_amount_minor, observed_amount_minor, difference_minor,
-unexplained_minor, recorded_at, recorded_by}`. `kind` is `balance_check` or
+unexplained_minor, note, recorded_at, recorded_by}`. `kind` is `balance_check` or
 `value_update` for recorded valuation accounts. Neither is spending or income.
 A zero difference is a check with zero adjustment, not fabricated activity.
 
@@ -6714,20 +6716,33 @@ for an unknown balance. A checked balance does not imply complete expense covera
 {
   "currencies": [{
     "currency": "DOP", "currency_fraction_digits": 2,
-    "assets_minor": 750000, "debts_minor": 0, "net_worth_minor": 750000,
+    "assets_minor": "750000", "cash_minor": "750000",
+    "other_assets_minor": "0", "debts_minor": "0", "net_worth_minor": "750000",
     "known_accounts": 1, "unknown_accounts": 0,
-    "recorded_spending_minor": 200000
+    "recorded_spending_minor": "200000", "as_of": "2026-09-03T12:00:00-04:00"
   }],
   "recent_activity": [], "recorded_at": "2026-09-03T16:01:00Z"
 }
 ```
+
+All Home aggregate `*_minor` fields are exact decimal-integer strings, so valid
+account totals cannot overflow a native Int64 decoder. Per-account/activity amounts
+remain Int64. `debts_minor` is a nonnegative magnitude. `cash_minor` sums positive
+cash/checking/savings position; `other_assets_minor` sums other positive position.
+`assets_minor` is their sum. `as_of` is the latest underlying recorded financial
+date, distinct from response `recorded_at`. Unknown balances are excluded from
+known subtotals and explicitly counted; zero known balances remain known.
 
 Totals derive from the same account projection, include archived accounts and
 remain separate per currency. Personal ownership shares apply to position with
 integer half-even minor-unit rounding once per account. Positive position is an
 asset, negative position a debt, including bank overdrafts and credit-card credit.
 Spending is the recorded expense total, not complete spending or an affordability
-forecast. Recent activity is bounded to five rows and includes account_id/currency.
+forecast. Recent activity is bounded to five rows. Each item is the activity response plus
+`account_id`, `account_nickname`, `currency`, and `currency_fraction_digits`.
+Opening preview `activities` items contain `activity_id`, `amount_minor`, `amount`,
+`occurred_at`, `note`, and nullable `included`. Check `note` is optional, at most
+200 Unicode code points, and persists without becoming correction provenance.
 
 ### Replay, isolation and failure
 

@@ -49,6 +49,9 @@ class FinancialAccountService:
     ) -> None:
         self._repository = repository
         self._clock = clock
+        from argus.domain.recording.loop_service import FinancialLoopService
+
+        self.loop = FinancialLoopService(self, repository, clock)
 
     def create(
         self,

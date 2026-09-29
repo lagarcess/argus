@@ -15,6 +15,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from argus.domain.recording.accounts import AccountFacts
+from argus.domain.recording.loop import CheckRecord, Coverage, ExpenseRecord
 from argus.domain.recording.errors import (
     AccountNotFound,
     IdempotencyConflict,
@@ -37,15 +38,17 @@ class NewAccount:
 class StoredAccount:
     account: AccountFacts
     opening: OpeningRecord | None
+    expenses: tuple[ExpenseRecord, ...] = ()
+    checks: tuple[CheckRecord, ...] = ()
+    coverage: tuple[Coverage, ...] = ()
 
     @property
     def has_records(self) -> bool:
-        return self.opening is not None
+        return self.opening is not None or bool(self.expenses) or bool(self.checks)
 
     @property
     def has_activity(self) -> bool:
-        # Activity is not part of this slice; the lock rule still reads a fact.
-        return False
+        return bool(self.expenses)
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,7 @@ class InMemoryFinancialAccountRepository:
         self._clock = clock
         self._lock = threading.Lock()
         self._accounts: dict[str, StoredAccount] = {}
+        self._operations: dict[tuple[str, str, str], tuple[str, str, int, str]] = {}
         self._reservations: dict[tuple[str, str, str], tuple[str, str]] = {}
 
     def create(
@@ -178,7 +182,7 @@ class InMemoryFinancialAccountRepository:
                 version=stored.account.version + 1,
                 updated_at=self._clock(),
             )
-            updated = StoredAccount(facts, stored.opening)
+            updated = replace(stored, account=facts)
             self._accounts[account_id] = updated
             return updated
 
@@ -208,9 +212,44 @@ class InMemoryFinancialAccountRepository:
             facts = replace(
                 stored.account, version=stored.account.version + 1, updated_at=now
             )
-            updated = StoredAccount(facts, record)
+            updated = replace(stored, account=facts, opening=record)
             self._accounts[account_id] = updated
             return updated
+
+    def mutate(
+        self,
+        *,
+        user_id,
+        account_id,
+        idempotency_key,
+        identity_hash,
+        expected_version,
+        planner,
+    ):
+        from argus.domain.recording.loop_storage import OperationResult, apply
+
+        with self._lock:
+            stored = self._owned(user_id, account_id)
+            key = (user_id, account_id, idempotency_key)
+            receipt = self._operations.get(key)
+            if receipt:
+                identity, record_id, revision, kind = receipt
+                if identity != identity_hash:
+                    raise IdempotencyConflict()
+                return OperationResult(stored, record_id, revision, kind, True)
+            if stored.account.version != expected_version:
+                raise StaleVersion()
+            mutation = planner(stored)
+            updated = apply(stored, mutation, self._clock())
+            record = mutation.record
+            revision = (
+                record.revision
+                if isinstance(record, CheckRecord)
+                else record.current.revision
+            )
+            self._accounts[account_id] = updated
+            self._operations[key] = (identity_hash, record.id, revision, mutation.kind)
+            return OperationResult(updated, record.id, revision, mutation.kind, False)
 
     def _owned(self, user_id: str, account_id: str) -> StoredAccount:
         stored = self._accounts.get(account_id)
