@@ -141,7 +141,7 @@ extension FinancialLoopUITests {
         openMoneyAccount(changed)
         tapVisible(app.buttons["accounts.edit"])
         tapVisible(app.buttons["accounts.type"])
-        app.buttons["Investment account"].tap()
+        app.buttons["Investments"].tap()
         tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 10))
         app.buttons["tab.plan"].tap()
