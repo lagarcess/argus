@@ -22,5 +22,5 @@ xcodebuild "$action" \
   -derivedDataPath "$ios_dir/.build/DerivedData" \
   -resultBundlePath "$result_bundle" \
   -parallel-testing-enabled NO \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGNING_REQUIRED=NO \
   "$@" 2>&1 | tee "${result_bundle%.xcresult}.log"

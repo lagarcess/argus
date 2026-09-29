@@ -1,4 +1,12 @@
-// Copy to Local.xcconfig only if a separate simulator installation is needed.
-// This identifier is a placeholder, not a production bundle identity.
+// Optional ignored simulator configuration. Production identity is unresolved.
 ARGUS_LOCAL_BUNDLE_IDENTIFIER = local.argus.foundation
-// No API, Supabase, provider, signing or account credentials belong in this app.
+// Default off. See ../AUTH_SETUP.md before enabling.
+ARGUS_AUTH_ENABLED = false
+// Root origins, no /api/v1 suffix. xcconfig requires :/$()/ for URL slashes.
+ARGUS_API_URL =
+ARGUS_SUPABASE_URL =
+ARGUS_SUPABASE_ANON_KEY =
+ARGUS_WEB_URL =
+// Exact main-frame bridge URL. HTTPS, or loopback HTTP for local development.
+ARGUS_CAPTCHA_URL =
+// Public anon key only. Never add passwords, service-role keys or session tokens.

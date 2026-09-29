@@ -1,10 +1,12 @@
 # Argus iPhone foundation
 
-An offline SwiftUI foundation with Home, Accounts, Argus, Plan and Search in
+A SwiftUI foundation, offline by default, with Home, Accounts, Argus, Plan and Search in
 the approved order. It runs as **Argus Sample**. Navigation, local search and
 Light / Dark / System appearance work. Financial figures are immutable display
-fixtures. There is no working backend, authentication, financial persistence,
-calculation, voice, sharing, monitoring or provider integration.
+fixtures. An optional, default-off registered-session adapter connects existing Argus
+authentication. See [native auth setup](AUTH_SETUP.md) for its contracts and local
+verification. There is no financial persistence, calculation, voice, sharing,
+monitoring or financial-provider integration.
 
 ## Run in Simulator
 
@@ -27,7 +29,8 @@ The test action also builds. Results and logs go to ignored `ios/.build/results/
 set `RESULT_DIR` to choose another output directory. Extra Xcode options may
 follow the action, for example `-only-testing:ArgusFoundationUITests/FoundationUITests/testNavigationAndHeaderReturn`.
 Tests run serially on the selected simulator and change only this sample app's
-appearance. They do not contact Argus or spend provider tokens.
+appearance. The foundation tests do not contact Argus or spend provider tokens. Auth tests
+are separately opt-in and require the isolated synthetic stack.
 
 To install and launch after a command-line build (substitute your simulator ID):
 
@@ -39,7 +42,8 @@ xcrun simctl launch <iPhone-UDID> local.argus.foundation
 
 Use a separate simulator when other work is active. The checked-in configuration
 supports Simulator only, device family 1 (iPhone), no Catalyst or iPad target.
-Signing is disabled. Production bundle identity, team, provisioning, physical
+A local ad-hoc signature enables simulator Keychain without a signing account.
+Production bundle identity, team, provisioning, physical
 device distribution and release OS support remain unresolved.
 
 ## Local configuration and future owners
@@ -48,17 +52,12 @@ device distribution and release OS support remain unresolved.
 `local.argus.foundation` bundle identifier is a replaceable simulator placeholder.
 Optional `Config/Local.xcconfig` is ignored; copy the neighboring example to
 give a second installation a different local identity. Changing identity creates
-a separate preference container. Do not place credentials in either file.
+a separate preference container. Only public endpoint configuration belongs in these files; never put passwords,
+service-role keys, access tokens or refresh tokens in app configuration.
 
-No endpoint configuration or network client exists yet because this lane is
-sample-only. Future service configuration needs an explicit consuming contract;
-adding an unused URL would imply a connection that does not exist.
-
-[#726](https://github.com/lagarcess/argus/pull/726) owns auth/session evidence,
-not this app. Before adding authentication, coordinate SDK/session ownership,
-server session isolation, storage, handoff/cookies, CAPTCHA and callback/recovery
-behavior with that lane. Do not copy its probes or synthetic adapter into the
-app. The foundation deliberately has no auth, ledger or provider SDK dependencies.
+The [registered-session continuation](AUTH_SETUP.md) uses the official Swift Auth
+SDK and existing Argus endpoints. #726 remains evidence, not application code.
+The adapter keeps sessions in a device-only Keychain, never in app preferences.
 Financial rules and calculations remain backend responsibilities.
 
 ## Reference and shared owners
@@ -77,7 +76,7 @@ behavior and explicitly labeled sample destinations within its assigned scope.
 
 Shared semantic tokens and controls live in `ArgusFoundation/`. The shell owns
 destination selection; individual views own transient presentation state.
-Appearance is the only app preference persisted by this foundation, using
+Appearance is the only non-credential app preference persisted by this foundation, using
 UserDefaults through SwiftUI AppStorage. Removing the app resets it. System
 appearance follows the OS, while Light and Dark override it. Appearance does
 not synchronize with a server profile. Static copy is localized for English and

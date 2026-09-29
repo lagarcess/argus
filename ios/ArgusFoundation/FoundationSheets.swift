@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct FoundationSheetView: View {
+    @EnvironmentObject private var auth: ProfileAuthModel
     let sheet: FoundationSheet
     @Binding var appearance: AppearancePreference
     @Environment(\.dismiss) private var dismiss
@@ -29,6 +30,7 @@ struct FoundationSheetView: View {
 
     private var profile: some View {
         SamplePage {
+            if auth.enabled { ProfileAccountSection(model: auth) }
             Text("profile.local").font(ArgusStyle.display(24, relativeTo: .title2))
             Text("profile.app").font(ArgusStyle.body(12, relativeTo: .caption))
                 .foregroundStyle(ArgusStyle.secondary)
@@ -41,7 +43,7 @@ struct FoundationSheetView: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("profile.preferences")
-            Text("profile.scope")
+            Text(auth.enabled ? "auth.profile.scope" : "profile.scope")
                 .font(ArgusStyle.body(14, relativeTo: .subheadline))
                 .foregroundStyle(ArgusStyle.secondary)
         }

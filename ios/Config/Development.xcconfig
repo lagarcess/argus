@@ -1,6 +1,9 @@
 // Simulator-only placeholder. Production identity and signing remain unapproved.
 ARGUS_LOCAL_BUNDLE_IDENTIFIER = local.argus.foundation
-CODE_SIGNING_ALLOWED = NO
+// Local ad-hoc simulator signature supplies Keychain identity; no account/team.
+CODE_SIGNING_ALLOWED = YES
+CODE_SIGN_IDENTITY = -
+CODE_SIGN_ENTITLEMENTS = Config/Simulator.entitlements
 CODE_SIGNING_REQUIRED = NO
 DEVELOPMENT_TEAM =
 SDKROOT = iphoneos
@@ -16,5 +19,12 @@ CLANG_ENABLE_MODULES = YES
 ENABLE_USER_SCRIPT_SANDBOXING = YES
 MARKETING_VERSION = 0.1.0
 CURRENT_PROJECT_VERSION = 1
+// Session continuation is opt-in. Public configuration only; no passwords or service keys.
+ARGUS_AUTH_ENABLED = false
+ARGUS_API_URL =
+ARGUS_SUPABASE_URL =
+ARGUS_SUPABASE_ANON_KEY =
+ARGUS_WEB_URL =
+ARGUS_CAPTCHA_URL =
 // Optional ignored overrides for local development; never put secrets here.
 #include? "Local.xcconfig"
