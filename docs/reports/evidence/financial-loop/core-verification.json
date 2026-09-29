@@ -2,9 +2,13 @@
   "status": "local component proof; physical iPhone acceptance pending",
   "date": "2026-09-29",
   "source_commit": "92020058d503459dbb7f9e2efa828dd5cddb1637",
-  "delivery_assembly_commit": "7f869693c",
+  "delivery_assembly_commit": "ba69fecd6728a978bec993b00ba1de48470db35c",
   "environment": "isolated localhost Auth, API and Postgres; synthetic users only",
-  "focused_tests": {"passed": 108, "failed": 0},
+  "focused_tests": {
+    "passed": 108,
+    "failed": 0,
+    "verification": "Repeated against the assembled candidate with disposable local Postgres; 108 passed."
+  },
   "independent_delta_review": {
     "result": "clean",
     "reviewed_from": "be4063355",
@@ -26,6 +30,11 @@
   "limits": [
     "No native interaction is proved by this artifact.",
     "No hosted migration, deployment, provisioning or phone verification occurred.",
-    "The complete assembled candidate still needs native acceptance and final-head revalidation."
-  ]
+    "Native simulator evidence is recorded separately; signed installation and internet phone acceptance remain pending."
+  ],
+  "assembled_candidate": {
+    "modularity_budget": "passed; no violations",
+    "unsigned_physical_ios_build": "passed; signing disabled; temporary override removed",
+    "native_feature_source": "Matches d5299f65; device configuration and setup docs are the only additional ios differences."
+  }
 }

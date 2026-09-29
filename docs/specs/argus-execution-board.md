@@ -17,7 +17,8 @@ The restart covers implementation, local verification, simulator builds, device
 preparation and coordination for the first financial loop only. The full MVEE
 map below remains the recovery map; no other journey is activated by this grant.
 Merges, signing/account actions, deployment, hosted mutations and spending still
-require specific approval. No implementation completion or phone proof exists yet.
+require specific approval. Local implementation and simulator proof exist; signed
+installation, hosted rollout and physical-phone proof remain outstanding.
 
 **Goal:** Deliver the loop defined under [full-scope execution and early demonstration](#full-scope-execution-and-early-demonstration)
 on the founder's physical iPhone over the internet using the existing user.
@@ -33,10 +34,10 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 
 | Responsibility | Exclusive implementation ownership | Checkout | Current action |
 | --- | --- | --- | --- |
-| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Final local checkpoint `92020058d`: 108 focused tests, independent clean delta review and exact HTTP/Home proof; assembled through `7f869693c` on delivery branch |
-| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Connected views compile; local checkpoint `b190881d`; actual API simulator journey and recovery checks in progress |
+| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Frozen at `92020058d`: independent clean review and exact HTTP/Home proof; 108 focused checks repeated successfully on assembled candidate `ba69fecd6` |
+| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Frozen at `d5299f65`: three actual API/Postgres simulator journeys pass; 39 session tests and five model tests pass; four environment-gated session tests explicitly skipped; independent delta review clean |
 | Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
-| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Coordinate single writers and exercise assembled candidate |
+| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Assembled source `ba69fecd6`; unsigned physical-iOS compilation and modularity pass; preserve simulator evidence and obtain concrete publication, signing and hosted access grants |
 
 Throughput checkpoint: three implementation responsibilities, one financial
 contract owner and one integration owner. Device access must not block local
@@ -53,12 +54,12 @@ manifest rather than creating another board.
 - [x] Phase A: Frame. Scope and authority recorded above.
 - [x] Phase B: Design the workflow. Trace existing owners and settle the consumed contract.
 - [ ] Phase C: Run the loop. Implement and verify each integrated increment.
-- [ ] Recover the native baseline and capture locked-reference comparisons.
-- [ ] Implement durable activity, corrections, reconciliation and shared reads.
-- [ ] Connect the native loop and verify it against a local API/database.
+- [x] Recover the native baseline and capture locked-reference comparisons.
+- [x] Implement durable activity, corrections, reconciliation and shared reads.
+- [x] Connect the native loop and verify it against a local API/database.
 - [ ] Prepare signing/install and exact hosted rollout actions for approval.
 - [ ] Verify the approved installed candidate on the physical phone over the internet.
-- [ ] Phase D: Keep the audit trail. Record decisions and evidence here as work advances.
+- [x] Phase D: Keep the audit trail. Record decisions and evidence here as work advances.
 - [ ] Phase E: Verify and hand back. Report phone-proven behavior and remaining MVEE gaps.
 
 Decision trail for this batch stays in this manifest.
@@ -90,9 +91,8 @@ Decision trail for this batch stays in this manifest.
 - Captain independently ran the core's local HTTP verification script against
   synthetic Auth and Postgres: expense, correction, check, late included expense,
   retry after intervening writes, unknown balance, second-owner refusal and
-  reopened read passed. Home amount-change assertions and native interaction
-  proof remain separate pending checks. This run used working source and is
-  provisional until the final candidate is revalidated.
+  reopened read passed. That provisional run was superseded by the final-source
+  HTTP/Home proof and native simulator evidence recorded below.
 - Automatic approval review blocked the native worker's combined commit/push
   because remote publication was treated as a reserved hosted change. Neither
   command ran. The worker subsequently committed locally. Specific branch-push
@@ -106,6 +106,38 @@ Decision trail for this batch stays in this manifest.
   are assembled locally; [component evidence](../reports/evidence/financial-loop/core-verification.json)
   records the source and limits. The owned local API/database remain available
   to the native owner. Integration was fetched again and remains `fcbb70cc2`.
+- Native checkpoint `d5299f65` passed three real local API/Postgres simulator
+  journeys: unknown balance through spending and an explicitly reviewed opening;
+  known balance through expense, correction, check, included late expense and
+  reopen; and Spanish Home/check review. Numeric Home deltas and foreground
+  recovery are asserted. Session tests executed 39 passes with four explicit
+  environment skips; five tests compile and exercise the actual native models.
+  Independent review is clean after fixing expired-session recovery, editable
+  inclusion review, and the foreground auth race that blocked Home refreshes.
+- The captain assembled device, core and native source at `ba69fecd6`, reran
+  108 backend checks and the modularity budget (all pass), and compiled the full
+  app for generic physical iOS with signing disabled. The temporary unsigned
+  device override was removed. Native feature/test sources match `d5299f65`;
+  only the reviewed opt-in device configuration and setup documentation differ.
+  Home, entry, check-review and reopened-account captures were compared with
+  the locked visual reference. This supports local visual acceptance, not
+  physical-device fidelity or internet completion.
+- Post-merge integration CI and release smoke are green for exact integration
+  `fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`:
+  [CI](https://github.com/lagarcess/argus/actions/runs/36537496516) and
+  [smoke](https://github.com/lagarcess/argus/actions/runs/36537496519).
+  These results do not cover the unpublished implementation candidate.
+
+**Next usable outcome:** install the reviewed financial-loop app with the
+founder's existing identity against the approved existing hosted infrastructure,
+then repeat the loop away from the Mac. No functionality on the founder's phone
+is yet proved by this batch. Publication permission, an available/trusted iPhone
+and Apple team, and restored read-only Render access are pending. The
+[device preparation evidence](../reports/financial-loop-device-preparation.md)
+identifies the actions; actual deployed API/web SHAs are required before fixing
+the minimal deployment candidate. Account and loop migrations are
+`20260928200000_financial_accounts_first_slice.sql` and
+`20260929090000_financial_loop.sql`; neither is approved for hosted application.
 
 
 ## Outcome and completion
