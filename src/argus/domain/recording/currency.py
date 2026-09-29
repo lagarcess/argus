@@ -14,7 +14,11 @@ from argus.domain.recording.errors import RecordingInputError
 
 
 def normalize_currency(value: str) -> str:
-    """Return the accepted ISO 4217 code or raise ``currency_unsupported``."""
+    """Return the accepted ISO 4217 code or raise ``currency_unsupported``.
+
+    Call this on write paths that accept a currency from the client. Reads must
+    not re-run it: a stored code that CLDR later retires still has to format.
+    """
 
     code = (value or "").strip().upper()
     if code not in currency_codes():
@@ -25,7 +29,15 @@ def normalize_currency(value: str) -> str:
 
 
 def currency_exponent(currency: str) -> int:
-    return get_currency_precision(normalize_currency(currency))
+    """CLDR minor-unit exponent for a currency that is already accepted or stored.
+
+    Does not re-check tender membership. Matches the stored-currency contract in
+    ``home_country``: a three-letter code that later leaves the tender set must
+    still load and format, so GET/list cannot become 500 after a CLDR upgrade.
+    """
+
+    code = (currency or "").strip().upper()
+    return get_currency_precision(code)
 
 
 # Stored amounts are Postgres bigint; the domain refuses what storage cannot hold.
@@ -33,7 +45,11 @@ MAX_MINOR_UNITS = 2**63 - 1
 
 
 def parse_minor_units(text: str, currency: str) -> int:
-    """Parse a dot-decimal string into signed minor units without rounding."""
+    """Parse a dot-decimal string into signed minor units without rounding.
+
+    ``currency`` must already be write-normalized or loaded from storage; this
+    path only needs the exponent.
+    """
 
     digits = currency_exponent(currency)
     unsigned = (text or "").strip()
@@ -57,7 +73,10 @@ def parse_minor_units(text: str, currency: str) -> int:
 
 
 def format_minor_units(minor: int, currency: str) -> str:
-    """Render signed minor units as the dot-decimal string the wire carries."""
+    """Render signed minor units as the dot-decimal string the wire carries.
+
+    Formats a stored or already-accepted code without a tender membership check.
+    """
 
     digits = currency_exponent(currency)
     sign = "-" if minor < 0 else ""

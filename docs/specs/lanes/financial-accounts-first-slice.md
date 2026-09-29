@@ -57,12 +57,14 @@ never reads as zero.
    `other_debt`, `property`, `vehicle`, `other_asset`. Nature derives from type
    by one table and is never stored. `credit_card` and `other_debt` are
    liabilities.
-2. Currency: one ISO 4217 code accepted only when it is in
-   `home_country.currency_codes()`. The minor-unit exponent comes from babel
-   after that check. Every stored amount is an integer count of minor units.
-   Input is a dot-decimal string; more fraction digits than the exponent allows
-   is `amount_precision`; minor units beyond signed 64-bit storage are
-   `amount_out_of_range`. The server never rounds input.
+2. Currency: creates and currency edits accept one ISO 4217 code only when it
+   is in `home_country.currency_codes()`. The minor-unit exponent comes from
+   babel. Reads format a stored code without re-checking tender membership
+   (same stored-currency contract as the profile). Every stored amount is an
+   integer count of minor units. Input is a dot-decimal string; more fraction
+   digits than the exponent allows is `amount_precision`; minor units beyond
+   signed 64-bit storage are `amount_out_of_range`. The server never rounds
+   input.
 3. Sign: the person types a liability as a positive amount owed. The domain
    flips it once. A stored balance is the signed value to the owner.
 4. Unknown: an account without an opening record has no known balance. Its

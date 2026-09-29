@@ -6436,10 +6436,12 @@ unchanged.
 - `type` is one of `cash`, `checking`, `savings`, `investment`, `credit_card`,
   `other_debt`, `property`, `vehicle`, `other_asset`. `nature` derives from it
   (`credit_card` and `other_debt` are liabilities) and is never stored.
-- `currency` is an ISO 4217 code accepted only when it is in the CLDR tender
-  set the profile's `currency_override` already uses; unknown codes are
-  `422 currency_unsupported`. `currency_fraction_digits` is that currency's
-  CLDR exponent. Every stored amount is an integer count of minor units
+- `currency` is an ISO 4217 code. Creates and currency edits accept only codes
+  in the CLDR tender set the profile's `currency_override` already uses;
+  unknown codes are `422 currency_unsupported`. Reads format the stored code's
+  CLDR exponent without re-checking tender membership, so a later CLDR
+  retirement cannot break GET or list (same stored-currency contract as the
+  profile). Every stored amount is an integer count of minor units
   (`amount_minor`); `amount` is the same value as a dot-decimal string. The
   client formats separators for its locale and sends dot-decimal strings back.
 - A balance is the signed value to the owner. The person types a liability as

@@ -43,6 +43,59 @@ def test_create_then_reopen_returns_the_same_accepted_data(alice: AccountsApi) -
     assert [item["id"] for item in listed] == [created["id"]]
 
 
+def test_reads_format_a_stored_currency_after_tender_retirement(
+    alice: AccountsApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GET/list must not re-check tender membership on a stored code.
+
+    A CLDR upgrade can drop a currency from the current tender set after an
+    account already stores it. Response construction sits outside the route's
+    domain-error mapping, so a tender re-check on read would 500 the owner.
+    """
+
+    created = _created(alice, {**CHECKING, "amount": "12500.00"})
+    # Simulate retirement: DOP is no longer among the codes writes may name.
+    still_writable = frozenset({"USD", "JPY", "EUR"})
+    monkeypatch.setattr(
+        "argus.domain.recording.currency.currency_codes",
+        lambda: still_writable,
+    )
+
+    reopened = alice.get(created["id"])
+    assert reopened.status_code == 200, reopened.text
+    body = reopened.json()
+    assert body["currency"] == "DOP"
+    assert body["currency_fraction_digits"] == 2
+    assert body["balance"]["amount"] == "12500.00"
+    assert body["opening"]["amount"] == "12500.00"
+
+    listed = alice.list()
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["accounts"][0]["balance"]["amount"] == "12500.00"
+
+    # Opening corrections still format under the stored code.
+    corrected = alice.opening(
+        created["id"],
+        {
+            "expected_revision": 1,
+            "amount": "12000.00",
+            "reason": "typo after tender retirement",
+        },
+    )
+    assert corrected.status_code == 200, corrected.text
+    assert corrected.json()["balance"]["amount"] == "12000.00"
+
+    # Writes that name a currency still enforce the current tender set.
+    refused = alice.edit(
+        created["id"],
+        {"expected_version": corrected.json()["version"], "currency": "DOP"},
+    )
+    assert (refused.status_code, refused.json()["code"]) == (
+        422,
+        "currency_unsupported",
+    )
+
+
 def test_known_zero_differs_from_unknown(alice: AccountsApi) -> None:
     zero = _created(alice, {"type": "cash", "currency": "DOP", "amount": "0"})
     unknown = _created(alice, {"type": "cash", "currency": "DOP"})
