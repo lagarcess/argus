@@ -359,8 +359,8 @@ extension FinancialLoopUITests {
         if let amount {
             fillMoneyField("accounts.amount", with: amount)
             if negative { app.buttons["accounts.amount.sign"].tap() }
-            dismissMoneyKeyboard()
         }
+        dismissMoneyKeyboard()
         tapVisible(app.buttons["accounts.save"])
         if !app.buttons["accounts.record"].waitForExistence(timeout: 15) {
             print("MONEY_UI_STATE " + app.debugDescription)
