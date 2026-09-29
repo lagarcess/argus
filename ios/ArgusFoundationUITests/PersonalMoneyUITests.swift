@@ -126,7 +126,7 @@ extension FinancialLoopUITests {
         closeMoneyDetail()
         assertHome(baseline + 830)
         assertMoneyTotals(reporting, purchases: 120, refunds: 250)
-        capture("card-payment-excluded-negative-net-spending")
+        capture("card-payment-excluded-refund-net-delta")
         app.terminate(); app.launch()
         openMoneyAccount(card); assertText("DOP 30.00")
         openMoneyAccount(checking); assertText("DOP 800.00")
@@ -154,6 +154,7 @@ extension FinancialLoopUITests {
         openMoneyAccount(wallet)
         assertText("DOP 560.00")
         assertHome(baseline + 1500)
+        let dollarsBefore = homeMoneyTotals(currency: "USD")
         let unknown = createMoneyAccount("Unknown dollars " + stamp, type: "checking", currency: "USD")
         assertText("Balance unknown")
         recordMoney(kind: "income", amount: "100", note: "Dollar income " + stamp)
@@ -166,7 +167,13 @@ extension FinancialLoopUITests {
         assertHome(baseline + 1500)
         assertText("USD")
         XCTAssertFalse(app.staticTexts["home.netWorth.USD"].exists)
-        capture("separate-currency-unknown")
+        let dollarsAfter = homeMoneyTotals(currency: "USD")
+        XCTAssertEqual(dollarsAfter["Income received"], dollarsBefore["Income received"].map { $0 + 100 })
+        XCTAssertEqual(dollarsAfter["Refunds received"], dollarsBefore["Refunds received"].map { $0 + 25 })
+        XCTAssertEqual(dollarsAfter["Net spending"], dollarsBefore["Net spending"].map { $0 - 25 })
+        XCTAssertLessThan(dollarsAfter["Net spending"] ?? 0, 0)
+        app.swipeUp()
+        capture("separate-currency-unknown-negative-net")
         app.terminate(); app.launch()
         openMoneyAccount(unknown); assertText("Balance unknown")
         try signIn(fresh: true, user: "B")
@@ -263,19 +270,20 @@ extension FinancialLoopUITests {
         return try XCTUnwrap(dropped)
     }
 
-    func homeMoneyTotals() -> [String: Decimal] {
+    func homeMoneyTotals(currency: String = "DOP") -> [String: Decimal] {
         app.buttons["tab.home"].tap()
         let screen = app.scrollViews["screen.home"]
         var values = [String: Decimal]()
         for title in ["Income received", "Gross purchases", "Refunds received", "Net spending"] {
-            let label = screen.staticTexts.matching(identifier: title).firstMatch
-            XCTAssertTrue(label.waitForExistence(timeout: 10))
-            let value = screen.staticTexts.allElementsBoundByIndex.first {
-                $0.label.hasPrefix("DOP ") && abs($0.frame.midY - label.frame.midY) < 4
-            }
-            let exact = value?.label.replacingOccurrences(of: "DOP", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces) ?? ""
+            let labels = screen.staticTexts.matching(identifier: title)
+            XCTAssertTrue(labels.firstMatch.waitForExistence(timeout: 10))
+            let amounts = screen.staticTexts.allElementsBoundByIndex.filter { $0.label.hasPrefix(currency + " ") }
+            let value = labels.allElementsBoundByIndex.compactMap { label in
+                amounts.first { abs($0.frame.midY - label.frame.midY) < 4 }
+            }.first
+            let exact = value?.label.replacingOccurrences(of: currency, with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces) ?? ""
             guard let parsed = Decimal(string: exact, locale: Locale(identifier: "en_US_POSIX")) else {
-                XCTFail("Home should show the recorded DOP total for " + title); return [:]
+                XCTFail("Home should show the recorded " + currency + " total for " + title); return [:]
             }
             values[title] = parsed
         }
