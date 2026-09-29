@@ -9,8 +9,8 @@ struct AccountsDestination: View {
     var body: some View {
         if !auth.enabled {
             AccountsSampleView(showSample: showSample)
-        } else if auth.state == .authenticated, let model = auth.accounts {
-            AccountsView(model: model)
+        } else if auth.state == .authenticated, let model = auth.accounts, let loop = auth.financialLoop {
+            AccountsView(model: model, loop: loop)
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -26,7 +26,7 @@ struct AccountsDestination: View {
 
 struct AccountsView: View {
     @ObservedObject var model: AccountsModel
-    @EnvironmentObject private var auth: ProfileAuthModel
+    @ObservedObject var loop: FinancialLoopModel
     @Environment(\.locale) private var locale
     @State private var managing = false
 
@@ -34,7 +34,7 @@ struct AccountsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 PersonalContext()
-                if let loop = auth.financialLoop, loop.pendingConfirmation != nil {
+                if loop.pendingConfirmation != nil {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("loop.pending.title").font(ArgusStyle.body(15))
                         Text("loop.pending.body").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
@@ -43,7 +43,7 @@ struct AccountsView: View {
                             .accessibilityIdentifier("loop.pending.retry.accounts")
                     }.padding(16).overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
                 }
-                if let recoveryError = auth.financialLoop?.recoveryErrorKey {
+                if let recoveryError = loop.recoveryErrorKey {
                     Text(LocalizedStringKey(recoveryError)).foregroundStyle(ArgusStyle.secondary)
                         .accessibilityIdentifier("loop.pending.error.accounts")
                 }
@@ -81,7 +81,7 @@ struct AccountsView: View {
 
             }.padding(24)
         }
-        .refreshable { await model.load(); if let account = model.selected { await auth.financialLoop?.open(account) } }
+        .refreshable { await model.load(); if let account = model.selected { await loop.open(account) } }
         .task(id: model.identity?.revision) { await model.load() }
         .sheet(item: $model.draft) { _ in AccountForm(model: model) }
     }
@@ -94,7 +94,7 @@ struct AccountsView: View {
         }
         VStack(spacing: 0) {
             ForEach(accounts, id: \.id) { account in
-                Button { Task { await model.open(account); await auth.financialLoop?.open(account) } } label: {
+                Button { Task { await model.open(account); await loop.open(account) } } label: {
                     AccountRow(account: account)
                 }.buttonStyle(.plain).accessibilityIdentifier("accounts.row.\(account.id)")
             }
@@ -103,9 +103,7 @@ struct AccountsView: View {
 
     @ViewBuilder private func detail(_ account: FinancialAccount) -> some View {
         AccountSummary(account: account, large: true)
-        if let loop = auth.financialLoop {
-            AccountActivityView(loop: loop, account: account)
-        }
+        AccountActivityView(loop: loop, account: account)
         Button("accounts.edit") { model.edit(account) }.buttonStyle(PillButtonStyle(primary: false))
             .accessibilityIdentifier("accounts.edit")
         Button(account.opening == nil ? "accounts.opening.add" : "accounts.opening.correct") { model.opening(account) }
