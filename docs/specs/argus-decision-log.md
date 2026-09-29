@@ -27,9 +27,19 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-27 | Lock distinct account setup, new activity and balance-check actions; require an explicit discrepancy review and traceable adjustment without invented income/spending. Reuse the existing destructive confirmation for removal. Experience owner: [MVEE balance checks](argus-minimum-viable-ecosystem-experience.md#account-activity-and-balance-checks); technical follow-up: [backend handoff](argus-account-balance-reconciliation-handoff.md). | Lucas |
 | 2026-09-27 | Lock simplified populated Home, bounded account previews, and inherited Recents/Omnisearch growing-list behavior. Preserve currency-separated net worth; combined conversion remains undefined. Owners: [MVEE Home summary](argus-minimum-viable-ecosystem-experience.md#populated-home-summary-and-list-boundary) and [DESIGN growing lists](../../.agent/designs/argus/DESIGN.md#growing-lists-across-ecosystem-surfaces). | Lucas |
 | 2026-09-27 | Lock copy-link household invitations, user-shared WhatsApp links, do-blitz as the short-link integration direction, and Resend email delivery; no incentives. Detailed owner: [MVEE invitation delivery](argus-minimum-viable-ecosystem-experience.md#invitation-delivery-founder-locked-september-27-2026). Contact discovery and implementation contracts are not implied. | Lucas |
-| 2026-09-28 | After foundations land, the Project delivery lead and the VM serial captain jointly own create/reopen/edit financial-account journey coordination across iPhone, Android, and web. Named surface owners (account-backend / iPhone / Android / web / chart) keep exclusive write; exclusive write on #723/#725/#726/#724 is preserved. Owner: [documentation authority — current implementation batch](../DOCUMENTATION_AUTHORITY.md#current-implementation-batch-september-28-2026). Source: [PR #727 handoff](https://github.com/lagarcess/argus/pull/727#issuecomment-5878051744). | Lucas |
-| 2026-09-28 | Park revenue, pricing, paywalls, billing integrations, and user trials while core journeys become functional; keep existing usage and cost safeguards. Owner: [documentation authority — founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral). | Lucas |
-| 2026-09-28 | Hold [#725](https://github.com/lagarcess/argus/pull/725) landing for a narrowed research / selected-file-import scope; the hold does not block account creation, native auth, or client wiring. Owner: [documentation authority — #725 hold](../DOCUMENTATION_AUTHORITY.md#current-implementation-batch-september-28-2026). | Lucas |
+| 2026-09-28, clarified 2026-09-29 | Revenue, pricing, paywalls and billing remain deferred; existing usage and cost safeguards remain. The current user-trial boundary permits founder dogfooding and physical-phone demonstrations. Detailed owner: [documentation authority — founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral). | Lucas |
+| 2026-09-29 | The [private iPhone delivery and execution lock](#september-29-2026-private-iphone-delivery-and-execution-lock) owns the current delivery decision and supersedes the batch instructions below. | Lucas |
+
+## Superseded coordination instructions (historical only)
+
+These entries record prior assignments, not active instructions. Their replacement
+is the [September 29 delivery lock](#september-29-2026-private-iphone-delivery-and-execution-lock).
+
+| Date | Historical decision | Disposition |
+| --- | --- | --- |
+| 2026-09-28 | The Project delivery lead and VM serial captain were assigned the three-interface account journey, with named exclusive writers for the surfaces and research/proof PRs. Source: [PR #727 handoff](https://github.com/lagarcess/argus/pull/727#issuecomment-5878051744). | Superseded by the September 29 delivery lock; this row assigns no current owners or work. |
+| 2026-09-28 | User trials were parked while core journeys became functional. | Clarified by the [current founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral); this historical pause does not block founder dogfooding or physical-phone demonstrations. |
+| 2026-09-28 | [#725](https://github.com/lagarcess/argus/pull/725) landing was held for a narrowed research / selected-file-import scope. | Superseded by the September 29 delivery lock; the old hold is not a pending landing assignment. |
 
 ## Wave 1 package-era constraints (not current locks)
 
