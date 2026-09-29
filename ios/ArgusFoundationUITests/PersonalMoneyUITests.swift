@@ -340,7 +340,9 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
         if let purchase {
             tapVisible(app.buttons["loop.purchase"])
-            app.buttons.matching(NSPredicate(format: "label CONTAINS %@", purchase)).firstMatch.tap()
+            let option = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", purchase, " · ")).firstMatch
+            XCTAssertTrue(option.waitForExistence(timeout: 5))
+            option.tap()
         }
         fillMoneyField("loop.note", with: note)
         dismissMoneyKeyboard()
