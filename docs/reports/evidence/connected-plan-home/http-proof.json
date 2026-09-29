@@ -20,31 +20,31 @@
   ],
   "accounts": [
     {
-      "id": "145e1880-25f4-4846-9178-87fa18d30234",
-      "nickname": "Plan checking 755341",
+      "id": "932838fb-1fbf-412b-9714-fb1a978f8c46",
+      "nickname": "Plan checking 0e8620",
       "currency": "DOP"
     },
     {
-      "id": "4096b4c2-f254-4ba4-aada-7ee56c5b3a1c",
-      "nickname": "Plan reserve 755341",
+      "id": "e24d7150-7d75-43f2-8cc5-119e379df57c",
+      "nickname": "Plan reserve 0e8620",
       "currency": "DOP"
     },
     {
-      "id": "75b9766b-9fda-413f-89a0-d0f896fdd45e",
-      "nickname": "Plan unknown dollars 755341",
+      "id": "1b0893c3-d9b4-485f-aac1-e7fc9d5fdac1",
+      "nickname": "Plan unknown dollars 0e8620",
       "currency": "USD"
     }
   ],
   "expectation_ids": [
-    "32bb0291-1cbd-4cf7-9196-3b5688db4d3e",
-    "cb011f21-614a-42f3-9c7d-01e5a9c0fe1f"
+    "4d0cfd18-ec08-4648-aa36-53cb93ddad88",
+    "0fc54c7c-b845-4453-9eaa-401bfa622b42"
   ],
   "activity_ids": [
-    "828063c5-16cd-4ac6-a58d-023087f53fc6",
-    "496a8ddb-675b-4cc6-b848-9cb2976ce167",
-    "8b3d0385-02c7-4705-91de-6bdc41dd87f4"
+    "e569029e-e52c-4562-8dd2-593d22d97886",
+    "cd357c87-1c63-4cf7-bbb1-8f3521d342c4",
+    "99470654-9e50-41bc-8564-78aa53293dd4"
   ],
-  "recorded_at": "2026-09-29T18:41:15.099204+00:00",
+  "recorded_at": "2026-09-29T19:17:08.416885+00:00",
   "limitations": [
     "Synthetic local identities only; no physical-device or internet deployment proof.",
     "Recurrence boundary and concurrency coverage belongs to the real-Postgres test matrix."
