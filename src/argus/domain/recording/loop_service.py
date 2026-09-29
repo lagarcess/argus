@@ -28,6 +28,7 @@ from argus.domain.recording.loop import (
     expected_at,
     observations,
     position,
+    residuals,
     validate_monotonic,
 )
 from argus.domain.recording.loop_schemas import (
@@ -86,6 +87,15 @@ def _view(stored):
     ):
         raise RecordingInputError(
             "amount_out_of_range", "The resulting recorded amount is too large."
+        )
+    if any(
+        value is not None and abs(value) > MAX_MINOR_UNITS
+        for value in residuals(
+            stored.opening, stored.checks, stored.expenses, stored.coverage
+        ).values()
+    ):
+        raise RecordingInputError(
+            "amount_out_of_range", "The resulting recorded difference is too large."
         )
     return _balance_response(b, stored.opening, stored.account).model_dump(mode="json")
 
@@ -286,7 +296,14 @@ class FinancialLoopService:
                 )
         check = replace(check, expected_minor=expected, difference_minor=difference)
         mutation = Mutation(check, links, "balance_check")
-        _view(apply(stored, mutation, now))
+        candidate = apply(stored, mutation, now)
+        for expense in candidate.expenses:
+            validate_monotonic(
+                expense,
+                observations(candidate.opening, candidate.checks),
+                candidate.coverage,
+            )
+        _view(candidate)
         preview = {
             "account_version": stored.account.version,
             "currency": stored.account.currency,

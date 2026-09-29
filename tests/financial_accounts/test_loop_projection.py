@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
+from argus.domain.recording.errors import RecordingInputError
 from argus.domain.recording.loop import (
     CheckRecord,
     Coverage,
@@ -13,7 +14,6 @@ from argus.domain.recording.loop import (
     residuals,
     validate_monotonic,
 )
-from argus.domain.recording.errors import RecordingInputError
 from argus.domain.recording.records import OpeningRecord, OpeningRevision
 
 T = datetime(2026, 9, 1, 12, tzinfo=timezone.utc)

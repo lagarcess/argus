@@ -20,8 +20,8 @@ from argus.domain.recording.accounts import (
     Nature,
 )
 from argus.domain.recording.currency import currency_exponent, format_minor_units
-from argus.domain.recording.records import Balance, OpeningRecord
 from argus.domain.recording.loop import position
+from argus.domain.recording.records import Balance, OpeningRecord
 from argus.domain.recording.repository import StoredAccount
 
 

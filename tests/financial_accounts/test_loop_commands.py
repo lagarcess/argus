@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -5,12 +6,10 @@ import pytest
 from argus.domain.recording.errors import (
     IdempotencyConflict,
     RecordingInputError,
-    StaleVersion,
 )
 from argus.domain.recording.loop_schemas import (
     ActivityRequest,
     CheckRequest,
-    LoopOpeningRequest,
 )
 from argus.domain.recording.repository import InMemoryFinancialAccountRepository
 from argus.domain.recording.schemas import CreateFinancialAccountRequest, account_response
@@ -19,12 +18,30 @@ from argus.domain.recording.service import FinancialAccountService
 NOW = datetime(2026, 9, 20, 12, tzinfo=timezone.utc)
 
 
-@pytest.fixture
-def scene():
-    service = FinancialAccountService(
-        InMemoryFinancialAccountRepository(lambda: NOW), lambda: NOW
-    )
+@pytest.fixture(params=["memory", "postgres"])
+def scene(request):
+    if request.param == "postgres":
+        dsn = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL")
+        if not dsn:
+            pytest.skip("ARGUS_DISPOSABLE_DATABASE_URL is not configured")
+        from argus.domain.recording.postgres_repository import (
+            PostgresFinancialAccountRepository,
+        )
+        from psycopg_pool import ConnectionPool
+
+        pool = ConnectionPool(dsn, min_size=0, max_size=4, open=True)
+        repository = PostgresFinancialAccountRepository(pool)
+    else:
+        pool = None
+        repository = InMemoryFinancialAccountRepository(lambda: NOW)
+    service = FinancialAccountService(repository, lambda: NOW)
     user = str(uuid4())
+    if pool:
+        with pool.connection() as connection:
+            connection.execute(
+                "insert into auth.users(id,email,is_anonymous) values(%s,%s,false)",
+                (user, f"loop-{user}@example.test"),
+            )
     account = service.create(
         user_id=user,
         idempotency_key="create",
@@ -35,7 +52,11 @@ def scene():
             as_of=NOW - timedelta(days=10),
         ),
     ).stored
-    return service, user, account.account.id
+    yield service, user, account.account.id
+    if pool:
+        with pool.connection() as connection:
+            connection.execute("delete from auth.users where id=%s", (user,))
+        pool.close()
 
 
 def expense(scene, amount, day, coverage=None, record_id=None, reason=None):
@@ -94,7 +115,9 @@ def test_complete_loop_correction_late_partial_and_new_spending(scene):
         "wrong amount",
     )
     assert account_response(fixed.stored).balance.amount_minor == 700000
-    assert len(fixed.stored.expenses[-1].revisions) == 2
+    assert (
+        len(next(x for x in fixed.stored.expenses if x.id == e.record_id).revisions) == 2
+    )
 
 
 def test_response_loss_replay_precedes_stale_version_and_does_not_repeat_expense(scene):

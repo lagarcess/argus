@@ -15,12 +15,12 @@ from typing import Protocol
 from uuid import uuid4
 
 from argus.domain.recording.accounts import AccountFacts
-from argus.domain.recording.loop import CheckRecord, Coverage, ExpenseRecord
 from argus.domain.recording.errors import (
     AccountNotFound,
     IdempotencyConflict,
     StaleVersion,
 )
+from argus.domain.recording.loop import CheckRecord, Coverage, ExpenseRecord
 from argus.domain.recording.records import OpeningRecord, OpeningRevision, OpeningWrite
 
 CREATE_SCOPE = "financial_accounts.create"

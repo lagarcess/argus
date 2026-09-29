@@ -188,6 +188,11 @@ def validate_monotonic(
     seen = False
     for observation in anchors:
         if not eligible(expense.current, observation):
+            if seen:
+                raise RecordingInputError(
+                    "coverage_date_conflict",
+                    "The selected date and time zone exclude activity already included in an earlier balance.",
+                )
             continue
         value = included(expense, observation, coverage)
         if seen and not value:

@@ -22,7 +22,11 @@ from argus.domain.recording.accounts import (
     validate_type,
 )
 from argus.domain.recording.currency import normalize_currency
-from argus.domain.recording.errors import AccountNotFound, StaleVersion
+from argus.domain.recording.errors import (
+    AccountNotFound,
+    RecordingInputError,
+    StaleVersion,
+)
 from argus.domain.recording.records import plan_opening_write
 from argus.domain.recording.repository import (
     CreateResult,
@@ -158,6 +162,11 @@ class FinancialAccountService:
         request: WriteOpeningRequest,
     ) -> StoredAccount:
         stored = self.get(user_id=user_id, account_id=account_id)
+        if stored.expenses or stored.checks:
+            raise RecordingInputError(
+                "preview_required",
+                "Review this starting balance against the recorded activity before saving.",
+            )
         current = stored.opening.current if stored.opening is not None else None
         if (
             request.expected_version != stored.account.version

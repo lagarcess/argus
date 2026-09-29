@@ -21,6 +21,7 @@ from argus.domain.recording.errors import (
     RegisteredAccountRequired,
     StaleVersion,
 )
+from argus.domain.recording.loop_postgres import hydrate, mutate
 from argus.domain.recording.records import (
     OPENING_KIND,
     OpeningRecord,
@@ -82,16 +83,21 @@ class PostgresFinancialAccountRepository:
 
     def list_accounts(self, *, user_id: str) -> list[StoredAccount]:
         with self._pool.connection() as connection:
+            connection.execute("set transaction isolation level repeatable read")
             rows = connection.execute(
                 f"select {_ACCOUNT_COLUMNS} from public.financial_accounts"
                 " where user_id = %s order by created_at asc, id asc",
                 (user_id,),
             ).fetchall()
             openings = self._openings(connection, user_id, [str(row[0]) for row in rows])
-        return [StoredAccount(_facts(row), openings.get(str(row[0]))) for row in rows]
+            return [
+                hydrate(connection, StoredAccount(_facts(row), openings.get(str(row[0]))))
+                for row in rows
+            ]
 
     def get_account(self, *, user_id: str, account_id: str) -> StoredAccount | None:
         with self._pool.connection() as connection:
+            connection.execute("set transaction isolation level repeatable read")
             return self._load(connection, user_id, account_id)
 
     def update_account(
@@ -165,6 +171,9 @@ class PostgresFinancialAccountRepository:
             raise AccountNotFound()
         return stored
 
+    def mutate(self, **kwargs):
+        return mutate(self, **kwargs)
+
     def _load(self, connection, user_id: str, account_id: str) -> StoredAccount | None:  # noqa: ANN001
         row = connection.execute(
             f"select {_ACCOUNT_COLUMNS} from public.financial_accounts"
@@ -174,7 +183,7 @@ class PostgresFinancialAccountRepository:
         if row is None:
             return None
         openings = self._openings(connection, user_id, [account_id])
-        return StoredAccount(_facts(row), openings.get(account_id))
+        return hydrate(connection, StoredAccount(_facts(row), openings.get(account_id)))
 
     def _openings(
         self,
