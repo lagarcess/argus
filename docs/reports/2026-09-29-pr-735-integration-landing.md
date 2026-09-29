@@ -6,7 +6,7 @@
 - Approved PR head: `a2f53c16fefee352f256632bc657550311cd6e19`
 - Integration parent at squash: `e3f9db651ade97512107e835dbf442aacf637641`
 - Squash merge: `296195e86c972e846c251d256b3cc211975bfd57`
-- Merge time: September 29, 2026, 02:56 UTC (approx)
+- Merge time: September 29, 2026, 02:56:56 -0500
 
 ## Outcome and remaining work
 
@@ -19,6 +19,9 @@ before authentication.
 
 No hosted feature enablement. No production deployment. No `main` promotion.
 [#732](https://github.com/lagarcess/argus/pull/732) design hold untouched.
+No linked GitHub issue was attached to #735 for auto-close; none retained open
+as a merge prerequisite. Client wiring across interfaces remains follow-on work
+against the accepted contract.
 
 ## Accepted evidence
 
@@ -28,17 +31,26 @@ No hosted feature enablement. No production deployment. No `main` promotion.
   reconciled tree, fixer re-READY after stale-opening HOLD.
 - Durable evidence under `docs/reports/evidence/financial-accounts-first-slice/`.
 - Contract: `docs/API_CONTRACT.md` §17.3, OpenAPI, lane spec, DATA_MODEL.
+- Post-squash product tip `296195e8` exact-head:
+  - [CI](https://github.com/lagarcess/argus/actions/runs/36514949476) `success`
+  - [Private Alpha Local Smoke](https://github.com/lagarcess/argus/actions/runs/36514949394) `success`
 
 ## Documentation and environment audit
 
 Flag already declared in product squash (`.env.example`, `render.yaml`,
 `.github/argus-env.sh`, release profile) as default `false`. This register adds
-the landing report and ledger entry only. No secrets rewritten. Hosted
-`ARGUS_FINANCIAL_ACCOUNTS_ENABLED` remains unchanged / default-off.
+the landing report, ledger entry, and authority note only. No secrets rewritten.
+Hosted `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` remains unchanged / default-off.
+`git diff --check` clean for this housekeeping tree.
 
-Direct push to integration is expected to be rejected (branch protection),
-so this register ships through a docs-only PR (same pattern as #734 / #736 /
-#737 / #740 / #741).
+Direct push to integration was rejected (branch protection GH006), so this
+register ships through a docs-only PR (same pattern as #734 / #736 / #737 /
+#740 / #741). After this register merges, the sole lander records the
+housekeeping tip SHA, proves clean local/remote parity
+(`HEAD == origin/codex/private-alpha-next`), and records terminal exact-head
+CI/smoke on that tip when those checks complete — in the #735/#742 completion
+comment and Project landing log. This report does not invent those post-merge
+results in advance.
 
 ## Authority boundary
 
