@@ -100,17 +100,27 @@ final class FinancialLoopModel: ObservableObject {
     func detail(_ activity: FinancialActivity) async throws -> FinancialActivityDetail {
         guard let identity else { throw SessionFailure.unauthorized }
         let ticket = generation
-        let value = try await controller.financialActivityDetail(activity.activityId ?? activity.recordId, expectedIdentity: identity)
-        guard generation == ticket else { throw SessionFailure.staleOperation }
-        return value
+        do {
+            let value = try await controller.financialActivityDetail(activity.activityId ?? activity.recordId, expectedIdentity: identity)
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            return value
+        } catch {
+            await handle(error, ticket: ticket)
+            throw error
+        }
     }
 
     func detailHistory(_ activity: FinancialActivityDetail) async throws -> [FinancialActivityDetail] {
         guard let identity else { throw SessionFailure.unauthorized }
         let ticket = generation
-        let page = try await controller.financialActivityDetailHistory(activity.activityId, expectedIdentity: identity)
-        guard generation == ticket else { throw SessionFailure.staleOperation }
-        return page.items
+        do {
+            let page = try await controller.financialActivityDetailHistory(activity.activityId, expectedIdentity: identity)
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            return page.items
+        } catch {
+            await handle(error, ticket: ticket)
+            throw error
+        }
     }
 
     func accountName(_ id: UUID) -> String {

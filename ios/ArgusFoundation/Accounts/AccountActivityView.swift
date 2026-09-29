@@ -71,14 +71,12 @@ struct AccountActivityView: View {
                             if detail.kind == .refund {
                                 Text(detail.purchaseActivityId == nil ? "loop.activity.purchaseNone" : "loop.activity.linkedPurchase")
                             }
-                            if detail.kind.isPaired {
-                                ForEach(detail.legs) { leg in
-                                    HStack {
-                                        Text(loop.accountName(leg.accountId))
-                                        Spacer()
-                                        Text(leg.role == "source" ? "loop.activity.from" : "loop.activity.to")
-                                    }.font(ArgusStyle.body(13, relativeTo: .subheadline))
-                                }
+                            ForEach(detail.legs) { leg in
+                                HStack {
+                                    Text(loop.accountName(leg.accountId))
+                                    Spacer()
+                                    Text(leg.role == "source" ? "loop.activity.from" : leg.role == "destination" ? "loop.activity.to" : "loop.activity.account")
+                                }.font(ArgusStyle.body(13, relativeTo: .subheadline))
                             }
                             if let reason = detail.reason { Text(verbatim: reason) }
                             if revisions.count > 1 {
@@ -132,6 +130,10 @@ struct FinancialActivityRow: View {
             VStack(alignment: .leading, spacing: 7) {
                 if let note = activity.note, !note.isEmpty { Text(verbatim: note).lineLimit(2) }
                 else { Text(LocalizedStringKey("loop.kind." + activity.kind)) }
+                if activity.active == false {
+                    Text("loop.activity.moved").font(ArgusStyle.body(11, relativeTo: .caption))
+                        .foregroundStyle(ArgusStyle.secondary).accessibilityIdentifier("activity.moved")
+                }
                 Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
                     .font(ArgusStyle.body(11, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
             }

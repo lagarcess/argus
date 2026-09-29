@@ -5,6 +5,45 @@ import XCTest
 
 @MainActor
 final class FinancialModelTests: XCTestCase {
+    func testDetail401RetiresSessionAndClosesAccountIdentity() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity)
+        var returnedToSignIn = false
+        loop.sessionChanged = { snapshot in
+            accounts.bind(snapshot)
+            returnedToSignIn = snapshot.phase != .authenticated
+        }
+        let row = try JSONDecoder().decode(FinancialActivity.self, from: Data(PresentationServer.activityRow.utf8))
+        await fixture.server.expireIdentity()
+        do { _ = try await loop.detail(row); XCTFail("Expired detail must fail") }
+        catch { XCTAssertTrue(returnedToSignIn) }
+        XCTAssertNil(accounts.identity)
+    }
+
+    func testDefinitivePendingRejectionShowsRecoveryErrorOnAccounts() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let account = try fixture.account()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity); accounts.accept(account)
+        loop.record(account)
+        let editor = try XCTUnwrap(loop.activityEditor)
+        await editor.load(); editor.amount = "20.00"
+        await editor.review(locale: Locale(identifier: "en_US"))
+        await fixture.server.failNextCommit(500)
+        await editor.confirm()
+        XCTAssertNotNil(loop.pendingConfirmation)
+        await fixture.server.failNextCommit(409)
+        await loop.retryPending()
+        XCTAssertNil(loop.pendingConfirmation)
+        XCTAssertNotNil(loop.recoveryErrorKey)
+        XCTAssertNil(try fixture.journal.pending(for: identity))
+    }
+
     func testCanonicalConfirmedWriteSurvivesRelaunchAndCannotReachAnotherOwner() async throws {
         let fixture = try PresentationFixture()
         let alice = try await fixture.login()
@@ -234,6 +273,9 @@ private actor PresentationServer {
     static let id = UUID()
     static let activityID = UUID()
     static let cashID = UUID()
+    static var activityRow: String {
+        #"{"record_id":"\#(activityID)","activity_id":"\#(activityID)","revision":1,"kind":"expense","amount_minor":2000,"amount":"20.00","balance_movement_minor":-2000,"occurred_at":"2026-09-01T12:00:00Z","time_zone":"UTC","recorded_at":"2026-09-01T12:00:00Z","coverage":[]}"#
+    }
     private var updated = false
     private var archived = false
     private var unknownBalance = false
@@ -288,7 +330,10 @@ private actor PresentationServer {
         let path = request.url!.path
         let body: String
         var status = 200
-        if path.hasSuffix("/options") {
+        if expired, request.httpMethod == "GET" {
+            status = 401
+            body = #"{"code":"unauthorized"}"#
+        } else if path.hasSuffix("/options") {
             let cash = Self.account(updated: false)
                 .replacingOccurrences(of: Self.id.uuidString, with: Self.cashID.uuidString)
                 .replacingOccurrences(of: "\"type\":\"checking\"", with: "\"type\":\"cash\"")
@@ -305,8 +350,9 @@ private actor PresentationServer {
             let reviewed = String(data: try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]), encoding: .utf8)!
             body = #"{"ready":true,"expected_versions":{},"affected_accounts":[\#(effects)],"reviewed_request":\#(reviewed),"preview_token":"reviewed"}"#
         } else if request.httpMethod == "POST" || request.httpMethod == "PATCH" {
-            canonicalCommits.append(request); updated = true
+            canonicalCommits.append(request)
             status = nextStatus ?? 200; nextStatus = nil
+            if status == 200 || status >= 500 { updated = true }
             let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
             let kind = payload["kind"] as? String ?? "expense"
             let accountID = payload["account_id"] as? String ?? Self.id.uuidString

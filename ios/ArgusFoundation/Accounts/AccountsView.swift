@@ -43,6 +43,10 @@ struct AccountsView: View {
                             .accessibilityIdentifier("loop.pending.retry.accounts")
                     }.padding(16).overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
                 }
+                if let recoveryError = auth.financialLoop?.recoveryErrorKey {
+                    Text(LocalizedStringKey(recoveryError)).foregroundStyle(ArgusStyle.secondary)
+                        .accessibilityIdentifier("loop.pending.error.accounts")
+                }
                 if let account = model.selected {
                     Button { model.back() } label: { Label("accounts.back", systemImage: "chevron.left") }
                         .frame(minHeight: 48).accessibilityIdentifier("accounts.back")

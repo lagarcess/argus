@@ -272,6 +272,7 @@
 "loop.activity.purchase" = "Original purchase (optional)";
 "loop.activity.purchaseNone" = "Purchase not linked";
 "loop.activity.linkedPurchase" = "Linked to original purchase";
+"loop.activity.moved" = "Moved to another account";
 "loop.activity.linkedCategory" = "Category follows the linked purchase.";
 "loop.activity.impact" = "Review account impact";
 "loop.activity.pairNote" = "Both accounts update together. This is not spending or income.";
@@ -317,3 +318,9 @@
 "loop.error.refund_before_purchase" = "A linked refund cannot be dated before its purchase.";
 "loop.error.purchase_has_refunds" = "Correct or unlink the connected refunds first, then correct this purchase.";
 "loop.error.coverage_conflict" = "Review each account’s balance question again.";
+"loop.error.accounts_invalid" = "Choose the account for this entry, or two different accounts for a transfer or card payment.";
+"loop.error.refund_category_conflict" = "A linked refund uses its purchase category. Change the purchase link or leave the refund unlinked.";
+"loop.error.kind_immutable" = "Correct this entry without changing its type.";
+"loop.error.field_not_applicable" = "Remove the field that does not apply to this entry type.";
+"loop.error.category_unknown" = "Choose an available category.";
+"loop.error.source_unknown" = "Choose an available income source.";

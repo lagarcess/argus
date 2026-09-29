@@ -262,11 +262,24 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
             return journal == .pendingConfirmation ? "loop.pending.existing" : "auth.error.storage"
         }
         guard case SessionFailure.rejected(_, let code) = error else { return "loop.error.connection" }
-        let known = ["stale_version", "stale_activity", "amount_precision", "amount_invalid", "amount_out_of_range",
-                     "date_in_future", "reason_required", "reason_invalid", "account_ineligible", "same_account",
-                     "currency_mismatch", "purchase_not_found", "refund_exceeds_purchase", "refund_before_purchase",
-                     "purchase_has_refunds", "coverage_conflict"]
-        if let code, known.contains(code) { return "loop.error." + code }
+        guard let code else { return "loop.error.validation" }
+        switch code {
+        case "accounts_invalid": return "loop.error.accounts_invalid"
+        case "purchase_invalid": return "loop.error.purchase_not_found"
+        case "refund_limit": return "loop.error.refund_exceeds_purchase"
+        case "linked_refund_category", "linked_refund_currency": return "loop.error.purchase_has_refunds"
+        case "refund_category_conflict": return "loop.error.refund_category_conflict"
+        case "coverage_invalid", "coverage_duplicate", "balance_coverage_required", "preview_required": return "loop.error.coverage_conflict"
+        case "amount_positive_required": return "loop.error.amount_invalid"
+        case "kind_immutable": return "loop.error.kind_immutable"
+        case "field_not_applicable": return "loop.error.field_not_applicable"
+        case "category_unknown": return "loop.error.category_unknown"
+        case "source_unknown": return "loop.error.source_unknown"
+        case "stale_version", "stale_activity", "amount_precision", "amount_invalid", "amount_out_of_range",
+             "date_in_future", "reason_required", "reason_invalid", "account_ineligible", "currency_mismatch",
+             "refund_before_purchase": return "loop.error." + code
+        default: break
+        }
         return "loop.error.validation"
     }
 }

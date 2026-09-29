@@ -272,6 +272,7 @@
 "loop.activity.purchase" = "Compra original (opcional)";
 "loop.activity.purchaseNone" = "Compra no vinculada";
 "loop.activity.linkedPurchase" = "Vinculado a la compra original";
+"loop.activity.moved" = "Movido a otra cuenta";
 "loop.activity.linkedCategory" = "La categoría sigue la compra vinculada.";
 "loop.activity.impact" = "Revisa el efecto en las cuentas";
 "loop.activity.pairNote" = "Ambas cuentas se actualizan juntas. Esto no es gasto ni ingreso.";
@@ -317,3 +318,9 @@
 "loop.error.refund_before_purchase" = "Un reembolso vinculado no puede tener fecha anterior a la compra.";
 "loop.error.purchase_has_refunds" = "Corrige o desvincula los reembolsos conectados antes de corregir esta compra.";
 "loop.error.coverage_conflict" = "Revisa otra vez la pregunta de saldo de cada cuenta.";
+"loop.error.accounts_invalid" = "Elige la cuenta de este registro, o dos cuentas distintas para una transferencia o pago de tarjeta.";
+"loop.error.refund_category_conflict" = "Un reembolso vinculado usa la categoría de su compra. Cambia el vínculo o deja el reembolso sin vincular.";
+"loop.error.kind_immutable" = "Corrige este registro sin cambiar su tipo.";
+"loop.error.field_not_applicable" = "Quita el campo que no corresponde a este tipo de registro.";
+"loop.error.category_unknown" = "Elige una categoría disponible.";
+"loop.error.source_unknown" = "Elige una fuente de ingreso disponible.";

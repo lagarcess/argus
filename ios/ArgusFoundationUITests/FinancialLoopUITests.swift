@@ -147,7 +147,8 @@ final class FinancialLoopUITests: XCTestCase {
 
     func testSpanishConnectedCheckReview() throws {
         guard ProcessInfo.processInfo.environment["ARGUS_TEST_EMAIL"] != nil else { throw XCTSkip("Requires isolated financial stack.") }
-        continueAfterFailure = false
+        try signIn()
+        app.terminate()
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "dark"]
         app.launch()
         XCTAssertTrue(app.staticTexts["home.netWorth.DOP"].waitForExistence(timeout: 15))
