@@ -2710,6 +2710,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   /api/v1/financial-plan/expectations/{expectation_id}:
+    get:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: expectation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expectation'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     patch:
       tags:
       - financial-accounts
@@ -2940,6 +2971,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SelectionReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-search:
+    get:
+      tags:
+      - financial-accounts
+      - financial-search
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 512
+          default: ''
+      - name: kind
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - account
+            - activity
+            - expectation
+            type: string
+          - type: 'null'
+      - name: currency
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            pattern: ^[A-Z]{3}$
+          - type: 'null'
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 2048
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchPage'
         '422':
           description: Validation Error
           content:
@@ -3861,6 +3961,31 @@ components:
       - can_search_current_workspace
       - can_use_grounded_discovery
       - can_submit_feedback
+    AccountHit:
+      properties:
+        kind:
+          type: string
+          const: account
+          default: account
+        account:
+          $ref: '#/components/schemas/FinancialAccountResponse'
+      type: object
+      required:
+      - account
+    ActivityHit:
+      properties:
+        kind:
+          type: string
+          const: activity
+          default: activity
+        activity:
+          $ref: '#/components/schemas/MoneyActivityResponse'
+        archived:
+          type: boolean
+      type: object
+      required:
+      - activity
+      - archived
     ActivityOperationResponse:
       properties:
         account:
@@ -5915,6 +6040,17 @@ components:
       type: object
       required:
       - expected_version
+    ExpectationHit:
+      properties:
+        kind:
+          type: string
+          const: expectation
+          default: expectation
+        expectation:
+          $ref: '#/components/schemas/Expectation'
+      type: object
+      required:
+      - expectation
     ExpectationReceipt:
       properties:
         expectation:
@@ -9793,6 +9929,29 @@ components:
       - layer
       - fragment
       - count
+    SearchPage:
+      properties:
+        items:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/AccountHit'
+            - $ref: '#/components/schemas/ActivityHit'
+            - $ref: '#/components/schemas/ExpectationHit'
+            discriminator:
+              propertyName: kind
+              mapping:
+                account: '#/components/schemas/AccountHit'
+                activity: '#/components/schemas/ActivityHit'
+                expectation: '#/components/schemas/ExpectationHit'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+      - next_cursor
     SearchRetestAction:
       properties:
         type:

@@ -5,13 +5,15 @@ import ArgusSession
 @MainActor
 final class AccountsModel: ObservableObject {
     @Published private(set) var accounts: [FinancialAccount] = []
-    @Published private(set) var selected: FinancialAccount?
+    @Published private(set) var selectedID: UUID?
+    var selected: FinancialAccount? { accounts.first { $0.id == selectedID } }
     @Published var draft: AccountDraft?
     @Published private(set) var busy = false
     @Published private(set) var errorKey: String?
     @Published private(set) var latest: FinancialAccount?
     @Published private(set) var needsReview = false
     @Published private(set) var identity: SessionSnapshot?
+    var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
     private let controller: SessionController
     private var generation = UUID()
@@ -28,7 +30,7 @@ final class AccountsModel: ObservableObject {
         guard snapshot?.revision != identity?.revision || snapshot?.profile?.id != identity?.profile?.id || snapshot?.phase != identity?.phase else { return }
         generation = UUID()
         identity = snapshot?.phase == .authenticated ? snapshot : nil
-        accounts = []; selected = nil; draft = nil; latest = nil
+        accounts = []; selectedID = nil; draft = nil; latest = nil
         clearOpening(); pendingCreate = nil; busy = false; errorKey = nil; needsReview = false
     }
 
@@ -36,18 +38,22 @@ final class AccountsModel: ObservableObject {
         await run { identity in let values = try await self.controller.financialAccounts(expectedIdentity: identity)
             if self.current(identity) {
                 self.accounts = values
-                if let selected = self.selected { self.selected = values.first { $0.id == selected.id } }
+                if !values.contains(where: { $0.id == self.selectedID }) { self.selectedID = nil }
             } }
     }
 
     func open(_ account: FinancialAccount) async {
         guard !busy else { return }
-        selected = account
-        await run { identity in let value = try await self.controller.financialAccount(id: account.id, expectedIdentity: identity)
-            if self.current(identity) { self.selected = value } }
+        select(account)
+        await refresh(account.id)
     }
 
-    func back() { guard !busy else { return }; selected = nil; errorKey = nil }
+    func refresh(_ accountID: UUID) async {
+        await run(targetAccountID: accountID) { identity in let value = try await self.controller.financialAccount(id: accountID, expectedIdentity: identity)
+            if self.current(identity) { self.upsert(value) } }
+    }
+
+    func back() { guard !busy else { return }; selectedID = nil; errorKey = nil }
     func create() { begin(AccountDraft()) }
     func edit(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .metadata)) }
     func opening(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .opening)) }
@@ -98,7 +104,9 @@ final class AccountsModel: ObservableObject {
                 saved = try await self.controller.writeOpening(id: base.id, request: request, key: self.openingKey, expectedIdentity: identity)
             }
             guard self.current(identity) else { return }
-            self.accept(saved); self.discard()
+            self.accept(saved)
+            if draft.mode == .create { self.select(saved) }
+            self.discard()
         }
     }
 
@@ -119,7 +127,7 @@ final class AccountsModel: ObservableObject {
     var createIsFrozen: Bool { pendingCreate != nil }
 
     func archive(_ account: FinancialAccount) async {
-        await run { identity in
+        await run(targetAccountID: account.id) { identity in
             let saved = try await self.controller.updateFinancialAccount(id: account.id,
                 request: EditFinancialAccountRequest(expectedVersion: account.version, archived: !account.archived), expectedIdentity: identity)
             if self.current(identity) { self.accept(saved) }
@@ -130,22 +138,24 @@ final class AccountsModel: ObservableObject {
         identity?.revision == captured.revision && identity?.profile?.id == captured.profile?.id
     }
 
-    func accept(_ account: FinancialAccount) {
+    func select(_ account: FinancialAccount) { upsert(account); selectedID = account.id }
+
+    func upsert(_ account: FinancialAccount) {
         if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }
         else { accounts.append(account) }
-        selected = account
     }
 
-    func accept(_ updated: [FinancialAccount], preserving originId: UUID?) {
-        let selectedId = selected?.id ?? originId
-        for account in updated {
-            if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }
-            else { accounts.append(account) }
-        }
-        selected = accounts.first { $0.id == selectedId }
+    func accept(_ account: FinancialAccount) {
+        upsert(account)
+        financialChanged?()
     }
 
-    private func run(_ operation: (SessionSnapshot) async throws -> Void) async {
+    func accept(_ updated: [FinancialAccount]) {
+        for account in updated { upsert(account) }
+        financialChanged?()
+    }
+
+    private func run(targetAccountID: UUID? = nil, _ operation: (SessionSnapshot) async throws -> Void) async {
         guard let identity, !busy else { return }
         let ticket = generation
         busy = true; errorKey = nil
@@ -174,9 +184,9 @@ final class AccountsModel: ObservableObject {
                     guard await synchronize(identity, ticket: ticket) else { return }
                     latest = value
                 }
-            } else if draft == nil, let selected, Self.requiresReview(error) {
-                let value = try? await controller.financialAccount(id: selected.id, expectedIdentity: identity)
-                if await synchronize(identity, ticket: ticket) { self.selected = value }
+            } else if draft == nil, let targetAccountID, Self.requiresReview(error) {
+                let value = try? await controller.financialAccount(id: targetAccountID, expectedIdentity: identity)
+                if await synchronize(identity, ticket: ticket), let value { self.upsert(value) }
             }
         }
     }

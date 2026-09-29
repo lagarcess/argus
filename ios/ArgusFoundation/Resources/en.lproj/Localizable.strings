@@ -402,3 +402,18 @@
 "plan.exclusion.account_changed" = "The account changed. Choose a compatible cash or bank account.";
 
 "plan.selection.unavailable" = "Not a cash account. Remove it from this forecast.";
+
+"search.title" = "Find your financial records";
+"search.gate" = "Sign in to search your accounts, activity and Plan.";
+"search.placeholder.connected" = "Search your finances";
+"search.filter.all" = "All";
+"search.filter.account" = "Accounts";
+"search.filter.activity" = "Activity";
+"search.filter.expectation" = "Plan";
+"search.currency.all" = "All currencies";
+"search.back" = "Back to search";
+"search.empty.records" = "Your accounts, activity and planned income or bills will appear here.";
+"search.empty.matches" = "No matching records. Try another search or filter.";
+"search.error" = "Search could not refresh. Your place is saved. Try again.";
+"search.unavailable" = "Financial search is unavailable right now.";
+"search.destination.unavailable" = "This record is no longer available. Return to your search.";

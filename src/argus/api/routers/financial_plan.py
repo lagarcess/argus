@@ -14,6 +14,7 @@ from argus.api.routers.financial_loop import _key
 from argus.domain.planning.model import UnsafeCutover
 from argus.domain.planning.responses import (
     Candidates,
+    Expectation,
     ExpectationReceipt,
     FulfillmentPreview,
     FulfillmentReceipt,
@@ -155,4 +156,11 @@ def link(
         lambda: PlanService(context.service).link(
             context.user_id, occurrence_id, body, _key(request, idempotency_key)
         ),
+    )
+
+
+@router.get("/expectations/{expectation_id}", response_model=Expectation)
+def get_expectation(request: Request, context: Context, expectation_id: str) -> Any:
+    return call(
+        request, lambda: PlanService(context.service).get(context.user_id, expectation_id)
     )

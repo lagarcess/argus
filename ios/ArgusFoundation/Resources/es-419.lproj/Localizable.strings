@@ -402,3 +402,18 @@
 "plan.exclusion.account_changed" = "La cuenta cambió. Elige una cuenta de efectivo o banco compatible.";
 
 "plan.selection.unavailable" = "No es una cuenta de efectivo. Quítala de esta proyección.";
+
+"search.title" = "Encuentra tus registros financieros";
+"search.gate" = "Inicia sesión para buscar tus cuentas, movimientos y Plan.";
+"search.placeholder.connected" = "Busca en tus finanzas";
+"search.filter.all" = "Todo";
+"search.filter.account" = "Cuentas";
+"search.filter.activity" = "Movimientos";
+"search.filter.expectation" = "Plan";
+"search.currency.all" = "Todas las monedas";
+"search.back" = "Volver a la búsqueda";
+"search.empty.records" = "Tus cuentas, movimientos e ingresos o pagos previstos aparecerán aquí.";
+"search.empty.matches" = "No hay coincidencias. Prueba otra búsqueda o filtro.";
+"search.error" = "No se pudo actualizar la búsqueda. Guardamos tu lugar. Inténtalo de nuevo.";
+"search.unavailable" = "La búsqueda financiera no está disponible ahora.";
+"search.destination.unavailable" = "Este registro ya no está disponible. Vuelve a tu búsqueda.";

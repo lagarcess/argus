@@ -62,9 +62,6 @@ struct FinancialPlanView: View {
         }
         .task { if model.projection == nil { await model.refresh() } }
         .refreshable { await loop.refresh() }
-        .sheet(item: $model.draft) { draft in
-            FinancialExpectationForm(model: model, draft: draft, loop: loop)
-        }
         .sheet(isPresented: $selectingAccounts) {
             if let projection = model.projection { FinancialPlanSelectionView(model: model, loop: loop, projection: projection) }
         }

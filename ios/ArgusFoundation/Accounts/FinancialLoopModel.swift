@@ -4,12 +4,18 @@ import ArgusSession
 @MainActor
 final class FinancialLoopModel: ObservableObject {
     @Published private(set) var home: FinancialHome?
-    @Published private(set) var activity: [FinancialActivity] = []
-    @Published private(set) var checks: [FinancialCheck] = []
-    @Published private(set) var activityCursor: String?
-    @Published private(set) var checksCursor: String?
-    @Published private(set) var loadingMore = false
-    @Published private(set) var errorKey: String?
+    struct AccountReadState {
+        var activity: [FinancialActivity] = []
+        var checks: [FinancialCheck] = []
+        var activityCursor: String?
+        var checksCursor: String?
+        var loading = false
+        var loadingMore = false
+        var errorKey: String?
+        var request = UUID()
+    }
+    @Published private(set) var accountReads: [UUID: AccountReadState] = [:]
+    func read(_ accountID: UUID) -> AccountReadState { accountReads[accountID] ?? AccountReadState() }
     @Published var editor: FinancialEditor?
     @Published var activityEditor: FinancialActivityEditor?
     @Published private(set) var pendingConfirmation: PendingFinancialConfirmation?
@@ -20,7 +26,7 @@ final class FinancialLoopModel: ObservableObject {
     private let journal: FinancialWriteJournal
     private var identity: SessionSnapshot?
     private var generation = UUID()
-    private var detailRequest = UUID()
+    var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
     lazy var plan = FinancialPlanModel(controller: controller, accounts: accounts, loop: self)
 
@@ -31,8 +37,8 @@ final class FinancialLoopModel: ObservableObject {
     func bind(_ snapshot: SessionSnapshot?) {
         guard identity?.revision != snapshot?.revision || identity?.profile?.id != snapshot?.profile?.id || identity?.phase != snapshot?.phase else { return }
         generation = UUID(); identity = snapshot?.phase == .authenticated ? snapshot : nil
-        home = nil; activity = []; checks = []; activityCursor = nil; checksCursor = nil; loadingMore = false
-        editor = nil; activityEditor = nil; errorKey = nil; recovering = false; recoveryErrorKey = nil
+        home = nil; accountReads = [:]
+        editor = nil; activityEditor = nil; recovering = false; recoveryErrorKey = nil
         if let identity {
             do { pendingConfirmation = try journal.pending(for: identity) }
             catch { pendingConfirmation = nil; recoveryErrorKey = "auth.error.storage" }
@@ -43,6 +49,7 @@ final class FinancialLoopModel: ObservableObject {
     func refresh() async {
         guard identity != nil else { return }
         await plan.refresh()
+        financialChanged?()
     }
 
     func acceptPlanHome(_ home: FinancialHome) { self.home = home }
@@ -50,33 +57,41 @@ final class FinancialLoopModel: ObservableObject {
     func open(_ account: FinancialAccount) async {
         guard let identity else { return }
         let ticket = generation
-        let request = UUID(); detailRequest = request
-        activity = []; checks = []; activityCursor = nil; checksCursor = nil; errorKey = nil
+        let request = UUID()
+        accountReads[account.id] = AccountReadState(loading: true, request: request)
+        defer {
+            if generation == ticket, accountReads[account.id]?.request == request { accountReads[account.id]?.loading = false }
+        }
         do {
             let entries = try await controller.financialActivity(accountId: account.id, expectedIdentity: identity)
             let observations = try await controller.financialChecks(accountId: account.id, expectedIdentity: identity)
-            guard generation == ticket, detailRequest == request, accounts.selected?.id == account.id else { return }
-            activity = entries.items; checks = observations.items
-            activityCursor = entries.nextCursor; checksCursor = observations.nextCursor
-        } catch { if detailRequest == request { await handle(error, ticket: ticket) } }
+            guard generation == ticket, accountReads[account.id]?.request == request else { return }
+            accountReads[account.id] = AccountReadState(activity: entries.items, checks: observations.items,
+                activityCursor: entries.nextCursor, checksCursor: observations.nextCursor, request: request)
+        } catch { await handle(error, ticket: ticket, accountID: account.id, request: request) }
     }
 
     func more(_ account: FinancialAccount, checks: Bool) async {
-        guard let identity, !loadingMore else { return }
-        let ticket = generation; let detail = detailRequest
-        loadingMore = true
-        defer { if generation == ticket { loadingMore = false } }
+        guard let identity, let state = accountReads[account.id], !state.loading, !state.loadingMore,
+              let cursor = checks ? state.checksCursor : state.activityCursor else { return }
+        let ticket = generation; let request = state.request
+        accountReads[account.id]?.loadingMore = true
+        defer {
+            if generation == ticket, accountReads[account.id]?.request == request { accountReads[account.id]?.loadingMore = false }
+        }
         do {
-            if checks, let cursor = checksCursor {
+            if checks {
                 let page = try await controller.financialChecks(accountId: account.id, cursor: cursor, expectedIdentity: identity)
-                guard generation == ticket, detailRequest == detail else { return }
-                self.checks += page.items; checksCursor = page.nextCursor
-            } else if let cursor = activityCursor {
+                guard generation == ticket, accountReads[account.id]?.request == request else { return }
+                accountReads[account.id]?.checks += page.items
+                accountReads[account.id]?.checksCursor = page.nextCursor
+            } else {
                 let page = try await controller.financialActivity(accountId: account.id, cursor: cursor, expectedIdentity: identity)
-                guard generation == ticket, detailRequest == detail else { return }
-                activity += page.items; activityCursor = page.nextCursor
+                guard generation == ticket, accountReads[account.id]?.request == request else { return }
+                accountReads[account.id]?.activity += page.items
+                accountReads[account.id]?.activityCursor = page.nextCursor
             }
-        } catch { await handle(error, ticket: ticket) }
+        } catch { await handle(error, ticket: ticket, accountID: account.id, request: request) }
     }
 
     func history(_ account: FinancialAccount, activity: FinancialActivity) async throws -> [FinancialActivity] {
@@ -92,10 +107,14 @@ final class FinancialLoopModel: ObservableObject {
     }
 
     func detail(_ activity: FinancialActivity) async throws -> FinancialActivityDetail {
+        try await detail(id: activity.activityId ?? activity.recordId)
+    }
+
+    func detail(id: UUID) async throws -> FinancialActivityDetail {
         guard let identity else { throw SessionFailure.unauthorized }
         let ticket = generation
         do {
-            let value = try await controller.financialActivityDetail(activity.activityId ?? activity.recordId, expectedIdentity: identity)
+            let value = try await controller.financialActivityDetail(id, expectedIdentity: identity)
             guard generation == ticket else { throw SessionFailure.staleOperation }
             return value
         } catch {
@@ -122,6 +141,12 @@ final class FinancialLoopModel: ObservableObject {
         return account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")
     }
 
+    func correct(_ activity: FinancialActivityDetail) {
+        guard let id = activity.legs.first?.accountId,
+              let account = accounts.accounts.first(where: { $0.id == id }) else { return }
+        record(account, correcting: activity)
+    }
+
     func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil) {
         guard let identity, pendingConfirmation == nil else { return }
         let ticket = generation
@@ -136,7 +161,7 @@ final class FinancialLoopModel: ObservableObject {
                 guard let self, self.generation == ticket else { return }
                 self.bind(snapshot); self.sessionChanged?(snapshot)
             }) { [weak self] receipt in
-                await self?.accepted(receipt, originId: account.id, ticket: ticket)
+                await self?.accepted(receipt, ticket: ticket)
             }
     }
 
@@ -153,7 +178,7 @@ final class FinancialLoopModel: ObservableObject {
                     let receipt = try await controller.sendPlanFulfillment(write, expectedIdentity: identity)
                     guard generation == ticket else { return }
                     try journal.clear(write, for: identity); pendingConfirmation = nil
-                    await accepted(receipt, originId: write.originAccountId, ticket: ticket)
+                    await accepted(receipt, ticket: ticket)
                 } else {
                     try await controller.sendPlanConfirmation(write, expectedIdentity: identity)
                     guard generation == ticket else { return }
@@ -166,7 +191,7 @@ final class FinancialLoopModel: ObservableObject {
                 let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
                 guard generation == ticket else { return }
                 try journal.clear(write, for: identity); pendingConfirmation = nil
-                await accepted(receipt, originId: write.originAccountId, ticket: ticket)
+                await accepted(receipt, ticket: ticket)
             }
         } catch {
             guard generation == ticket else { return }
@@ -221,13 +246,13 @@ final class FinancialLoopModel: ObservableObject {
         }
     }
 
-    private func accepted(_ receipt: FinancialActivityReceipt, originId: UUID?, ticket: UUID) async {
+    private func accepted(_ receipt: FinancialActivityReceipt, ticket: UUID) async {
         guard generation == ticket, identity != nil else { return }
         pendingConfirmation = nil
-        accounts.accept(receipt.accounts, preserving: originId)
+        accounts.accept(receipt.accounts)
         activityEditor = nil
         await refresh()
-        if let selected = accounts.selected { await open(selected) }
+        for account in receipt.accounts where accountReads[account.id] != nil { await open(account) }
     }
 
     func expense(_ account: FinancialAccount, correcting activity: FinancialActivity? = nil) {
@@ -260,13 +285,15 @@ final class FinancialLoopModel: ObservableObject {
         await open(account)
     }
 
-    private func handle(_ error: Error, ticket: UUID) async {
+    private func handle(_ error: Error, ticket: UUID, accountID: UUID? = nil, request: UUID? = nil) async {
         guard generation == ticket else { return }
         let snapshot = await controller.snapshot()
         guard generation == ticket else { return }
         if snapshot.revision != identity?.revision || snapshot.phase != .authenticated {
             bind(snapshot); sessionChanged?(snapshot)
-        } else { errorKey = FinancialEditor.message(error) }
+        } else if let accountID, accountReads[accountID]?.request == request {
+            accountReads[accountID]?.errorKey = FinancialEditor.message(error)
+        }
     }
 }
 

@@ -7088,3 +7088,42 @@ Unknown account starting balances remain unknown and are excluded from known
 subtotals; their expected attributed movements remain visible without inventing a
 starting position. Saved selected accounts remain removable if archived or no
 longer eligible. Expectation UUID paths normalize before lookup and receipt scoping.
+
+## Connected financial Search
+
+`GET /api/v1/financial-search` uses the financial-accounts exposure and registered
+owner gate. It does not search conversations or legacy collections. Parameters are
+`q` (0–512 characters, default empty), `kind` (`account`, `activity`,
+`expectation`, or omitted for all), optional ISO `currency`, `limit` (1–50,
+default 20), and opaque `cursor` (maximum 2048 characters).
+
+The response is `{items, next_cursor}`. Each item is a discriminated union:
+`{kind: "account", account: FinancialAccountResponse}`,
+`{kind: "activity", activity: MoneyActivityResponse, archived: boolean}`, or
+`{kind: "expectation", expectation: Expectation}`. IDs, money, currency, notes,
+state and archive status derive from those existing domain projections. Activity
+IDs are logical activity IDs, never transfer legs or obsolete correction revisions.
+An activity is labeled archived when any current participating account is archived.
+
+Empty queries browse grouped results in account, activity, expectation order.
+Within a group, normalized title/note then canonical ID supplies stable ordering.
+Text matching is case/accent insensitive; punctuation in a query is literal, never
+a SQL wildcard. Only current owned records participate, including archived ones.
+Cursors bind owner, normalized query, kind, currency and a digest of the complete
+matching snapshot. Changed snapshots return `409 financial_search_stale_cursor`;
+malformed/mismatched cursors return `422 financial_search_invalid_cursor`. Clients
+refresh from page one and replace their retained visible range atomically, with at
+most one automatic stale-cursor restart before showing Retry. Response pages are
+bounded; database loading currently reuses the full owner snapshot and is not
+claimed to be bounded database work.
+
+`GET /api/v1/financial-plan/expectations/{expectation_id}` returns the existing
+`Expectation` projection, including archived or out-of-forecast-window records.
+Missing and other-owner IDs both return the existing financial-record 404.
+
+The iPhone keeps only an owner-scoped origin descriptor (query, kind, currency,
+loaded-page count and visible-row ID) across relaunch. Results are memory-only and
+refetched before restoration. Sign-out clears the descriptor; owner/generation
+guards reject stale results. Existing financial detail/edit controls retain domain
+ownership. Accepted changes invalidate Search and return refreshes its loaded range
+while preserving the origin and surviving row anchor.

@@ -50,7 +50,7 @@ struct AccountsView: View {
                 if let account = model.selected {
                     Button { model.back() } label: { Label("accounts.back", systemImage: "chevron.left") }
                         .frame(minHeight: 48).accessibilityIdentifier("accounts.back")
-                    detail(account)
+                    AccountDetailView(account: account, model: model, loop: loop)
                 } else {
                     if managing {
                         Button { managing = false } label: { Label("accounts.back", systemImage: "chevron.left") }
@@ -73,17 +73,14 @@ struct AccountsView: View {
                             .buttonStyle(PillButtonStyle()).accessibilityIdentifier("accounts.add")
                     }
                 }
-                if let error = model.errorKey, model.draft == nil {
-                    Text(LocalizedStringKey(error)).accessibilityIdentifier("accounts.error")
-                    Button("accounts.retry") { Task { await model.load() } }.frame(minHeight: 48)
+                if model.selected == nil {
+                    AccountRequestStatus(model: model) { await model.load() }
                 }
-                if model.busy { ProgressView("accounts.loading") }
 
             }.padding(24)
         }
         .refreshable { await model.load(); if let account = model.selected { await loop.open(account) } }
         .task(id: model.identity?.revision) { await model.load() }
-        .sheet(item: $model.draft) { _ in AccountForm(model: model) }
     }
 
     @ViewBuilder private func accountRows(archived: Bool) -> some View {
@@ -101,7 +98,15 @@ struct AccountsView: View {
         }
     }
 
-    @ViewBuilder private func detail(_ account: FinancialAccount) -> some View {
+
+}
+
+struct AccountDetailView: View {
+    let account: FinancialAccount
+    @ObservedObject var model: AccountsModel
+    @ObservedObject var loop: FinancialLoopModel
+    @Environment(\.locale) private var locale
+    var body: some View {
         AccountSummary(account: account, large: true)
         AccountActivityView(loop: loop, account: account)
         Button("accounts.edit") { model.edit(account) }.buttonStyle(PillButtonStyle(primary: false))
@@ -123,6 +128,21 @@ struct AccountsView: View {
         }
         Button(account.archived ? "accounts.restore" : "accounts.archive") { Task { await model.archive(account) } }
             .buttonStyle(PillButtonStyle(primary: false)).disabled(model.busy).accessibilityIdentifier("accounts.archive")
+        AccountRequestStatus(model: model) { await model.refresh(account.id) }
+    }
+}
+
+private struct AccountRequestStatus: View {
+    @ObservedObject var model: AccountsModel
+    let retry: () async -> Void
+
+    var body: some View {
+        if let error = model.errorKey, model.draft == nil {
+            Text(LocalizedStringKey(error)).accessibilityIdentifier("accounts.error")
+            Button("accounts.retry") { Task { await retry() } }
+                .frame(minHeight: 48).disabled(model.busy).accessibilityIdentifier("accounts.retry")
+        }
+        if model.busy { ProgressView("accounts.loading").accessibilityIdentifier("accounts.loading") }
     }
 }
 

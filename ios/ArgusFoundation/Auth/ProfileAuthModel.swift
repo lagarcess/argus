@@ -11,6 +11,7 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var errorKey: String?
     @Published private(set) var accounts: AccountsModel?
     @Published private(set) var financialLoop: FinancialLoopModel?
+    @Published private(set) var financialSearch: FinancialSearchModel?
     let configuration: NativeAuthConfiguration?
     private let controller: SessionController?
     private var started = false
@@ -33,11 +34,15 @@ final class ProfileAuthModel: ObservableObject {
         controller = loadedController
         state = initialState
         if let loadedController {
+            financialSearch = FinancialSearchModel(controller: loadedController, prefix: (loadedConfiguration?.session.storagePrefix ?? "") + ".search.")
+            financialSearch?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             accounts = AccountsModel(controller: loadedController)
+            accounts?.financialChanged = { [weak self] in self?.financialSearch?.invalidate() }
             accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             if let accounts, let loadedConfiguration {
                 financialLoop = FinancialLoopModel(controller: loadedController, accounts: accounts,
                     journal: FinancialWriteJournal(configuration: loadedConfiguration.session))
+                financialLoop?.financialChanged = { [weak self] in self?.financialSearch?.invalidate() }
                 financialLoop?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             }
         }
@@ -86,6 +91,7 @@ final class ProfileAuthModel: ObservableObject {
 
     func signOut() async {
         guard let controller else { return }
+        financialSearch?.bind(nil)
         accounts?.bind(nil)
         financialLoop?.bind(nil)
         await perform { try await controller.signOut() }
@@ -116,6 +122,7 @@ final class ProfileAuthModel: ObservableObject {
     }
 
     private func accept(_ snapshot: SessionSnapshot) {
+        financialSearch?.bind(snapshot)
         accounts?.bind(snapshot)
         financialLoop?.bind(snapshot)
         profile = snapshot.profile

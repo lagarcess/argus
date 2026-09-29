@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** [connected Plan and Home](#connected-plan-and-home-lane) landed through PR #749 with local acceptance and clean independent review. #747 personal money recording and its #748 landing are complete. The founder authorized #749 and its bounded documentation landing; no further implementation lane is active. Physical-phone delivery remains pending.
+**Execution state:** [connected Search on iPhone](#connected-search-on-iphone-lane) has a locally verified delivery in [PR #751](https://github.com/lagarcess/argus/pull/751), awaiting founder merge authority after its terminal CI verdict. Connected Plan/Home (#749/#750) and personal money recording (#747/#748) are landed. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,160 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected Search on iPhone lane
+
+**Founder authorization, September 29, 2026:** implement connected Search over
+existing accounts, transactions and Plan expectations through a runnable local
+simulator demonstration and a merge-ready PR. Local tests, commits, pushes,
+publication and existing automatic Supabase PR previews are authorized. No merge,
+deployment, hosted configuration change or paid-provider call. Documents,
+household, web and chat-runtime work are excluded. Other MVEE retrieval types
+remain in the complete coverage map; this batch does not claim to finish D10.
+
+**Integration base:** freshly fetched
+`22f9c8cda8a65c74985e367d8cef68e55515e16b`, including #749 and #750.
+**Delivery branch:** `codex/connected-search`.
+**Checkout:** `/Users/garces/.codex/worktrees/connected-search/private-alpha-next`.
+
+**Goal and completion predicate:** search owned accounts, transactions and Plan
+expectations; open each actual domain detail screen; inspect or edit using its
+existing controls; return to the same query, filters, loaded results and scroll
+position with edits reflected. Relaunch preserves the appropriate owner-scoped
+search origin and reloads current records. Empty, loading, retryable failure and
+unavailable/deleted destinations are explicit in English and Spanish. Completion
+requires real API/Postgres and native acceptance, a short recording, restart
+instructions, green applicable CI and one clean independent fresh-context review
+(or an explicit pending verdict if no reviewer is available).
+
+**Isolation:** Search owns local allocation `58800` (API), `58801` (Supabase),
+`58802` (Postgres), `58805` (CAPTCHA bridge), `58913` (loopback simulator mirror)
+and dedicated simulator
+`01CBA853-5183-41AF-B1B8-024EF6DB8FFB` (`Argus Connected Search`). The physical-phone
+owner's checkout, device, signing, certificates, services and ports 58700–58749
+are untouched. Existing 584xx, 585xx and 586xx demonstrations remain intact.
+Do not change global simulator-tool defaults shared with another agent.
+
+### Search ownership and throughput
+
+- **Blocking first steps.** Recover current source, locked Search design and
+  financial/detail contracts. Record the bounded contract before implementation.
+- **Independent workstreams.** Read-only backend and native scouts inspect
+  distinct owners. The captain prepares the isolated local stack and simulator.
+- **Shared mutable state.** One implementation writer owns the Search backend,
+  native navigation and tests in the exclusive `connected-search-core` checkout
+  on `codex/connected-search-implementation`. The captain owns the separate
+  delivery/demo checkout and does not edit or run suites in the writer checkout. Detail editing keeps its existing domain owner.
+- **Smallest safe decomposition.** One coherent implementation owner avoids
+  dividing search identity, pagination and return-state behavior across agents.
+  The captain takes over assembled verification after handoff. One independent
+  reviewer inspects the finished diff, then affected fixes only.
+
+The captain owns this manifest, contract decisions, integration, native acceptance,
+recording, publication and readiness. `search_backend_scout` and
+`search_native_scout` are read-only and finish after their bounded reports.
+The implementation owner receives a consolidated scope and reports its changed
+files, exact commit and focused verification before relinquishing the checkout.
+No design/reviewer swarm or competing execution board is needed for this locked
+surface. The existing account, activity and Plan services remain the only money
+and persistence owners.
+
+### Search acceptance
+
+| User outcome | Existing capability | Connected work | Proof |
+| --- | --- | --- | --- |
+| Find existing financial records | Canonical account/activity/expectation storage; current text-search patterns | Owner-scoped typed search, bounded pages and type filters | Real Postgres and HTTP searches, corrections/current revisions, accents, literal query characters, pagination and second-owner isolation |
+| Inspect and edit a result | Native account details, activity detail/correction and Plan expectation editor | Typed destination opens the existing screen with live authorization/read | Native search-to-detail/edit/back for all three types; balance rules remain domain-owned |
+| Resume the same search | Native session lifetime and app navigation | Query/filter/result/scroll origin, current-request guards, refresh after detail edits | Native deep-scroll return, changed-match removal, pagination, relaunch and owner switch |
+| Recover without losing context | Existing error/empty and localization controls | Loading, empty, retry and unavailable destination states | Local API failure/retry and missing-record cases; English/dark and Spanish/light recordings |
+
+### Search execution checklist and decisions
+
+- [x] `how` over the affected subsystem. Two bounded code scouts plus captain synthesis.
+- [x] `architect` for parallel design exploration. Native and backend scouts compare reuse with domain-specific adapters; retain locked UI and existing detail owners.
+- [x] Write the throughput checkpoint as four todo items.
+- [x] Delegate code-writing to a subagent using your configured feature model. `search_implementation` owns the complete bounded implementation.
+- [x] Verify on the matching surface. Five assembled Search journeys passed against the isolated real API/Postgres.
+- [x] Preserve small, ordered commits. Skip rebasing published/evidenced work under repository policy; use ordered commits and one-way integration merge if needed.
+- [x] No design contest arose; `interrogate` was not needed. Locked design and existing editors were retained.
+- [x] Run **Opening a PR**. [PR #751](https://github.com/lagarcess/argus/pull/751) targets integration; no merge or deployment performed.
+
+Model the Domain chooses typed financial destinations and one owner-scoped search
+origin rather than independent booleans. Separate Before Serializing Shared State
+chooses an exclusive writer, isolated stack and simulator. Prove It Works requires
+the assembled native journey against real local records, beyond unit tests and
+screenshots. The existing manifest is the specification and decision trail;
+no additional planning board or housekeeping PR is part of this assignment.
+
+September 29 contract checkpoint: existing `/search` returns conversation dossiers,
+so financial retrieval gets a separate `/financial-search` adapter behind the
+existing registered financial context. It reads canonical account, current logical
+activity and expectation projections. Transfers appear once and corrected text
+replaces old text. The client uses typed destinations, an owner-scoped search
+origin and one shared presentation owner for existing detail/edit screens.
+Category and currency filters narrow results without inventing bilingual domain
+aliases or money calculations. The first implementation reuses the existing
+owned financial snapshot; response pagination is bounded, but that snapshot
+still reads the owner's records. No new search index or embeddings are implied.
+
+September 29 local setup checkpoint: the Search-owned stack is seeded with two
+synthetic identities, and native sign-in/relaunch/sign-out passed with Xcode exit
+zero on its dedicated simulator. The local read-fault extension passed 19 focused
+checks and preserves the inherited write-response-loss behavior. Its optional
+proxy is 58812; normal retained builds use direct API 58800. The
+[restart guide](../reports/evidence/connected-search/README.md) records commands
+that preserve data. These setup checks do not claim connected Search acceptance.
+
+September 29 backend checkpoint at `78e65a026`: 205 focused financial/Search
+tests passed against the isolated local Postgres with zero skips. The real
+Auth/API proof passed 15 checks covering current corrected activity, one transfer
+hit, literal/accent queries, pagination, stale cursors, archived records, unknown
+currency balances and cross-owner search/detail denial. Sanitized evidence is
+[api-proof.json](../reports/evidence/connected-search/api-proof.json). Native
+Search acceptance and independent review are recorded in the later completion checkpoint.
+
+September 29 review checkpoint at `12ade77d98ac74864ad05ca629548be055e89452`: the
+fresh-context `search_independent_review` agent returned clean after one full
+diff review and affected-fix checks. Its three P2 findings are closed: retained
+account navigation/read isolation, obsolete destination-request cancellation and
+recovery tied to the acted-on account. Native model verification passes 20 tests.
+The [review record](../reports/evidence/connected-search/independent-review.md)
+records exact commits and limits. Assembled simulator gates and CI are still
+in progress; this is not a merge-ready claim.
+
+September 29 local delivery checkpoint: the complete assigned Search journey
+passes in the isolated simulator against real local Auth/API/Postgres. Accounts,
+current activity and Plan expectations open their existing editors; edits refresh
+Search. Query, category, currency, loaded pages and exact position survive Back
+and two successive relaunches. Separate Accounts/Search details and owner switching
+pass. Delayed loading, 503/retry and unavailable detail states pass. The final
+three-editor run at `c775b0cdd1e05f4088fd9eb5d0ccf798d50882a4` also verifies
+English/dark and Spanish/light reopening. All confirmed independent findings are
+closed; the final affected-delta review at that SHA is clean.
+
+The [demo, recording, restart instructions and evidence table](../reports/evidence/connected-search/README.md)
+are durable in this PR. The 49-second excerpt shows activity correction, refreshed
+Search, Plan editing and reopening; the same successful test separately proves
+account rename/removal from old matches. Backend evidence includes 205 focused
+financial tests, 15 real HTTP checks, nine shared PostgreSQL CI scenarios,
+23 generated-API compatibility checks and 22 native model tests. A missing generated
+OpenAPI update found by CI was corrected. The PR's terminal readiness comment owns
+its exact published head, final CI result and evidence revalidation.
+
+Fresh integration remains `22f9c8cda8a65c74985e367d8cef68e55515e16b`, identical
+to the original base: no reconciliation merge or semantic overlap arose. Final
+modularity checks run on this already-reconciled tree. The local demo remains on
+58800 with preserved data; all old demos and the 58700–58749 environment remain
+untouched. Workers/reviewer have finished and relinquished their surfaces.
+
+Remaining scope is explicit: physical-phone internet delivery is not proved by
+this lane; Search still uses the canonical full-owner snapshot behind bounded
+response pages. Other MVEE Search types and conversation continuity remain in
+D09/D10 below. No new product deferral, hosted change or signing authority is
+implied by this locally verified result.
+
+Stop only for a concrete product conflict, inaccessible required tooling, or an
+action beyond the grant. Routine implementation choices and local fixes proceed.
 
 ## Connected Plan and Home lane
 
@@ -954,7 +1108,7 @@ sequence rather than a separate deferral policy in this document.
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |
-| [Search][mvee-search] and [conversation continuity][mvee-continuity], D09/D10 | Omnisearch/history and recovery contracts | Add domain search adapters and native destination/lifecycle wiring | Native continuity + Conversation/voice | Authorized domain reads; Temporary policy for that behavior | Search-to-destination/back recordings, draft/history readbacks and Temporary retention evidence |
+| [Search][mvee-search] and [conversation continuity][mvee-continuity], D09/D10 | Omnisearch/history and recovery contracts; locally verified account/activity/expectation Search in #751 | Deliver remaining MVEE domain retrieval and conversation lifecycle continuity; retain the connected Search origin contract | Native continuity + Conversation/voice | Authorized domain reads; Temporary policy for that behavior | Search-to-destination/back recordings, draft/history readbacks and Temporary retention evidence |
 | [Updates][mvee-updates], D11 | Existing operational infrastructure; notification contracts | Implement inbox, domain triggers and delivery jobs | Planning/Home | Trigger facts; permissions; channel/schedule decisions | Trigger/job receipts paired with phone inbox/source recordings |
 | [Profile and control][mvee-profile], D12 | Existing profile/usage/data-control contracts | Connect native controls to existing and new domain adapters | Native continuity | Identity/settings; domain lifecycle policy; approved personalization rollout | Phone settings/control recordings and authorized export/recovery readbacks |
 | [Charts][mvee-quality], D05/D06/D09/D15 | Selected chart direction and prototype | Connect canonical series to native chart components | Native continuity + domain series owners | Each domain's canonical series | Series-to-display checks, gesture/accessibility recordings and device performance receipts |

@@ -1,0 +1,61 @@
+import Foundation
+
+public enum FinancialSearchKind: String, Codable, CaseIterable, Sendable {
+    case account, activity, expectation
+}
+
+public enum FinancialSearchHit: Decodable, Sendable, Identifiable {
+    case account(FinancialAccount)
+    case activity(FinancialActivityDetail, archived: Bool)
+    case expectation(FinancialExpectation)
+
+    enum CodingKeys: String, CodingKey { case kind, account, activity, expectation, archived }
+    public init(from decoder: any Decoder) throws {
+        let value = try decoder.container(keyedBy: CodingKeys.self)
+        switch try value.decode(FinancialSearchKind.self, forKey: .kind) {
+        case .account: self = .account(try value.decode(FinancialAccount.self, forKey: .account))
+        case .activity: self = .activity(try value.decode(FinancialActivityDetail.self, forKey: .activity), archived: try value.decode(Bool.self, forKey: .archived))
+        case .expectation: self = .expectation(try value.decode(FinancialExpectation.self, forKey: .expectation))
+        }
+    }
+    public var kind: FinancialSearchKind {
+        switch self { case .account: .account; case .activity: .activity; case .expectation: .expectation }
+    }
+    public var recordID: UUID {
+        switch self { case .account(let value): value.id; case .activity(let value, _): value.activityId; case .expectation(let value): value.id }
+    }
+    public var id: String { kind.rawValue + "." + recordID.uuidString }
+    public var currency: String {
+        switch self { case .account(let value): value.currency; case .activity(let value, _): value.currency; case .expectation(let value): value.currency }
+    }
+    public var amount: String? {
+        switch self { case .account(let value): value.balance.amount; case .activity(let value, _): value.amount; case .expectation(let value): value.amount }
+    }
+    public var archived: Bool {
+        switch self { case .account(let value): value.archived; case .activity(_, let archived): archived; case .expectation(let value): value.archived }
+    }
+}
+
+public struct FinancialSearchPage: Decodable, Sendable {
+    public let items: [FinancialSearchHit]
+    public let nextCursor: String?
+    enum CodingKeys: String, CodingKey { case items, nextCursor = "next_cursor" }
+}
+
+extension SessionController {
+    public func financialSearch(query: String, kind: FinancialSearchKind?, currency: String?, cursor: String?, expectedIdentity: SessionSnapshot) async throws -> FinancialSearchPage {
+        var parameters = [URLQueryItem(name: "q", value: query)]
+        if let kind { parameters.append(URLQueryItem(name: "kind", value: kind.rawValue)) }
+        if let currency { parameters.append(URLQueryItem(name: "currency", value: currency)) }
+        if let cursor { parameters.append(URLQueryItem(name: "cursor", value: cursor)) }
+        let data = try await financialRequest(route: "financial-search", query: parameters, expectedIdentity: expectedIdentity)
+        do { return try JSONDecoder().decode(FinancialSearchPage.self, from: data) }
+        catch { throw SessionFailure.invalidResponse }
+    }
+
+    public func financialExpectation(_ id: UUID, expectedIdentity: SessionSnapshot) async throws -> FinancialExpectation {
+        let data = try await financialRequest(route: "financial-plan", path: "/expectations/" + id.uuidString, expectedIdentity: expectedIdentity)
+        do { return try JSONDecoder().decode(FinancialExpectation.self, from: data) }
+        catch { throw SessionFailure.invalidResponse }
+    }
+}

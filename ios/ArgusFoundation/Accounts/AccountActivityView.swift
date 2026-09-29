@@ -6,10 +6,9 @@ struct AccountActivityView: View {
     let account: FinancialAccount
     @State private var pendingCorrection: FinancialActivityDetail?
     @State private var inspected: FinancialActivity?
-    @State private var detail: FinancialActivityDetail?
-    @State private var revisions: [FinancialActivityDetail] = []
-    @State private var historyFailed = false
     @Environment(\.locale) private var locale
+
+    private var page: FinancialLoopModel.AccountReadState { loop.read(account.id) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -18,24 +17,24 @@ struct AccountActivityView: View {
             }.buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("accounts.record")
             Button("loop.check.title") { loop.check(account) }.frame(minHeight: 44)
                 .accessibilityIdentifier("accounts.check")
-            if let error = loop.errorKey {
+            if let error = page.errorKey {
                 Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                 Button("accounts.retry") { Task { await loop.open(account) } }
             }
-            if !loop.activity.isEmpty {
+            if !page.activity.isEmpty {
                 Text("loop.recent").font(ArgusStyle.display(22))
                 VStack(spacing: 0) {
-                    ForEach(loop.activity, id: \.recordId) { activity in
+                    ForEach(page.activity, id: \.recordId) { activity in
                         Button { inspected = activity } label: {
                             FinancialActivityRow(activity: activity, currency: account.currency)
                         }.buttonStyle(.plain).accessibilityIdentifier("activity.row." + activity.recordId.uuidString)
                     }
                 }
             }
-            if loop.activityCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: false) } }.disabled(loop.loadingMore) }
-            if !loop.checks.isEmpty {
+            if page.activityCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: false) } }.disabled(page.loadingMore) }
+            if !page.checks.isEmpty {
                 Text("loop.check.history").font(ArgusStyle.display(22))
-                ForEach(loop.checks, id: \.recordId) { check in
+                ForEach(page.checks, id: \.recordId) { check in
                     VStack(alignment: .leading, spacing: 8) {
                         Label(check.kind == "value_update" ? "loop.check.value" : "loop.check.title", systemImage: "checkmark.circle")
                         Text(verbatim: account.currency + " " + AccountPresentation.amount(AccountPresentation.decimal(check.observedAmountMinor, digits: account.currencyFractionDigits), locale: locale))
@@ -52,7 +51,7 @@ struct AccountActivityView: View {
                     }.font(ArgusStyle.body(13, relativeTo: .subheadline)).padding(.vertical, 12)
                 }
             }
-            if loop.checksCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: true) } }.disabled(loop.loadingMore) }
+            if page.checksCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: true) } }.disabled(page.loadingMore) }
         }
         .task(id: account.version) { await loop.open(account) }
         .sheet(item: $inspected, onDismiss: {
@@ -60,58 +59,76 @@ struct AccountActivityView: View {
         }) { activity in
             NavigationStack {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        FinancialActivityRow(activity: activity, currency: account.currency)
-                        if let detail {
-                            Text(LocalizedStringKey("loop.kind." + detail.kind.rawValue)).font(ArgusStyle.display(22))
-                            Text(verbatim: AccountPresentation.date(detail.occurredAt, zone: detail.timeZone, locale: locale))
-                            if let category = detail.categoryId { Text(LocalizedStringKey("loop.category." + category)) }
-                            if let source = detail.sourceId { Text(LocalizedStringKey("loop.source." + source)) }
-                            if let note = detail.note, !note.isEmpty { Text(verbatim: note) }
-                            if detail.kind == .refund {
-                                Text(detail.purchaseActivityId == nil ? "loop.activity.purchaseNone" : "loop.activity.linkedPurchase")
-                            }
-                            ForEach(detail.legs) { leg in
-                                HStack {
-                                    Text(loop.accountName(leg.accountId))
-                                    Spacer()
-                                    Text(leg.role == "source" ? "loop.activity.from" : leg.role == "destination" ? "loop.activity.to" : "loop.activity.account")
-                                }.font(ArgusStyle.body(13, relativeTo: .subheadline))
-                            }
-                            if let reason = detail.reason { Text(verbatim: reason) }
-                            if revisions.count > 1 {
-                                Text("loop.revisions").font(ArgusStyle.display(22))
-                                ForEach(revisions, id: \.revision) { revision in
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text(verbatim: revision.currency + " " + AccountPresentation.amount(revision.amount, locale: locale))
-                                        Text(verbatim: AccountPresentation.date(revision.occurredAt, zone: revision.timeZone, locale: locale))
-                                        if let reason = revision.reason { Text(verbatim: reason) }
-                                    }
-                                }
-                            }
-                        } else if !historyFailed { ProgressView("accounts.loading") }
-                        if historyFailed {
-                            Text("loop.error.connection")
-                            Button("accounts.retry") { Task { await loadHistory(activity) } }
-                        }
-                        Button("loop.correction.title") {
-                            pendingCorrection = detail
-                            inspected = nil
-                        }.buttonStyle(PillButtonStyle()).disabled(detail == nil).accessibilityIdentifier("activity.correct")
+                    FinancialActivityDetailView(loop: loop, activityID: activity.activityId ?? activity.recordId) { current in
+                        pendingCorrection = current; inspected = nil
                     }.padding(24)
                 }.background(ArgusStyle.background)
                     .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("action.close") { inspected = nil } } }
-            }.task(id: activity.recordId) { await loadHistory(activity) }
+            }
         }
     }
-    private func loadHistory(_ activity: FinancialActivity) async {
-        detail = nil; revisions = []; historyFailed = false
+}
+
+struct FinancialActivityDetailView: View {
+    @ObservedObject var loop: FinancialLoopModel
+    let activityID: UUID
+    let correct: (FinancialActivityDetail) -> Void
+    @State private var detail: FinancialActivityDetail?
+    @State private var revisions: [FinancialActivityDetail] = []
+    @State private var errorKey: String?
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            if let detail {
+                Text(LocalizedStringKey("loop.kind." + detail.kind.rawValue)).font(ArgusStyle.display(22))
+                Text(verbatim: detail.currency + " " + AccountPresentation.amount(detail.amount, locale: locale))
+                    .font(ArgusStyle.display(30)).monospacedDigit()
+                Text(verbatim: AccountPresentation.date(detail.occurredAt, zone: detail.timeZone, locale: locale))
+                if let category = detail.categoryId { Text(LocalizedStringKey("loop.category." + category)) }
+                if let source = detail.sourceId { Text(LocalizedStringKey("loop.source." + source)) }
+                if let note = detail.note, !note.isEmpty { Text(verbatim: note) }
+                if detail.kind == .refund { Text(detail.purchaseActivityId == nil ? "loop.activity.purchaseNone" : "loop.activity.linkedPurchase") }
+                ForEach(detail.legs) { leg in
+                    HStack {
+                        Text(loop.accountName(leg.accountId)); Spacer()
+                        Text(leg.role == "source" ? "loop.activity.from" : leg.role == "destination" ? "loop.activity.to" : "loop.activity.account")
+                    }.font(ArgusStyle.body(13, relativeTo: .subheadline))
+                }
+                if let reason = detail.reason { Text(verbatim: reason) }
+                if revisions.count > 1 {
+                    Text("loop.revisions").font(ArgusStyle.display(22))
+                    ForEach(revisions, id: \.revision) { revision in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(verbatim: revision.currency + " " + AccountPresentation.amount(revision.amount, locale: locale))
+                            Text(verbatim: AccountPresentation.date(revision.occurredAt, zone: revision.timeZone, locale: locale))
+                            if let reason = revision.reason { Text(verbatim: reason) }
+                        }
+                    }
+                }
+                Button("loop.correction.title") { correct(detail) }
+                    .buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil)
+                    .accessibilityIdentifier("activity.correct")
+            } else if errorKey == nil { ProgressView("accounts.loading") }
+            if let errorKey {
+                Text(LocalizedStringKey(errorKey)).accessibilityIdentifier("activity.detail.error")
+                Button("accounts.retry") { Task { await load() } }.frame(minHeight: 44)
+            }
+        }.task(id: activityID) { await load() }
+            .onChange(of: loop.activityEditor == nil) { _, closed in if closed { Task { await load() } } }
+    }
+    private func load() async {
+        errorKey = nil
         do {
-            let current = try await loop.detail(activity)
+            let current = try await loop.detail(id: activityID)
             detail = current
             revisions = try await loop.detailHistory(current)
-        } catch { historyFailed = true }
+        } catch {
+            if case SessionFailure.rejected(let status, _) = error, status == 404 || status == 403 {
+                detail = nil; errorKey = "search.destination.unavailable"
+            } else { errorKey = "loop.error.connection" }
+        }
     }
 }
 
