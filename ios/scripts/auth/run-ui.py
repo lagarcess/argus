@@ -7,6 +7,8 @@ import plistlib
 import subprocess
 from pathlib import Path
 
+from local_stack import Allocation
+
 ROOT = Path(__file__).resolve().parents[3]
 WORK = ROOT / "ios/.build/auth-local"
 DERIVED = ROOT / "ios/.build/DerivedData"
@@ -20,12 +22,23 @@ parser.add_argument("--captcha-mode", choices=["pass", "fail", "hold"], default=
 parser.add_argument("--accounts", action="store_true")
 parser.add_argument("--language", choices=["en", "es-419"], default="en")
 parser.add_argument("--appearance", choices=["light", "dark", "system"], default="light")
+parser.add_argument("--port-base", type=int, default=58400)
+parser.add_argument(
+    "--response-loss-proxy",
+    action="store_true",
+    help="Opt in to local committed-response-loss acceptance; requires API58512 build",
+)
 args = parser.parse_args()
-if args.accounts:
-    WORK = ROOT / "ios/.build/accounts-local"
+allocation = Allocation(args.accounts, args.port_base)
+WORK = allocation.work
+DERIVED = DERIVED.with_name(DERIVED.name + allocation.suffix)
 if args.simulator == "8B7975F1-1338-4966-90E2-770416CAF174":
     raise SystemExit("Refusing founder-owned simulator")
 cfg = json.loads((WORK / "client.json").read_text())
+if cfg["apiURL"] != allocation.url() + "/api/v1" or cfg["supabaseURL"] != allocation.url(
+    1
+):
+    raise SystemExit("Fixture does not match this loopback allocation")
 stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 common = [
     "-destination",
@@ -69,6 +82,7 @@ for target in targets:
             "ARGUS_TEST_ACCOUNTS_UI_ENABLED": str(args.accounts).lower(),
             "ARGUS_TEST_LANGUAGE": args.language,
             "ARGUS_TEST_APPEARANCE": args.appearance,
+            "ARGUS_TEST_RESPONSE_LOSS_PROXY": str(args.response_loss_proxy).lower(),
             "ARGUS_TEST_EMAIL_B": cfg["users"][1]["email"],
             "ARGUS_TEST_PASSWORD_B": cfg["users"][1]["password"],
             "ARGUS_TEST_EMAIL": cfg["users"][0]["email"],

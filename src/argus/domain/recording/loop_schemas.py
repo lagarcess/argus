@@ -79,7 +79,10 @@ class LoopOpeningRequest(WriteOpeningRequest):
 class ActivityResponse(BaseModel):
     record_id: str
     revision: int
-    kind: Literal["expense"] = "expense"
+    kind: Literal["expense", "income", "transfer", "card_payment", "refund"] = "expense"
+    activity_id: str | None = None
+    role: str = "single"
+    active: bool = True
     amount_minor: int
     amount: str
     balance_movement_minor: int
@@ -95,6 +98,7 @@ class ActivityResponse(BaseModel):
 
 class ObservationQuestion(BaseModel):
     observation_id: str
+    time_zone: str
     kind: Literal["opening", "balance_check", "value_update"]
     as_of: datetime
     amount_minor: int
@@ -189,6 +193,10 @@ class CurrencySummaryResponse(BaseModel):
     net_worth_minor: str
     known_accounts: int
     unknown_accounts: int
+    gross_income_minor: str = "0"
+    gross_purchases_minor: str = "0"
+    refunds_minor: str = "0"
+    net_spending_minor: str = "0"
     recorded_spending_minor: str
     as_of: datetime | None
 
@@ -200,7 +208,16 @@ class RecentActivityResponse(ActivityResponse):
     currency_fraction_digits: int
 
 
+class ReportingPeriod(BaseModel):
+    month: str
+    time_zone: str
+    start_at: datetime
+    end_at_exclusive: datetime
+
+
 class HomeResponse(BaseModel):
+    period: ReportingPeriod
+    coverage: Literal["recorded_only"] = "recorded_only"
     currencies: list[CurrencySummaryResponse]
     recent_activity: list[RecentActivityResponse]
     recorded_at: datetime

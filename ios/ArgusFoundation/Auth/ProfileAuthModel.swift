@@ -35,8 +35,9 @@ final class ProfileAuthModel: ObservableObject {
         if let loadedController {
             accounts = AccountsModel(controller: loadedController)
             accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
-            if let accounts {
-                financialLoop = FinancialLoopModel(controller: loadedController, accounts: accounts)
+            if let accounts, let loadedConfiguration {
+                financialLoop = FinancialLoopModel(controller: loadedController, accounts: accounts,
+                    journal: FinancialWriteJournal(configuration: loadedConfiguration.session))
                 financialLoop?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             }
         }

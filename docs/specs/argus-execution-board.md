@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** Local financial loop LANDED through PR #745. The founder authorized bounded landing documentation/verification through PR #746; its terminal result is recorded in the linked landing comment below. Signing, physical-phone installation and deployment are deferred. Other MVEE work remains stopped.
+**Execution state:** LOCALLY VERIFIED; final PR gates tracked in [#747](https://github.com/lagarcess/argus/pull/747) for the [personal money-recording batch](#personal-money-recording-batch). #745 and its #746 landing are complete. Signing, physical-phone installation, deployment and other MVEE implementation remain outside this authorization.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -10,7 +10,199 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
-## Financial-loop batch
+## Personal money-recording batch
+
+**Founder authorization, September 29, 2026:** Deliver received income, spending,
+transfers between owned accounts, credit-card payments and purchase refunds as
+one personal journey, including inspection, corrections and reconciliation with
+existing balance checks. Own backend, database and iPhone through a runnable
+simulator demonstration and a merge-ready PR. Publication and existing automatic
+PR previews are authorized. Merge, deployment, signing, production changes,
+paid-provider calls, web, imports, household and chat-runtime work are not.
+Do not invent exchange rates or unresolved loan rules. The earlier loop's scoped
+stop statements below are historical; this grant activates only the work here.
+
+**Integration base:** freshly fetched
+`b4fed10fe5cd325a7cd3e6ac21b87e9fbf5eb819` (#745 plus #746).
+**Delivery branch:** `codex/personal-money-recording`; [PR #747](https://github.com/lagarcess/argus/pull/747).
+**Goal:** a person uses the native app with the real local API/Postgres to receive
+income, spend, move money between owned accounts, pay a card and record a refund;
+Accounts and Home agree after inspection, corrections and reopening. Unknown
+balances stay unknown, currencies stay separate, linked movements commit once
+and together, and earlier activity respects each account's balance-check answers.
+
+### Delivery ownership and throughput
+
+The captain owns the shared contract decision, this manifest, assembled branch,
+independent acceptance, publication and scoped review. One backend writer owns
+recording domain/API/storage/migrations and API/data documentation. One native
+writer owns Swift features, localized presentation and native tests. Writers use
+separate branches; neither duplicates money rules or edits the other's surface.
+A bounded design comparison precedes the shared contract. Native presentation
+planning and local harness preparation can proceed alongside backend grounding;
+wire-dependent implementation consumes the accepted contract. Integration and
+simulator ownership are serialized by the captain.
+
+The main risk is atomic paired corrections and purchase/refund limits under
+concurrent writes, not account setup. Prove those with real Postgres before
+calling the assembled journey complete. Reuse existing auth, preview tokens,
+version checks, durable receipts and observation coverage. Preserve the previous
+runnable demo and its synthetic database while preparing this slice.
+
+### Acceptance and checkpoints
+
+| User outcome | Inherit | Delivered locally | Owner / real dependency | Observable proof |
+| --- | --- | --- | --- | --- |
+| Receive income and record spending | Account CRUD, expense preview/confirm, append-only correction/history | Typed income with optional source; connected recording and Home reads | Core and native; canonical activity contract | Native create/inspect/correct/reopen against real local DB; income does not become expense |
+| Move money between owned accounts, including cash withdrawal | Signed balances, versioning, coverage | One atomic movement with linked legs and per-account review; same-currency validation | Core owns linked mutation; native consumes preview | Both accounts and Home agree; no spending/income; one-sided failure writes neither leg; duplicate retry writes once |
+| Pay a credit card | Liability sign and credit-balance presentation | Payment from owned cash/bank to card, both sides correctable together | Same paired movement owner | Cash and debt change once; purchases remain the spending event; credit in favor stays explicit |
+| Record money returned | Stable expense identity and category catalog | Linked partial/multiple refunds, actual destination, absent-purchase path and received-month reporting | Core owns purchase/refund cap and category; native review | Refund is separate from purchase and income; cumulative cap survives concurrent corrections; negative net spending remains visible |
+| Reconcile and recover every supported activity | Immutable observations, explicit coverage, idempotency and session recovery | Multi-account coverage, revision consistency and native uncertain-write recovery | Shared core then assembled app | Existing check remains authoritative only for explicitly included activity; reopen, interrupted response and retry preserve one result; another identity sees nothing |
+| Click through a complete local demo | Installed prior build, local stack and capture harness | Integrated build, short recording, restart recipe, durable evidence, CI and scoped review | Captain after component integration | Real simulator actions and DB readbacks; exact source provenance; merge-ready PR with zero unresolved findings |
+
+Currency conversion and loan principal/interest allocation are not authorized.
+The recorded peso/dollar transfer boundary remains blocked; a foreign-currency
+refund uses the actual received amount with an explicitly unlinked purchase.
+Existing technical limitations must remain visible and must not be relabeled as
+founder-approved MVEE deferrals. The full MVEE coverage below remains the broader
+assignment, not a claim that this slice completes the ecosystem.
+
+### Execution checklist and decision trail
+
+- [x] Read the Principles section of poteto-mode.
+- [x] Phase A: Frame. Recover approved rules and the freshly fetched base; bind this bounded authorization and verification predicate.
+- [x] Phase B: Design the workflow. Trace the inherited owners, compare contract shapes, record one accepted contract and isolated writers.
+- [x] Phase C: Run the loop. Implement and verify the core and native journey in bounded units, then integrate on this branch.
+- [x] Phase D: Keep the audit trail. Update this section with decisions, named owners, evidence and exact remaining work.
+- [x] Phase E: Preserve the runnable simulator, recording and restart instructions. The terminal audit on [PR #747](https://github.com/lagarcess/argus/pull/747) owns exact final-head CI/review and the merge-ready verdict; this documentation does not waive those gates.
+
+Current checkpoint: all five recording kinds, inspection, corrections, balance-check
+coverage and recovery passed assembled simulator acceptance against real local
+Auth/API/Postgres. The [recording, retained accounts and restart guide](../reports/evidence/personal-money-recording/ios/README.md)
+make the demonstration repeatable. The shared
+[API contract](../API_CONTRACT.md#personal-money-activities-authorized-september-29-2026)
+and additive storage contract are committed. The isolated 585xx stack and Argus
+Personal Money simulator remain running; the earlier 584xx demo is preserved.
+Workers have completed their bounded assignments and released the simulator to
+the captain. This is local synthetic-user evidence, not physical-phone delivery.
+
+| Named owner | Branch / exclusive surfaces | Next usable result |
+| --- | --- | --- |
+| `money_core` | `codex/personal-money-core`, recording domain, API, additive migration, backend tests, API/data contracts | Complete through `79032245`; five kinds, paired correction, refund rules, monthly Home, preserved legacy receipts and additive revision integrity. Final scoped core review clean |
+| `money_iphone` | `codex/personal-money-iphone`, Swift feature/transport/models, localization and model tests | Complete through `3a6e5873`, integrated as `2e678d3d4`; 47 package cases with four expected environment skips and nine model tests. Scoped native review clean; simulator acceptance also verified the full-row tap fix |
+| `money_demo_setup` | `codex/personal-money-acceptance`, connected UI tests, isolated launcher and new evidence; exclusive simulator owner | Complete through `5de47c00`; original seven native cases plus the strengthened isolation case passed, nine original retained accounts checked against canonical reads, recording and restart guide committed; simulator released to captain |
+| Captain | `codex/personal-money-recording`, manifest, assembled source, independent proof and PR | Assembled source and independent HTTP proof complete; owns final CI/scoped review and retained local services; no merge |
+
+Design decision, September 29: two code-grounded alternatives and an independent
+cross-judge favored extending existing account records and exact-revision coverage
+with an atomic activity group. Replacing the ledger or rebuilding coverage foreign
+keys adds migration risk without a user benefit. Preserve old expense IDs and retry
+receipts. Correcting an account selection retires the old leg with retained history
+and applies the new leg in the same operation; do not edit one side independently.
+A single owner-scoped activity transaction lock, taken before sorted account locks
+by every new and legacy activity writer, serializes refund/correction invariants.
+Account-only check/opening/metadata writers retain their existing account lock.
+No SQL or native layer becomes a second financial rule owner.
+
+The canonical native contract exposes one operation, all affected account effects,
+per-account observation questions and a normalized reviewed request. Confirmation
+binds the complete affected versions and exact request; idempotent replay precedes
+stale-version rejection. A protected owner-scoped pending command survives native
+process death and supports explicit same-key recovery. Monthly Home reporting uses
+one explicit reporting zone and period, gross purchases/refunds/net spending and
+received income; negative net spending remains visible. Refund categories follow
+the linked purchase without rewriting historical provenance. Changing a purchase's
+category while refunds remain linked is rejected with explicit correction/unlink
+instructions; historical categories are not silently rewritten. Currency conversion
+and loan allocation remain outside the assigned operation set.
+
+The captain's local response-loss proxy forwards to loopback only and drops one
+successful activity response after the API accepts it. Five proxy checks pass.
+Use it for assembled process-restart and same-key recovery proof, not as a substitute
+for database atomicity and isolation checks. It does not change application behavior
+or hosted configuration.
+
+Backend verification includes 143 owner-run financial checks against the isolated
+database, plus the captain's real Auth/API identity check. The HTTP proof covers
+all five kinds, paired replay and inspection, wrong-account correction and history,
+refund caps, positive card credit, unknown USD investment balance, cross-owner
+refusal, durable reopening and refunds reducing received-month spending. The captain reran
+[HTTP acceptance](../reports/evidence/personal-money-recording/http-proof.json)
+against the assembled local API; its runtime source `062fd2aa8` is identical to
+`2e678d3d4` across backend, migrations and the proof script.
+The source-timezone and omitted-versus-explicit-null refund correction fixes passed
+independent delta review. Reusing grouped activity reads reduced a synthetic
+3,000-record projection from 2.598 seconds to 0.009 seconds without another cache.
+
+The native review corrected terminal authentication propagation, rejected-recovery
+explanations and retired-leg labels. A final delta review confirmed the Accounts
+view observes the recovery state directly. The captain's combined local financial,
+real Auth/API/Postgres, launcher and response-loss-proxy matrix passed 163 tests
+with no skips. The canonical OpenAPI artifact has been regenerated; its 23
+compatibility checks pass. The initial GitHub review at `b18050fcf` returned clean
+with zero threads and CI at `2e678d3d4` passed. Final-head CI/review are recorded
+in the PR terminal audit rather than duplicated as a moving SHA in this manifest.
+
+[Native verification](../reports/evidence/personal-money-recording/ios/verification.json)
+records the original seven selected cases plus a strengthened isolation case: row taps; income/spending/refund corrections;
+paired transfer and wrong-account correction; card payment/refund/credit;
+per-account reconciliation, currencies, unknowns and Spanish presentation;
+committed-response loss with same-key recovery after process restart; and a
+read-only Home relaunch; and pending-write isolation across loaded identities. The two fault-opt-in launcher tests also pass. Six long
+cases logged terminal passes but Xcode stalled finalizing their result bundles;
+they do not claim clean full-run exits. The final read-only run exited 0.
+Screenshots and canonical readbacks independently preserve the observations.
+The 2:55 recording is an explicitly edited demonstration, not the exhaustive test.
+
+The final scoped GitHub review found the original native isolation assertion could
+run before B loaded and had no pending A command. That claim is superseded by
+`testPendingMoneyWriteRemainsIsolatedAcrossIdentities` (`3106f2f6`, integrated as
+`b8aea0c0f`): a known B-owned account must load before absence assertions; an actual
+committed-response-loss A command stays absent from B, survives the switch back,
+and recovers once with the same record after reopening. This case passed in
+232.846 seconds with a clean test-runner exit. The fix changes tests and evidence
+only; no runtime defect was observed. Final CI and latest-delta review remain
+owned by the PR terminal audit.
+
+Application/backend source is unchanged after `2e678d3d4`; later commits add
+acceptance harness, evidence and documentation. Exact source provenance is retained
+in the evidence and revalidated against the final PR head. No physical phone,
+founder identity, real production data, signing, deployment or paid providers were
+used. Same-currency movements and chronological balance-check limits remain
+explicit implementation boundaries. The full MVEE below is not complete.
+
+
+### Founder acceptance and small clarity follow-up
+
+The founder accepted the demonstrated financial behavior, then requested visible
+**From / To** labels and removal of the redundant transfer-account heading before
+merge. This follow-up changes only the native form presentation; recording rules,
+records, API and migrations retain the accepted behavior. The existing English
+and Spanish labels remain the single copy source. The focused simulator check
+passed at `7a3bf64f`: English/dark and Spanish/light labels, both account menus,
+reviewed transfer effects, existing correction labels and expense/card picker
+regression checks. Both new-transfer previews were cancelled without confirmation.
+The [clarity evidence](../reports/evidence/personal-money-recording/ios/transfer-label-review/README.md)
+and final PR audit own verification and merge readiness; no merge is authorized.
+
+Remaining visual polish is tracked here, not silently treated as complete or as a
+new MVEE deferral. The native experience owner should review visible role labels
+on the other compact selectors (card payment, income source, category and linked
+purchase), plus spacing and long-account-name/larger-text presentation against the
+locked design. The focused Spanish screenshot also shows the existing
+`Transferencia` type chip partially clipped at the horizontal row's right edge;
+review selected-chip visibility in that polish work. These are follow-up
+presentation checks, not claims of financial defects or permission for a broader
+redesign. This requested fix is limited to
+transfer clarity; the full MVEE and physical-phone gates below remain unchanged.
+
+Model the Domain shaped the typed activity group. Separate Before Serializing
+Shared State shaped the isolated writers. Prove It Works requires both real
+Postgres invariants and assembled simulator acceptance; passing component tests
+alone will not close this batch. The exact wire and storage amendments live in
+API_CONTRACT and DATA_MODEL, owned by the core writer, rather than another board.
+
+## Landed financial-loop batch (historical authorization)
 
 The founder authorized this batch on September 29, 2026 after PR #744 merged.
 The restart covers implementation, local verification, simulator builds, device
@@ -251,7 +443,7 @@ instructions; the landing checkpoint above owns current status.
   independent reviewers have completed their assigned local work. The captain
   retains signing, hosted compatibility, publication and physical acceptance.
 
-### Current handoff
+### Financial-loop landing handoff
 
 The locally verified loop is merged through #745. Keep its
 simulator/local-backend demonstration runnable. PR #746 carries the
@@ -534,8 +726,9 @@ identifiers, not a second specification. A row's next integration task and plann
 evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
-founder's physical iPhone. Reuse and gaps below are the September 29 inspection
-snapshot. Only work required by the active financial-loop batch is restarted. Proposed owners
+founder's physical iPhone. Reuse and gaps below include landed #745 and the
+explicitly unmerged #747 candidate. Only the personal money-recording batch is
+active; its named owners and acceptance state are recorded above. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -543,10 +736,10 @@ sequence rather than a separate deferral policy in this document.
 | --- | --- | --- | --- | --- | --- |
 | [Access][mvee-access], D01 | Argus auth/recovery; Swift session/Keychain | Finish native/hosted auth adapter and guest conversion | Native continuity + Device/release | Identity API; signing/hosted access for phone proof | Physical-device auth recordings and session/identity test results |
 | [iPhone experience][mvee-platforms], D15 | Native shell; localization; design archive | Replace sample destinations with connected modules | Native continuity | Domain reads per destination | Device navigation/accessibility recordings against [native quality][mvee-quality] |
-| [Accounts and assets][mvee-accounts], D02/D04 | Landed account/opening backend; unfinished iOS client | Recover account client and extend saved-item data model | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
-| [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | Recording domain currently supports openings only | Implement posting and connect native entry/history clients | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
-| [Reconciliation][mvee-activity], D03 | Opening revisions; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Implement observation lineage and balance reads with posting | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
-| [Home][mvee-home], D05 | Locked design; account facts; chart prototype | Connect Home's read model and domain destinations | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
+| [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 native account/opening lifecycle and real local API | Extend saved assets and ownership/space behavior; verify existing lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
+| [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; unmerged #747 five-kind manual entry, paired correction/history and refund candidate | Local assembled acceptance passed; finish #747 final CI/review and later authorized phone proof; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
+| [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage candidate; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
+| [Home][mvee-home], D05 | #745 connected known/unknown positions; #747 monthly income/purchases/refunds candidate; locked design and chart prototype | Add approved forecast, plan/context, chart and destination surfaces through their domain owners; verify assembled Home on the phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
 | [Plan][mvee-plan], D06 | Existing calculators; locked plan design | Implement plan persistence and actual-activity adapters | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |

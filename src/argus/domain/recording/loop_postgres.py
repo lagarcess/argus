@@ -44,11 +44,11 @@ def hydrate(connection: Connection, stored: StoredAccount) -> StoredAccount:
     expenses, checks = {}, []
     for rid, kind, rev, amount, stamp, zone, reason, by, at, details in rows:
         rid = str(rid)
-        if kind == "expense":
+        if kind in {"expense", "income", "transfer", "card_payment", "refund"}:
             expenses.setdefault(rid, []).append(
                 ExpenseRevision(
                     rev,
-                    -amount,
+                    abs(amount),
                     stamp,
                     zone,
                     details.get("note"),
@@ -56,9 +56,17 @@ def hydrate(connection: Connection, stored: StoredAccount) -> StoredAccount:
                     reason,
                     str(by) if by else None,
                     at,
+                    kind=kind,
+                    role=details.get("role", "single"),
+                    active=details.get("active", True),
+                    activity_id=details.get("activity_id"),
+                    activity_revision=details.get("activity_revision"),
+                    source_id=details.get("source_id"),
+                    purchase_activity_id=details.get("purchase_activity_id"),
+                    purchase_revision=details.get("purchase_revision"),
                 )
             )
-        else:
+        elif kind == "balance_check":
             checks.append(
                 CheckRecord(
                     rid,

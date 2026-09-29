@@ -33,6 +33,7 @@ def test_create_then_reopen_returns_the_same_accepted_data(alice: AccountsApi) -
         "as_of": created["opening"]["as_of"],
         "basis": "opening",
         "activity_since_tracking_minor": 0,
+        "credit_minor": None,
     }
     assert created["opening"]["revision"] == 1
     assert created["opening"]["time_zone"] == "America/Santo_Domingo"
@@ -109,6 +110,7 @@ def test_known_zero_differs_from_unknown(alice: AccountsApi) -> None:
         "as_of": None,
         "basis": None,
         "activity_since_tracking_minor": 0,
+        "credit_minor": None,
     }
     assert unknown["opening"] is None
     assert unknown["nickname"] is None
@@ -506,7 +508,10 @@ def test_corrections_keep_history_and_enforce_expected_revision(
     assert len(redated.json()["opening"]["revisions"]) == 3
 
     for body, code in (
-        ({"expected_version": 3, "expected_revision": 3, "amount": "1"}, "reason_required"),
+        (
+            {"expected_version": 3, "expected_revision": 3, "amount": "1"},
+            "reason_required",
+        ),
         (
             {"expected_version": 3, "expected_revision": 3, "reason": "nothing changes"},
             "field_missing",

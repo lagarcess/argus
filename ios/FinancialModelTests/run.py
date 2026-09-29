@@ -1,5 +1,6 @@
 """Test the actual native presentation models without changing signing/project files."""
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -11,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     tests = package / "Tests/FinancialModelTests"
     source.mkdir(parents=True)
     tests.mkdir(parents=True)
-    for name in ("AccountsModel.swift", "FinancialLoopModel.swift", "AccountEntry.swift"):
+    for name in ("AccountsModel.swift", "FinancialLoopModel.swift", "FinancialActivityEditor.swift", "AccountEntry.swift"):
         shutil.copy(root / "ios/ArgusFoundation/Accounts" / name, source / name)
     # The formatter remains one production source; copy its exact declaration.
     presentation = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
@@ -28,4 +29,8 @@ let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], depend
     .testTarget(name: "FinancialModelTests", dependencies: ["FinancialModels", .product(name: "ArgusSession", package: "ArgusSession"), .product(name: "Auth", package: "supabase-swift")])
 ])
 ''')
-    subprocess.run(["swift", "test", "--package-path", str(package), "--scratch-path", str(root / "ios/.build/financial-model-tests")], check=True)
+    scratch = Path(os.environ.get("ARGUS_FINANCIAL_MODEL_SCRATCH_PATH", root / "ios/.build/financial-model-tests"))
+    command = ["swift", "test", "--package-path", str(package), "--scratch-path", str(scratch)]
+    if os.environ.get("ARGUS_SWIFT_DISABLE_SANDBOX") == "1":
+        command += ["--disable-sandbox", "--disable-automatic-resolution"]
+    subprocess.run(command, check=True)

@@ -33,6 +33,18 @@ struct FinancialHomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 PersonalContext()
+                if loop.pendingConfirmation != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("loop.pending.title").font(ArgusStyle.body(15))
+                        Text("loop.pending.body").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                        Button("loop.pending.retry") { Task { await loop.retryPending() } }
+                            .buttonStyle(PillButtonStyle()).disabled(loop.recovering)
+                            .accessibilityIdentifier("loop.pending.retry")
+                    }.padding(16).overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
+                }
+                if let recoveryError = loop.recoveryErrorKey {
+                    Text(LocalizedStringKey(recoveryError)).foregroundStyle(ArgusStyle.secondary)
+                }
                 if let home = loop.home {
                     if home.currencies.isEmpty {
                         Text("loop.home.empty").font(ArgusStyle.display())
@@ -47,7 +59,7 @@ struct FinancialHomeView: View {
                             }
                             Spacer(); Image(systemName: "chevron.right").font(.system(size: 12))
                         }.padding(.vertical, 16).contentShape(Rectangle())
-                    }.buttonStyle(.plain).disabled(accounts.accounts.isEmpty).accessibilityIdentifier("home.record")
+                    }.buttonStyle(.plain).disabled(accounts.accounts.isEmpty || loop.pendingConfirmation != nil).accessibilityIdentifier("home.record")
                     if !home.recentActivity.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("loop.recent").font(ArgusStyle.display(22))
@@ -85,7 +97,7 @@ struct FinancialHomeView: View {
         .refreshable { await accounts.load(); await loop.refresh() }
         .confirmationDialog("loop.chooseAccount", isPresented: $choosingAccount, titleVisibility: .visible) {
             ForEach(accounts.accounts.filter { !$0.archived }) { account in
-                Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) { loop.expense(account) }
+                Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) { loop.record(account) }
             }
         }
     }
@@ -114,7 +126,22 @@ struct FinancialHomeView: View {
                     if summary.otherAssetsMinor != "0" { summaryRow("loop.home.other", value: money(summary.otherAssetsMinor, summary)) }
                     summaryRow("loop.home.debt", value: money(summary.debtsMinor, summary))
                 }
-                summaryRow("loop.home.spending", value: money(summary.recordedSpendingMinor, summary))
+                if let period = loop.home?.period,
+                   let income = summary.grossIncomeMinor,
+                   let purchases = summary.grossPurchasesMinor,
+                   let refunds = summary.refundsMinor,
+                   let net = summary.netSpendingMinor {
+                    Text(verbatim: period.month).font(ArgusStyle.body(12, relativeTo: .caption))
+                        .foregroundStyle(ArgusStyle.secondary)
+                    summaryRow("loop.home.income", value: money(income, summary))
+                    summaryRow("loop.home.purchases", value: money(purchases, summary))
+                    summaryRow("loop.home.refunds", value: money(refunds, summary))
+                    summaryRow("loop.home.netSpending", value: money(net, summary))
+                    Text("loop.home.recordedOnly").font(ArgusStyle.body(11, relativeTo: .caption))
+                        .foregroundStyle(ArgusStyle.secondary)
+                } else {
+                    summaryRow("loop.home.spending", value: money(summary.recordedSpendingMinor, summary))
+                }
             }.padding(.top, 6)
         }
     }
@@ -143,6 +170,7 @@ struct AccountRow: View {
                 } else { Text("accounts.unknown") }
             }.font(ArgusStyle.body(12, relativeTo: .caption)).multilineTextAlignment(.trailing)
         }.padding(.vertical, 18).frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
             .accessibilityElement(children: .combine)
     }

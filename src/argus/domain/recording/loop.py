@@ -22,6 +22,24 @@ class ExpenseRevision:
     reason: str | None
     recorded_by: str | None
     recorded_at: datetime
+    kind: str = "expense"
+    role: str = "single"
+    active: bool = True
+    activity_id: str | None = None
+    activity_revision: int | None = None
+    source_id: str | None = None
+    purchase_activity_id: str | None = None
+    purchase_revision: int | None = None
+
+    @property
+    def movement_minor(self) -> int:
+        if not self.active:
+            return 0
+        return (
+            -self.amount_minor
+            if self.kind == "expense" or self.role == "source"
+            else self.amount_minor
+        )
 
 
 @dataclass(frozen=True)
@@ -110,7 +128,7 @@ def eligible(expense: ExpenseRevision, observation: Observation) -> bool:
 def included(
     expense: ExpenseRecord, observation: Observation, coverage: tuple[Coverage, ...]
 ) -> bool:
-    if not eligible(expense.current, observation):
+    if not expense.current.active or not eligible(expense.current, observation):
         return False
     for link in coverage:
         if (
@@ -129,18 +147,24 @@ def position(
     expenses: tuple[ExpenseRecord, ...],
     coverage: tuple[Coverage, ...],
 ) -> Balance:
-    activity = -sum(e.current.amount_minor for e in expenses)
+    activity = sum(e.current.movement_minor for e in expenses)
     anchors = observations(opening, checks)
     if not anchors:
         return Balance(state="unknown", activity_since_tracking_minor=activity)
     latest = anchors[-1]
     movement = sum(
-        -e.current.amount_minor for e in expenses if not included(e, latest, coverage)
+        e.current.movement_minor
+        for e in expenses
+        if e.current.active and not included(e, latest, coverage)
     )
     as_of, source_zone = max(
         [
             (latest.as_of, latest.time_zone),
-            *((e.current.occurred_at, e.current.time_zone) for e in expenses),
+            *(
+                (e.current.occurred_at, e.current.time_zone)
+                for e in expenses
+                if e.current.active
+            ),
         ],
         key=lambda source: source[0],
     )
@@ -162,11 +186,13 @@ def expected_at(
     if preceding is None:
         return None
     newly_covered = sum(
-        e.current.amount_minor
+        e.current.movement_minor
         for e in expenses
-        if included(e, observation, coverage) and not included(e, preceding, coverage)
+        if e.current.active
+        and included(e, observation, coverage)
+        and not included(e, preceding, coverage)
     )
-    return preceding.amount_minor - newly_covered
+    return preceding.amount_minor + newly_covered
 
 
 def residuals(
@@ -194,7 +220,7 @@ def validate_monotonic(
 ) -> None:
     seen = False
     for observation in anchors:
-        if not eligible(expense.current, observation):
+        if not expense.current.active or not eligible(expense.current, observation):
             if seen:
                 raise RecordingInputError(
                     "coverage_date_conflict",

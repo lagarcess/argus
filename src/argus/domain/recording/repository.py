@@ -119,6 +119,9 @@ class InMemoryFinancialAccountRepository:
         self._clock = clock
         self._lock = threading.Lock()
         self._accounts: dict[str, StoredAccount] = {}
+        self._money_receipts: dict[
+            tuple[str, str | None, str], tuple[str, str, int, tuple[str, ...]]
+        ] = {}
         self._operations: dict[tuple[str, str, str], tuple[str, str, int, str]] = {}
         self._reservations: dict[tuple[str, str, str], tuple[str, str]] = {}
 

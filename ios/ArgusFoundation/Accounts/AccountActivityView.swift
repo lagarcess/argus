@@ -4,17 +4,18 @@ import ArgusSession
 struct AccountActivityView: View {
     @ObservedObject var loop: FinancialLoopModel
     let account: FinancialAccount
-    @State private var pendingCorrection: FinancialActivity?
+    @State private var pendingCorrection: FinancialActivityDetail?
     @State private var inspected: FinancialActivity?
-    @State private var revisions: [FinancialActivity] = []
+    @State private var detail: FinancialActivityDetail?
+    @State private var revisions: [FinancialActivityDetail] = []
     @State private var historyFailed = false
     @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Button { loop.expense(account) } label: {
+            Button { loop.record(account) } label: {
                 Label("loop.record", systemImage: "plus").frame(maxWidth: .infinity)
-            }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("accounts.record")
+            }.buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("accounts.record")
             Button("loop.check.title") { loop.check(account) }.frame(minHeight: 44)
                 .accessibilityIdentifier("accounts.check")
             if let error = loop.errorKey {
@@ -55,31 +56,48 @@ struct AccountActivityView: View {
         }
         .task(id: account.version) { await loop.open(account) }
         .sheet(item: $inspected, onDismiss: {
-            if let activity = pendingCorrection { pendingCorrection = nil; loop.expense(account, correcting: activity) }
+            if let activity = pendingCorrection { pendingCorrection = nil; loop.record(account, correcting: activity) }
         }) { activity in
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         FinancialActivityRow(activity: activity, currency: account.currency)
-                        Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
-                        if let reason = activity.reason { Text(verbatim: reason) }
-                        if revisions.count > 1 {
-                            Text("loop.revisions").font(ArgusStyle.display(22))
-                            ForEach(revisions, id: \.revision) { revision in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    FinancialActivityRow(activity: revision, currency: account.currency)
-                                    if let reason = revision.reason { Text(verbatim: reason) }
+                        if let detail {
+                            Text(LocalizedStringKey("loop.kind." + detail.kind.rawValue)).font(ArgusStyle.display(22))
+                            Text(verbatim: AccountPresentation.date(detail.occurredAt, zone: detail.timeZone, locale: locale))
+                            if let category = detail.categoryId { Text(LocalizedStringKey("loop.category." + category)) }
+                            if let source = detail.sourceId { Text(LocalizedStringKey("loop.source." + source)) }
+                            if let note = detail.note, !note.isEmpty { Text(verbatim: note) }
+                            if detail.kind == .refund {
+                                Text(detail.purchaseActivityId == nil ? "loop.activity.purchaseNone" : "loop.activity.linkedPurchase")
+                            }
+                            ForEach(detail.legs) { leg in
+                                HStack {
+                                    Text(loop.accountName(leg.accountId))
+                                    Spacer()
+                                    Text(leg.role == "source" ? "loop.activity.from" : leg.role == "destination" ? "loop.activity.to" : "loop.activity.account")
+                                }.font(ArgusStyle.body(13, relativeTo: .subheadline))
+                            }
+                            if let reason = detail.reason { Text(verbatim: reason) }
+                            if revisions.count > 1 {
+                                Text("loop.revisions").font(ArgusStyle.display(22))
+                                ForEach(revisions, id: \.revision) { revision in
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text(verbatim: revision.currency + " " + AccountPresentation.amount(revision.amount, locale: locale))
+                                        Text(verbatim: AccountPresentation.date(revision.occurredAt, zone: revision.timeZone, locale: locale))
+                                        if let reason = revision.reason { Text(verbatim: reason) }
+                                    }
                                 }
                             }
-                        }
+                        } else if !historyFailed { ProgressView("accounts.loading") }
                         if historyFailed {
                             Text("loop.error.connection")
                             Button("accounts.retry") { Task { await loadHistory(activity) } }
                         }
                         Button("loop.correction.title") {
-                            pendingCorrection = activity
+                            pendingCorrection = detail
                             inspected = nil
-                        }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("activity.correct")
+                        }.buttonStyle(PillButtonStyle()).disabled(detail == nil).accessibilityIdentifier("activity.correct")
                     }.padding(24)
                 }.background(ArgusStyle.background)
                     .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
@@ -88,8 +106,12 @@ struct AccountActivityView: View {
         }
     }
     private func loadHistory(_ activity: FinancialActivity) async {
-        revisions = []; historyFailed = false
-        do { revisions = try await loop.history(account, activity: activity) } catch { historyFailed = true }
+        detail = nil; revisions = []; historyFailed = false
+        do {
+            let current = try await loop.detail(activity)
+            detail = current
+            revisions = try await loop.detailHistory(current)
+        } catch { historyFailed = true }
     }
 }
 
@@ -104,19 +126,34 @@ struct FinancialActivityRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: "arrow.up.right").frame(width: 24)
+            Image(systemName: symbol).frame(width: 24)
             VStack(alignment: .leading, spacing: 7) {
                 if let note = activity.note, !note.isEmpty { Text(verbatim: note).lineLimit(2) }
-                else { Text("loop.expense.title") }
+                else { Text(LocalizedStringKey("loop.kind." + activity.kind)) }
+                if activity.active == false {
+                    Text("loop.activity.moved").font(ArgusStyle.body(11, relativeTo: .caption))
+                        .foregroundStyle(ArgusStyle.secondary).accessibilityIdentifier("activity.moved")
+                }
                 Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
                     .font(ArgusStyle.body(11, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
             }
             Spacer(minLength: 8)
-            Text(verbatim: "−" + currency + " " + AccountPresentation.amount(activity.amount, locale: locale))
+            Text(verbatim: sign + currency + " " + AccountPresentation.amount(activity.amount, locale: locale))
                 .font(ArgusStyle.body(12, relativeTo: .caption)).monospacedDigit()
         }.font(ArgusStyle.body(14, relativeTo: .subheadline)).padding(.vertical, 16)
+            .contentShape(Rectangle())
             .overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
             .accessibilityElement(children: .combine)
+    }
+    private var sign: String { activity.balanceMovementMinor > 0 ? "+" : activity.balanceMovementMinor < 0 ? "−" : "" }
+    private var symbol: String {
+        switch activity.kind {
+        case "income": "arrow.down.left"
+        case "transfer": "arrow.left.arrow.right"
+        case "card_payment": "creditcard"
+        case "refund": "arrow.uturn.backward"
+        default: "arrow.up.right"
+        }
     }
 }
 
@@ -125,6 +162,10 @@ struct FinancialEditorPresenter: View {
     let appearance: AppearancePreference
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
+            .sheet(item: $loop.activityEditor) { editor in
+                FinancialActivityEditorView(model: editor)
+                    .preferredColorScheme(appearance.colorScheme).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink)
+            }
             .sheet(item: $loop.editor) { editor in
                 FinancialEditorView(model: editor)
                     .preferredColorScheme(appearance.colorScheme).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink)

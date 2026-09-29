@@ -72,6 +72,7 @@ class BalanceResponse(BaseModel):
     as_of: datetime | None = None
     basis: Literal["opening", "balance_check"] | None = None
     activity_since_tracking_minor: int = 0
+    credit_minor: int | None = None
 
 
 class OpeningRevisionResponse(BaseModel):
@@ -148,6 +149,9 @@ def _balance_response(balance: Balance, facts: AccountFacts) -> BalanceResponse:
     assert balance.amount_minor is not None and balance.as_of is not None
     return BalanceResponse(
         state="known",
+        credit_minor=max(balance.amount_minor, 0)
+        if facts.type == "credit_card"
+        else None,
         amount_minor=balance.amount_minor,
         amount=format_minor_units(balance.amount_minor, facts.currency),
         as_of=balance.as_of,

@@ -12,22 +12,32 @@ final class FinancialLoopModel: ObservableObject {
     @Published private(set) var errorKey: String?
     @Published private(set) var loading = false
     @Published var editor: FinancialEditor?
+    @Published var activityEditor: FinancialActivityEditor?
+    @Published private(set) var pendingConfirmation: PendingFinancialConfirmation?
+    @Published private(set) var recovering = false
+    @Published private(set) var recoveryErrorKey: String?
     private let controller: SessionController
     private let accounts: AccountsModel
+    private let journal: FinancialWriteJournal
     private var identity: SessionSnapshot?
     private var generation = UUID()
     private var homeRequest = UUID()
     private var detailRequest = UUID()
     var sessionChanged: ((SessionSnapshot) -> Void)?
 
-    init(controller: SessionController, accounts: AccountsModel) {
-        self.controller = controller; self.accounts = accounts
+    init(controller: SessionController, accounts: AccountsModel, journal: FinancialWriteJournal) {
+        self.controller = controller; self.accounts = accounts; self.journal = journal
     }
 
     func bind(_ snapshot: SessionSnapshot?) {
         guard identity?.revision != snapshot?.revision || identity?.profile?.id != snapshot?.profile?.id || identity?.phase != snapshot?.phase else { return }
         generation = UUID(); identity = snapshot?.phase == .authenticated ? snapshot : nil
-        home = nil; activity = []; checks = []; activityCursor = nil; checksCursor = nil; loadingMore = false; editor = nil; errorKey = nil; loading = false
+        home = nil; activity = []; checks = []; activityCursor = nil; checksCursor = nil; loadingMore = false
+        editor = nil; activityEditor = nil; errorKey = nil; loading = false; recovering = false; recoveryErrorKey = nil
+        if let identity {
+            do { pendingConfirmation = try journal.pending(for: identity) }
+            catch { pendingConfirmation = nil; recoveryErrorKey = "auth.error.storage" }
+        } else { pendingConfirmation = nil }
     }
 
     func refresh() async {
@@ -85,6 +95,91 @@ final class FinancialLoopModel: ObservableObject {
             entries += page.items; cursor = page.nextCursor
         } while cursor != nil
         return entries
+    }
+
+    func detail(_ activity: FinancialActivity) async throws -> FinancialActivityDetail {
+        guard let identity else { throw SessionFailure.unauthorized }
+        let ticket = generation
+        do {
+            let value = try await controller.financialActivityDetail(activity.activityId ?? activity.recordId, expectedIdentity: identity)
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            return value
+        } catch {
+            await handle(error, ticket: ticket)
+            throw error
+        }
+    }
+
+    func detailHistory(_ activity: FinancialActivityDetail) async throws -> [FinancialActivityDetail] {
+        guard let identity else { throw SessionFailure.unauthorized }
+        let ticket = generation
+        do {
+            let page = try await controller.financialActivityDetailHistory(activity.activityId, expectedIdentity: identity)
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            return page.items
+        } catch {
+            await handle(error, ticket: ticket)
+            throw error
+        }
+    }
+
+    func accountName(_ id: UUID) -> String {
+        guard let account = accounts.accounts.first(where: { $0.id == id }) else { return id.uuidString }
+        return account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")
+    }
+
+    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil) {
+        guard let identity, pendingConfirmation == nil else { return }
+        let ticket = generation
+        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, controller: controller,
+            journal: journal, identity: identity, started: { [weak self] write in
+                guard let self, self.generation == ticket else { return }
+                self.pendingConfirmation = write
+            }, resolved: { [weak self] in
+                guard let self, self.generation == ticket else { return }
+                self.pendingConfirmation = nil
+            }, retired: { [weak self] snapshot in
+                guard let self, self.generation == ticket else { return }
+                self.bind(snapshot); self.sessionChanged?(snapshot)
+            }) { [weak self] receipt in
+                await self?.accepted(receipt, originId: account.id, ticket: ticket)
+            }
+    }
+
+    func retryPending() async {
+        guard let identity, let write = pendingConfirmation, !recovering else { return }
+        let ticket = generation
+        recovering = true; recoveryErrorKey = nil
+        defer { if generation == ticket { recovering = false } }
+        do {
+            let current = await controller.snapshot()
+            guard generation == ticket, current == identity else { throw SessionFailure.staleOperation }
+            let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
+            guard generation == ticket else { return }
+            try journal.clear(write, for: identity)
+            pendingConfirmation = nil
+            await accepted(receipt, originId: write.originAccountId, ticket: ticket)
+        } catch {
+            guard generation == ticket else { return }
+            let current = await controller.snapshot()
+            guard generation == ticket else { return }
+            if current != identity { bind(current); sessionChanged?(current); return }
+            if case SessionFailure.rejected(let status, _) = error, (400..<500).contains(status), status != 408 {
+                do { try journal.clear(write, for: identity); pendingConfirmation = nil }
+                catch { recoveryErrorKey = "auth.error.storage"; return }
+                await accounts.load(); await refresh()
+            }
+            recoveryErrorKey = FinancialActivityEditor.message(error)
+        }
+    }
+
+    private func accepted(_ receipt: FinancialActivityReceipt, originId: UUID, ticket: UUID) async {
+        guard generation == ticket, identity != nil else { return }
+        pendingConfirmation = nil
+        accounts.accept(receipt.accounts, preserving: originId)
+        activityEditor = nil
+        await refresh()
+        if let selected = accounts.selected { await open(selected) }
     }
 
     func expense(_ account: FinancialAccount, correcting activity: FinancialActivity? = nil) {
