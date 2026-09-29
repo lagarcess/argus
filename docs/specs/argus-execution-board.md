@@ -189,8 +189,11 @@ Remaining visual polish is tracked here, not silently treated as complete or as 
 new MVEE deferral. The native experience owner should review visible role labels
 on the other compact selectors (card payment, income source, category and linked
 purchase), plus spacing and long-account-name/larger-text presentation against the
-locked design. These are follow-up presentation checks, not claims of financial
-defects or permission for a broader redesign. This requested fix is limited to
+locked design. The focused Spanish screenshot also shows the existing
+`Transferencia` type chip partially clipped at the horizontal row's right edge;
+review selected-chip visibility in that polish work. These are follow-up
+presentation checks, not claims of financial defects or permission for a broader
+redesign. This requested fix is limited to
 transfer clarity; the full MVEE and physical-phone gates below remain unchanged.
 
 Model the Domain shaped the typed activity group. Separate Before Serializing
