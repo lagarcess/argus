@@ -20,7 +20,9 @@ CAPTCHA hosting, identity, signing team and callbacks remain unapproved.
 The simulator uses an **ad-hoc signature with no account/team**, with
 `application-identifier` derived from the replaceable local bundle identity.
 This lets Keychain work; an unsigned simulator executable fails with -34018.
-The project remains simulator-only. This is not production signing configuration.
+The default project configuration remains simulator-only. The opt-in
+[device configuration](../docs/reports/financial-loop-device-preparation.md)
+requires approved signing access.
 
 ## Session behavior
 

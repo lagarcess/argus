@@ -40,8 +40,10 @@ xcrun simctl install <iPhone-UDID> ios/.build/DerivedData/Build/Products/Debug-i
 xcrun simctl launch <iPhone-UDID> local.argus.foundation
 ```
 
-Use a separate simulator when other work is active. The checked-in configuration
+Use a separate simulator when other work is active. The default configuration
 supports Simulator only, device family 1 (iPhone), no Catalyst or iPad target.
+The opt-in [device preparation](../docs/reports/financial-loop-device-preparation.md)
+uses a separate configuration after the founder approves signing access.
 A local ad-hoc signature enables simulator Keychain without a signing account.
 Production bundle identity, team, provisioning, physical
 device distribution and release OS support remain unresolved.

@@ -28,3 +28,5 @@ ARGUS_WEB_URL =
 ARGUS_CAPTCHA_URL =
 // Optional ignored overrides for local development; never put secrets here.
 #include? "Local.xcconfig"
+// Opt-in device overrides belong to the approved local signing setup.
+#include? "Device.local.xcconfig"

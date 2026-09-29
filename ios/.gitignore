@@ -4,3 +4,4 @@ xcuserdata/
 Config/Local.xcconfig
 *.xcresult/
 __pycache__/
+Config/Device.local.xcconfig

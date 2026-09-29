@@ -447,9 +447,9 @@ export async function acquireGuestCaptchaToken(
   });
 }
 
-export async function acquirePasswordAuthCaptchaToken(): Promise<string> {
+export async function acquirePasswordAuthCaptchaToken(signal?: AbortSignal): Promise<string> {
   try {
-    const token = (await acquireGuestCaptchaToken()).trim();
+    const token = (await acquireGuestCaptchaToken(undefined, signal)).trim();
     if (!token || token.length > 4096) {
       throw new Error("captcha_token_out_of_bounds");
     }
