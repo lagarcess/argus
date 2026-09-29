@@ -24,7 +24,7 @@ stop statements below are historical; this grant activates only the work here.
 
 **Integration base:** freshly fetched
 `b4fed10fe5cd325a7cd3e6ac21b87e9fbf5eb819` (#745 plus #746).
-**Delivery branch:** `codex/personal-money-recording`.
+**Delivery branch:** `codex/personal-money-recording`; [PR #747](https://github.com/lagarcess/argus/pull/747).
 **Goal:** a person uses the native app with the real local API/Postgres to receive
 income, spend, move money between owned accounts, pay a card and record a refund;
 Accounts and Home agree after inspection, corrections and reopening. Unknown
@@ -76,8 +76,10 @@ assignment, not a claim that this slice completes the ecosystem.
 - [ ] Phase D: Keep the audit trail. Update this section with decisions, named owners, evidence and exact remaining work.
 - [ ] Phase E: Verify and hand back. Deliver the runnable simulator, recording, restart instructions and merge-ready PR after CI and scoped review.
 
-Current checkpoint: the backend is implemented and the iPhone journey is in
-connected simulator acceptance. Publication has not started.
+Current checkpoint: core and native implementation are integrated in PR #747,
+with clean scoped local reviews. Connected simulator acceptance, recording and
+recovery proof are in progress while CI and the GitHub review run. This is not
+yet a merge-ready or physical-phone claim.
 The shared [API contract](../API_CONTRACT.md#personal-money-activities-authorized-september-29-2026)
 and additive storage contract are committed. The new local stack on 585xx and
 dedicated Argus Personal Money simulator are running. Launcher isolation passed
@@ -91,8 +93,8 @@ baseline component results, not acceptance of the new journey.
 | Named owner | Branch / exclusive surfaces | Next usable result |
 | --- | --- | --- |
 | `money_core` | `codex/personal-money-core`, recording domain, API, additive migration, backend tests, API/data contracts | Complete through `79032245`; five kinds, paired correction, refund rules, monthly Home, preserved legacy receipts and additive revision integrity. Final scoped core review clean |
-| `money_iphone` | `codex/personal-money-iphone`, Swift feature/transport/models, localization and native tests | Feature `99eb0a7b` integrated; 47 package tests with four expected environment skips and seven model tests. Fix three confirmed review findings and finish actual API simulator journeys |
-| `money_demo_setup` | `codex/personal-money-demo`, isolated local launchers and restart setup | Completed in `c2b56346`, integrated as `5a64e64a`; stack and simulator retained. Captain now owns assembled source and services |
+| `money_iphone` | `codex/personal-money-iphone`, Swift feature/transport/models, localization and model tests | Complete through `cbacc7f0`, integrated as `b18050fcf`; 47 package tests with four expected environment skips and nine model tests. Final scoped native review clean; available for concrete acceptance defects |
+| `money_demo_setup` | `codex/personal-money-acceptance`, connected UI tests, isolated launcher and new evidence; exclusive simulator owner | Setup complete in `c2b56346`. Now prove five-kind journeys, correction, check coverage, identity isolation and process-restart retry; record and preserve the runnable demo |
 | Captain | `codex/personal-money-recording`, manifest, assembled source, independent proof and PR | Integrate verified components, click through and record the real local app, finish CI/review without merging |
 
 Design decision, September 29: two code-grounded alternatives and an independent
@@ -134,10 +136,11 @@ The source-timezone and omitted-versus-explicit-null refund correction fixes pas
 independent delta review. Reusing grouped activity reads reduced a synthetic
 3,000-record projection from 2.598 seconds to 0.009 seconds without another cache.
 
-The first native review found three confirmed issues: inspection did not propagate
-terminal authentication failure, Accounts hid rejected recovery explanations, and
-retired account legs lacked a moved-entry label. The native owner is fixing these
-within the existing journey. CI, final review, recording and restart handoff remain
+The native review corrected terminal authentication propagation, rejected-recovery
+explanations and retired-leg labels. A final delta review confirmed the Accounts
+view observes the recovery state directly. The captain's combined local financial,
+real Auth/API/Postgres, launcher and response-loss-proxy matrix passed 163 tests
+with no skips. CI, GitHub review, assembled recording and restart handoff remain
 pending. None of these component results claims physical-phone delivery.
 
 Model the Domain shaped the typed activity group. Separate Before Serializing
