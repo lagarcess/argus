@@ -5,6 +5,41 @@ import XCTest
 
 @MainActor
 final class FinancialModelTests: XCTestCase {
+    func testArchiveReloadAndRestorePreserveBalanceAndListPlacement() async throws {
+        for unknown in [false, true] {
+            let fixture = try PresentationFixture()
+            await fixture.server.setUnknownBalance(unknown)
+            let identity = try await fixture.login()
+            let model = AccountsModel(controller: fixture.client)
+            model.bind(identity)
+            await model.load()
+            let original = try XCTUnwrap(AccountPresentation.accounts(model.accounts, archived: false).first)
+            XCTAssertTrue(AccountPresentation.accounts(model.accounts, archived: true).isEmpty)
+            await model.archive(original)
+            model.back()
+            await model.load()
+            XCTAssertTrue(AccountPresentation.accounts(model.accounts, archived: false).isEmpty)
+            let archived = try XCTUnwrap(AccountPresentation.accounts(model.accounts, archived: true).first)
+            XCTAssertEqual(archived.id, original.id)
+            XCTAssertEqual(archived.balance, original.balance)
+            XCTAssertEqual(model.accounts.count, 1, "Archiving must retain the canonical record")
+            await model.open(archived)
+            await model.archive(try XCTUnwrap(model.selected))
+            model.back()
+            await model.load()
+            let restored = try XCTUnwrap(AccountPresentation.accounts(model.accounts, archived: false).first)
+            XCTAssertEqual(restored.id, original.id)
+            XCTAssertEqual(restored.balance, original.balance)
+            XCTAssertTrue(AccountPresentation.accounts(model.accounts, archived: true).isEmpty)
+            let patches = await fixture.server.archivePatches
+            XCTAssertEqual(patches.count, 2)
+            for request in patches {
+                let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody)) as? [String: Any])
+                XCTAssertEqual(Set(payload.keys), ["archived", "expected_version"])
+            }
+        }
+    }
+
     func testUncertainSaveFreezesDraftAndReplaysAcceptedOperation() async throws {
         for status in [500, 408] {
             let fixture = try PresentationFixture()
@@ -135,6 +170,11 @@ private actor PresentationServer {
     static let id = UUID()
     static let activityID = UUID()
     private var updated = false
+    private var archived = false
+    private var unknownBalance = false
+    private var accountVersion = 1
+    private(set) var archivePatches: [URLRequest] = []
+    func setUnknownBalance(_ value: Bool) { unknownBalance = value }
     private var nextStatus: Int?
     private var expired = false
     private var homeGate: RequestGate?
@@ -150,7 +190,17 @@ private actor PresentationServer {
         guard path.contains("/financial-") else { return try await auth.send(request) }
         var status = 200
         let body: String
-        if path.hasSuffix("/financial-home") {
+        if request.httpMethod == "PATCH", path.hasSuffix(Self.id.uuidString) {
+            let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+            archived = payload["archived"] as! Bool
+            accountVersion += 1
+            archivePatches.append(request)
+            body = accountRecord()
+        } else if path.hasSuffix("/financial-accounts") {
+            body = "{\"accounts\":[" + accountRecord() + "]}"
+        } else if path.hasSuffix(Self.id.uuidString), request.httpMethod == "GET" {
+            body = accountRecord()
+        } else if path.hasSuffix("/financial-home") {
             let amount = updated ? "8000" : "10000"
             body = #"{"currencies":[{"currency":"DOP","currency_fraction_digits":2,"assets_minor":"\#(amount)","cash_minor":"\#(amount)","other_assets_minor":"0","debts_minor":"0","net_worth_minor":"\#(amount)","recorded_spending_minor":"2000","known_accounts":1,"unknown_accounts":0,"as_of":null}],"recent_activity":[],"recorded_at":"2026-09-01T12:00:00Z"}"#
             if let gate = homeGate { homeGate = nil; await gate.enter() }
@@ -164,6 +214,15 @@ private actor PresentationServer {
             body = #"{"account":\#(Self.account(updated:true)),"activity":{"record_id":"\#(Self.activityID)","revision":1,"kind":"expense","amount_minor":2000,"amount":"20.00","balance_movement_minor":-2000,"occurred_at":"2026-09-01T12:00:00Z","time_zone":"UTC","recorded_at":"2026-09-01T12:00:00Z","coverage":[]},"replayed":true}"#
         } else { body = #"{"items":[],"next_cursor":null}"# }
         return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+    }
+    private func accountRecord() -> String {
+        var record = Self.account(updated: updated)
+            .replacingOccurrences(of: "\"archived\":false", with: "\"archived\":\(archived)")
+            .replacingOccurrences(of: "\"version\":1", with: "\"version\":\(accountVersion)")
+        if unknownBalance {
+            record = record.replacingOccurrences(of: Self.balance(updated), with: #"{"state":"unknown","amount_minor":null,"amount":null,"as_of":null,"basis":null,"activity_since_tracking_minor":0}"#)
+        }
+        return record
     }
     static func balance(_ updated: Bool) -> String {
         #"{"state":"known","amount_minor":\#(updated ? 8000 : 10000),"amount":"\#(updated ? "80.00" : "100.00")","as_of":"2026-09-01T12:00:00Z","basis":"opening","activity_since_tracking_minor":\#(updated ? -2000 : 0)}"#

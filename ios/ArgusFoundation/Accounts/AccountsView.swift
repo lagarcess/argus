@@ -28,6 +28,7 @@ struct AccountsView: View {
     @ObservedObject var model: AccountsModel
     @EnvironmentObject private var auth: ProfileAuthModel
     @Environment(\.locale) private var locale
+    @State private var managing = false
 
     var body: some View {
         ScrollView {
@@ -38,19 +39,26 @@ struct AccountsView: View {
                         .frame(minHeight: 48).accessibilityIdentifier("accounts.back")
                     detail(account)
                 } else {
-                    if model.accounts.isEmpty, !model.busy {
-                        Text("accounts.empty.title").font(ArgusStyle.display())
-                        Text("accounts.empty.body").foregroundStyle(ArgusStyle.secondary)
-                    }
-                    VStack(spacing: 0) {
-                        ForEach(model.accounts, id: \.id) { account in
-                            Button { Task { await model.open(account); await auth.financialLoop?.open(account) } } label: {
-                                AccountRow(account: account)
-                            }.buttonStyle(.plain).accessibilityIdentifier("accounts.row.\(account.id)")
+                    if managing {
+                        Button { managing = false } label: { Label("accounts.back", systemImage: "chevron.left") }
+                            .frame(minHeight: 48).accessibilityIdentifier("accounts.manage.back")
+                        Text("accounts.manage").font(ArgusStyle.display())
+                        Text("accounts.manage.body").foregroundStyle(ArgusStyle.secondary)
+                        Text("accounts.active").font(ArgusStyle.display(23)).accessibilityAddTraits(.isHeader)
+                        accountRows(archived: false)
+                        Text("accounts.archived.section").font(ArgusStyle.display(23)).accessibilityAddTraits(.isHeader)
+                        accountRows(archived: true)
+                    } else {
+                        Button("accounts.manage") { managing = true }
+                            .frame(minHeight: 48).accessibilityIdentifier("accounts.manage")
+                        if AccountPresentation.accounts(model.accounts, archived: false).isEmpty, !model.busy {
+                            Text(model.accounts.isEmpty ? "accounts.empty.title" : "accounts.active.empty").font(ArgusStyle.display())
+                            Text(model.accounts.isEmpty ? "accounts.empty.body" : "accounts.manage.body").foregroundStyle(ArgusStyle.secondary)
                         }
+                        accountRows(archived: false)
+                        Button("accounts.add") { model.create() }
+                            .buttonStyle(PillButtonStyle()).accessibilityIdentifier("accounts.add")
                     }
-                    Button("accounts.add") { model.create() }
-                        .buttonStyle(PillButtonStyle()).accessibilityIdentifier("accounts.add")
                 }
                 if let error = model.errorKey, model.draft == nil {
                     Text(LocalizedStringKey(error)).accessibilityIdentifier("accounts.error")
@@ -63,6 +71,21 @@ struct AccountsView: View {
         .refreshable { await model.load(); if let account = model.selected { await auth.financialLoop?.open(account) } }
         .task(id: model.identity?.revision) { await model.load() }
         .sheet(item: $model.draft) { _ in AccountForm(model: model) }
+    }
+
+    @ViewBuilder private func accountRows(archived: Bool) -> some View {
+        let accounts = AccountPresentation.accounts(model.accounts, archived: archived)
+        if managing, accounts.isEmpty, !model.busy {
+            Text(archived ? "accounts.archived.empty" : "accounts.active.empty")
+                .foregroundStyle(ArgusStyle.secondary)
+        }
+        VStack(spacing: 0) {
+            ForEach(accounts, id: \.id) { account in
+                Button { Task { await model.open(account); await auth.financialLoop?.open(account) } } label: {
+                    AccountRow(account: account)
+                }.buttonStyle(.plain).accessibilityIdentifier("accounts.row.\(account.id)")
+            }
+        }
     }
 
     @ViewBuilder private func detail(_ account: FinancialAccount) -> some View {
@@ -112,6 +135,9 @@ struct AccountSummary: View {
 
 /// Separator-only presentation preserves every digit without floating-point conversion.
 enum AccountPresentation {
+    static func accounts(_ records: [FinancialAccount], archived: Bool) -> [FinancialAccount] {
+        records.filter { $0.archived == archived }
+    }
     static func decimal(_ minor: Int64, digits: Int) -> String { decimal(String(minor), digits: digits) }
     static func decimal(_ minor: String, digits: Int) -> String {
         let negative = minor.hasPrefix("-")

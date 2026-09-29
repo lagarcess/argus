@@ -252,3 +252,10 @@
 "loop.revisions" = "Historial de correcciones";
 "loop.coverage.opening" = "Saldo inicial";
 "loop.coverage.check" = "Saldo verificado";
+
+"accounts.manage" = "Administrar cuentas";
+"accounts.manage.body" = "Archiva para ordenar tu lista de cuentas. Los saldos y el historial siguen formando parte de tus finanzas.";
+"accounts.active" = "Activas";
+"accounts.archived.section" = "Archivadas";
+"accounts.archived.empty" = "No hay cuentas archivadas.";
+"accounts.active.empty" = "No hay cuentas activas.";

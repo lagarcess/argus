@@ -252,3 +252,10 @@
 "loop.revisions" = "Correction history";
 "loop.coverage.opening" = "Starting balance";
 "loop.coverage.check" = "Checked balance";
+
+"accounts.manage" = "Manage accounts";
+"accounts.manage.body" = "Archive to tidy your account list. Balances and history remain in your financial picture.";
+"accounts.active" = "Active";
+"accounts.archived.section" = "Archived";
+"accounts.archived.empty" = "No archived accounts.";
+"accounts.active.empty" = "No active accounts.";

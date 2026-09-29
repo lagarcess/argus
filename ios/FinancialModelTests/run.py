@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
         shutil.copy(root / "ios/ArgusFoundation/Accounts" / name, source / name)
     # The formatter remains one production source; copy its exact declaration.
     presentation = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
-    (source / "AccountPresentation.swift").write_text("import Foundation\n" + presentation[presentation.index("enum AccountPresentation {"):])
+    (source / "AccountPresentation.swift").write_text("import Foundation\nimport ArgusSession\n" + presentation[presentation.index("enum AccountPresentation {"):])
     shutil.copy(root / "ios/Packages/ArgusSession/Tests/ArgusSessionTests/TestSupport.swift", tests / "TestSupport.swift")
     shutil.copy(Path(__file__).with_name("FinancialModelTests.swift"), tests / "FinancialModelTests.swift")
     (package / "Package.swift").write_text('''// swift-tools-version: 6.0
