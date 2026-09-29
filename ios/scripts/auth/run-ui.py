@@ -23,6 +23,7 @@ parser.add_argument("--accounts", action="store_true")
 parser.add_argument("--language", choices=["en", "es-419"], default="en")
 parser.add_argument("--appearance", choices=["light", "dark", "system"], default="light")
 parser.add_argument("--port-base", type=int, default=58400)
+parser.add_argument("--search-query", help="Reuse the isolated Search HTTP proof records")
 parser.add_argument(
     "--response-loss-proxy",
     action="store_true",
@@ -90,6 +91,8 @@ for target in targets:
             "ARGUS_TEST_PASSWORD": cfg["users"][0]["password"],
         }
     )
+    if args.search_query is not None:
+        target["EnvironmentVariables"]["ARGUS_TEST_SEARCH_QUERY"] = args.search_query
 # Keep beside original because __TESTROOT__ paths are relative to this file.
 runner = source.with_name(f"ios-auth-{stamp}.xctestrun")
 runner.write_bytes(plistlib.dumps(settings))
