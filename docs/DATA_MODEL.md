@@ -2652,3 +2652,10 @@ none acquires owner lock after account lock. Reads use repeatable-read snapshots
 Money rules stay in domain code. Owner serialization protects refund/purchase races.
 Group/membership SELECT RLS is registered-owner only, writes service-only; receipts
 have no client grants. Home derives monthly totals from current primary legs.
+
+financial_activity_revisions is only the owner-qualified group revision identity;
+it stores no duplicate money facts. Group current revision, memberships and receipts
+reference it. Revision purchase_activity_id/purchase_revision are generated from
+details and enforce an owner-qualified FK to the exact reviewed purchase revision.
+This preserves one source for refund provenance while making cross-owner references
+unrepresentable. The additive integrity migration is 20260929130000.

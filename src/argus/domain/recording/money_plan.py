@@ -90,6 +90,14 @@ def plan(
 ) -> MoneyPlan:
     by_id = {s.account.id: s for s in accounts}
     old = activity(accounts, activity_id) if activity_id else None
+    if (
+        old
+        and old["kind"] == "refund"
+        and "purchase_activity_id" not in request.model_fields_set
+    ):
+        request = request.model_copy(
+            update={"purchase_activity_id": old["purchase_activity_id"]}
+        )
     if request.expected_revision != (old["revision"] if old else None):
         raise StaleVersion()
     if old and old["kind"] != request.kind:

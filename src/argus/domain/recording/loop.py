@@ -160,7 +160,11 @@ def position(
     as_of, source_zone = max(
         [
             (latest.as_of, latest.time_zone),
-            *((e.current.occurred_at, e.current.time_zone) for e in expenses),
+            *(
+                (e.current.occurred_at, e.current.time_zone)
+                for e in expenses
+                if e.current.active
+            ),
         ],
         key=lambda source: source[0],
     )

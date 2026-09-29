@@ -3,7 +3,7 @@
 from dataclasses import replace
 from typing import Any
 
-from argus.domain.recording.errors import RecordingInputError
+from argus.domain.recording.errors import AccountNotFound, RecordingInputError
 from argus.domain.recording.loop_schemas import ActivityRequest
 from argus.domain.recording.loop_service import token
 from argus.domain.recording.loop_storage import OperationResult
@@ -28,6 +28,8 @@ def legacy_plan(
             if stored
             else None
         )
+        if record is None:
+            raise AccountNotFound()
         if record and (
             not record.current.active
             or record.current.kind != "expense"

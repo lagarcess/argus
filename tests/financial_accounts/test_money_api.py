@@ -70,3 +70,52 @@ def test_canonical_http_preview_confirm_reopen_identity_and_home(client, kind):
     home = client.get("/api/v1/financial-home?month=2026-09", headers=headers).json()
     assert home["period"]["month"] == "2026-09" and home["coverage"] == "recorded_only"
     assert len(home["recent_activity"]) == 1
+
+
+def test_legacy_wrong_account_correction_cannot_move_hidden_source(client):
+    headers = {"Authorization": f"Bearer {ALICE}"}
+    ids = []
+    for _ in range(2):
+        ids.append(
+            client.post(
+                "/api/v1/financial-accounts",
+                headers={**headers, "Idempotency-Key": str(uuid4())},
+                json={"type": "cash", "currency": "USD"},
+            ).json()["id"]
+        )
+    body = {
+        "expected_version": 1,
+        "amount": "25",
+        "occurred_at": "2026-09-02T12:00:00-04:00",
+    }
+    path = "/api/v1/financial-accounts/" + ids[0] + "/activity"
+    body["preview_token"] = client.post(
+        path + "/preview", headers=headers, json=body
+    ).json()["preview_token"]
+    item = client.post(
+        path, headers={**headers, "Idempotency-Key": str(uuid4())}, json=body
+    ).json()["activity"]
+    correction = {**body, "expected_revision": 1, "reason": "Wrong account"}
+    wrong = "/api/v1/financial-accounts/" + ids[1] + "/activity/" + item["record_id"]
+    assert (
+        client.post(wrong + "/preview", headers=headers, json=correction).status_code
+        == 404
+    )
+    assert (
+        client.patch(
+            wrong, headers={**headers, "Idempotency-Key": str(uuid4())}, json=correction
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get("/api/v1/financial-accounts/" + ids[0], headers=headers).json()[
+            "version"
+        ]
+        == 2
+    )
+    assert (
+        client.get("/api/v1/financial-accounts/" + ids[1], headers=headers).json()[
+            "version"
+        ]
+        == 1
+    )

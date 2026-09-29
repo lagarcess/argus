@@ -46,6 +46,10 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
         "insert into public.financial_activity_groups(id,user_id,kind,current_revision) values(%s,%s,%s,%s) on conflict(id) do update set current_revision=excluded.current_revision",
         (result.activity_id, user_id, primary.kind, result.revision),
     )
+    connection.execute(
+        "insert into public.financial_activity_revisions(activity_id,revision,user_id) values(%s,%s,%s)",
+        (result.activity_id, result.revision, user_id),
+    )
     for account_id, mutation in result.mutations.items():
         record = mutation.record
         assert isinstance(record, ExpenseRecord)

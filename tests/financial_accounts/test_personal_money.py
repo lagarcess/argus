@@ -267,3 +267,49 @@ def test_paired_coverage_answers_are_independent(scene):
     )
     balances = {a.id: a.balance.amount_minor for a in result["accounts"]}
     assert balances == {first: 10000, second: 12000}
+
+
+def test_omitted_refund_link_preserves_cap_and_explicit_null_unlinks(scene):
+    aid = account(scene)
+    purchase = save(
+        scene, kind="expense", account_id=aid, amount="40", category_id="shopping"
+    )["activity"]
+    refund = save(
+        scene,
+        kind="refund",
+        account_id=aid,
+        amount="30",
+        purchase_activity_id=purchase["activity_id"],
+    )["activity"]
+    money = MoneyService(scene[0])
+    replacement = dict(
+        kind="refund",
+        account_id=aid,
+        amount="50",
+        occurred_at=NOW - timedelta(days=2),
+        expected_revision=1,
+        reason="Correct received amount",
+    )
+    with pytest.raises(RecordingInputError, match="refund_limit"):
+        money.preview(
+            user_id=scene[1],
+            request=MoneyRequest(**replacement),
+            activity_id=refund["activity_id"],
+        )
+    replacement["amount"] = "25"
+    preview = money.preview(
+        user_id=scene[1],
+        request=MoneyRequest(**replacement),
+        activity_id=refund["activity_id"],
+    )
+    assert preview["reviewed_request"]["purchase_activity_id"] == purchase["activity_id"]
+    assert preview["reviewed_request"]["category_id"] == "shopping"
+    replacement.update(amount="50", purchase_activity_id=None)
+    preview = money.preview(
+        user_id=scene[1],
+        request=MoneyRequest(**replacement),
+        activity_id=refund["activity_id"],
+    )
+    assert (
+        preview["ready"] and preview["reviewed_request"]["purchase_activity_id"] is None
+    )
