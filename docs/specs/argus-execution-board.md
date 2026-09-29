@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** LANDED and locally verified: [#747](https://github.com/lagarcess/argus/pull/747) personal money recording, following #745 and #746. The [landing record](#pr-747-integration-landing) owns integration provenance. Signing, physical-phone installation, deployment and other MVEE implementation remain outside this authorization.
+**Execution state:** ACTIVE: one [connected Plan and Home lane](#connected-plan-and-home-lane). #747 personal money recording and its #748 landing are complete. This grant covers local implementation, verification and PR publication, not merge or physical-phone delivery.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,84 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected Plan and Home lane
+
+**Founder authorization, September 29, 2026:** deliver commitments, recurrence,
+fulfillment and the connected cash forecast as one local iPhone journey. Own
+implementation, local builds/tests, commits, pushes and one reviewable PR with
+existing automatic PR previews. No merge, deployment, signing changes, hosted
+configuration, production data or paid-provider calls. Preserve both existing
+584xx and 585xx demonstrations. Search, household, imports, web, voice and the
+chat-runtime redesign are untouched. Budgets, savings goals and debt-plan
+lifecycles remain assigned work in the complete MVEE map, outside this batch.
+
+**Integration base:** freshly fetched
+`21309f0832d438fd18651f47209e8c789a8fcc53`, containing #747 as `6eb057e9a`
+and #748 as `21309f083`. **Delivery branch:** `codex/connected-plan-home`.
+
+**Goal:** enter expected income and bills, including one-time and recurring
+items; inspect the same dated, currency-separated forecast in Plan and Home;
+record or link one canonical actual activity; inspect and correct that activity
+or edit the expectation; reopen with the same durable state. A bill due before
+later income must show the intervening shortfall. Expected money never changes
+actual balances. The [MVEE connected-plan rules](argus-minimum-viable-ecosystem-experience.md#connected-plan-status)
+and [locked design](../reports/mobile-design-lock-2026-09-28.md) own acceptance.
+
+### Ownership and throughput
+
+The captain owns shared contract decisions, this manifest, the delivery branch,
+local simulator/backend integration, evidence, PR publication and readiness.
+`plan_core` owns expected-record storage, recurrence, fulfillment/link rules,
+forecast, backend routes, migrations, backend tests and canonical API/data docs.
+A single native writer owns Swift types, transport, Plan/Home presentation,
+localization and native model tests on a separate branch. The captain owns the
+assembled UI tests and recording. Writers must not edit each other's files.
+
+Start backend contract grounding alongside native design inspection and isolated
+local verification setup. Agree the wire contract before dependent UI wiring.
+Prove recurrence and canonical posting with real Postgres, integrate both
+implementations, then verify the assembled journey. Keep one final independent
+reviewer in a fresh context; review only affected fixes after that pass. Do not
+request Codex review for this batch. If no independent reviewer is available,
+publish with review pending instead of inventing a verdict.
+
+The main risks are duplicate fulfillment, stale links after corrections, calendar
+boundaries and inconsistent actual/forecast snapshots. Reuse the landed activity
+service, owner locking, exact money types, revision checks, confirmation preview,
+receipts, account observation coverage and native uncertain-write recovery.
+No second balance or activity ledger is permitted.
+
+### Acceptance and checkpoints
+
+| User outcome | Inherited capability | Remaining work | Owner and dependency | Proof |
+| --- | --- | --- | --- | --- |
+| Enter expected income and bills | Registered owner gate, account catalog, exact money input, native forms | Durable expectations and recurrence with editable dates/account/currency | Core owns rules; native consumes agreed contract | Real API/DB create/edit/reopen; monthly boundaries, leap dates and zones |
+| Understand cash before next income | Canonical account balances, unknown markers, Home position, locked Plan design | Shared dated forecast, explicit included accounts and currency, interim negative balance | Core forecast; native Plan and Home read same projection | Bill-before-income case, unknown cash and separate currencies, chart/readback agreement |
+| Record receipt/payment or link existing activity | Landed activity preview/confirm and balance-check coverage | Atomic fulfillment identity and matching review, no duplicate actual entry | Core recording owner, then native confirmation | Duplicate/interrupted retries and concurrent links create one activity; fulfilled occurrence excluded |
+| Correct and continue | Append-only activity corrections, stable identity and history | Re-evaluate links; expectation edits preserve fulfillment identity; actual versus planned status | Shared link owner and native refresh | Amount correction does not create a second expected payment; changed account requires review; refund does not reopen bill |
+| Reopen the assembled app | Keychain identity and pending-command recovery, real local stack | Complete simulator journey, recording and restart instructions | Captain after integration | Real local Auth/API/Postgres, process relaunch, loaded second identity, retained demo and durable artifacts |
+
+### Execution checklist and decision trail
+
+- [x] Read the Principles section of poteto-mode.
+- [x] Phase A: Frame. Recover approved rules, current integration, locked design and the bounded verification predicate.
+- [ ] Phase B: Design the workflow. Inspect inherited owners, settle the shared contract and assign isolated writers.
+- [ ] Phase C: Run the loop. Implement and verify bounded backend/native units, then integrate and exercise the whole journey.
+- [ ] Phase D: Keep the audit trail. Record technical decisions, ownership, evidence and limitations here as work progresses.
+- [ ] Phase E: Verify and hand back. Preserve a runnable simulator, short recording and restart recipe; publish one PR with applicable CI and honest independent review status.
+
+This section is the lane specification and decision trail. It replaces separate
+planning/checklist documents for this assignment. Poteto design panels and
+reviewer swarms are omitted under the founder's explicit proportionality rule.
+The backend owner's code-grounded proposal and captain's independent inspection
+settle the contract. Final independent review is a separate fresh-context pass.
+
+September 29 grounding: Plan is a sample destination today. Home already consumes
+canonical financial position and monthly recorded activity. Keep those owners;
+add expected records and derived occurrences without copying actual balances.
+The new delivery checkout is isolated from the retained demos. No other MVEE
+batch is activated and no new product deferral is introduced.
 
 ## Personal money-recording batch
 
@@ -758,7 +836,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
 landed #747 personal recording journey. This local batch is complete; its named
-owners and evidence are recorded above. No other MVEE batch is active. Proposed owners
+owners and evidence are recorded above. The connected Plan/Home lane above is active; no other MVEE batch is active. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
