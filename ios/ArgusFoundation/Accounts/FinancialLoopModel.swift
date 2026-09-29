@@ -21,6 +21,7 @@ final class FinancialLoopModel: ObservableObject {
     private var identity: SessionSnapshot?
     private var generation = UUID()
     private var detailRequest = UUID()
+    var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
     lazy var plan = FinancialPlanModel(controller: controller, accounts: accounts, loop: self)
 
@@ -43,6 +44,7 @@ final class FinancialLoopModel: ObservableObject {
     func refresh() async {
         guard identity != nil else { return }
         await plan.refresh()
+        financialChanged?()
     }
 
     func acceptPlanHome(_ home: FinancialHome) { self.home = home }
@@ -92,10 +94,14 @@ final class FinancialLoopModel: ObservableObject {
     }
 
     func detail(_ activity: FinancialActivity) async throws -> FinancialActivityDetail {
+        try await detail(id: activity.activityId ?? activity.recordId)
+    }
+
+    func detail(id: UUID) async throws -> FinancialActivityDetail {
         guard let identity else { throw SessionFailure.unauthorized }
         let ticket = generation
         do {
-            let value = try await controller.financialActivityDetail(activity.activityId ?? activity.recordId, expectedIdentity: identity)
+            let value = try await controller.financialActivityDetail(id, expectedIdentity: identity)
             guard generation == ticket else { throw SessionFailure.staleOperation }
             return value
         } catch {
@@ -120,6 +126,12 @@ final class FinancialLoopModel: ObservableObject {
     func accountName(_ id: UUID) -> String {
         guard let account = accounts.accounts.first(where: { $0.id == id }) else { return id.uuidString }
         return account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")
+    }
+
+    func correct(_ activity: FinancialActivityDetail) {
+        guard let id = activity.legs.first?.accountId,
+              let account = accounts.accounts.first(where: { $0.id == id }) else { return }
+        record(account, correcting: activity)
     }
 
     func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil) {

@@ -51,6 +51,11 @@ struct FoundationShell: View {
         .background {
             if let loop = auth.financialLoop { FinancialEditorPresenter(loop: loop, appearance: appearance) }
         }
+        .background {
+            if let accounts = auth.accounts, let loop = auth.financialLoop {
+                FinancialDomainPresenter(accounts: accounts, plan: loop.plan, loop: loop, search: auth.financialSearch)
+            }
+        }
         .sheet(item: $sheet) { selected in
             FoundationSheetView(sheet: selected, appearance: $appearance)
                 .preferredColorScheme(appearance.colorScheme)
@@ -99,7 +104,9 @@ struct FoundationShell: View {
         case .plan:
             if auth.enabled { FinancialPlanDestination(showProfile: { sheet = .profile }) }
             else { PlanSampleView() }
-        case .search: SearchSampleView(destination: $destination)
+        case .search:
+            if auth.enabled { FinancialSearchDestination(active: destination == .search, showProfile: { sheet = .profile }) }
+            else { SearchSampleView(destination: $destination) }
         }
     }
 }

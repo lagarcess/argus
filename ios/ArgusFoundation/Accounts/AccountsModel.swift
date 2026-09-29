@@ -12,6 +12,7 @@ final class AccountsModel: ObservableObject {
     @Published private(set) var latest: FinancialAccount?
     @Published private(set) var needsReview = false
     @Published private(set) var identity: SessionSnapshot?
+    var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
     private let controller: SessionController
     private var generation = UUID()
@@ -130,13 +131,17 @@ final class AccountsModel: ObservableObject {
         identity?.revision == captured.revision && identity?.profile?.id == captured.profile?.id
     }
 
+    func select(_ account: FinancialAccount) { selected = account }
+
     func accept(_ account: FinancialAccount) {
+        financialChanged?()
         if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }
         else { accounts.append(account) }
         selected = account
     }
 
     func accept(_ updated: [FinancialAccount], preserving originId: UUID?) {
+        financialChanged?()
         let selectedId = selected?.id ?? originId
         for account in updated {
             if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }

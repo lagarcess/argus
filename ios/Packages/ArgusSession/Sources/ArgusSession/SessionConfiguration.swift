@@ -30,7 +30,7 @@ public struct SessionConfiguration: Sendable {
         self.keychainService = keychainService
     }
 
-    var storagePrefix: String {
+    public var storagePrefix: String {
         let environment = Self.origin(argusAPIURL) + "|" + Self.origin(supabaseURL)
         return "argus." + SHA256.hash(data: Data(environment.utf8)).map { String(format: "%02x", $0) }.joined()
     }
