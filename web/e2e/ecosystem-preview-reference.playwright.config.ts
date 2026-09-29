@@ -1,8 +1,8 @@
 import path from "node:path";
 import { defineConfig } from "@playwright/test";
+import { referenceManifest } from "./ecosystem-preview-reference-manifest";
 
-// Server lifecycles belong to the release captain. This observational harness
-// never starts, replaces, builds, or stops any of the three reference servers.
+// Playwright owns the three isolated reference processes through teardown.
 export default defineConfig({
   testDir: __dirname,
   testMatch: "ecosystem-preview-reference.gate.ts",
@@ -27,4 +27,5 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "off",
   },
+  webServer: referenceManifest.map((reference) => reference.webServer),
 });

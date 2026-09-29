@@ -1,19 +1,17 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import en from "../public/locales/en/common.json";
 import { LANGUAGE_STORAGE_KEY, THEME_STORAGE_KEY } from "../lib/browser-storage";
 import { previewCodeIdentity } from "./ecosystem-preview-evidence";
+import { referenceManifest, referenceRepositoryRoot as repositoryRoot, type Reference } from "./ecosystem-preview-reference-manifest";
 import { CONVERSATIONS, FREEZE_CSS, installBreakpointFixture } from "./support/breakpoint-fixture";
 
-const repositoryRoot = path.resolve(__dirname, "../..");
 const durableDirectory = process.env.ARGUS_PREVIEW_EVIDENCE_DIR;
 const outputDirectory = path.resolve(durableDirectory ?? path.join(__dirname, "../temp/ecosystem-preview-reference"));
-const productionSourceSha = "a9286b21886eb03df7a21f2f4b7d5e79af570679";
-const integrationSha = "c3b2042b9b69c5b75e173d145ed0020f00ccd79e";
 const sourceOwners = [
   "app/chat/page.tsx", "app/layout.tsx", "app/globals.css",
   "components/chat/ChatInterface.tsx", "components/chat/EmptyChatSurface.tsx",
@@ -23,13 +21,6 @@ const sourceOwners = [
   "public/locales/en/common.json",
 ];
 const widths = [1440, 834, 390];
-type Reference = { name: string; origin: string; sourceSha: string; webRoot: string };
-const references: Reference[] = [
-  { name: "production-source", origin: "http://127.0.0.1:3200", sourceSha: productionSourceSha,
-    webRoot: "/tmp/argus-web-production-reference/web" },
-  { name: "integration", origin: "http://127.0.0.1:3199", sourceSha: integrationSha,
-    webRoot: path.join(repositoryRoot, "web") },
-];
 type RequestRecord = { method: string; url: string; disposition: string };
 type Audit = { requests: RequestRecord[]; violations: string[]; pageErrors: string[]; consoleErrors: string[] };
 
@@ -37,10 +28,28 @@ function git(...args: string[]) {
   return execFileSync("git", args, { cwd: repositoryRoot, encoding: "utf8" }).trim();
 }
 
+function extractedFiles(directory: string, prefix = ""): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const relative = path.posix.join(prefix, entry.name);
+    if (entry.isDirectory()) return extractedFiles(path.join(directory, entry.name), relative);
+    if (!entry.isFile()) throw new Error(`Reference source must be a regular file: ${relative}`);
+    return [relative];
+  });
+}
+
 // This verifies named rendered owners in a local source extraction. It does
 // not assert that a hosted production deployment uses this source revision.
 function verifyReferenceSource(reference: Reference) {
-  const owners = sourceOwners.map((owner) => {
+  const previewRoute = "app/dev/ecosystem";
+  const previewFiles = reference.kind === "preview"
+    ? git("ls-tree", "-r", "--name-only", reference.sourceSha, "--", `web/${previewRoute}`).split("\n").filter(Boolean).map((file) => file.slice("web/".length))
+    : [];
+  if (reference.kind === "preview") {
+    expect(previewFiles.length, "The current commit must contain the preview route").toBeGreaterThan(0);
+    const extracted = extractedFiles(path.join(reference.webRoot, previewRoute), previewRoute).sort();
+    expect(extracted, "The extracted preview route must have exactly the committed source files").toEqual([...previewFiles].sort());
+  }
+  const owners = [...sourceOwners, ...previewFiles].map((owner) => {
     const expected = execFileSync("git", ["show", `${reference.sourceSha}:web/${owner}`], { cwd: repositoryRoot });
     const actual = readFileSync(path.join(reference.webRoot, owner));
     const digest = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
@@ -50,7 +59,7 @@ function verifyReferenceSource(reference: Reference) {
     return { path: `web/${owner}`, expectedSha256, actualSha256 };
   });
   return { sourceSha: reference.sourceSha, webTree: git("rev-parse", `${reference.sourceSha}:web`),
-    extractedWebRoot: reference.webRoot, verifiedOwners: owners };
+    extractedWebRoot: reference.webRoot, verifiedOwners: owners, completePreviewRoute: reference.kind === "preview" };
 }
 
 async function guardNetwork(page: Page, origin: string, audit: Audit, fixture: boolean) {
@@ -111,14 +120,17 @@ async function capture(page: Page, prefix: string, surface: string, captures: ob
     capturedAt: new Date().toISOString() });
 }
 
-async function runCell(page: Page, testInfo: TestInfo, name: string, origin: string, width: number,
-  source: object, fixture: boolean, action: (captures: object[]) => Promise<void>) {
+async function runCell(page: Page, testInfo: TestInfo, reference: Reference, width: number,
+  action: (captures: object[]) => Promise<void>) {
+  const { origin } = reference;
+  const name = `${reference.name}-${width}`;
+  const source = verifyReferenceSource(reference);
   const identity = previewCodeIdentity(repositoryRoot, durableDirectory);
   const audit: Audit = { requests: [], violations: [], pageErrors: [], consoleErrors: [] };
   const captures: object[] = [];
   mkdirSync(outputDirectory, { recursive: true });
   await page.setViewportSize({ width, height: 1000 });
-  await guardNetwork(page, origin, audit, fixture);
+  await guardNetwork(page, origin, audit, reference.kind === "chat");
   try {
     await action(captures);
     expect(audit.violations, "No unexpected network request may escape the local fixture boundary").toEqual([]);
@@ -126,13 +138,14 @@ async function runCell(page: Page, testInfo: TestInfo, name: string, origin: str
     expect(audit.consoleErrors, "Browser console errors").toEqual([]);
     expect(previewCodeIdentity(repositoryRoot, durableDirectory).codeHead).toBe(identity.codeHead);
   } finally {
-    const evidence = { name, ...identity, source, origin, captures, audit,
+    const evidence = { name, ...identity, source, origin,
+      server: { lifecycle: "Playwright webServer", ...reference.webServer }, captures, audit,
       environment: { browser: page.context().browser()?.version(), node: process.version, platform: os.platform(), release: os.release(),
         viewport: page.viewportSize(), deviceScaleFactor: 1, timezone: "America/Santo_Domingo", locale: "en-US",
         appearance: "light", reducedMotion: "reduce", serviceWorkers: "blocked", websockets: "only same-origin Next development HMR", retries: 0 },
       limitations: ["Local source reference, not hosted-deployment verification or founder visual approval.",
         "Registered identity and financial/chat readouts are local fixtures; no real authorization, model turn, write or provider call is exercised.",
-        "Only named rendered source owners are byte-verified; the pinned full web Git tree is recorded for context.",
+        "Named shared rendered owners are byte-verified; current preview also verifies its complete route source file set. Other web files are not byte-verified; the full web Git tree is recorded for context.",
         "Screenshots freeze animations/caret and hide Next development chrome and the fixture DevModeBadge via shared FREEZE_CSS."],
     };
     const body = JSON.stringify(evidence, null, 2);
@@ -141,11 +154,10 @@ async function runCell(page: Page, testInfo: TestInfo, name: string, origin: str
   }
 }
 
-for (const reference of references) for (const width of widths) {
+for (const reference of referenceManifest.filter((item) => item.kind === "chat")) for (const width of widths) {
   test(`${reference.name}-${width}`, async ({ page }, testInfo) => {
     const name = `${reference.name}-${width}`;
-    const source = verifyReferenceSource(reference);
-    await runCell(page, testInfo, name, reference.origin, width, source, true, async (captures) => {
+    await runCell(page, testInfo, reference, width, async (captures) => {
       await page.goto(`${reference.origin}/chat`, { waitUntil: "networkidle" });
       await expect(page.getByTestId("chat-input")).toBeVisible();
       await capture(page, name, width >= 720 ? "cold-chat-expanded-rail" : "cold-chat", captures);
@@ -171,21 +183,19 @@ for (const reference of references) for (const width of widths) {
   });
 }
 
-for (const width of widths) test(`preview-before-${width}`, async ({ page }, testInfo) => {
-  const name = `preview-before-${width}`;
-  const origin = "http://127.0.0.1:3197";
-  const identity = previewCodeIdentity(repositoryRoot, durableDirectory);
+for (const reference of referenceManifest.filter((item) => item.kind === "preview")) for (const width of widths) test(`${reference.name}-${width}`, async ({ page }, testInfo) => {
+  const name = `${reference.name}-${width}`;
+  const { origin } = reference;
   await page.addInitScript(({ themeKey, languageKey }) => {
     window.localStorage.setItem(themeKey, "light");
     window.localStorage.setItem(languageKey, "en");
   }, { themeKey: THEME_STORAGE_KEY, languageKey: LANGUAGE_STORAGE_KEY });
-  await runCell(page, testInfo, name, origin, width,
-    { sourceSha: identity.codeHead, webTree: git("rev-parse", `${identity.codeHead}:web`) }, false, async (captures) => {
-      for (const view of ["home", "argus", "settings"] as const) {
-        await page.goto(`${origin}/dev/ecosystem?view=${view}&state=sample&audience=guest`, { waitUntil: "networkidle" });
-        await expect(page.getByTestId("ecosystem-preview")).toHaveAttribute("data-preview-view", view);
-        await expect(page.getByTestId("preview-main")).toBeVisible();
-        await capture(page, name, view, captures);
-      }
-    });
+  await runCell(page, testInfo, reference, width, async (captures) => {
+    for (const view of ["home", "argus", "settings"] as const) {
+      await page.goto(`${origin}/dev/ecosystem?view=${view}&state=sample&audience=guest`, { waitUntil: "networkidle" });
+      await expect(page.getByTestId("ecosystem-preview")).toHaveAttribute("data-preview-view", view);
+      await expect(page.getByTestId("preview-main")).toBeVisible();
+      await capture(page, name, view, captures);
+    }
+  });
 });
