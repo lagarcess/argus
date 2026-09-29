@@ -6,6 +6,14 @@ extension FinancialLoopUITests {
         let id: String
     }
 
+    func testRetainedHomeSurvivesReopening() throws {
+        try signIn()
+        let before = homeValue()
+        app.terminate(); app.launch()
+        assertHome(before)
+        capture("retained-demo-home")
+    }
+
     func testAccountAndActivityRowsOpenFromCenter() throws {
         try signIn()
         let name = "Tap " + String(UUID().uuidString.prefix(4))
