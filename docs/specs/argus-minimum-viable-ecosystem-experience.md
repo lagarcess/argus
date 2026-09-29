@@ -1,6 +1,8 @@
 # Argus minimum viable ecosystem experience
 
 **Status:** Founder-approved experience direction, recorded September 26, 2026.
+**Latest founder lock:** September 28, 2026: complete scope, agent-first direction,
+private iPhone delivery, existing infrastructure reuse, and web-work hold.
 **Audience:** Product, design, engineering, and collaborating agents.
 **Decision source:** Founder conversation approving the ecosystem structure and asking to lock it into a document, including information ingestion.
 **Purpose:** Define the smallest cohesive ecosystem, its surfaces, and the movement of information between them. This is an experience specification, not an implementation schedule or a claim of shipped capability.
@@ -26,7 +28,11 @@ Not everyone must complete every step or use every surface. Each surface must be
 Use [documentation authority](../DOCUMENTATION_AUTHORITY.md) for the reading order,
 document ownership, historical pointers, and assigned-package reconciliation.
 
-This document owns the founder-approved pivot experience described here. It changes the intended product direction from chat as the entire workspace to a financial ecosystem with chat as a powerful entry point and interaction method.
+This document owns the founder-approved pivot experience described here. Argus is
+an agent-first financial ecosystem: conversation is the intended primary way to
+get things done across its surfaces. Simple manual controls remain a complete
+alternative. The existing research/backtest-oriented chat is reusable
+infrastructure, not the finished ecosystem conversational architecture.
 
 Existing production documentation continues to describe current implementation and operational safeguards. This document does not assert that the pivot is implemented, silently rewrite release gates, authorize deployment, or establish an engineering sequence. Older chat-primary scope statements should not be used to erase this explicitly approved future experience. Implementation work must reconcile relevant contracts and product documentation explicitly.
 
@@ -55,6 +61,176 @@ An account balance is not the same as money remaining after commitments. Show th
 
 Approval locks the product direction, not a claim that demand or retention has already been proven. Learn which uncertainties users resolve, which inputs are burdensome, and which real decisions bring them back.
 
+### 1.2 Private iPhone delivery: the immediate finish line
+
+**Founder-locked September 28, 2026.** Deliver the agreed financial ecosystem on
+the founder's physical iPhone, using the existing user account and real, durable
+data over the internet. It must work away from the development computer. The
+founder must be able to hand the phone to someone and demonstrate working
+journeys. Simulator screens, sample figures, isolated API tests and merged
+components do not establish this outcome.
+
+Public App Store publication is not required. Select and verify an appropriate
+signed private installation route. Real data means deliberately entered or
+authorized data; it does not authorize copying production data into tests.
+
+The ecosystem conversational-runtime redesign remains deferred for this first
+private delivery. Preserve and connect the existing supported Argus capabilities;
+do not imply that the old chat can perform the new financial actions. Full
+agent-first MVEE completion additionally requires the conversational actions and
+voice paths described below. This named exception must remain visible: the
+private iPhone milestone is not permission to quietly drop other financial,
+household, ingestion or planning requirements.
+
+Voice dictation, transcription and spoken conversation remain approved scope.
+Their financial-action interpretation shares the deferred runtime dependency;
+audio capture or playback alone must not be reported as complete voice actions.
+
+### 1.3 Complete scope checklist
+
+This is the scope index for delivery planning. The linked sections own detailed
+behavior; do not maintain another competing feature definition or use this table
+as a claim of implementation. A package must identify what it completes and what
+remains outstanding. Explicit later/experimental items stay distinguished below.
+
+| Area | Required coverage | Detailed owner |
+| --- | --- | --- |
+| Access | Existing identity; sign-in, registration, confirmation/resend, recovery/reset, secure session refresh and relaunch, logout/account switching, browser-to-app transitions, guest chat and registration with return to action | [Guest boundary](#guest-access-and-registration); existing API/auth contracts |
+| iPhone experience | Home, Accounts, Argus, Plan, Search, Updates and Profile; native navigation; English/es-419; persistent themes; accessibility, keyboard and physical-device acceptance | [Platforms and navigation](#2-product-character-and-platforms) |
+| Accounts and assets | Cash, checking, savings, investments, cards/debts, optional vehicles/property/other assets; known/zero/unknown; nickname/date/institution; relevant debt terms; estimates, ownership shares and linked debt; create/reopen/edit/archive/restore | [Accounts](#accounts-organize-the-financial-facts) |
+| Activity | Expense, income, transfer, payment and refund; categories/notes; corrections, removal/undo/recovery, history and consistent linked movements | [Activity](#account-activity-and-balance-checks); [refunds](#refunds-corrections-and-adjustments) |
+| Reconciliation | Recorded versus observed balance; explicit gaps/adjustments; missing and earlier activity; per-account inclusion review; statement overlap; no invented activity or duplicate money | [Balance checks](#account-activity-and-balance-checks); [trust requirements](#5-shared-ingestion-and-trust-requirements) |
+| Home | Assets/debts/net worth by currency, cash/debt breakdown, freshness/unknowns, recent activity, upcoming commitments, expected versus received income, cash forecast, shortfalls, Record and resume review | [Home](#home-understand-where-i-stand) |
+| Plan | Budgets, savings goals, debt plans, recurring/occasional obligations and variable income; funding/dates; actual versus projected progress; shared allocation and matching actual entries to commitments | [Plan](#plan-decide-what-i-want-to-change) |
+| Spaces | Personal, Household, private Business and Custom; create/rename/archive/restore, constrained deletion/recovery, account moves with history and linked-record review | [Spaces](#financial-spaces); [account moves](#reassigning-accounts-between-spaces) |
+| Household | Link/email invitations, acceptance/expiry/revocation, separate identities, explicit sharing/editing rights, joint records, private contributions, shared plans, leave/remove semantics and no indirect disclosure | [Household](#12-household-collaboration-approved-minimum-capacity) |
+| Intake | Manual, text, voice, supported PDFs/structured files/images, photos/scans/screenshots; editable drafts, source preview, destination/currency/date review, uncertainty/duplicates, batch confirmation, resume and manual fallback | [Ingestion](#4-information-ingestion-one-destination-several-entry-methods) |
+| Argus | Inherit finance explanations, research, calculations, simulations, comparisons and evidence; permitted personal/shared context; confirmed record/plan actions through shared services; distinguish hypothetical and actual | [Argus](#argus-ask-understand-and-get-things-done); [runtime sequence](#agentic-ecosystem-direction-and-sequence) |
+| Voice | xAI direction; dictation/transcription, spoken replies, interruption/cancellation, editable interpretation, text handoff, confirmation, permission/consent/retention and latency/cost acceptance | [Voice](#43-speak-to-argus); architecture's provider contract |
+| Search and continuity | Accounts, activity, plans/goals, documents, conversations, saved answers/analyses; real previews, origin-preserving return, recents/drafts, archive/recovery and defined Temporary chat | [Search](#search-find-what-i-already-know); [chat recovery](#temporary-chat-and-conversation-recovery) |
+| Updates | Persistent inbox, deadlines/thresholds/milestones, scheduled summaries, review/freshness needs and relevant changed conditions; explanation, action link, preferences and private notification previews | [Updates](#updates-tell-me-when-something-deserves-attention) |
+| Profile and control | Personal details/avatar/photo; App/Account/Support grouping; language/themes, response preferences, controlled personalization, security/sessions, usage, help, export/deletion/recovery and retention | [Profile](#profile-control-argus); existing product availability |
+| Charts | Useful polished financial summaries, scrubbing, dates/units/currency, gaps/unknowns, themes/accessibility and physical-device performance; render canonical facts | [Design quality](#native-quality-and-tester-feedback); architecture's chart direction |
+| Operational delivery | Signed physical-phone build, reachable authenticated API, configured integrations, migrations, durable storage, backups/restoration, monitoring, safe updates/rollback and real-account acceptance | [Infrastructure](#14-infrastructure-and-cost-constraints); [acceptance](#15-connected-acceptance-and-delivery-discipline) |
+
+Fixed category identities and localized default labels must preserve reporting
+when renamed; approved Business/Custom labels must not create a competing
+financial taxonomy. Detailed category/API contracts remain implementation work.
+Supported investment holdings are a later extension of recorded investment value,
+not a reason to postpone basic investment accounts.
+
+### 1.4 Infrastructure and cost constraints
+
+**Founder-locked:** reuse Render and the existing Supabase project on the current
+plan. A second Supabase project or paid upgrade is not a prerequisite. Preserve
+the existing user identity, chats, profiles, research and backtests; add financial
+tables with explicit authorization and appropriate access policies. Separate
+tables do not isolate shared authentication settings, database resources or
+migration effects. Use additive compatible migrations and validate existing
+behavior, backups and restoration before hosted changes.
+
+Retain a modular monolith with clear domain owners and shared services for manual
+and future conversational actions. Native clients call the authenticated API
+over HTTPS; the web frontend is not their required intermediary. Reuse current
+background execution and add separate compute only for demonstrated workloads,
+not one server per product pillar. Do not create separate financial ledgers or
+chat brains per client. Measure actual capacity before proposing spending;
+upgrades and hosted changes need explicit authorization.
+
+Preserve the existing production Argus web app and its useful services. New
+capabilities require deliberate rollout/configuration. Whether the private build
+uses a separate Render deployment or the compatible existing API deployment
+requires a bounded deployment decision; sharing Supabase is settled and must not
+be reopened as an automatic second-project requirement.
+
+Production delivery includes secure secrets, HTTPS, verified authentication
+links, required jobs and selected email/document/voice/notification integrations.
+Physical-device identity, signing and installation must be addressed early,
+alongside a reachable backend, rather than discovered after feature development.
+No provider secret belongs in the client, chat transcript or repository.
+
+### 1.5 Connected acceptance and delivery discipline
+
+The following must work on the physical iPhone over the internet with durable
+records, including relaunch, failed requests and authorized household variants:
+
+1. Record everyday activity; Accounts, budget, Home and relevant Updates agree.
+2. Import a supported statement; preview the source, resolve uncertainty and
+   duplicates, confirm, inspect the resulting records and resume interrupted work.
+3. Explore a financial choice using inherited Argus capabilities; save the chosen
+   plan manually during the runtime deferral, record progress and revisit it.
+4. Open a meaningful update, inspect its source and make a supported correction
+   or action; dependent views reflect it.
+5. Invite a partner and perform shared journeys while private information stays
+   private and shared money is counted once.
+
+After the deferred runtime is implemented, repeat supported actions through text
+and voice using the same service contracts and confirmation boundaries. Do not
+waive that eventual parity or pretend it was proven by manual acceptance.
+
+One integrated iPhone build is the product under construction. Parallel work
+packages serve complete user outcomes against accepted shared contracts, with
+one owner per domain/branch and explicit dependencies. Integrate frequently and
+inspect actual journeys early. Keep necessary engineering breakdown underneath
+the product view; report demonstrated capabilities, gaps and blockers rather
+than agent counts, screenshots or passing component tests as product completion.
+
+Use one maintained execution plan derived from this MVEE, including verified
+reuse/missing-work inventory, dependency map, owners, decisions and acceptance.
+Avoid fragmented documentation PRs, duplicate proof implementations, indefinite
+review loops and environments created without actionable assignments. Existing
+review proportionality and release gates remain applicable. No timeline or
+flawless-delivery promise is established here.
+
+**Stop remains in force:** this publication records the founder's requirements.
+It does not resume stopped agents, implementation, providers, deployments,
+migrations, paid services or the previously paused execution goal. A restart
+requires explicit founder instruction.
+
+### 1.6 Holds, later work and unresolved decisions
+
+- **Web remake:** frozen. Spend no resources on its implementation or polish now.
+  Preserve the polished existing web as the reuse/design reference. A later
+  marketing/download page may coexist with it; replacing web with a landing page
+  is not decided and is not required for private iPhone delivery.
+- **Android:** remains an intended native product; its next delivery assignment
+  follows explicit prioritization and must not displace the immediate iPhone
+  outcome. Existing work is preserved.
+- **Agentic runtime:** deferred as described above; shared financial services
+  must support its later inheritance without duplicating rules.
+- **Plaid sandbox:** available as a future ingestion/core-loop development aid;
+  credential validation is not a working bank connection. It must feed the same
+  recording/review flow, not revive a competing connector proof or ledger.
+- **Conditional integrations:** Dominican bank access, browser-assisted access,
+  wallet-triggered capture, automated listing valuations and financial-product
+  discovery remain exploratory. Licensed access, valuation validity and actual
+  coverage need evidence. They are not prerequisites for a useful private build.
+- **Watchlist:** its saved-symbol purpose, freshness, sourcing and possible
+  research-to-backtest handoff remain queued product/technical questions.
+- **Monetization:** preserve the original monetization/flywheel rationale as
+  future input; do not allocate free/paid features prematurely. RevenueCat mobile
+  and Lemon Squeezy web remain candidates to evaluate, not current delivery work.
+- **Analytics and sharing:** preserve existing operational telemetry. New
+  ecosystem PostHog work follows proven core loops. Growth sharing remains parked
+  until actual user sharing preferences are understood; it is distinct from
+  required household collaboration.
+- **Decisions still needed:** supported initial formats/OCR provider; upload
+  limit, encrypted-file handling and file/audio retention; household editing,
+  departure and recovery details; notification channels/scheduling; Temporary
+  chat/context and memory handling; app identity/distribution and hosted rollout.
+  Ask when the named contract actually needs the decision, not as blanket setup.
+
+### 1.7 Founder delivery concerns
+
+The founder explicitly identified months lost building disconnected pieces,
+repeatedly incomplete scope inventories, excessive web allocation, unnecessary
+infrastructure cost, idle environments, fragmented lanes and PR ceremony, and
+design quality requiring repeated personal intervention. These concerns are
+delivery constraints, not new product modules. Foundations must converge on a
+usable assembled experience; the founder must not have to reconstruct product
+status from agent reports. Maintain honest completion claims and the complete
+scope above when producing assignments or status reports.
+
 ## 2. Product character and platforms
 
 - Retain the current Argus visual identity and typography. The founder rejected replacing it with a new visual identity.
@@ -74,6 +250,28 @@ Use a refined floating glass treatment on mobile, simple recognizable icons, and
 The bar may compact or recede while scrolling and return when needed. Movement must not make navigation difficult to recover, obscure input, or ignore reduced-motion settings.
 
 Updates and profile live in the header outside the primary bar on financial surfaces. Chat uses its dedicated conversation controls described below. Profile opens app/account settings; Home owns the personal financial overview. Keep the chat header restrained: no redundant “Ask Argus” title or duplicate top-left branding over the branded cold start. Home may retain the wordmark; other surfaces use clear destination titles.
+
+### Native quality and tester feedback
+
+Founder-reported tester feedback: the pivot is too wordy, lacks useful transaction
+icons/charts, loses Search context when opening chat, does not preview a selected
+file, and sends Back to unrelated nested Settings. These are acceptance failures
+to address, not polish that can remain indefinitely behind “foundation” work.
+
+Use concise labels, recognizable activity icons and meaningful visual summaries;
+put extended explanation on demand. Preserve the locked Argus identity and calm
+progressive disclosure. Charts need canonical data, honest gaps, touch scrubbing,
+scroll compatibility, correct dates/units, accessible alternatives and measured
+device performance. A visually attractive fixture is not connected chart proof.
+
+Evaluate native document scanning, file/photo selection, actual document/image
+previews, share-to-Argus intake and suitable on-device preprocessing as parts of
+the assigned journeys. Evaluate local type/size/readability checks and ML for
+unwanted or irrelevant content before upload; this is not a selected classifier
+or a guarantee that all unwanted material can be blocked. Provide understandable
+rejection/correction paths and minimize unnecessary uploads. Server validation
+and authorization remain authoritative. Include device permissions, accessibility,
+keyboard/safe areas and network interruptions in physical-iPhone acceptance.
 
 ## 3. Minimum useful capacity of each surface
 
@@ -377,11 +575,17 @@ does not claim that the gate is implemented or change current auth endpoints.
 
 #### Agentic ecosystem direction and sequence
 
-Founder-locked September 28, 2026: Argus should eventually let a registered
-person perform the supported app workflows through conversation as well as
-manual controls. Both entry points use the same canonical actions, financial
+Founder-locked September 28, 2026: text and voice are the intended primary
+interface for every supported app workflow. Manual controls are the secondary,
+extremely simple alternative and must remain complete and usable. Both entry
+points use the same canonical actions, financial
 rules, permission checks and confirmation boundaries. Research, calculations
 and historical simulations remain capabilities within this broader assistant.
+
+The founder cited Meta Muse as a goal-to-action experience reference, not a
+provider selection or authorization to copy its architecture. Re-architect by
+inheriting useful Argus services, artifacts and safeguards. The current
+research/backtest-oriented chat alone does not satisfy this agentic direction.
 
 The ecosystem conversational-runtime work is deferred until the core workflows
 and their UI are defined. Build the manual workflows and their shared service
@@ -442,6 +646,12 @@ allocation, or reconciliation contracts.
 Minimum capacity is unified retrieval across transactions, accounts, plans, goals, conversations, saved answers, and prior analyses, with direct links to their owning surfaces.
 
 Build on the existing Omnisearch and history experience. Finding “that certificate comparison” should recover useful prior thinking, not require remembering which screen created it.
+
+Opening a result preserves its search origin: query, filters, results and scroll
+position. Chat and document destinations provide an obvious return to that
+context; Back must not route to unrelated Settings or require reconstructing the
+search. A file result opens the actual authorized document/image preview with
+related records and appropriate actions, not just a filename and Delete button.
 
 Market-product discovery is an expansion direction: loans, cards, insurance, savings products, and other alternatives. It becomes useful when there is maintained, sourced inventory. Do not fill the minimum ecosystem with fictional offers or imply shopping/execution capabilities that do not exist.
 
@@ -579,6 +789,13 @@ Begin with the same draft/review boundary. Any future automatic acceptance of tr
 - **Freshness:** an old known balance remains old, even if Argus opens the screen today. The app must not imply continuous awareness beyond available data.
 - **Privacy and control:** explain what is collected and retained; provide appropriate deletion/export controls. Keep financial amounts, document contents, transcripts, and credentials out of analytics and ordinary logs. Storage contracts and enforcement of the registered-account boundary still need implementation.
 - **Recovery:** preserve review progress where appropriate and offer a manual path when parsing, voice, or bank access fails.
+- **Money representation:** use exact arithmetic; unknown is not zero. Keep
+  currencies separate and distinguish actual, expected, estimated and hypothetical
+  values throughout records, projections, summaries and charts.
+- **Reliable writes:** retries and double taps must not duplicate records.
+  Concurrent edits require explicit reconciliation against the current basis;
+  interrupted requests retain a recoverable path without silent resubmission of
+  stale facts. These guarantees apply to every entry method.
 
 ## 6. Connected journeys that the ecosystem must support
 
