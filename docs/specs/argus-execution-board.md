@@ -120,6 +120,15 @@ currency balances and cross-owner search/detail denial. Sanitized evidence is
 [api-proof.json](../reports/evidence/connected-search/api-proof.json). Native
 Search acceptance and independent review remain pending.
 
+September 29 review checkpoint at `12ade77d98ac74864ad05ca629548be055e89452`: the
+fresh-context `search_independent_review` agent returned clean after one full
+diff review and affected-fix checks. Its three P2 findings are closed: retained
+account navigation/read isolation, obsolete destination-request cancellation and
+recovery tied to the acted-on account. Native model verification passes 20 tests.
+The [review record](../reports/evidence/connected-search/independent-review.md)
+records exact commits and limits. Assembled simulator gates and CI are still
+in progress; this is not a merge-ready claim.
+
 Stop only for a concrete product conflict, inaccessible required tooling, or an
 action beyond the grant. Routine implementation choices and local fixes proceed.
 
