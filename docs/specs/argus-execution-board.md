@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** PLANNING ONLY. Implementation remains STOPPED. No worker dispatch or hosted changes are authorized.
+**Execution state:** ACTIVE for the complete first financial loop only. Other MVEE work remains stopped. Merges and hosted changes require founder approval.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,62 @@
 commit and push on September 29, 2026. This authorizes documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Active financial-loop batch
+
+The founder authorized this batch on September 29, 2026 after PR #744 merged.
+The restart covers implementation, local verification, simulator builds, device
+preparation and coordination for the first financial loop only. The full MVEE
+map below remains the recovery map; no other journey is activated by this grant.
+Merges, signing/account actions, deployment, hosted mutations and spending still
+require specific approval. No implementation completion or phone proof exists yet.
+
+**Goal:** Deliver the loop defined under [full-scope execution and early demonstration](#full-scope-execution-and-early-demonstration)
+on the founder's physical iPhone over the internet using the existing user.
+Preserve the [locked design](../reports/mobile-design-lock-2026-09-28.md).
+Simulator acceptance is an intermediate gate; physical-phone acceptance closes
+the batch. Unknown balances, corrections, reconciliation, retry, persistence and
+identity isolation follow the linked canonical requirements and technical handoff.
+
+**Base:** freshly fetched `fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`.
+**Captain:** main delivery agent on `codex/financial-loop-delivery`.
+**No-touch:** production web/remake, Android implementation, new MVEE pillars,
+agentic runtime, billing/growth, hosted records/settings and unapproved providers.
+
+| Responsibility | Exclusive implementation ownership | Checkout | Current action |
+| --- | --- | --- | --- |
+| Financial core | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `financial-loop-core` | Trace existing flow and propose contract, then implement after captain synthesis |
+| iPhone | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `financial-loop-iphone` from preserved iOS checkpoint | Recover and inspect source/design; establish simulator baseline and consume the shared financial contract |
+| Device preparation | iOS project/signing/configuration, local build setup and deployment approval evidence; no feature Swift files | `financial-loop-device` | Inspect signing, device and existing hosting access; prepare exact approval actions |
+| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Coordinate single writers and exercise assembled candidate |
+
+Throughput checkpoint: three implementation responsibilities, one financial
+contract owner and one integration owner. Device access must not block local
+financial/native work. CPU-heavy Xcode and database suites use separate owners;
+shared simulator control is exclusive to the native owner until handed to QA.
+The first stop requiring the founder is a concrete signing or hosted action,
+not a routine engineering decision. Completion remains unverified until the
+physical-phone evidence exists.
+
+The execution checklist adapts poteto's figure-it-out workflow into this existing
+manifest rather than creating another board.
+
+- [x] Read the Principles section of the poteto-mode skill.
+- [x] Phase A: Frame. Scope and authority recorded above.
+- [ ] Phase B: Design the workflow. Trace existing owners and settle the consumed contract.
+- [ ] Phase C: Run the loop. Implement and verify each integrated increment.
+- [ ] Recover the native baseline and capture locked-reference comparisons.
+- [ ] Implement durable activity, corrections, reconciliation and shared reads.
+- [ ] Connect the native loop and verify it against a local API/database.
+- [ ] Prepare signing/install and exact hosted rollout actions for approval.
+- [ ] Verify the approved installed candidate on the physical phone over the internet.
+- [ ] Phase D: Keep the audit trail. Record decisions and evidence here as work advances.
+- [ ] Phase E: Verify and hand back. Report phone-proven behavior and remaining MVEE gaps.
+
+Decision trail for this batch stays in this manifest. On restart, isolate the
+three writers and recover the preserved iOS lineage instead of rebuilding its
+account client. Evidence is the fetched base above and the preserved checkpoint
+in the recovery table. Result is active implementation preparation, not delivery.
 
 ## Outcome and completion
 
@@ -29,9 +85,8 @@ A release manifest under `docs/release-manifests/` remains the evidence for one
 specific deployment, not a competing product plan.
 
 The founder assigns the full MVEE private iPhone outcome to this delivery captain.
-Execution remains stopped until the one restart authorization. That authorization
-covers continuous delivery across the full non-deferred scope below, not only the
-first demonstration. Record named owners and each consumed technical contract
+The full-scope execution proposal below remains recorded. The current restart
+authorizes only the first financial loop; additional MVEE work remains stopped. Record named owners and each consumed technical contract
 before implementation of that dependency. Routine progression does not require
 new batch approvals. No 24-hour delivery promise has been made.
 
@@ -162,7 +217,7 @@ inspection, not a new hosted verification.
 
 ## Full-scope execution and early demonstration
 
-**State remains stopped pending one explicit founder restart.** The first usable
+**Only this first loop is now authorized under the active batch above.** The first usable
 outcome is a complete financial loop on the physical iPhone over the internet,
 using the founder's existing user. Establish an account balance, record an
 expense, see Accounts and Home reflect it, correct it, reconcile a checked
@@ -272,7 +327,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below are the September 29 inspection
-snapshot. Every implementation row is stopped until restart. Proposed owners
+snapshot. Only work required by the active financial-loop batch is restarted. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -395,7 +450,8 @@ for handoff; stale chat status is not proof a writer is alive.
 
 ## Parallel delivery across the full scope
 
-On the single restart authorization, activate full-scope ownership from the
+This is the proposed full-scope sequence, not the current batch authorization.
+When separately authorized, activate full-scope ownership from the
 coverage table. Begin the device/hosted, financial backend and native core-loop
 responsibilities together. Also start independent household membership/invitation,
 intake capture/preview, inherited conversation, existing profile/settings and
