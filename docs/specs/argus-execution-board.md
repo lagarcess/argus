@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** ACTIVE for the complete first financial loop only. Other MVEE work remains stopped. Merges and hosted changes require founder approval.
+**Execution state:** Local financial loop LANDED through PR #745. Signing, physical-phone installation and deployment are deferred. Other MVEE work remains stopped; no additional merge or hosted action is authorized.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -10,7 +10,7 @@ commit and push on September 29, 2026. This authorizes documentation preservatio
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
-## Active financial-loop batch
+## Financial-loop batch
 
 The founder authorized this batch on September 29, 2026 after PR #744 merged.
 The restart covers implementation, local verification, simulator builds, device
@@ -50,11 +50,38 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 | Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Source `c2425f2e2` includes reviewed timezone/type-lock corrections; 126 focused checks, including real local Postgres, pass on published delivery source; earlier exact HTTP/Home proof retained |
 | iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Source `bbfb3bff` with archive evidence in `129d2c876`: three original actual API/Postgres journeys plus focused archive/restore pass; six model tests and 39 session tests pass; four environment-gated session tests explicitly skipped |
 | Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
-| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Publish authorized delivery branch and review PR, complete CI/scoped review, and retain runnable local demonstration; signing, Render login and deployment deferred |
+| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | PR #745 landed; complete bounded integration verification and retain runnable local demonstration; signing, Render login and deployment deferred |
 
-### PR #745 review checkpoint
+### PR #745 integration landing
 
-[Review PR #745](https://github.com/lagarcess/argus/pull/745) is open against
+The founder authorized merging only approved head
+`944b2cb70ab008aa2ed9385b5d81555bad84f7fd` while its checks remained green.
+[PR #745](https://github.com/lagarcess/argus/pull/745) squash-merged on September
+29, 2026 at 10:57:30 UTC as `afc3db5ae679a32676fae94ed7c5e9c9ef68b633`, onto
+`fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`. Integration had not advanced; no
+reconciliation merge or intervening semantic overlap existed. The merge tree
+exactly matches the approved PR tree, preserving accepted evidence.
+
+The [terminal PR audit](https://github.com/lagarcess/argus/pull/745#issuecomment-5888571700)
+records green PR/push CI and smoke, the final clean scoped Codex review, zero
+unresolved threads, source equivalence, runnable demo and limitations. Post-merge
+exact-head integration CI and smoke are recorded in the merged PR's landing
+comment after completion; neither a merge nor this ledger substitutes for them.
+
+No linked issues require closure. The configuration audit found no new production
+environment variable: the existing financial flag stays default-off in
+`.env.example`; the CAPTCHA adapter reuses the existing public Turnstile key;
+device signing has its checked-in, unpopulated `Device.local.xcconfig.example`;
+local XCTest controls come from the private fixture launcher. No ignored env file,
+hosted configuration, production data, or deployment was changed. Existing core
+and native worktrees remain owned by the runnable local demo and are preserved.
+
+The local simulator deliverable is complete. The physical-iPhone internet outcome
+and remaining MVEE coverage below are not completed or activated by this landing.
+
+### PR #745 review checkpoint (pre-merge evidence)
+
+[Review PR #745](https://github.com/lagarcess/argus/pull/745) was reviewed against
 `codex/private-alpha-next`. Original reviewed head `b5cfedef998079f3978f9282e60bc287afa7dc25`
 passed [CI](https://github.com/lagarcess/argus/actions/runs/36549243112) and
 [local smoke](https://github.com/lagarcess/argus/actions/runs/36549243153).
@@ -132,14 +159,14 @@ manifest rather than creating another board.
 - [x] Read the Principles section of the poteto-mode skill.
 - [x] Phase A: Frame. Scope and authority recorded above.
 - [x] Phase B: Design the workflow. Trace existing owners and settle the consumed contract.
-- [ ] Phase C: Run the loop. Implement and verify each integrated increment.
+- [x] Phase C: Run the loop. Implement and verify the complete authorized local simulator loop.
 - [x] Recover the native baseline and capture locked-reference comparisons.
 - [x] Implement durable activity, corrections, reconciliation and shared reads.
 - [x] Connect the native loop and verify it against a local API/database.
 - [ ] Prepare signing/install and exact hosted rollout actions for approval.
 - [ ] Verify the approved installed candidate on the physical phone over the internet.
 - [x] Phase D: Keep the audit trail. Record decisions and evidence here as work advances.
-- [ ] Phase E: Verify and hand back. Report phone-proven behavior and remaining MVEE gaps.
+- [x] Phase E: Verify and hand back the authorized local simulator deliverable, recording, restart instructions and limitations. Phone acceptance remains deferred above.
 
 Decision trail for this batch stays in this manifest.
 
