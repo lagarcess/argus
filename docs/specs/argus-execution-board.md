@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** [connected Plan and Home](#connected-plan-and-home-lane) landed through PR #749 with local acceptance and clean independent review. #747 personal money recording and its #748 landing are complete. The founder authorized #749 and its bounded documentation landing; no further implementation lane is active. Physical-phone delivery remains pending.
+**Execution state:** [connected Search on iPhone](#connected-search-on-iphone-lane) is the active local delivery lane. Connected Plan/Home (#749/#750) and personal money recording (#747/#748) are landed. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,92 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected Search on iPhone lane
+
+**Founder authorization, September 29, 2026:** implement connected Search over
+existing accounts, transactions and Plan expectations through a runnable local
+simulator demonstration and a merge-ready PR. Local tests, commits, pushes,
+publication and existing automatic Supabase PR previews are authorized. No merge,
+deployment, hosted configuration change or paid-provider call. Documents,
+household, web and chat-runtime work are excluded. Other MVEE retrieval types
+remain in the complete coverage map; this batch does not claim to finish D10.
+
+**Integration base:** freshly fetched
+`22f9c8cda8a65c74985e367d8cef68e55515e16b`, including #749 and #750.
+**Delivery branch:** `codex/connected-search`.
+**Checkout:** `/Users/garces/.codex/worktrees/connected-search/private-alpha-next`.
+
+**Goal and completion predicate:** search owned accounts, transactions and Plan
+expectations; open each actual domain detail screen; inspect or edit using its
+existing controls; return to the same query, filters, loaded results and scroll
+position with edits reflected. Relaunch preserves the appropriate owner-scoped
+search origin and reloads current records. Empty, loading, retryable failure and
+unavailable/deleted destinations are explicit in English and Spanish. Completion
+requires real API/Postgres and native acceptance, a short recording, restart
+instructions, green applicable CI and one clean independent fresh-context review
+(or an explicit pending verdict if no reviewer is available).
+
+**Isolation:** Search owns local allocation `58800` (API), `58801` (Supabase),
+`58802` (Postgres), `58805` (CAPTCHA bridge) and dedicated simulator
+`01CBA853-5183-41AF-B1B8-024EF6DB8FFB` (`Argus Connected Search`). The physical-phone
+owner's checkout, device, signing, certificates, services and ports 58700–58749
+are untouched. Existing 584xx, 585xx and 586xx demonstrations remain intact.
+Do not change global simulator-tool defaults shared with another agent.
+
+### Search ownership and throughput
+
+- **Blocking first steps.** Recover current source, locked Search design and
+  financial/detail contracts. Record the bounded contract before implementation.
+- **Independent workstreams.** Read-only backend and native scouts inspect
+  distinct owners. The captain prepares the isolated local stack and simulator.
+- **Shared mutable state.** One implementation writer owns the Search backend,
+  native navigation and tests on the delivery branch after the captain commits
+  this scope. The captain does not edit or run suites in that checkout while
+  the writer holds it. Detail editing keeps its existing domain owner.
+- **Smallest safe decomposition.** One coherent implementation owner avoids
+  dividing search identity, pagination and return-state behavior across agents.
+  The captain takes over assembled verification after handoff. One independent
+  reviewer inspects the finished diff, then affected fixes only.
+
+The captain owns this manifest, contract decisions, integration, native acceptance,
+recording, publication and readiness. `search_backend_scout` and
+`search_native_scout` are read-only and finish after their bounded reports.
+The implementation owner receives a consolidated scope and reports its changed
+files, exact commit and focused verification before relinquishing the checkout.
+No design/reviewer swarm or competing execution board is needed for this locked
+surface. The existing account, activity and Plan services remain the only money
+and persistence owners.
+
+### Search acceptance
+
+| User outcome | Existing capability | Connected work | Proof |
+| --- | --- | --- | --- |
+| Find existing financial records | Canonical account/activity/expectation storage; current text-search patterns | Owner-scoped typed search, bounded pages and type filters | Real Postgres and HTTP searches, corrections/current revisions, accents, literal query characters, pagination and second-owner isolation |
+| Inspect and edit a result | Native account details, activity detail/correction and Plan expectation editor | Typed destination opens the existing screen with live authorization/read | Native search-to-detail/edit/back for all three types; balance rules remain domain-owned |
+| Resume the same search | Native session lifetime and app navigation | Query/filter/result/scroll origin, current-request guards, refresh after detail edits | Native deep-scroll return, changed-match removal, pagination, relaunch and owner switch |
+| Recover without losing context | Existing error/empty and localization controls | Loading, empty, retry and unavailable destination states | Local API failure/retry and missing-record cases; English/dark and Spanish/light recordings |
+
+### Search execution checklist and decisions
+
+- [x] `how` over the affected subsystem. Two bounded code scouts plus captain synthesis.
+- [x] `architect` for parallel design exploration. Native and backend scouts compare reuse with domain-specific adapters; retain locked UI and existing detail owners.
+- [x] Write the throughput checkpoint as four todo items.
+- [ ] Delegate code-writing to a subagent using your configured feature model.
+- [ ] Verify on the matching surface.
+- [ ] Rebase into small, ordered commits. Skip rebasing published/evidenced work under repository policy; use ordered commits and one-way integration merge if needed.
+- [ ] If the design is contested, `interrogate` before shipping. Skip unless a concrete conflict appears; no new product choice is currently required.
+- [ ] Run **Opening a PR**.
+
+Model the Domain chooses typed financial destinations and one owner-scoped search
+origin rather than independent booleans. Separate Before Serializing Shared State
+chooses an exclusive writer, isolated stack and simulator. Prove It Works requires
+the assembled native journey against real local records, beyond unit tests and
+screenshots. The existing manifest is the specification and decision trail;
+no additional planning board or housekeeping PR is part of this assignment.
+
+Stop only for a concrete product conflict, inaccessible required tooling, or an
+action beyond the grant. Routine implementation choices and local fixes proceed.
 
 ## Connected Plan and Home lane
 
