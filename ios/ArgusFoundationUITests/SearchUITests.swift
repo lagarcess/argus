@@ -82,10 +82,12 @@ extension FinancialLoopUITests {
         XCTAssertEqual(app.textFields["search.query"].value as? String, query)
         XCTAssertTrue(app.buttons["search.currency"].label.contains("DOP"))
         capture("search-second-page-exact-return")
-        app.terminate(); app.launch(); app.buttons["tab.search"].tap()
-        assertSearchFrame(identifier, y: before.minY)
-        XCTAssertFalse(app.buttons["search.more"].exists)
-        capture("search-second-page-relaunch")
+        for attempt in 1...2 {
+            app.terminate(); app.launch(); app.buttons["tab.search"].tap()
+            assertSearchFrame(identifier, y: before.minY)
+            XCTAssertFalse(app.buttons["search.more"].exists)
+            capture("search-second-page-relaunch-\(attempt)")
+        }
     }
 
     func testSearchOwnerSwitchClearsOriginAndResults() throws {
