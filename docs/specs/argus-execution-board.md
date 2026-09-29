@@ -104,8 +104,9 @@ Decision trail for this batch stays in this manifest.
   complete HTTP loop on a separate synthetic identity, including exact Home
   position/spending deltas after each write and replay. The five core commits
   are assembled locally; [component evidence](../reports/evidence/financial-loop/core-verification.json)
-  records the source and limits. The owned local API/database remain available
-  to the native owner. Integration was fetched again and remains `fcbb70cc2`.
+  records the source and limits. The owned local API/database supported native
+  acceptance and were then stopped with their data retained. Integration was
+  fetched again and remains `fcbb70cc2`.
 - Native checkpoint `d5299f65` passed three real local API/Postgres simulator
   journeys: unknown balance through spending and an explicitly reviewed opening;
   known balance through expense, correction, check, included late expense and
@@ -127,6 +128,15 @@ Decision trail for this batch stays in this manifest.
   [CI](https://github.com/lagarcess/argus/actions/runs/36537496516) and
   [smoke](https://github.com/lagarcess/argus/actions/runs/36537496519).
   These results do not cover the unpublished implementation candidate.
+- [Simulator demonstration and acceptance evidence](../reports/evidence/financial-loop/ios/README.md)
+  were assembled in evidence-only commit `9b94c65c3`, preserving the tested
+  application source. The recording, seven captures and sanitized XCTest results
+  are committed locally; remote preservation still needs publication approval.
+  The evidence README records the exact existing-stack restart commands. All
+  worker-owned build/recording/API/database processes are stopped; synthetic data,
+  fixtures, worktrees and the installed simulator app are preserved. Writers and
+  independent reviewers have completed their assigned local work. The captain
+  retains signing, hosted compatibility, publication and physical acceptance.
 
 **Next usable outcome:** install the reviewed financial-loop app with the
 founder's existing identity against the approved existing hosted infrastructure,

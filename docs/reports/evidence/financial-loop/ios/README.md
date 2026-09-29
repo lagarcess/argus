@@ -62,11 +62,46 @@ than assuming an empty database. Do not reset another owner’s running stack.
 
 At handoff, the native worker has stopped its CAPTCHA bridge (port 58405), log
 reader and recorder; Xcode is idle. The simulator remains booted for review at
-`197C9C31-77FD-4D31-A9C6-EACA55732B15`. The core owner retains API port 58400,
-Supabase 58401 and Postgres 58402. Restart the local bridge with
-`python3 ios/scripts/auth/bridge.py` before a fresh sign-in test. No hosted system
-was changed by this native verification.
+`197C9C31-77FD-4D31-A9C6-EACA55732B15`. After the captain assembled the evidence,
+the core owner stopped only API 58400 and the owned Supabase/Postgres stack on
+58401/58402. Its volume and ignored `client.json` and `verification-client.json`
+remain intact. The app is installed in the simulator but requires those local
+services to resume connected interaction. No hosted system was changed.
+
+For this preserved stack, use the core checkout below; do not configure, reset
+or reseed it. Its older launcher removes inherited financial flags, so this
+bounded wrapper supplies the local flag at process launch. It runs the reviewed
+backend source `92020058d` and does not print credentials.
+
+```sh
+cd /Users/garces/.codex/worktrees/financial-loop-core/private-alpha-next
+/Users/garces/.codex/worktrees/5a42/private-alpha-next/.venv/bin/python ios/scripts/auth/local_stack.py start
+/Users/garces/.codex/worktrees/5a42/private-alpha-next/.venv/bin/python - <<'PY'
+import importlib.util
+import os
+import sys
+
+spec = importlib.util.spec_from_file_location("local_stack", "ios/scripts/auth/local_stack.py")
+stack = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(stack)
+original_execve = os.execve
+
+def financial_execve(path, argv, env):
+    env["ARGUS_FINANCIAL_ACCOUNTS_ENABLED"] = "true"
+    original_execve(path, argv, env)
+
+os.execve = financial_execve
+stack.api(sys.executable)
+PY
+```
+
+Before fresh sign-in, run `python3 ios/scripts/auth/bridge.py` from the preserved
+native checkout in a separate terminal. Use the native fixture for UI tests and
+the separate verifier fixture for HTTP checks; do not run both against the same
+identity concurrently. Stop only the owned processes and retain the volume again
+after acceptance. The captain owns subsequent lifecycle and access coordination.
 
 The full local result bundle is `/tmp/argus-loop-iphone-evidence/ui-1790671670.xcresult`.
 Raw bundles/logs are not committed because auth diagnostics can contain synthetic
-credentials. The selected evidence and sanitized summary here are durable.
+credentials. The selected evidence and sanitized summary are committed locally;
+remote preservation is pending explicit publication approval.
