@@ -20,6 +20,12 @@ Merges, signing/account actions, deployment, hosted mutations and spending still
 require specific approval. Local implementation and simulator proof exist; signed
 installation, hosted rollout and physical-phone proof remain outstanding.
 
+**GitHub publication authorized:** The founder explicitly approved pushing
+`codex/financial-loop-delivery`, opening its review PR, and completing CI and
+scoped review. This grant is GitHub publication only. Physical-device signing,
+Render login and deployment are deferred. Keep the simulator/local-backend
+demonstration runnable with retained synthetic data and restart instructions.
+
 **Goal:** Deliver the loop defined under [full-scope execution and early demonstration](#full-scope-execution-and-early-demonstration)
 on the founder's physical iPhone over the internet using the existing user.
 Preserve the [locked design](../reports/mobile-design-lock-2026-09-28.md).
@@ -37,7 +43,7 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 | Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Frozen at `92020058d`: independent clean review and exact HTTP/Home proof; 108 focused checks repeated successfully on assembled candidate `ba69fecd6` |
 | iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Frozen at `d5299f65`: three actual API/Postgres simulator journeys pass; 39 session tests and five model tests pass; four environment-gated session tests explicitly skipped; independent delta review clean |
 | Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
-| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Assembled source `ba69fecd6`; unsigned physical-iOS compilation and modularity pass; preserve simulator evidence and obtain concrete publication, signing and hosted access grants |
+| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Publish authorized delivery branch and review PR, complete CI/scoped review, and retain runnable local demonstration; signing, Render login and deployment deferred |
 
 Throughput checkpoint: three implementation responsibilities, one financial
 contract owner and one integration owner. Device access must not block local
@@ -80,7 +86,7 @@ Decision trail for this batch stays in this manifest.
   but unavailable iPhone 15, and an expired Render CLI session. The existing
   Supabase project is healthy on its current Free plan; its applied migration
   inventory does not yet include the financial-account migration. Founder
-  access requests are pending. No hosted mutation or provisioning occurred.
+  access work is now explicitly deferred. No hosted mutation or provisioning occurred.
 - The consumed API contract is committed on the financial branch in
   `ee77772c9` and amended in `0de85dca`. Home aggregates use exact decimal-integer
   strings; one backend projection owns totals and ownership-share rounding.
@@ -95,10 +101,10 @@ Decision trail for this batch stays in this manifest.
   HTTP/Home proof and native simulator evidence recorded below.
 - Automatic approval review blocked the native worker's combined commit/push
   because remote publication was treated as a reserved hosted change. Neither
-  command ran. The worker subsequently committed locally. Specific branch-push
-  and review-PR approval is pending; all further publication is paused while
-  local implementation and testing continue. Previously published device and
-  captain checkpoints remain preserved; no PR/integration merge occurred.
+  command ran. The worker subsequently committed locally. The founder later
+  explicitly approved publication of the assembled delivery branch and its
+  review PR, resolving that publication blocker only. Previously published
+  device and captain checkpoints remain preserved; no PR/integration merge occurred.
 - Financial checkpoint `92020058d` passed independent review after fixes for
   stale metadata planning and native uppercase UUIDs. The captain reran the
   complete HTTP loop on a separate synthetic identity, including exact Home
@@ -131,20 +137,19 @@ Decision trail for this batch stays in this manifest.
 - [Simulator demonstration and acceptance evidence](../reports/evidence/financial-loop/ios/README.md)
   were assembled in evidence-only commit `9b94c65c3`, preserving the tested
   application source. The recording, seven captures and sanitized XCTest results
-  are committed locally; remote preservation still needs publication approval.
+  are committed locally and included in the authorized review publication.
   The evidence README records the exact existing-stack restart commands. All
   worker-owned build/recording/API/database processes are stopped; synthetic data,
   fixtures, worktrees and the installed simulator app are preserved. Writers and
   independent reviewers have completed their assigned local work. The captain
   retains signing, hosted compatibility, publication and physical acceptance.
 
-**Next usable outcome:** install the reviewed financial-loop app with the
-founder's existing identity against the approved existing hosted infrastructure,
-then repeat the loop away from the Mac. No functionality on the founder's phone
-is yet proved by this batch. Publication permission, an available/trusted iPhone
-and Apple team, and restored read-only Render access are pending. The
+**Current review outcome:** publish the locally verified loop for review and
+keep its simulator/local-backend demonstration runnable. Physical-device signing,
+Render login and deployment are explicitly deferred. No functionality on the
+founder's phone is yet proved by this batch. When those actions are resumed, the
 [device preparation evidence](../reports/financial-loop-device-preparation.md)
-identifies the actions; actual deployed API/web SHAs are required before fixing
+identifies the access needed; actual deployed API/web SHAs are required before fixing
 the minimal deployment candidate. Account and loop migrations are
 `20260928200000_financial_accounts_first_slice.sql` and
 `20260929090000_financial_loop.sql`; neither is approved for hosted application.
