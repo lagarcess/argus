@@ -1,0 +1,31 @@
+{
+  "status": "local component proof; physical iPhone acceptance pending",
+  "date": "2026-09-29",
+  "source_commit": "92020058d503459dbb7f9e2efa828dd5cddb1637",
+  "delivery_assembly_commit": "7f869693c",
+  "environment": "isolated localhost Auth, API and Postgres; synthetic users only",
+  "focused_tests": {"passed": 108, "failed": 0},
+  "independent_delta_review": {
+    "result": "clean",
+    "reviewed_from": "be4063355",
+    "reviewed_to": "92020058d503459dbb7f9e2efa828dd5cddb1637",
+    "independent_regressions_passed": 4
+  },
+  "captain_http_verification": {
+    "result": "passed",
+    "account_balance_minor": 700000,
+    "original_check_difference_minor": -60000,
+    "current_unexplained_minor": 0,
+    "home": "exact position and spending deltas after each write and replay",
+    "retry": "same accepted record after intervening writes",
+    "isolation": "second owner denied account and activity reads",
+    "unknown": "preserved",
+    "reopen": "new HTTP client reads durable balance",
+    "command": "python scripts/verify_financial_loop.py --fixture <ignored local verification-client.json>"
+  },
+  "limits": [
+    "No native interaction is proved by this artifact.",
+    "No hosted migration, deployment, provisioning or phone verification occurred.",
+    "The complete assembled candidate still needs native acceptance and final-head revalidation."
+  ]
+}

@@ -33,7 +33,7 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 
 | Responsibility | Exclusive implementation ownership | Checkout | Current action |
 | --- | --- | --- | --- |
-| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Local Auth/API/Postgres loop passed owner and captain runs; finishing guard tests, exact Home-delta assertions and durable checkpoint |
+| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Final local checkpoint `92020058d`: 108 focused tests, independent clean delta review and exact HTTP/Home proof; assembled through `7f869693c` on delivery branch |
 | iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Connected views compile; local checkpoint `b190881d`; actual API simulator journey and recovery checks in progress |
 | Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
 | Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Coordinate single writers and exercise assembled candidate |
@@ -99,6 +99,13 @@ Decision trail for this batch stays in this manifest.
   and review-PR approval is pending; all further publication is paused while
   local implementation and testing continue. Previously published device and
   captain checkpoints remain preserved; no PR/integration merge occurred.
+- Financial checkpoint `92020058d` passed independent review after fixes for
+  stale metadata planning and native uppercase UUIDs. The captain reran the
+  complete HTTP loop on a separate synthetic identity, including exact Home
+  position/spending deltas after each write and replay. The five core commits
+  are assembled locally; [component evidence](../reports/evidence/financial-loop/core-verification.json)
+  records the source and limits. The owned local API/database remain available
+  to the native owner. Integration was fetched again and remains `fcbb70cc2`.
 
 
 ## Outcome and completion
