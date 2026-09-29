@@ -71,7 +71,7 @@ No second balance or activity ledger is permitted.
 
 - [x] Read the Principles section of poteto-mode.
 - [x] Phase A: Frame. Recover approved rules, current integration, locked design and the bounded verification predicate.
-- [ ] Phase B: Design the workflow. Inspect inherited owners, settle the shared contract and assign isolated writers.
+- [x] Phase B: Design the workflow. Inspect inherited owners, settle the shared contract and assign isolated writers.
 - [ ] Phase C: Run the loop. Implement and verify bounded backend/native units, then integrate and exercise the whole journey.
 - [ ] Phase D: Keep the audit trail. Record technical decisions, ownership, evidence and limitations here as work progresses.
 - [ ] Phase E: Verify and hand back. Preserve a runnable simulator, short recording and restart recipe; publish one PR with applicable CI and honest independent review status.
@@ -87,6 +87,26 @@ canonical financial position and monthly recorded activity. Keep those owners;
 add expected records and derived occurrences without copying actual balances.
 The new delivery checkout is isolated from the retained demos. No other MVEE
 batch is activated and no new product deferral is introduced.
+
+September 29 contract checkpoint: the [connected Plan API contract](../API_CONTRACT.md#connected-personal-plan-and-home-september-29-2026)
+uses derived dated occurrences and one durable link to an existing canonical
+activity. Fulfillment composes with the recording transaction under the same
+owner lock. Activity amount/date corrections retain fulfillment; a changed
+account or currency requires link review. Refunds never reopen a bill.
+Schedule/account cutovers preserve linked occurrences; monthly dates clamp
+without drifting, and duplicate month-end dates collapse to one occurrence.
+Selected cash accounts and the saved IANA time zone are explicit. Forecasts
+separate currencies, retain unknown balances, and order bills before income
+on the same date as a conservative date-only assumption. The native app extends
+its existing uncertain-command journal instead of adding another recovery owner.
+
+The connected demonstration owns local allocation `58600` (API), `58601`
+(Supabase), `58602` (Postgres), `58605` (CAPTCHA bridge), and simulator
+`4E22655F-72DC-468F-AEBB-97FBDC58B514` (`Argus Connected Plan`). Synthetic
+credentials remain ignored. The inherited app builds and the existing
+sign-in/relaunch/sign-out UI acceptance passed with a clean Xcode exit on this
+allocation. This establishes the local foundation only; connected Plan proof
+is still pending implementation. Existing `584xx` and `585xx` demos are intact.
 
 ## Personal money-recording batch
 
