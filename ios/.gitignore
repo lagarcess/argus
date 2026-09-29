@@ -3,3 +3,4 @@
 xcuserdata/
 Config/Local.xcconfig
 *.xcresult/
+__pycache__/

@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -26,6 +27,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ai.argus.foundation.R
+
+internal val LocalSessionEnabled = staticCompositionLocalOf { false }
 
 @Composable
 internal fun QuietIcon(
@@ -42,7 +45,7 @@ internal fun QuietIcon(
 @Composable
 internal fun SampleNotice() {
     Text(
-        stringResource(R.string.sample_notice),
+        stringResource(if (LocalSessionEnabled.current) R.string.session_sample_notice else R.string.sample_notice),
         modifier = Modifier.fillMaxWidth().testTag("sample_notice").padding(vertical = 8.dp),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
