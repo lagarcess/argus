@@ -33,8 +33,6 @@ from argus.domain.recording.errors import (
 from argus.domain.recording.loop import (
     CheckRecord,
     Coverage,
-    ExpenseRecord,
-    ExpenseRevision,
     eligible,
     expected_at,
     observations,
@@ -43,7 +41,6 @@ from argus.domain.recording.loop import (
     validate_monotonic,
 )
 from argus.domain.recording.loop_schemas import (
-    CATEGORY_IDS,
     ActivityRequest,
     CheckRequest,
     LoopOpeningRequest,
@@ -53,7 +50,6 @@ from argus.domain.recording.records import (
     OpeningRecord,
     OpeningRevision,
     _as_instant,
-    _normalize_reason,
     _validate_zone,
     plan_opening_write,
 )
@@ -145,9 +141,15 @@ class FinancialLoopService:
         request: ActivityRequest,
         record_id: str | None = None,
     ) -> dict[str, Any]:
-        stored = self._current(user_id, account_id, request.expected_version)
-        _, preview = self._activity(stored, request, self._record_id(record_id))
-        return preview
+        from argus.domain.recording.money_legacy import preview
+
+        return preview(
+            self,
+            user_id=user_id,
+            account_id=account_id,
+            request=request,
+            record_id=record_id,
+        )
 
     def write_activity(
         self,
@@ -158,109 +160,16 @@ class FinancialLoopService:
         idempotency_key: str,
         record_id: str | None = None,
     ) -> OperationResult:
-        account_id = self.accounts.get(user_id=user_id, account_id=account_id).account.id
-        record_id = self._record_id(record_id)
-        identity = token("activity", account_id, record_id, request)
+        from argus.domain.recording.money_legacy import write
 
-        def plan(stored: StoredAccount) -> Mutation:
-            mutation, preview = self._activity(stored, request, record_id)
-            self._confirmed(request, preview)
-            return mutation
-
-        return self.repository.mutate(
+        return write(
+            self,
             user_id=user_id,
             account_id=account_id,
+            request=request,
             idempotency_key=idempotency_key,
-            identity_hash=identity,
-            expected_version=request.expected_version,
-            planner=plan,
+            record_id=record_id,
         )
-
-    def _activity(
-        self, stored: StoredAccount, request: ActivityRequest, record_id: str | None
-    ) -> tuple[Mutation, dict[str, Any]]:
-        now = self.clock()
-        current = next((e for e in stored.expenses if e.id == record_id), None)
-        if record_id and not current:
-            raise AccountNotFound()
-        if request.expected_revision != (current.current.revision if current else None):
-            raise StaleVersion()
-        amount = parse_minor_units(request.amount, stored.account.currency)
-        if amount <= 0:
-            raise RecordingInputError(
-                "amount_positive_required", "An expense needs a positive amount."
-            )
-        if request.category_id is not None and request.category_id not in CATEGORY_IDS:
-            raise RecordingInputError(
-                "category_unknown", "Choose an available expense category."
-            )
-        stamp = _stamp(request.occurred_at, request.time_zone, now)
-        reason = _normalize_reason(request.reason, required=current is not None)
-        revision = ExpenseRevision(
-            (current.current.revision if current else 0) + 1,
-            amount,
-            stamp,
-            request.time_zone,
-            (request.note or "").strip() or None,
-            request.category_id,
-            reason,
-            stored.account.user_id,
-            now,
-        )
-        expense = ExpenseRecord(
-            current.id if current else str(uuid4()),
-            stored.account.id,
-            (*current.revisions, revision) if current else (revision,),
-        )
-        answers = _answers(request.coverage, "observation_id")
-        anchors = observations(stored.opening, stored.checks)
-        eligible_ids = {a.id for a in anchors if eligible(revision, a)}
-        if set(answers) - eligible_ids:
-            raise RecordingInputError(
-                "coverage_invalid",
-                "The selected balance does not cover this activity date.",
-            )
-        questions, links = [], []
-        for anchor in anchors:
-            if anchor.id not in eligible_ids:
-                continue
-            choice = answers.get(anchor.id)
-            questions.append(
-                {
-                    "observation_id": anchor.id,
-                    "kind": anchor.kind,
-                    "as_of": anchor.as_of,
-                    "amount_minor": anchor.amount_minor,
-                    "amount": format_minor_units(
-                        anchor.amount_minor, stored.account.currency
-                    ),
-                    "included": choice,
-                }
-            )
-            if choice is not None:
-                links.append(
-                    Coverage(
-                        anchor.id, anchor.revision, expense.id, revision.revision, choice
-                    )
-                )
-        ready = set(answers) == eligible_ids
-        mutation = Mutation(expense, tuple(links), "expense")
-        after = None
-        if ready:
-            candidate = apply(stored, mutation, now)
-            validate_monotonic(expense, anchors, candidate.coverage)
-            after = _view(candidate)
-        preview = {
-            "account_version": stored.account.version,
-            "ready": ready,
-            "observations": questions,
-            "before": _view(stored),
-            "after": after,
-            "preview_token": token("activity", stored.account.id, record_id, request)
-            if ready
-            else None,
-        }
-        return mutation, preview
 
     def preview_check(
         self, *, user_id: str, account_id: str, request: CheckRequest
@@ -335,7 +244,7 @@ class FinancialLoopService:
         links = tuple(
             Coverage(check.id, 1, e.id, e.current.revision, True)
             for e in stored.expenses
-            if eligible(e.current, anchor)
+            if e.current.active and eligible(e.current, anchor)
         )
         expected = expected_at(
             anchor,
@@ -449,7 +358,11 @@ class FinancialLoopService:
         )
         anchor = observations(opening, ())[0]
         answers = _answers(request.coverage, "activity_id")
-        applicable = {e.id for e in stored.expenses if eligible(e.current, anchor)}
+        applicable = {
+            e.id
+            for e in stored.expenses
+            if e.current.active and eligible(e.current, anchor)
+        }
         if set(answers) - applicable:
             raise RecordingInputError(
                 "coverage_invalid", "The selected activity falls after the opening date."

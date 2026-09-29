@@ -58,11 +58,15 @@ def categories(
 @router.get("/financial-home", response_model=HomeResponse)
 def home(
     request: Request,
+    month: str | None = None,
+    time_zone: str = "America/Santo_Domingo",
     context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
 ):
     return _call(
         request,
-        lambda: home_response(context.service.list_accounts(user_id=context.user_id)),
+        lambda: home_response(
+            context.service.list_accounts(user_id=context.user_id), month, time_zone
+        ),
     )
 
 

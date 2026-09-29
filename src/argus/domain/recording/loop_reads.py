@@ -31,10 +31,13 @@ def activity_response(
     return {
         "record_id": record.id,
         "revision": r.revision,
-        "kind": "expense",
+        "kind": r.kind,
+        "activity_id": r.activity_id or record.id,
+        "role": r.role,
+        "active": r.active,
         "amount_minor": r.amount_minor,
         "amount": format_minor_units(r.amount_minor, stored.account.currency),
-        "balance_movement_minor": -r.amount_minor,
+        "balance_movement_minor": r.movement_minor,
         "occurred_at": r.occurred_at,
         "time_zone": r.time_zone,
         "note": r.note,
@@ -138,7 +141,15 @@ def _personal(amount: int, bps: int) -> int:
     return quotient if amount >= 0 else -quotient
 
 
-def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
+def home_response(
+    accounts: list[StoredAccount],
+    month: str | None = None,
+    time_zone: str = "America/Santo_Domingo",
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    from argus.domain.recording.money_home import period
+
+    reporting = period(month, time_zone, now)
     groups = {}
     recent = []
     for stored in accounts:
@@ -156,6 +167,10 @@ def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
                 "known_accounts": 0,
                 "unknown_accounts": 0,
                 "recorded_spending_minor": 0,
+                "gross_income_minor": 0,
+                "gross_purchases_minor": 0,
+                "refunds_minor": 0,
+                "net_spending_minor": 0,
                 "as_of": None,
             },
         )
@@ -163,7 +178,9 @@ def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
             stored.opening, stored.checks, stored.expenses, stored.coverage
         )
         group["recorded_spending_minor"] += sum(
-            e.current.amount_minor for e in stored.expenses
+            e.current.amount_minor
+            for e in stored.expenses
+            if e.current.active and e.current.kind == "expense"
         )
         if balance.state == "unknown":
             group["unknown_accounts"] += 1
@@ -186,6 +203,17 @@ def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
             ].astimezone(timezone.utc):
                 group["as_of"] = balance.as_of
         for expense in stored.expenses:
+            r = expense.current
+            if not r.active or r.role == "destination":
+                continue
+            if reporting["start_at"] <= r.occurred_at < reporting["end_at_exclusive"]:
+                key = {
+                    "expense": "gross_purchases_minor",
+                    "income": "gross_income_minor",
+                    "refund": "refunds_minor",
+                }.get(r.kind)
+                if key:
+                    group[key] += r.amount_minor
             recent.append(
                 {
                     **activity_response(stored, expense),
@@ -196,6 +224,9 @@ def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
                 }
             )
     for group in groups.values():
+        group["net_spending_minor"] = (
+            group["gross_purchases_minor"] - group["refunds_minor"]
+        )
         for key in list(group):
             if key.endswith("_minor"):
                 group[key] = str(group[key])
@@ -203,5 +234,7 @@ def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
     return {
         "currencies": [groups[k] for k in sorted(groups)],
         "recent_activity": recent[:5],
-        "recorded_at": datetime.now(timezone.utc),
+        "recorded_at": now or datetime.now(timezone.utc),
+        "period": reporting,
+        "coverage": "recorded_only",
     }

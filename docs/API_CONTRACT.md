@@ -6581,7 +6581,9 @@ Record the starting balance on an account that has none, or correct it.
 This extends the same registered-owner surface with expenses, corrections, checked
 balances and Home. All requests use the existing flag, identity, money parsing and
 account version. This is the bounded first financial loop, not the complete MVEE.
-Transfers, refunds, ingestion, household and plans are separate assignments.
+This paragraph describes the original #745 scope. The current personal-money
+extension below authorizes income, transfers, card payments and refunds; ingestion,
+household and plans remain separate assignments.
 
 ### Activity and preview
 
@@ -6600,7 +6602,7 @@ Transfers, refunds, ingestion, household and plans are separate assignments.
 }
 ```
 
-This batch records expense only. `amount` must be positive; its balance movement
+The original account-scoped command records expense only; the canonical personal-money command below adds the other kinds. `amount` must be positive; its balance movement
 is negative for both assets and liabilities. `note` is optional, at most 200
 Unicode code points. `category_id` is optional and accepts the server catalog IDs
 from `GET /financial-categories`. Its envelope is `{categories:[{id,kind:"expense"}]}`
@@ -6913,7 +6915,7 @@ Canonical routes, all under `/api/v1` and the existing registered-owner/default-
 - `POST /financial-activities/preview`, `POST /financial-activities`
 - `GET /financial-activities/{id}`, `GET /financial-activities/{id}/history`
 - `POST /financial-activities/{id}/preview`, `PATCH /financial-activities/{id}`
-- `GET /financial-activities/options`: `{accounts:[FinancialAccountResponse],eligibility:{kind:[account_type]},categories:[string],sources:[string]}`.
+- `GET /financial-activities/options`: `{accounts:[FinancialAccountResponse],eligibility:{kind:[account_type]},destination_eligibility:{paired_kind:[account_type]},categories:[string],sources:[string]}`.
 - `GET /financial-activities/purchases?currency=DOP`: `{items:[Activity]}`; each purchase adds `refunded_minor` and `refundable_minor`.
 
 The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
