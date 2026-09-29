@@ -1880,6 +1880,47 @@ conflicts. Rows cascade with their account.
 Both are `security definer`, executable by `service_role` only. The API calls
 them over `DATABASE_URL`; there is no client write path.
 
+### Complete financial loop extension
+
+Migration `20260929090000_financial_loop.sql` extends these same records with
+`expense` and `balance_check`; it does not add a parallel ledger. The canonical
+wire and review behavior is [the complete financial loop contract](API_CONTRACT.md#complete-financial-loop-authorized-september-29-2026).
+
+`financial_record_revisions.details` holds typed kind-specific facts. Expense
+revisions store optional note/category beside the existing signed amount/date,
+reason, actor and timestamp. The domain exposes positive expense amounts while
+the durable movement is negative. Check revisions store immutable confirmation
+expected amount, difference, reviewed account version, source, kind and optional
+note. The observed signed amount/date use the existing columns. Check sequence
+is the strictly increasing reviewed account version; local-day admission prevents
+backdated insertion in this build. Opening remains one stable record with revisions.
+
+`financial_observation_coverage` binds exact observation and activity revisions.
+Its composite keys enforce the same account and owner through both records and
+revisions. Each row records an explicit `included` fact. Correction writes new
+coverage rows beside the new revision, retaining earlier choices. New checks
+capture the currently known eligible activity. Current balance and unexplained
+residuals derive in `domain/recording/loop.py`; confirmation facts are not replaced
+when later activity explains a difference. No recording-order timestamp substitutes
+for a source financial date.
+
+`financial_operation_receipts` binds owner/account/idempotency key to the accepted
+record/revision and request hash. The Postgres repository locks the account,
+checks registered ownership, replays an existing receipt before CAS, then appends
+record/revision/coverage and receipt atomically. An exception rolls back every
+write. All money decisions remain in the shared domain, not repeated in SQL.
+Metadata edits bind validation and CAS to the same caller-visible version.
+Read snapshots use repeatable-read transactions; mutations hydrate under their
+account lock. Native clients have no write grant. Coverage has registered-owner
+SELECT RLS; receipts have no client read policy or grant.
+
+Home derives currency-separated personal-position subtotals from that same read.
+Its aggregate minor units are exact decimal-integer strings; single-account
+positions, activity totals and residuals are checked within Int64 before commit.
+Unknown positions remain absent from known subtotals and explicitly counted.
+Archived accounts retain their money in this projection.
+
+
 ## 12.2 backtest_jobs
 
 Represents durable lifecycle state for a backtest execution job. Jobs bridge

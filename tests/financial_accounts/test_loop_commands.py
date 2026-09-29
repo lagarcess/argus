@@ -6,13 +6,19 @@ import pytest
 from argus.domain.recording.errors import (
     IdempotencyConflict,
     RecordingInputError,
+    StaleVersion,
 )
 from argus.domain.recording.loop_schemas import (
     ActivityRequest,
     CheckRequest,
+    LoopOpeningRequest,
 )
 from argus.domain.recording.repository import InMemoryFinancialAccountRepository
-from argus.domain.recording.schemas import CreateFinancialAccountRequest, account_response
+from argus.domain.recording.schemas import (
+    CreateFinancialAccountRequest,
+    EditFinancialAccountRequest,
+    account_response,
+)
 from argus.domain.recording.service import FinancialAccountService
 
 NOW = datetime(2026, 9, 20, 12, tzinfo=timezone.utc)
@@ -187,3 +193,158 @@ def test_later_confirmed_same_day_check_becomes_current(scene):
         idempotency_key="same-day",
     )
     assert account_response(result.stored).balance.amount_minor == 800000
+
+
+def test_unknown_opening_after_spending_requires_review_and_preserves_inclusion(scene):
+    service, user, _ = scene
+    account = service.create(
+        user_id=user,
+        idempotency_key="unknown",
+        request=CreateFinancialAccountRequest(type="cash", currency="USD"),
+    ).stored
+    local = (service, user, account.account.id)
+    e, _ = expense(local, "20", 5)
+    request = LoopOpeningRequest(
+        expected_version=2, amount="100", as_of=NOW - timedelta(days=3)
+    )
+    preview = service.loop.preview_opening(
+        user_id=user, account_id=account.account.id, request=request
+    )
+    assert not preview["ready"] and preview["before"]["state"] == "unknown"
+    request = LoopOpeningRequest.model_validate(
+        {
+            **request.model_dump(),
+            "coverage": [{"activity_id": e.record_id, "included": True}],
+        }
+    )
+    preview = service.loop.preview_opening(
+        user_id=user, account_id=account.account.id, request=request
+    )
+    result = service.loop.write_opening(
+        user_id=user,
+        account_id=account.account.id,
+        request=request.model_copy(update={"preview_token": preview["preview_token"]}),
+        idempotency_key="opening",
+    )
+    assert account_response(result.stored).balance.amount_minor == 10000
+    assert account_response(result.stored).balance.activity_since_tracking_minor == -2000
+
+
+def test_timezone_transition_cannot_exclude_already_included_activity(scene):
+    service, user, _ = scene
+    start = datetime(2026, 1, 2, 0, tzinfo=timezone.utc)
+    account = service.create(
+        user_id=user,
+        idempotency_key="zone",
+        request=CreateFinancialAccountRequest(
+            type="cash", currency="USD", amount="100", as_of=start, time_zone="UTC"
+        ),
+    ).stored
+    body = ActivityRequest(
+        expected_version=1,
+        amount="10",
+        occurred_at=start + timedelta(hours=20),
+        time_zone="UTC",
+        coverage=[{"observation_id": account.opening.id, "included": True}],
+    )
+    preview = service.loop.preview_activity(
+        user_id=user, account_id=account.account.id, request=body
+    )
+    service.loop.write_activity(
+        user_id=user,
+        account_id=account.account.id,
+        request=body.model_copy(update={"preview_token": preview["preview_token"]}),
+        idempotency_key="zone-expense",
+    )
+    check = CheckRequest(
+        expected_version=2,
+        amount="100",
+        as_of=start + timedelta(hours=1),
+        time_zone="Pacific/Kiritimati",
+    )
+    with pytest.raises(RecordingInputError, match="coverage_date_conflict"):
+        service.loop.preview_check(
+            user_id=user, account_id=account.account.id, request=check
+        )
+    assert service.get(user_id=user, account_id=account.account.id).account.version == 2
+
+
+def test_opening_correction_cannot_overflow_current_residual(scene):
+    service, user, _ = scene
+    account = service.create(
+        user_id=user,
+        idempotency_key="range",
+        request=CreateFinancialAccountRequest(
+            type="cash", currency="USD", amount="0", as_of=NOW - timedelta(days=10)
+        ),
+    ).stored
+    local = (service, user, account.account.id)
+    checked(local, "-92233720368547758.07", 5)
+    body = LoopOpeningRequest(
+        expected_version=2,
+        expected_revision=1,
+        amount="92233720368547758.07",
+        reason="Correct starting amount",
+    )
+    with pytest.raises(RecordingInputError, match="amount_out_of_range"):
+        service.loop.preview_opening(
+            user_id=user, account_id=account.account.id, request=body
+        )
+    current = service.get(user_id=user, account_id=account.account.id)
+    assert current.account.version == 2 and current.opening.current.amount_minor == 0
+
+
+def test_home_aggregates_exact_strings_beyond_int64_and_preserves_archived_unknown(scene):
+    from argus.domain.recording.loop_reads import home_response
+
+    service, user, _ = scene
+    for key in ("one", "two"):
+        service.create(
+            user_id=user,
+            idempotency_key=key,
+            request=CreateFinancialAccountRequest(
+                type="cash", currency="USD", amount="92233720368547758.07"
+            ),
+        )
+    service.create(
+        user_id=user,
+        idempotency_key="blank",
+        request=CreateFinancialAccountRequest(type="cash", currency="USD"),
+    )
+    usd = next(
+        row
+        for row in home_response(service.list_accounts(user_id=user))["currencies"]
+        if row["currency"] == "USD"
+    )
+    assert usd["net_worth_minor"] == str(2 * (2**63 - 1))
+    assert usd["unknown_accounts"] == 1 and usd["known_accounts"] == 2
+
+
+def test_edit_cannot_apply_currency_rules_from_a_different_version(scene, monkeypatch):
+    service, user, _ = scene
+    account = service.create(
+        user_id=user,
+        idempotency_key="race-account",
+        request=CreateFinancialAccountRequest(type="cash", currency="DOP"),
+    ).stored
+    original_get = service.get
+    fired = False
+
+    def interleaved_get(*, user_id, account_id):
+        nonlocal fired
+        old = original_get(user_id=user_id, account_id=account_id)
+        if not fired:
+            fired = True
+            expense((service, user, account.account.id), "100", 5)
+        return old
+
+    monkeypatch.setattr(service, "get", interleaved_get)
+    with pytest.raises(StaleVersion):
+        service.edit(
+            user_id=user,
+            account_id=account.account.id,
+            request=EditFinancialAccountRequest(expected_version=2, currency="JPY"),
+        )
+    stored = original_get(user_id=user, account_id=account.account.id)
+    assert stored.account.version == 2 and stored.account.currency == "DOP"
+    assert stored.expenses[0].current.amount_minor == 10000

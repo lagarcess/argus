@@ -126,3 +126,55 @@ def test_opening_route_cannot_bypass_review_after_expense(client):
     )
     assert denied.status_code == 400
     assert client.get(path, headers=headers).json()["balance"]["state"] == "unknown"
+
+
+def test_native_uppercase_ids_return_committed_opening_and_activity(client):
+    headers = {"Authorization": f"Bearer {ALICE}"}
+    account = client.post(
+        "/api/v1/financial-accounts",
+        headers={**headers, "Idempotency-Key": str(uuid4())},
+        json={"type": "cash", "currency": "USD"},
+    ).json()
+    path = "/api/v1/financial-accounts/" + account["id"].upper()
+    opening = {
+        "expected_version": 1,
+        "amount": "100",
+        "as_of": "2026-09-01T08:00:00-04:00",
+    }
+    opening["preview_token"] = client.post(
+        path + "/opening/preview", headers=headers, json=opening
+    ).json()["preview_token"]
+    response = client.put(
+        path + "/opening",
+        headers={**headers, "Idempotency-Key": str(uuid4())},
+        json=opening,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["balance"]["amount_minor"] == 10000
+    body = {
+        "expected_version": 2,
+        "amount": "10",
+        "occurred_at": "2026-09-01T12:00:00-04:00",
+        "coverage": [
+            {
+                "observation_id": response.json()["opening"]["record_id"].upper(),
+                "included": True,
+            }
+        ],
+    }
+    body["preview_token"] = client.post(
+        path + "/activity/preview", headers=headers, json=body
+    ).json()["preview_token"]
+    expense = client.post(
+        path + "/activity",
+        headers={**headers, "Idempotency-Key": str(uuid4())},
+        json=body,
+    )
+    assert expense.status_code == 201, expense.text
+    assert (
+        client.get(
+            path + "/activity/" + expense.json()["activity"]["record_id"].upper(),
+            headers=headers,
+        ).status_code
+        == 200
+    )

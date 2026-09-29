@@ -2,8 +2,9 @@
 
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from argus.domain.recording.schemas import (
     BalanceResponse,
@@ -27,6 +28,11 @@ class CoverageAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
     observation_id: str
     included: bool
+
+    @field_validator("observation_id")
+    @classmethod
+    def canonical_observation(cls, value: str) -> str:
+        return str(UUID(value))
 
 
 class ActivityRequest(BaseModel):
@@ -58,6 +64,11 @@ class OpeningCoverageAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
     activity_id: str
     included: bool
+
+    @field_validator("activity_id")
+    @classmethod
+    def canonical_activity(cls, value: str) -> str:
+        return str(UUID(value))
 
 
 class LoopOpeningRequest(WriteOpeningRequest):

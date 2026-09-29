@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import json
 from datetime import datetime, timezone
+from typing import Any
+from uuid import UUID
 
 from argus.domain.recording.currency import currency_exponent, format_minor_units
 from argus.domain.recording.errors import (
@@ -12,11 +14,15 @@ from argus.domain.recording.errors import (
     RecordingInputError,
     StaleVersion,
 )
-from argus.domain.recording.loop import position, residuals
+from argus.domain.recording.loop import CheckRecord, ExpenseRecord, position, residuals
+from argus.domain.recording.loop_storage import OperationResult
+from argus.domain.recording.repository import StoredAccount
 from argus.domain.recording.schemas import account_response
 
 
-def activity_response(stored, record, revision=None):
+def activity_response(
+    stored: StoredAccount, record: ExpenseRecord, revision: int | None = None
+) -> dict[str, Any]:
     r = next((r for r in record.revisions if r.revision == revision), record.current)
     choices = {}
     for link in sorted(stored.coverage, key=lambda c: c.observation_revision):
@@ -43,7 +49,7 @@ def activity_response(stored, record, revision=None):
     }
 
 
-def check_response(stored, check):
+def check_response(stored: StoredAccount, check: CheckRecord) -> dict[str, Any]:
     gaps = residuals(stored.opening, stored.checks, stored.expenses, stored.coverage)
     return {
         "record_id": check.id,
@@ -62,7 +68,7 @@ def check_response(stored, check):
     }
 
 
-def operation_response(result):
+def operation_response(result: OperationResult) -> dict[str, Any]:
     body = {"account": account_response(result.stored), "replayed": result.replayed}
     if result.kind == "expense":
         record = next(e for e in result.stored.expenses if e.id == result.record_id)
@@ -73,7 +79,13 @@ def operation_response(result):
     return body
 
 
-def page(stored, items, limit, cursor, scope):
+def page(
+    stored: StoredAccount,
+    items: list[dict[str, Any]],
+    limit: int,
+    cursor: str | None,
+    scope: str,
+) -> dict[str, Any]:
     offset = 0
     if cursor:
         try:
@@ -108,21 +120,25 @@ def page(stored, items, limit, cursor, scope):
     return {"items": selected, "next_cursor": next_cursor}
 
 
-def expense_record(stored, record_id):
+def expense_record(stored: StoredAccount, record_id: str) -> ExpenseRecord:
+    try:
+        record_id = str(UUID(record_id))
+    except ValueError:
+        raise AccountNotFound() from None
     record = next((e for e in stored.expenses if e.id == record_id), None)
     if record is None:
         raise AccountNotFound()
     return record
 
 
-def _personal(amount, bps):
+def _personal(amount: int, bps: int) -> int:
     quotient, remainder = divmod(abs(amount) * bps, 10000)
     if remainder > 5000 or remainder == 5000 and quotient % 2:
         quotient += 1
     return quotient if amount >= 0 else -quotient
 
 
-def home_response(accounts):
+def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
     groups = {}
     recent = []
     for stored in accounts:

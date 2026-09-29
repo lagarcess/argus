@@ -132,6 +132,8 @@ class FinancialAccountService:
         request: EditFinancialAccountRequest,
     ) -> StoredAccount:
         stored = self.get(user_id=user_id, account_id=account_id)
+        if request.expected_version != stored.account.version:
+            raise StaleVersion()
         edit = AccountEdit(
             nickname=request.nickname
             if "nickname" in request.model_fields_set

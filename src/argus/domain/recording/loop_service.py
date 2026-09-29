@@ -2,8 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
+
+from argus.domain.recording.loop_schemas import CoverageAnswer, OpeningCoverageAnswer
+from argus.domain.recording.loop_storage import OperationResult
+from argus.domain.recording.repository import FinancialAccountRepository, StoredAccount
+
+if TYPE_CHECKING:
+    from argus.domain.recording.service import FinancialAccountService
+
 from dataclasses import replace
-from uuid import uuid4
+from datetime import datetime
+from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from argus.domain.backtest_admission import canonical_hash
@@ -49,14 +60,21 @@ from argus.domain.recording.records import (
 from argus.domain.recording.schemas import _balance_response
 
 
-def token(kind, account_id, record_id, request):
+def token(
+    kind: str,
+    account_id: str,
+    record_id: str | None,
+    request: ActivityRequest | CheckRequest | LoopOpeningRequest,
+) -> str:
     body = request.model_dump(mode="json", exclude={"preview_token"})
     return canonical_hash(
         {"kind": kind, "account_id": account_id, "record_id": record_id, "request": body}
     )
 
 
-def _answers(values, key):
+def _answers(
+    values: list[CoverageAnswer] | list[OpeningCoverageAnswer], key: str
+) -> dict[str, bool]:
     answers = {}
     for value in values:
         identity = getattr(value, key)
@@ -68,7 +86,7 @@ def _answers(values, key):
     return answers
 
 
-def _stamp(stamp, zone, now):
+def _stamp(stamp: datetime, zone: str, now: datetime) -> datetime:
     stamp = _as_instant(stamp)
     _validate_zone(zone, None)
     if stamp > now:
@@ -78,7 +96,7 @@ def _stamp(stamp, zone, now):
     return stamp
 
 
-def _view(stored):
+def _view(stored: StoredAccount) -> dict[str, Any]:
     b = position(stored.opening, stored.checks, stored.expenses, stored.coverage)
     if (
         b.amount_minor is not None
@@ -101,28 +119,50 @@ def _view(stored):
 
 
 class FinancialLoopService:
-    def __init__(self, accounts, repository, clock):
+    def __init__(
+        self,
+        accounts: FinancialAccountService,
+        repository: FinancialAccountRepository,
+        clock: Callable[[], datetime],
+    ) -> None:
         self.accounts = accounts
         self.repository = repository
         self.clock = clock
 
-    def _current(self, user_id, account_id, expected_version):
+    def _current(
+        self, user_id: str, account_id: str, expected_version: int
+    ) -> StoredAccount:
         stored = self.accounts.get(user_id=user_id, account_id=account_id)
         if stored.account.version != expected_version:
             raise StaleVersion()
         return stored
 
-    def preview_activity(self, *, user_id, account_id, request, record_id=None):
+    def preview_activity(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        request: ActivityRequest,
+        record_id: str | None = None,
+    ) -> dict[str, Any]:
         stored = self._current(user_id, account_id, request.expected_version)
-        _, preview = self._activity(stored, request, record_id)
+        _, preview = self._activity(stored, request, self._record_id(record_id))
         return preview
 
     def write_activity(
-        self, *, user_id, account_id, request, idempotency_key, record_id=None
-    ):
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        request: ActivityRequest,
+        idempotency_key: str,
+        record_id: str | None = None,
+    ) -> OperationResult:
+        account_id = self.accounts.get(user_id=user_id, account_id=account_id).account.id
+        record_id = self._record_id(record_id)
         identity = token("activity", account_id, record_id, request)
 
-        def plan(stored):
+        def plan(stored: StoredAccount) -> Mutation:
             mutation, preview = self._activity(stored, request, record_id)
             self._confirmed(request, preview)
             return mutation
@@ -136,7 +176,9 @@ class FinancialLoopService:
             planner=plan,
         )
 
-    def _activity(self, stored, request: ActivityRequest, record_id):
+    def _activity(
+        self, stored: StoredAccount, request: ActivityRequest, record_id: str | None
+    ) -> tuple[Mutation, dict[str, Any]]:
         now = self.clock()
         current = next((e for e in stored.expenses if e.id == record_id), None)
         if record_id and not current:
@@ -220,13 +262,24 @@ class FinancialLoopService:
         }
         return mutation, preview
 
-    def preview_check(self, *, user_id, account_id, request):
+    def preview_check(
+        self, *, user_id: str, account_id: str, request: CheckRequest
+    ) -> dict[str, Any]:
         stored = self._current(user_id, account_id, request.expected_version)
         _, preview = self._check(stored, request)
         return preview
 
-    def write_check(self, *, user_id, account_id, request, idempotency_key):
-        def plan(stored):
+    def write_check(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        request: CheckRequest,
+        idempotency_key: str,
+    ) -> OperationResult:
+        account_id = self.accounts.get(user_id=user_id, account_id=account_id).account.id
+
+        def plan(stored: StoredAccount) -> Mutation:
             mutation, preview = self._check(stored, request)
             self._confirmed(request, preview)
             return mutation
@@ -240,7 +293,9 @@ class FinancialLoopService:
             planner=plan,
         )
 
-    def _check(self, stored, request: CheckRequest):
+    def _check(
+        self, stored: StoredAccount, request: CheckRequest
+    ) -> tuple[Mutation, dict[str, Any]]:
         now = self.clock()
         stamp = _stamp(request.as_of, request.time_zone, now)
         anchors = observations(stored.opening, stored.checks)
@@ -317,13 +372,24 @@ class FinancialLoopService:
         }
         return mutation, preview
 
-    def preview_opening(self, *, user_id, account_id, request):
+    def preview_opening(
+        self, *, user_id: str, account_id: str, request: LoopOpeningRequest
+    ) -> dict[str, Any]:
         stored = self._current(user_id, account_id, request.expected_version)
         _, preview = self._opening(stored, request)
         return preview
 
-    def write_opening(self, *, user_id, account_id, request, idempotency_key):
-        def plan(stored):
+    def write_opening(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        request: LoopOpeningRequest,
+        idempotency_key: str,
+    ) -> OperationResult:
+        account_id = self.accounts.get(user_id=user_id, account_id=account_id).account.id
+
+        def plan(stored: StoredAccount) -> Mutation:
             mutation, preview = self._opening(stored, request)
             self._confirmed(request, preview)
             return mutation
@@ -337,9 +403,15 @@ class FinancialLoopService:
             planner=plan,
         )
 
-    def _opening(self, stored, request: LoopOpeningRequest):
+    def _opening(
+        self, stored: StoredAccount, request: LoopOpeningRequest
+    ) -> tuple[Mutation, dict[str, Any]]:
         now = self.clock()
         current = stored.opening.current if stored.opening else None
+        if current is None and request.as_of is None:
+            raise RecordingInputError(
+                "field_missing", "Review a specific date for this starting balance."
+            )
         if request.expected_revision != (current.revision if current else None):
             raise StaleVersion()
         write = plan_opening_write(
@@ -425,7 +497,19 @@ class FinancialLoopService:
         }
 
     @staticmethod
-    def _confirmed(request, preview):
+    def _record_id(value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            return str(UUID(value))
+        except ValueError:
+            raise AccountNotFound() from None
+
+    @staticmethod
+    def _confirmed(
+        request: ActivityRequest | CheckRequest | LoopOpeningRequest,
+        preview: dict[str, Any],
+    ) -> None:
         if preview.get("ready") is False:
             raise RecordingInputError(
                 "balance_coverage_required",

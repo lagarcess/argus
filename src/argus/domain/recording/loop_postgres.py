@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from psycopg import Connection
+
+from argus.domain.recording.loop_storage import Planner
+from argus.domain.recording.repository import StoredAccount
+
+if TYPE_CHECKING:
+    from argus.domain.recording.postgres_repository import (
+        PostgresFinancialAccountRepository,
+    )
+
 from dataclasses import replace
 
 from psycopg.types.json import Jsonb
@@ -21,7 +33,7 @@ from argus.domain.recording.loop import (
 from argus.domain.recording.loop_storage import OperationResult
 
 
-def hydrate(connection, stored):
+def hydrate(connection: Connection, stored: StoredAccount) -> StoredAccount:
     account = stored.account
     rows = connection.execute(
         "select r.id,r.record_kind,v.revision,v.amount_minor,v.as_of,v.as_of_zone,v.reason,v.recorded_by,v.recorded_at,v.details "
@@ -81,15 +93,15 @@ def hydrate(connection, stored):
 
 
 def mutate(
-    repository,
+    repository: PostgresFinancialAccountRepository,
     *,
-    user_id,
-    account_id,
-    idempotency_key,
-    identity_hash,
-    expected_version,
-    planner,
-):
+    user_id: str,
+    account_id: str,
+    idempotency_key: str,
+    identity_hash: str,
+    expected_version: int,
+    planner: Planner,
+) -> OperationResult:
     with repository._pool.connection() as connection:
         with connection.transaction():
             owner = connection.execute(

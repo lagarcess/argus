@@ -7,6 +7,11 @@ Validation and product rules stay in the domain modules.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from argus.domain.recording.loop_storage import OperationResult, Planner
+
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -58,6 +63,17 @@ class CreateResult:
 
 
 class FinancialAccountRepository(Protocol):
+    def mutate(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        idempotency_key: str,
+        identity_hash: str,
+        expected_version: int,
+        planner: Planner,
+    ) -> OperationResult: ...
+
     def create(
         self,
         *,
@@ -219,13 +235,13 @@ class InMemoryFinancialAccountRepository:
     def mutate(
         self,
         *,
-        user_id,
-        account_id,
-        idempotency_key,
-        identity_hash,
-        expected_version,
-        planner,
-    ):
+        user_id: str,
+        account_id: str,
+        idempotency_key: str,
+        identity_hash: str,
+        expected_version: int,
+        planner: Planner,
+    ) -> OperationResult:
         from argus.domain.recording.loop_storage import OperationResult, apply
 
         with self._lock:

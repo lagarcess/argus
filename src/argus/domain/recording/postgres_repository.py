@@ -22,6 +22,7 @@ from argus.domain.recording.errors import (
     StaleVersion,
 )
 from argus.domain.recording.loop_postgres import hydrate, mutate
+from argus.domain.recording.loop_storage import OperationResult, Planner
 from argus.domain.recording.records import (
     OPENING_KIND,
     OpeningRecord,
@@ -131,7 +132,7 @@ class PostgresFinancialAccountRepository:
                         (account_id, user_id),
                     ).fetchone()
                     raise StaleVersion() if exists else AccountNotFound()
-            stored = self._load(connection, user_id, account_id)
+                stored = self._load(connection, user_id, account_id)
         if stored is None:  # pragma: no cover - the row was just updated
             raise AccountNotFound()
         return stored
@@ -171,8 +172,25 @@ class PostgresFinancialAccountRepository:
             raise AccountNotFound()
         return stored
 
-    def mutate(self, **kwargs):
-        return mutate(self, **kwargs)
+    def mutate(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        idempotency_key: str,
+        identity_hash: str,
+        expected_version: int,
+        planner: Planner,
+    ) -> OperationResult:
+        return mutate(
+            self,
+            user_id=user_id,
+            account_id=account_id,
+            idempotency_key=idempotency_key,
+            identity_hash=identity_hash,
+            expected_version=expected_version,
+            planner=planner,
+        )
 
     def _load(self, connection, user_id: str, account_id: str) -> StoredAccount | None:  # noqa: ANN001
         row = connection.execute(
@@ -182,6 +200,7 @@ class PostgresFinancialAccountRepository:
         ).fetchone()
         if row is None:
             return None
+        account_id = str(row[0])
         openings = self._openings(connection, user_id, [account_id])
         return hydrate(connection, StoredAccount(_facts(row), openings.get(account_id)))
 

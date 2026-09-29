@@ -6447,9 +6447,9 @@ unchanged.
 - A balance is the signed value to the owner. The person types a liability as
   the positive amount owed; the server flips the sign once. A liability above
   zero is credit in the person's favor.
-- `balance.state = "unknown"` means the account has no opening record. It has
+- `balance.state = "unknown"` means the account has no opening or balance check. It has
   no amount and is never presented as zero. `activity_since_tracking_minor`
-  is `0` in this slice, which records no activity.
+  is the signed total of recorded activity in the complete financial loop.
 - `nickname` is optional, trimmed, at most 60 Unicode code points; blank
   clears it. `ownership_share_bps` is 1 to 10,000 (default 10,000) and is a
   fact about the item, never a permission.
@@ -6617,7 +6617,7 @@ cannot be included in it. Amount equality never establishes inclusion.
 Preview returns `{account_version, ready, observations, before, after, preview_token}`.
 Each observation has `{observation_id, kind, as_of, amount_minor, amount, included}`;
 `included` is null when an answer is needed. `before` and nullable `after` are
-BalanceResponse. A ready preview supplies a token over the normalized complete
+BalanceResponse. A ready preview supplies a token over the validated complete
 input and account version. Confirmation adds `preview_token` and requires
 `Idempotency-Key`; a missing answer cannot be committed. The token is recomputed
 server-side under the account lock. A stale account returns `409 stale_version`
@@ -6694,7 +6694,7 @@ confirmation order; date-only expense input never supplies that order.
 
 Existing opening PUT remains compatible for accounts without activity. With
 activity, `POST /financial-accounts/{id}/opening/preview` uses WriteOpeningRequest
-plus `coverage` entries `{activity_id,included}` for each existing expense on or
+plus an explicit `as_of` for a new opening and `coverage` entries `{activity_id,included}` for each existing expense on or
 before the proposed opening day. It returns `{account_version,ready,activities,
 before,after,preview_token}`. Confirmation PUT supplies the token and answers.
 Unknown-to-known opening and corrections must not silently double-charge earlier

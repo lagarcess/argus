@@ -55,6 +55,18 @@ def run(fixture: Path) -> dict[str, object]:
             }, f"{path} failed ({result.status_code})"
             return result.json()
 
+        def totals():
+            rows = client.get("/financial-home", headers=owner).json()["currencies"]
+            row = next((r for r in rows if r["currency"] == "DOP"), {})
+            return int(row.get("net_worth_minor", "0")), int(
+                row.get("recorded_spending_minor", "0")
+            )
+
+        initial_position, initial_spending = totals()
+
+        def home_delta(position, spending):
+            assert totals() == (initial_position + position, initial_spending + spending)
+
         account = post(
             "/financial-accounts",
             {
@@ -66,6 +78,7 @@ def run(fixture: Path) -> dict[str, object]:
             },
             str(uuid4()),
         )
+        home_delta(1000000, 0)
         path = "/financial-accounts/" + account["id"]
 
         def expense(amount, days, coverage=(), record_id=None):
@@ -98,8 +111,10 @@ def run(fixture: Path) -> dict[str, object]:
 
         first, _, _, _ = expense("2000", 8)
         assert first["account"]["balance"]["amount_minor"] == 800000
+        home_delta(800000, 200000)
         fixed, _, _, _ = expense("1900", 8, record_id=first["activity"]["record_id"])
         assert fixed["account"]["balance"]["amount_minor"] == 810000
+        home_delta(810000, 190000)
         body = {
             "expected_version": fixed["account"]["version"],
             "amount": "7500",
@@ -110,20 +125,24 @@ def run(fixture: Path) -> dict[str, object]:
         assert preview["difference_minor"] == -60000
         body["preview_token"] = preview["preview_token"]
         checked = post(path + "/balance-checks", body, str(uuid4()))
+        home_delta(750000, 190000)
         late, late_body, key, route = expense(
             "600",
             7,
             [{"observation_id": checked["check"]["record_id"], "included": True}],
         )
         assert late["account"]["balance"]["amount_minor"] == 750000
+        home_delta(750000, 250000)
         new, _, _, _ = expense("500", 2)
         assert new["account"]["balance"]["amount_minor"] == 700000
+        home_delta(700000, 300000)
         replay = post(route, late_body, key)
         assert (
             replay["replayed"]
             and replay["activity"]["record_id"] == late["activity"]["record_id"]
         )
         assert replay["account"]["balance"]["amount_minor"] == 700000
+        home_delta(700000, 300000)
         assert client.get(path, headers=other).status_code == 404
         assert client.get(path + "/activity", headers=other).status_code == 404
         checks = client.get(path + "/balance-checks", headers=owner).json()["items"]
@@ -159,6 +178,7 @@ def run(fixture: Path) -> dict[str, object]:
         "isolation": "other owner refused",
         "unknown": "preserved",
         "reopen": "durable HTTP read",
+        "home": "position and spending deltas agree after every write and replay",
         "proof": "localhost synthetic Auth/API/Postgres, not physical iPhone",
     }
 
