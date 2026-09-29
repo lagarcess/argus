@@ -2,12 +2,13 @@
 
 A SwiftUI foundation, offline by default, with Home, Accounts, Argus, Plan and Search in
 the approved order. It runs as **Argus Sample**. Navigation, local search and
-Light / Dark / System appearance work. Financial figures are immutable display
-fixtures outside the connected Accounts surface. An optional, default-off
+Light / Dark / System appearance work. With authentication disabled, financial figures are immutable display fixtures.
+With authentication configured, Home and Accounts use canonical server records. An optional, default-off
 registered-session adapter connects existing Argus authentication. See
 [native auth setup](AUTH_SETUP.md) and [financial account setup](ACCOUNTS_SETUP.md)
 for configuration and verification. With native authentication configured,
-Accounts reads and writes the server's registered-only financial-account API;
+Accounts establishes balances, records and corrects expenses, and checks balances.
+Home reads the same canonical position and recorded-spending totals;
 the server feature flag remains authoritative. No financial records are stored
 in app preferences. Calculations, voice, sharing, monitoring and financial-provider
 integrations remain outside this client.
@@ -32,9 +33,9 @@ integrations remain outside this client.
 The test action also builds. Results and logs go to ignored `ios/.build/results/`;
 set `RESULT_DIR` to choose another output directory. Extra Xcode options may
 follow the action, for example `-only-testing:ArgusFoundationUITests/FoundationUITests/testNavigationAndHeaderReturn`.
-Tests run serially on the selected simulator and change only this sample app's
-appearance. The foundation tests do not contact Argus or spend provider tokens. Auth tests
-are separately opt-in and require the isolated synthetic stack.
+Tests run serially on the selected simulator. Foundation tests use local fixtures;
+auth and financial journey tests are separately opt-in and require the isolated
+synthetic stack. They write synthetic financial records, without provider calls.
 
 To install and launch after a command-line build (substitute your simulator ID):
 
@@ -80,9 +81,9 @@ neither copied nor merged into this lane. The archive's finance JavaScript is
 not used. The locked template owns interactions; this lane adds native shell
 behavior and explicitly labeled sample destinations within its assigned scope.
 
-The financial-account continuation inspected the now-merged #727 at exact head
+The historical account-only continuation inspected the now-merged #727 at exact head
 `f0a64ffb9d70ce5b82491cf8e1803bb8a6ec7431`; the same locked archive remains
-the experience reference. Its bounded implementation contract is the
+the experience reference. Its recovered implementation is described by the
 [account client spec](../docs/superpowers/specs/2026-09-29-ios-financial-accounts.md).
 
 Shared semantic tokens and controls live in `ArgusFoundation/`. The shell owns
@@ -113,3 +114,8 @@ Durable acceptance captures and their exact source/head boundaries live in
 [`docs/reports/evidence/ios-foundation/`](../docs/reports/evidence/ios-foundation/).
 Simulator accessibility checks are a basic foundation check; they do not claim
 physical-device VoiceOver, production financial journeys or backend acceptance.
+
+Connected financial acceptance is owned by the current
+[execution manifest](../docs/specs/argus-execution-board.md), linked to the MVEE.
+See [financial setup](ACCOUNTS_SETUP.md) for the repeatable simulator and model
+checks. A simulator pass does not satisfy physical-iPhone internet acceptance.

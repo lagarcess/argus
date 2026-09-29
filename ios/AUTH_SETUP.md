@@ -2,7 +2,8 @@
 
 Authentication is **off by default**. Profile can connect to existing Argus
 signup/login and `/me`. The [account continuation](ACCOUNTS_SETUP.md) reuses that
-same session to connect Accounts; other destinations remain local samples.
+same session for canonical Home, Accounts, expense corrections and balance checks.
+Argus, Plan and Search remain local sample destinations in this bounded build.
 The auth adapter adds no guest bootstrap, calculations or provider calls.
 
 ## Configuration
