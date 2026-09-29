@@ -1,0 +1,129 @@
+"""Financial accounts, first slice: create, list, reopen, edit, opening.
+
+Thin transport: auth, flag, request validation, error shaping. Rules live in
+``argus.domain.recording``; storage in its repositories.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Header, Request, Response
+
+from argus.api.dependencies import problem
+from argus.api.financial_accounts import (
+    FinancialAccountsContext,
+    domain_problem,
+    require_financial_accounts_context,
+)
+from argus.domain import backtest_admission
+from argus.domain.recording.schemas import (
+    CreateFinancialAccountRequest,
+    EditFinancialAccountRequest,
+    FinancialAccountListResponse,
+    FinancialAccountResponse,
+    WriteOpeningRequest,
+    account_response,
+)
+
+router = APIRouter(prefix="/api/v1", tags=["financial-accounts"])
+
+
+@router.post(
+    "/financial-accounts",
+    response_model=FinancialAccountResponse,
+    status_code=201,
+    responses={200: {"model": FinancialAccountResponse, "description": "Exact replay"}},
+)
+def create_financial_account(
+    request: Request,
+    response: Response,
+    body: CreateFinancialAccountRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
+) -> FinancialAccountResponse:
+    key = _required_idempotency_key(request, idempotency_key)
+    try:
+        result = context.service.create(
+            user_id=context.user_id, idempotency_key=key, request=body
+        )
+    except Exception as error:
+        raise domain_problem(request, error) from None
+    response.status_code = 201 if result.created else 200
+    return account_response(result.stored)
+
+
+@router.get("/financial-accounts", response_model=FinancialAccountListResponse)
+def list_financial_accounts(
+    context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
+) -> FinancialAccountListResponse:
+    accounts = context.service.list_accounts(user_id=context.user_id)
+    return FinancialAccountListResponse(
+        accounts=[account_response(item) for item in accounts]
+    )
+
+
+@router.get("/financial-accounts/{account_id}", response_model=FinancialAccountResponse)
+def get_financial_account(
+    request: Request,
+    account_id: str,
+    context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
+) -> FinancialAccountResponse:
+    try:
+        stored = context.service.get(user_id=context.user_id, account_id=account_id)
+    except Exception as error:
+        raise domain_problem(request, error) from None
+    return account_response(stored)
+
+
+@router.patch("/financial-accounts/{account_id}", response_model=FinancialAccountResponse)
+def edit_financial_account(
+    request: Request,
+    account_id: str,
+    body: EditFinancialAccountRequest,
+    context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
+) -> FinancialAccountResponse:
+    try:
+        stored = context.service.edit(
+            user_id=context.user_id, account_id=account_id, request=body
+        )
+    except Exception as error:
+        raise domain_problem(request, error) from None
+    return account_response(stored)
+
+
+@router.put(
+    "/financial-accounts/{account_id}/opening", response_model=FinancialAccountResponse
+)
+def write_financial_opening(
+    request: Request,
+    account_id: str,
+    body: WriteOpeningRequest,
+    context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
+) -> FinancialAccountResponse:
+    try:
+        stored = context.service.write_opening(
+            user_id=context.user_id, account_id=account_id, request=body
+        )
+    except Exception as error:
+        raise domain_problem(request, error) from None
+    return account_response(stored)
+
+
+def _required_idempotency_key(request: Request, raw: str | None) -> str:
+    state, key = backtest_admission.validate_idempotency_key(raw)
+    if state == "ok" and key is not None:
+        return key
+    if state == "invalid":
+        raise problem(
+            request,
+            status_code=422,
+            code="validation_error",
+            title="Validation Error",
+            detail="Idempotency-Key must be 1-128 visible ASCII characters with no whitespace.",
+        )
+    raise problem(
+        request,
+        status_code=400,
+        code="idempotency_key_required",
+        title="Idempotency Key Required",
+        detail="POST /financial-accounts requires an Idempotency-Key header.",
+    )
