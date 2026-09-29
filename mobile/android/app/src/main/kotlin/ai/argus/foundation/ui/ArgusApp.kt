@@ -51,6 +51,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ai.argus.foundation.Appearance
 import ai.argus.foundation.R
+import ai.argus.foundation.accounts.AccountsController
+import ai.argus.foundation.ui.accounts.AccountsPage
 import ai.argus.foundation.auth.SessionStatus
 import ai.argus.foundation.auth.SessionUiState
 
@@ -65,12 +67,13 @@ internal enum class Page(@StringRes val title: Int) {
     SESSION(R.string.session_title),
 }
 
-/** Financial pages remain samples; optional session access is isolated in Settings. */
+/** Accounts uses the registered session owner; other destinations remain explicit samples. */
 @Composable
 fun ArgusApp(
     appearance: Appearance,
     onAppearanceChange: (Appearance) -> Unit,
     sessionState: SessionUiState? = null,
+    accountsController: AccountsController? = null,
     onSignIn: (String, String) -> Unit = { _, _ -> },
     onSignOut: () -> Unit = {},
     onSessionRetry: () -> Unit = {},
@@ -78,6 +81,7 @@ fun ArgusApp(
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.ARGUS) }
     var page by rememberSaveable { mutableStateOf(Page.ROOT) }
+    var sessionFromAccounts by remember { mutableStateOf(false) }
     var settingsSource by rememberSaveable { mutableStateOf(Page.ROOT) }
     var dialog by rememberSaveable { mutableStateOf<Int?>(null) }
     val sessionEnabled = sessionState != null && sessionState.status != SessionStatus.DISABLED
@@ -119,9 +123,18 @@ fun ArgusApp(
     val unavailable = { dialog = R.string.unavailable_body }
     val back = {
         page = when (page) {
-            Page.PREFERENCES, Page.SESSION -> Page.SETTINGS
+            Page.SESSION -> if (sessionFromAccounts) Page.ROOT else Page.SETTINGS
+            Page.PREFERENCES -> Page.SETTINGS
             Page.SETTINGS -> settingsSource
             else -> Page.ROOT
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(sessionState?.status, sessionFromAccounts) {
+        if (sessionFromAccounts && page == Page.SESSION && sessionState?.status == SessionStatus.SIGNED_IN) {
+            page = Page.ROOT
+            destination = Destination.ACCOUNTS
+            sessionFromAccounts = false
         }
     }
 
@@ -144,7 +157,7 @@ fun ArgusApp(
                     Page.SETTINGS -> SettingsPage(
                         onPreferences = { page = Page.PREFERENCES }, unavailable = unavailable,
                         sessionState = sessionState?.takeUnless { it.status == SessionStatus.DISABLED },
-                        onSession = { page = Page.SESSION },
+                        onSession = { sessionFromAccounts = false; page = Page.SESSION },
                     )
                     Page.SESSION -> sessionState?.let { state ->
                         SessionPage(state, onSignIn, onSignOut, onSessionRetry, onRecovery)
@@ -160,6 +173,13 @@ fun ArgusApp(
                             onSend = { focus.clearFocus(); dialog = R.string.chat_disconnected },
                             unavailable = unavailable, composerEnabled = composerEnabled,
                         )
+                        Destination.ACCOUNTS -> if (accountsController != null) {
+                            AccountsPage(accountsController, sessionState, onSignIn = {
+                                sessionFromAccounts = true; page = Page.SESSION
+                            })
+                        } else {
+                            EcosystemPage(destination, requireRegistration, unavailable)
+                        }
                         else -> key(destination) {
                             EcosystemPage(destination, requireRegistration, unavailable)
                         }

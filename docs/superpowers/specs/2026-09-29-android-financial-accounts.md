@@ -13,7 +13,9 @@ records, retaining the September 28 design lock and EN/es-419 support.
 
 1. Sign in through the existing session owner; Accounts provides list, create,
    detail, metadata edit, opening entry/correction, archive and restore.
-   Active accounts stay in the ordinary list; Manage accounts exposes archived
+   Initial creation asks only type, nickname, currency and balance. Optional
+   assets add a compact All/Half/Another ownership disclosure; dates and zones
+   remain in later editing. Active accounts stay in the ordinary list; Manage accounts exposes archived
    accounts. Other destinations remain explicitly sample/unavailable.
 2. API_CONTRACT section 17.3 at `296195e86c972e846c251d256b3cc211975bfd57`
    owns payloads. PATCH binds the version the form opened with. Opening PUT

@@ -28,15 +28,50 @@ class SessionController internal constructor(
     private val sdk: SessionSdk,
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val now: () -> Instant = { Clock.System.now() },
-) {
+) : AuthenticatedRequests {
     private val mutableState = MutableStateFlow(SessionUiState(SessionStatus.WORKING))
-    val state: StateFlow<SessionUiState> = mutableState.asStateFlow()
+    override val state: StateFlow<SessionUiState> = mutableState.asStateFlow()
     private val mutex = Mutex()
     private val epoch = AtomicLong()
     private val revision = AtomicLong()
     private val restoring = AtomicBoolean()
     private var loaded = false
     private var stored: StoredSession? = null
+
+    /** A 401 refreshes through this owner, but never silently replays a financial write. */
+    override suspend fun <T> authenticatedRequest(
+        ownershipEpoch: Long,
+        request: suspend (String) -> T,
+    ): T {
+        var result: Result<T>? = null
+        operation(ownershipEpoch) {
+            if (state.value.status != SessionStatus.SIGNED_IN) throw SessionAccessFailure()
+            var record = stored ?: throw SessionAccessFailure()
+            if (record.kind != AccountKind.REGISTERED || record.revocation != Revocation.NONE) {
+                throw SessionAccessFailure()
+            }
+            if (record.session.expiresAt <= now() + 30.seconds) {
+                refreshStored()
+                verifyStored(ownershipEpoch)
+                record = stored ?: throw SessionAccessFailure()
+            }
+            if (epoch.get() != ownershipEpoch || state.value.status != SessionStatus.SIGNED_IN) {
+                throw SessionAccessFailure()
+            }
+            try {
+                result = Result.success(request(record.session.accessToken))
+            } catch (_: BearerRejected) {
+                publish(ownershipEpoch, SessionUiState(SessionStatus.WORKING))
+                refreshStored()
+                verifyStored(ownershipEpoch)
+                throw SessionAccessFailure()
+            }
+        }
+        if (epoch.get() != ownershipEpoch || state.value.status != SessionStatus.SIGNED_IN) {
+            throw SessionAccessFailure()
+        }
+        return result?.getOrThrow() ?: throw SessionAccessFailure()
+    }
 
     suspend fun restore() {
         if (!restoring.compareAndSet(false, true)) return

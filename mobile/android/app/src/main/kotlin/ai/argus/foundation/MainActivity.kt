@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
                 ArgusApp(
                     appearance.selected, appearance::select,
                     sessionState = sessionState,
+                    accountsController = sessionOwner.accountsController,
                     onSignIn = sessionOwner::signIn,
                     onSignOut = sessionOwner::signOut,
                     onSessionRetry = sessionOwner::retrySession,

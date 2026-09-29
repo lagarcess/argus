@@ -1,6 +1,8 @@
 package ai.argus.foundation
 
 import android.app.Application
+import ai.argus.foundation.accounts.AccountsController
+import ai.argus.foundation.accounts.ArgusAccountsApi
 import ai.argus.foundation.auth.AuthEnvironment
 import ai.argus.foundation.auth.SessionController
 import ai.argus.foundation.auth.createSessionController
@@ -17,11 +19,19 @@ class ArgusApplication : Application() {
     var sessionController: SessionController? = null
         private set
 
+    var accountsController: AccountsController? = null
+        private set
+
     override fun onCreate() {
         super.onCreate()
         authEnvironment = AuthEnvironment.fromBuildConfig()
         sessionController = authEnvironment?.let { createSessionController(applicationContext, it) }
-        sessionController?.let { controller -> sessionScope.launch { controller.restore() } }
+        sessionController?.let { controller ->
+            authEnvironment?.let { environment ->
+                accountsController = AccountsController(controller, ArgusAccountsApi(environment.apiBaseUrl, controller), sessionScope)
+            }
+            sessionScope.launch { controller.restore() }
+        }
     }
 
     fun signIn(email: String, password: String) {

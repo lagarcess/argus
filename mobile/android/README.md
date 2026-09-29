@@ -1,9 +1,10 @@
 # Argus Android foundation
 
 Open this directory in Android Studio. This is a native Kotlin/Compose **sample
-application**, package `ai.argus.foundation.sample`. Financial features remain
-illustrative. Registered authentication is available only in an explicitly
-configured local debug build; it is disabled by default and in release builds.
+application**, package `ai.argus.foundation.sample`. An explicitly configured
+local debug build connects registered Accounts to the existing financial API.
+Other financial destinations remain illustrative. Registered authentication is
+disabled by default and in release builds.
 The Light/Dark/System preference uses local app storage. The unsent sample
 draft uses Android saved UI state to survive activity recreation. Other content is
 explicitly illustrative. A UI registration notice is not server authorization.
@@ -99,7 +100,8 @@ owns this continuation. The five-tab sample remains available without sign-in.
 An enabled build adds Account under Profile & settings. Argus owns password
 validation and profile truth through `/api/v1/auth/login` and bearer `/api/v1/me`.
 The pinned Supabase Kotlin SDK 3.2.6 owns refresh and provider logout. Ktor 3.3.1
-matches that SDK's declared dependency. No financial endpoint is connected.
+matches that SDK's declared dependency. The Accounts continuation below reuses
+this session owner for every financial request.
 
 Set these variables only for a disposable, CAPTCHA-disabled local stack:
 
@@ -157,3 +159,86 @@ Use only disposable credentials and keep input files restricted. The former
 proves encrypted storage, expired-token refresh, server rejection after logout,
 and separate-process restoration. The latter drives the real bilingual UI and
 checks the browser handoff. Default builds run the ordinary sample/UI tests.
+
+
+## Local financial Accounts
+
+The [Accounts spec](../../docs/superpowers/specs/2026-09-29-android-financial-accounts.md)
+binds this client to API_CONTRACT 17.3. Accounts supports create, read, metadata
+edit, opening corrections, archive and restore. Other destinations remain
+samples. All financial responses are refetched after process restart; drafts
+are memory-only and retire on identity changes. No transactions, totals,
+delete, offline sync or cross-surface synchronization are claimed.
+
+### Dedicated local setup
+
+Inventory containers/ports and select a free, uniquely named stack first. The
+example below reserves API59400, gateway59401, DB59402, mail59403/59404 and
+shadow59406. Do not stop/reset a shared stack or the shared adb daemon.
+Prerequisites: the repository's Python dependencies, Docker, Supabase CLI and
+the pinned Android toolchain. No hosted project is used.
+
+```bash
+# From repository root. Refuses to overwrite an existing config.
+python3 mobile/android/tools/local_accounts.py prepare /tmp/android-accounts-local
+supabase start --workdir /tmp/android-accounts-local -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+umask 077
+supabase status --workdir /tmp/android-accounts-local -o json > /tmp/android-accounts-stack-private.json
+export ARGUS_ANDROID_STACK_JSON=/tmp/android-accounts-stack-private.json
+export ARGUS_ANDROID_PYTHON=/absolute/path/to/argus-venv/bin/python
+python3 mobile/android/tools/local_accounts.py api
+```
+
+`prepare` derives configuration from the repo and copies current migrations;
+seeds are disabled. Set `ARGUS_ANDROID_STACK_NAME=android-accounts-<unique>` and
+`ARGUS_ANDROID_PORT_BASE` before preparation to reserve a different range.
+Set matching `ARGUS_ANDROID_API_PORT` for both API and build. The launcher
+accepts loopback stack URLs only, uses durable Supabase persistence, enables
+Accounts only locally and builds a clean environment without model credentials.
+The API launcher runs in the foreground: stop/restart that owned process to
+exercise durable readback; never reset its database for a restart check.
+`ARGUS_ANDROID_TEST_ACCOUNTS_ENABLED=false` provides a local flag-off probe;
+`ARGUS_ANDROID_TEST_GUEST_ENABLED=true` permits a real local guest bootstrap
+for denial checks. Neither changes hosted configuration.
+
+In a second terminal with the same stack/API environment and configured
+`JAVA_HOME`, `ANDROID_HOME`, `GRADLE_USER_HOME`:
+
+```bash
+python3 mobile/android/tools/local_accounts.py build
+```
+
+This builds the opt-in app, JVM tests, lint and instrumentation APK. The
+emulator uses 10.0.2.2 to reach the host API/auth gateway. The existing recovery
+URL is retained; this Accounts recipe does not start a browser recovery server.
+For shared-backend cross-surface validation, point the existing auth build
+variables at the captain's approved local API and auth gateway; use the same
+registered identity deliberately. Independent fixture runs do not prove sync.
+
+### Native acceptance and restart
+
+Generate two disposable registered `@example.test` identities through the local
+`POST /api/v1/auth/signup` with generated passwords, local nonempty CAPTCHA
+placeholder and languages `en` and `es-419`. Store only `email`/`password` in a
+0600 JSON array outside Git; never paste them into reports or logs.
+
+```bash
+export ARGUS_ANDROID_IDENTITIES_JSON=/absolute/private/identities.json
+export ARGUS_ANDROID_EVIDENCE_DIR=/tmp/android-accounts-evidence
+export ARGUS_ANDROID_TEST_DEVICE=emulator-5584 # confirmed dedicated to this run
+python3 mobile/android/tools/device_accounts.py install
+python3 mobile/android/tools/device_accounts.py ui 0 # English/light
+# Pull screenshots before the next mode clears the app fixture.
+# /sdcard/Android/data/ai.argus.foundation.sample/files/evidence/accounts-<width>x<height>/
+python3 mobile/android/tools/device_accounts.py ui 1 # Spanish/dark
+python3 mobile/android/tools/device_accounts.py core
+python3 mobile/android/tools/device_accounts.py save
+# Stop/restart the owned API process, preserving DB; restore force-stops only the app.
+python3 mobile/android/tools/device_accounts.py restore
+```
+
+The UI/core/save modes clear only this application on the selected emulator;
+restore preserves app data and verifies a durable server record after session
+restoration. Use phone-size viewports and 130% font scale on the owned emulator.
+Emulator evidence is not physical-device acceptance. Review the final PR audit
+for exact source/evidence SHAs, retained evidence and test outcomes.
