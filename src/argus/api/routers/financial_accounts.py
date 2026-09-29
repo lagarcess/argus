@@ -14,8 +14,8 @@ from argus.api.financial_accounts import (
     domain_problem,
     require_financial_accounts_context,
 )
-from argus.api.routers.financial_loop import router as loop_router
 from argus.api.routers.financial_activities import router as money_router
+from argus.api.routers.financial_loop import router as loop_router
 from argus.domain import backtest_admission
 from argus.domain.recording.loop_schemas import LoopOpeningRequest
 from argus.domain.recording.schemas import (

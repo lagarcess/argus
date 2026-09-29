@@ -76,21 +76,23 @@ assignment, not a claim that this slice completes the ecosystem.
 - [ ] Phase D: Keep the audit trail. Update this section with decisions, named owners, evidence and exact remaining work.
 - [ ] Phase E: Verify and hand back. Deliver the runnable simulator, recording, restart instructions and merge-ready PR after CI and scoped review.
 
-Current checkpoint: implementation is active in isolated core/native branches.
+Current checkpoint: the backend is implemented and the iPhone journey is in
+connected simulator acceptance. Publication has not started.
 The shared [API contract](../API_CONTRACT.md#personal-money-activities-authorized-september-29-2026)
 and additive storage contract are committed. The new local stack on 585xx and
 dedicated Argus Personal Money simulator are running. Launcher isolation passed
-14 tests. The earlier 584xx demo remains healthy and unchanged. Native pending-write
-storage has four component tests; assembled recovery acceptance is still pending.
+14 tests. The earlier 584xx demo remains healthy and unchanged. The new native app
+is installed on the dedicated simulator. Native pending-write storage has four
+component tests; assembled process-restart recovery acceptance is still pending.
 The captain ran the inherited financial suite before changes: 71 passed, 18
 Postgres-dependent cases skipped pending the new disposable database. These are
 baseline component results, not acceptance of the new journey.
 
 | Named owner | Branch / exclusive surfaces | Next usable result |
 | --- | --- | --- |
-| `money_core` | `codex/personal-money-core`, recording domain, API, additive migration, backend tests, API/data contracts | Contract committed in `6b9a92de`; implement all activity kinds and atomic correction/reconciliation |
-| `money_iphone` | `codex/personal-money-iphone`, Swift feature/transport/models, localization and native tests | Durable uncertain-write recovery first; consume accepted contract for the complete recording editor/detail/Home |
-| `money_demo_setup` | `codex/personal-money-demo`, isolated local launchers and restart setup | Completed in `c2b56346`, integrated as `5a64e64a`; stack and simulator prepared, no new app installed yet |
+| `money_core` | `codex/personal-money-core`, recording domain, API, additive migration, backend tests, API/data contracts | Complete through `79032245`; five kinds, paired correction, refund rules, monthly Home, preserved legacy receipts and additive revision integrity. Final scoped core review clean |
+| `money_iphone` | `codex/personal-money-iphone`, Swift feature/transport/models, localization and native tests | Feature `99eb0a7b` integrated; 47 package tests with four expected environment skips and seven model tests. Fix three confirmed review findings and finish actual API simulator journeys |
+| `money_demo_setup` | `codex/personal-money-demo`, isolated local launchers and restart setup | Completed in `c2b56346`, integrated as `5a64e64a`; stack and simulator retained. Captain now owns assembled source and services |
 | Captain | `codex/personal-money-recording`, manifest, assembled source, independent proof and PR | Integrate verified components, click through and record the real local app, finish CI/review without merging |
 
 Design decision, September 29: two code-grounded alternatives and an independent
@@ -121,6 +123,22 @@ successful activity response after the API accepts it. Five proxy checks pass.
 Use it for assembled process-restart and same-key recovery proof, not as a substitute
 for database atomicity and isolation checks. It does not change application behavior
 or hosted configuration.
+
+Backend verification includes 143 owner-run financial checks against the isolated
+database, plus the captain's real Auth/API identity check. The HTTP proof covers
+all five kinds, paired replay and inspection, wrong-account correction and history,
+refund caps, positive card credit, unknown USD investment balance, cross-owner
+refusal, durable reopening and a negative net-spending month. Its initial API
+source is `8a6716044`; final assembled evidence must be revalidated before READY.
+The source-timezone and omitted-versus-explicit-null refund correction fixes passed
+independent delta review. Reusing grouped activity reads reduced a synthetic
+3,000-record projection from 2.598 seconds to 0.009 seconds without another cache.
+
+The first native review found three confirmed issues: inspection did not propagate
+terminal authentication failure, Accounts hid rejected recovery explanations, and
+retired account legs lacked a moved-entry label. The native owner is fixing these
+within the existing journey. CI, final review, recording and restart handoff remain
+pending. None of these component results claims physical-phone delivery.
 
 Model the Domain shaped the typed activity group. Separate Before Serializing
 Shared State shaped the isolated writers. Prove It Works requires both real
