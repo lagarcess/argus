@@ -59,3 +59,29 @@ Archive/restore now passes its own account ID to `run(targetAccountID:)`, and re
 Search updates now compare the requested origin with the existing origin before clearing anything. Re-selecting the current query, kind, or currency preserves results, loaded pages, cursor, and scroll origin; actual changes still retire obsolete requests and clear the old result set. The model regression covers both the no-op and changed-filter paths. The native fault-delay adjustment changes test observability only.
 
 `git diff --check 68c45b8f0 12ade77d9` passed. This remained a read-only source/test review. Captain reports 20 model tests and native build passing; I did not rerun them or operate the simulator, services, database, device, credentials, or providers. Exact-head native acceptance, CI/reconciliation, and release authority remain with the captain/founder; this verdict does not claim those gates completed.
+
+## Restoration delta follow-up
+
+Exact reviewed SHA: `b304c2f529fe770934f8c87892ff314deb7a292b`.
+Delta: `12ade77d98ac74864ad05ca629548be055e89452..b304c2f529fe770934f8c87892ff314deb7a292b`.
+
+Verdict: **clean affected-fix review; no actionable findings in this delta.** Prior closed findings remain closed. Unchanged code was not subjected to a new full review.
+
+The loading/opening indicator is now an overlay rather than a row inside the result stack, so showing and removing it no longer changes result-row geometry. Restoration retains its immutable target when an unchanged anchor is temporarily constrained by layout, rather than declaring success at an intermediate content boundary. Explicit dragging releases pending restoration, allowing subsequent visible-row observations to own the saved origin. When the original anchor disappears, the existing surviving-row selection is retained and boundary fallback is permitted; an empty result explicitly clears obsolete restoration. Request/owner guards and query-change retirement remain intact.
+
+The new model tests exercise delayed layout completion, removed-anchor boundary fallback, explicit-scroll cancellation and persistence, and empty-result cleanup. Native assertion changes add failure geometry and screenshot diagnostics without weakening the existing three-point tolerance. The generated OpenAPI additions match the two already-reviewed GET routes and their typed response schemas; no new runtime endpoint behavior is introduced by this delta. The manifest/review publication accurately attributes the earlier clean verdict to its earlier exact SHA and leaves assembled acceptance/CI pending.
+
+Verification performed here: read-only source/test/contract inspection and `git diff --check 12ade77d9 b304c2f52` (passed). The captain reports 22 model tests and a generic native build passing and is rerunning native geometry/recovery acceptance. I did not rerun tests, operate services/simulators/databases/devices, inspect credentials, or modify repository files. This review does not claim the in-progress native acceptance or remaining release gates completed.
+
+## Final measured-scroll follow-up
+
+Exact reviewed SHA: `c775b0cdd1e05f4088fd9eb5d0ccf798d50882a4`.
+Review scope: net delta from `b304c2f529fe770934f8c87892ff314deb7a292b` only.
+
+Verdict: **clean affected-delta review; no actionable findings.** Earlier closed findings remain closed.
+
+The runtime delta eagerly measures the already loaded Search rows with `VStack` and removes `ScrollViewReader`/`scrollTo`. The existing `UIScrollView` restoration code is now the sole owner of offset adjustment. The deferred completion path retains the restoration-token guard, requests layout, and uses the same measured-row adjustment as preference updates. This directly addresses the captain's demonstrated underestimated lazy content height and competing offset writes. It does not change backend loading, pagination, query state, identity guards, or money behavior. No temporary logging remains in the net diff.
+
+The targeted native test now starts from an explicit fresh sign-in and checks the same row position across two successive relaunches. It retains the existing position tolerance and failure diagnostics; it does not relax acceptance. Eager layout applies to retained loaded pages, so it is a proportional local geometry fix for this bounded Search lane; this review does not infer a new large-dataset performance requirement.
+
+`git diff --check b304c2f52 c775b0cdd1e05f4088fd9eb5d0ccf798d50882a4` passed. Review was read-only; no repository files, tests, simulator, services, credentials, or device were operated. The captain reports repeated-relaunch acceptance passed at `89747bb51` before diagnostic cleanup and is recording the final editor journey. This review does not claim final-head native acceptance, CI, or release gates completed.

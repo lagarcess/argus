@@ -47,9 +47,81 @@ xcrun simctl launch 01CBA853-5183-41AF-B1B8-024EF6DB8FFB local.argus.foundation
 open -a Simulator
 ```
 
+## Try the connected journey
+
+The retained simulator is signed into a synthetic local user after acceptance.
+Open the Search tab (magnifying glass), enter `Search`, and choose Accounts,
+Activity or Plan. Use the currency selector to narrow results.
+
+- An account result opens the real account detail. Edit its name, return to
+  Search, and see the changed matching result.
+- An activity result opens the real activity detail and correction flow. Correct
+  the amount or note, return, and inspect the current canonical revision.
+- A Plan result opens its existing expectation editor. Save a change and see
+  Search refresh; this does not change actual balances.
+- Search `Search 0e0f30`, select Accounts and DOP, then load the next page.
+  Open a result, return, and reopen the app to check the retained search origin.
+
+Records created by acceptance remain available. Search `F476FC` to find the
+final three-editor fixture: `Revised bank F476FC`, `Search income F476FC`
+(DOP 27), and `Search bill F476FC` (DOP 35).
+
+[Watch the 49-second demonstration](search-demo.mp4): correct a receipt in the
+existing editor, return to its refreshed Search result, search/edit the Plan
+expectation, and reopen in Spanish. The account rename is covered by the same
+successful native test and its [empty old-match result](search-account-edit-removes-old-match.png).
+The clip is continuous simulator footage, trimmed only to remove idle footage;
+setup/login and the earlier account rename are outside the recorded excerpt.
+
+[English activity result](search-activity-correction-return.png) ·
+[Plan after edit](search-plan-expectation-editor-return.png) ·
+[Spanish after reopening](search-spanish-light-relaunch.png) ·
+[Exact scroll return](search-second-page-exact-return.png) ·
+[Second reopening](search-second-page-relaunch-2.png).
+
 ## Verification record
 
-Environment checkpoint at integration base `22f9c8cda`: the existing native
-registered-session sign-in/relaunch/sign-out test passed on the new simulator
-with clean Xcode exit zero. This verifies isolated setup, not connected Search.
-Connected Search acceptance, recording and final review are pending implementation.
+| Surface | Evidence | Status |
+| --- | --- | --- |
+| Financial/Search backend | 205 focused tests against real local Postgres, zero skips | Passed |
+| Search HTTP and ownership | [15-check real Auth/API proof](api-proof.json) | Passed |
+| Required database discovery | Nine shared Search cases via `tests/test_financial_search_postgres.py` | Passed |
+| Generated API artifact | 23 compatibility tests | Passed |
+| Native state/model behavior | 22 tests; session package 48 passed, four opt-in live skips | Passed |
+| Existing detail editors | `ui-20260929T220326Z.xcresult`, English/dark and Spanish/light | Passed at `c775b0c` |
+| Accounts/Search independence | `ui-20260929T214541Z.xcresult` | Passed |
+| Owner switch and isolation | `ui-20260929T214915Z.xcresult` | Passed |
+| Exact multi-page return/relaunch | `ui-20260929T220141Z.xcresult`, Back plus two relaunches, <3-point difference | Passed at `89747bb51` |
+| Loading, retry and missing destination | `ui-20260929T215321Z.xcresult`, delayed read / 503 / retry / detail 404 | Passed |
+| Independent review | [Full pass and affected deltas](independent-review.md) | Clean through `c775b0cdd1e05f4088fd9eb5d0ccf798d50882a4` |
+| CI | [PR #751](https://github.com/lagarcess/argus/pull/751) | Terminal status and exact published head are recorded in the PR readiness comment |
+
+The `.xcresult` bundles and raw logs are ignored local diagnostics; committed
+screenshots and the final recording are the durable demonstration evidence.
+The API proof was captured at `78e65a026`; later changes do not alter its backend
+runtime. The account-tab and owner-switch runs used `5333b3304` and `397bd075`;
+the recovery run used `93accb1d`. Subsequent native changes are limited to Search
+scroll restoration. Its successful `89747bb51` run retained temporary numeric
+geometry logs; `c775b0c` removes those logs without changing behavior, and passes
+the full editor/relaunch journey. Final documentation/media commits do not alter
+that reviewed implementation. The final PR readiness comment records exact-head
+revalidation, current integration and terminal CI; earlier screenshots are
+retained evidence, not claimed to have been captured at a future commit.
+
+The scroll defect was confirmed in native traces: lazy content bounds clamped a
+valid saved offset, then a competing SwiftUI scroll-to-row operation undid the
+UIKit correction. Loaded pages now have measured row heights and one offset
+owner. No diagnostic runtime logging remains.
+
+## Remaining limitations
+
+- This proves the assigned Search journey on a local simulator with synthetic
+  users and real local Auth/API/Postgres. It does not prove physical-phone
+  internet delivery, signing or deployment.
+- Search covers accounts, current canonical activity and Plan expectations.
+  Documents, household and other MVEE retrieval types remain in the existing
+  execution manifest, outside this assignment.
+- Response pages are bounded; the canonical financial snapshot still reads the
+  owner's full record set. This is not a new indexed or semantic search engine.
+- Edits use the existing financial controls and their existing limitations. Search
+  does not create new money rules or a second transaction ledger.

@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** [connected Search on iPhone](#connected-search-on-iphone-lane) is the active local delivery lane. Connected Plan/Home (#749/#750) and personal money recording (#747/#748) are landed. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** [connected Search on iPhone](#connected-search-on-iphone-lane) has a locally verified delivery in [PR #751](https://github.com/lagarcess/argus/pull/751), awaiting founder merge authority after its terminal CI verdict. Connected Plan/Home (#749/#750) and personal money recording (#747/#748) are landed. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -81,10 +81,10 @@ and persistence owners.
 - [x] `architect` for parallel design exploration. Native and backend scouts compare reuse with domain-specific adapters; retain locked UI and existing detail owners.
 - [x] Write the throughput checkpoint as four todo items.
 - [x] Delegate code-writing to a subagent using your configured feature model. `search_implementation` owns the complete bounded implementation.
-- [ ] Verify on the matching surface.
-- [ ] Rebase into small, ordered commits. Skip rebasing published/evidenced work under repository policy; use ordered commits and one-way integration merge if needed.
-- [ ] If the design is contested, `interrogate` before shipping. Skip unless a concrete conflict appears; no new product choice is currently required.
-- [ ] Run **Opening a PR**.
+- [x] Verify on the matching surface. Five assembled Search journeys passed against the isolated real API/Postgres.
+- [x] Preserve small, ordered commits. Skip rebasing published/evidenced work under repository policy; use ordered commits and one-way integration merge if needed.
+- [x] No design contest arose; `interrogate` was not needed. Locked design and existing editors were retained.
+- [x] Run **Opening a PR**. [PR #751](https://github.com/lagarcess/argus/pull/751) targets integration; no merge or deployment performed.
 
 Model the Domain chooses typed financial destinations and one owner-scoped search
 origin rather than independent booleans. Separate Before Serializing Shared State
@@ -118,7 +118,7 @@ Auth/API proof passed 15 checks covering current corrected activity, one transfe
 hit, literal/accent queries, pagination, stale cursors, archived records, unknown
 currency balances and cross-owner search/detail denial. Sanitized evidence is
 [api-proof.json](../reports/evidence/connected-search/api-proof.json). Native
-Search acceptance and independent review remain pending.
+Search acceptance and independent review are recorded in the later completion checkpoint.
 
 September 29 review checkpoint at `12ade77d98ac74864ad05ca629548be055e89452`: the
 fresh-context `search_independent_review` agent returned clean after one full
@@ -128,6 +128,37 @@ recovery tied to the acted-on account. Native model verification passes 20 tests
 The [review record](../reports/evidence/connected-search/independent-review.md)
 records exact commits and limits. Assembled simulator gates and CI are still
 in progress; this is not a merge-ready claim.
+
+September 29 local delivery checkpoint: the complete assigned Search journey
+passes in the isolated simulator against real local Auth/API/Postgres. Accounts,
+current activity and Plan expectations open their existing editors; edits refresh
+Search. Query, category, currency, loaded pages and exact position survive Back
+and two successive relaunches. Separate Accounts/Search details and owner switching
+pass. Delayed loading, 503/retry and unavailable detail states pass. The final
+three-editor run at `c775b0cdd1e05f4088fd9eb5d0ccf798d50882a4` also verifies
+English/dark and Spanish/light reopening. All confirmed independent findings are
+closed; the final affected-delta review at that SHA is clean.
+
+The [demo, recording, restart instructions and evidence table](../reports/evidence/connected-search/README.md)
+are durable in this PR. The 49-second excerpt shows activity correction, refreshed
+Search, Plan editing and reopening; the same successful test separately proves
+account rename/removal from old matches. Backend evidence includes 205 focused
+financial tests, 15 real HTTP checks, nine shared PostgreSQL CI scenarios,
+23 generated-API compatibility checks and 22 native model tests. A missing generated
+OpenAPI update found by CI was corrected. The PR's terminal readiness comment owns
+its exact published head, final CI result and evidence revalidation.
+
+Fresh integration remains `22f9c8cda8a65c74985e367d8cef68e55515e16b`, identical
+to the original base: no reconciliation merge or semantic overlap arose. Final
+modularity checks run on this already-reconciled tree. The local demo remains on
+58800 with preserved data; all old demos and the 58700–58749 environment remain
+untouched. Workers/reviewer have finished and relinquished their surfaces.
+
+Remaining scope is explicit: physical-phone internet delivery is not proved by
+this lane; Search still uses the canonical full-owner snapshot behind bounded
+response pages. Other MVEE Search types and conversation continuity remain in
+D09/D10 below. No new product deferral, hosted change or signing authority is
+implied by this locally verified result.
 
 Stop only for a concrete product conflict, inaccessible required tooling, or an
 action beyond the grant. Routine implementation choices and local fixes proceed.
@@ -1076,7 +1107,7 @@ sequence rather than a separate deferral policy in this document.
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |
-| [Search][mvee-search] and [conversation continuity][mvee-continuity], D09/D10 | Omnisearch/history and recovery contracts | Add domain search adapters and native destination/lifecycle wiring | Native continuity + Conversation/voice | Authorized domain reads; Temporary policy for that behavior | Search-to-destination/back recordings, draft/history readbacks and Temporary retention evidence |
+| [Search][mvee-search] and [conversation continuity][mvee-continuity], D09/D10 | Omnisearch/history and recovery contracts; locally verified account/activity/expectation Search in #751 | Deliver remaining MVEE domain retrieval and conversation lifecycle continuity; retain the connected Search origin contract | Native continuity + Conversation/voice | Authorized domain reads; Temporary policy for that behavior | Search-to-destination/back recordings, draft/history readbacks and Temporary retention evidence |
 | [Updates][mvee-updates], D11 | Existing operational infrastructure; notification contracts | Implement inbox, domain triggers and delivery jobs | Planning/Home | Trigger facts; permissions; channel/schedule decisions | Trigger/job receipts paired with phone inbox/source recordings |
 | [Profile and control][mvee-profile], D12 | Existing profile/usage/data-control contracts | Connect native controls to existing and new domain adapters | Native continuity | Identity/settings; domain lifecycle policy; approved personalization rollout | Phone settings/control recordings and authorized export/recovery readbacks |
 | [Charts][mvee-quality], D05/D06/D09/D15 | Selected chart direction and prototype | Connect canonical series to native chart components | Native continuity + domain series owners | Each domain's canonical series | Series-to-display checks, gesture/accessibility recordings and device performance receipts |
