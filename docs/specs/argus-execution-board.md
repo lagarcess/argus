@@ -171,6 +171,28 @@ founder identity, real production data, signing, deployment or paid providers we
 used. Same-currency movements and chronological balance-check limits remain
 explicit implementation boundaries. The full MVEE below is not complete.
 
+
+### Founder acceptance and small clarity follow-up
+
+The founder accepted the demonstrated financial behavior, then requested visible
+**From / To** labels and removal of the redundant transfer-account heading before
+merge. This follow-up changes only the native form presentation; recording rules,
+records, API and migrations retain the accepted behavior. The existing English
+and Spanish labels remain the single copy source. The focused simulator check
+passed at `7a3bf64f`: English/dark and Spanish/light labels, both account menus,
+reviewed transfer effects, existing correction labels and expense/card picker
+regression checks. Both new-transfer previews were cancelled without confirmation.
+The [clarity evidence](../reports/evidence/personal-money-recording/ios/transfer-label-review/README.md)
+and final PR audit own verification and merge readiness; no merge is authorized.
+
+Remaining visual polish is tracked here, not silently treated as complete or as a
+new MVEE deferral. The native experience owner should review visible role labels
+on the other compact selectors (card payment, income source, category and linked
+purchase), plus spacing and long-account-name/larger-text presentation against the
+locked design. These are follow-up presentation checks, not claims of financial
+defects or permission for a broader redesign. This requested fix is limited to
+transfer clarity; the full MVEE and physical-phone gates below remain unchanged.
+
 Model the Domain shaped the typed activity group. Separate Before Serializing
 Shared State shaped the isolated writers. Prove It Works requires both real
 Postgres invariants and assembled simulator acceptance; passing component tests
