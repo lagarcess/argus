@@ -29,13 +29,46 @@ python3 ios/scripts/auth/local_stack.py api --accounts --accounts-enabled on --p
 Run the existing local CAPTCHA bridge in its own terminal:
 
 ```sh
-python3 ios/scripts/auth/bridge.py
+python3 ios/scripts/auth/bridge.py --accounts
 ```
 
 The API must include the canonical financial migrations, including the financial
 loop migration. A `/health` response alone is not proof that these migrations are
 present. The stack creates only synthetic identities in ignored local files.
 Never copy passwords or tokens into configuration or committed evidence.
+
+### Keep another demonstration running
+
+Use a separate checkout and one `--port-base` value across all three launchers.
+The allocation derives the Supabase project ID, ignored state directory, API,
+database, CAPTCHA and recovery URLs. Existing commands retain their original
+ports and state. Configuration refuses occupied ports or an existing stack;
+restart reuses retained data and does not reseed.
+
+For a second demo, reserve 58500–58511 and create a new owned simulator:
+
+```sh
+python3 ios/scripts/auth/local_stack.py configure --accounts --port-base 58500
+python3 ios/scripts/auth/local_stack.py start --accounts --port-base 58500
+python3 ios/scripts/auth/local_stack.py seed --accounts --port-base 58500
+python3 ios/scripts/auth/local_stack.py api --accounts --port-base 58500 --accounts-enabled on --python "$PWD/.venv/bin/python"
+# In another terminal:
+python3 ios/scripts/auth/bridge.py --accounts --port-base 58500
+python3 ios/scripts/auth/run-ui.py <new-owned-simulator-UDID> --accounts --port-base 58500 --only ArgusFoundationUITests/FinancialLoopUITests
+```
+
+State is `ios/.build/accounts-local-58500`; the local project is
+`ios-accounts-58500`. The API uses 58500, Supabase 58501, Postgres 58502 and
+CAPTCHA 58505. The ignored `ios/Config/Local.xcconfig` belongs to this checkout;
+never copy another demo's fixture or overwrite its simulator. Restart only the
+`start`, `api` and bridge commands as needed. Leave `configure` and `seed` for
+first setup. No web server is needed for this accounts demonstration.
+
+Run launcher isolation checks with:
+
+```sh
+python3 -m pytest ios/scripts/auth/test_local_stack.py -q --no-cov
+```
 
 ## Verify
 

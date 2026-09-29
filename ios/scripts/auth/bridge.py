@@ -1,11 +1,11 @@
 """Serve only the lane's public CAPTCHA test page on loopback; never log tokens."""
 
 import argparse
-
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from local_stack import Allocation
 
 WORK = Path(__file__).resolve().parents[2] / ".build/auth-local"
 
@@ -41,6 +41,8 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--accounts", action="store_true")
-    if parser.parse_args().accounts:
-        WORK = Path(__file__).resolve().parents[2] / ".build/accounts-local"
-    HTTPServer(("127.0.0.1", 58405), Handler).serve_forever()
+    parser.add_argument("--port-base", type=int, default=58400)
+    args = parser.parse_args()
+    allocation = Allocation(args.accounts, args.port_base)
+    WORK = allocation.work
+    HTTPServer(("127.0.0.1", allocation.port_base + 5), Handler).serve_forever()

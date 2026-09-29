@@ -11,29 +11,97 @@ import shutil
 import socket
 import subprocess
 import urllib.request
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 backend environments.
+    import tomli as tomllib
+from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[3]
-WORK = ROOT / "ios/.build/auth-local"
-STACK = WORK / "stack"
-PROJECT = "ios-auth-8be2"
-PORTS = {
-    ("api", "port"): 58401,
-    ("db", "port"): 58402,
-    ("local_smtp", "port"): 58403,
-    ("local_smtp", "smtp_port"): 58404,
-    ("db", "shadow_port"): 58407,
-    ("studio", "port"): 58408,
-    ("db.pooler", "port"): 58409,
-    ("analytics", "port"): 58410,
-    ("edge_runtime", "inspector_port"): 58411,
-}
+
+
+@dataclass(frozen=True)
+class Allocation:
+    """One loopback allocation owns its project, ports and ignored state."""
+
+    accounts: bool = False
+    port_base: int = 58400
+
+    def __post_init__(self):
+        if not 1024 <= self.port_base <= 65524:
+            raise ValueError("Port base must leave twelve unprivileged ports available")
+
+    @property
+    def suffix(self) -> str:
+        return "" if self.port_base == 58400 else f"-{self.port_base}"
+
+    @property
+    def work(self) -> Path:
+        return (
+            ROOT
+            / "ios/.build"
+            / (("accounts-local" if self.accounts else "auth-local") + self.suffix)
+        )
+
+    @property
+    def stack(self) -> Path:
+        return self.work / "stack"
+
+    @property
+    def project(self) -> str:
+        return ("ios-accounts" if self.accounts else "ios-auth-8be2") + self.suffix
+
+    @property
+    def ports(self) -> dict[tuple[str, str], int]:
+        return {
+            key: self.port_base + offset
+            for key, offset in {
+                ("api", "port"): 1,
+                ("db", "port"): 2,
+                ("local_smtp", "port"): 3,
+                ("local_smtp", "smtp_port"): 4,
+                ("db", "shadow_port"): 7,
+                ("studio", "port"): 8,
+                ("db.pooler", "port"): 9,
+                ("analytics", "port"): 10,
+                ("edge_runtime", "inspector_port"): 11,
+            }.items()
+        }
+
+    def url(self, offset: int = 0) -> str:
+        return f"http://127.0.0.1:{self.port_base + offset}"
+
+    @property
+    def web_port(self) -> int:
+        return 3001 if self.port_base == 58400 else self.port_base + 6
+
+    @property
+    def web_url(self) -> str:
+        return f"http://127.0.0.1:{self.web_port}"
+
+    def verify(self) -> None:
+        config = tomllib.loads((self.stack / "supabase/config.toml").read_text())
+        if config.get("project_id") != self.project:
+            raise SystemExit("Stack ownership mismatch")
+        for (section, key), port in self.ports.items():
+            entry = config
+            for part in section.split("."):
+                entry = entry.get(part, {})
+            if entry.get(key) != port:
+                raise SystemExit("Stack port allocation mismatch")
+
+
+ALLOCATION = Allocation()
 EXCLUDE = "vector,edge-runtime,imgproxy,studio,logflare,realtime,storage-api,postgres-meta,supavisor"
 
 
 def sb(*args: str, capture: bool = True) -> subprocess.CompletedProcess:
+    ALLOCATION.verify()
     return subprocess.run(
-        ["supabase", *args, "--workdir", str(STACK)],
+        ["supabase", *args, "--workdir", str(ALLOCATION.stack)],
         check=True,
         capture_output=capture,
         text=True,
@@ -41,9 +109,14 @@ def sb(*args: str, capture: bool = True) -> subprocess.CompletedProcess:
 
 
 def configure(*, accounts: bool = False) -> None:
-    if (STACK / "supabase/config.toml").exists():
+    if (ALLOCATION.stack / "supabase/config.toml").exists():
         raise SystemExit("Configuration exists. Reuse it; do not reset an active stack.")
-    for port in [58400, 58405, *([] if accounts else [3001]), *PORTS.values()]:
+    for port in [
+        ALLOCATION.port_base,
+        ALLOCATION.port_base + 5,
+        *([] if accounts else [ALLOCATION.web_port]),
+        *ALLOCATION.ports.values(),
+    ]:
         with socket.socket() as sock:
             try:
                 sock.bind(("127.0.0.1", port))
@@ -51,7 +124,7 @@ def configure(*, accounts: bool = False) -> None:
                 raise SystemExit(
                     f"Port {port} is occupied. Coordinate a new allocation; stop nothing."
                 ) from None
-    target = STACK / "supabase"
+    target = ALLOCATION.stack / "supabase"
     target.mkdir(parents=True, mode=0o700)
     shutil.copytree(ROOT / "supabase/migrations", target / "migrations")
     shutil.copy2(ROOT / "supabase/seed.sql", target / "seed.sql")
@@ -70,14 +143,14 @@ def configure(*, accounts: bool = False) -> None:
         if key:
             name = key[1]
             if not section and name == "project_id":
-                line = f'project_id = "{PROJECT}"'
-            elif (section, name) in PORTS:
-                line = f"{name} = {PORTS[section,name]}"
+                line = f'project_id = "{ALLOCATION.project}"'
+            elif (section, name) in ALLOCATION.ports:
+                line = f"{name} = {ALLOCATION.ports[section,name]}"
             elif section == "auth" and name == "site_url":
-                line = 'site_url = "http://127.0.0.1:3001"'
+                line = f'site_url = "{ALLOCATION.web_url}"'
             elif section == "auth" and name == "additional_redirect_urls":
                 line = (
-                    'additional_redirect_urls = ["http://127.0.0.1:3001/auth/recovery"]'
+                    f'additional_redirect_urls = ["{ALLOCATION.web_url}/auth/recovery"]'
                 )
                 redirects = True
             elif section == "auth" and name == "jwt_expiry":
@@ -85,7 +158,7 @@ def configure(*, accounts: bool = False) -> None:
             elif section == "auth.email" and name == "enable_confirmations":
                 line = "enable_confirmations = true"
         if section == "local_smtp" and line.strip().startswith("# smtp_port ="):
-            line = "smtp_port = 58404"
+            line = f"smtp_port = {ALLOCATION.port_base + 4}"
         lines.append(line)
     # Public Cloudflare always-pass test secret; local container only.
     lines += [
@@ -96,19 +169,24 @@ def configure(*, accounts: bool = False) -> None:
         'secret = "1x0000000000000000000000000000000AA"',
     ]
     (target / "config.toml").write_text("\n".join(lines) + "\n")
-    print(f"Configured isolated {PROJECT} stack, ports 58401-58411.")
+    print(
+        f"Configured isolated {ALLOCATION.project} stack, ports {ALLOCATION.port_base + 1}-{ALLOCATION.port_base + 11}."
+    )
 
 
 def status() -> dict:
     result = json.loads(sb("status", "-o", "json").stdout)
-    if result["API_URL"] != "http://127.0.0.1:58401":
+    if result["API_URL"] != ALLOCATION.url(1):
         raise SystemExit("Refusing non-lane Supabase endpoint")
+    database = urlsplit(result["DB_URL"])
+    if database.hostname != "127.0.0.1" or database.port != ALLOCATION.port_base + 2:
+        raise SystemExit("Refusing non-lane database endpoint")
     return result
 
 
 def seed() -> None:
     cfg = status()
-    path = WORK / "client.json"
+    path = ALLOCATION.work / "client.json"
     if path.exists():
         raise SystemExit(
             "Synthetic client fixture already exists; reuse, do not mint accounts repeatedly."
@@ -133,7 +211,7 @@ def seed() -> None:
             user = json.load(response)
         users.append({"email": email, "password": password, "id": user["id"]})
     fixture = {
-        "apiURL": "http://127.0.0.1:58400/api/v1",
+        "apiURL": ALLOCATION.url() + "/api/v1",
         "supabaseURL": cfg["API_URL"],
         "publicAnonKey": cfg["ANON_KEY"],
         "users": users,
@@ -155,11 +233,11 @@ def seed() -> None:
             [
                 "// Ignored local synthetic stack; public configuration only.",
                 "ARGUS_AUTH_ENABLED = true",
-                "ARGUS_API_URL = " + url("http://127.0.0.1:58400"),
+                "ARGUS_API_URL = " + url(ALLOCATION.url()),
                 "ARGUS_SUPABASE_URL = " + url(cfg["API_URL"]),
                 "ARGUS_SUPABASE_ANON_KEY = " + cfg["ANON_KEY"],
-                "ARGUS_WEB_URL = " + url("http://127.0.0.1:3001"),
-                "ARGUS_CAPTCHA_URL = " + url("http://127.0.0.1:58405/captcha.html"),
+                "ARGUS_WEB_URL = " + url(ALLOCATION.web_url),
+                "ARGUS_CAPTCHA_URL = " + url(ALLOCATION.url(5) + "/captcha.html"),
             ]
         )
         + "\n"
@@ -207,7 +285,7 @@ def api(python: str, *, accounts_enabled: bool = False) -> None:
             "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED": "true",
             "ARGUS_MOCK_AUTH": "false",
             "NEXT_PUBLIC_MOCK_AUTH": "false",
-            "ARGUS_APP_ORIGIN": "http://127.0.0.1:3001",
+            "ARGUS_APP_ORIGIN": ALLOCATION.web_url,
         }
     )
     for key in (
@@ -239,7 +317,7 @@ def api(python: str, *, accounts_enabled: bool = False) -> None:
             "--host",
             "127.0.0.1",
             "--port",
-            "58400",
+            str(ALLOCATION.port_base),
             "--no-access-log",
         ],
         env,
@@ -254,22 +332,30 @@ if __name__ == "__main__":
     parser.add_argument(
         "--python", help="Absolute path to a dependency-complete Python runtime"
     )
-    parser.add_argument("--accounts", action="store_true", help="Use isolated ios-accounts stack/state; does not reserve web port")
-    parser.add_argument("--accounts-enabled", choices=["on", "off"], default="off", help="Explicit local API financial-record exposure (default off)")
+    parser.add_argument(
+        "--accounts",
+        action="store_true",
+        help="Use isolated ios-accounts stack/state; does not reserve web port",
+    )
+    parser.add_argument(
+        "--accounts-enabled",
+        choices=["on", "off"],
+        default="off",
+        help="Explicit local API financial-record exposure (default off)",
+    )
+    parser.add_argument("--port-base", type=int, default=58400)
     args = parser.parse_args()
-    if args.accounts:
-        WORK = ROOT / "ios/.build/accounts-local"
-        STACK = WORK / "stack"
-        PROJECT = "ios-accounts"
-    elif args.accounts_enabled == "on":
+    ALLOCATION = Allocation(args.accounts, args.port_base)
+    if not args.accounts and args.accounts_enabled == "on":
         raise SystemExit("Financial accounts require --accounts isolation")
-    WORK.mkdir(parents=True, exist_ok=True, mode=0o700)
+    ALLOCATION.work.mkdir(parents=True, exist_ok=True, mode=0o700)
     if args.action == "configure":
         configure(accounts=args.accounts)
     elif args.action == "start":
-        with (WORK / "supabase-start.log").open("w") as log:
+        ALLOCATION.verify()
+        with (ALLOCATION.work / "supabase-start.log").open("w") as log:
             subprocess.run(
-                ["supabase", "start", "-x", EXCLUDE, "--workdir", str(STACK)],
+                ["supabase", "start", "-x", EXCLUDE, "--workdir", str(ALLOCATION.stack)],
                 stdout=log,
                 stderr=log,
                 check=True,
@@ -286,14 +372,14 @@ if __name__ == "__main__":
             raise SystemExit("Web port is not allocated to the accounts lane")
         cfg = status()
         with socket.socket() as sock:
-            sock.bind(("127.0.0.1", 3001))
+            sock.bind(("127.0.0.1", ALLOCATION.web_port))
         env = dict(os.environ)
         env.update(
             {
                 "NEXT_PUBLIC_SUPABASE_URL": cfg["API_URL"],
                 "NEXT_PUBLIC_SUPABASE_ANON_KEY": cfg["ANON_KEY"],
-                "NEXT_PUBLIC_ARGUS_API_URL": "http://127.0.0.1:58400/api/v1",
-                "ARGUS_APP_ORIGIN": "http://127.0.0.1:3001",
+                "NEXT_PUBLIC_ARGUS_API_URL": ALLOCATION.url() + "/api/v1",
+                "ARGUS_APP_ORIGIN": ALLOCATION.web_url,
                 "NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
                 "NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN": "",
                 "NEXT_PUBLIC_MOCK_AUTH": "false",
@@ -308,14 +394,17 @@ if __name__ == "__main__":
         binary = shutil.which("bun")
         os.execve(
             binary,
-            [binary, "run", "dev", "--hostname", "127.0.0.1", "--port", "3001"],
+            [
+                binary,
+                "run",
+                "dev",
+                "--hostname",
+                "127.0.0.1",
+                "--port",
+                str(ALLOCATION.web_port),
+            ],
             env,
         )
     elif args.action == "stop":
-        if (
-            f'project_id = "{PROJECT}"'
-            not in (STACK / "supabase/config.toml").read_text()
-        ):
-            raise SystemExit("Stack ownership mismatch")
         sb("stop")
-        print(f"Stopped only {PROJECT}; local data retained.")
+        print(f"Stopped only {ALLOCATION.project}; local data retained.")
