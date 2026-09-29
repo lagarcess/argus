@@ -22,7 +22,9 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["accounts.save"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Balance unknown")).firstMatch.waitForExistence(timeout: 10))
         capture("unknown-balance")
-        app.buttons["accounts.opening"].tap()
+        record(amount: "10", note: "Spending before a known balance")
+        assertText("Balance unknown")
+        tapVisible(app.buttons["accounts.opening"])
         let amount = app.textFields["accounts.amount"]
         XCTAssertTrue(amount.waitForExistence(timeout: 5))
         amount.tap(); amount.typeText("25.50")
@@ -31,6 +33,9 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["Done"].tap()
         capture("signed-balance-entry")
         app.buttons["accounts.save"].tap()
+        XCTAssertTrue(app.buttons["opening.coverage.yes"].waitForExistence(timeout: 10))
+        capture("unknown-to-known-coverage")
+        tapVisible(app.buttons["opening.coverage.yes"])
         XCTAssertTrue(app.buttons["loop.edit"].waitForExistence(timeout: 10))
         app.buttons["accounts.save"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "DOP -25.50")).firstMatch.waitForExistence(timeout: 10))
@@ -94,6 +99,24 @@ final class FinancialLoopUITests: XCTestCase {
         assertText("DOP 7,000.00")
         assertText("Already in checked balance")
         capture("financial-loop-preserved-after-reopen")
+    }
+
+    func testSpanishConnectedCheckReview() throws {
+        app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "dark"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["home.netWorth.DOP"].waitForExistence(timeout: 15))
+        capture("connected-home-spanish")
+        app.buttons["tab.accounts"].tap()
+        let account = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "accounts.row.")).firstMatch
+        tapVisible(account)
+        tapVisible(app.buttons["accounts.check"])
+        app.textFields["loop.amount"].tap(); app.textFields["loop.amount"].typeText("50")
+        app.buttons["Listo"].tap()
+        app.buttons["loop.review"].tap()
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "loop.")).firstMatch.exists)
+        capture("checked-balance-review-spanish")
+        app.buttons["Cancelar"].tap()
     }
 
     private func record(amount: String, note: String, included: Bool = false) {
