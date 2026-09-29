@@ -207,13 +207,13 @@ def home_response(
             if not r.active or r.role == "destination":
                 continue
             if reporting["start_at"] <= r.occurred_at < reporting["end_at_exclusive"]:
-                key = {
+                summary_key = {
                     "expense": "gross_purchases_minor",
                     "income": "gross_income_minor",
                     "refund": "refunds_minor",
                 }.get(r.kind)
-                if key:
-                    group[key] += r.amount_minor
+                if summary_key:
+                    group[summary_key] += r.amount_minor
             recent.append(
                 {
                     **activity_response(stored, expense),

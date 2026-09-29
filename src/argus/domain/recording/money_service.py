@@ -101,15 +101,18 @@ class MoneyService:
 
     def purchases(self, *, user_id: str, currency: str | None = None) -> dict[str, Any]:
         records = current_activities(self.accounts.list_accounts(user_id=user_id))
+        refunded: dict[str, int] = {}
+        for item in records:
+            purchase_id = item["purchase_activity_id"]
+            if purchase_id:
+                refunded[purchase_id] = (
+                    refunded.get(purchase_id, 0) + item["amount_minor"]
+                )
         items = []
         for item in records:
             if item["kind"] != "expense" or currency and item["currency"] != currency:
                 continue
-            total = sum(
-                a["amount_minor"]
-                for a in records
-                if a["purchase_activity_id"] == item["activity_id"]
-            )
+            total = refunded.get(item["activity_id"], 0)
             items.append(
                 {
                     **item,

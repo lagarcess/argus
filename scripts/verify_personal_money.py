@@ -7,7 +7,7 @@ import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -59,12 +59,12 @@ def run(fixture: Path) -> dict[str, Any]:
                 200,
                 201,
             ), f"{path} failed ({result.status_code})"
-            return result.json()
+            return cast(dict[str, Any], result.json())
 
         def get(path: str) -> dict[str, Any]:
             result = client.get(path, headers=owner)
             assert result.status_code == 200, f"{path} failed ({result.status_code})"
-            return result.json()
+            return cast(dict[str, Any], result.json())
 
         def account(kind: str, currency: str, amount: str | None) -> dict[str, Any]:
             return post(
@@ -88,7 +88,9 @@ def run(fixture: Path) -> dict[str, Any]:
             assert (
                 home["period"]["month"] == month and home["coverage"] == "recorded_only"
             )
-            row = next((r for r in home["currencies"] if r["currency"] == "DOP"), {})
+            row: dict[str, Any] = next(
+                (r for r in home["currencies"] if r["currency"] == "DOP"), {}
+            )
             return {
                 k: int(row.get(k, "0"))
                 for k in (
@@ -142,7 +144,7 @@ def run(fixture: Path) -> dict[str, Any]:
                 200,
                 201,
             ), f"Confirm failed ({result.status_code})"
-            return result.json(), reviewed, key
+            return cast(dict[str, Any], result.json()), reviewed, key
 
         income, _, _ = record(
             {
