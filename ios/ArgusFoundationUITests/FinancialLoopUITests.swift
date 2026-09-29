@@ -217,8 +217,10 @@ final class FinancialLoopUITests: XCTestCase {
         var scrolled = false
         for _ in 0..<12 {
             if element.isHittable && element.frame.midY > 115 && element.frame.midY < app.frame.height - 130 { break }
+            let before = element.frame
             if element.frame.midY < 115 { app.swipeDown() } else { app.swipeUp() }
             scrolled = true
+            if element.isHittable && abs(element.frame.midY - before.midY) < 2 { break }
         }
         if scrolled {
         var previous = element.frame
