@@ -150,9 +150,6 @@ struct FinancialSearchView: View {
                 .onPreferenceChange(SearchRowFrames.self) { frames in
                     scroll.frames = frames
                     if let restoration = model.restoration {
-                        #if DEBUG
-                        searchRestorationLog.info("frames count=\(frames.count, privacy: .public) targetPresent=\(frames[restoration.anchor] != nil, privacy: .public) targetY=\(frames[restoration.anchor]?.minY ?? -9999, privacy: .public) desired=\(restoration.offset, privacy: .public)")
-                        #endif
                         if let frame = frames[restoration.anchor],
                            scroll.restore(restoration, currentRowOffset: frame.minY) {
                             model.restored(restoration.id)
@@ -168,9 +165,6 @@ struct FinancialSearchView: View {
                     Task { @MainActor in
                         await Task.yield()
                         guard model.restoration?.id == restoration.id else { return }
-                        #if DEBUG
-                        searchRestorationLog.info("start cachedTargetY=\(scroll.frames[restoration.anchor]?.minY ?? -9999, privacy: .public) desired=\(restoration.offset, privacy: .public) bound=\(scroll.view != nil, privacy: .public)")
-                        #endif
                         scroll.view?.layoutIfNeeded()
                         if let frame = scroll.frames[restoration.anchor],
                            scroll.restore(restoration, currentRowOffset: frame.minY) {
@@ -226,13 +220,7 @@ private final class SearchScrollOffset: ObservableObject {
     weak var view: UIScrollView?
     var frames: [String: CGRect] = [:]
     func restore(_ restoration: FinancialSearchRestoration, currentRowOffset: Double) -> Bool {
-        #if DEBUG
-        searchRestorationLog.info("restore rowY=\(currentRowOffset, privacy: .public) desired=\(restoration.offset, privacy: .public) bound=\(self.view != nil, privacy: .public)")
-        #endif
         guard let view else { return false }
-        #if DEBUG
-        searchRestorationLog.info("native offset=\(view.contentOffset.y, privacy: .public) contentHeight=\(view.contentSize.height, privacy: .public) viewport=\(view.bounds.height, privacy: .public) insetTop=\(view.adjustedContentInset.top, privacy: .public) insetBottom=\(view.adjustedContentInset.bottom, privacy: .public)")
-        #endif
         let minimum = -view.adjustedContentInset.top
         let maximum = max(minimum, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
         switch restoration.adjustment(rowOffset: currentRowOffset, contentOffset: view.contentOffset.y,
@@ -253,18 +241,9 @@ private struct SearchScrollProbe: UIViewRepresentable {
         DispatchQueue.main.async {
             var parent = view.superview
             while let current = parent {
-                if let scroll = current as? UIScrollView {
-                    controller.view = scroll
-                    #if DEBUG
-                    searchRestorationLog.info("probeBound offset=\(scroll.contentOffset.y, privacy: .public) contentHeight=\(scroll.contentSize.height, privacy: .public) viewport=\(scroll.bounds.height, privacy: .public)")
-                    #endif
-                    return
-                }
+                if let scroll = current as? UIScrollView { controller.view = scroll; return }
                 parent = current.superview
             }
-            #if DEBUG
-            searchRestorationLog.info("probeUnbound attached=\(view.superview != nil, privacy: .public)")
-            #endif
         }
     }
 }

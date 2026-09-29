@@ -1,9 +1,5 @@
 import SwiftUI
 import ArgusSession
-#if DEBUG
-import OSLog
-let searchRestorationLog = Logger(subsystem: "local.argus.search-debug", category: "restoration")
-#endif
 
 struct FinancialSearchOrigin: Codable, Equatable {
     var query = ""
@@ -72,9 +68,6 @@ final class FinancialSearchModel: ObservableObject {
                let saved = try? JSONDecoder().decode(FinancialSearchOrigin.self, from: bytes),
                saved.query.count <= 512, (1...10000).contains(saved.pages) { origin = saved }
         }
-        #if DEBUG
-        searchRestorationLog.info("bind pages=\(self.origin.pages, privacy: .public) offset=\(self.origin.anchorOffset, privacy: .public) hasAnchor=\(self.origin.anchor != nil, privacy: .public)")
-        #endif
         identity = next; ownerID = nextOwner
         items = []; cursor = nil; destination = nil; opening = false; destinationError = nil
         loading = false; errorKey = nil; loaded = false; dirty = true; restoration = nil
@@ -94,27 +87,16 @@ final class FinancialSearchModel: ObservableObject {
     }
 
     func remember(anchor: String, offset: Double) {
-        #if DEBUG
-        searchRestorationLog.info("remember candidate=\(offset, privacy: .public) saved=\(self.origin.anchorOffset, privacy: .public) loading=\(self.loading, privacy: .public) restoring=\(self.restoration != nil, privacy: .public) destination=\(self.destination != nil, privacy: .public) opening=\(self.opening, privacy: .public)")
-        #endif
         guard !loading, restoration == nil, destination == nil, !opening else { return }
         origin.anchor = anchor; origin.anchorOffset = offset; persist()
     }
 
     func restored(_ id: UUID) {
         guard restoration?.id == id else { return }
-        #if DEBUG
-        searchRestorationLog.info("restored savedOffset=\(self.origin.anchorOffset, privacy: .public)")
-        #endif
         restoration = nil
     }
 
-    func userScrolled() {
-        #if DEBUG
-        searchRestorationLog.info("userScrolled restoring=\(self.restoration != nil, privacy: .public)")
-        #endif
-        restoration = nil
-    }
+    func userScrolled() { restoration = nil }
 
     func invalidate() { dirty = true }
     func activate() async { if !loaded || dirty { await refresh() } }
@@ -161,9 +143,6 @@ final class FinancialSearchModel: ObservableObject {
             }
             loaded = true; dirty = false; persist()
             if !append || restarted {
-                #if DEBUG
-                searchRestorationLog.info("loaded count=\(self.items.count, privacy: .public) offset=\(self.origin.anchorOffset, privacy: .public) hasAnchor=\(self.origin.anchor != nil, privacy: .public) removed=\(anchorRemoved, privacy: .public)")
-                #endif
                 restoration = origin.anchor.map {
                     FinancialSearchRestoration(anchor: $0, offset: origin.anchorOffset, permitsBoundaryFallback: anchorRemoved)
                 }
