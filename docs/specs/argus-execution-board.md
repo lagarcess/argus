@@ -112,6 +112,14 @@ proxy is 58812; normal retained builds use direct API 58800. The
 [restart guide](../reports/evidence/connected-search/README.md) records commands
 that preserve data. These setup checks do not claim connected Search acceptance.
 
+September 29 backend checkpoint at `78e65a026`: 205 focused financial/Search
+tests passed against the isolated local Postgres with zero skips. The real
+Auth/API proof passed 15 checks covering current corrected activity, one transfer
+hit, literal/accent queries, pagination, stale cursors, archived records, unknown
+currency balances and cross-owner search/detail denial. Sanitized evidence is
+[api-proof.json](../reports/evidence/connected-search/api-proof.json). Native
+Search acceptance and independent review remain pending.
+
 Stop only for a concrete product conflict, inaccessible required tooling, or an
 action beyond the grant. Routine implementation choices and local fixes proceed.
 
