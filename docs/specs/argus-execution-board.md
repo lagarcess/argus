@@ -76,16 +76,21 @@ assignment, not a claim that this slice completes the ecosystem.
 - [ ] Phase D: Keep the audit trail. Update this section with decisions, named owners, evidence and exact remaining work.
 - [ ] Phase E: Verify and hand back. Deliver the runnable simulator, recording, restart instructions and merge-ready PR after CI and scoped review.
 
-Current checkpoint: implementation is active in isolated core/native/demo branches.
+Current checkpoint: implementation is active in isolated core/native branches.
+The shared [API contract](../API_CONTRACT.md#personal-money-activities-authorized-september-29-2026)
+and additive storage contract are committed. The new local stack on 585xx and
+dedicated Argus Personal Money simulator are running. Launcher isolation passed
+14 tests. The earlier 584xx demo remains healthy and unchanged. Native pending-write
+storage has four component tests; assembled recovery acceptance is still pending.
 The captain ran the inherited financial suite before changes: 71 passed, 18
 Postgres-dependent cases skipped pending the new disposable database. These are
 baseline component results, not acceptance of the new journey.
 
 | Named owner | Branch / exclusive surfaces | Next usable result |
 | --- | --- | --- |
-| `money_core` | `codex/personal-money-core`, recording domain, API, additive migration, backend tests, API/data contracts | Commit exact shared wire contract first; implement all activity kinds and atomic correction/reconciliation |
+| `money_core` | `codex/personal-money-core`, recording domain, API, additive migration, backend tests, API/data contracts | Contract committed in `6b9a92de`; implement all activity kinds and atomic correction/reconciliation |
 | `money_iphone` | `codex/personal-money-iphone`, Swift feature/transport/models, localization and native tests | Durable uncertain-write recovery first; consume accepted contract for the complete recording editor/detail/Home |
-| `money_demo_setup` | `codex/personal-money-demo`, isolated local launchers and restart setup | Separate synthetic stack on 585xx and dedicated simulator; preserve prior 584xx demo |
+| `money_demo_setup` | `codex/personal-money-demo`, isolated local launchers and restart setup | Completed in `c2b56346`, integrated as `5a64e64a`; stack and simulator prepared, no new app installed yet |
 | Captain | `codex/personal-money-recording`, manifest, assembled source, independent proof and PR | Integrate verified components, click through and record the real local app, finish CI/review without merging |
 
 Design decision, September 29: two code-grounded alternatives and an independent
@@ -106,8 +111,16 @@ stale-version rejection. A protected owner-scoped pending command survives nativ
 process death and supports explicit same-key recovery. Monthly Home reporting uses
 one explicit reporting zone and period, gross purchases/refunds/net spending and
 received income; negative net spending remains visible. Refund categories follow
-the linked purchase without rewriting historical provenance. Currency conversion
+the linked purchase without rewriting historical provenance. Changing a purchase's
+category while refunds remain linked is rejected with explicit correction/unlink
+instructions; historical categories are not silently rewritten. Currency conversion
 and loan allocation remain outside the assigned operation set.
+
+The captain's local response-loss proxy forwards to loopback only and drops one
+successful activity response after the API accepts it. Five proxy checks pass.
+Use it for assembled process-restart and same-key recovery proof, not as a substitute
+for database atomicity and isolation checks. It does not change application behavior
+or hosted configuration.
 
 Model the Domain shaped the typed activity group. Separate Before Serializing
 Shared State shaped the isolated writers. Prove It Works requires both real
