@@ -5,6 +5,48 @@ import UniformTypeIdentifiers
 final class FinancialLoopUITests: XCTestCase {
     private let app = XCUIApplication()
 
+    func testArchiveManagementRestoresSameAccount() throws {
+        try signIn(fresh: true)
+        let baseline = homeValue()
+        app.buttons["tab.accounts"].tap()
+        tapVisible(app.buttons["accounts.add"])
+        app.buttons["accounts.type.checking"].tap()
+        let nickname = "Archive review " + UUID().uuidString.prefix(6)
+        app.textFields["accounts.nickname"].tap(); app.textFields["accounts.nickname"].typeText(nickname)
+        app.textFields["accounts.amount"].tap(); app.textFields["accounts.amount"].typeText("125")
+        app.buttons["Done"].tap(); app.buttons["accounts.save"].tap()
+        assertText("DOP 125.00")
+        tapVisible(app.buttons["accounts.back"])
+        let original = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch
+        XCTAssertTrue(original.waitForExistence(timeout: 10))
+        let originalID = original.identifier
+        tapVisible(original)
+        tapVisible(app.buttons["accounts.archive"])
+        XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
+        for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
+        app.buttons["accounts.back"].tap()
+        XCTAssertFalse(app.buttons[originalID].exists)
+        capture("archive-active-list")
+        assertHome(baseline + 125)
+        app.buttons["tab.accounts"].tap()
+        for _ in 0..<5 { if app.buttons["accounts.manage"].isHittable { break }; app.swipeDown() }
+        app.buttons["accounts.manage"].tap()
+        let archived = app.buttons[originalID]
+        XCTAssertTrue(archived.waitForExistence(timeout: 10))
+        for _ in 0..<5 { if archived.isHittable { break }; app.swipeUp() }
+        capture("archive-management")
+        archived.tap()
+        assertText("DOP 125.00")
+        tapVisible(app.buttons["accounts.archive"])
+        XCTAssertTrue(app.buttons["Archive account"].waitForExistence(timeout: 10))
+        for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
+        app.buttons["accounts.back"].tap()
+        for _ in 0..<5 { if app.buttons["accounts.manage.back"].isHittable { break }; app.swipeDown() }
+        app.buttons["accounts.manage.back"].tap()
+        XCTAssertTrue(app.buttons[originalID].waitForExistence(timeout: 10))
+        assertHome(baseline + 125)
+    }
+
     func testAccountEntryKeepsUnknownAndSignedBalances() throws {
         try signIn()
         app.buttons["tab.accounts"].tap()
@@ -174,7 +216,7 @@ final class FinancialLoopUITests: XCTestCase {
         for _ in 0..<7 { if element.isHittable { break }; app.swipeUp() }
         element.tap()
     }
-    private func signIn() throws {
+    private func signIn(fresh: Bool = false) throws {
         let environment = ProcessInfo.processInfo.environment
         guard let email = environment["ARGUS_TEST_EMAIL"], let password = environment["ARGUS_TEST_PASSWORD"] else {
             throw XCTSkip("Requires isolated synthetic API and registered identity.")
@@ -183,6 +225,7 @@ final class FinancialLoopUITests: XCTestCase {
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-appearancePreference", "dark"]
         app.launch()
         app.buttons["header.profile"].tap()
+        if fresh, app.buttons["auth.signOut"].waitForExistence(timeout: 2) { app.buttons["auth.signOut"].tap() }
         if !app.buttons["auth.signOut"].waitForExistence(timeout: 5) {
             let emailField = app.textFields["auth.email"]
             XCTAssertTrue(emailField.waitForExistence(timeout: 10))
