@@ -104,6 +104,14 @@ aliases or money calculations. The first implementation reuses the existing
 owned financial snapshot; response pagination is bounded, but that snapshot
 still reads the owner's records. No new search index or embeddings are implied.
 
+September 29 local setup checkpoint: the Search-owned stack is seeded with two
+synthetic identities, and native sign-in/relaunch/sign-out passed with Xcode exit
+zero on its dedicated simulator. The local read-fault extension passed 19 focused
+checks and preserves the inherited write-response-loss behavior. Its optional
+proxy is 58812; normal retained builds use direct API 58800. The
+[restart guide](../reports/evidence/connected-search/README.md) records commands
+that preserve data. These setup checks do not claim connected Search acceptance.
+
 Stop only for a concrete product conflict, inaccessible required tooling, or an
 action beyond the grant. Routine implementation choices and local fixes proceed.
 
