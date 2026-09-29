@@ -6990,7 +6990,7 @@ Plan/Home projection. Defaults are today through 30 days later in the saved time
 start must be today and end is inclusive, at most 366 days later. The response is:
 
 ```
-{selection:{version,account_ids:[uuid],time_zone},accounts:[FinancialAccountResponse],
+{home:HomeResponse,selection:{version,account_ids:[uuid],time_zone},accounts:[FinancialAccountResponse],
  expectations:[Expectation],occurrences:[Occurrence],currencies:[ForecastCurrency],
  start_date,end_date,coverage:"recorded_and_expected",has_expectations:boolean}
 ```
@@ -7005,7 +7005,7 @@ start_date:date,end_date:date|null,month_days:[integer]}`. Monthly defaults to t
 day; twice-monthly requires two distinct days from 1..31, where 31 means month end.
 Short months clamp each anchor without drift and deduplicate coincident dates.
 All dates use the owner's saved reporting zone. Expectations retain their scheduled
-calendar dates when that zone changes. Maximum schedule span is ten years.
+calendar dates when that zone changes. An explicitly bounded schedule spans at most ten years; no end date repeats until edited.
 
 `POST /financial-plan/expectations` accepts
 `{kind,title,currency,amount,account_id:null|uuid,schedule}`. `PATCH /financial-plan/expectations/{id}`
@@ -7029,7 +7029,7 @@ The UI may propose eligible accounts and then save the reviewed selection.
 `Occurrence` is `{id,expectation_id,expectation_version,kind,title,currency,
 currency_fraction_digits,amount_minor,amount,account_id:uuid|null,due_date,projection_date,
 status:"planned"|"fulfilled"|"needs_review",activity_id:uuid|null,activity_revision:integer|null,
-exclusion_reason:null|"account_unassigned"|"account_not_selected"|"link_needs_review",
+exclusion_reason:null|"account_unassigned"|"account_not_selected"|"link_needs_review"|"account_changed",
 overdue:boolean}`. IDs are opaque stable strings. Linked snapshots survive edits.
 An activity account/currency mismatch yields needs_review and excludes that ambiguous
 occurrence from projection until explicitly relinked. Amount/date correction keeps
@@ -7060,11 +7060,22 @@ be created for an already linked occurrence; use its original entry or explicit 
 unknown_account_ids:[uuid],known_starting_minor:string,starting_minor:string|null,
 expected_income_minor:string,expected_bills_minor:string,net_cash_change_minor:string,
 ending_minor:string|null,first_shortfall_date:date|null,as_of:datetime|null,
-points:[{date,occurrence_id,change_minor:string,known_balance_minor:string,balance_minor:string|null}],
-order:"bills_before_income"}`. Signed starting cash includes overdrafts. Any unknown
+points:[{date,occurrence_id:uuid|null,change_minor:string,known_balance_minor:string,balance_minor:string|null}],
+order:"bills_before_income"}`. Points always begin with a zero-change baseline at start_date
+and null occurrence_id. Account-only edits retain cadence and choose the next scheduled
+date on/after the safe cutover automatically. Signed starting cash includes overdrafts. Any unknown
 included balance makes starting/ending/points totals null while known subtotals remain.
 Unfulfilled overdue movements project at start_date with their actual due_date retained.
 Same-day bills precede income, conservatively exposing a possible intraday shortfall;
 order is date-only, not a claim about transaction times. No expectations is incomplete
 coverage, never a claim future expenses are zero. Actual totals remain separate in the
 existing financial-home response. Both native Home and Plan consume this one projection.
+
+Pending expectations whose selected account changes type/currency expose account_changed.
+A selection that no longer identifies a cash account stays visible but contributes no
+cash total. Archived cash accounts remain included, consistent with recorded Home.
+
+`home` reuses the complete existing financial-home response, including recorded monthly
+totals and recent activity, derived from the same repeatable-read snapshot as the
+forecast. Native Home consumes this field with the forecast. The standalone financial-home
+route remains compatible for other callers.

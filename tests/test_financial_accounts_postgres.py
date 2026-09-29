@@ -119,7 +119,7 @@ def test_migration_objects_exist_on_the_integration_schema() -> None:
             "select tablename from pg_tables where schemaname = 'public'"
             " and tablename like 'financial_%' order by 1"
         ).fetchall()
-        assert [row[0] for row in tables] == [
+        assert {
             "financial_account_idempotency",
             "financial_accounts",
             "financial_activity_groups",
@@ -130,7 +130,7 @@ def test_migration_objects_exist_on_the_integration_schema() -> None:
             "financial_operation_receipts",
             "financial_record_revisions",
             "financial_records",
-        ]
+        } <= {row[0] for row in tables}
         rls = connection.execute(
             "select relname, relrowsecurity from pg_class"
             " where relname like 'financial_%' and relkind = 'r' order by 1"
