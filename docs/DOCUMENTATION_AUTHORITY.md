@@ -1,7 +1,8 @@
 # Argus documentation authority
 
-**Updated:** September 29, 2026. Founder-approved private iPhone delivery lock.
-Implementation remains stopped; this publication authorizes documentation only.
+**Updated:** September 29, 2026. Private iPhone direction and financial-loop landing.
+Current delivered work, remaining scope and action authority live in the
+[execution manifest](specs/argus-execution-board.md), not in this ownership guide.
 **Purpose:** Help an agent distinguish approved product direction, existing technical contracts, historical rationale, and authorized implementation work.
 
 ## Start here
@@ -11,7 +12,7 @@ Implementation remains stopped; this publication authorizes documentation only.
 3. Read the [minimum viable ecosystem experience (MVEE)](specs/argus-minimum-viable-ecosystem-experience.md) for the approved audience, surfaces, ingestion, loop, household collaboration, and open decisions.
 4. Read [ARCHITECTURE.md](ARCHITECTURE.md), [API_CONTRACT.md](API_CONTRACT.md), [DATA_MODEL.md](DATA_MODEL.md), and [DESIGN.md](../.agent/designs/argus/DESIGN.md) before relevant technical or UI work. Their existing contracts are not replaced by experience prose.
 5. Read the [private iPhone execution manifest](specs/argus-execution-board.md) for
-   the stopped delivery plan, dependencies, ownership requirements and acceptance.
+   current landed work, authorized actions, dependencies, ownership and acceptance.
 6. Read the explicitly assigned package or slice. For a Wave 1 assignment, start with [its README](specs/wave-1/README.md) and the package's existing gates. A roadmap or brainstorm does not assign work by itself.
 
 ## One owner per kind of decision
@@ -61,7 +62,7 @@ merely to make an experience specification read as if it has shipped.
 Do not infer these from a polished demo or the MVEE:
 
 - Registration/conversion mechanics and enforcement of the [locked guest access boundary](specs/argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration); guest financial persistence is no longer an open product choice.
-- Financial activity, balance/transaction reconciliation, household extensions and historical-data conversion beyond the landed [account first slice](specs/lanes/financial-accounts-first-slice.md). Existing account APIs and money contracts remain authoritative; do not redesign them from vision prose.
+- Financial capabilities beyond the landed [account first slice](specs/lanes/financial-accounts-first-slice.md) and [local financial loop](specs/argus-execution-board.md#pr-745-integration-landing), including household extensions and unsupported historical-data conversion. Existing account/activity/reconciliation API and money contracts remain authoritative; do not redesign them from vision prose.
 - Household membership lifecycle, permission enforcement/RLS, ownership, revocation, deletion, and retention implementation. The consent/visibility experience is settled; its technical realization is not.
 - API routes, action schemas, chat-to-record integration, runtime state ownership, jobs, and event contracts for the new surfaces.
 - Voice integration contracts under the [selected voice/chart direction](ARCHITECTURE.md#voice-and-chart-direction), OCR providers, supported file formats/institutions, secure bank-access design, wallet/device capabilities, and automatic-acceptance policies.
@@ -86,7 +87,7 @@ Retired strategy narratives now live in `docs/archive/`, with compatibility poin
 
 ## Wave 1 reconciliation boundary
 
-The private iPhone execution manifest supplies the current proposed delivery map. It does not restart Wave 1 or any stopped lane. Applicable technical and release gates still apply when a package is explicitly assigned; historical package sequencing does not override the latest founder stop or iPhone priority.
+The private iPhone execution manifest supplies the current delivery map and records explicit assignments and landed work. It does not itself restart Wave 1 or any stopped lane. Applicable technical and release gates still apply when a package is explicitly assigned; historical package sequencing does not override current founder authority or the iPhone priority.
 
 In particular, Wave 1's two-audience landing, limited navigation, hidden account/upload/budget surfaces, and earlier onboarding assumptions are package-era choices, not permanent limits on the ecosystem. A temporary shipping subset may still be appropriate, but the assigned spec must say so explicitly. Before implementing a conflicting experience requirement, reconcile that package with the founder-approved MVEE and record what is retained, revised, or deferred. Do not expose unfinished surfaces just because they are approved in the vision.
 
@@ -134,9 +135,11 @@ identity and a modular backend. It does not authorize hosted migrations, setting
 paid providers or deployment. Existing API/data/security contracts remain in
 force; reconcile their concrete amendments within assigned implementation work.
 
-All product implementation remains stopped. Publishing these documents and
-opening their PR is authorized. Creating new implementation lanes, restarting
-workers, merging or deploying is not authorized by this publication.
+The original documentation-only publication did not authorize implementation.
+Subsequent founder grants and their completed outcomes are recorded in the
+[execution manifest](specs/argus-execution-board.md). Consult that current state
+before acting; this ownership guide neither grants nor revokes restart, merge,
+preview, deployment or spending authority.
 
 ## Handoff rule
 
