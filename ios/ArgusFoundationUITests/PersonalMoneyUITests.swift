@@ -340,7 +340,7 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
         if let purchase {
             tapVisible(app.buttons["loop.purchase"])
-            let option = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", purchase, " · ")).firstMatch
+            let option = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@ AND NOT identifier BEGINSWITH 'loop.' AND NOT identifier BEGINSWITH 'activity.'", purchase, " · ")).firstMatch
             XCTAssertTrue(option.waitForExistence(timeout: 5))
             option.tap()
         }
@@ -350,9 +350,12 @@ extension FinancialLoopUITests {
     }
 
     func chooseMoneyAccount(_ identifier: String, account: MoneyAccount) {
-        tapVisible(app.buttons[identifier])
-        XCTAssertTrue(app.buttons[account.name].waitForExistence(timeout: 5))
-        app.buttons[account.name].tap()
+        let picker = app.buttons[identifier]
+        if picker.label.contains(account.name) { return }
+        tapVisible(picker)
+        let option = app.buttons.matching(NSPredicate(format: "label == %@ AND NOT identifier BEGINSWITH 'loop.' AND NOT identifier BEGINSWITH 'accounts.'", account.name)).firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        option.tap()
     }
 
     func fillMoneyField(_ identifier: String, with value: String) {
@@ -369,7 +372,10 @@ extension FinancialLoopUITests {
 
     func moneyField(_ identifier: String) -> XCUIElement {
         let field = app.textFields[identifier]
-        return field.exists ? field : app.textViews[identifier]
+        let view = app.textViews[identifier]
+        let appeared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in field.exists || view.exists }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [appeared], timeout: 10), .completed)
+        return field.exists ? field : view
     }
 
     func dismissMoneyKeyboard() {
