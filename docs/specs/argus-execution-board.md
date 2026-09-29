@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** LOCALLY VERIFIED; final PR gates tracked in [#747](https://github.com/lagarcess/argus/pull/747) for the [personal money-recording batch](#personal-money-recording-batch). #745 and its #746 landing are complete. Signing, physical-phone installation, deployment and other MVEE implementation remain outside this authorization.
+**Execution state:** LANDED and locally verified: [#747](https://github.com/lagarcess/argus/pull/747) personal money recording, following #745 and #746. The [landing record](#pr-747-integration-landing) owns integration provenance. Signing, physical-phone installation, deployment and other MVEE implementation remain outside this authorization.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -30,6 +30,36 @@ income, spend, move money between owned accounts, pay a card and record a refund
 Accounts and Home agree after inspection, corrections and reopening. Unknown
 balances stay unknown, currencies stay separate, linked movements commit once
 and together, and earlier activity respects each account's balance-check answers.
+
+### PR #747 integration landing
+
+The founder authorized merge of reviewed head
+`5a997df3142dd9ca2d73207f8e4d8822705a646d` after green checks and zero unresolved
+findings. It squash-merged on September 29, 2026 at 17:20:38 UTC as
+`6eb057e9abe23ecbbfa0228b9ba0e57623d2f696`, onto unchanged integration
+`b4fed10fe5cd325a7cd3e6ac21b87e9fbf5eb819`. The merge and approved-head trees are
+identical; no reconciliation or intervening semantic overlap invalidates the
+accepted financial, recovery, isolation or transfer-label evidence.
+
+The [terminal PR audit](https://github.com/lagarcess/argus/pull/747#issuecomment-5895015807)
+records green exact-head CI/smoke and the clean final scoped review. Exact
+post-merge CI/smoke and final local/remote parity are recorded in the merged PR's
+landing comment. The canonical checkout fast-forwarded cleanly to the merge.
+
+This lands the locally verified personal recording journey, not physical-iPhone
+or full MVEE delivery. The [demo and restart guide](../reports/evidence/personal-money-recording/ios/README.md)
+and [transfer-label proof](../reports/evidence/personal-money-recording/ios/transfer-label-review/README.md)
+remain available; local services, synthetic identities and both demos are
+preserved. Existing visual-polish notes below remain open; no further MVEE
+implementation is activated by this landing.
+
+No linked issue requires closure. No new production environment variable or
+tracked-template change is required: `ARGUS_TEST_RESPONSE_LOSS_PROXY` is an
+explicit local UI-test switch, and the existing financial exposure flag stays
+default-off. The two additive personal-money migrations are landed source only;
+no hosted migration, configuration change, signing, deployment or main promotion
+was performed. The original implementation grant above remains historical;
+this separate founder merge authorization applies only to #747.
 
 ### Delivery ownership and throughput
 
@@ -76,7 +106,7 @@ assignment, not a claim that this slice completes the ecosystem.
 - [x] Phase D: Keep the audit trail. Update this section with decisions, named owners, evidence and exact remaining work.
 - [x] Phase E: Preserve the runnable simulator, recording and restart instructions. The terminal audit on [PR #747](https://github.com/lagarcess/argus/pull/747) owns exact final-head CI/review and the merge-ready verdict; this documentation does not waive those gates.
 
-Current checkpoint: all five recording kinds, inspection, corrections, balance-check
+Current checkpoint: #747 is landed. All five recording kinds, inspection, corrections, balance-check
 coverage and recovery passed assembled simulator acceptance against real local
 Auth/API/Postgres. The [recording, retained accounts and restart guide](../reports/evidence/personal-money-recording/ios/README.md)
 make the demonstration repeatable. The shared
@@ -183,7 +213,7 @@ passed at `7a3bf64f`: English/dark and Spanish/light labels, both account menus,
 reviewed transfer effects, existing correction labels and expense/card picker
 regression checks. Both new-transfer previews were cancelled without confirmation.
 The [clarity evidence](../reports/evidence/personal-money-recording/ios/transfer-label-review/README.md)
-and final PR audit own verification and merge readiness; no merge is authorized.
+and final PR audit own verification. The later founder-authorized merge is recorded above.
 
 Remaining visual polish is tracked here, not silently treated as complete or as a
 new MVEE deferral. The native experience owner should review visible role labels
@@ -727,8 +757,8 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
-explicitly unmerged #747 candidate. Only the personal money-recording batch is
-active; its named owners and acceptance state are recorded above. Proposed owners
+landed #747 personal recording journey. This local batch is complete; its named
+owners and evidence are recorded above. No other MVEE batch is active. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -737,9 +767,9 @@ sequence rather than a separate deferral policy in this document.
 | [Access][mvee-access], D01 | Argus auth/recovery; Swift session/Keychain | Finish native/hosted auth adapter and guest conversion | Native continuity + Device/release | Identity API; signing/hosted access for phone proof | Physical-device auth recordings and session/identity test results |
 | [iPhone experience][mvee-platforms], D15 | Native shell; localization; design archive | Replace sample destinations with connected modules | Native continuity | Domain reads per destination | Device navigation/accessibility recordings against [native quality][mvee-quality] |
 | [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 native account/opening lifecycle and real local API | Extend saved assets and ownership/space behavior; verify existing lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
-| [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; unmerged #747 five-kind manual entry, paired correction/history and refund candidate | Local assembled acceptance passed; finish #747 final CI/review and later authorized phone proof; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
-| [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage candidate; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
-| [Home][mvee-home], D05 | #745 connected known/unknown positions; #747 monthly income/purchases/refunds candidate; locked design and chart prototype | Add approved forecast, plan/context, chart and destination surfaces through their domain owners; verify assembled Home on the phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
+| [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
+| [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
+| [Home][mvee-home], D05 | #745 connected known/unknown positions; #747 monthly income/purchases/refunds; locked design and chart prototype | Add approved forecast, plan/context, chart and destination surfaces through their domain owners; verify assembled Home on the phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
 | [Plan][mvee-plan], D06 | Existing calculators; locked plan design | Implement plan persistence and actual-activity adapters | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
