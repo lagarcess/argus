@@ -1,5 +1,10 @@
 # iPhone financial accounts
 
+Historical scope for the preserved account-only checkpoint. The active
+[financial-loop batch](../../specs/argus-execution-board.md#active-financial-loop-batch)
+supersedes its sequencing and sample-Home boundary. Retain this document for
+source provenance; it does not assign additional work.
+
 ## Why
 
 Connect the existing native Accounts destination to the landed registered-only

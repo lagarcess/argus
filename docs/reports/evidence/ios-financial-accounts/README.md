@@ -1,5 +1,9 @@
 # Stopped iPhone account client: recovery checkpoint
 
+This is the historical stop record. Current restart authority, recovered source
+and acceptance status live in the
+[execution manifest](../../../specs/argus-execution-board.md#active-financial-loop-batch).
+
 Saved September 29, 2026 at the founder's request. **Preservation only. Not a
 working-build, review-ready, merge-ready or deployment claim.** Implementation
 remains stopped; this checkpoint does not resolve the earlier build approval
