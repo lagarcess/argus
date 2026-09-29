@@ -6,7 +6,7 @@
 - Approved PR head: `a2f53c16fefee352f256632bc657550311cd6e19`
 - Integration parent at squash: `e3f9db651ade97512107e835dbf442aacf637641`
 - Squash merge: `296195e86c972e846c251d256b3cc211975bfd57`
-- Merge time: September 29, 2026, 02:56:56 -0500
+- Merge time: September 29, 2026, 02:56:56 UTC (`2026-09-28T21:56:56-05:00`)
 
 ## Outcome and remaining work
 
