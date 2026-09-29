@@ -433,7 +433,18 @@ def test_legacy_backfill_preserves_ids_coverage_hash_and_response_loss_receipt(
                                 "insert into public.financial_activity_revisions(activity_id,revision,user_id) values(%s,1,%s)",
                                 (rid, scene[1]),
                             )
-                        c.execute(statement + " on conflict do nothing")
+                        # Only this fixture is pre-upgrade data. Other owners may
+                        # already have moved legs written by the current application.
+                        target = statement.strip().split("(", 1)[0]
+                        predicates = {
+                            "insert into public.financial_activity_groups": " and user_id=%s and id=%s",
+                            "insert into public.financial_activity_memberships": " and r.user_id=%s and r.id=%s",
+                            "insert into public.financial_activity_revisions": " where user_id=%s and activity_id=%s",
+                        }
+                        c.execute(
+                            statement + predicates[target] + " on conflict do nothing",
+                            (scene[1], rid),
+                        )
     replay = scene[0].loop.write_activity(
         user_id=scene[1],
         account_id=aid,
