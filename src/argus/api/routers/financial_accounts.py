@@ -16,6 +16,7 @@ from argus.api.financial_accounts import (
 )
 from argus.api.routers.financial_activities import router as money_router
 from argus.api.routers.financial_loop import router as loop_router
+from argus.api.routers.financial_plan import router as plan_router
 from argus.domain import backtest_admission
 from argus.domain.recording.loop_schemas import LoopOpeningRequest
 from argus.domain.recording.schemas import (
@@ -146,3 +147,5 @@ def _required_idempotency_key(request: Request, raw: str | None) -> str:
 router.include_router(loop_router)
 
 router.include_router(money_router)
+
+router.include_router(plan_router)

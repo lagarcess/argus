@@ -1,0 +1,208 @@
+"""One snapshot supplies dated Plan and Home cash projections."""
+
+from datetime import date, datetime
+from typing import Any
+
+from argus.domain.planning.model import expectation_response, occurrences
+from argus.domain.planning.schemas import CASH_TYPES
+from argus.domain.recording.currency import currency_exponent
+from argus.domain.recording.loop_reads import _personal, home_response
+from argus.domain.recording.money_reads import current_activities
+from argus.domain.recording.repository import StoredAccount
+from argus.domain.recording.schemas import account_response
+
+
+def matches(occurrence: dict[str, Any], activity: dict[str, Any]) -> bool:
+    return (
+        activity["kind"] == ("income" if occurrence["kind"] == "income" else "expense")
+        and activity["currency"] == occurrence["currency"]
+        and len(activity["legs"]) == 1
+        and activity["legs"][0]["account_id"] == occurrence["account_id"]
+    )
+
+
+def occurrence_response(
+    item: dict[str, Any], state: dict[str, Any], actual: dict[str, Any], start: date
+) -> dict[str, Any]:
+    link = state["links"].get(item["id"])
+    activity = actual.get(link["activity_id"]) if link else None
+    status = (
+        "planned"
+        if not link
+        else "fulfilled"
+        if activity and matches(item, activity)
+        else "needs_review"
+    )
+    reason = None
+    if status == "needs_review":
+        reason = "link_needs_review"
+    elif status == "planned":
+        if not item["account_id"]:
+            reason = "account_unassigned"
+        elif item["account_id"] not in state["selection"]["account_ids"]:
+            reason = "account_not_selected"
+    due = date.fromisoformat(item["due_date"])
+    return item | {
+        "projection_date": max(start, due).isoformat(),
+        "status": status,
+        "activity_id": link["activity_id"] if link else None,
+        "activity_revision": activity["revision"] if activity else None,
+        "exclusion_reason": reason,
+        "overdue": due < start and status != "fulfilled",
+    }
+
+
+def projection(
+    state: dict[str, Any],
+    accounts: list[StoredAccount],
+    start: date,
+    end: date,
+    now: datetime,
+) -> dict[str, Any]:
+    actual = {a["activity_id"]: a for a in current_activities(accounts)}
+    rows = [
+        occurrence_response(item, state, actual, start)
+        for item in occurrences(state, end).values()
+        if date.fromisoformat(item["due_date"]) <= end
+    ]
+    by_id = {s.account.id: s.account for s in accounts}
+    for row in rows:
+        selected_account = by_id.get(row["account_id"])
+        if (
+            row["status"] == "planned"
+            and row["account_id"]
+            and (
+                selected_account is None
+                or selected_account.type not in CASH_TYPES
+                or selected_account.currency != row["currency"]
+            )
+        ):
+            row["exclusion_reason"] = "account_changed"
+    rows = [
+        r
+        for r in rows
+        if r["status"] != "fulfilled" or date.fromisoformat(r["due_date"]) >= start
+    ]
+    rows.sort(
+        key=lambda r: (
+            r["projection_date"],
+            r["kind"] == "income",
+            r["due_date"],
+            r["id"],
+        )
+    )
+    selected = set(state["selection"]["account_ids"])
+    currencies = {}
+    projected_balances: dict[str, int | None] = {}
+    for stored in accounts:
+        if stored.account.id not in selected or stored.account.type not in CASH_TYPES:
+            continue
+        code = stored.account.currency
+        group = currencies.setdefault(
+            code,
+            {
+                "currency": code,
+                "currency_fraction_digits": currency_exponent(code),
+                "account_ids": [],
+                "unknown_account_ids": [],
+                "known_starting_minor": 0,
+                "expected_income_minor": 0,
+                "expected_bills_minor": 0,
+                "as_of": None,
+            },
+        )
+        group["account_ids"].append(stored.account.id)
+        balance = account_response(stored).balance
+        projected_balances[stored.account.id] = balance.amount_minor
+        if balance.state == "unknown":
+            group["unknown_account_ids"].append(stored.account.id)
+        else:
+            group["known_starting_minor"] += _personal(
+                balance.amount_minor, stored.account.ownership_share_bps
+            )
+            if balance.as_of and (
+                group["as_of"] is None or balance.as_of < group["as_of"]
+            ):
+                group["as_of"] = balance.as_of
+    for group in currencies.values():
+        known = group["known_starting_minor"]
+        complete = not group["unknown_account_ids"]
+        group["starting_minor"] = str(known) if complete else None
+        group["first_shortfall_date"] = (
+            start.isoformat() if complete and known < 0 else None
+        )
+        points = [
+            {
+                "date": start.isoformat(),
+                "occurrence_id": None,
+                "change_minor": "0",
+                "known_balance_minor": str(known),
+                "balance_minor": str(known) if complete else None,
+            }
+        ]
+        for row in rows:
+            if (
+                row["currency"] != group["currency"]
+                or row["status"] != "planned"
+                or row["exclusion_reason"]
+            ):
+                continue
+            income = row["kind"] == "income"
+            account_id = row["account_id"]
+            share = by_id[account_id].ownership_share_bps
+            whole_change = row["amount_minor"] if income else -row["amount_minor"]
+            before = projected_balances[account_id]
+            if before is None:
+                change = _personal(whole_change, share)
+            else:
+                after = before + whole_change
+                change = _personal(after, share) - _personal(before, share)
+                projected_balances[account_id] = after
+                known += change
+            group["expected_income_minor" if income else "expected_bills_minor"] += abs(
+                change
+            )
+            points.append(
+                {
+                    "date": row["projection_date"],
+                    "occurrence_id": row["id"],
+                    "change_minor": str(change),
+                    "known_balance_minor": str(known),
+                    "balance_minor": str(known) if complete else None,
+                }
+            )
+            if complete and known < 0 and group["first_shortfall_date"] is None:
+                group["first_shortfall_date"] = row["projection_date"]
+        group.update(
+            points=points,
+            ending_minor=str(known) if complete else None,
+            net_cash_change_minor=str(
+                group["expected_income_minor"] - group["expected_bills_minor"]
+            ),
+            order="bills_before_income",
+        )
+        for key in (
+            "known_starting_minor",
+            "expected_income_minor",
+            "expected_bills_minor",
+        ):
+            group[key] = str(group[key])
+    return {
+        "home": home_response(
+            accounts, time_zone=state["selection"]["time_zone"], now=now
+        ),
+        "selection": state["selection"],
+        "accounts": [account_response(s).model_dump(mode="json") for s in accounts],
+        "expectations": [
+            expectation_response(e, state["links"], start)
+            for e in state["expectations"].values()
+        ],
+        "occurrences": rows,
+        "currencies": [currencies[c] for c in sorted(currencies)],
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "coverage": "recorded_and_expected",
+        "has_expectations": any(
+            not e["archived"] for e in state["expectations"].values()
+        ),
+    }

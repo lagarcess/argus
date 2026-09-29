@@ -11,6 +11,10 @@ struct FinancialActivityEditorView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    if let occurrence = model.planOccurrence {
+                        Text(occurrence.title).font(ArgusStyle.display(22))
+                        Text("plan.record.disclosure").font(ArgusStyle.body(13, relativeTo: .subheadline)).foregroundStyle(ArgusStyle.secondary)
+                    }
                     if model.kind != .transfer {
                         Text(model.origin.nickname ?? NSLocalizedString("accounts.type." + model.origin.type, comment: ""))
                             .font(ArgusStyle.body(14, relativeTo: .subheadline)).foregroundStyle(ArgusStyle.secondary)
@@ -72,7 +76,7 @@ struct FinancialActivityEditorView: View {
 
     private var entry: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if !model.isCorrection {
+            if !model.isCorrection && model.planOccurrence == nil {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("loop.activity.kind")
                     ScrollView(.horizontal) {

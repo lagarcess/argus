@@ -6,7 +6,7 @@ struct AccountForm: View {
     @Environment(\.locale) private var locale
     @State private var choosingType = true
     @State private var otherAssets = false
-    @FocusState private var amountFocused: Bool
+    @FocusState private var focusedField: String?
     private let primaryTypes = ["cash", "checking", "savings", "investment", "credit_card", "other_debt"]
     private var locked: Bool { model.busy || model.createIsFrozen || model.openingIsReviewed }
 
@@ -48,7 +48,7 @@ struct AccountForm: View {
                             if model.createIsFrozen {
                                 Text("accounts.create.retry").font(ArgusStyle.body(12, relativeTo: .caption))
                             }
-                            Button { amountFocused = false; Task { await model.save(locale: locale) } } label: {
+                            Button { focusedField = nil; Task { await model.save(locale: locale) } } label: {
                                 Text(model.createIsFrozen || model.openingUncertain ? "accounts.retry" : draft.mode == .create ? "accounts.add" : draft.mode == .opening && !model.openingIsReviewed ? "loop.review" : "accounts.save")
                                     .frame(maxWidth: .infinity)
                             }
@@ -71,7 +71,7 @@ struct AccountForm: View {
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
-                    Button("accounts.keyboard.done") { amountFocused = false }
+                    Button("accounts.keyboard.done") { focusedField = nil }
                 }
             }
             .interactiveDismissDisabled()
@@ -118,7 +118,7 @@ struct AccountForm: View {
             }
             HStack(spacing: 8) {
                 TextField("accounts.amount.placeholder", text: binding(\.amount))
-                    .keyboardType(.decimalPad).focused($amountFocused).monospacedDigit()
+                    .keyboardType(.decimalPad).focused($focusedField, equals: "accounts.amount").monospacedDigit()
                     .accessibilityIdentifier("accounts.amount")
                 Button {
                     guard !locked else { return }
@@ -242,7 +242,7 @@ struct AccountForm: View {
     private func field(_ key: LocalizedStringKey, text: Binding<String>, identifier: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(key).font(ArgusStyle.body(14, relativeTo: .subheadline))
-            TextField(key, text: text).padding(.horizontal, 14).frame(minHeight: 52)
+            TextField(key, text: text).focused($focusedField, equals: identifier).padding(.horizontal, 14).frame(minHeight: 52)
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
                 .accessibilityIdentifier(identifier)
         }.disabled(locked)

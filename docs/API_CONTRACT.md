@@ -6979,3 +6979,112 @@ retains personal shares. Archived accounts remain in summaries.
 Legacy expense URLs, IDs and request receipt hashes stay replayable through the same
 planner/projection. Moved/retired legs cannot be independently corrected. Existing
 check/opening coverage behavior stays exact-revision and append-only.
+
+## Connected personal Plan and Home (September 29, 2026)
+
+All `/api/v1/financial-plan` routes reuse the financial-account exposure and registered-owner
+boundary. Cash expectations do not write balances. There is no FX or card-debt plan here.
+
+`GET /financial-plan?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` returns the shared
+Plan/Home projection. Defaults are today through 30 days later in the saved time zone;
+start must be today and end is inclusive, at most 366 days later. The response is:
+
+```
+{home:HomeResponse,selection:{version,account_ids:[uuid],time_zone},accounts:[FinancialAccountResponse],
+ expectations:[Expectation],occurrences:[Occurrence],currencies:[ForecastCurrency],
+ start_date,end_date,coverage:"recorded_and_expected",has_expectations:boolean}
+```
+
+`Expectation` is `{id,version,kind:"income"|"bill",title,currency,currency_fraction_digits,
+amount_minor,amount,account_id:uuid|null,schedule:Schedule,archived:boolean,
+earliest_effective_date:date}`. Title is trimmed, 1..100 characters. `amount` is the
+existing positive dot-decimal string; `amount_minor` is an integer. Account is optional,
+but if selected must be owned cash/checking/savings in the same currency.
+`Schedule` is `{cadence:"once"|"weekly"|"every_two_weeks"|"monthly"|"twice_monthly",
+start_date:date,end_date:date|null,month_days:[integer]}`. Monthly defaults to the start
+day; twice-monthly requires two distinct days from 1..31, where 31 means month end.
+Short months clamp each anchor without drift and deduplicate coincident dates.
+All dates use the owner's saved reporting zone. Expectations retain their scheduled
+calendar dates when that zone changes. An explicitly bounded schedule spans at most ten years; no end date repeats until edited.
+
+`POST /financial-plan/expectations` accepts
+`{kind,title,currency,amount,account_id:null|uuid,schedule}`. `PATCH /financial-plan/expectations/{id}`
+accepts `{expected_version,title?,amount?,account_id?,schedule?,effective_date?,archived?}`.
+Kind/currency are immutable. Every write requires `Idempotency-Key`. Response is
+`{expectation:Expectation,replayed:boolean}`. A full structural edit means schedule or
+account changes. Its cutover defaults to `earliest_effective_date`, the later of today
+and the day after the last explicitly fulfilled occurrence, including future prepaid
+occurrences. An earlier cutover returns `422 plan_cutover_unsafe` with
+`earliest_effective_date` in the problem. New schedule start must be on/after cutover.
+Older schedule segments end before cutover. Title/amount edits update pending
+occurrences only and preserve every linked occurrence's snapshot and identity.
+Archiving hides pending movements but retains fulfilled history; restoring reuses it.
+No operation removes actual activity or changes its immutable kind.
+
+`PUT /financial-plan/selection` accepts `{expected_version,account_ids:[uuid],time_zone}`
+and returns `{selection,replayed}`. Version starts at zero with an empty selection and
+America/Santo_Domingo. Explicit empty stays empty. No account is silently included.
+The UI may propose eligible accounts and then save the reviewed selection.
+
+`Occurrence` is `{id,expectation_id,expectation_version,kind,title,currency,
+currency_fraction_digits,amount_minor,amount,account_id:uuid|null,due_date,projection_date,
+status:"planned"|"fulfilled"|"needs_review",activity_id:uuid|null,activity_revision:integer|null,
+exclusion_reason:null|"account_unassigned"|"account_not_selected"|"link_needs_review"|"account_changed",
+overdue:boolean}`. IDs are opaque stable strings. Linked snapshots survive edits.
+An activity account/currency mismatch yields needs_review and excludes that ambiguous
+occurrence from projection until explicitly relinked. Amount/date correction keeps
+explicit fulfillment. Refunds never reopen paid bills. Read status derives from the
+current canonical activity, not a stored completion flag.
+
+`POST /financial-plan/occurrences/{id}/fulfillment/preview` accepts
+`{expected_version:integer,activity:MoneyRequest}`. It returns
+`{occurrence:Occurrence,money:MoneyPreviewResponse}`. Use money.reviewed_request with
+money.preview_token in the confirmation body at the same path without `/preview`.
+Confirmation requires Idempotency-Key and returns
+`{occurrence:Occurrence,activity:MoneyActivityResponse,accounts:[FinancialAccountResponse],replayed}`.
+The entry must use the occurrence's selected cash account, currency and corresponding
+kind (bill becomes expense). Actual amount/date may differ and use existing money
+preview, observation coverage and correction rules. Activity and link commit together.
+
+`GET /financial-plan/occurrences/{id}/candidates` returns `{items:[MoneyActivityResponse]}`
+for current owner/direction/currency/account matches not linked elsewhere. Explicit
+linking uses `POST /financial-plan/occurrences/{id}/link` with
+`{expected_version,activity_id,activity_revision}` and Idempotency-Key. It returns
+`{occurrence,replayed}`. The selected activity detail is the review; no second preview
+route is needed. A changed activity revision is stale. Relinking replaces only this
+occurrence's link, preserves its expectation snapshot and never creates activity.
+One actual activity may fulfill only one occurrence. A different new activity cannot
+be created for an already linked occurrence; use its original entry or explicit relink.
+
+`ForecastCurrency` is `{currency,currency_fraction_digits,account_ids:[uuid],
+unknown_account_ids:[uuid],known_starting_minor:string,starting_minor:string|null,
+expected_income_minor:string,expected_bills_minor:string,net_cash_change_minor:string,
+ending_minor:string|null,first_shortfall_date:date|null,as_of:datetime|null,
+points:[{date,occurrence_id:uuid|null,change_minor:string,known_balance_minor:string,balance_minor:string|null}],
+order:"bills_before_income"}`. Points always begin with a zero-change baseline at start_date
+and null occurrence_id. Account-only edits retain cadence and choose the next scheduled
+date on/after the safe cutover automatically. Signed starting cash includes overdrafts. Any unknown
+included balance makes starting/ending/points totals null while known subtotals remain.
+Unfulfilled overdue movements project at start_date with their actual due_date retained.
+Same-day bills precede income, conservatively exposing a possible intraday shortfall;
+order is date-only, not a claim about transaction times. No expectations is incomplete
+coverage, never a claim future expenses are zero. Actual totals remain separate in the
+existing financial-home response. Both native Home and Plan consume this one projection.
+
+Pending expectations whose selected account changes type/currency expose account_changed.
+A selection that no longer identifies a cash account stays visible but contributes no
+cash total. Archived cash accounts remain included, consistent with recorded Home.
+
+`home` reuses the complete existing financial-home response, including recorded monthly
+totals and recent activity, derived from the same repeatable-read snapshot as the
+forecast. Native Home consumes this field with the forecast. The standalone financial-home
+route remains compatible for other callers.
+
+Forecast positions use the same per-account ownership attribution and rounding as
+recorded Home. Each expected whole-account movement changes that account's projected
+whole balance before attribution; its attributed delta supplies forecast totals.
+This keeps fulfillment continuous even at fractional-share minor-unit boundaries.
+Unknown account starting balances remain unknown and are excluded from known
+subtotals; their expected attributed movements remain visible without inventing a
+starting position. Saved selected accounts remain removable if archived or no
+longer eligible. Expectation UUID paths normalize before lookup and receipt scoping.

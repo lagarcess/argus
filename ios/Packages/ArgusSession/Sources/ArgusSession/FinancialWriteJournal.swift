@@ -6,15 +6,16 @@ import Foundation
 /// and preview token; a retry sends these same bytes with the same key.
 public struct PendingFinancialConfirmation: Codable, Equatable, Sendable {
     public let ownerId: UUID
-    public let originAccountId: UUID
+    public let originAccountId: UUID?
     public let route: String
     public let path: String
     public let method: String
     public let body: Data
     public let key: UUID
+    public let planOperation: FinancialPlanOperation?
 
-    public init(ownerId: UUID, originAccountId: UUID, route: String, path: String,
-                method: String, body: Data, key: UUID) {
+    public init(ownerId: UUID, originAccountId: UUID?, route: String, path: String,
+                method: String, body: Data, key: UUID, planOperation: FinancialPlanOperation? = nil) {
         self.ownerId = ownerId
         self.originAccountId = originAccountId
         self.route = route
@@ -22,6 +23,7 @@ public struct PendingFinancialConfirmation: Codable, Equatable, Sendable {
         self.method = method
         self.body = body
         self.key = key
+        self.planOperation = planOperation
     }
 }
 
@@ -55,7 +57,7 @@ public final class FinancialWriteJournal: @unchecked Sendable {
     public func begin(_ write: PendingFinancialConfirmation, for identity: SessionSnapshot) throws {
         let owner = try Self.owner(identity)
         guard write.ownerId == owner, !write.body.isEmpty,
-              write.method == "POST" || write.method == "PATCH",
+              write.method == "POST" || write.method == "PATCH" || write.method == "PUT",
               !write.route.isEmpty, (write.path.isEmpty || write.path.hasPrefix("/")), !write.path.hasPrefix("//")
         else { throw FinancialWriteJournalError.invalidIdentity }
         try locked {

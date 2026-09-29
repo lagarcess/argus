@@ -2626,6 +2626,334 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan:
+    get:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: start_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+      - name: end_date
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/expectations:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpectationCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpectationReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/expectations/{expectation_id}:
+    patch:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: expectation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpectationEdit'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpectationReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/occurrences/{occurrence_id}/candidates:
+    get:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidates'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/occurrences/{occurrence_id}/fulfillment:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Fulfillment'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FulfillmentReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/occurrences/{occurrence_id}/fulfillment/preview:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Fulfillment'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FulfillmentPreview'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/occurrences/{occurrence_id}/link:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: occurrence_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkWrite'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/selection:
+    put:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectionWrite'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelectionReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/history:
     get:
       tags:
@@ -4115,6 +4443,15 @@ components:
       required:
       - success
       - deleted_count
+    Candidates:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/MoneyActivityResponse'
+          type: array
+      type: object
+      required:
+      - items
     CategoriesResponse:
       properties:
         categories:
@@ -5462,6 +5799,132 @@ components:
       - payload
       - created_at
       - updated_at
+    Expectation:
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+        kind:
+          type: string
+          enum:
+          - income
+          - bill
+        title:
+          type: string
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        schedule:
+          $ref: '#/components/schemas/Schedule'
+        archived:
+          type: boolean
+        earliest_effective_date:
+          type: string
+          format: date
+      type: object
+      required:
+      - id
+      - version
+      - kind
+      - title
+      - currency
+      - currency_fraction_digits
+      - amount_minor
+      - amount
+      - account_id
+      - schedule
+      - archived
+      - earliest_effective_date
+    ExpectationCreate:
+      properties:
+        kind:
+          type: string
+          enum:
+          - income
+          - bill
+        title:
+          type: string
+          maxLength: 100
+          minLength: 1
+        currency:
+          type: string
+          maxLength: 3
+        amount:
+          type: string
+          maxLength: 40
+        account_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        schedule:
+          $ref: '#/components/schemas/Schedule'
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - title
+      - currency
+      - amount
+      - schedule
+    ExpectationEdit:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        title:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+        account_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        schedule:
+          anyOf:
+          - $ref: '#/components/schemas/Schedule'
+          - type: 'null'
+        effective_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        archived:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+    ExpectationReceipt:
+      properties:
+        expectation:
+          $ref: '#/components/schemas/Expectation'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - expectation
+      - replayed
     FeedbackRequest:
       properties:
         type:
@@ -5553,6 +6016,109 @@ components:
       - updated_at
       - balance
       - opening
+    ForecastCurrency:
+      properties:
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        account_ids:
+          items:
+            type: string
+          type: array
+        unknown_account_ids:
+          items:
+            type: string
+          type: array
+        known_starting_minor:
+          type: string
+        starting_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expected_income_minor:
+          type: string
+        expected_bills_minor:
+          type: string
+        net_cash_change_minor:
+          type: string
+        ending_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        first_shortfall_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        points:
+          items:
+            $ref: '#/components/schemas/Point'
+          type: array
+        order:
+          type: string
+          const: bills_before_income
+      type: object
+      required:
+      - currency
+      - currency_fraction_digits
+      - account_ids
+      - unknown_account_ids
+      - known_starting_minor
+      - starting_minor
+      - expected_income_minor
+      - expected_bills_minor
+      - net_cash_change_minor
+      - ending_minor
+      - first_shortfall_date
+      - as_of
+      - points
+      - order
+    Fulfillment:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        activity:
+          $ref: '#/components/schemas/MoneyRequest'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - activity
+    FulfillmentPreview:
+      properties:
+        occurrence:
+          $ref: '#/components/schemas/Occurrence'
+        money:
+          $ref: '#/components/schemas/MoneyPreviewResponse'
+      type: object
+      required:
+      - occurrence
+      - money
+    FulfillmentReceipt:
+      properties:
+        occurrence:
+          $ref: '#/components/schemas/Occurrence'
+        replayed:
+          type: boolean
+        activity:
+          $ref: '#/components/schemas/MoneyActivityResponse'
+        accounts:
+          items:
+            $ref: '#/components/schemas/FinancialAccountResponse'
+          type: array
+      type: object
+      required:
+      - occurrence
+      - replayed
+      - activity
+      - accounts
     GuestAccountSignupRequest:
       properties:
         email:
@@ -5839,6 +6405,33 @@ components:
       - recent_activity
       - recorded_at
     JsonValue: {}
+    LinkReceipt:
+      properties:
+        occurrence:
+          $ref: '#/components/schemas/Occurrence'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - occurrence
+      - replayed
+    LinkWrite:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        activity_id:
+          type: string
+          format: uuid
+        activity_revision:
+          type: integer
+          minimum: 1.0
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - activity_id
+      - activity_revision
     LocalizedText:
       properties:
         locale_key:
@@ -6832,6 +7425,83 @@ components:
       - amount_minor
       - amount
       - included
+    Occurrence:
+      properties:
+        id:
+          type: string
+        expectation_id:
+          type: string
+        expectation_version:
+          type: integer
+        kind:
+          type: string
+          enum:
+          - income
+          - bill
+        title:
+          type: string
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        due_date:
+          type: string
+          format: date
+        projection_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum:
+          - planned
+          - fulfilled
+          - needs_review
+        activity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        activity_revision:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        exclusion_reason:
+          anyOf:
+          - type: string
+            enum:
+            - account_unassigned
+            - account_not_selected
+            - link_needs_review
+            - account_changed
+          - type: 'null'
+        overdue:
+          type: boolean
+      type: object
+      required:
+      - id
+      - expectation_id
+      - expectation_version
+      - kind
+      - title
+      - currency
+      - currency_fraction_digits
+      - amount_minor
+      - amount
+      - account_id
+      - due_date
+      - projection_date
+      - status
+      - activity_id
+      - activity_revision
+      - exclusion_reason
+      - overdue
     OnboardingState:
       properties:
         completed:
@@ -7091,6 +7761,75 @@ components:
       type: object
       required:
       - items
+    PlanResponse:
+      properties:
+        home:
+          $ref: '#/components/schemas/HomeResponse'
+        selection:
+          $ref: '#/components/schemas/Selection'
+        accounts:
+          items:
+            $ref: '#/components/schemas/FinancialAccountResponse'
+          type: array
+        expectations:
+          items:
+            $ref: '#/components/schemas/Expectation'
+          type: array
+        occurrences:
+          items:
+            $ref: '#/components/schemas/Occurrence'
+          type: array
+        currencies:
+          items:
+            $ref: '#/components/schemas/ForecastCurrency'
+          type: array
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        coverage:
+          type: string
+          const: recorded_and_expected
+        has_expectations:
+          type: boolean
+      type: object
+      required:
+      - home
+      - selection
+      - accounts
+      - expectations
+      - occurrences
+      - currencies
+      - start_date
+      - end_date
+      - coverage
+      - has_expectations
+    Point:
+      properties:
+        date:
+          type: string
+          format: date
+        occurrence_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        change_minor:
+          type: string
+        known_balance_minor:
+          type: string
+        balance_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - date
+      - occurrence_id
+      - change_minor
+      - known_balance_minor
+      - balance_minor
     ProfilePatch:
       properties:
         display_name:
@@ -8778,6 +9517,34 @@ components:
             format: date
           - type: 'null'
       type: object
+    Schedule:
+      properties:
+        cadence:
+          type: string
+          enum:
+          - once
+          - weekly
+          - every_two_weeks
+          - monthly
+          - twice_monthly
+        start_date:
+          type: string
+          format: date
+        end_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        month_days:
+          items:
+            type: integer
+          type: array
+          maxItems: 2
+      additionalProperties: false
+      type: object
+      required:
+      - cadence
+      - start_date
     SearchAssetDecisionCounts:
       properties:
         promising:
@@ -9092,6 +9859,51 @@ components:
       required:
       - start_date
       - end_date
+    Selection:
+      properties:
+        version:
+          type: integer
+        account_ids:
+          items:
+            type: string
+          type: array
+        time_zone:
+          type: string
+      type: object
+      required:
+      - version
+      - account_ids
+      - time_zone
+    SelectionReceipt:
+      properties:
+        selection:
+          $ref: '#/components/schemas/Selection'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - selection
+      - replayed
+    SelectionWrite:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 0.0
+        account_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 100
+        time_zone:
+          type: string
+          maxLength: 64
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - account_ids
+      - time_zone
     SensitivityStatus:
       type: string
       enum:

@@ -96,7 +96,9 @@ struct FoundationShell: View {
             } else { HomeSampleView(destination: $destination, showSample: { sheet = .sample }) }
         case .accounts: AccountsDestination(showProfile: { sheet = .profile }, showSample: { sheet = .sample })
         case .argus: ChatSampleView(showSample: { sheet = .sample })
-        case .plan: PlanSampleView()
+        case .plan:
+            if auth.enabled { FinancialPlanDestination(showProfile: { sheet = .profile }) }
+            else { PlanSampleView() }
         case .search: SearchSampleView(destination: $destination)
         }
     }

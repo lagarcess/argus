@@ -25,9 +25,14 @@ struct FinancialHomeDestination: View {
 struct FinancialHomeView: View {
     @ObservedObject var loop: FinancialLoopModel
     @ObservedObject var accounts: AccountsModel
+    @ObservedObject private var plan: FinancialPlanModel
     @Binding var destination: AppDestination
     @Environment(\.locale) private var locale
     @State private var choosingAccount = false
+
+    init(loop: FinancialLoopModel, accounts: AccountsModel, destination: Binding<AppDestination>) {
+        self.loop = loop; self.accounts = accounts; self.plan = loop.plan; self._destination = destination
+    }
 
     var body: some View {
         ScrollView {
@@ -35,7 +40,7 @@ struct FinancialHomeView: View {
                 PersonalContext()
                 if loop.pendingConfirmation != nil {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("loop.pending.title").font(ArgusStyle.body(15))
+                        Text(LocalizedStringKey(loop.pendingTitle)).font(ArgusStyle.body(15))
                         Text("loop.pending.body").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
                         Button("loop.pending.retry") { Task { await loop.retryPending() } }
                             .buttonStyle(PillButtonStyle()).disabled(loop.recovering)
@@ -72,6 +77,7 @@ struct FinancialHomeView: View {
                             }
                         }
                     }
+                    FinancialComingUpView(model: loop.plan, viewPlan: { destination = .plan })
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text("destination.accounts").font(ArgusStyle.display(22))
@@ -85,8 +91,8 @@ struct FinancialHomeView: View {
                         }
                     }
                 }
-                if loop.loading { ProgressView("accounts.loading") }
-                if let error = loop.errorKey {
+                if plan.loading { ProgressView("accounts.loading") }
+                if let error = plan.errorKey {
                     Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                     Button("accounts.retry") { Task { await loop.refresh() } }.frame(minHeight: 44)
                 }

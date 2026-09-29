@@ -23,8 +23,12 @@ class Fault:
 
     def consume(self, method: str, path: str, status: int) -> bool:
         eligible = (
-            method in {"POST", "PATCH"}
-            and path.startswith("/api/v1/financial-activities")
+            method in {"POST", "PATCH", "PUT"}
+            and (
+                path == "/api/v1/financial-activities"
+                or path.startswith("/api/v1/financial-activities/")
+                or path.startswith("/api/v1/financial-plan/")
+            )
             and not path.endswith("/preview")
             and 200 <= status < 300
         )
@@ -86,6 +90,7 @@ def handler(upstream_port: int, fault: Fault) -> type[BaseHTTPRequestHandler]:
         do_GET = forward
         do_POST = forward
         do_PATCH = forward
+        do_PUT = forward
         do_DELETE = forward
 
     return Proxy

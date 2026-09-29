@@ -50,18 +50,7 @@ class MoneyService:
         activity_id = self._id(activity_id)
 
         def planner(accounts: list[StoredAccount]) -> MoneyPlan:
-            result = plan(accounts, request, activity_id, self.accounts._clock())
-            if request.expected_versions != result.preview["expected_versions"]:
-                raise StaleVersion()
-            if not result.preview["ready"]:
-                raise RecordingInputError(
-                    "balance_coverage_required", "Review each balance question."
-                )
-            if request.preview_token != result.preview["preview_token"]:
-                raise RecordingInputError(
-                    "preview_required", "Review the proposed change before saving it."
-                )
-            return result
+            return self.prepare(accounts, request, activity_id)
 
         records, aid, revision, affected, replayed = transact(
             self.repository,
@@ -78,6 +67,25 @@ class MoneyService:
             ],
             "replayed": replayed,
         }
+
+    def prepare(
+        self,
+        accounts: list[StoredAccount],
+        request: MoneyRequest,
+        activity_id: str | None = None,
+    ) -> MoneyPlan:
+        result = plan(accounts, request, activity_id, self.accounts._clock())
+        if request.expected_versions != result.preview["expected_versions"]:
+            raise StaleVersion()
+        if not result.preview["ready"]:
+            raise RecordingInputError(
+                "balance_coverage_required", "Review each balance question."
+            )
+        if request.preview_token != result.preview["preview_token"]:
+            raise RecordingInputError(
+                "preview_required", "Review the proposed change before saving it."
+            )
+        return result
 
     def detail(self, *, user_id: str, activity_id: str) -> dict[str, Any]:
         aid = self._id(activity_id)

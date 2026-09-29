@@ -2659,3 +2659,18 @@ reference it. Revision purchase_activity_id/purchase_revision are generated from
 details and enforce an owner-qualified FK to the exact reviewed purchase revision.
 This preserves one source for refund provenance while making cross-owner references
 unrepresentable. The additive integrity migration is 20260929130000.
+
+### Connected Plan storage
+
+The additive connected Plan migration stores owner-scoped expectations with versioned
+schedule segments, owner projection selection, occurrence-to-canonical-activity links,
+and idempotency receipts. It stores no actual balance or parallel ledger. Expectations
+contain only planned money; linked occurrence snapshots preserve the reviewed schedule
+and amount while actual amounts always derive from the current canonical activity.
+Owner-qualified foreign keys connect links to expectations and activity revisions.
+RLS allows registered owners to read their rows; writes remain service-only and receipt
+rows have no client grants. All Plan writes take the same financial activity owner lock
+before account locks. Recording from Plan composes the existing Money planner/persist
+inside that transaction. Read snapshots use repeatable read for planning and accounts.
+Schedule edits cut over only after every previously fulfilled date, including future
+prepayments. Amount/title edits retain occurrence identity and linked snapshots.

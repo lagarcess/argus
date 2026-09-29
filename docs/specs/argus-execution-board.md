@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** LANDED and locally verified: [#747](https://github.com/lagarcess/argus/pull/747) personal money recording, following #745 and #746. The [landing record](#pr-747-integration-landing) owns integration provenance. Signing, physical-phone installation, deployment and other MVEE implementation remain outside this authorization.
+**Execution state:** one [connected Plan and Home lane](#connected-plan-and-home-lane), implemented in PR #749 with local acceptance and review evidence below. #747 personal money recording and its #748 landing are complete. No merge or physical-phone delivery is authorized by this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,153 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected Plan and Home lane
+
+**Founder authorization, September 29, 2026:** deliver commitments, recurrence,
+fulfillment and the connected cash forecast as one local iPhone journey. Own
+implementation, local builds/tests, commits, pushes and one reviewable PR with
+existing automatic PR previews. No merge, deployment, signing changes, hosted
+configuration, production data or paid-provider calls. Preserve both existing
+584xx and 585xx demonstrations. Search, household, imports, web, voice and the
+chat-runtime redesign are untouched. Budgets, savings goals and debt-plan
+lifecycles remain assigned work in the complete MVEE map, outside this batch.
+
+**Integration base:** freshly fetched
+`21309f0832d438fd18651f47209e8c789a8fcc53`, containing #747 as `6eb057e9a`
+and #748 as `21309f083`. **Delivery branch:** `codex/connected-plan-home`.
+
+**Goal:** enter expected income and bills, including one-time and recurring
+items; inspect the same dated, currency-separated forecast in Plan and Home;
+record or link one canonical actual activity; inspect and correct that activity
+or edit the expectation; reopen with the same durable state. A bill due before
+later income must show the intervening shortfall. Expected money never changes
+actual balances. The [MVEE connected-plan rules](argus-minimum-viable-ecosystem-experience.md#connected-plan-status)
+and [locked design](../reports/mobile-design-lock-2026-09-28.md) own acceptance.
+
+### Ownership and throughput
+
+The captain owns shared contract decisions, this manifest, the delivery branch,
+local simulator/backend integration, evidence, PR publication and readiness.
+`plan_core` owns expected-record storage, recurrence, fulfillment/link rules,
+forecast, backend routes, migrations, backend tests and canonical API/data docs.
+A single native writer owns Swift types, transport, Plan/Home presentation,
+localization and native model tests on a separate branch. The captain owns the
+assembled UI tests and recording. Writers must not edit each other's files.
+
+Start backend contract grounding alongside native design inspection and isolated
+local verification setup. Agree the wire contract before dependent UI wiring.
+Prove recurrence and canonical posting with real Postgres, integrate both
+implementations, then verify the assembled journey. Keep one final independent
+reviewer in a fresh context; review only affected fixes after that pass. Do not
+request Codex review for this batch. If no independent reviewer is available,
+publish with review pending instead of inventing a verdict.
+
+The main risks are duplicate fulfillment, stale links after corrections, calendar
+boundaries and inconsistent actual/forecast snapshots. Reuse the landed activity
+service, owner locking, exact money types, revision checks, confirmation preview,
+receipts, account observation coverage and native uncertain-write recovery.
+No second balance or activity ledger is permitted.
+
+### Acceptance and checkpoints
+
+| User outcome | Inherited capability | Implementation in #749 | Responsible owner | Assembled proof |
+| --- | --- | --- | --- | --- |
+| Enter expected income and bills | Registered identity, account catalog, exact money input, native forms | Durable editable expectations; one-time, weekly, every two weeks, monthly and twice-monthly schedules | Core rules; native presentation; captain integration | Real API/DB and native create/edit/reopen; month-end, leap-date and zone tests |
+| Understand cash before next income | Canonical account balances, unknown markers and locked Plan design | One dated forecast in Plan/Home, explicit accounts/currency, shortfall and partial-share rounding | Core projection; shared native Plan model | DOP 100 minus bill 200 before income 500 shows an interim shortfall; USD unknown stays unknown |
+| Record receipt/payment or link existing activity | Landed preview/confirm and balance-check coverage | Atomic occurrence-to-activity link and matching review; no second ledger | Existing recording owner and Plan link transaction | Payment/correction plus existing-income link; duplicate/concurrent retries and rollback tests |
+| Correct and continue | Append-only activity corrections and stable identity | Links re-evaluate actual revisions; expectation edits preserve fulfilled identity | Shared core link owner and native refresh | Correction 200 to 180 changes actual cash; expected 500 to 600 does not add a fulfilled receipt again; refund does not reopen bill |
+| Reopen the assembled app | Keychain and owner-scoped pending-command recovery | Shared refresh, durable links and existing retry journal | Captain acceptance, native/core fixes as needed | Simulator relaunch and loaded second identity; retained demonstration, recording and API readback |
+
+### Execution checklist and decision trail
+
+- [x] Read the Principles section of poteto-mode.
+- [x] Phase A: Frame. Recover approved rules, current integration, locked design and the bounded verification predicate.
+- [x] Phase B: Design the workflow. Inspect inherited owners, settle the shared contract and assign isolated writers.
+- [x] Phase C: Run the loop. Implement and verify bounded backend/native units, then integrate and exercise the whole journey.
+- [x] Phase D: Keep the audit trail. Record technical decisions, ownership, evidence and limitations here as work progresses.
+- [x] Phase E: Verify and hand back. Preserve a runnable simulator, short recording and restart recipe; publish one PR with applicable CI and honest independent review status.
+
+This section is the lane specification and decision trail. It replaces separate
+planning/checklist documents for this assignment. Poteto design panels and
+reviewer swarms are omitted under the founder's explicit proportionality rule.
+The backend owner's code-grounded proposal and captain's independent inspection
+settle the contract. Final independent review is a separate fresh-context pass.
+
+September 29 grounding: Plan is a sample destination today. Home already consumes
+canonical financial position and monthly recorded activity. Keep those owners;
+add expected records and derived occurrences without copying actual balances.
+The new delivery checkout is isolated from the retained demos. No other MVEE
+batch is activated and no new product deferral is introduced.
+
+September 29 contract checkpoint: the [connected Plan API contract](../API_CONTRACT.md#connected-personal-plan-and-home-september-29-2026)
+uses derived dated occurrences and one durable link to an existing canonical
+activity. Fulfillment composes with the recording transaction under the same
+owner lock. Activity amount/date corrections retain fulfillment; a changed
+account or currency requires link review. Refunds never reopen a bill.
+Schedule/account cutovers preserve linked occurrences; monthly dates clamp
+without drifting, and duplicate month-end dates collapse to one occurrence.
+Selected cash accounts and the saved IANA time zone are explicit. Forecasts
+separate currencies, retain unknown balances, and order bills before income
+on the same date as a conservative date-only assumption. The native app extends
+its existing uncertain-command journal instead of adding another recovery owner.
+
+The connected demonstration owns local allocation `58600` (API), `58601`
+(Supabase), `58602` (Postgres), `58605` (CAPTCHA bridge), and simulator
+`4E22655F-72DC-468F-AEBB-97FBDC58B514` (`Argus Connected Plan`). Synthetic
+credentials remain ignored. The inherited app builds and the existing
+sign-in/relaunch/sign-out UI acceptance passed with a clean Xcode exit on this
+allocation. Existing `584xx` and `585xx` demos are intact.
+
+### September 29 delivery evidence
+
+[PR #749](https://github.com/lagarcess/argus/pull/749) contains the connected
+backend, additive migration, native implementation and the
+[runnable demonstration, recording and restart guide](../reports/evidence/connected-plan-home/README.md).
+Plan and recorded Home derive from one repeatable-read snapshot. All actual
+posting remains owned by the landed recording service. Included account shares
+use that owner's minor-unit rounding; no second balance ledger exists.
+
+- The assembled native journey passed: DOP 100 cash, a 200 bill before later
+  expected income of 500, payment, correction to 180, an existing receipt of
+  450 linked without duplication, expectation edit, and reopen at DOP 370.
+  Weekly transport remains expected and does not change actual cash.
+- Unknown USD stays unknown in Plan and Accounts. English/dark and Spanish/light
+  presentation passed. Archived or retyped selected accounts remain removable.
+- Real local HTTP acceptance: 16 checks passed after the clock fix, including
+  refunds retaining fulfillment, changed-account link review and owner isolation.
+  Financial/API/Postgres/OpenAPI matrix: 209 passed, zero skipped. Swift package:
+  50 passed, four separately gated live tests skipped; native models: 12 passed.
+- Interrupted-payment/relaunch acceptance passed with a clean Xcode exit:
+  owner B saw neither A's records nor pending command; A retried the original
+  committed payment once, with one activity and DOP 80 remaining. The
+  [native acceptance record](../reports/evidence/connected-plan-home/native-acceptance.json)
+  records each case and source checkpoint. Final-head CI and the terminal
+  publication verdict are recorded in the PR audit.
+- The independent fresh-context reviewer `plan_independent_review` reviewed
+  `21309f08..196ccea2` once, found three confirmed issues, then returned clean on
+  affected fixes at `ab1e3e63`. The UUID edit, proportional forecast and selected
+  account fixes are recorded in the [review evidence](../reports/evidence/connected-plan-home/review-delta.md).
+  The clock delta is clean at `36abc0bc`; keyboard focus is clean at `20750992`.
+  This is the founder-authorized substitute, not GitHub Codex review.
+- Original base and refreshed integration are both
+  `21309f0832d438fd18651f47209e8c789a8fcc53`. Integration has not advanced;
+  no reconciliation merge or semantic overlap invalidates retained evidence.
+  Modularity passes on the would-be merged tree. CI passed on `36abc0bc`;
+  the final publication head must also reach terminal applicable checks.
+
+**Remaining across the MVEE:** this delivers commitments, recurrence,
+fulfillment and the connected forecast locally. Budgets, savings goals and
+complete debt-plan lifecycles remain under D06. Physical-iPhone installation,
+internet access, deployment and the rest of the coverage map remain incomplete.
+No new deferral is introduced. Other MVEE lanes have not been activated.
+
+**Visual follow-through:** preserve the locked quiet native hierarchy, dark/light
+support, existing controls and icons. Plan chart points represent dated movements,
+not equal time intervals; the readout names date/currency and the included accounts are listed below. Future polish
+should tighten long occurrence lists and reduce repeated account/expectation copy
+without losing the distinction between planned and actual amounts. This does not
+reopen the web remake or authorize a broader redesign.
 
 ## Personal money-recording batch
 
@@ -758,7 +905,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
 landed #747 personal recording journey. This local batch is complete; its named
-owners and evidence are recorded above. No other MVEE batch is active. Proposed owners
+owners and evidence are recorded above. The connected Plan/Home lane above is active; no other MVEE batch is active. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -769,8 +916,8 @@ sequence rather than a separate deferral policy in this document.
 | [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 native account/opening lifecycle and real local API | Extend saved assets and ownership/space behavior; verify existing lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
-| [Home][mvee-home], D05 | #745 connected known/unknown positions; #747 monthly income/purchases/refunds; locked design and chart prototype | Add approved forecast, plan/context, chart and destination surfaces through their domain owners; verify assembled Home on the phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked plan design | Implement plan persistence and actual-activity adapters | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 locally connects commitments and dated cash forecast (unmerged) | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 locally verifies commitments, recurrence, fulfillment and forecast (unmerged) | Budgets, savings goals, debt-plan lifecycles and their actual/projection adapters; shared variants and physical-phone proof | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
