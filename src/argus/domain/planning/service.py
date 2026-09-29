@@ -49,6 +49,17 @@ class PlanService:
             )
         return projection(state, accounts, start, end, self.accounts._clock())
 
+    def get(self, user_id: str, expectation_id: str) -> dict[str, Any]:
+        try:
+            identifier = str(UUID(expectation_id))
+        except ValueError:
+            raise AccountNotFound() from None
+        state, _ = storage.read(self.repository, user_id)
+        item = state["expectations"].get(identifier)
+        if item is None:
+            raise AccountNotFound()
+        return model.expectation_response(item, state["links"], self.today(state))
+
     def _write(
         self, user_id: str, scope: str, body: Any, key: str, action: Any
     ) -> dict[str, Any]:
