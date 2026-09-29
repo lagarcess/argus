@@ -120,7 +120,7 @@ The planning update corrects these omissions without changing MVEE scope.
   The plan now identifies the specific consumed contracts so independent work
   can proceed. Signing does not block finance; posting does not block previews.
 - Native quality, charts, Temporary chat and profile controls were implicit in
-  broad D rows. All 17 MVEE checklist areas now have explicit delivery/proof rows.
+  broad D rows. The work map now links these source areas to delivery owners and evidence.
 - Native auth is reusable, but the current shell's financial destinations are
   samples. No source claim, old screenshot or merged PR is phone acceptance.
 - The iOS recovery row describes the historical stop. Its once-retained worktree
@@ -217,12 +217,9 @@ defects to its writer. Separate test/evidence files prevent competing edits.
    using deliberate founder-entered records on the physical phone. Close and
    reopen the app, interrupt a write and retry, and verify Accounts/Home agreement.
    Use authorized test identities for isolation; redact committed evidence.
-7. Prove reconciliation against the existing
-   [balance handoff](argus-account-balance-reconciliation-handoff.md). A checked
-   balance and later entry of already-included activity must not subtract the
-   same money twice. A genuinely later expense must change the balance. Corrections
-   must preserve that distinction and history. An unknown balance must never
-   become a calculated zero merely because activity exists.
+7. Replay the existing [balance handoff](argus-account-balance-reconciliation-handoff.md)
+   cases on the assembled candidate. Compare observed results to that source and
+   record the source revision with the phone/database evidence.
 
 Do not wait for every registration, confirmation/resend, recovery/reset, guest
 return-to-action or account-management case before advancing this loop. Keep
@@ -267,134 +264,87 @@ before repeating a pattern across screens.
 
 ### Complete MVEE coverage
 
-This is the single coverage table for all 17 areas of the
-[MVEE scope checklist](argus-minimum-viable-ecosystem-experience.md#13-complete-scope-checklist),
-its detailed sections and the explicit runtime exception. Each row includes the
-full behavior of its linked requirement, not only the examples in the cells.
-D01-D15 remain stable work identifiers. Split rows share their existing ID;
-they do not create competing requirements or plans.
+The [MVEE scope checklist](argus-minimum-viable-ecosystem-experience.md#13-complete-scope-checklist)
+is the requirement index. Read each linked source for the user outcome and its
+expected behavior; this table stores execution metadata only. D01-D15 are work
+identifiers, not a second specification. A row's next integration task and planned
+evidence are not an exhaustive scope or a substitute for the linked requirement.
 
-**Current phone evidence:** no assembled outcome is verified on the founder's
-physical iPhone. Inheritance below means landed code, existing product contracts
-or explicitly labeled preserved/prototype work. It does not imply native or
-current hosted acceptance. Every implementation row is stopped until restart;
-D14 alone carries the explicit runtime deferral. Owners below are accountable
-roles to bind to named workers at dispatch, not a claim of running agents. The
-captain owns delivery of every row; domain leads own the complete connected
-outcome with native implementation support.
+**Current phone evidence:** none of the assembled outcomes is verified on the
+founder's physical iPhone. Reuse and gaps below are the September 29 inspection
+snapshot. Every implementation row is stopped until restart. Proposed owners
+must be bound to named workers at dispatch. D14 follows the linked runtime
+sequence rather than a separate deferral policy in this document.
 
-| Complete user outcome and MVEE owner | Existing capability to inherit | Remaining implementation and connection | Proposed owner | Actual dependencies | Proof in the assembled app |
+| Canonical user outcome / work ID | Inspected reuse | Next integration task | Proposed owner | Execution dependencies | Evidence to collect against the linked source |
 | --- | --- | --- | --- | --- | --- |
-| **Access, D01.** Use existing identity; sign in, register, confirm/resend, recover/reset, refresh/relaunch, switch/logout; use guest chat and register with return to action. [Guest boundary](argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration) | Existing Argus/Supabase auth and recovery; landed Swift session/Keychain package | Hosted CAPTCHA and callbacks, complete native access flows, guest transfer and registered-only financial enforcement | Native continuity + Device/release | Existing identity/API; signing and hosted grants for phone proof. Core finance does not wait for every access case | Complete each access path on phone; relaunch/expiry/offline recovery; account switch reveals no prior user's facts; guest cannot persist finances |
-| **iPhone experience, D15.** Navigate Home, Accounts, Argus, Plan, Search, Updates and Profile with locked design, English/es-419, persistent themes and accessibility. [Platforms/design](argus-minimum-viable-ecosystem-experience.md#2-product-character-and-platforms) | Native shell, localization/session foundations; September 28 design archive | Connected navigation/state, concise copy and activity icons; keyboard, safe areas, glass/motion and accessible controls; no sample values masquerading as real data | Native continuity | Domain reads per destination, not completion of all destinations | Demonstrate all destinations, correct Back paths, theme/relaunch, enlarged text, VoiceOver, reduced motion and keyboard behavior on phone |
-| **Accounts and assets, D02/D04.** Maintain cash/bank/investment/card/debt accounts and optional property/vehicle/other assets with dates, terms, estimates, ownership shares and linked debt. [Accounts](argus-minimum-viable-ecosystem-experience.md#accounts-organize-the-financial-facts) | Landed account/opening contract with exact money, unknowns, revisions, retries and owner isolation; unfinished iOS client | Finish simple setup/detail/edit/archive/restore and appropriate debt metadata; value updates, shares, linked debt and canonical totals; archive retains money/history | Financial core | Existing account identity; activity history from D03; D07 only for shared variants | Create known/zero/unknown values; change estimates/share; archive/restore without changing totals; debt counted once; relaunch retains identity and history |
-| **Activity, D03.** Record expense, income, transfer, payment and refund; categorize, annotate, correct, remove, undo and restore linked movements. [Activity/refunds](argus-minimum-viable-ecosystem-experience.md#account-activity-and-balance-checks) | Shared recording domain, money precision/sign conversion, opening revisions and concurrency safeguards | Durable atomic activity and linked legs; fixed category identities/localized renamed labels; 200-character notes; partial/unlinked refunds, card credit and principal/interest distinctions | Financial core | Existing account contract; native feature client consumes its shared posting API | Exercise every activity type, partial refunds and both transfer legs; retries/stale edits cannot duplicate or overwrite; corrections/restoration update all dependent views |
-| **Reconciliation, D03.** Compare recorded/observed balances, resolve gaps and earlier activity or statement overlap without invented income or double money. [Balance handoff](argus-account-balance-reconciliation-handoff.md) | Opening-balance history and exact arithmetic; approved behavior cases | Observation/adjustment lineage, per-account inclusion review, preview/concurrency, missing activity and incomplete-coverage reads | Financial core | Account/activity identity and authoritative observation/inclusion contract | Check balance, add already-included earlier expense, add later expense, correct/remove/restore; verify correct balances/history after relaunch; unknown prior value never yields a fabricated difference |
-| **Home, D05.** Understand position, change and upcoming cash needs; record or resume review. [Home](argus-minimum-viable-ecosystem-experience.md#home-understand-where-i-stand) | Locked populated design; account facts; chart prototype only | Canonical assets/debt/net worth by currency, freshness/unknowns, recent activity, account preview, commitments, expected/received income, forecast and dated shortfalls | Planning/Home | D02/D03 for position; D06 for future cash; D04/D07 for applicable contexts; D08 for import resume | Expense/correction changes Home and Accounts together; show incomplete data honestly; detect earlier shortfall despite positive period end; drill into source and resume interrupted review |
-| **Plan, D06.** Maintain budgets, goals, debt plans, recurring/occasional commitments and variable income; record actual progress. [Plan](argus-minimum-viable-ecosystem-experience.md#plan-decide-what-i-want-to-change) | Existing grounded calculators and locked plan design | Durable plans, funding/dates, recurrence, allocation and expectation-to-actual matching; manual scenario-to-plan flow and correction propagation | Planning/Home | Financial actual-posting/link contract; Household only for shared plans | Create each plan type, fulfill/link activity, refund/correct/remove/restore; no duplicate allocation or cash subtraction; projected and actual progress remain distinct |
-| **Spaces, D04.** Organize Personal, private Business/Custom and Household contexts; manage lifecycle and account moves without lost history. [Spaces/moves](argus-minimum-viable-ecosystem-experience.md#financial-spaces) | Personal default in landed account model; locked UI behavior | Private-space persistence, unique recoverable names, archive/restore, empty-only delete/undo, permanent Personal, account moves and linked-record review | Financial core | Account identity/history; affected plan/document/household link contracts for moves | Move and move back with original IDs/history; preview affected links; preserve archived search and obligations; reject nonempty deletion; no move changes money or grants sharing |
-| **Household, D07.** Invite a partner, explicitly share/edit/jointly own records and plans, contribute privately, revoke or leave safely. [Household](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity) | Existing independent user identities; selected do-blitz link and Resend email direction, not a working integration | Invitation expiry/accept/revoke; membership/edit/visibility contracts; joint facts, shared plans and source-document visibility; leave/remove/retention behavior | Household | Existing identities; affected domain adapters. Editing/departure/retention decisions remain required | Two authorized people invite/accept/share/edit/revoke/leave; shared records update both; no duplicate joint money or private-source disclosure in totals, chat, files, search, updates or export |
-| **Intake, D08 plus D03/D13/D14.** Capture manually or through supported statements/files/images/photos/scans; review, correct, confirm and resume. [Ingestion](argus-minimum-viable-ecosystem-experience.md#4-information-ingestion-one-destination-several-entry-methods) | Manual account entry; synthetic review/retry kit only | Production PDF/structured-file/image paths, extraction, actual previews, destination/date/currency review, uncertainty/duplicates, batch confirmation and resume; evaluate native scanning/share-to-app/preprocessing. Typed/spoken financial proposals map to D14 | Intake | File/OCR/size/password/retention decisions; D03 for confirmation only; D07 for shared sources; D14 for financial language actions | Authorized samples traverse actual preview/extraction/review/confirmation; interrupt/resume/reconfirm without duplicates; reject unsupported/unreadable files clearly; retain manual fallback and hide unshared pages |
-| **Argus, D09.** Ask finance questions, research, calculate, compare, simulate and revisit evidence; use permitted recorded context. [Argus](argus-minimum-viable-ecosystem-experience.md#argus-ask-understand-and-get-things-done) | Existing single runtime, SSE, calculators/research/backtests, persisted artifacts and assumptions | Native streaming/cards/actions/history; authorized personal/shared context through existing runtime; inherited capabilities and error recovery; manually save selected plans during D14 deferral | Conversation/voice | Existing conversation API; financial/household reads only for contextual answers; paid live evidence grant | Stream and reopen supported answers/calculations/research/simulations, including a non-buy-and-hold strategy; retain evidence and assumptions; hypothetical questions never write finances or reveal private context |
-| **Voice, D13.** Dictate/edit text and hold spoken conversations with interruption, cancellation and text handoff. [Voice](argus-minimum-viable-ecosystem-experience.md#43-speak-to-argus) | Existing conversation services; selected xAI direction, not an implemented voice service | Capture/transcription/playback, interruption, context handoff, permission/consent/retention, recovery and latency/cost measurement | Conversation/voice | Existing conversation path, audio/privacy policy and provider grant; financial actions alone depend on D14 | On phone dictate, edit, converse, interrupt/cancel, deny permission and return to text; preserve context and never save finances implicitly; measure latency/cost |
-| **Search and continuity, D09/D10.** Find all authorized records/files/analyses, preview them and return to the same search; preserve drafts, recents, archive/recovery and defined Temporary chat. [Search](argus-minimum-viable-ecosystem-experience.md#search-find-what-i-already-know), [Temporary chat](argus-minimum-viable-ecosystem-experience.md#temporary-chat-and-conversation-recovery) | Existing Omnisearch/history and conversation recovery contracts | Financial/file/plan coverage, actual previews and origin-preserving native navigation; unsent drafts; Temporary context defaults/lock/discard/no-history/no-new-memory enforcement | Native continuity + Conversation/voice | Each domain supplies authorized reads; conversation owner supplies lifecycle; Temporary policy blocks that behavior only | Open chat/file from filtered scrolled results and return intact; restore original archived/deleted identity; test recents states, draft restoration and both Temporary variants without history/memory creation |
-| **Updates, D11.** Receive persistent, useful deadlines, thresholds, milestones, scheduled summaries, freshness/review notices and relevant changed conditions; act on their source. [Updates](argus-minimum-viable-ecosystem-experience.md#updates-tell-me-when-something-deserves-attention) | Existing notification contracts/hidden capability and operational infrastructure, not a connected ecosystem inbox | Durable inbox, domain-triggered updates, schedules/delivery/preferences and sourced external-condition monitoring; explanations and deep links | Planning/Home | Each trigger fact independently; household visibility; channel/schedule decisions and any provider authority | Trigger each category; open source and correct it; verify persistence, schedules, preferences and permission revocation; notification previews expose no amounts or private details |
-| **Profile and control, D12.** Manage personal details/avatar/photo, App/Account/Support settings, language/theme, response preferences, controlled personalization, security/usage/help and data lifecycle. [Profile](argus-minimum-viable-ecosystem-experience.md#profile-control-argus) | Existing profile/settings/security/usage/help/data-control contracts; role-restricted memory with existing controls | Native controls and persistence; domain-aware export/delete/recovery/retention; earned opt-in and inspect/edit/delete/reset/disable/why controls for any widened personalization | Native continuity | Existing identity/settings first; each domain supplies lifecycle/access; explicit retention and personalization rollout | Relaunch preferences; inspect real sessions/usage; exercise authorized export/removal/recovery; private facts stay private; financial records never become arbitrary chat memory |
-| **Charts, D05/D06/D09/D15.** Understand canonical financial summaries through polished accessible charts. [Native quality](argus-minimum-viable-ecosystem-experience.md#native-quality-and-tester-feedback) | Selected chart direction and prototype; existing result chart semantics | Real series, useful icons/summaries, touch scrubbing, correct dates/units/currencies, gaps/unknowns, themes/accessibility and measured phone performance | Native continuity with domain series owners | Canonical series per chart; financial arithmetic remains backend-owned | Scrub actual data while scrolling; inspect missing points and both themes; compare plotted values to source; use accessible alternative and measure physical-device responsiveness |
-| **Operational delivery, D01/D15.** Use and update the same signed app away from the Mac with durable data and recoverable service operation. [Infrastructure/acceptance](argus-minimum-viable-ecosystem-experience.md#14-infrastructure-and-cost-constraints) | Existing Render/Supabase project/current plan, release gates, CI and operational/cost safeguards | Signing/install/update route, HTTPS/native auth, compatible migrations/configuration, required jobs/integrations, monitoring, safe backup/restore and rollback, complete phone acceptance | Device/release + Captain + independent acceptance | Exact candidate, signing/access, merge/hosted/deployment grants, existing project/plan; no upgrade assumed | Cellular/away-from-Mac journeys on exact app/backend versions, relaunch/interrupted requests, two-user isolation; restore/rollback in safe environment; preserve production web; demonstrate all five MVEE connected journeys |
-| **Agentic financial actions, D14. Founder-approved deferral for first private delivery.** Perform supported actions through text/voice with shared permissions and confirmation. [Runtime sequence](argus-minimum-viable-ecosystem-experience.md#agentic-ecosystem-direction-and-sequence) | Existing single conversational runtime and services; current chat does not provide this outcome | Later assigned runtime/action integration, ambiguity and hypothetical/actual handling, shared editable proposals, confirmation/correction/recovery and full action parity | Conversation/voice when separately activated | Founder-approved D14 runtime sequence; stable manual contracts/UI and model-facing gates | After activation repeat every supported manual action through text/voice; test ambiguity, interruption, permissions and no unconfirmed writes. Until then report the named gap, never full agentic completion |
+| [Access][mvee-access], D01 | Argus auth/recovery; Swift session/Keychain | Finish native/hosted auth adapter and guest conversion | Native continuity + Device/release | Identity API; signing/hosted access for phone proof | Physical-device auth recordings and session/identity test results |
+| [iPhone experience][mvee-platforms], D15 | Native shell; localization; design archive | Replace sample destinations with connected modules | Native continuity | Domain reads per destination | Device navigation/accessibility recordings against [native quality][mvee-quality] |
+| [Accounts and assets][mvee-accounts], D02/D04 | Landed account/opening backend; unfinished iOS client | Recover account client and extend saved-item data model | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
+| [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | Recording domain currently supports openings only | Implement posting and connect native entry/history clients | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
+| [Reconciliation][mvee-activity], D03 | Opening revisions; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Implement observation lineage and balance reads with posting | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
+| [Home][mvee-home], D05 | Locked design; account facts; chart prototype | Connect Home's read model and domain destinations | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
+| [Plan][mvee-plan], D06 | Existing calculators; locked plan design | Implement plan persistence and actual-activity adapters | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
+| [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
+| [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
+| [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
+| [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |
+| [Search][mvee-search] and [conversation continuity][mvee-continuity], D09/D10 | Omnisearch/history and recovery contracts | Add domain search adapters and native destination/lifecycle wiring | Native continuity + Conversation/voice | Authorized domain reads; Temporary policy for that behavior | Search-to-destination/back recordings, draft/history readbacks and Temporary retention evidence |
+| [Updates][mvee-updates], D11 | Existing operational infrastructure; notification contracts | Implement inbox, domain triggers and delivery jobs | Planning/Home | Trigger facts; permissions; channel/schedule decisions | Trigger/job receipts paired with phone inbox/source recordings |
+| [Profile and control][mvee-profile], D12 | Existing profile/usage/data-control contracts | Connect native controls to existing and new domain adapters | Native continuity | Identity/settings; domain lifecycle policy; approved personalization rollout | Phone settings/control recordings and authorized export/recovery readbacks |
+| [Charts][mvee-quality], D05/D06/D09/D15 | Selected chart direction and prototype | Connect canonical series to native chart components | Native continuity + domain series owners | Each domain's canonical series | Series-to-display checks, gesture/accessibility recordings and device performance receipts |
+| [Operational delivery][mvee-infrastructure], D01/D15 | Existing hosting, CI and release safeguards | Prepare and execute authorized signed candidate rollout | Device/release + Captain + independent acceptance | Candidate and explicit access/merge/hosted grants | Exact app/backend release manifest and [connected-journey][mvee-acceptance] evidence |
+| [Agentic financial actions / runtime sequence][mvee-runtime], D14 | Existing single runtime; no ecosystem action integration | Await the separate activation required by the source | Conversation/voice when activated | Manual contracts/UI; runtime assignment and eval gates | Source-linked action acceptance evidence after activation; no completion claim before it |
 
-### Shared acceptance and explicit disposition
+[mvee-access]: argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration
+[mvee-platforms]: argus-minimum-viable-ecosystem-experience.md#2-product-character-and-platforms
+[mvee-quality]: argus-minimum-viable-ecosystem-experience.md#native-quality-and-tester-feedback
+[mvee-accounts]: argus-minimum-viable-ecosystem-experience.md#accounts-organize-the-financial-facts
+[mvee-activity]: argus-minimum-viable-ecosystem-experience.md#account-activity-and-balance-checks
+[mvee-refunds]: argus-minimum-viable-ecosystem-experience.md#refunds-corrections-and-adjustments
+[mvee-home]: argus-minimum-viable-ecosystem-experience.md#home-understand-where-i-stand
+[mvee-plan]: argus-minimum-viable-ecosystem-experience.md#plan-decide-what-i-want-to-change
+[mvee-spaces]: argus-minimum-viable-ecosystem-experience.md#financial-spaces
+[mvee-moves]: argus-minimum-viable-ecosystem-experience.md#reassigning-accounts-between-spaces
+[mvee-household]: argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity
+[mvee-intake]: argus-minimum-viable-ecosystem-experience.md#4-information-ingestion-one-destination-several-entry-methods
+[mvee-argus]: argus-minimum-viable-ecosystem-experience.md#argus-ask-understand-and-get-things-done
+[mvee-voice]: argus-minimum-viable-ecosystem-experience.md#43-speak-to-argus
+[mvee-search]: argus-minimum-viable-ecosystem-experience.md#search-find-what-i-already-know
+[mvee-continuity]: argus-minimum-viable-ecosystem-experience.md#temporary-chat-and-conversation-recovery
+[mvee-updates]: argus-minimum-viable-ecosystem-experience.md#updates-tell-me-when-something-deserves-attention
+[mvee-profile]: argus-minimum-viable-ecosystem-experience.md#profile-control-argus
+[mvee-infrastructure]: argus-minimum-viable-ecosystem-experience.md#14-infrastructure-and-cost-constraints
+[mvee-acceptance]: argus-minimum-viable-ecosystem-experience.md#15-connected-acceptance-and-delivery-discipline
+[mvee-runtime]: argus-minimum-viable-ecosystem-experience.md#agentic-ecosystem-direction-and-sequence
 
-Every active row inherits [MVEE trust requirements](argus-minimum-viable-ecosystem-experience.md#5-shared-ingestion-and-trust-requirements):
-exact arithmetic; separate currencies; actual/expected/estimated/hypothetical and
-unknown/zero distinctions; provenance and separate activity/as-of/capture dates;
-no draft effects; idempotent retries and concurrency; source matching and
-linked corrections; authorized recovery; and no sensitive data in ordinary
-logs/analytics. The financial owner supplies one record/projection contract,
-the household owner one permission contract, and every consumer enforces them.
-The native lead owns shared navigation/session/UI conventions. Domain workers
-may own disjoint native feature files; the lead does not become a queue for all
-screen implementation. The delivery captain serializes shared integration.
+### Acceptance source and evidence ownership
 
-The [existing holds register](argus-minimum-viable-ecosystem-experience.md#16-holds-later-work-and-unresolved-decisions)
-is the only source of additional dispositions. Web remake is frozen and Android
-is preserved pending its explicit assignment. Plaid, bank/browser access,
-wallet automation, automated valuations and product discovery are exploratory,
-not promised private-delivery integrations. Watchlist remains queued. Investment
-holdings beyond recorded value are a later extension under the scope checklist.
-Billing/monetization, growth sharing and new ecosystem analytics remain parked;
-existing safeguards remain. Public App Store publication is not required.
-MVEE sections 8 and 11.2 also exclude financial execution, guaranteed outcomes
-and broader family/adviser/business-accounting capabilities. None of those
-boundaries removes household collaboration or manual/document/voice delivery.
+Derive expected results from the linked MVEE sections, including their linked
+technical contracts, [shared trust requirements](argus-minimum-viable-ecosystem-experience.md#5-shared-ingestion-and-trust-requirements)
+and [connected acceptance journeys][mvee-acceptance]. This manifest owns who
+collects the evidence, when it is collected and where it is recorded. It does
+not own another editable list of expected product behavior. The table's evidence
+column selects verification methods, not a replacement acceptance specification.
 
-File/OCR/retention, household edits/departure/recovery, notifications/schedules,
-Temporary chat/audio context, and distribution/hosted decisions are **open
-requirements with owners**, not approved deferrals. The owner proposes a concrete
-policy or implementation and escalates only genuine product/access/spending
-choices. A blocked decision delays only its dependent work. No owner may replace
-an in-scope path with unsupported copy or mark it deferred without founder approval.
+At dispatch and acceptance, read the current MVEE source and record its commit
+and section anchors with the task/evidence. If the source changes, assess the
+affected assignment and evidence against that source; do not update a copied
+requirement list here. A missing or renamed source anchor is a coverage gap to
+resolve before accepting that work, never permission to infer its behavior.
 
-### Acceptance for each work item
+The financial owner supplies the record/projection contract, the household
+owner the permission contract, and the native lead the shared navigation/session
+contract. Domain workers can own disjoint native files. The captain serializes
+shared integration and compares the work map to the current canonical scope
+index when allocating work; row count alone is not a completeness claim.
 
-Acceptance derives from the [complete MVEE scope](argus-minimum-viable-ecosystem-experience.md#13-complete-scope-checklist).
-These checks define the user result, not new endpoints or schema decisions.
-
-- **D01:** the physical phone works away from the Mac with the existing identity.
-  Verify login/relaunch/logout, registration/confirmation/resend, recovery/reset,
-  account switching and guest return-to-action. No secrets in the build.
-- **D02:** known/zero/unknown create, stable retry, list/reopen, metadata edit,
-  opening correction with current concurrency tokens, archive/restore, restart
-  persistence and owner isolation all work through the actual iPhone UI.
-- **D03:** expense/income/transfer/payment/refund and notes/categories work with
-  exact amounts. Exercise partial refunds, two-sided movements, earlier activity,
-  balance gaps, stale edits, duplicate retries and correction/removal/restoration.
-  Verify dependent records after every change. Do not manufacture balancing income.
-- **D04:** private-space creation and lifecycle, account moves and link conflicts,
-  unknown asset estimates, ownership shares and linked debt preserve identity and
-  history. Personal/household totals do not double-count a joint asset or loan.
-- **D05:** Home derives canonical values by currency with dates, source/freshness
-  and missing information. Expected income is not current cash. Exercise a
-  shortfall before an earlier bill even when end-period cash is positive.
-- **D06:** create/edit a budget, savings goal and debt plan; link an actual entry;
-  correct, refund, remove and restore it. Progress and forecasts update without
-  allocating or subtracting the same money twice. Recurring/occasional expectations
-  and variable income show dates and uncertainty.
-- **D07:** two real authorized users exercise link/email invitation, acceptance,
-  explicit sharing, contributions, joint records, editing, revocation and leaving.
-  Private facts remain absent from totals, chat, documents, search and updates.
-- **D08:** a declared supported sample passes file/photo intake, actual preview,
-  extraction, uncertainty/duplicate review, batch confirmation and interrupted
-  resume. Confirm again without duplicate records. Unsupported or unreadable files
-  fail clearly. Apply approved retention and source visibility; use consenting
-  real samples only under a specific data-handling authorization.
-- **D09:** existing supported questions, calculations, research and historical
-  simulations stream and reopen on the phone with the same evidence/assumptions.
-  Preserve conversation drafts, history, archive/recovery and defined Temporary
-  chat. Do not suggest unsupported financial actions are connected.
-- **D10:** query/filter results include authorized financial records, plans, files
-  and existing analyses. A result opens its real content. Back restores the query,
-  filters and scroll position; no detour through Settings.
-- **D11:** exercise a deadline, threshold, milestone, stale record and selected
-  changed condition. An update explains its basis, persists, opens its owner and
-  respects preferences, household access and private notification previews.
-- **D12:** preferences persist; security and usage reflect actual service state.
-  Export/delete/recovery and personalization follow their explicit permissions
-  and retention rules. Financial records never become arbitrary chat memory.
-- **D13:** verify dictation, transcription, spoken replies, interruption/cancel,
-  editable interpretation and return to text. Document permission, retention,
-  failure recovery, measured latency and cost. D14-dependent actions stay visibly
-  incomplete until tested; voice must not save without confirmation.
-- **D14:** every supported manual action is available through text and voice with
-  the same permission checks and confirmation. Test hypothetical/quoted/actual
-  distinctions, correction, ambiguity, interruption and recovery. Reuse the one
-  Argus runtime; satisfy the existing model-facing evaluation gates.
-- **D15:** run all [connected acceptance journeys](argus-minimum-viable-ecosystem-experience.md#15-connected-acceptance-and-delivery-discipline)
-  against the assembled deployed candidate and physical phone. Check English,
-  Spanish, themes, enlarged text, accessibility, charts/icons, file previews,
-  permissions, failed requests and relaunch. Verify backup restoration and rollback
-  in a safe environment. State the deferred-runtime gap explicitly.
+Dispositions derive from the [MVEE holds register](argus-minimum-viable-ecosystem-experience.md#16-holds-later-work-and-unresolved-decisions),
+[runtime sequence][mvee-runtime] and [product boundaries](argus-minimum-viable-ecosystem-experience.md#8-differentiation-and-boundaries).
+The decision register below tracks unresolved delivery inputs and owners; it
+cannot convert them into approved deferrals. Any new disposition requires a
+founder decision in the canonical product source before execution metadata changes.
 
 ## Proposed team and shared ownership
 
@@ -589,18 +539,15 @@ only when a product choice, access grant or spending authority is necessary.
 | Single execution restart and action authority | Captain; entire assignment | Authorize continuous implementation/build/test/review/branch publication across all non-deferred coverage once the plan is accepted. Merge, signing/install access, hosted mutation/deployment and paid-provider grants remain explicit; no per-pillar restart prompts |
 | Apple account/team, physical phone access, stable app identity, supported device/OS and private updates | Device/release; installation and phone acceptance | Inspect existing entitlement/team/device access and choose the shortest supported signed route with a stable identity and repeatable update path. Public App Store release is unnecessary. Device specifics remain unverified; backend and native implementation continue |
 | Existing Render/Supabase access, deployed revisions/migrations/capacity and production-compatible rollout | Device/release; hosted proof | Reuse existing project/current plan and compatible Render capacity. Prepare exact migration/settings/candidate, production-web regression evidence, backup/restore and rollback before the hosted grant. No new project or spending by default |
-| Financial/private-space recovery window, purge/export behavior and production limits | Financial core + Native continuity; lifecycle controls | Preserve record identity and linked restoration; propose explicit recovery/retention limits before release. Keep permanent Personal and empty-only space deletion. Never infer financial retention from chat policy. Ordinary posting can progress |
+| Financial/private-space recovery window, purge/export behavior and production limits | Financial core + Native continuity; lifecycle controls | Propose the unresolved limits under [account recovery][mvee-activity] and [space lifecycle][mvee-spaces] before release. Ordinary posting can progress |
 | Household editing, departure, joint-record custody and recovery | Household; shared writes and revocation | Recommend view-only sharing unless edit rights are explicitly granted; revoke future access promptly without silently deleting another person's records. Present joint custody/export/retention choices for approval. Private journeys and invitation mechanics can progress |
 | File formats/institutions, OCR, upload/page limits, encrypted files and retention | Intake; extraction/storage | Cover declared PDFs, structured exports and images/photos; select concrete supported samples. Recommend local type/readability checks, private source access and explicit sharing; do not accept unreviewed OCR as fact. Determine limits/provider from bounded synthetic evaluation, then seek any paid/data-handling grant. Do not drop photo/PDF intake because selection is unfinished |
 | Notifications, schedule defaults, time zones and monitored external conditions | Planning/Home; delivery and scheduled updates | Recommend a persistent inbox and opt-in private push previews; no financial details outside the authenticated app. Founder selects external channels/defaults. Use existing jobs and sourced conditions; trigger/inbox implementation can progress independently |
-| Audio and Temporary chat context/provider retention | Conversation/voice; Temporary behavior and live audio | Recommend no retained raw audio by default; Temporary has context off initially, locked after first message, no history or new memories and explicit discard. Verify provider retention feasibility before promising it; get policy approval. Regular native chat can progress |
+| Audio and Temporary chat context/provider retention | Conversation/voice; Temporary behavior and live audio | Recommend no retained raw audio by default; verify provider feasibility and seek approval for unresolved retention under [voice][mvee-voice] and [Temporary chat][mvee-continuity]. Regular native chat can progress |
 | Provider credentials, spend caps and consenting data/test identities | Relevant domain + Device/release; live voice/OCR/research/backtest/invite acceptance | Use existing approved providers, server-held secrets and bounded cases/caps. Request credentials via secure configuration, not chat. Use synthetic documents/accounts until real samples and second-user participation are authorized; no broad production data copies |
 | VM access and direct coordination | Captain; remote workers | Verify secure connectivity, exact checkout, exclusive writer and pushed checkpoints before remote assignment. Use local agents for ready work until then; do not make additional machines a prerequisite |
 | D14 activation | Captain + Conversation/voice | Respect the founder-approved runtime sequence. Keep its unmet action parity visible and request the separate runtime assignment when its prerequisites are satisfied; do not use it to defer ordinary voice, manual workflows or financial read-context |
 
 
-Web remake, billing, new growth sharing and new ecosystem analytics are not
-current work. Android remains preserved pending explicit assignment. Plaid,
-wallet automation, bank access, valuations and watchlist ideas follow the
-[MVEE holds and later-work register](argus-minimum-viable-ecosystem-experience.md#16-holds-later-work-and-unresolved-decisions).
-Do not turn them into prerequisites for private iPhone delivery.
+Use the canonical disposition links above when assigning work. This documentation
+change does not activate implementation or any held integration.
