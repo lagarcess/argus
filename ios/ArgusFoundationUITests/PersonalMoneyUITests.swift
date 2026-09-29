@@ -140,7 +140,7 @@ extension FinancialLoopUITests {
         openMoneyAccount(checking); assertText("DOP 800.00")
     }
 
-    func testMoneyReconciliationCurrenciesAndIdentity() throws {
+    func testMoneyReconciliationCurrenciesAndSpanish() throws {
         try signIn()
         let baseline = homeValue()
         let stamp = String(UUID().uuidString.prefix(5))
@@ -184,13 +184,6 @@ extension FinancialLoopUITests {
         capture("separate-currency-unknown-negative-net")
         app.terminate(); app.launch()
         openMoneyAccount(unknown); assertText("Balance unknown")
-        try signIn(fresh: true, user: "B")
-        app.buttons["tab.accounts"].tap()
-        XCTAssertFalse(app.buttons["accounts.row." + bank.id].exists)
-        XCTAssertFalse(app.buttons["accounts.row." + unknown.id].exists)
-        XCTAssertFalse(app.buttons["loop.pending.retry.accounts"].exists)
-        capture("second-identity-isolated")
-        try signIn(fresh: true)
         openMoneyAccount(bank); assertText("DOP 940.00")
         app.terminate()
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "light"]
@@ -221,25 +214,73 @@ extension FinancialLoopUITests {
         }
     }
 
+    func testPendingMoneyWriteRemainsIsolatedAcrossIdentities() throws {
+        try requireResponseLossProxy()
+        let stamp = String(UUID().uuidString.prefix(5))
+        try signIn(fresh: true, user: "B")
+        let other = createMoneyAccount("Isolated B " + stamp, type: "checking", amount: "321")
+        let otherHome = homeValue()
+        try signIn(fresh: true)
+        let owner = createMoneyAccount("Pending A " + stamp, type: "checking", amount: "100")
+        let note = "Isolated pending income " + stamp
+        let droppedBefore = try interruptMoneyIncome(note: note)
+        capture("isolation-a-committed-response-lost")
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["loop.pending.retry"].waitForExistence(timeout: 20))
+        capture("isolation-a-pending-before-switch")
+
+        try signIn(fresh: true, user: "B")
+        app.buttons["tab.accounts"].tap()
+        // B's own persisted row is the positive load barrier for absence claims.
+        XCTAssertTrue(app.buttons["accounts.row." + other.id].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["accounts.row." + owner.id].exists)
+        XCTAssertFalse(app.buttons["loop.pending.retry.accounts"].exists)
+        openMoneyAccount(other); assertText("DOP 321.00")
+        capture("isolation-b-own-account-loaded")
+        assertHome(otherHome)
+        XCTAssertFalse(app.buttons["loop.pending.retry"].exists)
+        capture("isolation-b-home-without-a-pending")
+
+        try signIn(fresh: true)
+        XCTAssertTrue(app.buttons["loop.pending.retry"].waitForExistence(timeout: 20))
+        capture("isolation-a-pending-restored")
+        try recoverMoneyIncome(owner, note: note, droppedBefore: droppedBefore)
+        capture("isolation-a-recovered-once-after-reopen")
+    }
+
     func testCommittedResponseLossSurvivesRelaunch() throws {
-        guard ProcessInfo.processInfo.environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == "true" else {
-            throw XCTSkip("Requires explicit local response-loss proxy build on 58512.")
-        }
+        try requireResponseLossProxy()
         try signIn()
         let stamp = String(UUID().uuidString.prefix(5))
         let account = createMoneyAccount("Recovery " + stamp, type: "checking", amount: "100")
+        let note = "Recovered income " + stamp
+        let before = try interruptMoneyIncome(note: note)
+        capture("committed-response-lost")
+        app.terminate(); app.launch()
+        try recoverMoneyIncome(account, note: note, droppedBefore: before)
+    }
+
+    func requireResponseLossProxy() throws {
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == "true" else {
+            throw XCTSkip("Requires explicit local response-loss proxy build on 58512.")
+        }
+    }
+
+    func interruptMoneyIncome(note: String) throws -> Int {
         tapVisible(app.buttons["accounts.record"])
         app.buttons["loop.kind.income"].tap()
         fillMoneyField("loop.amount", with: "25")
-        fillMoneyField("loop.note", with: "Recovered income " + stamp)
+        fillMoneyField("loop.note", with: note)
         dismissMoneyKeyboard()
         reviewMoney()
         let before = try faultStatus(arm: true)
         tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.staticTexts["loop.error"].waitForExistence(timeout: 30))
         XCTAssertFalse(app.buttons["Cancel"].isEnabled)
-        capture("committed-response-lost")
-        app.terminate(); app.launch()
+        return before
+    }
+
+    func recoverMoneyIncome(_ account: MoneyAccount, note: String, droppedBefore: Int) throws {
         let pending = app.buttons["loop.pending.retry"]
         XCTAssertTrue(pending.waitForExistence(timeout: 20))
         capture("pending-recovery-after-relaunch")
@@ -248,11 +289,10 @@ extension FinancialLoopUITests {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: cleared, object: pending)], timeout: 20), .completed)
         openMoneyAccount(account)
         assertText("DOP 125.00")
-        let records = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'activity.row.' AND label CONTAINS %@", "Recovered income " + stamp))
+        let records = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'activity.row.' AND label CONTAINS %@", note))
         XCTAssertEqual(records.count, 1)
         let recordID = records.firstMatch.identifier
-        let after = try faultStatus(arm: false)
-        XCTAssertEqual(after, before + 1)
+        XCTAssertEqual(try faultStatus(arm: false), droppedBefore + 1)
         app.terminate(); app.launch()
         openMoneyAccount(account); assertText("DOP 125.00")
         XCTAssertTrue(app.buttons[recordID].exists)
