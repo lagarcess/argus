@@ -8,6 +8,10 @@ and those outstanding delivery boundaries.
 
 ## Demonstration and observed results
 
+The [transfer-label clarity addendum](transfer-label-review/README.md) verifies
+the later visible From/To correction in English and Spanish. The accepted 2:55
+recording below predates this label-only change and retains its financial proof.
+
 [Personal money loop recording](personal-money-loop.mp4) is 2 minutes 55 seconds.
 It combines three excerpts: income, spending and linked refund; an owned-account
 transfer; and a credit-card payment. It shows real review, confirmation, account
