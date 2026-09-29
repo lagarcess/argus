@@ -8,6 +8,8 @@ struct AccountActivityView: View {
     @State private var inspected: FinancialActivity?
     @Environment(\.locale) private var locale
 
+    private var page: FinancialLoopModel.AccountReadState { loop.read(account.id) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Button { loop.record(account) } label: {
@@ -15,24 +17,24 @@ struct AccountActivityView: View {
             }.buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("accounts.record")
             Button("loop.check.title") { loop.check(account) }.frame(minHeight: 44)
                 .accessibilityIdentifier("accounts.check")
-            if let error = loop.errorKey {
+            if let error = page.errorKey {
                 Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                 Button("accounts.retry") { Task { await loop.open(account) } }
             }
-            if !loop.activity.isEmpty {
+            if !page.activity.isEmpty {
                 Text("loop.recent").font(ArgusStyle.display(22))
                 VStack(spacing: 0) {
-                    ForEach(loop.activity, id: \.recordId) { activity in
+                    ForEach(page.activity, id: \.recordId) { activity in
                         Button { inspected = activity } label: {
                             FinancialActivityRow(activity: activity, currency: account.currency)
                         }.buttonStyle(.plain).accessibilityIdentifier("activity.row." + activity.recordId.uuidString)
                     }
                 }
             }
-            if loop.activityCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: false) } }.disabled(loop.loadingMore) }
-            if !loop.checks.isEmpty {
+            if page.activityCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: false) } }.disabled(page.loadingMore) }
+            if !page.checks.isEmpty {
                 Text("loop.check.history").font(ArgusStyle.display(22))
-                ForEach(loop.checks, id: \.recordId) { check in
+                ForEach(page.checks, id: \.recordId) { check in
                     VStack(alignment: .leading, spacing: 8) {
                         Label(check.kind == "value_update" ? "loop.check.value" : "loop.check.title", systemImage: "checkmark.circle")
                         Text(verbatim: account.currency + " " + AccountPresentation.amount(AccountPresentation.decimal(check.observedAmountMinor, digits: account.currencyFractionDigits), locale: locale))
@@ -49,7 +51,7 @@ struct AccountActivityView: View {
                     }.font(ArgusStyle.body(13, relativeTo: .subheadline)).padding(.vertical, 12)
                 }
             }
-            if loop.checksCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: true) } }.disabled(loop.loadingMore) }
+            if page.checksCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: true) } }.disabled(page.loadingMore) }
         }
         .task(id: account.version) { await loop.open(account) }
         .sheet(item: $inspected, onDismiss: {

@@ -26,7 +26,6 @@ struct FinancialSearchView: View {
     @ObservedObject var loop: FinancialLoopModel
     let active: Bool
     @StateObject private var scroll = SearchScrollOffset()
-    @State private var restoring = false
     @FocusState private var focused: Bool
     private var inputKey: String { (model.ownerID ?? "") + "|" + model.origin.query + "|" + (model.origin.kind?.rawValue ?? "") + "|" + (model.origin.currency ?? "") }
     private var currencies: [String] { Array(Set(accounts.accounts.map(\.currency) + model.items.map(\.currency) + [model.origin.currency].compactMap { $0 })).sorted() }
@@ -70,7 +69,7 @@ struct FinancialSearchView: View {
                             .frame(minHeight: 48).accessibilityIdentifier("search.back")
                         switch destination {
                         case .account(let id):
-                            if let account = accounts.selected, account.id == id {
+                            if let account = accounts.accounts.first(where: { $0.id == id }) {
                                 AccountDetailView(account: account, model: accounts, loop: loop)
                             } else { Text("search.destination.unavailable") }
                         case .activity(let id):
@@ -143,19 +142,28 @@ struct FinancialSearchView: View {
                 .accessibilityIdentifier("search.results")
                 .refreshable { await model.refresh() }
                 .onPreferenceChange(SearchRowFrames.self) { frames in
-                    guard !restoring, active,
+                    scroll.frames = frames
+                    if let restoration = model.restoration {
+                        if let frame = frames[restoration.anchor],
+                           scroll.restore(currentRowOffset: frame.minY, desiredRowOffset: restoration.offset) {
+                            model.restored(restoration.id)
+                        }
+                        return
+                    }
+                    guard active,
                           let row = frames.filter({ $0.value.maxY > 0 }).min(by: { $0.value.minY < $1.value.minY }) else { return }
                     model.remember(anchor: row.key, offset: row.value.minY)
                 }
-                .onChange(of: model.restoration) { _, _ in
-                    guard let anchor = model.origin.anchor else { return }
-                    let offset = model.origin.anchorOffset
-                    restoring = true
-                    reader.scrollTo(anchor, anchor: .top)
+                .onChange(of: model.restoration) { _, restoration in
+                    guard let restoration else { return }
                     Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(100))
-                        scroll.restore(rowOffset: offset)
-                        restoring = false
+                        await Task.yield()
+                        guard model.restoration?.id == restoration.id else { return }
+                        if let frame = scroll.frames[restoration.anchor], abs(frame.minY - restoration.offset) < 0.5 {
+                            model.restored(restoration.id)
+                        } else {
+                            reader.scrollTo(restoration.anchor, anchor: .top)
+                        }
                     }
                 }
         }
@@ -204,11 +212,16 @@ private struct SearchRowFrames: PreferenceKey {
 @MainActor
 private final class SearchScrollOffset: ObservableObject {
     weak var view: UIScrollView?
-    func restore(rowOffset: Double) {
-        guard let view else { return }
+    var frames: [String: CGRect] = [:]
+    func restore(currentRowOffset: Double, desiredRowOffset: Double) -> Bool {
+        guard let view else { return false }
+        let delta = currentRowOffset - desiredRowOffset
+        if abs(delta) < 0.5 { return true }
         let maximum = max(-view.adjustedContentInset.top, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
-        let y = min(maximum, max(-view.adjustedContentInset.top, view.contentOffset.y - rowOffset))
+        let y = min(maximum, max(-view.adjustedContentInset.top, view.contentOffset.y + delta))
+        if abs(y - view.contentOffset.y) < 0.5 { return true }
         view.setContentOffset(CGPoint(x: view.contentOffset.x, y: y), animated: false)
+        return false
     }
 }
 

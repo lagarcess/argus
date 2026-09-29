@@ -129,6 +129,48 @@ extension FinancialLoopUITests {
         capture("search-unavailable-destination")
     }
 
+    func testSearchAccountRemainsIndependentWhenSwitchingAccountsTabs() throws {
+        try signIn(fresh: true)
+        func activity(_ note: String) -> XCUIElement {
+            app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'activity.row.' AND label CONTAINS %@", note)).firstMatch
+        }
+        let stamp = String(UUID().uuidString.prefix(6))
+        let first = createMoneyAccount("Search tab A " + stamp, type: "checking", amount: "100")
+        let firstNote = "Only account A " + stamp
+        recordMoney(kind: "income", amount: "11", note: firstNote)
+        let second = createMoneyAccount("Accounts tab B " + stamp, type: "checking", amount: "200")
+        let secondNote = "Only account B " + stamp
+        recordMoney(kind: "income", amount: "22", note: secondNote)
+        searchFor(first.name, kind: "account")
+        tapVisible(searchRow(first.name))
+        XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
+        app.buttons["tab.accounts"].tap()
+        assertText(second.name)
+        XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
+        XCTAssertFalse(activity(firstNote).exists)
+        scrollMoneyTop(); app.buttons["accounts.back"].tap()
+        app.buttons["tab.search"].tap()
+        assertText(first.name)
+        XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["search.destination.unavailable"].exists)
+        openMoneyAccount(second)
+        XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
+        app.buttons["tab.search"].tap()
+        XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
+        XCTAssertFalse(activity(secondNote).exists)
+        tapVisible(app.buttons["accounts.edit"])
+        replaceMoneyField("accounts.nickname", with: first.name + " revised")
+        dismissMoneyKeyboard(); tapVisible(app.buttons["accounts.save"])
+        XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 15))
+        app.buttons["tab.accounts"].tap()
+        assertText(second.name)
+        XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
+        app.buttons["tab.search"].tap()
+        assertText(first.name + " revised")
+        XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
+        capture("search-accounts-independent-detail-identities")
+    }
+
     private func searchFor(_ query: String, kind: String) {
         app.buttons["tab.search"].tap()
         let field = app.textFields["search.query"]

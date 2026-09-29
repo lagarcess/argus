@@ -10,6 +10,12 @@ struct FinancialSearchOrigin: Codable, Equatable {
     var anchorOffset: Double = 0
 }
 
+struct FinancialSearchRestoration: Equatable {
+    let id = UUID()
+    let anchor: String
+    let offset: Double
+}
+
 @MainActor
 final class FinancialSearchModel: ObservableObject {
     enum Destination { case account(UUID), activity(UUID) }
@@ -21,7 +27,7 @@ final class FinancialSearchModel: ObservableObject {
     @Published private(set) var destination: Destination?
     @Published private(set) var opening = false
     @Published private(set) var destinationError: String?
-    @Published private(set) var restoration = UUID()
+    @Published private(set) var restoration: FinancialSearchRestoration?
     @Published private(set) var ownerID: String?
     var sessionChanged: ((SessionSnapshot) -> Void)?
     private let controller: SessionController
@@ -51,21 +57,27 @@ final class FinancialSearchModel: ObservableObject {
         }
         identity = next; ownerID = nextOwner
         items = []; cursor = nil; destination = nil; opening = false; destinationError = nil
-        loading = false; errorKey = nil; loaded = false; dirty = true
+        loading = false; errorKey = nil; loaded = false; dirty = true; restoration = nil
     }
 
     func update(query: String? = nil, kind: FinancialSearchKind?? = nil, currency: String?? = nil) {
         if let query { origin.query = String(query.prefix(512)) }
         if let kind { origin.kind = kind }
         if let currency { origin.currency = currency }
+        detailRequest = UUID(); opening = false; destinationError = nil; destination = nil; restoration = nil
         origin.pages = 1; origin.anchor = nil; origin.anchorOffset = 0
         request = UUID(); loading = false; items = []; cursor = nil; loaded = false; dirty = true; errorKey = nil
         persist()
     }
 
     func remember(anchor: String, offset: Double) {
-        guard !loading, destination == nil, !opening else { return }
+        guard !loading, restoration == nil, destination == nil, !opening else { return }
         origin.anchor = anchor; origin.anchorOffset = offset; persist()
+    }
+
+    func restored(_ id: UUID) {
+        guard restoration?.id == id else { return }
+        restoration = nil
     }
 
     func invalidate() { dirty = true }
@@ -111,7 +123,9 @@ final class FinancialSearchModel: ObservableObject {
                 origin.anchor = items.isEmpty ? nil : items[min(index, items.count - 1)].id
             }
             loaded = true; dirty = false; persist()
-            if !append || restarted { restoration = UUID() }
+            if (!append || restarted), let anchor = origin.anchor {
+                restoration = FinancialSearchRestoration(anchor: anchor, offset: origin.anchorOffset)
+            }
         } catch {
             guard request == ticket else { return }
             await failed(error, identity: identity, ticket: ticket, detail: false)
@@ -128,7 +142,7 @@ final class FinancialSearchModel: ObservableObject {
             case .account(let account):
                 let live = try await controller.financialAccount(id: account.id, expectedIdentity: identity)
                 guard detailRequest == ticket, self.identity == identity else { return }
-                accounts.select(live); destination = .account(live.id)
+                accounts.upsert(live); destination = .account(live.id)
             case .activity(let activity, _):
                 _ = try await controller.financialActivityDetail(activity.activityId, expectedIdentity: identity)
                 guard detailRequest == ticket, self.identity == identity else { return }
@@ -137,6 +151,7 @@ final class FinancialSearchModel: ObservableObject {
                 destination = .activity(activity.activityId)
             case .expectation(let expectation):
                 let live = try await controller.financialExpectation(expectation.id, expectedIdentity: identity)
+                guard detailRequest == ticket, self.identity == identity else { return }
                 await loop.plan.refresh()
                 guard detailRequest == ticket, self.identity == identity else { return }
                 guard loop.plan.errorKey == nil else { throw SessionFailure.unavailable }

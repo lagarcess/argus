@@ -29,7 +29,7 @@ final class FinancialModelTests: XCTestCase {
         let account = try fixture.account()
         let accounts = AccountsModel(controller: fixture.client)
         let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
-        accounts.bind(identity); loop.bind(identity); accounts.accept(account)
+        accounts.bind(identity); loop.bind(identity); accounts.select(account)
         loop.record(account)
         let editor = try XCTUnwrap(loop.activityEditor)
         await editor.load(); editor.amount = "20.00"
@@ -50,7 +50,7 @@ final class FinancialModelTests: XCTestCase {
         let account = try fixture.account()
         let accounts = AccountsModel(controller: fixture.client)
         let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
-        accounts.bind(alice); loop.bind(alice); accounts.accept(account)
+        accounts.bind(alice); loop.bind(alice); accounts.select(account)
         loop.record(account)
         let editor = try XCTUnwrap(loop.activityEditor)
         await editor.load()
@@ -94,7 +94,8 @@ final class FinancialModelTests: XCTestCase {
             XCTAssertEqual(commits[0].httpBody, commits[1].httpBody)
             XCTAssertEqual(commits[0].value(forHTTPHeaderField: "Idempotency-Key"), commits[1].value(forHTTPHeaderField: "Idempotency-Key"))
         }
-        XCTAssertEqual(reopenedAccounts.selected?.balance.amount, "80.00")
+        XCTAssertEqual(reopenedAccounts.accounts.first { $0.id == account.id }?.balance.amount, "80.00")
+        XCTAssertNil(reopenedAccounts.selected, "Recovering a write does not navigate the Accounts tab")
     }
 
     func testArchiveReloadAndRestorePreserveBalanceAndListPlacement() async throws {
@@ -205,7 +206,7 @@ final class FinancialModelTests: XCTestCase {
         let identity = try await fixture.login()
         let accounts = AccountsModel(controller: fixture.client)
         let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
-        accounts.bind(identity); loop.bind(identity); accounts.accept(try fixture.account())
+        accounts.bind(identity); loop.bind(identity); accounts.select(try fixture.account())
         let gate = RequestGate()
         await fixture.server.holdNextHome(gate)
         let earlier = Task { await loop.refresh() }
@@ -293,6 +294,12 @@ private actor PresentationServer {
     func failNextCommit(_ status: Int) { nextStatus = status }
     func holdNextHome(_ gate: RequestGate) { homeGate = gate }
     func holdCommit(_ gate: RequestGate) { commitGate = gate }
+    private var readReplies: [String: (Int, String)] = [:]
+    private var readGates: [String: RequestGate] = [:]
+    func readReply(_ path: String, body: String, status: Int = 200, gate: RequestGate? = nil) {
+        readReplies[path] = (status, body)
+        readGates[path] = gate
+    }
     private var searchReplies: [(Int, String)] = []
     private var searchGate: RequestGate?
     private(set) var searches: [URLRequest] = []
@@ -313,6 +320,11 @@ private actor PresentationServer {
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         let path = request.url!.path
         guard path.contains("/financial-") else { return try await auth.send(request) }
+        let readKey = path + (request.url!.query.map { "?" + $0 } ?? "")
+        if request.httpMethod == "GET", let reply = readReplies[readKey] {
+            if let gate = readGates.removeValue(forKey: readKey) { await gate.enter() }
+            return (Data(reply.1.utf8), HTTPURLResponse(url: request.url!, statusCode: reply.0, httpVersion: nil, headerFields: nil)!)
+        }
         if path.contains("/financial-search") { return await search(request) }
         if path.contains("/financial-plan") { return try await plan(request) }
         if path.contains("/financial-activities") {
@@ -545,6 +557,15 @@ extension FinancialModelTests {
         await reopened.activate()
         XCTAssertEqual(reopened.items.map(\.recordID), [PresentationServer.id, second])
         XCTAssertEqual(reopened.origin.anchorOffset, -19)
+        let restoration = try XCTUnwrap(reopened.restoration)
+        reopened.remember(anchor: reopened.items[0].id, offset: 54)
+        XCTAssertEqual(reopened.origin.anchor, model.origin.anchor, "Initial layout cannot replace the saved deep-scroll anchor")
+        XCTAssertEqual(reopened.origin.anchorOffset, -19)
+        reopened.restored(UUID())
+        XCTAssertNotNil(reopened.restoration)
+        reopened.restored(restoration.id)
+        reopened.remember(anchor: reopened.items[1].id, offset: -20)
+        XCTAssertEqual(reopened.origin.anchorOffset, -20)
         let key = "financial.search.origin." + identity.profile!.id
         let saved = String(data: try XCTUnwrap(defaults.data(forKey: key)), encoding: .utf8)!
         XCTAssertFalse(saved.contains("Synthetic")); XCTAssertFalse(saved.contains("amount"))
@@ -617,5 +638,134 @@ extension FinancialModelTests {
         await model.refresh(); await model.more()
         XCTAssertEqual(model.errorKey, "search.error")
         XCTAssertFalse(model.loading)
+    }
+}
+
+@MainActor
+extension FinancialModelTests {
+    func testSearchOriginChangesRetireDelayedAccountAndExpectationOpens() async throws {
+        for field in ["query", "kind", "currency"] {
+            for expectation in [false, true] {
+                let fixture = try PresentationFixture()
+                let identity = try await fixture.login()
+                let accounts = AccountsModel(controller: fixture.client)
+                let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+                let search = FinancialSearchModel(controller: fixture.client, defaults: UserDefaults(suiteName: UUID().uuidString)!)
+                accounts.bind(identity); loop.bind(identity); search.bind(identity)
+                let hit: FinancialSearchHit
+                let path: String
+                let body: String
+                if expectation {
+                    let item = try JSONDecoder().decode(FinancialExpectation.self, from: Data(PresentationServer.expectation.utf8))
+                    hit = .expectation(item); path = "/api/v1/financial-plan/expectations/" + item.id.uuidString
+                    body = PresentationServer.expectation
+                } else {
+                    let item = try fixture.account()
+                    hit = .account(item); path = "/api/v1/financial-accounts/" + item.id.uuidString
+                    body = PresentationServer.account(updated: false)
+                }
+                let gate = RequestGate()
+                await fixture.server.readReply(path, body: body, gate: gate)
+                let pending = Task { await search.open(hit, accounts: accounts, loop: loop) }
+                await gate.waitUntilStarted()
+                XCTAssertTrue(search.opening)
+                switch field {
+                case "query": search.update(query: "A newer search")
+                case "kind": search.update(kind: .some(.activity))
+                default: search.update(currency: .some("USD"))
+                }
+                XCTAssertFalse(search.opening)
+                await gate.release(); await pending.value
+                XCTAssertNil(search.destination)
+                XCTAssertNil(loop.plan.draft)
+                XCTAssertNil(accounts.selected)
+                XCTAssertNil(search.destinationError)
+            }
+        }
+    }
+
+    func testSearchAccountNavigationAndAcceptedEditsPreserveAccountsSelection() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        let search = FinancialSearchModel(controller: fixture.client, defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        accounts.bind(identity); loop.bind(identity); search.bind(identity)
+        let first = try fixture.account()
+        let second = try JSONDecoder().decode(FinancialAccount.self, from: Data(PresentationServer.account(updated: false)
+            .replacingOccurrences(of: first.id.uuidString, with: UUID().uuidString).utf8))
+        accounts.select(second)
+        await search.open(.account(first), accounts: accounts, loop: loop)
+        XCTAssertEqual(accounts.selected?.id, second.id)
+        guard case .account(let opened) = search.destination else { return XCTFail("Search must retain its own account destination") }
+        XCTAssertEqual(opened, first.id)
+        accounts.back()
+        XCTAssertNil(accounts.selected)
+        XCTAssertNotNil(accounts.accounts.first { $0.id == first.id })
+        accounts.select(second)
+        let updated = try JSONDecoder().decode(FinancialAccount.self, from: Data(PresentationServer.account(updated: true).utf8))
+        accounts.accept(updated)
+        XCTAssertEqual(accounts.selected?.id, second.id)
+        XCTAssertEqual(accounts.accounts.first { $0.id == first.id }?.balance.amount, "80.00")
+        accounts.back(); accounts.accept(updated)
+        XCTAssertNil(accounts.selected, "A Search edit cannot navigate Accounts from its list")
+    }
+}
+
+@MainActor
+extension FinancialModelTests {
+    func testConcurrentAccountDetailsKeepActivityChecksAndPaginationIsolated() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity)
+        let first = try fixture.account()
+        let second = try JSONDecoder().decode(FinancialAccount.self, from: Data(PresentationServer.account(updated: false)
+            .replacingOccurrences(of: first.id.uuidString, with: UUID().uuidString).utf8))
+        let firstRow = UUID(), secondRow = UUID(), firstCheck = UUID(), secondCheck = UUID()
+        func activities(_ id: UUID, cursor: String? = nil) -> String {
+            let row = PresentationServer.activityRow.replacingOccurrences(of: PresentationServer.activityID.uuidString, with: id.uuidString)
+            return "{\"items\":[" + row + "],\"next_cursor\":" + (cursor.map { "\"" + $0 + "\"" } ?? "null") + "}"
+        }
+        func checks(_ id: UUID) -> String {
+            #"{"items":[{"record_id":"\#(id)","revision":1,"kind":"balance_check","as_of":"2026-09-01T12:00:00Z","time_zone":"UTC","source":"manual","observed_amount_minor":10000,"recorded_at":"2026-09-01T12:00:00Z"}],"next_cursor":null}"#
+        }
+        let a = "/api/v1/financial-accounts/" + first.id.uuidString
+        let b = "/api/v1/financial-accounts/" + second.id.uuidString
+        let held = RequestGate()
+        await fixture.server.readReply(a + "/activity", body: activities(firstRow, cursor: "a-next"), gate: held)
+        await fixture.server.readReply(a + "/balance-checks", body: checks(firstCheck))
+        await fixture.server.readReply(b + "/activity", body: activities(secondRow, cursor: "b-next"))
+        await fixture.server.readReply(b + "/balance-checks", body: checks(secondCheck))
+        let firstRead = Task { await loop.open(first) }
+        await held.waitUntilStarted()
+        await loop.open(second)
+        XCTAssertEqual(loop.read(second.id).activity.map(\.recordId), [secondRow])
+        await held.release(); await firstRead.value
+        XCTAssertEqual(loop.read(first.id).activity.map(\.recordId), [firstRow])
+        XCTAssertEqual(loop.read(first.id).checks.map(\.recordId), [firstCheck])
+        XCTAssertEqual(loop.read(second.id).activity.map(\.recordId), [secondRow])
+        XCTAssertEqual(loop.read(second.id).checks.map(\.recordId), [secondCheck])
+
+        let delayedPage = RequestGate(), obsolete = UUID(), nextB = UUID(), refreshedA = UUID()
+        await fixture.server.readReply(a + "/activity?cursor=a-next", body: activities(obsolete), gate: delayedPage)
+        await fixture.server.readReply(b + "/activity?cursor=b-next", body: activities(nextB))
+        let oldPage = Task { await loop.more(first, checks: false) }
+        await delayedPage.waitUntilStarted()
+        await loop.more(second, checks: false)
+        XCTAssertEqual(loop.read(second.id).activity.map(\.recordId), [secondRow, nextB])
+        await fixture.server.readReply(a + "/activity", body: activities(refreshedA))
+        await loop.open(first)
+        await delayedPage.release(); await oldPage.value
+        XCTAssertEqual(loop.read(first.id).activity.map(\.recordId), [refreshedA])
+        XCTAssertFalse(loop.read(first.id).loadingMore)
+        XCTAssertEqual(loop.read(second.id).checks.map(\.recordId), [secondCheck])
+        await fixture.server.readReply(b + "/activity", body: #"{"code":"unavailable"}"#, status: 503)
+        await loop.open(second)
+        XCTAssertNotNil(loop.read(second.id).errorKey)
+        XCTAssertNil(loop.read(first.id).errorKey)
+        loop.bind(nil)
+        XCTAssertTrue(loop.accountReads.isEmpty)
     }
 }
