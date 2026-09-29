@@ -101,7 +101,8 @@ struct FinancialSearchView: View {
     private var results: some View {
         ScrollViewReader { reader in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
+                // Loaded pages need measured row heights before restoring a partial row.
+                VStack(alignment: .leading, spacing: 0) {
                     SearchScrollProbe(controller: scroll).frame(height: 0)
                     if let error = model.destinationError {
                         Text(LocalizedStringKey(error)).padding(.vertical, 12).accessibilityIdentifier("search.destination.error")
