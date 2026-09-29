@@ -195,7 +195,9 @@ extension FinancialLoopUITests {
     private func assertSearchFrame(_ identifier: String, y: CGFloat) {
         let row = app.buttons[identifier]
         let restored = NSPredicate { _, _ in row.exists && row.isHittable && abs(row.frame.minY - y) < 3 }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: restored, object: nil)], timeout: 20), .completed)
+        let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: restored, object: nil)], timeout: 20)
+        if result != .completed { capture("search-scroll-mismatch") }
+        XCTAssertEqual(result, .completed, "Expected row y=\(y), actual=\(row.exists ? row.frame.minY : -1)")
     }
     private func armSearchRead(path: String, status: Int, delay: Int = 0) throws {
         let endpoint = try XCTUnwrap(ProcessInfo.processInfo.environment["ARGUS_TEST_FAULT_URL"])
