@@ -40,10 +40,10 @@ def sb(*args: str, capture: bool = True) -> subprocess.CompletedProcess:
     )
 
 
-def configure() -> None:
+def configure(*, accounts: bool = False) -> None:
     if (STACK / "supabase/config.toml").exists():
         raise SystemExit("Configuration exists. Reuse it; do not reset an active stack.")
-    for port in [58400, 58405, 3001, *PORTS.values()]:
+    for port in [58400, 58405, *([] if accounts else [3001]), *PORTS.values()]:
         with socket.socket() as sock:
             try:
                 sock.bind(("127.0.0.1", port))
@@ -96,7 +96,7 @@ def configure() -> None:
         'secret = "1x0000000000000000000000000000000AA"',
     ]
     (target / "config.toml").write_text("\n".join(lines) + "\n")
-    print("Configured isolated ios-auth-8be2 stack, ports 58401-58411.")
+    print(f"Configured isolated {PROJECT} stack, ports 58401-58411.")
 
 
 def status() -> dict:
@@ -169,7 +169,7 @@ def seed() -> None:
     )
 
 
-def api(python: str) -> None:
+def api(python: str, *, accounts_enabled: bool = False) -> None:
     cfg = status()
     env = {
         key: value
@@ -200,6 +200,7 @@ def api(python: str) -> None:
             "SUPABASE_POSTGRES_SESSION_POOLER_URL": cfg["DB_URL"],
             "DATABASE_URL": cfg["DB_URL"],
             "ARGUS_PERSISTENCE_MODE": "supabase",
+            "ARGUS_FINANCIAL_ACCOUNTS_ENABLED": str(accounts_enabled).lower(),
             "ARGUS_MARKET_DATA_PROVIDER_MODE": "synthetic_unit_fixture",
             "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "false",
             "ARGUS_GUEST_ACCESS_ENABLED": "true",
@@ -253,10 +254,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--python", help="Absolute path to a dependency-complete Python runtime"
     )
+    parser.add_argument("--accounts", action="store_true", help="Use isolated ios-accounts stack/state; does not reserve web port")
+    parser.add_argument("--accounts-enabled", choices=["on", "off"], default="off", help="Explicit local API financial-record exposure (default off)")
     args = parser.parse_args()
+    if args.accounts:
+        WORK = ROOT / "ios/.build/accounts-local"
+        STACK = WORK / "stack"
+        PROJECT = "ios-accounts"
+    elif args.accounts_enabled == "on":
+        raise SystemExit("Financial accounts require --accounts isolation")
     WORK.mkdir(parents=True, exist_ok=True, mode=0o700)
     if args.action == "configure":
-        configure()
+        configure(accounts=args.accounts)
     elif args.action == "start":
         with (WORK / "supabase-start.log").open("w") as log:
             subprocess.run(
@@ -271,8 +280,10 @@ if __name__ == "__main__":
     elif args.action == "api":
         if not args.python or not Path(args.python).is_absolute():
             raise SystemExit("--python must be an absolute interpreter path")
-        api(args.python)
+        api(args.python, accounts_enabled=args.accounts_enabled == "on")
     elif args.action == "web":
+        if args.accounts:
+            raise SystemExit("Web port is not allocated to the accounts lane")
         cfg = status()
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 3001))
@@ -307,4 +318,4 @@ if __name__ == "__main__":
         ):
             raise SystemExit("Stack ownership mismatch")
         sb("stop")
-        print("Stopped only ios-auth-8be2; local data retained.")
+        print(f"Stopped only {PROJECT}; local data retained.")

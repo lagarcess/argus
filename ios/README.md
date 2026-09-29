@@ -3,10 +3,14 @@
 A SwiftUI foundation, offline by default, with Home, Accounts, Argus, Plan and Search in
 the approved order. It runs as **Argus Sample**. Navigation, local search and
 Light / Dark / System appearance work. Financial figures are immutable display
-fixtures. An optional, default-off registered-session adapter connects existing Argus
-authentication. See [native auth setup](AUTH_SETUP.md) for its contracts and local
-verification. There is no financial persistence, calculation, voice, sharing,
-monitoring or financial-provider integration.
+fixtures outside the connected Accounts surface. An optional, default-off
+registered-session adapter connects existing Argus authentication. See
+[native auth setup](AUTH_SETUP.md) and [financial account setup](ACCOUNTS_SETUP.md)
+for configuration and verification. With native authentication configured,
+Accounts reads and writes the server's registered-only financial-account API;
+the server feature flag remains authoritative. No financial records are stored
+in app preferences. Calculations, voice, sharing, monitoring and financial-provider
+integrations remain outside this client.
 
 ## Run in Simulator
 
@@ -75,6 +79,11 @@ the archive is unchanged. That PR was open and in review at lane start. Its cano
 neither copied nor merged into this lane. The archive's finance JavaScript is
 not used. The locked template owns interactions; this lane adds native shell
 behavior and explicitly labeled sample destinations within its assigned scope.
+
+The financial-account continuation inspected the now-merged #727 at exact head
+`f0a64ffb9d70ce5b82491cf8e1803bb8a6ec7431`; the same locked archive remains
+the experience reference. Its bounded implementation contract is the
+[account client spec](../docs/superpowers/specs/2026-09-29-ios-financial-accounts.md).
 
 Shared semantic tokens and controls live in `ArgusFoundation/`. The shell owns
 destination selection; individual views own transient presentation state.

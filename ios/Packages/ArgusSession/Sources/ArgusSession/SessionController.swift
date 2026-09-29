@@ -2,7 +2,7 @@ import Auth
 import Foundation
 
 /// The sole native session owner. Product identity comes from Argus /me, not a
-/// decoded JWT or a parallel profile cache. Financial state stays outside this package.
+/// decoded JWT or a parallel profile cache. Account API values are transported without client financial rules.
 public actor SessionController {
     private let configuration: SessionConfiguration
     private let vault: CredentialVault
@@ -155,40 +155,55 @@ public actor SessionController {
     }
 
     private func loadProfile(using client: AuthClient, epoch: UInt64) async throws -> SessionSnapshot {
+        let request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/me"))
+        let result = try await authenticatedResponse(using: client, epoch: epoch, request: request)
         do {
-            let session = try await client.session
-            try vault.check(epoch)
-            guard !session.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
-            var result = try await fetchProfile(token: session.accessToken)
-            try vault.check(epoch)
-            if result.1.statusCode == 401 {
-                let refreshed = try await client.refreshSession()
-                try vault.check(epoch)
-                result = try await fetchProfile(token: refreshed.accessToken)
-                try vault.check(epoch)
-            }
-            guard result.1.statusCode != 401 else {
-                try suspendUsableSession()
-                throw SessionFailure.unauthorized
-            }
-            guard (200..<300).contains(result.1.statusCode) else { throw problem(result.0, status: result.1.statusCode) }
             struct ProfileEnvelope: Decodable { let user: SessionProfile }
             let profile = try JSONDecoder().decode(ProfileEnvelope.self, from: result.0).user
-            guard UUID(uuidString: profile.id) == session.user.id else {
+            guard UUID(uuidString: profile.id) == (try vault.session())?.user.id else {
                 try suspendUsableSession()
                 throw SessionFailure.invalidResponse
             }
             try vault.check(epoch)
             setState(.authenticated, profile: profile)
             return state
-        } catch {
-            // A concurrent sign-out/switch must win even when an old request fails.
-            if vault.epoch() != epoch { throw (error as? SessionFailure) == .unauthorized || (error as? SessionFailure) == .invalidResponse ? safe(error) : SessionFailure.staleOperation }
-            do { try vault.check(epoch) }
-            catch {
-                try suspendUsableSession()
-                throw SessionFailure.storageUnavailable
+        } catch { throw safe(error) }
+    }
+    /// Shared authenticated transport for /me and financial records. SDK owns
+    /// refresh coalescing; this layer permits only one 401 refresh/retry.
+    private func authenticatedResponse(using client: AuthClient, epoch: UInt64,
+                                       request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var retiring = false
+        do {
+            try vault.check(epoch)
+            let session = try await client.session
+            try vault.check(epoch)
+            guard !session.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
+            var authorized = request
+            authorized.setValue("Bearer " + session.accessToken, forHTTPHeaderField: "Authorization")
+            var result = try await transport.send(authorized, origin: configuration.argusAPIURL)
+            try vault.check(epoch)
+            if result.1.statusCode == 401 {
+                let refreshed = try await client.refreshSession()
+                try vault.check(epoch)
+                authorized.setValue("Bearer " + refreshed.accessToken, forHTTPHeaderField: "Authorization")
+                result = try await transport.send(authorized, origin: configuration.argusAPIURL)
+                try vault.check(epoch)
             }
+            guard result.1.statusCode != 401 else {
+                retiring = true
+                try suspendUsableSession()
+                throw SessionFailure.unauthorized
+            }
+            guard (200..<300).contains(result.1.statusCode) else { throw problem(result.0, status: result.1.statusCode) }
+            return result
+        } catch {
+            if vault.epoch() != epoch {
+                if retiring { throw safe(error) }
+                throw SessionFailure.staleOperation
+            }
+            do { try vault.check(epoch) }
+            catch { try suspendUsableSession(); throw SessionFailure.storageUnavailable }
             if (error as? AuthError) == .sessionMissing {
                 endAccountEpoch(as: .signedOut)
                 try vault.removeSession()
@@ -196,19 +211,11 @@ public actor SessionController {
             }
             if case let AuthError.api(_, _, _, response) = error,
                [400, 401, 403].contains(response.statusCode) {
-                // The only SDK network calls in this method are refresh grants.
-                // Refusal ends usable auth, but an unknown response code is not
-                // proof of server revocation. Keep cleanup pending and block entry.
                 try suspendUsableSession()
                 throw SessionFailure.unauthorized
             }
             throw safe(error)
         }
-    }
-    private func fetchProfile(token: String) async throws -> (Data, HTTPURLResponse) {
-        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/me"))
-        request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
-        return try await transport.send(request, origin: configuration.argusAPIURL)
     }
     private func suspendUsableSession() throws {
         // Invalidate delivery and SDK writes before journal I/O can fail. Actual
@@ -272,5 +279,63 @@ public actor SessionController {
         if error is DecodingError { return .invalidResponse }
         if (error as? AuthError) == .sessionMissing { return .unauthorized }
         return .unavailable
+    }
+}
+
+
+extension SessionController {
+    public func financialAccounts(expectedIdentity: SessionSnapshot) async throws -> [FinancialAccount] {
+        struct Envelope: Decodable { let accounts: [FinancialAccount] }
+        let data = try await financialRequest(expectedIdentity: expectedIdentity)
+        do { return try JSONDecoder().decode(Envelope.self, from: data).accounts }
+        catch { throw SessionFailure.invalidResponse }
+    }
+
+    public func financialAccount(id: UUID, expectedIdentity: SessionSnapshot) async throws -> FinancialAccount {
+        try decodeAccount(await financialRequest(path: "/" + id.uuidString, expectedIdentity: expectedIdentity))
+    }
+
+    public func createFinancialAccount(_ request: CreateFinancialAccountRequest,
+                                       expectedIdentity: SessionSnapshot) async throws -> FinancialAccount {
+        try decodeAccount(await financialRequest(method: "POST", body: encoded(request),
+            key: request.idempotencyKey.uuidString, expectedIdentity: expectedIdentity))
+    }
+
+    public func updateFinancialAccount(id: UUID, request: EditFinancialAccountRequest,
+                                       expectedIdentity: SessionSnapshot) async throws -> FinancialAccount {
+        try decodeAccount(await financialRequest(path: "/" + id.uuidString, method: "PATCH",
+            body: encoded(request), expectedIdentity: expectedIdentity))
+    }
+
+    public func writeOpening(id: UUID, request: WriteOpeningRequest,
+                             expectedIdentity: SessionSnapshot) async throws -> FinancialAccount {
+        try decodeAccount(await financialRequest(path: "/" + id.uuidString + "/opening", method: "PUT",
+            body: encoded(request), expectedIdentity: expectedIdentity))
+    }
+
+    private func encoded(_ value: some Encodable) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try encoder.encode(value)
+    }
+    private func decodeAccount(_ data: Data) throws -> FinancialAccount {
+        do { return try JSONDecoder().decode(FinancialAccount.self, from: data) }
+        catch { throw SessionFailure.invalidResponse }
+    }
+    private func financialRequest(path: String = "", method: String = "GET", body: Data? = nil,
+                                  key: String? = nil, expectedIdentity: SessionSnapshot) async throws -> Data {
+        guard expectedIdentity.phase == .authenticated, expectedIdentity.profile != nil else { throw SessionFailure.unauthorized }
+        guard state.phase == .authenticated, state.revision == expectedIdentity.revision,
+              state.profile?.id == expectedIdentity.profile?.id else { throw SessionFailure.staleOperation }
+        guard !mutating else { throw SessionFailure.busy }
+        if try vault.pending() != nil { throw SessionFailure.pendingSignOut }
+        let epoch = vault.epoch()
+        try vault.check(epoch)
+        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/financial-accounts" + path))
+        request.httpMethod = method
+        request.httpBody = body
+        if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        if let key { request.setValue(key, forHTTPHeaderField: "Idempotency-Key") }
+        return try await authenticatedResponse(using: activeAuth(), epoch: epoch, request: request).0
     }
 }

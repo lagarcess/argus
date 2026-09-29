@@ -17,7 +17,14 @@ parser.add_argument(
     default="ArgusFoundationUITests/AuthJourneyUITests/testRegisteredSessionSurvivesRelaunchAndSignsOut",
 )
 parser.add_argument("--captcha-mode", choices=["pass", "fail", "hold"], default="pass")
+parser.add_argument("--accounts", action="store_true")
+parser.add_argument("--language", choices=["en", "es-419"], default="en")
+parser.add_argument("--appearance", choices=["light", "dark", "system"], default="light")
 args = parser.parse_args()
+if args.accounts:
+    WORK = ROOT / "ios/.build/accounts-local"
+if args.simulator == "8B7975F1-1338-4966-90E2-770416CAF174":
+    raise SystemExit("Refusing founder-owned simulator")
 cfg = json.loads((WORK / "client.json").read_text())
 stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 common = [
@@ -59,6 +66,11 @@ for target in targets:
     target.setdefault("EnvironmentVariables", {}).update(
         {
             "ARGUS_TEST_AUTH_UI_ENABLED": "true",
+            "ARGUS_TEST_ACCOUNTS_UI_ENABLED": str(args.accounts).lower(),
+            "ARGUS_TEST_LANGUAGE": args.language,
+            "ARGUS_TEST_APPEARANCE": args.appearance,
+            "ARGUS_TEST_EMAIL_B": cfg["users"][1]["email"],
+            "ARGUS_TEST_PASSWORD_B": cfg["users"][1]["password"],
             "ARGUS_TEST_EMAIL": cfg["users"][0]["email"],
             "ARGUS_TEST_PASSWORD": cfg["users"][0]["password"],
         }

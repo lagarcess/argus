@@ -87,7 +87,7 @@ struct FoundationShell: View {
     @ViewBuilder private func destinationView(_ tab: AppDestination) -> some View {
         switch tab {
         case .home: HomeSampleView(destination: $destination, showSample: { sheet = .sample })
-        case .accounts: AccountsSampleView(showSample: { sheet = .sample })
+        case .accounts: AccountsDestination(showProfile: { sheet = .profile }, showSample: { sheet = .sample })
         case .argus: ChatSampleView(showSample: { sheet = .sample })
         case .plan: PlanSampleView()
         case .search: SearchSampleView(destination: $destination)

@@ -1,0 +1,189 @@
+import SwiftUI
+import ArgusSession
+
+/// Memory-only presentation state. The session owns identity; the API owns records.
+@MainActor
+final class AccountsModel: ObservableObject {
+    @Published private(set) var accounts: [FinancialAccount] = []
+    @Published private(set) var selected: FinancialAccount?
+    @Published var draft: AccountDraft?
+    @Published private(set) var busy = false
+    @Published private(set) var errorKey: String?
+    @Published private(set) var latest: FinancialAccount?
+    @Published private(set) var needsReview = false
+    @Published private(set) var identity: SessionSnapshot?
+    var sessionChanged: ((SessionSnapshot) -> Void)?
+    private let controller: SessionController
+    private var generation = UUID()
+    private var pendingCreate: CreateFinancialAccountRequest?
+
+    init(controller: SessionController) { self.controller = controller }
+
+    func bind(_ snapshot: SessionSnapshot?) {
+        guard snapshot?.revision != identity?.revision || snapshot?.profile?.id != identity?.profile?.id || snapshot?.phase != identity?.phase else { return }
+        generation = UUID()
+        identity = snapshot?.phase == .authenticated ? snapshot : nil
+        accounts = []; selected = nil; draft = nil; latest = nil
+        pendingCreate = nil; busy = false; errorKey = nil; needsReview = false
+    }
+
+    func load() async {
+        await run { identity in let values = try await self.controller.financialAccounts(expectedIdentity: identity)
+            if self.current(identity) { self.accounts = values } }
+    }
+
+    func open(_ account: FinancialAccount) async {
+        guard !busy else { return }
+        selected = account
+        await run { identity in let value = try await self.controller.financialAccount(id: account.id, expectedIdentity: identity)
+            if self.current(identity) { self.selected = value } }
+    }
+
+    func back() { guard !busy else { return }; selected = nil; errorKey = nil }
+    func create() { begin(AccountDraft()) }
+    func edit(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .metadata)) }
+    func opening(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .opening)) }
+    func discard() { draft = nil; pendingCreate = nil; latest = nil; needsReview = false; errorKey = nil }
+    func editLatest() {
+        guard let latest, let mode = draft?.mode else { return }
+        begin(AccountDraft(account: latest, mode: mode))
+    }
+
+    private func begin(_ draft: AccountDraft) {
+        self.draft = draft; pendingCreate = nil; errorKey = nil; latest = nil; needsReview = false
+    }
+
+    func save(locale: Locale = .current) async {
+        guard let draft, !needsReview else { return }
+        await run { identity in
+            let amount = try AccountEntry.amount(draft.amount, locale: locale)
+            let share = try AccountEntry.share(draft.share)
+            let saved: FinancialAccount
+            switch draft.mode {
+            case .create:
+                if self.pendingCreate == nil {
+                    self.pendingCreate = CreateFinancialAccountRequest(type: draft.type, currency: draft.currency,
+                        nickname: draft.nickname, amount: amount,
+                        asOf: draft.amount.isEmpty ? nil : draft.asOf, timeZone: draft.timeZone, ownershipShareBps: share)
+                }
+                saved = try await self.controller.createFinancialAccount(self.pendingCreate!, expectedIdentity: identity)
+            case .metadata:
+                guard let base = draft.base else { return }
+                saved = try await self.controller.updateFinancialAccount(id: base.id,
+                    request: EditFinancialAccountRequest(expectedVersion: base.version, nickname: draft.nickname,
+                        type: draft.type == base.type ? nil : draft.type,
+                        currency: draft.currency == base.currency ? nil : draft.currency, ownershipShareBps: share == base.ownershipShareBps ? nil : share), expectedIdentity: identity)
+            case .opening:
+                guard let base = draft.base else { return }
+                saved = try await self.controller.writeOpening(id: base.id,
+                    request: WriteOpeningRequest(expectedVersion: base.version, expectedRevision: base.opening?.revision,
+                        amount: amount,
+                        asOf: draft.asOf == base.opening?.asOf ? nil : draft.asOf,
+                        timeZone: draft.timeZone == base.opening?.timeZone ? nil : draft.timeZone,
+                        reason: draft.reason), expectedIdentity: identity)
+            }
+            guard self.current(identity) else { return }
+            self.accept(saved); self.discard()
+        }
+    }
+
+    var createIsFrozen: Bool { pendingCreate != nil }
+
+    func archive(_ account: FinancialAccount) async {
+        await run { identity in
+            let saved = try await self.controller.updateFinancialAccount(id: account.id,
+                request: EditFinancialAccountRequest(expectedVersion: account.version, archived: !account.archived), expectedIdentity: identity)
+            if self.current(identity) { self.accept(saved) }
+        }
+    }
+
+    private func current(_ captured: SessionSnapshot) -> Bool {
+        identity?.revision == captured.revision && identity?.profile?.id == captured.profile?.id
+    }
+
+    private func accept(_ account: FinancialAccount) {
+        if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }
+        else { accounts.append(account) }
+        selected = account
+    }
+
+    private func run(_ operation: (SessionSnapshot) async throws -> Void) async {
+        guard let identity, !busy else { return }
+        let ticket = generation
+        busy = true; errorKey = nil
+        defer { if generation == ticket { busy = false } }
+        do { try await operation(identity) }
+        catch {
+            guard generation == ticket else { return }
+            let snapshot = await controller.snapshot()
+            guard generation == ticket else { return }
+            if snapshot.revision != identity.revision || snapshot.phase != .authenticated {
+                bind(snapshot); sessionChanged?(snapshot); return
+            }
+            errorKey = Self.message(error)
+            if case SessionFailure.rejected(let status, _) = error, status == 422 || status == 400 { pendingCreate = nil }
+            if draft?.base != nil && Self.requiresReview(error) {
+                needsReview = true
+                if let id = draft?.base?.id {
+                    let value = try? await controller.financialAccount(id: id, expectedIdentity: identity)
+                    guard generation == ticket else { return }
+                    guard await synchronize(identity, ticket: ticket) else { return }
+                    latest = value
+                }
+            } else if draft == nil, let selected, Self.requiresReview(error) {
+                let value = try? await controller.financialAccount(id: selected.id, expectedIdentity: identity)
+                if await synchronize(identity, ticket: ticket) { self.selected = value }
+            }
+        }
+    }
+
+    private func synchronize(_ identity: SessionSnapshot, ticket: UUID) async -> Bool {
+        let snapshot = await controller.snapshot()
+        guard generation == ticket else { return false }
+        if snapshot.revision != identity.revision || snapshot.phase != .authenticated {
+            bind(snapshot); sessionChanged?(snapshot); return false
+        }
+        return true
+    }
+
+    private static func requiresReview(_ error: Error) -> Bool {
+        if case SessionFailure.rejected(let status, _) = error { return status == 409 || status >= 500 }
+        return true
+    }
+
+    private static func message(_ error: Error) -> String {
+        if let entry = error as? AccountEntry.Failure { return entry == .share ? "accounts.error.share" : "accounts.error.amount_invalid" }
+        guard case SessionFailure.rejected(let status, let code) = error else { return "accounts.error.connection" }
+        let supported = ["amount_precision", "amount_invalid", "amount_out_of_range", "currency_unsupported", "currency_locked",
+                         "date_in_future", "date_invalid", "time_zone_invalid", "nickname_invalid", "reason_required", "reason_invalid",
+                         "field_missing", "type_locked", "nature_change_requires_empty_account", "stale_version", "idempotency_conflict",
+                         "financial_accounts_unavailable", "financial_account_not_found", "account_conversion_required", "validation_error"]
+        if let code, supported.contains(code) { return "accounts.error." + code }
+        return status == 401 ? "auth.error.unauthorized" : "accounts.error.connection"
+    }
+}
+
+struct AccountDraft: Identifiable {
+    enum Mode { case create, metadata, opening }
+    let id = UUID()
+    var mode: Mode = .create
+    var base: FinancialAccount?
+    var nickname = ""
+    var type = "checking"
+    var currency = "DOP"
+    var amount = ""
+    var asOf = ISO8601DateFormatter().string(from: Date())
+    var timeZone = "America/Santo_Domingo"
+    var reason = ""
+    var share = "100"
+
+    init() {}
+    init(account: FinancialAccount, mode: Mode) {
+        self.mode = mode; base = account; nickname = account.nickname ?? ""
+        type = account.type; currency = account.currency
+        share = String(account.ownershipShareBps / 100) + "." + String(format: "%02d", account.ownershipShareBps % 100)
+        // Empty correction amount means carry forward. Never submit signed read money as user input.
+        asOf = account.opening?.asOf ?? ISO8601DateFormatter().string(from: Date())
+        timeZone = account.opening?.timeZone ?? "America/Santo_Domingo"
+    }
+}
