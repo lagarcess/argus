@@ -219,7 +219,9 @@ private final class SearchScrollOffset: ObservableObject {
         if abs(delta) < 0.5 { return true }
         let maximum = max(-view.adjustedContentInset.top, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
         let y = min(maximum, max(-view.adjustedContentInset.top, view.contentOffset.y + delta))
-        if abs(y - view.contentOffset.y) < 0.5 { return true }
+        // Lazy rows can grow the content bounds after scrollTo. A clamped position
+        // is not proof that the saved row offset has been restored.
+        if abs(y - view.contentOffset.y) < 0.5 { return false }
         view.setContentOffset(CGPoint(x: view.contentOffset.x, y: y), animated: false)
         return false
     }
