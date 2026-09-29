@@ -33,9 +33,9 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 
 | Responsibility | Exclusive implementation ownership | Checkout | Current action |
 | --- | --- | --- | --- |
-| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Existing 44 tests pass; local Supabase is available; implementing the shared contract and projection tests |
+| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Contract and command/projection checkpoint `0de85dca` has 54 passing tests; Postgres persistence and route wiring in progress |
 | iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Source reconciled and baseline simulator build passed; repair inherited forms and connect the accepted contract |
-| Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Prepare internet CAPTCHA adapter/configuration and exact signing/deployment actions |
+| Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Published checkpoint `ea3370606`: unsigned device build, 27 focused tests and four local production-route browser tests pass; independent review in progress |
 | Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Coordinate single writers and exercise assembled candidate |
 
 Throughput checkpoint: three implementation responsibilities, one financial
@@ -51,7 +51,7 @@ manifest rather than creating another board.
 
 - [x] Read the Principles section of the poteto-mode skill.
 - [x] Phase A: Frame. Scope and authority recorded above.
-- [ ] Phase B: Design the workflow. Trace existing owners and settle the consumed contract.
+- [x] Phase B: Design the workflow. Trace existing owners and settle the consumed contract.
 - [ ] Phase C: Run the loop. Implement and verify each integrated increment.
 - [ ] Recover the native baseline and capture locked-reference comparisons.
 - [ ] Implement durable activity, corrections, reconciliation and shared reads.
@@ -80,6 +80,13 @@ Decision trail for this batch stays in this manifest.
   Supabase project is healthy on its current Free plan; its applied migration
   inventory does not yet include the financial-account migration. Founder
   access requests are pending. No hosted mutation or provisioning occurred.
+- The consumed API contract is committed on the financial branch in
+  `ee77772c9` and amended in `0de85dca`. Home aggregates use exact decimal-integer
+  strings; one backend projection owns totals and ownership-share rounding.
+  Native clients format those values without recomputing financial rules.
+- Device checkpoint `ea3370606` is published for review. Its proof uses an
+  unsigned build and synthetic local CAPTCHA responses. It does not establish
+  production login, a signed installation, or physical-phone acceptance.
 
 
 ## Outcome and completion
@@ -108,8 +115,12 @@ new batch approvals. No 24-hour delivery promise has been made.
 
 ## Verified starting point
 
-Refreshed by fetch on September 29. Current integration is
-`12bccd4d6e173a5d8805e495fd30b7ead36741c6`, the #743 merge. The original
+The active batch starts from integration
+`fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`, the #744 merge. Its exact-commit
+[CI](https://github.com/lagarcess/argus/actions/runs/36537496516) and
+[Private Alpha Local Smoke](https://github.com/lagarcess/argus/actions/runs/36537496519)
+were refreshed on September 29 and both succeeded. The earlier planning snapshot
+used `12bccd4d6e173a5d8805e495fd30b7ead36741c6`, the #743 merge. The original
 publication inspected `de8729843b726a3fd03210cebcedede5e44227c8`.
 The account product commit is `296195e86c972e846c251d256b3cc211975bfd57`.
 GitHub merge/closure state and the linked repository documents were inspected.
