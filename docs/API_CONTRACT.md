@@ -6373,8 +6373,8 @@ Registered users record the financial accounts that make up their picture:
 create one, reopen it, edit its details, and record or correct its starting
 balance with preserved history. Spec:
 [`docs/specs/lanes/financial-accounts-first-slice.md`](specs/lanes/financial-accounts-first-slice.md).
-This slice holds no activity, balance checks, categories, transfers, refunds,
-imports, plans, spaces beyond the Personal default, or household sharing.
+The original account slice is extended by the complete financial loop below.
+Transfers, refunds, imports, plans, extra spaces and household remain outside this batch.
 
 Behind the default-off `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` flag. While it is
 off, or when durable mode has no `DATABASE_URL`, every route below returns
@@ -6571,6 +6571,175 @@ Record the starting balance on an account that has none, or correct it.
   date change reorders nothing, and the revision is still stored.
 
 **Response:** `200` with the account shape.
+
+
+## Complete financial loop (authorized September 29, 2026)
+
+This extends the same registered-owner surface with expenses, corrections, checked
+balances and Home. All requests use the existing flag, identity, money parsing and
+account version. This is the bounded first financial loop, not the complete MVEE.
+Transfers, refunds, ingestion, household and plans are separate assignments.
+
+### Activity and preview
+
+`POST /financial-accounts/{id}/activity/preview` and
+`POST /financial-accounts/{id}/activity` accept:
+
+```json
+{
+  "expected_version": 1,
+  "amount": "2000.00",
+  "occurred_at": "2026-09-02T12:00:00-04:00",
+  "time_zone": "America/Santo_Domingo",
+  "note": "Groceries",
+  "category_id": null,
+  "coverage": []
+}
+```
+
+This batch records expense only. `amount` must be positive; its balance movement
+is negative for both assets and liabilities. `note` is optional, at most 200
+Unicode code points. `category_id` is optional and accepts the server catalog IDs
+from `GET /financial-categories`; clients localize these IDs, never invent money
+meaning from labels. `occurred_at` requires an offset and cannot be in the future.
+The stored IANA zone is retained independently of the server zone.
+
+`coverage` is a list of `{observation_id, included}` answers. An opening and a
+balance check are both observations. For an activity on or before an observation's
+local calendar day, the preview asks whether it was already included. Same-day
+activity always asks; the API does not infer inclusion from a time supplied by a
+date-only control. An included expense remains included in every later eligible
+observation. Contradictory answers are rejected. Expenses after an observation day
+cannot be included in it. Amount equality never establishes inclusion.
+
+Preview returns `{account_version, ready, observations, before, after, preview_token}`.
+Each observation has `{observation_id, kind, as_of, amount_minor, amount, included}`;
+`included` is null when an answer is needed. `before` and nullable `after` are
+BalanceResponse. A ready preview supplies a token over the normalized complete
+input and account version. Confirmation adds `preview_token` and requires
+`Idempotency-Key`; a missing answer cannot be committed. The token is recomputed
+server-side under the account lock. A stale account returns `409 stale_version`
+without writing anything. Preview itself is read-only and reserves nothing.
+
+Corrections use `POST /financial-accounts/{id}/activity/{record_id}/preview` and
+`PATCH /financial-accounts/{id}/activity/{record_id}` with the same complete input
+plus `expected_revision` and a required `reason` of at most 200 code points. The
+preview makes the proposed current balance visible before confirmation. A date or
+amount change is reviewed again; previous revisions and confirmations remain.
+
+Create/correct returns `{account, activity, replayed}`. Activity is:
+
+```json
+{
+  "record_id": "uuid", "revision": 1, "kind": "expense",
+  "amount_minor": 200000, "amount": "2000.00",
+  "balance_movement_minor": -200000,
+  "occurred_at": "2026-09-02T12:00:00-04:00",
+  "time_zone": "America/Santo_Domingo", "note": "Groceries",
+  "category_id": null, "reason": null,
+  "recorded_at": "2026-09-02T16:01:00Z", "recorded_by": "uuid",
+  "coverage": []
+}
+```
+
+`GET /financial-accounts/{id}/activity?limit=20&cursor=...` returns
+`{items, next_cursor}` ordered by occurred_at and record ID, descending. Limit is
+1..100. Cursors bind account and account version; a write requires refreshing the
+list instead of mixing pages from different snapshots. Activity detail at
+`GET /financial-accounts/{id}/activity/{record_id}` returns the current item.
+`GET /financial-accounts/{id}/activity/{record_id}/history` has the same bounded
+page envelope for revisions, newest first. Account GET does not embed these lists.
+
+### Checked balance
+
+`POST /financial-accounts/{id}/balance-checks/preview` accepts:
+
+```json
+{
+  "expected_version": 2, "amount": "7500.00",
+  "as_of": "2026-09-03T12:00:00-04:00",
+  "time_zone": "America/Santo_Domingo", "source": "manual"
+}
+```
+
+It returns `{account_version, currency, currency_fraction_digits,
+expected_amount_minor, observed_amount_minor, difference_minor, as_of,
+time_zone, preview_token}`. The amount uses the existing account sign convention,
+including positive typed debt owed. Expected/difference are null for unknown
+prior position. The confirmation POST to `/balance-checks` adds `preview_token`
+and `Idempotency-Key`; it atomically stores expected/observed/difference, reviewed
+account version, source, author, time and covered expense revisions. Response is
+`{account, check, replayed}`. A check has `{record_id, revision, kind, as_of,
+time_zone, source, expected_amount_minor, observed_amount_minor, difference_minor,
+unexplained_minor, recorded_at, recorded_by}`. `kind` is `balance_check` or
+`value_update` for recorded valuation accounts. Neither is spending or income.
+A zero difference is a check with zero adjustment, not fabricated activity.
+
+`GET /financial-accounts/{id}/balance-checks?limit=20&cursor=...` returns
+`{items,next_cursor}`. Original confirmation values never change. `unexplained_minor`
+is current explanation after explicit late activity/corrections, and never claims
+source matching from arithmetic alone. A partial included expense leaves a partial
+discrepancy. The latest observed position remains authoritative for included
+activity; excluded/new activity changes current balance.
+
+For this implementation batch, new checks must be at or after the latest
+observation's local day. Earlier insertion returns `422 check_before_latest_observation`
+and must be presented as unsupported in this build. This is a visible technical
+limitation, not an approved MVEE deferral. Same-day checks have an explicit server
+confirmation order; date-only expense input never supplies that order.
+
+### Opening with activity
+
+Existing opening PUT remains compatible for accounts without activity. With
+activity, `POST /financial-accounts/{id}/opening/preview` uses WriteOpeningRequest
+plus `coverage` entries `{activity_id,included}` for each existing expense on or
+before the proposed opening day. It returns `{account_version,ready,activities,
+before,after,preview_token}`. Confirmation PUT supplies the token and answers.
+Unknown-to-known opening and corrections must not silently double-charge earlier
+expenses. Changing an opening behind a check changes its current explanation,
+not the immutable observed amount. An opening after an existing check is rejected
+as `422 opening_after_check`. New and corrected openings participate in the same
+account lock and preserve their existing append-only revision history.
+
+### Home and shared balance read
+
+BalanceResponse adds basis `balance_check` alongside `opening`, and the signed
+`activity_since_tracking_minor` is populated even when position is unknown.
+No opening/check still means unknown after recording expenses. There is no amount
+for an unknown balance. A checked balance does not imply complete expense coverage.
+
+`GET /financial-home` returns:
+
+```json
+{
+  "currencies": [{
+    "currency": "DOP", "currency_fraction_digits": 2,
+    "assets_minor": 750000, "debts_minor": 0, "net_worth_minor": 750000,
+    "known_accounts": 1, "unknown_accounts": 0,
+    "recorded_spending_minor": 200000
+  }],
+  "recent_activity": [], "recorded_at": "2026-09-03T16:01:00Z"
+}
+```
+
+Totals derive from the same account projection, include archived accounts and
+remain separate per currency. Personal ownership shares apply to position with
+integer half-even minor-unit rounding once per account. Positive position is an
+asset, negative position a debt, including bank overdrafts and credit-card credit.
+Spending is the recorded expense total, not complete spending or an affordability
+forecast. Recent activity is bounded to five rows and includes account_id/currency.
+
+### Replay, isolation and failure
+
+Activity, check and activity-aware opening writes are atomic with their scoped
+idempotency receipt. Same key and complete body replays the accepted record/revision
+before stale-version validation, even after the account advances. The returned
+account is the current projection, while the operation item identifies the accepted
+revision. A changed body returns 409 idempotency_conflict. No partial record,
+coverage or receipt survives a failed transaction. One account row lock serializes
+metadata, opening, activity and check writes. Reads use one coherent snapshot.
+All relation keys enforce the same owner/account; guest and cross-owner requests
+retain the existing refusal shape. No production client holds a direct write grant.
 
 ---
 
