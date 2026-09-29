@@ -33,9 +33,9 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 
 | Responsibility | Exclusive implementation ownership | Checkout | Current action |
 | --- | --- | --- | --- |
-| Financial core | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `financial-loop-core` | Trace existing flow and propose contract, then implement after captain synthesis |
-| iPhone | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `financial-loop-iphone` from preserved iOS checkpoint | Recover and inspect source/design; establish simulator baseline and consume the shared financial contract |
-| Device preparation | iOS project/signing/configuration, local build setup and deployment approval evidence; no feature Swift files | `financial-loop-device` | Inspect signing, device and existing hosting access; prepare exact approval actions |
+| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Existing 44 tests pass; local Supabase is available; implementing the shared contract and projection tests |
+| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Source reconciled and baseline simulator build passed; repair inherited forms and connect the accepted contract |
+| Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Prepare internet CAPTCHA adapter/configuration and exact signing/deployment actions |
 | Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Coordinate single writers and exercise assembled candidate |
 
 Throughput checkpoint: three implementation responsibilities, one financial
@@ -61,10 +61,26 @@ manifest rather than creating another board.
 - [ ] Phase D: Keep the audit trail. Record decisions and evidence here as work advances.
 - [ ] Phase E: Verify and hand back. Report phone-proven behavior and remaining MVEE gaps.
 
-Decision trail for this batch stays in this manifest. On restart, isolate the
-three writers and recover the preserved iOS lineage instead of rebuilding its
-account client. Evidence is the fetched base above and the preserved checkpoint
-in the recovery table. Result is active implementation preparation, not delivery.
+Decision trail for this batch stays in this manifest.
+
+- Restart uses three isolated writers and recovers the preserved iOS lineage.
+  The fetched base and recovery checkpoint above identify their source. The
+  native baseline builds and runs but still shows fixtures.
+- Financial design extends the existing record/revision graph and one domain
+  projection. Explicit inclusion decisions cover opening/check boundaries;
+  immutable check confirmation facts remain separate from current residuals.
+  The financial owner records the consumed wire contract in API_CONTRACT and
+  data shape in DATA_MODEL before client integration.
+- A dedicated existing-web `/auth/native-captcha` adapter may reuse the current
+  challenge owner for native login. It contains no password or session state.
+  This is a required auth connection, not web remake work. Its deployment still
+  requires approval.
+- Read-only access inventory found no valid local signing identity, a known
+  but unavailable iPhone 15, and an expired Render CLI session. The existing
+  Supabase project is healthy on its current Free plan; its applied migration
+  inventory does not yet include the financial-account migration. Founder
+  access requests are pending. No hosted mutation or provisioning occurred.
+
 
 ## Outcome and completion
 
