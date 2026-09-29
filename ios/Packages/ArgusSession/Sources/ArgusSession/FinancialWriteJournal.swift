@@ -56,7 +56,7 @@ public final class FinancialWriteJournal: @unchecked Sendable {
         let owner = try Self.owner(identity)
         guard write.ownerId == owner, !write.body.isEmpty,
               write.method == "POST" || write.method == "PATCH",
-              !write.route.isEmpty, write.path.hasPrefix("/"), !write.path.hasPrefix("//")
+              !write.route.isEmpty, (write.path.isEmpty || write.path.hasPrefix("/")), !write.path.hasPrefix("//")
         else { throw FinancialWriteJournalError.invalidIdentity }
         try locked {
             if let existing = try read(owner: owner) {

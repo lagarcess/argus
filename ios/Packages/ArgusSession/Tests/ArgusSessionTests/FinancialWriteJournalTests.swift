@@ -69,7 +69,7 @@ final class FinancialWriteJournalTests: XCTestCase {
     }
 
     private func write(owner: UUID) -> PendingFinancialConfirmation {
-        .init(ownerId: owner, originAccountId: UUID(), route: "financial-activities", path: "/",
+        .init(ownerId: owner, originAccountId: UUID(), route: "financial-activities", path: "",
               method: "POST", body: Data(#"{"preview_token":"reviewed"}"#.utf8), key: UUID())
     }
 }

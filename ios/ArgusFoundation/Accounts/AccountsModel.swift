@@ -136,6 +136,15 @@ final class AccountsModel: ObservableObject {
         selected = account
     }
 
+    func accept(_ updated: [FinancialAccount], preserving originId: UUID) {
+        let selectedId = selected?.id ?? originId
+        for account in updated {
+            if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }
+            else { accounts.append(account) }
+        }
+        selected = accounts.first { $0.id == selectedId }
+    }
+
     private func run(_ operation: (SessionSnapshot) async throws -> Void) async {
         guard let identity, !busy else { return }
         let ticket = generation

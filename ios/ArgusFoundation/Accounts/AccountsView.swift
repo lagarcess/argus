@@ -34,6 +34,15 @@ struct AccountsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 PersonalContext()
+                if let loop = auth.financialLoop, loop.pendingConfirmation != nil {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("loop.pending.title").font(ArgusStyle.body(15))
+                        Text("loop.pending.body").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                        Button("loop.pending.retry") { Task { await loop.retryPending() } }
+                            .buttonStyle(PillButtonStyle()).disabled(loop.recovering)
+                            .accessibilityIdentifier("loop.pending.retry.accounts")
+                    }.padding(16).overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
+                }
                 if let account = model.selected {
                     Button { model.back() } label: { Label("accounts.back", systemImage: "chevron.left") }
                         .frame(minHeight: 48).accessibilityIdentifier("accounts.back")
@@ -127,7 +136,11 @@ struct AccountSummary: View {
                 Text(verbatim: account.currency + " " + AccountPresentation.amount(amount, locale: locale))
                     .font(large ? ArgusStyle.display(30) : ArgusStyle.body()).monospacedDigit()
             } else { Text("accounts.unknown") }
-            if account.nature == "liability" { Text("accounts.signedBalance").font(ArgusStyle.body(12, relativeTo: .caption)) }
+            if account.type == "credit_card", (account.balance.creditMinor ?? 0) > 0 {
+                Text("accounts.creditBalance").font(ArgusStyle.body(12, relativeTo: .caption))
+            } else if account.nature == "liability" {
+                Text("accounts.signedBalance").font(ArgusStyle.body(12, relativeTo: .caption))
+            }
             if account.archived { Text("accounts.archived").font(ArgusStyle.body(12, relativeTo: .caption)) }
         }.fixedSize(horizontal: false, vertical: true).accessibilityElement(children: .combine)
     }

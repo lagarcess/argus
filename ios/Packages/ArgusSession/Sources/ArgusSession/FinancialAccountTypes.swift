@@ -31,9 +31,11 @@ public struct FinancialBalance: Codable, Equatable, Sendable {
     public let asOf: String?
     public let basis: String?
     public let activitySinceTrackingMinor: Int64
+    public let creditMinor: Int64?
     enum CodingKeys: String, CodingKey {
         case state, amount, basis
         case amountMinor = "amount_minor", asOf = "as_of", activitySinceTrackingMinor = "activity_since_tracking_minor"
+        case creditMinor = "credit_minor"
     }
 }
 

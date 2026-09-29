@@ -27,6 +27,9 @@ public struct FinancialActivity: Codable, Equatable, Sendable {
     public var coverage: [FinancialCoverage]
     public var accountId: UUID?
     public var currency: String?
+    public var activityId: UUID?
+    public var role: String?
+    public var active: Bool?
     enum CodingKeys: String, CodingKey {
         case recordId = "record_id"
         case revision
@@ -44,6 +47,8 @@ public struct FinancialActivity: Codable, Equatable, Sendable {
         case coverage
         case accountId = "account_id"
         case currency
+        case activityId = "activity_id"
+        case role, active
     }
 }
 
@@ -54,6 +59,7 @@ public struct FinancialObservation: Codable, Equatable, Sendable {
     public var amountMinor: Int64
     public var amount: String
     public var included: Bool?
+    public var timeZone: String?
     enum CodingKeys: String, CodingKey {
         case observationId = "observation_id"
         case kind
@@ -61,6 +67,7 @@ public struct FinancialObservation: Codable, Equatable, Sendable {
         case amountMinor = "amount_minor"
         case amount
         case included
+        case timeZone = "time_zone"
     }
 }
 
@@ -224,6 +231,10 @@ public struct FinancialCurrencySummary: Codable, Equatable, Sendable {
     public var knownAccounts: Int
     public var unknownAccounts: Int
     public var recordedSpendingMinor: String
+    public var grossIncomeMinor: String?
+    public var grossPurchasesMinor: String?
+    public var refundsMinor: String?
+    public var netSpendingMinor: String?
     enum CodingKeys: String, CodingKey {
         case currency
         case currencyFractionDigits = "currency_fraction_digits"
@@ -236,6 +247,18 @@ public struct FinancialCurrencySummary: Codable, Equatable, Sendable {
         case knownAccounts = "known_accounts"
         case unknownAccounts = "unknown_accounts"
         case recordedSpendingMinor = "recorded_spending_minor"
+        case grossIncomeMinor = "gross_income_minor", grossPurchasesMinor = "gross_purchases_minor"
+        case refundsMinor = "refunds_minor", netSpendingMinor = "net_spending_minor"
+    }
+}
+
+public struct FinancialHomePeriod: Codable, Equatable, Sendable {
+    public var month: String
+    public var timeZone: String
+    public var startAt: String
+    public var endAtExclusive: String
+    enum CodingKeys: String, CodingKey {
+        case month, timeZone = "time_zone", startAt = "start_at", endAtExclusive = "end_at_exclusive"
     }
 }
 
@@ -243,10 +266,13 @@ public struct FinancialHome: Codable, Equatable, Sendable {
     public var currencies: [FinancialCurrencySummary]
     public var recentActivity: [FinancialActivity]
     public var recordedAt: String
+    public var period: FinancialHomePeriod?
+    public var coverage: String?
     enum CodingKeys: String, CodingKey {
         case currencies
         case recentActivity = "recent_activity"
         case recordedAt = "recorded_at"
+        case period, coverage
     }
 }
 

@@ -5,6 +5,59 @@ import XCTest
 
 @MainActor
 final class FinancialModelTests: XCTestCase {
+    func testCanonicalConfirmedWriteSurvivesRelaunchAndCannotReachAnotherOwner() async throws {
+        let fixture = try PresentationFixture()
+        let alice = try await fixture.login()
+        let account = try fixture.account()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(alice); loop.bind(alice); accounts.accept(account)
+        loop.record(account)
+        let editor = try XCTUnwrap(loop.activityEditor)
+        await editor.load()
+        editor.amount = "20.00"
+        await editor.review(locale: Locale(identifier: "en_US"))
+        XCTAssertTrue(editor.canConfirm)
+        await fixture.server.failNextCommit(500)
+        await editor.confirm()
+        XCTAssertEqual(editor.phase, .uncertain)
+        XCTAssertNotNil(loop.pendingConfirmation)
+        let firstCount = await fixture.server.canonicalCommits.count
+        XCTAssertEqual(firstCount, 1)
+
+        let reopened = try fixture.reopened()
+        let restored = try await reopened.restore()
+        let reopenedAccounts = AccountsModel(controller: reopened)
+        let reopenedJournal = FinancialWriteJournal(storage: fixture.storage, prefix: fixture.configuration.storagePrefix)
+        let reopenedLoop = FinancialLoopModel(controller: reopened, accounts: reopenedAccounts, journal: reopenedJournal)
+        reopenedAccounts.bind(restored); reopenedLoop.bind(restored)
+        XCTAssertNotNil(reopenedLoop.pendingConfirmation)
+        let reopenCount = await fixture.server.canonicalCommits.count
+        XCTAssertEqual(reopenCount, 1, "Opening the app must not submit a request")
+
+        _ = try await reopened.signOut()
+        let bob = try await reopened.login(email: "bob@example.test", password: "synthetic-password", captchaToken: "synthetic-captcha")
+        reopenedAccounts.bind(bob); reopenedLoop.bind(bob)
+        XCTAssertNil(reopenedLoop.pendingConfirmation)
+        await reopenedLoop.retryPending()
+        let bobCount = await fixture.server.canonicalCommits.count
+        XCTAssertEqual(bobCount, 1)
+
+        _ = try await reopened.signOut()
+        let aliceAgain = try await reopened.login(email: "alice@example.test", password: "synthetic-password", captchaToken: "synthetic-captcha")
+        reopenedAccounts.bind(aliceAgain); reopenedLoop.bind(aliceAgain)
+        XCTAssertNotNil(reopenedLoop.pendingConfirmation)
+        await reopenedLoop.retryPending()
+        XCTAssertNil(reopenedLoop.pendingConfirmation)
+        let commits = await fixture.server.canonicalCommits
+        XCTAssertEqual(commits.count, 2)
+        if commits.count == 2 {
+            XCTAssertEqual(commits[0].httpBody, commits[1].httpBody)
+            XCTAssertEqual(commits[0].value(forHTTPHeaderField: "Idempotency-Key"), commits[1].value(forHTTPHeaderField: "Idempotency-Key"))
+        }
+        XCTAssertEqual(reopenedAccounts.selected?.balance.amount, "80.00")
+    }
+
     func testArchiveReloadAndRestorePreserveBalanceAndListPlacement() async throws {
         for unknown in [false, true] {
             let fixture = try PresentationFixture()
@@ -89,7 +142,7 @@ final class FinancialModelTests: XCTestCase {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()
         let accounts = AccountsModel(controller: fixture.client)
-        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
         accounts.bind(identity); loop.bind(identity)
         var returnedToSignIn = false
         loop.sessionChanged = { snapshot in
@@ -112,7 +165,7 @@ final class FinancialModelTests: XCTestCase {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()
         let accounts = AccountsModel(controller: fixture.client)
-        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
         accounts.bind(identity); loop.bind(identity); accounts.accept(try fixture.account())
         let gate = RequestGate()
         await fixture.server.holdNextHome(gate)
@@ -132,7 +185,7 @@ final class FinancialModelTests: XCTestCase {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()
         let accounts = AccountsModel(controller: fixture.client)
-        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
         accounts.bind(identity); loop.bind(identity)
         loop.expense(try fixture.account())
         let editor = try XCTUnwrap(loop.editor)
@@ -154,10 +207,21 @@ final class FinancialModelTests: XCTestCase {
 private struct PresentationFixture {
     let server = PresentationServer()
     let client: SessionController
+    let journal: FinancialWriteJournal
+    let storage: MemoryStore
+    let configuration: SessionConfiguration
     init() throws {
         let config = try SessionConfiguration(argusAPIURL: URL(string: "https://api.example.test")!, supabaseURL: URL(string: "https://auth.example.test")!, publicAnonKey: "sb_publishable_test", keychainService: UUID().uuidString)
         let server = self.server
-        client = try SessionController(configuration: config, storage: MemoryStore(), fetch: { try await server.send($0) })
+        let storage = MemoryStore()
+        self.configuration = config
+        self.storage = storage
+        client = try SessionController(configuration: config, storage: storage, fetch: { try await server.send($0) })
+        journal = FinancialWriteJournal(storage: storage, prefix: config.storagePrefix)
+    }
+    func reopened() throws -> SessionController {
+        let server = self.server
+        return try SessionController(configuration: configuration, storage: storage, fetch: { try await server.send($0) })
     }
     func login(email: String = "alice@example.test") async throws -> SessionSnapshot {
         try await client.login(email: email, password: "synthetic-password", captchaToken: "synthetic-captcha")
@@ -169,6 +233,7 @@ private actor PresentationServer {
     let auth = AuthServer()
     static let id = UUID()
     static let activityID = UUID()
+    static let cashID = UUID()
     private var updated = false
     private var archived = false
     private var unknownBalance = false
@@ -180,6 +245,7 @@ private actor PresentationServer {
     private var homeGate: RequestGate?
     private var commitGate: RequestGate?
     private(set) var commits: [URLRequest] = []
+    private(set) var canonicalCommits: [URLRequest] = []
     private(set) var previews: [URLRequest] = []
     func expireIdentity() { expired = true }
     func failNextCommit(_ status: Int) { nextStatus = status }
@@ -188,6 +254,9 @@ private actor PresentationServer {
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         let path = request.url!.path
         guard path.contains("/financial-") else { return try await auth.send(request) }
+        if path.contains("/financial-activities") {
+            return try canonical(request)
+        }
         var status = 200
         let body: String
         if request.httpMethod == "PATCH", path.hasSuffix(Self.id.uuidString) {
@@ -213,6 +282,41 @@ private actor PresentationServer {
             status = expired ? 401 : nextStatus ?? 200; nextStatus = nil
             body = #"{"account":\#(Self.account(updated:true)),"activity":{"record_id":"\#(Self.activityID)","revision":1,"kind":"expense","amount_minor":2000,"amount":"20.00","balance_movement_minor":-2000,"occurred_at":"2026-09-01T12:00:00Z","time_zone":"UTC","recorded_at":"2026-09-01T12:00:00Z","coverage":[]},"replayed":true}"#
         } else { body = #"{"items":[],"next_cursor":null}"# }
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+    }
+    private func canonical(_ request: URLRequest) throws -> (Data, URLResponse) {
+        let path = request.url!.path
+        let body: String
+        var status = 200
+        if path.hasSuffix("/options") {
+            let cash = Self.account(updated: false)
+                .replacingOccurrences(of: Self.id.uuidString, with: Self.cashID.uuidString)
+                .replacingOccurrences(of: "\"type\":\"checking\"", with: "\"type\":\"cash\"")
+            body = #"{"accounts":[\#(accountRecord()),\#(cash)],"eligibility":{"expense":["cash","checking","savings","credit_card"],"income":["cash","checking","savings","investment"],"transfer":["cash","checking","savings","investment"],"card_payment":["cash","checking","savings","investment"],"refund":["cash","checking","savings","credit_card"]},"destination_eligibility":{"transfer":["cash","checking","savings","investment"],"card_payment":["credit_card"]},"categories":["groceries"],"sources":["salary"]}"#
+        } else if path.hasSuffix("/purchases") {
+            body = #"{"items":[]}"#
+        } else if path.hasSuffix("/preview") {
+            let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+            let ids = [payload["account_id"], payload["source_account_id"], payload["destination_account_id"]]
+                .compactMap { $0 as? String }
+            let effects = ids.map { id in
+                #"{"account_id":"\#(id)","currency":"DOP","currency_fraction_digits":2,"before":\#(Self.balance(false)),"after":\#(Self.balance(true)),"observations":[],"unexplained_before":{},"unexplained_after":{}}"#
+            }.joined(separator: ",")
+            let reviewed = String(data: try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]), encoding: .utf8)!
+            body = #"{"ready":true,"expected_versions":{},"affected_accounts":[\#(effects)],"reviewed_request":\#(reviewed),"preview_token":"reviewed"}"#
+        } else if request.httpMethod == "POST" || request.httpMethod == "PATCH" {
+            canonicalCommits.append(request); updated = true
+            status = nextStatus ?? 200; nextStatus = nil
+            let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+            let kind = payload["kind"] as? String ?? "expense"
+            let accountID = payload["account_id"] as? String ?? Self.id.uuidString
+            let date = payload["occurred_at"] as? String ?? "2026-09-01T12:00:00Z"
+            let zone = payload["time_zone"] as? String ?? "UTC"
+            let activity = #"{"activity_id":"\#(Self.activityID)","revision":1,"kind":"\#(kind)","amount_minor":2000,"amount":"20.00","currency":"DOP","currency_fraction_digits":2,"occurred_at":"\#(date)","time_zone":"\#(zone)","note":null,"category_id":null,"source_id":null,"purchase_activity_id":null,"purchase_revision":null,"reason":null,"recorded_at":"2026-09-01T12:00:00Z","recorded_by":null,"legs":[{"record_id":"\#(Self.activityID)","record_revision":1,"account_id":"\#(accountID)","role":"single","balance_movement_minor":-2000,"coverage":[]}]}"#
+            body = #"{"activity":\#(activity),"accounts":[\#(Self.account(updated: true))],"replayed":\#(canonicalCommits.count > 1)}"#
+        } else {
+            body = #"{"items":[],"next_cursor":null}"#
+        }
         return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
     }
     private func accountRecord() -> String {
