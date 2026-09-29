@@ -77,6 +77,7 @@ def test_reads_format_a_stored_currency_after_tender_retirement(
     corrected = alice.opening(
         created["id"],
         {
+            "expected_version": 1,
             "expected_revision": 1,
             "amount": "12000.00",
             "reason": "typo after tender retirement",
@@ -270,7 +271,13 @@ def test_unauthenticated_and_guest_requests_are_refused(
         guest.get(owned["id"]),
         guest.edit(owned["id"], {"expected_version": 1, "nickname": "x"}),
         guest.opening(
-            owned["id"], {"expected_revision": 1, "amount": "2", "reason": "r"}
+            owned["id"],
+            {
+                "expected_version": 1,
+                "expected_revision": 1,
+                "amount": "2",
+                "reason": "r",
+            },
         ),
     ):
         assert response.status_code == 403, response.text
@@ -282,7 +289,10 @@ def test_a_malformed_account_id_is_not_found(alice: AccountsApi) -> None:
     for response in (
         alice.get("not-a-uuid"),
         alice.edit("not-a-uuid", {"expected_version": 1, "nickname": "x"}),
-        alice.opening("not-a-uuid", {"expected_revision": None, "amount": "1"}),
+        alice.opening(
+            "not-a-uuid",
+            {"expected_version": 1, "expected_revision": None, "amount": "1"},
+        ),
     ):
         assert (response.status_code, response.json()["code"]) == (
             404,
@@ -299,7 +309,13 @@ def test_two_users_cannot_read_or_mutate_each_others_accounts(
         bob.get(owned["id"]),
         bob.edit(owned["id"], {"expected_version": 1, "nickname": "Mine now"}),
         bob.opening(
-            owned["id"], {"expected_revision": 1, "amount": "0", "reason": "drain"}
+            owned["id"],
+            {
+                "expected_version": 1,
+                "expected_revision": 1,
+                "amount": "0",
+                "reason": "drain",
+            },
         ),
     ):
         assert response.status_code == 404, response.text
@@ -380,6 +396,58 @@ def test_archive_changes_no_balance_and_restore_returns_it(alice: AccountsApi) -
     assert restored["balance"] == created["balance"]
 
 
+def test_opening_write_binds_caller_visible_account_version(alice: AccountsApi) -> None:
+    """Opening must refuse a stale client view of account metadata.
+
+    Before this guard, PUT …/opening checked only expected_revision and CASed
+    the account version the server had just read. A concurrent currency/type
+    edit between the client's GET and the opening PUT still applied, because
+    the server re-read the new version and signed under metadata the caller
+    never saw.
+    """
+
+    created = _created(alice, {"type": "checking", "currency": "DOP"})
+    assert created["version"] == 1
+    assert created["opening"] is None
+    seen_version = created["version"]
+
+    concurrent = alice.edit(
+        created["id"],
+        {"expected_version": 1, "currency": "USD", "type": "credit_card"},
+    )
+    assert concurrent.status_code == 200, concurrent.text
+    assert concurrent.json()["version"] == 2
+    assert concurrent.json()["nature"] == "liability"
+
+    stale = alice.opening(
+        created["id"],
+        {
+            "expected_version": seen_version,
+            "expected_revision": None,
+            "amount": "100.00",
+        },
+    )
+    assert (stale.status_code, stale.json()["code"]) == (409, "stale_version")
+    unchanged = alice.get(created["id"]).json()
+    assert unchanged["opening"] is None
+    assert unchanged["version"] == 2
+    assert unchanged["currency"] == "USD"
+    assert unchanged["type"] == "credit_card"
+
+    fresh = alice.opening(
+        created["id"],
+        {
+            "expected_version": 2,
+            "expected_revision": None,
+            "amount": "100.00",
+        },
+    )
+    assert fresh.status_code == 200, fresh.text
+    assert fresh.json()["balance"]["amount_minor"] == -10_000
+    assert fresh.json()["version"] == 3
+    assert fresh.json()["opening"]["revision"] == 1
+
+
 def test_corrections_keep_history_and_enforce_expected_revision(
     alice: AccountsApi,
 ) -> None:
@@ -389,6 +457,7 @@ def test_corrections_keep_history_and_enforce_expected_revision(
     corrected = alice.opening(
         account_id,
         {
+            "expected_version": 1,
             "expected_revision": 1,
             "amount": "12000.00",
             "reason": "typo in starting balance",
@@ -409,7 +478,13 @@ def test_corrections_keep_history_and_enforce_expected_revision(
     assert body["opening"]["revisions"][0]["as_of"] == created["opening"]["as_of"]
 
     stale = alice.opening(
-        account_id, {"expected_revision": 1, "amount": "1.00", "reason": "late"}
+        account_id,
+        {
+            "expected_version": 2,
+            "expected_revision": 1,
+            "amount": "1.00",
+            "reason": "late",
+        },
     )
     assert (stale.status_code, stale.json()["code"]) == (409, "stale_version")
     assert alice.get(account_id).json() == body
@@ -417,6 +492,7 @@ def test_corrections_keep_history_and_enforce_expected_revision(
     redated = alice.opening(
         account_id,
         {
+            "expected_version": 2,
             "expected_revision": 2,
             "as_of": "2026-09-01T08:00:00-04:00",
             "reason": "balance was from the 1st",
@@ -430,12 +506,36 @@ def test_corrections_keep_history_and_enforce_expected_revision(
     assert len(redated.json()["opening"]["revisions"]) == 3
 
     for body, code in (
-        ({"expected_revision": 3, "amount": "1"}, "reason_required"),
-        ({"expected_revision": 3, "reason": "nothing changes"}, "field_missing"),
-        ({"expected_revision": 3, "amount": "1", "reason": "x" * 201}, "reason_invalid"),
-        ({"expected_revision": 3, "amount": "1.005", "reason": "r"}, "amount_precision"),
+        ({"expected_version": 3, "expected_revision": 3, "amount": "1"}, "reason_required"),
         (
-            {"expected_revision": 3, "as_of": "2999-01-01T00:00:00Z", "reason": "r"},
+            {"expected_version": 3, "expected_revision": 3, "reason": "nothing changes"},
+            "field_missing",
+        ),
+        (
+            {
+                "expected_version": 3,
+                "expected_revision": 3,
+                "amount": "1",
+                "reason": "x" * 201,
+            },
+            "reason_invalid",
+        ),
+        (
+            {
+                "expected_version": 3,
+                "expected_revision": 3,
+                "amount": "1.005",
+                "reason": "r",
+            },
+            "amount_precision",
+        ),
+        (
+            {
+                "expected_version": 3,
+                "expected_revision": 3,
+                "as_of": "2999-01-01T00:00:00Z",
+                "reason": "r",
+            },
             "date_in_future",
         ),
     ):
@@ -452,20 +552,34 @@ def test_an_unknown_balance_can_be_recorded_later_with_no_expected_revision(
 ) -> None:
     created = _created(alice, {"type": "cash", "currency": "USD"})
     premature = alice.opening(
-        created["id"], {"expected_revision": 1, "amount": "5", "reason": "r"}
+        created["id"],
+        {
+            "expected_version": 1,
+            "expected_revision": 1,
+            "amount": "5",
+            "reason": "r",
+        },
     )
     assert (premature.status_code, premature.json()["code"]) == (409, "stale_version")
-    missing = alice.opening(created["id"], {"expected_revision": None})
+    missing = alice.opening(
+        created["id"], {"expected_version": 1, "expected_revision": None}
+    )
     assert (missing.status_code, missing.json()["code"]) == (422, "field_missing")
 
-    recorded = alice.opening(created["id"], {"expected_revision": None, "amount": "5.25"})
+    recorded = alice.opening(
+        created["id"],
+        {"expected_version": 1, "expected_revision": None, "amount": "5.25"},
+    )
     assert recorded.status_code == 200, recorded.text
     assert recorded.json()["balance"]["amount_minor"] == 525
     assert recorded.json()["opening"]["revision"] == 1
     assert recorded.json()["opening"]["reason"] is None
     assert recorded.json()["version"] == 2
 
-    twice = alice.opening(created["id"], {"expected_revision": None, "amount": "9"})
+    twice = alice.opening(
+        created["id"],
+        {"expected_version": 1, "expected_revision": None, "amount": "9"},
+    )
     assert (twice.status_code, twice.json()["code"]) == (409, "stale_version")
 
 

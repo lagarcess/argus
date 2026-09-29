@@ -156,9 +156,12 @@ class FinancialAccountService:
     ) -> StoredAccount:
         stored = self.get(user_id=user_id, account_id=account_id)
         current = stored.opening.current if stored.opening is not None else None
-        if request.expected_revision != (current.revision if current else None):
-            # The body is validated against the basis the caller holds; when that
-            # basis is already stale, say so first. Storage re-checks under lock.
+        if (
+            request.expected_version != stored.account.version
+            or request.expected_revision != (current.revision if current else None)
+        ):
+            # The body is validated against the view the caller holds; when that
+            # view is already stale, say so first. Storage re-checks under lock.
             raise StaleVersion()
         write = plan_opening_write(
             account_type=stored.account.type,
@@ -174,8 +177,8 @@ class FinancialAccountService:
             user_id=user_id,
             account_id=stored.account.id,
             expected_revision=request.expected_revision,
-            # The amount was signed and scaled under this read's type and currency;
-            # storage refuses the write if the account moved since.
-            expected_version=stored.account.version,
+            # Caller-visible version: amount was signed and scaled under the
+            # metadata that version names; storage refuses if the account moved.
+            expected_version=request.expected_version,
             write=write,
         )

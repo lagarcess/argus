@@ -86,10 +86,17 @@ class ProductionScene:
     def correct(
         self, account_id: str, expected_revision: int, reason: str, **fields
     ) -> dict[str, Any]:
+        # Reopen for the caller-visible account version the opening write binds.
+        expected_version = self.reopen({"id": account_id})["version"]
         return self._ok(
             self.api.opening(
                 account_id,
-                {"expected_revision": expected_revision, "reason": reason, **fields},
+                {
+                    "expected_version": expected_version,
+                    "expected_revision": expected_revision,
+                    "reason": reason,
+                    **fields,
+                },
             )
         )
 

@@ -7442,6 +7442,9 @@ components:
       - public_account_access_enabled
     WriteOpeningRequest:
       properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
         expected_revision:
           anyOf:
           - type: integer
@@ -7469,6 +7472,8 @@ components:
           - type: 'null'
       additionalProperties: false
       type: object
+      required:
+      - expected_version
   responses:
     AuthSessionVerificationUnavailable:
       description: Bounded Supabase session verification is temporarily unavailable; retry

@@ -81,10 +81,12 @@ never reads as zero.
    (`nature_change_requires_empty_account`).
 9. Archive: organizational. It changes no record and no balance. Restore is the
    same edit with `archived=false`.
-10. Concurrency: account edits carry `expected_version`; opening corrections
-    carry `expected_revision`, and the server additionally commits an opening
-    only under the account version it read to sign and scale the amount. A
-    mismatch is `409 stale_version` and changes nothing.
+10. Concurrency: account edits carry `expected_version`; opening writes carry
+    both `expected_version` (the caller-visible account version) and
+    `expected_revision`. A mismatch on either is `409 stale_version` and
+    changes nothing. The account-version bind makes a concurrent currency or
+    type edit between the client's read and the opening PUT unrepresentable
+    as a successful write.
 11. Idempotency: create requires `Idempotency-Key` with the contract grammar.
     The identity is the canonical hash of the validated request. Same key and
     identity replays the original account with no second write; same key with
@@ -93,7 +95,7 @@ never reads as zero.
 12. Correction: a revision carries a non-empty reason of up to 200 code points,
     the acting user and the server instant. Revision 1 is the original entry.
     Recording an opening on an account that has none uses the same route with
-    `expected_revision: null`.
+    `expected_revision: null` and the account's current `expected_version`.
 
 ## API surface
 
@@ -107,7 +109,7 @@ request and response shapes.
 | `GET /api/v1/financial-accounts` | List the caller's accounts, archived included and flagged. |
 | `GET /api/v1/financial-accounts/{id}` | Reopen one account with its balance and opening history. |
 | `PATCH /api/v1/financial-accounts/{id}` | Edit nickname, type, currency, archived, ownership share with `expected_version`. |
-| `PUT /api/v1/financial-accounts/{id}/opening` | Record or correct the starting balance and its date with `expected_revision`. |
+| `PUT /api/v1/financial-accounts/{id}/opening` | Record or correct the starting balance and its date with `expected_version` and `expected_revision`. |
 
 ## Acceptance
 
@@ -120,7 +122,9 @@ Deterministic (in-memory repository, no database), in
 - duplicate create retries return one account; a changed body conflicts;
 - unauthenticated and guest requests are refused; flag off hides the surface;
 - edits enforce the locks and `expected_version`;
-- corrections keep history and enforce `expected_revision`.
+- corrections keep history and enforce `expected_version` plus `expected_revision`;
+- an opening write that carries a stale caller-visible account version after a
+  concurrent currency/type edit is `409 stale_version` and writes nothing.
 
 The first-slice scenarios named in section 18 of the recording contract
 (`clavito_large_opening`, `blank_opening_unknown`,

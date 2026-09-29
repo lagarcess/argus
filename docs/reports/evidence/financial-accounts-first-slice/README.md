@@ -68,7 +68,7 @@ Python 3.10.20 (pinned). Provider keys blanked;
 | Duplicate retries make one account | `test_duplicate_create_retries_make_one_account`, `test_duplicate_submission_create_part` | `test_concurrent_duplicate_creates_make_one_account` (8 threads) | replay and conflict |
 | Unauthenticated and guest writes refused | `test_unauthenticated_and_guest_requests_are_refused` | `test_storage_refuses_an_anonymous_owner` (SQL function) | real GoTrue anonymous session → 403 |
 | Two users isolated, including RLS | `test_two_users_cannot_read_or_mutate_each_others_accounts` | `test_rls_reads_are_owner_only_and_registered_only_and_writes_have_no_client_path`, `test_another_user_cannot_reach_the_account_through_the_repository` | two real registered sessions |
-| Corrections preserve history, stale rules | `test_corrections_keep_history_and_enforce_expected_revision`, `test_first_slice_create_reopen_edit` | `test_edit_and_opening_compare_and_set_write_nothing_when_stale` | correction and stale edit |
+| Corrections preserve history, stale rules | `test_corrections_keep_history_and_enforce_expected_revision`, `test_opening_write_binds_caller_visible_account_version`, `test_first_slice_create_reopen_edit` | `test_edit_and_opening_compare_and_set_write_nothing_when_stale` | correction and stale edit |
 | Default-off exposure | `test_flag_off_hides_the_surface_from_everyone` | | |
 | Migration from the integration schema | | `test_migration_objects_exist_on_the_integration_schema`; 81 + 1 migrations applied in order | |
 

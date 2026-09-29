@@ -52,6 +52,10 @@ class EditFinancialAccountRequest(BaseModel):
 class WriteOpeningRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # Caller-visible account version from the GET/list/edit response the person
+    # is acting on. Required so a concurrent currency/type edit between that
+    # read and this write cannot apply under metadata the caller never saw.
+    expected_version: int = Field(ge=1)
     # The current opening revision, or null when the account has no opening yet.
     expected_revision: int | None = Field(default=None, ge=1)
     amount: str | None = Field(default=None, max_length=40)

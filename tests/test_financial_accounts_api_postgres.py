@@ -175,7 +175,12 @@ def test_real_sessions_create_reopen_edit_and_stay_isolated(
                 ),
                 client.put(
                     f"/api/v1/financial-accounts/{account['id']}/opening",
-                    json={"expected_revision": 1, "amount": "0", "reason": "drain"},
+                    json={
+                        "expected_version": 1,
+                        "expected_revision": 1,
+                        "amount": "0",
+                        "reason": "drain",
+                    },
                     headers=bob,
                 ),
             ):
@@ -208,7 +213,12 @@ def test_real_sessions_create_reopen_edit_and_stay_isolated(
 
             corrected = client.put(
                 f"/api/v1/financial-accounts/{account['id']}/opening",
-                json={"expected_revision": 1, "amount": "12000.00", "reason": "typo"},
+                json={
+                    "expected_version": 2,
+                    "expected_revision": 1,
+                    "amount": "12000.00",
+                    "reason": "typo",
+                },
                 headers=alice,
             )
             assert corrected.status_code == 200, corrected.text

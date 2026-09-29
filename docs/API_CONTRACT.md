@@ -6542,6 +6542,7 @@ Record the starting balance on an account that has none, or correct it.
 **Request:**
 ```json
 {
+  "expected_version": 1,
   "expected_revision": 1,
   "amount": "12000.00",
   "as_of": "2026-09-01T08:00:00-04:00",
@@ -6550,12 +6551,16 @@ Record the starting balance on an account that has none, or correct it.
 }
 ```
 
+- `expected_version` is required and is the account `version` from the
+  GET/list/edit response the caller is acting on. A mismatch is
+  `409 stale_version` and writes nothing. Binding the opening write to that
+  caller-visible version makes a concurrent currency or type edit between the
+  client's read and this PUT unrepresentable as a successful write: the amount
+  is signed and scaled only under metadata the caller already saw.
 - `expected_revision` is the current opening revision, or `null` when the
   account has no opening yet. A mismatch is `409 stale_version` and writes
-  nothing. The server also signs and scales the amount under the account
-  `version` it reads for the request and commits only if that version still
-  holds, so a concurrent currency or type edit on an empty account makes the
-  write stale instead of storing units under the old metadata.
+  nothing. Storage re-checks both the caller-supplied account version and the
+  opening revision under lock.
 - A first opening needs `amount`; `reason` is optional. A correction needs a
   non-empty `reason` of at most 200 code points (`422 reason_required`,
   `422 reason_invalid`) and at least one of `amount`, `as_of`, `time_zone`

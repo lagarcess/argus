@@ -185,9 +185,11 @@ grant execute on function public.create_financial_account(
 ) to service_role;
 
 -- Record a first opening (p_expected_revision null) or append a correction
--- (p_expected_revision = the current revision). The caller signed and scaled
--- the amount under the account version it read, so that version is compared
--- too. Any mismatch writes nothing.
+-- (p_expected_revision = the current revision). The caller must supply the
+-- account version it saw when composing the write (p_expected_version); that
+-- version is compared under the account lock so a concurrent currency/type
+-- edit cannot apply under metadata the caller never saw. Any mismatch writes
+-- nothing.
 create or replace function public.write_financial_opening(
     p_user_id uuid,
     p_account_id uuid,
