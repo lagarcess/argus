@@ -1,7 +1,8 @@
 # Native financial-loop evidence
 
-This is a local component checkpoint. The founder’s physical iPhone, existing
-identity and real data over the internet remain the delivery acceptance boundary.
+This is the founder-authorized local simulator deliverable for PR #745. The
+founder's physical iPhone, existing identity and real data over the internet remain
+the overall delivery goal; signing, installation and deployment are deferred.
 The [execution manifest](../../../../specs/argus-execution-board.md) owns that status.
 
 Native source: `d5299f65a5e9a49ccb50509b2d839107f7734f95`.
@@ -119,6 +120,7 @@ processes and retain the volume and ignored fixtures.
 
 The full local result bundle is `/tmp/argus-loop-iphone-evidence/ui-1790671670.xcresult`.
 Raw bundles/logs are not committed because auth diagnostics can contain synthetic
-credentials. The original selected evidence and sanitized summary are published
-in PR #745. The additional archive-review correction/evidence commits remain local
-pending resolution of its unexpected automatic hosted-preview publication effect.
+credentials. The original selected evidence, sanitized summary and additional
+archive-review correction/evidence commits are published in PR #745. The founder
+authorized its existing automatic Supabase preview; all integration settings stay
+unchanged. CI and scoped review completion are recorded in the PR's terminal audit.

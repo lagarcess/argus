@@ -22,15 +22,22 @@ installation, hosted rollout and physical-phone proof remain outstanding.
 
 **GitHub publication authorized:** The founder explicitly approved pushing
 `codex/financial-loop-delivery`, opening its review PR, and completing CI and
-scoped review. This grant is GitHub publication only. Physical-device signing,
-Render login and deployment are deferred. Keep the simulator/local-backend
+scoped review, including its existing automatic Supabase preview. Physical-device
+signing, installation, Render login and deployment are deferred. Keep the simulator/local-backend
 demonstration runnable with retained synthetic data and restart instructions.
 
-**Goal:** Deliver the loop defined under [full-scope execution and early demonstration](#full-scope-execution-and-early-demonstration)
-on the founder's physical iPhone over the internet using the existing user.
+**Current review deliverable:** The founder subsequently made the complete loop
+working in the simulator against the real local API/database the acceptance target
+for PR #745, with a short recording, restart instructions and honest limitations.
+Own CI and scoped review through a merge-ready verdict without routine approvals;
+do not merge or deploy. Physical signing, installation and deployment are deferred.
+
+**Overall delivery goal:** Deliver the loop defined under [full-scope execution and early demonstration](#full-scope-execution-and-early-demonstration)
+on the founder's physical iPhone over the internet using the existing user when
+those deferred actions are authorized.
 Preserve the [locked design](../reports/mobile-design-lock-2026-09-28.md).
-Simulator acceptance is an intermediate gate; physical-phone acceptance closes
-the batch. Unknown balances, corrections, reconciliation, retry, persistence and
+Simulator acceptance closes the current local deliverable, not the full MVEE or
+physical-phone outcome. Unknown balances, corrections, reconciliation, retry, persistence and
 identity isolation follow the linked canonical requirements and technical handoff.
 
 **Base:** freshly fetched `fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`.
@@ -40,24 +47,27 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 
 | Responsibility | Exclusive implementation ownership | Checkout | Current action |
 | --- | --- | --- | --- |
-| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Frozen at `92020058d`: independent clean review and exact HTTP/Home proof; 108 focused checks repeated successfully on assembled candidate `ba69fecd6` |
-| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Frozen at `d5299f65`: three actual API/Postgres simulator journeys pass; 39 session tests and five model tests pass; four environment-gated session tests explicitly skipped; independent delta review clean |
+| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Source `c2425f2e2` includes reviewed timezone/type-lock corrections; 126 focused checks, including real local Postgres, pass on published delivery source; earlier exact HTTP/Home proof retained |
+| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Source `bbfb3bff` with archive evidence in `129d2c876`: three original actual API/Postgres journeys plus focused archive/restore pass; six model tests and 39 session tests pass; four environment-gated session tests explicitly skipped |
 | Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
 | Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Publish authorized delivery branch and review PR, complete CI/scoped review, and retain runnable local demonstration; signing, Render login and deployment deferred |
 
 ### PR #745 review checkpoint
 
 [Review PR #745](https://github.com/lagarcess/argus/pull/745) is open against
-`codex/private-alpha-next`. Published head `b5cfedef998079f3978f9282e60bc287afa7dc25`
+`codex/private-alpha-next`. Original reviewed head `b5cfedef998079f3978f9282e60bc287afa7dc25`
 passed [CI](https://github.com/lagarcess/argus/actions/runs/36549243112) and
 [local smoke](https://github.com/lagarcess/argus/actions/runs/36549243153).
 The original and freshly fetched integration base remain `fcbb70cc2`; no
 reconciliation merge or intervening integration overlap exists.
 
 The first Codex review found three confirmed defects. Each has a thumbs-up and
-an evidence-backed reply; threads remain unresolved because the fixes are local:
+an evidence-backed reply. All fixes below were published in `6d3f8e066`; this
+documentation follow-up changes no product/test source. The PR's terminal audit
+will record final exact-head CI, thread resolution and the scoped review result
+after they finish; this checkpoint does not pre-empt that verdict.
 
-| Finding | Local correction and verification | Delivery commit |
+| Finding | Published correction and verification | Delivery commit |
 | --- | --- | --- |
 | Balance timestamps used the opening's timezone regardless of source | Canonical position retains its source revision's IANA zone; Home orders freshness by UTC instant, including repeated DST hours. Memory and real-Postgres regressions cover preview/save/reopen | `71ea905a7` from core `c2425f2e2` |
 | Account type remained editable after a check without expenses | Existing type lock includes balance checks/value updates; opening-only behavior preserved | `71ea905a7` |
@@ -67,7 +77,11 @@ The assembled local correction candidate `08254e668` passed 126 focused backend
 checks including real Postgres, full Ruff and modularity checks. The original
 financial-loop evidence remains historical at its recorded sources; the changed
 timezone/type-lock and account-list surfaces have the focused replacement proof
-above. No clean final PR review or candidate CI claim is made for unpublished fixes.
+above. At published head `6d3f8e066`, all 126 backend checks and all six native model
+tests passed again. Modularity passed against the current integration descendant;
+product/test source is unchanged from `08254e668`. Native sources match `bbfb3bff`
+and financial sources match `c2425f2e2`, explicitly revalidating the focused
+simulator and source-timezone/type-lock evidence for the published candidate.
 
 **Preview cleanup and publication authorization:** the founder authorized
 verification, removal of only PR #745's disposable preview, and disabling
@@ -109,8 +123,8 @@ contract owner and one integration owner. Device access must not block local
 financial/native work. CPU-heavy Xcode and database suites use separate owners;
 shared simulator control is exclusive to the native owner until handed to QA.
 The first stop requiring the founder is a concrete signing or hosted action,
-not a routine engineering decision. Completion remains unverified until the
-physical-phone evidence exists.
+not a routine engineering decision. Physical-phone completion remains unverified;
+it is deferred beyond this explicitly authorized local review deliverable.
 
 The execution checklist adapts poteto's figure-it-out workflow into this existing
 manifest rather than creating another board.
