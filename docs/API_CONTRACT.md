@@ -6906,3 +6906,72 @@ If no, it likely should wait.
 
 > [!NOTE]
 > Keep `summary` out entirely and use `metrics` everywhere. “Summary” can later become an AI-written explanation, while `metrics` stays machine-readable.
+
+## Personal money activities (authorized September 29, 2026)
+
+Canonical routes, all under `/api/v1` and the existing registered-owner/default-off gate:
+- `POST /financial-activities/preview`, `POST /financial-activities`
+- `GET /financial-activities/{id}`, `GET /financial-activities/{id}/history`
+- `POST /financial-activities/{id}/preview`, `PATCH /financial-activities/{id}`
+- `GET /financial-activities/options`: `{accounts:[FinancialAccountResponse],eligibility:{kind:[account_type]},categories:[string],sources:[string]}`.
+- `GET /financial-activities/purchases?currency=DOP`: `{items:[Activity]}`; each purchase adds `refunded_minor` and `refundable_minor`.
+
+The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
+Kind is `expense|income|transfer|card_payment|refund`, immutable on correction.
+Singles use account_id; pairs use source/destination. Irrelevant non-null fields fail.
+Amount is a positive decimal string; occurred_at requires an offset and cannot be
+future. Zone defaults to America/Santo_Domingo. Note/reason max 200 characters.
+Correction requires current expected_revision and nonempty reason. Expense/refund
+category is optional; income source is `salary|remittance|interest|other` or null.
+Linked refund category normalizes from purchase; an explicitly different value fails.
+Explicit `purchase_activity_id:null` unlinks; cap errors never silently unlink.
+Expected_versions maps UUID to account version. Coverage is
+`[{account_id,observation_id,included}]`.
+
+Preview is `{ready,expected_versions,affected_accounts,reviewed_request,preview_token}`.
+Each affected account is `{account_id,currency,currency_fraction_digits,before,after,
+observations,unexplained_before,unexplained_after}`. Before/after use BalanceResponse;
+after/unexplained_after are null until ready. Unexplained maps check UUID to nullable
+signed minor units. Observations use existing ObservationQuestion. Include all old/new
+leg accounts and old/new linked purchase accounts, even unchanged dependencies.
+Preview validates supplied version hints and returns the entire required version map.
+Ready reviewed_request is the normalized full command, with canonical category,
+complete expected_versions and preview_token null. Confirm sends exactly this command
+with the token and Idempotency-Key. Complete exact account-version set, activity
+revision and token must match under locks; stale writes change nothing.
+
+Activity is `{activity_id,revision,kind,amount_minor,amount,currency,
+currency_fraction_digits,occurred_at,time_zone,note,category_id,source_id,
+purchase_activity_id,purchase_revision,reason,recorded_at,recorded_by,legs}`.
+Leg is `{record_id,record_revision,account_id,role,balance_movement_minor,coverage}`;
+role is `single|source|destination`; coverage uses legacy CoverageAnswer.
+Write returns `{activity,accounts:[FinancialAccountResponse],replayed}`: accepted
+historical revision plus all affected accounts' current projections. History is
+`{items:[Activity],next_cursor:null}`, newest first. Account activity additionally
+exposes activity_id, role and active; retired legs have zero movement and active false.
+Home recent activity shows each paired operation once.
+
+Income admits cash/checking/savings/investment; expense/refund cash/checking/savings/
+credit_card. Transfer connects distinct cash/checking/savings/investment accounts;
+card payment uses those sources and credit_card destination. Pairs and linked refunds
+require same currency. No FX/loan allocation. Positive card balance exposes credit_minor
+in BalanceResponse. Unknown remains unknown after activity.
+
+Linked refunds target owned expenses, cannot precede purchase local financial date,
+and cumulative current linked refunds cannot exceed purchase. Purchase corrections
+cannot reduce below refunded amount, move after a linked refund, or change category
+while refunds are linked. Error directs explicit refund correction/unlink then purchase
+correction and optional relink. Purchase account correction preserves identity/links.
+
+`GET /financial-home?month=2026-09&time_zone=America/Santo_Domingo` adds
+`period:{month,time_zone,start_at,end_at_exclusive}`, `coverage:"recorded_only"`, and
+currency string integers gross_income_minor, gross_purchases_minor, refunds_minor,
+net_spending_minor. Default month uses clock in requested zone; default zone is Santo
+Domingo. Half-open monthly interval controls received-month refund attribution. Net
+may be negative. Transfers/payments contribute zero. Existing recorded_spending_minor
+remains lifetime gross purchases. Activity uses full transaction amounts; position
+retains personal shares. Archived accounts remain in summaries.
+
+Legacy expense URLs, IDs and request receipt hashes stay replayable through the same
+planner/projection. Moved/retired legs cannot be independently corrected. Existing
+check/opening coverage behavior stays exact-revision and append-only.

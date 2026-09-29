@@ -2626,3 +2626,29 @@ When adding or changing a table, ask:
 > *Does this store durable truth, recovery state, or useful research memory without turning context into simulation truth?*
 
 If no, it likely should wait for post-Alpha.
+
+### Personal money activity extension (authorized September 29, 2026)
+
+Additive migration retains financial_records/revisions and existing coverage foreign
+keys. All activity uses current signed leg movements in the existing projection.
+Kind, role, active and source/refund provenance live in revision details. Account
+correction retires departed legs with new inactive zero revisions and creates/reuses
+replacement records; immutable account_id and historical coverage remain.
+
+financial_activity_groups owns stable identity, owner, immutable kind and current
+revision. financial_activity_memberships binds each group revision to exact record
+revisions and role using owner-qualified composite keys. Shared facts derive from
+primary single/source leg, never a second stored amount. All existing expense IDs
+and revisions backfill as groups with identical IDs. Refund provenance contains
+stable purchase group and reviewed revision. Purchase category edits with linked
+refunds fail explicitly, so copied historical category cannot silently drift.
+
+financial_activity_receipts binds owner/key, request hash, accepted group/revision and
+affected account IDs. Every canonical AND legacy activity writer takes one owner
+transaction advisory lock before discovering dependencies, then the complete affected
+account rows in UUID order. Replay precedes CAS. All revisions/membership/coverage,
+versions and receipt commit atomically. Metadata/opening/check writers stay account-only;
+none acquires owner lock after account lock. Reads use repeatable-read snapshots.
+Money rules stay in domain code. Owner serialization protects refund/purchase races.
+Group/membership SELECT RLS is registered-owner only, writes service-only; receipts
+have no client grants. Home derives monthly totals from current primary legs.
