@@ -36,7 +36,8 @@ instructions, green applicable CI and one clean independent fresh-context review
 (or an explicit pending verdict if no reviewer is available).
 
 **Isolation:** Search owns local allocation `58800` (API), `58801` (Supabase),
-`58802` (Postgres), `58805` (CAPTCHA bridge) and dedicated simulator
+`58802` (Postgres), `58805` (CAPTCHA bridge), `58913` (loopback simulator mirror)
+and dedicated simulator
 `01CBA853-5183-41AF-B1B8-024EF6DB8FFB` (`Argus Connected Search`). The physical-phone
 owner's checkout, device, signing, certificates, services and ports 58700–58749
 are untouched. Existing 584xx, 585xx and 586xx demonstrations remain intact.

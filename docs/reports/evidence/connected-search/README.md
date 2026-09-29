@@ -13,7 +13,8 @@ iPhone 17e with iOS 27, `01CBA853-5183-41AF-B1B8-024EF6DB8FFB`.
 The installed bundle identifier is `local.argus.foundation`.
 
 Search owns API 58800, Supabase 58801, Postgres 58802 and CAPTCHA bridge 58805.
-Optional recovery acceptance uses proxy 58812. The ignored
+The clickable simulator mirror uses loopback-only port 58913. Optional recovery
+acceptance uses proxy 58812. The ignored
 `ios/.build/accounts-local-58800/client.json` contains local synthetic credentials.
 Do not publish that file or raw authentication logs.
 
@@ -44,8 +45,29 @@ Launch only the owned simulator:
 ```sh
 xcrun simctl boot 01CBA853-5183-41AF-B1B8-024EF6DB8FFB # only if shut down
 xcrun simctl launch 01CBA853-5183-41AF-B1B8-024EF6DB8FFB local.argus.foundation
-open -a Simulator
 ```
+
+Open [the live simulator](http://localhost:58913) on this Mac. This is a clickable
+mirror of the installed native app, connected to the real local API and database.
+The current Xcode installation uses DeviceHub instead of `Simulator.app`; the
+verified browser mirror avoids depending on a missing app launcher.
+
+If the mirror is not running, start it in its own terminal and keep that terminal
+open. Stop the previous mirror terminal before replacing it on the same port.
+Cleanup targets only the Search simulator:
+
+```sh
+SEARCH_SIM=01CBA853-5183-41AF-B1B8-024EF6DB8FFB
+cleanup_search_mirror() {
+  npx --yes serve-sim@0.1.47 --kill "$SEARCH_SIM" >/dev/null 2>&1 || true
+}
+trap cleanup_search_mirror EXIT INT TERM HUP
+cleanup_search_mirror
+npx --yes serve-sim@0.1.47 --port 58913 --host 127.0.0.1 --codec mjpeg --fit "$SEARCH_SIM"
+```
+
+Use only **Argus Connected Search** in the mirror; other listed simulators belong
+to preserved demos or other owners. The mirror does not expose the app publicly.
 
 ## Try the connected journey
 
@@ -91,7 +113,7 @@ setup/login and the earlier account rename are outside the recorded excerpt.
 | Existing detail editors | `ui-20260929T220326Z.xcresult`, English/dark and Spanish/light | Passed at `c775b0c` |
 | Accounts/Search independence | `ui-20260929T214541Z.xcresult` | Passed |
 | Owner switch and isolation | `ui-20260929T214915Z.xcresult` | Passed |
-| Exact multi-page return/relaunch | `ui-20260929T220141Z.xcresult`, Back plus two relaunches, <3-point difference | Passed at `89747bb51` |
+| Exact multi-page return/relaunch | `ui-20260929T221133Z.xcresult`, Back plus two relaunches, <3-point difference | Passed at published `144322568` |
 | Loading, retry and missing destination | `ui-20260929T215321Z.xcresult`, delayed read / 503 / retry / detail 404 | Passed |
 | Independent review | [Full pass and affected deltas](independent-review.md) | Clean through `c775b0cdd1e05f4088fd9eb5d0ccf798d50882a4` |
 | CI | [PR #751](https://github.com/lagarcess/argus/pull/751) | Terminal status and exact published head are recorded in the PR readiness comment |
@@ -104,7 +126,9 @@ the recovery run used `93accb1d`. Subsequent native changes are limited to Searc
 scroll restoration. Its successful `89747bb51` run retained temporary numeric
 geometry logs; `c775b0c` removes those logs without changing behavior, and passes
 the full editor/relaunch journey. Final documentation/media commits do not alter
-that reviewed implementation. The final PR readiness comment records exact-head
+that reviewed implementation. Published `144322568` additionally passed the exact
+multi-page Back/two-relaunch test and 34 Search database/API/OpenAPI tests. The
+mirror-guide correction changes documentation only. The final PR readiness comment records exact-head
 revalidation, current integration and terminal CI; earlier screenshots are
 retained evidence, not claimed to have been captured at a future commit.
 
