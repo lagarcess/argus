@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** [connected Search on iPhone](#connected-search-on-iphone-lane) has a locally verified delivery in [PR #751](https://github.com/lagarcess/argus/pull/751), awaiting founder merge authority after its terminal CI verdict. Connected Plan/Home (#749/#750) and personal money recording (#747/#748) are landed. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** [connected Search on iPhone](#pr-751-integration-landing) is landed through [PR #751](https://github.com/lagarcess/argus/pull/751), with its locally verified demonstration preserved. No next slice is authorized. Connected Plan/Home (#749/#750) and personal money recording (#747/#748) are landed. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,39 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## PR #751 integration landing
+
+The founder authorized merging approved head
+`f753d5111876457c98be9ffe0235123dbf107eb9`, completing integration verification
+and the necessary bounded landing-documentation PR. No next slice, deployment,
+hosted configuration change or physical-testing environment change is authorized.
+
+- [PR #751](https://github.com/lagarcess/argus/pull/751) squash-merged at
+  `2026-09-29T22:46:19Z` as `5c143e642249872cd1d807a92dc4dd367c698671` onto
+  unchanged integration `22f9c8cda8a65c74985e367d8cef68e55515e16b`.
+  Approved-head and merge trees are identical. No reconciliation or semantic
+  overlap arose; accepted native/API/visual evidence remains valid.
+- Applicable PR CI and smoke are green; the independent affected-delta review is
+  clean through `c775b0cdd1e05f4088fd9eb5d0ccf798d50882a4`, with only reviewed
+  provenance documentation/media afterward. Zero unresolved threads remained.
+  The [terminal audit](https://github.com/lagarcess/argus/pull/751#issuecomment-5900394900)
+  records exact-head acceptance and review provenance.
+- The canonical integration checkout fast-forwarded cleanly to the merge, with
+  zero ahead/behind and passing modularity budgets. Exact post-merge CI, final
+  landing-documentation PR and local/remote parity are recorded in the merged
+  PR's final landing comment after those checks reach terminal state.
+- No linked issues require closure. The configuration audit found no production
+  environment variable, migration or hosted activation requirement. The added
+  `ARGUS_TEST_SEARCH_QUERY` is an opt-in UI-test input; the existing local
+  fault-proxy input remains test-only. Financial exposure remains default-off.
+- The [Search demo, recording and restart guide](../reports/evidence/connected-search/README.md)
+  remain usable from their existing checkout, API 58800 and loopback mirror
+  58913. All older demos and the separate phone-testing checkout, device,
+  signing, services and ports 58700–58749 remain untouched.
+- This closes the assigned local Search journey, not physical-iPhone internet
+  delivery or the whole MVEE. Remaining retrieval domains and the documented
+  full-owner snapshot scale limit remain tracked below. No new slice starts.
 
 ## Connected Search on iPhone lane
 
