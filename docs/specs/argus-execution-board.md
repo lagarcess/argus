@@ -69,7 +69,7 @@ financial-loop evidence remains historical at its recorded sources; the changed
 timezone/type-lock and account-list surfaces have the focused replacement proof
 above. No clean final PR review or candidate CI claim is made for unpublished fixes.
 
-**Preview cleanup and remaining publication blocker:** the founder authorized
+**Preview cleanup and publication authorization:** the founder authorized
 verification, removal of only PR #745's disposable preview, and disabling
 automatic previews only for this PR. CLI and connected Supabase branch inventories
 confirmed a real environment, not a skipped-preview notice: branch
@@ -84,23 +84,18 @@ only the unchanged default branch remains on existing project
 `lgdhvepyrzbnscqssgqq`. No new token, other branch deletion, main-project mutation,
 or integration-setting change was made.
 
-No supported PR-only exclusion was found in current CLI controls, official docs,
-or the dashboard implementation. The documented
-[Automatic branching control](https://supabase.com/docs/guides/deployment/branching/github-integration#syncing-github-branches)
-belongs to the project's GitHub connection (`new_branch_per_pr`), so turning it off
-would affect automatic preview creation for all its PRs. That broader change is
-not authorized. Deletion alone does not establish that a later push cannot
-recreate the preview. Further pushes therefore await the founder's decision on
-this specific project-wide control; do not disable project branching or delete
-the project as a substitute. Recommend turning off only Automatic branching,
-preserving all other integration settings, subject to explicit approval and
-verified setting readback.
+After reviewing the expected cost and isolation, the founder explicitly authorized
+PR #745's existing automatic Supabase preview as a side effect of publishing its
+fixes. The publication blocker is resolved. Preserve Automatic branching and all
+other integration settings. No further infrastructure investigation, production
+changes or application deployment is authorized. No new token is needed.
 
-After that blocker is resolved, publish the local fixes, wait for exact-head CI,
-resolve the addressed threads and request only a review of this correction delta.
-Do not repeat a broad review of unchanged code or merge this PR. The old green
-Supabase check remains historical automation evidence, not application delivery
-or physical-phone acceptance.
+Publish the local fixes, wait for exact-head CI, resolve the addressed threads and
+request only a review of this correction delta. Report a merge-ready verdict after
+the scoped review returns clean and unresolved threads reach zero; do not merge.
+The preview's green check is automation evidence, not application delivery or
+physical-phone acceptance. Keep the broader MVEE and deferred physical-phone
+work pending under their existing authority boundaries.
 
 **Runnable local demonstration:** the retained database and synthetic identities
 are running again. Native `bbfb3bff` and core `c2425f2e2` are the locally verified
