@@ -8,9 +8,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 import local_stack
+import pytest
 
 
 @pytest.mark.parametrize("enabled", [False, True])
