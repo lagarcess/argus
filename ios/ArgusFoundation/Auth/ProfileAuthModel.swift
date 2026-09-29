@@ -9,6 +9,7 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var profile: SessionProfile?
     @Published private(set) var confirmationRequired = false
     @Published private(set) var errorKey: String?
+    @Published private(set) var accounts: AccountsModel?
     let configuration: NativeAuthConfiguration?
     private let controller: SessionController?
     private var started = false
@@ -30,6 +31,10 @@ final class ProfileAuthModel: ObservableObject {
         configuration = loadedConfiguration
         controller = loadedController
         state = initialState
+        if let loadedController {
+            accounts = AccountsModel(controller: loadedController)
+            accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
+        }
     }
 
     var enabled: Bool { state != .disabled }
@@ -72,6 +77,7 @@ final class ProfileAuthModel: ObservableObject {
 
     func signOut() async {
         guard let controller else { return }
+        accounts?.bind(nil)
         await perform { try await controller.signOut() }
     }
 
@@ -100,6 +106,7 @@ final class ProfileAuthModel: ObservableObject {
     }
 
     private func accept(_ snapshot: SessionSnapshot) {
+        accounts?.bind(snapshot)
         profile = snapshot.profile
         switch snapshot.phase {
         case .signedOut: state = .signedOut

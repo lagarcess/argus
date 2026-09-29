@@ -78,7 +78,7 @@ final class LiveSessionTests: XCTestCase, @unchecked Sendable {
     }
 }
 
-private struct LocalSessionFixture: Sendable {
+struct LocalSessionFixture: Sendable {
     struct User: Decodable, Sendable { let email: String; let password: String; let id: String }
     private struct Input: Decodable { let apiURL: URL; let supabaseURL: URL; let publicAnonKey: String; let users: [User] }
     // Public Cloudflare test token. Never available from the product target.
@@ -138,7 +138,7 @@ private struct LocalSessionFixture: Sendable {
     }
 }
 
-private final class RequestCounter: @unchecked Sendable {
+final class RequestCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
     func record(_ request: URLRequest) {
