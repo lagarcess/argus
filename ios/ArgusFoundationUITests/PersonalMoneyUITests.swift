@@ -304,7 +304,8 @@ extension FinancialLoopUITests {
         let finished = expectation(description: "Local fault proxy responds")
         var dropped: Int?
         var failure: Error?
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:58512/__fault")!)
+        let endpoint = ProcessInfo.processInfo.environment["ARGUS_TEST_FAULT_URL"] ?? "http://127.0.0.1:58512/__fault"
+        var request = URLRequest(url: try XCTUnwrap(URL(string: endpoint)))
         request.httpMethod = arm ? "POST" : "GET"
         URLSession.shared.dataTask(with: request) { data, response, error in
             failure = error

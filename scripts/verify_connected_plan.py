@@ -48,7 +48,6 @@ class LocalPlan:
                         "password": identity["password"],
                         "captcha_token": "argus-local-browser-qa",
                     },
-                    headers={"Origin": "http://127.0.0.1:58606"},
                 )
                 assert (
                     response.status_code == 200
@@ -290,8 +289,9 @@ class LocalPlan:
             and dop["ending_minor"] == "35000"
             and dop["net_cash_change_minor"] == "0",
         )
-        current = self.request("GET", "/financial-plan/expectations/" + income["id"])
-        current = current.get("expectation", current)
+        current = next(
+            e for e in self.projection()["expectations"] if e["id"] == income["id"]
+        )
         self.request(
             "PATCH",
             "/financial-plan/expectations/" + income["id"],
@@ -352,11 +352,16 @@ class LocalPlan:
             projected["selection"]["time_zone"] == "America/New_York",
         )
         self.request(
-            "GET", "/financial-plan/expectations/" + bill["id"], user=1, expected=(404,)
+            "PATCH",
+            "/financial-plan/expectations/" + bill["id"],
+            {"expected_version": bill["version"], "title": "Unauthorized edit"},
+            user=1,
+            key=str(uuid4()),
+            expected=(404,),
         )
         other = self.request("GET", "/financial-plan", user=1)
         self.check(
-            "Second authenticated identity cannot read owner expectations",
+            "Second authenticated identity cannot read or edit owner expectations",
             bill["id"] not in {e["id"] for e in other["expectations"]}
             and bank["id"] not in other["selection"]["account_ids"],
         )
