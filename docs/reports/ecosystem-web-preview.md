@@ -41,7 +41,8 @@ labels instead of changing a shared owner.
 ## Current refinement evidence
 
 The [before/after comparison](evidence/pr-732/web-refinement/README.md) contains
-31 existing-web/before captures and 48 fresh after captures. The after run
+31 historical existing-web/before captures, 48 after captures and 31 replacement
+reference captures with enforced server ownership. The after run
 records **46 passing interaction cases**, zero API/external requests and zero
 browser exceptions. Its [verification record](evidence/pr-732/web-refinement/after/verification.json)
 and per-case JSON bind the evidence to the code below.
@@ -54,6 +55,27 @@ and per-case JSON bind the evidence to the code below.
 | After evidence code head | `53029f5d7c18827adba9daf79197936086ea0188` |
 | After evidence full web tree | `6f8fd6c501fd48e8af8e35688bbe227a98d988bc` |
 | After evidence preview-source tree | `906080f3045c87c1708ee6206a03625eaf11ff03` |
+| Reference-server correction and capture head | `8e5d74e25bb3e26952019823ab386cdb7153b075` |
+
+Review found that the original reference harness verified source files without
+binding them to the externally started server. The correction makes one
+manifest own each source directory, origin and launch command; Playwright
+starts and stops those servers and refuses an occupied origin. An inert HTTP
+200 listener was rejected before any screenshots were accepted. All nine
+reference/current-preview cells then passed with 31 new screenshots and no
+network violations, page exceptions or console errors. The
+[replacement reference record](evidence/pr-732/web-refinement/reference-bound/verification.json)
+supersedes the earlier reference provenance; original images remain historical.
+
+The correction changes only the three reference-harness files. The entire
+application tree and the 46-case acceptance inputs are unchanged from
+`53029f5d7c18827adba9daf79197936086ea0188`, so that product acceptance is
+explicitly retained. The reference correction's full web tree is
+`56941cbf59ef3a2e7fbecbed1c30b0c7100c333a`; later documentation publication must
+preserve it. Focused harness lint and TypeScript checks pass. An additional
+plain repository-wide `tsc --noEmit` includes existing Bun test declarations
+and unrelated e2e files and fails there; those files are unchanged. Production
+build/TypeScript and final CI remain the established delivery checks.
 
 The refined preview inherits the existing web rail, reading widths, starting
 chat composition, active transcript/composer separation and settings density.
@@ -88,7 +110,8 @@ contract, migrations, environment variables or directly affected tests. The
 prototype is not imported. Reconciliation is a normal one-way merge with no
 rebase. Original/before evidence remains historical; the after run replaces
 all affected behavioral evidence. Later documentation/evidence-only commits
-must explicitly revalidate the recorded web tree in the terminal audit.
+must explicitly revalidate the applicable recorded source trees and acceptance
+inputs in the terminal audit.
 
 This is local Chromium fixture evidence on macOS arm64. It does not exercise
 real authentication, server authorization, persistence, model/provider turns,

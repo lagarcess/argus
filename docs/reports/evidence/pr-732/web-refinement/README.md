@@ -14,12 +14,12 @@ also records the full web tree, environment and the other local gates.
 
 | Surface | Before/reference | Refined preview |
 | --- | --- | --- |
-| Desktop starting chat | [Existing web](before/integration-1440-cold-chat-expanded-rail.png), [before](before/preview-before-1440-argus.png) | [Centered greeting and composer](after/desktop-en-light-argus.png) |
-| Desktop active chat | [Existing web](before/integration-1440-active-chat-fixture.png) | [Stable header and docked composer](after/desktop-en-light-active-chat-docked.png), [200% text and independent scrolling](after/desktop-en-light-active-chat-text-200-scroll.png) |
+| Desktop starting chat | [Existing web](reference-bound/integration-1440-cold-chat-expanded-rail.png), [before](before/preview-before-1440-argus.png) | [Centered greeting and composer](after/desktop-en-light-argus.png) |
+| Desktop active chat | [Existing web](reference-bound/integration-1440-active-chat-fixture.png) | [Stable header and docked composer](after/desktop-en-light-active-chat-docked.png), [200% text and independent scrolling](after/desktop-en-light-active-chat-text-200-scroll.png) |
 | Home | [Desktop before](before/preview-before-1440-home.png), [narrow before](before/preview-before-390-home.png) | [Desktop](after/desktop-en-light-home.png), [Spanish/Dark](after/desktop-es-dark-home.png), [narrow Coming up priority](after/narrow-home-upcoming-priority.png) |
-| Tablet navigation | [Existing collapsed rail](before/integration-834-cold-chat-collapsed-rail.png), [before](before/preview-before-834-argus.png) | [Collapsed rail with Accounts](after/tablet-es-light-accounts.png), [local rail choice across preferences](after/tablet-es-light-rail-preferences-local-state.png) |
+| Tablet navigation | [Existing collapsed rail](reference-bound/integration-834-cold-chat-collapsed-rail.png), [before](before/preview-before-834-argus.png) | [Collapsed rail with Accounts](after/tablet-es-light-accounts.png), [local rail choice across preferences](after/tablet-es-light-rail-preferences-local-state.png) |
 | Account inspection | Earlier preview used dialogs at every width | [Accounts side pane](after/accounts-desktop-account-inspector.png), [Search side pane](after/search-desktop-account-inspector.png), [selected URL after resize](after/tablet-account-inspector-stacked-after-resize.png), [fresh tablet sheet](after/tablet-account-detail-after-resize.png) |
-| Settings | [Existing web](before/integration-1440-settings-open.png), [before](before/preview-before-1440-settings.png) | [Desktop grouped rows](after/desktop-en-light-settings.png), [narrow Spanish/Dark](after/narrow-es-dark-settings.png), [System persistence](after/settings-spanish-system-dark-persistence.png) |
+| Settings | [Existing web](reference-bound/integration-1440-settings-open.png), [before](before/preview-before-1440-settings.png) | [Desktop grouped rows](after/desktop-en-light-settings.png), [narrow Spanish/Dark](after/narrow-es-dark-settings.png), [System persistence](after/settings-spanish-system-dark-persistence.png) |
 | Narrow reading area | [Before starting chat](before/preview-before-390-argus.png) | [Starting chat](after/narrow-en-light-argus.png), [active chat at 200% text](after/narrow-en-light-active-chat-text-200-scroll.png), [360px long label](after/compact-es-light-enlarged-text-long-label.png) |
 | Fixture truth and recovery | Same approved local sample boundaries | [Guest handoff](after/desktop-en-light-guest-registration-handoff.png), [unsaved draft](after/account-create-unsaved-review.png), [correction review](after/account-correction-review.png), [empty](after/home-empty-state.png), [loading](after/home-loading-state.png), [error](after/home-error-state.png) |
 
@@ -45,16 +45,67 @@ server authorization, financial persistence, physical devices and other browser
 engines are not exercised. The production not-found result may use HTTP 200
 streaming with an explicit Next.js 404 marker; it contains no preview markup.
 
-The final PR audit must bind later publication heads to the recorded web tree
-`6f8fd6c501fd48e8af8e35688bbe227a98d988bc` and state the terminal CI/review
-outcome. Technical proof does not grant founder visual acceptance.
+The final PR audit must revalidate the accepted application and test inputs,
+account for the reference-only correction below, and state the terminal
+CI/review outcome. Technical proof does not grant founder visual acceptance.
+
+## Reference-server provenance revalidation
+
+Review identified that the earlier harness verified source files while relying
+on externally started servers. At `8e5d74e25bb3e26952019823ab386cdb7153b075`,
+one manifest now owns each source root, loopback origin, readiness route and
+Next.js command. Playwright starts and stops all three servers with existing
+server reuse disabled. A source directory and a browser origin can no longer
+silently refer to independent processes.
+
+The [negative check](reference-bound/occupied-port-rejection.json) placed an
+unrelated HTTP 200 listener on a reference origin. Playwright refused it before
+running a case or accepting a screenshot; the [failure log](reference-bound/occupied-port-run.txt)
+records the expected refusal. The subsequent [reference run](reference-bound/run.txt)
+passed all **nine cells**, captured **31 PNGs**, and recorded zero network
+violations, page exceptions or console errors. Each cell records the owned
+server configuration, checked source hashes and capture SHA. The current
+preview also verifies its complete route file set. All temporary servers were
+stopped by framework teardown; the user preview on port 3197 was untouched.
+
+These captures supersede the original reference run's provenance. The original
+before images remain historical. Useful replacements:
+[production desktop](reference-bound/production-source-1440-cold-chat-expanded-rail.png),
+[integration tablet](reference-bound/integration-834-cold-chat-collapsed-rail.png),
+[current desktop guest preview](reference-bound/preview-current-1440-argus.png).
+The [verification record](reference-bound/verification.json) records exact
+source identity and limitations.
+
+The correction changes only the reference gate, its configuration and its
+shared manifest. Product source and the 46-case acceptance inputs remain
+identical to the after capture head. Their application tree is
+`ecedb7edac3f5973703573781d19781718141ed9`. That acceptance remains valid; the
+new reference harness and its affected capture gate were reverified instead.
+The corrected full web tree is `56941cbf59ef3a2e7fbecbed1c30b0c7100c333a`.
+
+To repeat this reference gate, first extract each manifest revision's `web`
+tree into that entry's isolated source directory and link its `node_modules`
+to the installed workspace dependencies. Do not copy environment files.
+For `preview-current`, extract the current worker HEAD. Leave the three
+manifest ports free, then run from `web` with a fresh evidence directory:
+
+```sh
+ARGUS_PREVIEW_EVIDENCE_DIR=/absolute/path/to/docs/reports/evidence/new-run \
+  bunx playwright test --config e2e/ecosystem-preview-reference.playwright.config.ts
+```
+
+Focused lint and harness TypeScript checks pass. A plain repository-wide
+`tsc --noEmit` separately reports existing Bun-test declaration and unrelated
+e2e typing failures; no files responsible for those failures changed here.
 
 ## Before and web references
 
 The [reference run](before/run.txt) passed all nine cells and captured 31 PNGs
 at code/harness head `2da77b1a09769901b9ca9bfe28d317eddde2ffa1`. Each cell's JSON
 records source hashes, environment, requests and capture identity. All nine
-record zero network violations, page exceptions and console errors.
+record zero network violations, page exceptions and console errors. This is
+the historical run; use the enforced server-ownership captures above for
+current reference provenance.
 
 | Surface | Existing web | Preview before refinement |
 | --- | --- | --- |

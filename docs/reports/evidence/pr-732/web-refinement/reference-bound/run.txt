@@ -1,0 +1,98 @@
+(node:32532) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[production-source] (node:32548) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[production-source] (Use `node --trace-warnings ...` to show where the warning was created)
+[production-source] (node:32549) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[production-source] (Use `node --trace-warnings ...` to show where the warning was created)
+[production-source] ▲ Next.js 16.2.4 (webpack)
+[production-source] - Local:         http://127.0.0.1:3200
+[production-source] - Network:       http://127.0.0.1:3200
+[production-source] ✓ Ready in 234ms
+[production-source]
+[production-source]   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+[production-source]   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+[production-source]
+[production-source]     - include was updated to add '.next-reference/types/**/*.ts'
+[production-source]     - include was updated to add '.next-reference/dev/types/**/*.ts'
+[production-source]
+[production-source]
+[production-source] (node:32549) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[production-source] ○ Compiling /chat ...
+[production-source]  GET /chat 200 in 3.9s (next.js: 3.7s, application-code: 109ms)
+[integration] (node:32561) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[integration] (Use `node --trace-warnings ...` to show where the warning was created)
+[integration] (node:32562) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[integration] (Use `node --trace-warnings ...` to show where the warning was created)
+[integration] ▲ Next.js 16.2.4 (webpack)
+[integration] - Local:         http://127.0.0.1:3199
+[integration] - Network:       http://127.0.0.1:3199
+[integration] ✓ Ready in 205ms
+[integration]
+[integration]   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+[integration]   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+[integration]
+[integration]           - include was updated to add '.next-reference/types/**/*.ts'
+[integration]           - include was updated to add '.next-reference/dev/types/**/*.ts'
+[integration]
+[integration]
+[integration] (node:32562) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[integration] ○ Compiling /chat ...
+[integration]  GET /chat 200 in 3.7s (next.js: 3.6s, application-code: 106ms)
+[preview-current] (node:32567) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[preview-current] (Use `node --trace-warnings ...` to show where the warning was created)
+[preview-current] (node:32568) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[preview-current] (Use `node --trace-warnings ...` to show where the warning was created)
+[preview-current] ▲ Next.js 16.2.4 (webpack)
+[preview-current] - Local:         http://127.0.0.1:3201
+[preview-current] - Network:       http://127.0.0.1:3201
+[preview-current] ✓ Ready in 209ms
+[preview-current]
+[preview-current]   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+[preview-current]   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+[preview-current]
+[preview-current]       - include was updated to add '.next-reference/types/**/*.ts'
+[preview-current]       - include was updated to add '.next-reference/dev/types/**/*.ts'
+[preview-current]
+[preview-current]
+[preview-current] (node:32568) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[preview-current]  GET /dev/ecosystem 200 in 2.2s (next.js: 2.1s, application-code: 82ms)
+
+Running 9 tests using 1 worker
+
+(node:32573) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:32573) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:32573) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[production-source]  GET /chat 200 in 14ms (next.js: 2ms, application-code: 12ms)
+[production-source]  GET /chat?conversation=conversation-alpha 200 in 12ms (next.js: 1097µs, application-code: 11ms)
+  ✓  1 e2e/ecosystem-preview-reference.gate.ts:158:7 › production-source-1440 (4.9s)
+[production-source]  GET /chat 200 in 12ms (next.js: 946µs, application-code: 11ms)
+[production-source]  GET /chat?conversation=conversation-alpha 200 in 12ms (next.js: 999µs, application-code: 11ms)
+  ✓  2 e2e/ecosystem-preview-reference.gate.ts:158:7 › production-source-834 (4.5s)
+[production-source]  GET /chat 200 in 11ms (next.js: 844µs, application-code: 10ms)
+[production-source]  GET /chat?conversation=conversation-alpha 200 in 11ms (next.js: 1007µs, application-code: 10ms)
+  ✓  3 e2e/ecosystem-preview-reference.gate.ts:158:7 › production-source-390 (3.5s)
+[integration]  GET /chat 200 in 15ms (next.js: 3ms, application-code: 13ms)
+[integration]  GET /chat?conversation=conversation-alpha 200 in 12ms (next.js: 1062µs, application-code: 11ms)
+  ✓  4 e2e/ecosystem-preview-reference.gate.ts:158:7 › integration-1440 (4.5s)
+[integration]  GET /chat 200 in 12ms (next.js: 1067µs, application-code: 11ms)
+[integration]  GET /chat?conversation=conversation-alpha 200 in 17ms (next.js: 1654µs, application-code: 15ms)
+  ✓  5 e2e/ecosystem-preview-reference.gate.ts:158:7 › integration-834 (4.5s)
+[integration]  GET /chat 200 in 10ms (next.js: 912µs, application-code: 9ms)
+[integration]  GET /chat?conversation=conversation-alpha 200 in 11ms (next.js: 839µs, application-code: 10ms)
+  ✓  6 e2e/ecosystem-preview-reference.gate.ts:158:7 › integration-390 (3.5s)
+[preview-current]  GET /dev/ecosystem?view=home&state=sample&audience=guest 200 in 15ms (next.js: 1527µs, application-code: 13ms)
+[preview-current]  GET /dev/ecosystem?view=argus&state=sample&audience=guest 200 in 17ms (next.js: 1075µs, application-code: 16ms)
+[preview-current]  GET /dev/ecosystem?view=settings&state=sample&audience=guest 200 in 13ms (next.js: 894µs, application-code: 13ms)
+  ✓  7 e2e/ecosystem-preview-reference.gate.ts:186:118 › preview-current-1440 (4.2s)
+[preview-current]  GET /dev/ecosystem?view=home&state=sample&audience=guest 200 in 13ms (next.js: 1043µs, application-code: 12ms)
+[preview-current]  GET /dev/ecosystem?view=argus&state=sample&audience=guest 200 in 12ms (next.js: 904µs, application-code: 11ms)
+[preview-current]  GET /dev/ecosystem?view=settings&state=sample&audience=guest 200 in 11ms (next.js: 851µs, application-code: 10ms)
+  ✓  8 e2e/ecosystem-preview-reference.gate.ts:186:118 › preview-current-834 (4.1s)
+[preview-current]  GET /dev/ecosystem?view=home&state=sample&audience=guest 200 in 12ms (next.js: 906µs, application-code: 11ms)
+[preview-current]  GET /dev/ecosystem?view=argus&state=sample&audience=guest 200 in 12ms (next.js: 894µs, application-code: 11ms)
+[preview-current]  GET /dev/ecosystem?view=settings&state=sample&audience=guest 200 in 12ms (next.js: 1117µs, application-code: 11ms)
+  ✓  9 e2e/ecosystem-preview-reference.gate.ts:186:118 › preview-current-390 (4.1s)
+
+  9 passed (51.2s)
