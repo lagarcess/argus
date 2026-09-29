@@ -36,5 +36,20 @@
     "modularity_budget": "passed; no violations",
     "unsigned_physical_ios_build": "passed; signing disabled; temporary override removed",
     "native_feature_source": "Matches d5299f65; device configuration and setup docs are the only additional ios differences."
+  },
+  "review_followup": {
+    "source_commit": "c2425f2e2d49d8b99a39a1d52da468a109048818",
+    "assembled_candidate": "08254e668",
+    "focused_backend_passed": 126,
+    "failed": 0,
+    "checks": [
+      "memory and real-Postgres source-timezone projection",
+      "check/value-update type locks",
+      "DST freshness instant ordering",
+      "full Ruff",
+      "modularity budget"
+    ],
+    "publication": "local fixes; PR745 published b5cfedef CI passed, correction CI and follow-up review pending",
+    "original_evidence": "Original HTTP/money-loop proof above retains its recorded source; this follow-up replaces proof for the changed timezone/type-lock surfaces."
   }
 }

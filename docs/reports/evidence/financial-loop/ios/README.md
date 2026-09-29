@@ -10,6 +10,13 @@ The evidence commit changes artifacts only. Both simulator and API used those
 sources with the real local Supabase/Postgres stack and synthetic registered data.
 See [sanitized results](verification.json) for exact runtime, counts and hashes.
 
+The PR #745 review corrections are separately verified at native source
+`bbfb3bffc7da1dfbd1309916a6f0847d5d51a32c` and backend
+`c2425f2e2d49d8b99a39a1d52da468a109048818`. See the
+[archive management acceptance](archive-review.md) for the changed native
+surface. The original recording below remains evidence of its original source;
+it is not presented as a new capture of the review fixes.
+
 ## Demonstration
 
 [Connected loop recording](connected-loop.mp4) is 2 minutes 9 seconds. It starts
@@ -60,18 +67,19 @@ harness and the serial connected UI suite. Run the UI suite against one allocate
 stack and simulator; it appends synthetic accounts and verifies Home deltas rather
 than assuming an empty database. Do not reset another owner’s running stack.
 
-At handoff, the native worker has stopped its CAPTCHA bridge (port 58405), log
-reader and recorder; Xcode is idle. The simulator remains booted for review at
-`197C9C31-77FD-4D31-A9C6-EACA55732B15`. After the captain assembled the evidence,
-the core owner stopped only API 58400 and the owned Supabase/Postgres stack on
-58401/58402. Its volume and ignored `client.json` and `verification-client.json`
-remain intact. The app is installed in the simulator but requires those local
-services to resume connected interaction. No hosted system was changed.
+For the current founder review, API 58400, CAPTCHA bridge 58405 and the retained
+Supabase/Postgres stack on 58401/58402 are intentionally left running. Simulator
+`197C9C31-77FD-4D31-A9C6-EACA55732B15` contains the installed app and preserved
+demo session. The volume and ignored `client.json` and `verification-client.json`
+remain intact. Recording/build processes and the separate archive-QA simulator
+are stopped. The earlier handoff stopped local services; the captain subsequently
+verified the restart recipe below and restored them without reset or reseeding.
 
 For this preserved stack, use the core checkout below; do not configure, reset
 or reseed it. Its older launcher removes inherited financial flags, so this
 bounded wrapper supplies the local flag at process launch. It runs the reviewed
-backend source `92020058d` and does not print credentials.
+backend source `c2425f2e2` and does not print credentials. Skip service-start commands
+while their owned ports are already listening.
 
 ```sh
 cd /Users/garces/.codex/worktrees/financial-loop-core/private-alpha-next
@@ -95,13 +103,22 @@ stack.api(sys.executable)
 PY
 ```
 
-Before fresh sign-in, run `python3 ios/scripts/auth/bridge.py` from the preserved
-native checkout in a separate terminal. Use the native fixture for UI tests and
+If the bridge is stopped, run `python3 ios/scripts/auth/bridge.py` from the preserved
+native checkout in a separate terminal. Launch the installed demo with:
+
+```sh
+xcrun simctl launch 197C9C31-77FD-4D31-A9C6-EACA55732B15 local.argus.foundation
+open -a Simulator
+```
+
+Use the native fixture for UI tests and
 the separate verifier fixture for HTTP checks; do not run both against the same
-identity concurrently. Stop only the owned processes and retain the volume again
-after acceptance. The captain owns subsequent lifecycle and access coordination.
+identity concurrently. Leave the demo services running for founder review. The
+captain owns subsequent lifecycle; any later cleanup must stop only owned
+processes and retain the volume and ignored fixtures.
 
 The full local result bundle is `/tmp/argus-loop-iphone-evidence/ui-1790671670.xcresult`.
 Raw bundles/logs are not committed because auth diagnostics can contain synthetic
-credentials. The selected evidence and sanitized summary are committed locally;
-remote preservation is pending explicit publication approval.
+credentials. The original selected evidence and sanitized summary are published
+in PR #745. The additional archive-review correction/evidence commits remain local
+pending resolution of its unexpected automatic hosted-preview publication effect.

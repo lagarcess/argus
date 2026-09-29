@@ -45,6 +45,48 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 | Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
 | Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Publish authorized delivery branch and review PR, complete CI/scoped review, and retain runnable local demonstration; signing, Render login and deployment deferred |
 
+### PR #745 review checkpoint
+
+[Review PR #745](https://github.com/lagarcess/argus/pull/745) is open against
+`codex/private-alpha-next`. Published head `b5cfedef998079f3978f9282e60bc287afa7dc25`
+passed [CI](https://github.com/lagarcess/argus/actions/runs/36549243112) and
+[local smoke](https://github.com/lagarcess/argus/actions/runs/36549243153).
+The original and freshly fetched integration base remain `fcbb70cc2`; no
+reconciliation merge or intervening integration overlap exists.
+
+The first Codex review found three confirmed defects. Each has a thumbs-up and
+an evidence-backed reply; threads remain unresolved because the fixes are local:
+
+| Finding | Local correction and verification | Delivery commit |
+| --- | --- | --- |
+| Balance timestamps used the opening's timezone regardless of source | Canonical position retains its source revision's IANA zone; Home orders freshness by UTC instant, including repeated DST hours. Memory and real-Postgres regressions cover preview/save/reopen | `71ea905a7` from core `c2425f2e2` |
+| Account type remained editable after a check without expenses | Existing type lock includes balance checks/value updates; opening-only behavior preserved | `71ea905a7` |
+| Archived accounts remained in the active list | Active list filters archived rows; Manage accounts retains Active/Archived groups and existing Restore. Six model checks and one real-API simulator archive/restore journey passed, with unchanged Home and same record ID | `632ea5f49`, `08254e668`; [visual/behavior evidence](../reports/evidence/financial-loop/ios/archive-review.md) in `abd955f3c` |
+
+The assembled local correction candidate `08254e668` passed 126 focused backend
+checks including real Postgres, full Ruff and modularity checks. The original
+financial-loop evidence remains historical at its recorded sources; the changed
+timezone/type-lock and account-list surfaces have the focused replacement proof
+above. No clean final PR review or candidate CI claim is made for unpublished fixes.
+
+**Publication blocker:** opening the authorized PR unexpectedly triggered the
+existing Supabase GitHub integration. Its bot reports creation and migration of
+preview `yjuknxqpmgddgswvtgwk`. This exceeded the intended GitHub-only boundary
+through repository automation; no direct hosted mutation or production rollout
+was requested. Further pushes are paused pending founder direction about that
+automation. Do not delete the preview or alter hosted integration settings without
+approval. Its green check is not local CI, approved deployment or phone evidence.
+After that blocker is resolved, publish the local fixes, wait for exact-head CI,
+resolve the addressed threads and request only a review of this correction delta.
+Do not repeat a broad review of unchanged code or merge this PR.
+
+**Runnable local demonstration:** the retained database and synthetic identities
+are running again. Native `bbfb3bff` and core `c2425f2e2` are the locally verified
+review corrections. Keep the owned API 58400, CAPTCHA 58405 and Supabase/Postgres
+58401/58402 alive for founder use; restart instructions are in the
+[evidence README](../reports/evidence/financial-loop/ios/README.md#reproduce-and-resume).
+No physical-iPhone, signing, Render login or deployment work is active.
+
 Throughput checkpoint: three implementation responsibilities, one financial
 contract owner and one integration owner. Device access must not block local
 financial/native work. CPU-heavy Xcode and database suites use separate owners;
