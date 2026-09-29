@@ -1,12 +1,12 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** Local financial loop LANDED through PR #745. Signing, physical-phone installation and deployment are deferred. Other MVEE work remains stopped; no additional merge or hosted action is authorized.
+**Execution state:** Local financial loop LANDED through PR #745. Only bounded landing documentation/verification remains authorized, including founder-approved PR #746. Signing, physical-phone installation and deployment are deferred. Other MVEE work remains stopped.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
-**Preservation authorization:** The founder accepted this expanded plan for
-commit and push on September 29, 2026. This authorizes documentation preservation
+**Original preservation authorization (historical):** The founder accepted this expanded plan for
+commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
@@ -26,11 +26,12 @@ scoped review, including its existing automatic Supabase preview. Physical-devic
 signing, installation, Render login and deployment are deferred. Keep the simulator/local-backend
 demonstration runnable with retained synthetic data and restart instructions.
 
-**Current review deliverable:** The founder subsequently made the complete loop
+**Accepted local deliverable:** The founder made the complete loop
 working in the simulator against the real local API/database the acceptance target
 for PR #745, with a short recording, restart instructions and honest limitations.
-Own CI and scoped review through a merge-ready verdict without routine approvals;
-do not merge or deploy. Physical signing, installation and deployment are deferred.
+That deliverable passed CI and scoped review, then merged under the later explicit
+grant recorded below. Keep its demo runnable. Physical signing, installation and
+deployment are deferred; this completion does not activate another MVEE journey.
 
 **Overall delivery goal:** Deliver the loop defined under [full-scope execution and early demonstration](#full-scope-execution-and-early-demonstration)
 on the founder's physical iPhone over the internet using the existing user when
@@ -65,8 +66,10 @@ exactly matches the approved PR tree, preserving accepted evidence.
 The [terminal PR audit](https://github.com/lagarcess/argus/pull/745#issuecomment-5888571700)
 records green PR/push CI and smoke, the final clean scoped Codex review, zero
 unresolved threads, source equivalence, runnable demo and limitations. Post-merge
-exact-head integration CI and smoke are recorded in the merged PR's landing
-comment after completion; neither a merge nor this ledger substitutes for them.
+[integration CI](https://github.com/lagarcess/argus/actions/runs/36558771357) and
+[smoke](https://github.com/lagarcess/argus/actions/runs/36558771345) passed at the
+exact merge SHA. The [landing comment](https://github.com/lagarcess/argus/pull/745#issuecomment-5889046424)
+records final documentation publication and integration parity after #746.
 
 No linked issues require closure. The configuration audit found no new production
 environment variable: the existing financial flag stays default-off in
@@ -85,14 +88,14 @@ and remaining MVEE coverage below are not completed or activated by this landing
 `codex/private-alpha-next`. Original reviewed head `b5cfedef998079f3978f9282e60bc287afa7dc25`
 passed [CI](https://github.com/lagarcess/argus/actions/runs/36549243112) and
 [local smoke](https://github.com/lagarcess/argus/actions/runs/36549243153).
-The original and freshly fetched integration base remain `fcbb70cc2`; no
-reconciliation merge or intervening integration overlap exists.
+At review time the original and freshly fetched integration base was `fcbb70cc2`;
+no reconciliation merge or intervening integration overlap existed.
 
 The first Codex review found three confirmed defects. Each has a thumbs-up and
 an evidence-backed reply. All fixes below were published in `6d3f8e066`; this
-documentation follow-up changes no product/test source. The PR's terminal audit
-will record final exact-head CI, thread resolution and the scoped review result
-after they finish; this checkpoint does not pre-empt that verdict.
+documentation follow-up changes no product/test source. The linked terminal audit
+records final green CI, resolution of all three threads and the clean scoped
+review on approved head `944b2cb70`. Those publication/review steps are complete.
 
 | Finding | Published correction and verification | Delivery commit |
 | --- | --- | --- |
@@ -131,12 +134,11 @@ fixes. The publication blocker is resolved. Preserve Automatic branching and all
 other integration settings. No further infrastructure investigation, production
 changes or application deployment is authorized. No new token is needed.
 
-Publish the local fixes, wait for exact-head CI, resolve the addressed threads and
-request only a review of this correction delta. Report a merge-ready verdict after
-the scoped review returns clean and unresolved threads reach zero; do not merge.
-The preview's green check is automation evidence, not application delivery or
-physical-phone acceptance. Keep the broader MVEE and deferred physical-phone
-work pending under their existing authority boundaries.
+The fixes were published, exact-head CI passed, the addressed threads were
+resolved and the scoped recheck returned clean before the founder approved the
+merge. Do not repeat those completed steps. Preview status is automation evidence,
+not application delivery or physical-phone acceptance. The broader MVEE and
+deferred physical-phone work retain their existing authority boundaries.
 
 **Runnable local demonstration:** the retained database and synthetic identities
 are running again. Native `bbfb3bff` and core `c2425f2e2` are the locally verified
@@ -168,7 +170,11 @@ manifest rather than creating another board.
 - [x] Phase D: Keep the audit trail. Record decisions and evidence here as work advances.
 - [x] Phase E: Verify and hand back the authorized local simulator deliverable, recording, restart instructions and limitations. Phone acceptance remains deferred above.
 
-Decision trail for this batch stays in this manifest.
+### Historical implementation checkpoints
+
+The following records describe intermediate states before #745 landed. Their
+publication, process and integration statuses are historical, not current work
+instructions; the landing checkpoint above owns current status.
 
 - Restart uses three isolated writers and recovers the preserved iOS lineage.
   The fetched base and recovery checkpoint above identify their source. The
@@ -204,7 +210,8 @@ Decision trail for this batch stays in this manifest.
   command ran. The worker subsequently committed locally. The founder later
   explicitly approved publication of the assembled delivery branch and its
   review PR, resolving that publication blocker only. Previously published
-  device and captain checkpoints remain preserved; no PR/integration merge occurred.
+  device and captain checkpoints were preserved; no PR/integration merge had
+  occurred at that checkpoint. The subsequent #745 merge is recorded above.
 - Financial checkpoint `92020058d` passed independent review after fixes for
   stale metadata planning and native uppercase UUIDs. The captain reran the
   complete HTTP loop on a separate synthetic identity, including exact Home
@@ -244,15 +251,19 @@ Decision trail for this batch stays in this manifest.
   independent reviewers have completed their assigned local work. The captain
   retains signing, hosted compatibility, publication and physical acceptance.
 
-**Current review outcome:** publish the locally verified loop for review and
-keep its simulator/local-backend demonstration runnable. Physical-device signing,
+### Current handoff
+
+The locally verified loop is merged through #745. Keep its
+simulator/local-backend demonstration runnable and finish only the authorized
+landing documentation/verification through #746. Physical-device signing,
 Render login and deployment are explicitly deferred. No functionality on the
 founder's phone is yet proved by this batch. When those actions are resumed, the
 [device preparation evidence](../reports/financial-loop-device-preparation.md)
 identifies the access needed; actual deployed API/web SHAs are required before fixing
 the minimal deployment candidate. Account and loop migrations are
 `20260928200000_financial_accounts_first_slice.sql` and
-`20260929090000_financial_loop.sql`; neither is approved for hosted application.
+`20260929090000_financial_loop.sql`; neither is approved for application to the
+production project. The earlier isolated automatic-preview grant is recorded above.
 
 
 ## Outcome and completion
@@ -274,14 +285,15 @@ A release manifest under `docs/release-manifests/` remains the evidence for one
 specific deployment, not a competing product plan.
 
 The founder assigns the full MVEE private iPhone outcome to this delivery captain.
-The full-scope execution proposal below remains recorded. The current restart
-authorizes only the first financial loop; additional MVEE work remains stopped. Record named owners and each consumed technical contract
+The full-scope execution proposal below remains recorded. The completed restart
+covered only the first local financial loop; additional MVEE work remains stopped. Record named owners and each consumed technical contract
 before implementation of that dependency. Routine progression does not require
 new batch approvals. No 24-hour delivery promise has been made.
 
 ## Verified starting point
 
-The active batch starts from integration
+This is the historical baseline before #745; current landed status is above.
+The financial-loop batch started from integration
 `fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`, the #744 merge. Its exact-commit
 [CI](https://github.com/lagarcess/argus/actions/runs/36537496516) and
 [Private Alpha Local Smoke](https://github.com/lagarcess/argus/actions/runs/36537496519)
@@ -410,7 +422,8 @@ inspection, not a new hosted verification.
 
 ## Full-scope execution and early demonstration
 
-**Only this first loop is now authorized under the active batch above.** The first usable
+**The local first-loop deliverable landed through #745; the current handoff above
+owns the remaining authorization.** The full-scope proposal's first usable
 outcome is a complete financial loop on the physical iPhone over the internet,
 using the founder's existing user. Establish an account balance, record an
 expense, see Accounts and Home reflect it, correct it, reconcile a checked
