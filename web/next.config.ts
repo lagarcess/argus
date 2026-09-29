@@ -16,6 +16,13 @@ const nextConfig: NextConfig = {
     return [{
       source: "/:path*",
       headers: [{ key: "Content-Security-Policy", value: "img-src 'self' data:;" }],
+    }, {
+      source: "/auth/native-captcha",
+      headers: [
+        { key: "Cache-Control", value: "no-store" },
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Frame-Options", value: "DENY" },
+      ],
     }];
   },
   distDir: process.env.NEXT_DIST_DIR ?? ".next",

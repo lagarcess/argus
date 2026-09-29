@@ -1,0 +1,13 @@
+// Copy to ignored Device.local.xcconfig only after approving the Apple team and app ID.
+SUPPORTED_PLATFORMS = iphoneos
+CODE_SIGN_STYLE = Automatic
+CODE_SIGNING_ALLOWED = YES
+CODE_SIGNING_REQUIRED = YES
+CODE_SIGN_IDENTITY = Apple Development
+// Xcode derives device entitlements from the approved provisioning profile.
+CODE_SIGN_ENTITLEMENTS =
+DEVELOPMENT_TEAM =
+ARGUS_LOCAL_BUNDLE_IDENTIFIER =
+// Add the approved public endpoints using Local.xcconfig.example as the key list.
+// Do not use loopback URLs or Cloudflare test keys for the internet build.
+ARGUS_AUTH_ENABLED = false
