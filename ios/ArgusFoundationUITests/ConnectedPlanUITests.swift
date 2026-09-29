@@ -173,7 +173,13 @@ extension FinancialLoopUITests {
         fillMoneyField("plan.expectation.amount", with: amount)
         dismissMoneyKeyboard()
         tapVisible(app.buttons["plan.expectation.account"])
-        app.buttons[account.name].tap()
+        let accountOption = app.buttons[account.name]
+        for _ in 0..<12 {
+            if accountOption.exists && accountOption.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssertTrue(accountOption.waitForExistence(timeout: 5))
+        accountOption.tap()
         if daysAhead != 0 { choosePlanDate(daysAhead: daysAhead) }
         if cadence != "Once" {
             tapVisible(app.buttons["plan.expectation.recurrence"])
