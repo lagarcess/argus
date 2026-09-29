@@ -170,6 +170,7 @@ struct AccountRow: View {
                 } else { Text("accounts.unknown") }
             }.font(ArgusStyle.body(12, relativeTo: .caption)).multilineTextAlignment(.trailing)
         }.padding(.vertical, 18).frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
             .overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
             .accessibilityElement(children: .combine)
     }

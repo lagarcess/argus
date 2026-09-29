@@ -141,6 +141,7 @@ struct FinancialActivityRow: View {
             Text(verbatim: sign + currency + " " + AccountPresentation.amount(activity.amount, locale: locale))
                 .font(ArgusStyle.body(12, relativeTo: .caption)).monospacedDigit()
         }.font(ArgusStyle.body(14, relativeTo: .subheadline)).padding(.vertical, 16)
+            .contentShape(Rectangle())
             .overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
             .accessibilityElement(children: .combine)
     }
