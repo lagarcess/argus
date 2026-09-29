@@ -10,16 +10,13 @@ from argus.domain.recording.loop_schemas import ActivityRequest
 from argus.domain.recording.schemas import CreateFinancialAccountRequest
 from argus.domain.recording.service import FinancialAccountService
 
-from tests.test_financial_accounts_postgres import (
-    DSN,
-    _set_authenticated_claims,
-)
-from tests.test_financial_accounts_postgres import (
-    repository as repository,
-)
-from tests.test_financial_accounts_postgres import (
-    users as users,
-)
+from tests import test_financial_accounts_postgres as shared
+
+DSN = shared.DSN
+repository = shared.repository
+users = shared.users
+_set_authenticated_claims = shared._set_authenticated_claims
+
 
 pytestmark = pytest.mark.skipif(
     not DSN, reason="ARGUS_DISPOSABLE_DATABASE_URL is not configured"
