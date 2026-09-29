@@ -69,16 +69,38 @@ financial-loop evidence remains historical at its recorded sources; the changed
 timezone/type-lock and account-list surfaces have the focused replacement proof
 above. No clean final PR review or candidate CI claim is made for unpublished fixes.
 
-**Publication blocker:** opening the authorized PR unexpectedly triggered the
-existing Supabase GitHub integration. Its bot reports creation and migration of
-preview `yjuknxqpmgddgswvtgwk`. This exceeded the intended GitHub-only boundary
-through repository automation; no direct hosted mutation or production rollout
-was requested. Further pushes are paused pending founder direction about that
-automation. Do not delete the preview or alter hosted integration settings without
-approval. Its green check is not local CI, approved deployment or phone evidence.
+**Preview cleanup and remaining publication blocker:** the founder authorized
+verification, removal of only PR #745's disposable preview, and disabling
+automatic previews only for this PR. CLI and connected Supabase branch inventories
+confirmed a real environment, not a skipped-preview notice: branch
+`4d58c555-c26d-4a51-bdfb-c1765042aca3`, preview project
+`yjuknxqpmgddgswvtgwk`, git branch `codex/financial-loop-delivery`, PR `745`,
+non-default, non-persistent, and created without production data.
+
+The existing integration checkout's environment credential authenticated CLI
+reads, but CLI deletion lacked `branching_development_delete`. The connected
+Supabase tool successfully deleted that exact branch. A fresh inventory confirmed
+only the unchanged default branch remains on existing project
+`lgdhvepyrzbnscqssgqq`. No new token, other branch deletion, main-project mutation,
+or integration-setting change was made.
+
+No supported PR-only exclusion was found in current CLI controls, official docs,
+or the dashboard implementation. The documented
+[Automatic branching control](https://supabase.com/docs/guides/deployment/branching/github-integration#syncing-github-branches)
+belongs to the project's GitHub connection (`new_branch_per_pr`), so turning it off
+would affect automatic preview creation for all its PRs. That broader change is
+not authorized. Deletion alone does not establish that a later push cannot
+recreate the preview. Further pushes therefore await the founder's decision on
+this specific project-wide control; do not disable project branching or delete
+the project as a substitute. Recommend turning off only Automatic branching,
+preserving all other integration settings, subject to explicit approval and
+verified setting readback.
+
 After that blocker is resolved, publish the local fixes, wait for exact-head CI,
 resolve the addressed threads and request only a review of this correction delta.
-Do not repeat a broad review of unchanged code or merge this PR.
+Do not repeat a broad review of unchanged code or merge this PR. The old green
+Supabase check remains historical automation evidence, not application delivery
+or physical-phone acceptance.
 
 **Runnable local demonstration:** the retained database and synthetic identities
 are running again. Native `bbfb3bff` and core `c2425f2e2` are the locally verified
