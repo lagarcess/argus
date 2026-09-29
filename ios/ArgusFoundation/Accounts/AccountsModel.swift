@@ -15,6 +15,11 @@ final class AccountsModel: ObservableObject {
     var sessionChanged: ((SessionSnapshot) -> Void)?
     private let controller: SessionController
     private var generation = UUID()
+    @Published private(set) var openingPreview: OpeningPreview?
+    @Published private(set) var openingUncertain = false
+    private var pendingOpening: WriteOpeningRequest?
+    private var openingCoverage: [OpeningCoverage] = []
+    private var openingKey = UUID()
     private var pendingCreate: CreateFinancialAccountRequest?
 
     init(controller: SessionController) { self.controller = controller }
@@ -24,7 +29,7 @@ final class AccountsModel: ObservableObject {
         generation = UUID()
         identity = snapshot?.phase == .authenticated ? snapshot : nil
         accounts = []; selected = nil; draft = nil; latest = nil
-        pendingCreate = nil; busy = false; errorKey = nil; needsReview = false
+        clearOpening(); pendingCreate = nil; busy = false; errorKey = nil; needsReview = false
     }
 
     func load() async {
@@ -46,14 +51,14 @@ final class AccountsModel: ObservableObject {
     func create() { begin(AccountDraft()) }
     func edit(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .metadata)) }
     func opening(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .opening)) }
-    func discard() { draft = nil; pendingCreate = nil; latest = nil; needsReview = false; errorKey = nil }
+    func discard() { clearOpening(); draft = nil; pendingCreate = nil; latest = nil; needsReview = false; errorKey = nil }
     func editLatest() {
         guard let latest, let mode = draft?.mode else { return }
         begin(AccountDraft(account: latest, mode: mode))
     }
 
     private func begin(_ draft: AccountDraft) {
-        self.draft = draft; pendingCreate = nil; errorKey = nil; latest = nil; needsReview = false
+        clearOpening(); self.draft = draft; pendingCreate = nil; errorKey = nil; latest = nil; needsReview = false
     }
 
     func save(locale: Locale = .current) async {
@@ -78,16 +83,36 @@ final class AccountsModel: ObservableObject {
                         currency: draft.currency == base.currency ? nil : draft.currency, ownershipShareBps: share == base.ownershipShareBps ? nil : share), expectedIdentity: identity)
             case .opening:
                 guard let base = draft.base else { return }
-                saved = try await self.controller.writeOpening(id: base.id,
-                    request: WriteOpeningRequest(expectedVersion: base.version, expectedRevision: base.opening?.revision,
-                        amount: amount,
-                        asOf: draft.asOf == base.opening?.asOf ? nil : draft.asOf,
-                        timeZone: draft.timeZone == base.opening?.timeZone ? nil : draft.timeZone,
-                        reason: draft.reason), expectedIdentity: identity)
+                guard let request = self.pendingOpening else {
+                    var request = WriteOpeningRequest(expectedVersion: base.version, expectedRevision: base.opening?.revision,
+                        amount: amount, asOf: draft.asOf == base.opening?.asOf ? nil : draft.asOf,
+                        timeZone: draft.timeZone == base.opening?.timeZone ? nil : draft.timeZone, reason: draft.reason)
+                    request.coverage = self.openingCoverage
+                    let preview = try await self.controller.openingPreview(accountId: base.id, request: request, expectedIdentity: identity)
+                    guard self.current(identity) else { return }
+                    self.openingPreview = preview
+                    if preview.ready { request.previewToken = preview.previewToken; self.pendingOpening = request }
+                    return
+                }
+                self.openingUncertain = true
+                saved = try await self.controller.writeOpening(id: base.id, request: request, key: self.openingKey, expectedIdentity: identity)
             }
             guard self.current(identity) else { return }
             self.accept(saved); self.discard()
         }
+    }
+
+    var openingIsReviewed: Bool { pendingOpening != nil }
+    func editOpening() { guard !openingUncertain else { return }; clearOpening() }
+    func answerOpening(_ id: UUID, included: Bool, locale: Locale) async {
+        guard !busy, !openingUncertain else { return }
+        openingCoverage.removeAll { $0.activityId == id }
+        openingCoverage.append(.init(activityId: id, included: included))
+        pendingOpening = nil
+        await save(locale: locale)
+    }
+    private func clearOpening() {
+        openingPreview = nil; pendingOpening = nil; openingCoverage = []; openingKey = UUID(); openingUncertain = false
     }
 
     var createIsFrozen: Bool { pendingCreate != nil }
@@ -124,6 +149,11 @@ final class AccountsModel: ObservableObject {
                 bind(snapshot); sessionChanged?(snapshot); return
             }
             errorKey = Self.message(error)
+            if pendingOpening != nil {
+                if case SessionFailure.rejected(let status, _) = error, (400..<500).contains(status), status != 408 {
+                    clearOpening()
+                } else { return }
+            }
             if case SessionFailure.rejected(let status, _) = error, status == 422 || status == 400 { pendingCreate = nil }
             if draft?.base != nil && Self.requiresReview(error) {
                 needsReview = true

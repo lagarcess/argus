@@ -69,6 +69,7 @@ struct FinancialEditorView: View {
                 }
             }
             .interactiveDismissDisabled(model.busy || model.phase == .uncertain)
+            .task { await model.loadCategories() }
         }
     }
 
@@ -99,6 +100,14 @@ struct FinancialEditorView: View {
                 Text("\(model.note.unicodeScalars.count)/200").font(ArgusStyle.body(11, relativeTo: .caption))
                     .foregroundStyle(ArgusStyle.secondary).frame(maxWidth: .infinity, alignment: .trailing)
             }
+            if !model.isCheck && !model.categories.isEmpty {
+                Picker("loop.category", selection: $model.categoryId) {
+                    Text("loop.category.none").tag(nil as String?)
+                    ForEach(model.categories) { category in
+                        Text(LocalizedStringKey("loop.category." + category.id)).tag(Optional(category.id))
+                    }
+                }.accessibilityIdentifier("loop.category")
+            }
             if model.isCorrection {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("accounts.reason")
@@ -121,19 +130,20 @@ struct FinancialEditorView: View {
             }
             ForEach(preview.observations, id: \.observationId) { observation in
                 VStack(alignment: .leading, spacing: 10) {
+                    Text(observation.kind == "opening" ? "loop.coverage.opening" : "loop.coverage.check")
                     Text(verbatim: AccountPresentation.date(observation.asOf, zone: model.account.opening?.timeZone ?? TimeZone.current.identifier, locale: locale))
                         .font(ArgusStyle.body(13, relativeTo: .caption))
                     Text(verbatim: model.account.currency + " " + AccountPresentation.amount(observation.amount, locale: locale)).monospacedDigit()
-                    if !preview.ready {
+                    if !preview.ready && observation.included == nil {
                         HStack {
                             Button("loop.coverage.yes") {
                                 model.answer(observation.observationId, included: true)
                                 Task { await model.review(locale: locale) }
-                            }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("loop.coverage.yes")
+                            }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("loop.coverage.yes." + observation.kind + "." + observation.observationId.uuidString)
                             Button("loop.coverage.no") {
                                 model.answer(observation.observationId, included: false)
                                 Task { await model.review(locale: locale) }
-                            }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("loop.coverage.no")
+                            }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("loop.coverage.no." + observation.kind + "." + observation.observationId.uuidString)
                         }.disabled(model.busy)
                     } else {
                         Text(observation.included == true ? "loop.coverage.included" : "loop.coverage.excluded")
@@ -141,7 +151,7 @@ struct FinancialEditorView: View {
                     }
                 }
             }
-        }.accessibilityIdentifier("loop.preview")
+        }
     }
 
     private func checkReview(_ preview: BalanceCheckPreview) -> some View {
@@ -156,7 +166,7 @@ struct FinancialEditorView: View {
             if preview.differenceMinor != nil && preview.differenceMinor != 0 {
                 Text("loop.check.missing").font(ArgusStyle.body(13, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
             }
-        }.accessibilityIdentifier("loop.preview")
+        }
     }
 
     private func minorValue(_ label: LocalizedStringKey, amount: Int64?, digits: Int) -> some View {

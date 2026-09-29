@@ -1,4 +1,5 @@
 import SwiftUI
+import ArgusSession
 
 struct AccountForm: View {
     @ObservedObject var model: AccountsModel
@@ -7,7 +8,7 @@ struct AccountForm: View {
     @State private var otherAssets = false
     @FocusState private var amountFocused: Bool
     private let primaryTypes = ["cash", "checking", "savings", "investment", "credit_card", "other_debt"]
-    private var locked: Bool { model.busy || model.createIsFrozen }
+    private var locked: Bool { model.busy || model.createIsFrozen || model.openingIsReviewed }
 
     var body: some View {
         NavigationStack {
@@ -29,6 +30,7 @@ struct AccountForm: View {
                         if draft.mode != .create {
                             savedDetails(draft)
                         }
+                        if let preview = model.openingPreview { openingReview(preview) }
                         if let error = model.errorKey {
                             Text(LocalizedStringKey(error)).fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("accounts.form.error")
@@ -47,12 +49,13 @@ struct AccountForm: View {
                                 Text("accounts.create.retry").font(ArgusStyle.body(12, relativeTo: .caption))
                             }
                             Button { amountFocused = false; Task { await model.save(locale: locale) } } label: {
-                                Text(model.createIsFrozen ? "accounts.retry" : draft.mode == .create ? "accounts.add" : "accounts.save")
+                                Text(model.createIsFrozen || model.openingUncertain ? "accounts.retry" : draft.mode == .create ? "accounts.add" : draft.mode == .opening && !model.openingIsReviewed ? "loop.review" : "accounts.save")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(PillButtonStyle()).disabled(model.busy)
                             .accessibilityIdentifier("accounts.save")
                         }
+                        if model.openingUncertain { Text("loop.retry.same") }
                         if model.busy { ProgressView("accounts.saving") }
                     }.padding(24)
                 }
@@ -63,7 +66,7 @@ struct AccountForm: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("accounts.cancel") { model.discard() }.disabled(model.busy)
+                    Button("accounts.cancel") { model.discard() }.disabled(model.busy || model.openingUncertain)
                         .frame(minHeight: 44).accessibilityIdentifier("accounts.cancel")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
@@ -72,6 +75,34 @@ struct AccountForm: View {
                 }
             }
             .interactiveDismissDisabled()
+        }
+    }
+
+    private func openingReview(_ preview: OpeningPreview) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            if preview.ready {
+                HStack {
+                    Text("loop.after"); Spacer()
+                    if let amount = preview.after?.amount {
+                        Text(verbatim: (model.draft?.currency ?? "") + " " + AccountPresentation.amount(amount, locale: locale)).monospacedDigit()
+                    } else { Text("accounts.unknown") }
+                }
+                if !model.openingUncertain { Button("loop.edit") { model.editOpening() }.accessibilityIdentifier("loop.edit") }
+            } else { Text("loop.opening.coverage").font(ArgusStyle.display(22)) }
+            ForEach(preview.activities, id: \.activityId) { activity in
+                VStack(alignment: .leading, spacing: 8) {
+                    if let note = activity.note, !note.isEmpty { Text(verbatim: note) }
+                    Text(verbatim: (model.draft?.currency ?? "") + " " + AccountPresentation.amount(activity.amount, locale: locale))
+                    if !preview.ready && activity.included == nil {
+                        HStack {
+                            Button("loop.coverage.yes") { Task { await model.answerOpening(activity.activityId, included: true, locale: locale) } }
+                                .buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("opening.coverage.yes")
+                            Button("loop.coverage.no") { Task { await model.answerOpening(activity.activityId, included: false, locale: locale) } }
+                                .buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("opening.coverage.no")
+                        }.disabled(model.busy)
+                    } else { Text(activity.included == true ? "loop.coverage.included" : "loop.coverage.excluded") }
+                }
+            }
         }
     }
 

@@ -6,6 +6,9 @@ final class FinancialLoopModel: ObservableObject {
     @Published private(set) var home: FinancialHome?
     @Published private(set) var activity: [FinancialActivity] = []
     @Published private(set) var checks: [FinancialCheck] = []
+    @Published private(set) var activityCursor: String?
+    @Published private(set) var checksCursor: String?
+    @Published private(set) var loadingMore = false
     @Published private(set) var errorKey: String?
     @Published private(set) var loading = false
     @Published var editor: FinancialEditor?
@@ -22,9 +25,9 @@ final class FinancialLoopModel: ObservableObject {
     }
 
     func bind(_ snapshot: SessionSnapshot?) {
-        guard identity?.revision != snapshot?.revision || identity?.profile?.id != snapshot?.profile?.id else { return }
+        guard identity?.revision != snapshot?.revision || identity?.profile?.id != snapshot?.profile?.id || identity?.phase != snapshot?.phase else { return }
         generation = UUID(); identity = snapshot?.phase == .authenticated ? snapshot : nil
-        home = nil; activity = []; checks = []; editor = nil; errorKey = nil; loading = false
+        home = nil; activity = []; checks = []; activityCursor = nil; checksCursor = nil; loadingMore = false; editor = nil; errorKey = nil; loading = false
     }
 
     func refresh() async {
@@ -44,13 +47,44 @@ final class FinancialLoopModel: ObservableObject {
         guard let identity else { return }
         let ticket = generation
         let request = UUID(); detailRequest = request
-        activity = []; checks = []; errorKey = nil
+        activity = []; checks = []; activityCursor = nil; checksCursor = nil; errorKey = nil
         do {
             let entries = try await controller.financialActivity(accountId: account.id, expectedIdentity: identity)
             let observations = try await controller.financialChecks(accountId: account.id, expectedIdentity: identity)
             guard generation == ticket, detailRequest == request, accounts.selected?.id == account.id else { return }
             activity = entries.items; checks = observations.items
+            activityCursor = entries.nextCursor; checksCursor = observations.nextCursor
         } catch { if detailRequest == request { await handle(error, ticket: ticket) } }
+    }
+
+    func more(_ account: FinancialAccount, checks: Bool) async {
+        guard let identity, !loadingMore else { return }
+        let ticket = generation; let detail = detailRequest
+        loadingMore = true
+        defer { if generation == ticket { loadingMore = false } }
+        do {
+            if checks, let cursor = checksCursor {
+                let page = try await controller.financialChecks(accountId: account.id, cursor: cursor, expectedIdentity: identity)
+                guard generation == ticket, detailRequest == detail else { return }
+                self.checks += page.items; checksCursor = page.nextCursor
+            } else if let cursor = activityCursor {
+                let page = try await controller.financialActivity(accountId: account.id, cursor: cursor, expectedIdentity: identity)
+                guard generation == ticket, detailRequest == detail else { return }
+                activity += page.items; activityCursor = page.nextCursor
+            }
+        } catch { await handle(error, ticket: ticket) }
+    }
+
+    func history(_ account: FinancialAccount, activity: FinancialActivity) async throws -> [FinancialActivity] {
+        guard let identity else { throw SessionFailure.unauthorized }
+        let ticket = generation
+        var entries: [FinancialActivity] = []; var cursor: String?
+        repeat {
+            let page = try await controller.financialActivityHistory(accountId: account.id, recordId: activity.recordId, cursor: cursor, expectedIdentity: identity)
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            entries += page.items; cursor = page.nextCursor
+        } while cursor != nil
+        return entries
     }
 
     func expense(_ account: FinancialAccount, correcting activity: FinancialActivity? = nil) {
@@ -98,6 +132,7 @@ final class FinancialEditor: ObservableObject, Identifiable {
     @Published var note = ""
     @Published var reason = ""
     @Published var date = Date()
+    @Published private(set) var categories: [FinancialCategory] = []
     @Published var categoryId: String?
     @Published private(set) var phase = Phase.editing
     @Published private(set) var expensePreview: ExpensePreview?
@@ -130,6 +165,12 @@ final class FinancialEditor: ObservableObject, Identifiable {
     var canEdit: Bool { phase == .editing || (phase == .review && expensePreview?.ready == false) }
     var canConfirm: Bool { phase == .uncertain || (phase == .review && (checkPreview != nil || expensePreview?.ready == true)) }
     var readyToReview: Bool { !amount.isEmpty && (!isCorrection || !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+
+    func loadCategories() async {
+        guard !isCheck else { return }
+        do { categories = try await controller.financialCategories(expectedIdentity: identity).categories }
+        catch { /* Optional categorization must not block recording. */ }
+    }
 
     func edit() {
         guard phase == .review else { return }
@@ -193,7 +234,7 @@ final class FinancialEditor: ObservableObject, Identifiable {
         } catch {
             errorKey = Self.message(error)
             if Self.isConflict(error) { phase = .conflict }
-            else if case SessionFailure.rejected = error { phase = .editing }
+            else if case SessionFailure.rejected(let status, _) = error, (400..<500).contains(status), status != 408 { phase = .editing }
             else { phase = .uncertain }
         }
     }

@@ -307,10 +307,10 @@ extension SessionController {
             body: encoded(request), expectedIdentity: expectedIdentity))
     }
 
-    public func writeOpening(id: UUID, request: WriteOpeningRequest,
+    public func writeOpening(id: UUID, request: WriteOpeningRequest, key: UUID? = nil,
                              expectedIdentity: SessionSnapshot) async throws -> FinancialAccount {
         try decodeAccount(await financialRequest(path: "/" + id.uuidString + "/opening", method: "PUT",
-            body: encoded(request), expectedIdentity: expectedIdentity))
+            body: encoded(request), key: key?.uuidString, expectedIdentity: expectedIdentity))
     }
 
     func encoded(_ value: some Encodable) throws -> Data {
@@ -323,7 +323,7 @@ extension SessionController {
         catch { throw SessionFailure.invalidResponse }
     }
     func financialRequest(route: String = "financial-accounts", path: String = "", method: String = "GET", body: Data? = nil,
-                                  key: String? = nil, expectedIdentity: SessionSnapshot) async throws -> Data {
+                                  key: String? = nil, query: [URLQueryItem] = [], expectedIdentity: SessionSnapshot) async throws -> Data {
         guard expectedIdentity.phase == .authenticated, expectedIdentity.profile != nil else { throw SessionFailure.unauthorized }
         guard state.phase == .authenticated, state.revision == expectedIdentity.revision,
               state.profile?.id == expectedIdentity.profile?.id else { throw SessionFailure.staleOperation }
@@ -331,7 +331,9 @@ extension SessionController {
         if try vault.pending() != nil { throw SessionFailure.pendingSignOut }
         let epoch = vault.epoch()
         try vault.check(epoch)
-        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/" + route + path))
+        var components = URLComponents(url: configuration.argusAPIURL.appending(path: "api/v1/" + route + path), resolvingAgainstBaseURL: false)!
+        if !query.isEmpty { components.queryItems = query }
+        var request = URLRequest(url: components.url!)
         request.httpMethod = method
         request.httpBody = body
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }

@@ -119,13 +119,16 @@ public struct WriteOpeningRequest: Encodable, Equatable, Sendable {
     public let asOf: String?
     public let timeZone: String?
     public let reason: String?
+    public var coverage: [OpeningCoverage]? = nil
+    public var previewToken: String? = nil
     public init(expectedVersion: Int, expectedRevision: Int?, amount: String? = nil,
                 asOf: String? = nil, timeZone: String? = nil, reason: String? = nil) {
         self.expectedVersion = expectedVersion; self.expectedRevision = expectedRevision
         self.amount = amount; self.asOf = asOf; self.timeZone = timeZone; self.reason = reason
     }
     enum CodingKeys: String, CodingKey {
-        case amount, reason
+        case amount, reason, coverage
+        case previewToken = "preview_token"
         case expectedVersion = "expected_version", expectedRevision = "expected_revision", asOf = "as_of", timeZone = "time_zone"
     }
     public func encode(to encoder: any Encoder) throws {
@@ -136,5 +139,7 @@ public struct WriteOpeningRequest: Encodable, Equatable, Sendable {
         try container.encodeIfPresent(asOf, forKey: .asOf)
         try container.encodeIfPresent(timeZone, forKey: .timeZone)
         try container.encodeIfPresent(reason, forKey: .reason)
+        try container.encodeIfPresent(coverage, forKey: .coverage)
+        try container.encodeIfPresent(previewToken, forKey: .previewToken)
     }
 }

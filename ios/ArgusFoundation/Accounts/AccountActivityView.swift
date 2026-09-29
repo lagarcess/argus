@@ -4,7 +4,10 @@ import ArgusSession
 struct AccountActivityView: View {
     @ObservedObject var loop: FinancialLoopModel
     let account: FinancialAccount
+    @State private var pendingCorrection: FinancialActivity?
     @State private var inspected: FinancialActivity?
+    @State private var revisions: [FinancialActivity] = []
+    @State private var historyFailed = false
     @Environment(\.locale) private var locale
 
     var body: some View {
@@ -28,6 +31,7 @@ struct AccountActivityView: View {
                     }
                 }
             }
+            if loop.activityCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: false) } }.disabled(loop.loadingMore) }
             if !loop.checks.isEmpty {
                 Text("loop.check.history").font(ArgusStyle.display(22))
                 ForEach(loop.checks, id: \.recordId) { check in
@@ -40,32 +44,52 @@ struct AccountActivityView: View {
                         if let difference = check.differenceMinor {
                             Text("loop.difference") + Text(verbatim: " " + account.currency + " " + AccountPresentation.amount(AccountPresentation.decimal(difference, digits: account.currencyFractionDigits), locale: locale))
                         }
-                        if let remaining = check.unexplainedMinor, remaining != 0 {
+                        if let remaining = check.unexplainedMinor {
                             Text("loop.check.unexplained") + Text(verbatim: " " + account.currency + " " + AccountPresentation.amount(AccountPresentation.decimal(remaining, digits: account.currencyFractionDigits), locale: locale))
                         }
                         if let note = check.note, !note.isEmpty { Text(verbatim: note) }
                     }.font(ArgusStyle.body(13, relativeTo: .subheadline)).padding(.vertical, 12)
                 }
             }
+            if loop.checksCursor != nil { Button("loop.more") { Task { await loop.more(account, checks: true) } }.disabled(loop.loadingMore) }
         }
         .task(id: account.version) { await loop.open(account) }
-        .sheet(item: $inspected) { activity in
+        .sheet(item: $inspected, onDismiss: {
+            if let activity = pendingCorrection { pendingCorrection = nil; loop.expense(account, correcting: activity) }
+        }) { activity in
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         FinancialActivityRow(activity: activity, currency: account.currency)
                         Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
                         if let reason = activity.reason { Text(verbatim: reason) }
+                        if revisions.count > 1 {
+                            Text("loop.revisions").font(ArgusStyle.display(22))
+                            ForEach(revisions, id: \.revision) { revision in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    FinancialActivityRow(activity: revision, currency: account.currency)
+                                    if let reason = revision.reason { Text(verbatim: reason) }
+                                }
+                            }
+                        }
+                        if historyFailed {
+                            Text("loop.error.connection")
+                            Button("accounts.retry") { Task { await loadHistory(activity) } }
+                        }
                         Button("loop.correction.title") {
+                            pendingCorrection = activity
                             inspected = nil
-                            loop.expense(account, correcting: activity)
                         }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("activity.correct")
                     }.padding(24)
                 }.background(ArgusStyle.background)
                     .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .cancellationAction) { Button("action.close") { inspected = nil } } }
-            }
+            }.task(id: activity.recordId) { await loadHistory(activity) }
         }
+    }
+    private func loadHistory(_ activity: FinancialActivity) async {
+        revisions = []; historyFailed = false
+        do { revisions = try await loop.history(account, activity: activity) } catch { historyFailed = true }
     }
 }
 

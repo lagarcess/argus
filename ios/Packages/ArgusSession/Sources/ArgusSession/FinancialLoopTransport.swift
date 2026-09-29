@@ -1,16 +1,27 @@
 import Foundation
 
 extension SessionController {
+    public func openingPreview(accountId: UUID, request: WriteOpeningRequest, expectedIdentity: SessionSnapshot) async throws -> OpeningPreview {
+        try await loopResponse(path: accountPath(accountId) + "/opening/preview", method: "POST", body: encoded(request), identity: expectedIdentity)
+    }
+    public func financialCategories(expectedIdentity: SessionSnapshot) async throws -> FinancialCategoryCatalog {
+        try await loopResponse(route: "financial-categories", identity: expectedIdentity)
+    }
+
     public func financialHome(expectedIdentity: SessionSnapshot) async throws -> FinancialHome {
         try await loopResponse(route: "financial-home", identity: expectedIdentity)
     }
 
     public func financialActivity(accountId: UUID, cursor: String? = nil, expectedIdentity: SessionSnapshot) async throws -> FinancialPage<FinancialActivity> {
-        try await loopResponse(path: accountPath(accountId) + "/activity" + pageQuery(cursor), identity: expectedIdentity)
+        try await loopResponse(path: accountPath(accountId) + "/activity", query: pageQuery(cursor), identity: expectedIdentity)
+    }
+
+    public func financialActivityHistory(accountId: UUID, recordId: UUID, cursor: String? = nil, expectedIdentity: SessionSnapshot) async throws -> FinancialPage<FinancialActivity> {
+        try await loopResponse(path: activityPath(accountId, recordId) + "/history", query: pageQuery(cursor), identity: expectedIdentity)
     }
 
     public func financialChecks(accountId: UUID, cursor: String? = nil, expectedIdentity: SessionSnapshot) async throws -> FinancialPage<FinancialCheck> {
-        try await loopResponse(path: accountPath(accountId) + "/balance-checks" + pageQuery(cursor), identity: expectedIdentity)
+        try await loopResponse(path: accountPath(accountId) + "/balance-checks", query: pageQuery(cursor), identity: expectedIdentity)
     }
 
     public func expensePreview(accountId: UUID, recordId: UUID? = nil, request: ExpenseRequest,
@@ -41,17 +52,14 @@ extension SessionController {
     private func activityPath(_ accountId: UUID, _ recordId: UUID?) -> String {
         accountPath(accountId) + "/activity" + (recordId.map { "/" + $0.uuidString } ?? "")
     }
-    private func pageQuery(_ cursor: String?) -> String {
-        guard let cursor else { return "" }
-        var query = URLComponents()
-        query.queryItems = [URLQueryItem(name: "cursor", value: cursor)]
-        return "?" + (query.percentEncodedQuery ?? "")
+    private func pageQuery(_ cursor: String?) -> [URLQueryItem] {
+        cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? []
     }
     private func loopResponse<Value: Decodable>(route: String = "financial-accounts", path: String = "",
                                                method: String = "GET", body: Data? = nil, key: UUID? = nil,
-                                               identity: SessionSnapshot) async throws -> Value {
+                                               query: [URLQueryItem] = [], identity: SessionSnapshot) async throws -> Value {
         let data = try await financialRequest(route: route, path: path, method: method, body: body,
-                                              key: key?.uuidString, expectedIdentity: identity)
+                                              key: key?.uuidString, query: query, expectedIdentity: identity)
         do { return try JSONDecoder().decode(Value.self, from: data) }
         catch { throw SessionFailure.invalidResponse }
     }

@@ -258,3 +258,31 @@ public struct FinancialPage<Item: Codable & Equatable & Sendable>: Codable, Equa
         case nextCursor = "next_cursor"
     }
 }
+
+public struct OpeningCoverage: Codable, Equatable, Sendable {
+    public let activityId: UUID
+    public let included: Bool
+    public init(activityId: UUID, included: Bool) { self.activityId = activityId; self.included = included }
+    enum CodingKeys: String, CodingKey { case activityId = "activity_id", included }
+}
+public struct OpeningActivity: Decodable, Sendable {
+    public let activityId: UUID
+    public let amount: String
+    public let occurredAt: String
+    public let note: String?
+    public let included: Bool?
+    enum CodingKeys: String, CodingKey { case activityId = "activity_id", amount, occurredAt = "occurred_at", note, included }
+}
+public struct OpeningPreview: Decodable, Sendable {
+    public let ready: Bool
+    public let activities: [OpeningActivity]
+    public let before: FinancialBalance
+    public let after: FinancialBalance?
+    public let previewToken: String?
+    enum CodingKeys: String, CodingKey { case ready, activities, before, after, previewToken = "preview_token" }
+}
+public struct FinancialCategory: Decodable, Sendable, Identifiable {
+    public let id: String
+    public let kind: String
+}
+public struct FinancialCategoryCatalog: Decodable, Sendable { public let categories: [FinancialCategory] }

@@ -102,7 +102,7 @@ struct FinancialHomeView: View {
                 } else { Text("accounts.unknown").font(ArgusStyle.display(30)) }
                 Text("loop.home.source").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
                 if summary.unknownAccounts > 0 {
-                    Text("\(summary.unknownAccounts) accounts with unknown balances")
+                    Text(verbatim: String(format: NSLocalizedString("loop.home.unknownCount", comment: ""), summary.unknownAccounts))
                         .font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
                 }
             }
