@@ -24,11 +24,28 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ai.argus.foundation.Appearance
 import ai.argus.foundation.R
+import ai.argus.foundation.auth.SessionStatus
+import ai.argus.foundation.auth.SessionUiState
 
 @Composable
-internal fun SettingsPage(onPreferences: () -> Unit, unavailable: () -> Unit) {
+internal fun SettingsPage(
+    onPreferences: () -> Unit,
+    unavailable: () -> Unit,
+    sessionState: SessionUiState? = null,
+    onSession: () -> Unit = {},
+) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
-        DetailRow(R.string.guest_identity, R.string.guest_identity_detail)
+        if (sessionState == null) {
+            DetailRow(R.string.guest_identity, R.string.guest_identity_detail)
+        } else {
+            val identity = when (sessionState.status) {
+                SessionStatus.SIGNED_IN -> R.string.session_registered_identity
+                SessionStatus.GUEST_PRESERVED -> R.string.session_guest_title
+                else -> R.string.session_title
+            }
+            DetailRow(identity, R.string.session_settings_detail, onClick = onSession,
+                modifier = Modifier.testTag("session_entry"))
+        }
         SectionTitle(R.string.app_group)
         DetailRow(R.string.preferences, R.string.preferences_detail, onClick = onPreferences,
             modifier = Modifier.testTag("preferences"))
@@ -40,7 +57,8 @@ internal fun SettingsPage(onPreferences: () -> Unit, unavailable: () -> Unit) {
         DetailRow(R.string.usage, R.string.usage_detail, onClick = unavailable)
         SectionTitle(R.string.support_group)
         DetailRow(R.string.help_feedback, R.string.help_feedback_detail, onClick = unavailable)
-        Text(stringResource(R.string.settings_footer), Modifier.padding(vertical = 24.dp),
+        Text(stringResource(if (sessionState == null) R.string.settings_footer
+            else R.string.session_settings_footer), Modifier.padding(vertical = 24.dp),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -75,7 +93,8 @@ internal fun PreferencesPage(appearance: Appearance, onAppearanceChange: (Appear
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         SectionTitle(R.string.language_region)
-        Text(stringResource(R.string.language_notice), style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(if (LocalSessionEnabled.current) R.string.session_language_notice
+            else R.string.language_notice), style = MaterialTheme.typography.bodyLarge)
         SampleNotice()
     }
 }

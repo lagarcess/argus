@@ -39,6 +39,7 @@ import ai.argus.foundation.R
 internal fun ChatPage(
     composer: String, onComposerChange: (String) -> Unit,
     requireRegistration: () -> Unit, onSend: () -> Unit, unavailable: () -> Unit,
+    composerEnabled: Boolean = true,
 ) {
     val composerLabel = stringResource(R.string.type_message)
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
@@ -72,7 +73,7 @@ internal fun ChatPage(
             color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column {
                 TextField(
-                    value = composer, onValueChange = onComposerChange,
+                    value = composer, onValueChange = onComposerChange, enabled = composerEnabled,
                     modifier = Modifier.fillMaxWidth().testTag("composer")
                         .semantics { contentDescription = composerLabel },
                     placeholder = { Text(stringResource(R.string.type_message)) },
