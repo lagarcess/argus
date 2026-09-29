@@ -367,3 +367,91 @@ def test_purchase_provenance_rejects_cross_owner_and_missing_revision(
         )["purchase_revision"]
         == 1
     )
+
+
+def test_legacy_backfill_preserves_ids_coverage_hash_and_response_loss_receipt(
+    scene, repository
+):
+    import json
+    from pathlib import Path
+
+    from argus.domain.recording.loop_schemas import ActivityRequest
+    from argus.domain.recording.loop_service import token
+
+    aid = account(scene)
+    stored = scene[0].get(user_id=scene[1], account_id=aid)
+    rid = str(uuid4())
+    request = ActivityRequest(
+        expected_version=1,
+        amount="25",
+        occurred_at=NOW - timedelta(days=10),
+        category_id="shopping",
+        coverage=[{"observation_id": stored.opening.id, "included": True}],
+    )
+    original_hash = token("activity", aid, None, request)
+    with repository._pool.connection() as c:
+        with c.transaction():
+            c.execute(
+                "insert into public.financial_records(id,account_id,user_id,record_kind,current_revision) values(%s,%s,%s,'expense',1)",
+                (rid, aid, scene[1]),
+            )
+            c.execute(
+                "insert into public.financial_record_revisions(record_id,user_id,revision,amount_minor,as_of,as_of_zone,recorded_by,details) values(%s,%s,1,-2500,%s,%s,%s,%s)",
+                (
+                    rid,
+                    scene[1],
+                    request.occurred_at,
+                    request.time_zone,
+                    scene[1],
+                    json.dumps({"category_id": "shopping"}),
+                ),
+            )
+            c.execute(
+                "insert into public.financial_observation_coverage(account_id,user_id,observation_id,observation_revision,activity_id,activity_revision,included) values(%s,%s,%s,1,%s,1,true)",
+                (aid, scene[1], stored.opening.id, rid),
+            )
+            c.execute(
+                "insert into public.financial_operation_receipts(user_id,account_id,idempotency_key,identity_hash,record_id,revision,kind) values(%s,%s,'old-response-loss',%s,%s,1,'expense')",
+                (scene[1], aid, original_hash, rid),
+            )
+            c.execute(
+                "update public.financial_accounts set version=2 where id=%s", (aid,)
+            )
+            for name in (
+                "20260929120000_personal_money_activities.sql",
+                "20260929130000_personal_money_revision_integrity.sql",
+            ):
+                for statement in Path("supabase/migrations", name).read_text().split(";"):
+                    if statement.strip().startswith(
+                        "insert into public.financial_activity_"
+                    ):
+                        if (
+                            "insert into public.financial_activity_memberships("
+                            in statement
+                        ):
+                            c.execute(
+                                "insert into public.financial_activity_revisions(activity_id,revision,user_id) values(%s,1,%s)",
+                                (rid, scene[1]),
+                            )
+                        c.execute(statement + " on conflict do nothing")
+    replay = scene[0].loop.write_activity(
+        user_id=scene[1],
+        account_id=aid,
+        request=request.model_copy(update={"preview_token": original_hash}),
+        idempotency_key="old-response-loss",
+    )
+    assert replay.replayed and replay.record_id == rid and replay.revision == 1
+    canonical = MoneyService(scene[0]).detail(user_id=scene[1], activity_id=rid)
+    assert canonical["activity_id"] == rid and canonical["category_id"] == "shopping"
+    assert canonical["legs"][0]["coverage"] == [
+        {"observation_id": stored.opening.id, "included": True}
+    ]
+    assert account_response(replay.stored).balance.amount_minor == 10000
+    with repository._pool.connection() as c:
+        assert (
+            c.execute(
+                "select identity_hash from public.financial_operation_receipts where user_id=%s and account_id=%s",
+                (scene[1], aid),
+            ).fetchone()[0]
+            == original_hash
+        )

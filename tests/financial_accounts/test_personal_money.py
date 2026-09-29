@@ -313,3 +313,91 @@ def test_omitted_refund_link_preserves_cap_and_explicit_null_unlinks(scene):
     assert (
         preview["ready"] and preview["reviewed_request"]["purchase_activity_id"] is None
     )
+
+
+def test_each_pair_observation_keeps_its_own_source_zone(scene):
+    service, user, _ = scene
+    ids = []
+    for zone in ("Pacific/Honolulu", "Pacific/Kiritimati"):
+        stored = service.create(
+            user_id=user,
+            idempotency_key=str(uuid4()),
+            request=CreateFinancialAccountRequest(
+                type="cash",
+                currency="DOP",
+                amount="100",
+                as_of=NOW - timedelta(days=10),
+                time_zone=zone,
+            ),
+        ).stored
+        ids.append(stored.account.id)
+    preview = MoneyService(service).preview(
+        user_id=user,
+        request=MoneyRequest(
+            kind="transfer",
+            source_account_id=ids[0],
+            destination_account_id=ids[1],
+            amount="10",
+            occurred_at=NOW - timedelta(days=11),
+        ),
+    )
+    zones = {
+        effect["account_id"]: effect["observations"][0]["time_zone"]
+        for effect in preview["affected_accounts"]
+    }
+    assert zones == dict(
+        zip(ids, ("Pacific/Honolulu", "Pacific/Kiritimati"), strict=True)
+    )
+
+
+def test_refund_preserve_link_and_explicit_unlink_have_distinct_receipt_identity(scene):
+    from argus.domain.recording.errors import IdempotencyConflict
+
+    aid = account(scene)
+    purchase = save(scene, kind="expense", account_id=aid, amount="40")["activity"]
+    refund = save(
+        scene,
+        kind="refund",
+        account_id=aid,
+        amount="30",
+        purchase_activity_id=purchase["activity_id"],
+    )["activity"]
+    money = MoneyService(scene[0])
+    body = MoneyRequest(
+        kind="refund",
+        account_id=aid,
+        amount="25",
+        occurred_at=NOW - timedelta(days=2),
+        expected_revision=1,
+        reason="Correct amount",
+    )
+    preview = money.preview(
+        user_id=scene[1], request=body, activity_id=refund["activity_id"]
+    )
+    omitted = body.model_copy(
+        update={
+            "expected_versions": preview["expected_versions"],
+            "preview_token": preview["preview_token"],
+        }
+    )
+    first = money.write(
+        user_id=scene[1],
+        request=omitted,
+        activity_id=refund["activity_id"],
+        idempotency_key="omitted-link",
+    )
+    assert first["activity"]["purchase_activity_id"] == purchase["activity_id"]
+    replay = money.write(
+        user_id=scene[1],
+        request=omitted,
+        activity_id=refund["activity_id"],
+        idempotency_key="omitted-link",
+    )
+    assert replay["replayed"] and replay["activity"] == first["activity"]
+    with pytest.raises(IdempotencyConflict):
+        money.write(
+            user_id=scene[1],
+            request=omitted.model_copy(update={"purchase_activity_id": None}),
+            activity_id=refund["activity_id"],
+            idempotency_key="omitted-link",
+        )

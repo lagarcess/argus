@@ -31,7 +31,14 @@ def groups(
 def activity(
     accounts: list[StoredAccount], activity_id: str, revision: int | None = None
 ) -> dict[str, Any]:
-    history = groups(accounts).get(activity_id)
+    return render_activity(activity_id, groups(accounts).get(activity_id), revision)
+
+
+def render_activity(
+    activity_id: str,
+    history: dict[int, list[tuple[StoredAccount, ExpenseRecord, ExpenseRevision]]] | None,
+    revision: int | None = None,
+) -> dict[str, Any]:
     if not history:
         raise AccountNotFound()
     number = max(history) if revision is None else revision
@@ -75,4 +82,4 @@ def activity(
 
 
 def current_activities(accounts: list[StoredAccount]) -> list[dict[str, Any]]:
-    return [activity(accounts, aid) for aid in groups(accounts)]
+    return [render_activity(aid, history) for aid, history in groups(accounts).items()]

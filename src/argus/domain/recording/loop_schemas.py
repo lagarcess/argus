@@ -98,6 +98,7 @@ class ActivityResponse(BaseModel):
 
 class ObservationQuestion(BaseModel):
     observation_id: str
+    time_zone: str
     kind: Literal["opening", "balance_check", "value_update"]
     as_of: datetime
     amount_minor: int

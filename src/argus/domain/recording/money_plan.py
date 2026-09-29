@@ -1,4 +1,4 @@
-"""Atomic activity planning; all financial decisions stay in this module."""
+"""Plan atomic activity revisions over the shared financial projection."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -55,6 +55,17 @@ def identity(request: MoneyRequest, activity_id: str | None) -> str:
             "request": request.model_dump(mode="json", exclude={"preview_token"}),
         }
     )
+
+
+def request_identity(request: MoneyRequest, activity_id: str | None) -> str:
+    value = identity(request, activity_id)
+    if (
+        activity_id
+        and request.kind == "refund"
+        and "purchase_activity_id" not in request.model_fields_set
+    ):
+        return canonical_hash({"identity": value, "purchase_link_omitted": True})
+    return value
 
 
 def selected(request: MoneyRequest) -> dict[str, str]:
@@ -286,6 +297,7 @@ def plan(
                             "observation_id": anchor.id,
                             "kind": anchor.kind,
                             "as_of": anchor.as_of,
+                            "time_zone": anchor.time_zone,
                             "amount_minor": anchor.amount_minor,
                             "amount": format_minor_units(
                                 anchor.amount_minor, stored.account.currency

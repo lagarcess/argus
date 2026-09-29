@@ -6620,7 +6620,8 @@ observation. Contradictory answers are rejected. Expenses after an observation d
 cannot be included in it. Amount equality never establishes inclusion.
 
 Preview returns `{account_version, ready, observations, before, after, preview_token}`.
-Each observation has `{observation_id, kind, as_of, amount_minor, amount, included}`;
+Each observation has `{observation_id, kind, as_of, time_zone, amount_minor, amount, included}`;
+`time_zone` belongs to that stored observation, independently of the activity or other accounts.
 `included` is null when an answer is needed. `before` and nullable `after` are
 BalanceResponse. A ready preview supplies a token over the validated complete
 input and account version. Confirmation adds `preview_token` and requires
@@ -6926,7 +6927,8 @@ future. Zone defaults to America/Santo_Domingo. Note/reason max 200 characters.
 Correction requires current expected_revision and nonempty reason. Expense/refund
 category is optional; income source is `salary|remittance|interest|other` or null.
 Linked refund category normalizes from purchase; an explicitly different value fails.
-Explicit `purchase_activity_id:null` unlinks; cap errors never silently unlink.
+Explicit `purchase_activity_id:null` unlinks; omission on a refund correction preserves
+the existing link and preview emits it explicitly. Cap errors never silently unlink.
 Expected_versions maps UUID to account version. Coverage is
 `[{account_id,observation_id,included}]`.
 

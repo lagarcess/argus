@@ -8,8 +8,13 @@ from argus.domain.recording.errors import (
     RecordingInputError,
     StaleVersion,
 )
-from argus.domain.recording.money_plan import MoneyPlan, identity, plan
-from argus.domain.recording.money_reads import activity, current_activities, groups
+from argus.domain.recording.money_plan import MoneyPlan, plan, request_identity
+from argus.domain.recording.money_reads import (
+    activity,
+    current_activities,
+    groups,
+    render_activity,
+)
 from argus.domain.recording.money_schemas import MoneyRequest
 from argus.domain.recording.repository import StoredAccount
 from argus.domain.recording.schemas import account_response
@@ -62,7 +67,7 @@ class MoneyService:
             self.repository,
             user_id,
             idempotency_key,
-            identity(request, activity_id),
+            request_identity(request, activity_id),
             planner,
             self.accounts._clock(),
         )
@@ -87,7 +92,10 @@ class MoneyService:
         if not revisions:
             raise AccountNotFound()
         return {
-            "items": [activity(records, aid, r) for r in sorted(revisions, reverse=True)],
+            "items": [
+                render_activity(aid, revisions, r)
+                for r in sorted(revisions, reverse=True)
+            ],
             "next_cursor": None,
         }
 
