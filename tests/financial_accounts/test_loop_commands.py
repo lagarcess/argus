@@ -348,3 +348,134 @@ def test_edit_cannot_apply_currency_rules_from_a_different_version(scene, monkey
     stored = original_get(user_id=user, account_id=account.account.id)
     assert stored.account.version == 2 and stored.account.currency == "DOP"
     assert stored.expenses[0].current.amount_minor == 10000
+
+
+@pytest.mark.parametrize("with_opening", [False, True])
+@pytest.mark.parametrize("source_kind", ["balance_check", "expense"])
+def test_balance_date_uses_latest_source_zone_after_reopen(
+    scene, with_opening, source_kind
+):
+    from zoneinfo import ZoneInfo
+
+    from argus.domain.recording.loop import position
+    from argus.domain.recording.loop_reads import home_response
+
+    service, user, original = scene
+    if with_opening:
+        account_id = original
+    else:
+        account_id = service.create(
+            user_id=user,
+            idempotency_key=str(uuid4()),
+            request=CreateFinancialAccountRequest(type="checking", currency="DOP"),
+        ).stored.account.id
+    current = service.get(user_id=user, account_id=account_id)
+    source_time = (NOW - timedelta(days=5)).replace(hour=1)
+    source_zone = "America/Chicago"
+    body = CheckRequest(
+        expected_version=current.account.version,
+        amount="100",
+        as_of=source_time,
+        time_zone=source_zone,
+    )
+    preview = service.loop.preview_check(
+        user_id=user, account_id=account_id, request=body
+    )
+    result = service.loop.write_check(
+        user_id=user,
+        account_id=account_id,
+        request=body.model_copy(update={"preview_token": preview["preview_token"]}),
+        idempotency_key=str(uuid4()),
+    )
+    if source_kind == "expense":
+        source_time = (NOW - timedelta(days=2)).replace(hour=1)
+        source_zone = "Pacific/Honolulu"
+        body = ActivityRequest(
+            expected_version=result.stored.account.version,
+            amount="1",
+            occurred_at=source_time,
+            time_zone=source_zone,
+        )
+        preview = service.loop.preview_activity(
+            user_id=user, account_id=account_id, request=body
+        )
+        assert (
+            preview["after"]["as_of"]
+            == source_time.astimezone(ZoneInfo(source_zone)).isoformat()
+        )
+        result = service.loop.write_activity(
+            user_id=user,
+            account_id=account_id,
+            request=body.model_copy(update={"preview_token": preview["preview_token"]}),
+            idempotency_key=str(uuid4()),
+        )
+    expected = source_time.astimezone(ZoneInfo(source_zone)).isoformat()
+    reopened = service.get(user_id=user, account_id=account_id)
+    for stored in (result.stored, reopened):
+        balance = position(
+            stored.opening, stored.checks, stored.expenses, stored.coverage
+        )
+        assert balance.as_of.isoformat() == expected
+        assert account_response(stored).balance.as_of.isoformat() == expected
+        assert home_response([stored])["currencies"][0]["as_of"].isoformat() == expected
+
+
+@pytest.mark.parametrize("with_opening", [False, True])
+@pytest.mark.parametrize(
+    "initial_type,target_type,record_kind",
+    [
+        ("checking", "investment", "balance_check"),
+        ("investment", "checking", "value_update"),
+    ],
+)
+def test_observation_locks_account_type_without_expenses(
+    scene, with_opening, initial_type, target_type, record_kind
+):
+    service, user, _ = scene
+    account = service.create(
+        user_id=user,
+        idempotency_key=str(uuid4()),
+        request=CreateFinancialAccountRequest(
+            type=initial_type,
+            currency="DOP",
+            amount="100" if with_opening else None,
+            as_of=NOW - timedelta(days=10) if with_opening else None,
+        ),
+    ).stored
+    observed = checked((service, user, account.account.id), "90", 5).stored
+    assert not observed.expenses and observed.checks[0].kind == record_kind
+    with pytest.raises(RecordingInputError, match="type_locked"):
+        service.edit(
+            user_id=user,
+            account_id=account.account.id,
+            request=EditFinancialAccountRequest(
+                expected_version=observed.account.version, type=target_type
+            ),
+        )
+    reopened = service.get(user_id=user, account_id=account.account.id)
+    assert reopened.account.type == initial_type
+    assert reopened.account.version == observed.account.version
+    assert reopened.checks == observed.checks
+
+
+def test_home_freshness_compares_instants_across_source_zone_clock_change(scene):
+    from argus.domain.recording.loop_reads import home_response
+
+    service, user, _ = scene
+    accounts = [
+        service.create(
+            user_id=user,
+            idempotency_key=str(uuid4()),
+            request=CreateFinancialAccountRequest(
+                type="checking",
+                currency="DOP",
+                amount="100",
+                as_of=datetime(2025, 11, 2, hour, minute, tzinfo=timezone.utc),
+                time_zone="America/Chicago",
+            ),
+        ).stored
+        for hour, minute in ((6, 45), (7, 15))
+    ]
+    assert home_response(accounts)["currencies"][0]["as_of"].isoformat() == (
+        "2025-11-02T01:15:00-06:00"
+    )

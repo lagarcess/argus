@@ -181,7 +181,9 @@ def home_response(accounts: list[StoredAccount]) -> dict[str, Any]:
                 group[key] += amount
             else:
                 group["debts_minor"] -= amount
-            if group["as_of"] is None or balance.as_of > group["as_of"]:
+            if group["as_of"] is None or balance.as_of.astimezone(timezone.utc) > group[
+                "as_of"
+            ].astimezone(timezone.utc):
                 group["as_of"] = balance.as_of
         for expense in stored.expenses:
             recent.append(

@@ -53,7 +53,7 @@ class StoredAccount:
 
     @property
     def has_activity(self) -> bool:
-        return bool(self.expenses)
+        return bool(self.expenses) or bool(self.checks)
 
 
 @dataclass(frozen=True)

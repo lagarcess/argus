@@ -137,10 +137,17 @@ def position(
     movement = sum(
         -e.current.amount_minor for e in expenses if not included(e, latest, coverage)
     )
+    as_of, source_zone = max(
+        [
+            (latest.as_of, latest.time_zone),
+            *((e.current.occurred_at, e.current.time_zone) for e in expenses),
+        ],
+        key=lambda source: source[0],
+    )
     return Balance(
         state="known",
         amount_minor=latest.amount_minor + movement,
-        as_of=max([latest.as_of, *(e.current.occurred_at for e in expenses)]),
+        as_of=as_of.astimezone(ZoneInfo(source_zone)),
         basis="opening" if latest.kind == "opening" else "balance_check",
         activity_since_tracking_minor=activity,
     )

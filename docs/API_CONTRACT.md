@@ -6455,6 +6455,9 @@ unchanged.
   fact about the item, never a permission.
 - `as_of` values render in the revision's stored IANA `time_zone` (default
   `America/Santo_Domingo`) so a later zone change never reinterprets a date.
+  Projected `balance.as_of` and Home freshness use the stored zone of the
+  observation or activity that supplies that latest timestamp, not the
+  opening's zone.
 - `version` increments on every write that touches the account or its
   records. `opening.revision` increments on every opening write.
 
@@ -6527,7 +6530,7 @@ applies to `PATCH` and `PUT …/opening`.
   changes nothing. A successful edit increments `version`.
 - Fields are optional and independent. `nickname: null` or blank clears it.
 - Currency locks once the account has a record: `422 currency_locked`. Type
-  locks once activity exists (`422 type_locked`, unreachable in this slice);
+  locks once an expense, balance check, or value update exists (`422 type_locked`);
   with only an opening, a change inside the same nature is allowed and a nature
   flip is `422 nature_change_requires_empty_account`.
 - `archived` is organizational. It changes no record and no balance, and the

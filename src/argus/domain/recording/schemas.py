@@ -133,16 +133,13 @@ def account_response(stored: StoredAccount) -> FinancialAccountResponse:
         updated_at=facts.updated_at,
         balance=_balance_response(
             position(stored.opening, stored.checks, stored.expenses, stored.coverage),
-            stored.opening,
             facts,
         ),
         opening=_opening_response(stored.opening, facts),
     )
 
 
-def _balance_response(
-    balance: Balance, opening: OpeningRecord | None, facts: AccountFacts
-) -> BalanceResponse:
+def _balance_response(balance: Balance, facts: AccountFacts) -> BalanceResponse:
     if balance.state == "unknown":
         return BalanceResponse(
             state="unknown",
@@ -153,9 +150,7 @@ def _balance_response(
         state="known",
         amount_minor=balance.amount_minor,
         amount=format_minor_units(balance.amount_minor, facts.currency),
-        as_of=balance.as_of.astimezone(ZoneInfo(opening.current.time_zone))
-        if opening
-        else balance.as_of,
+        as_of=balance.as_of,
         basis=balance.basis,
         activity_since_tracking_minor=balance.activity_since_tracking_minor,
     )

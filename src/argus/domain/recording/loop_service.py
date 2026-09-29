@@ -115,7 +115,7 @@ def _view(stored: StoredAccount) -> dict[str, Any]:
         raise RecordingInputError(
             "amount_out_of_range", "The resulting recorded difference is too large."
         )
-    return _balance_response(b, stored.opening, stored.account).model_dump(mode="json")
+    return _balance_response(b, stored.account).model_dump(mode="json")
 
 
 class FinancialLoopService:
