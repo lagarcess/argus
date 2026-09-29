@@ -29,7 +29,10 @@ final class AccountsModel: ObservableObject {
 
     func load() async {
         await run { identity in let values = try await self.controller.financialAccounts(expectedIdentity: identity)
-            if self.current(identity) { self.accounts = values } }
+            if self.current(identity) {
+                self.accounts = values
+                if let selected = self.selected { self.selected = values.first { $0.id == selected.id } }
+            } }
     }
 
     func open(_ account: FinancialAccount) async {
@@ -101,7 +104,7 @@ final class AccountsModel: ObservableObject {
         identity?.revision == captured.revision && identity?.profile?.id == captured.profile?.id
     }
 
-    private func accept(_ account: FinancialAccount) {
+    func accept(_ account: FinancialAccount) {
         if let index = accounts.firstIndex(where: { $0.id == account.id }) { accounts[index] = account }
         else { accounts.append(account) }
         selected = account

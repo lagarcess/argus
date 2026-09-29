@@ -313,7 +313,7 @@ extension SessionController {
             body: encoded(request), expectedIdentity: expectedIdentity))
     }
 
-    private func encoded(_ value: some Encodable) throws -> Data {
+    func encoded(_ value: some Encodable) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return try encoder.encode(value)
@@ -322,7 +322,7 @@ extension SessionController {
         do { return try JSONDecoder().decode(FinancialAccount.self, from: data) }
         catch { throw SessionFailure.invalidResponse }
     }
-    private func financialRequest(path: String = "", method: String = "GET", body: Data? = nil,
+    func financialRequest(route: String = "financial-accounts", path: String = "", method: String = "GET", body: Data? = nil,
                                   key: String? = nil, expectedIdentity: SessionSnapshot) async throws -> Data {
         guard expectedIdentity.phase == .authenticated, expectedIdentity.profile != nil else { throw SessionFailure.unauthorized }
         guard state.phase == .authenticated, state.revision == expectedIdentity.revision,
@@ -331,7 +331,7 @@ extension SessionController {
         if try vault.pending() != nil { throw SessionFailure.pendingSignOut }
         let epoch = vault.epoch()
         try vault.check(epoch)
-        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/financial-accounts" + path))
+        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/" + route + path))
         request.httpMethod = method
         request.httpBody = body
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }

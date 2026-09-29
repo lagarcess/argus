@@ -5,53 +5,29 @@ struct AccountForm: View {
     @Environment(\.locale) private var locale
     @State private var choosingType = true
     @State private var otherAssets = false
+    @FocusState private var amountFocused: Bool
     private let primaryTypes = ["cash", "checking", "savings", "investment", "credit_card", "other_debt"]
+    private var locked: Bool { model.busy || model.createIsFrozen }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 if let draft = model.draft {
                     VStack(alignment: .leading, spacing: 24) {
+                        if draft.mode == .create {
+                            Text("accounts.setup.hint").foregroundStyle(ArgusStyle.secondary)
+                        }
                         if draft.mode != .opening {
                             typeControl(draft)
-                            field("accounts.currency", text: binding(\.currency), identifier: "accounts.currency")
-                                .textInputAutocapitalization(.characters).autocorrectionDisabled()
                             field("accounts.nickname", text: binding(\.nickname), identifier: "accounts.nickname")
-                            DisclosureGroup("accounts.ownership") {
-                                field("accounts.share", text: binding(\.share), identifier: "accounts.share").keyboardType(.decimalPad)
-                                Text("accounts.share.help").font(ArgusStyle.body(12, relativeTo: .caption))
-                            }
                         }
                         if draft.mode != .metadata {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(draft.base?.nature == "liability" || ["credit_card", "other_debt"].contains(draft.type)
-                                     ? "accounts.amount.owed" : "accounts.amount")
-                                Text(verbatim: draft.currency).foregroundStyle(ArgusStyle.secondary)
-                                TextField("accounts.amount.placeholder", text: binding(\.amount))
-                                    .keyboardType(.decimalPad).textFieldStyle(.roundedBorder).monospacedDigit()
-                                    .frame(minHeight: 48).accessibilityIdentifier("accounts.amount")
-                                if let exact = try? AccountEntry.amount(draft.amount, locale: locale) {
-                                    Text(verbatim: draft.currency + " " + AccountPresentation.amount(exact, locale: locale)).monospacedDigit()
-                                }
-                                Text(draft.mode == .opening && draft.base?.opening != nil ? "accounts.amount.unchanged" : "accounts.amount.optional")
-                                    .font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
-                                Text("accounts.amount.format").font(ArgusStyle.body(12, relativeTo: .caption))
-                            }
-                            if draft.mode == .opening {
-                            DisclosureGroup("accounts.date.details") {
-                                VStack(alignment: .leading, spacing: 20) {
-                                    DatePicker("accounts.date", selection: dateBinding, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
-                                        .environment(\.timeZone, TimeZone(identifier: draft.timeZone) ?? .gmt)
-                                        .accessibilityIdentifier("accounts.date")
-                                    Picker("accounts.zone", selection: binding(\.timeZone)) {
-                                        ForEach(TimeZone.knownTimeZoneIdentifiers, id: \.self) { zone in Text(verbatim: zone).tag(zone) }
-                                    }.frame(minHeight: 48).accessibilityIdentifier("accounts.zone")
-                                }.padding(.top, 12).textInputAutocapitalization(.never).autocorrectionDisabled()
-                            }
-                            }
-                            if draft.mode == .opening {
-                                field("accounts.reason", text: binding(\.reason), identifier: "accounts.reason")
-                            }
+                            amountControl(draft)
+                        } else {
+                            currencyControl
+                        }
+                        if draft.mode != .create {
+                            savedDetails(draft)
                         }
                         if let error = model.errorKey {
                             Text(LocalizedStringKey(error)).fixedSize(horizontal: false, vertical: true)
@@ -67,10 +43,15 @@ struct AccountForm: View {
                                 Text("accounts.review.unavailable")
                             }
                         } else {
-                            if model.createIsFrozen { Text("accounts.create.retry").font(ArgusStyle.body(12, relativeTo: .caption)) }
-                            Button(model.createIsFrozen ? "accounts.retry" : "accounts.save") { Task { await model.save(locale: locale) } }
-                                .buttonStyle(PillButtonStyle()).disabled(model.busy)
-                                .accessibilityIdentifier("accounts.save")
+                            if model.createIsFrozen {
+                                Text("accounts.create.retry").font(ArgusStyle.body(12, relativeTo: .caption))
+                            }
+                            Button { amountFocused = false; Task { await model.save(locale: locale) } } label: {
+                                Text(model.createIsFrozen ? "accounts.retry" : draft.mode == .create ? "accounts.add" : "accounts.save")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PillButtonStyle()).disabled(model.busy)
+                            .accessibilityIdentifier("accounts.save")
                         }
                         if model.busy { ProgressView("accounts.saving") }
                     }.padding(24)
@@ -78,52 +59,140 @@ struct AccountForm: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(ArgusStyle.background)
-            .navigationTitle(Text("accounts.form.title"))
+            .navigationTitle(Text(model.draft?.mode == .create ? "accounts.add" : "accounts.form.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("accounts.cancel") { model.discard() }.disabled(model.busy)
                         .frame(minHeight: 44).accessibilityIdentifier("accounts.cancel")
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("accounts.keyboard.done") { amountFocused = false }
+                }
             }
             .interactiveDismissDisabled()
         }
     }
 
+    private func amountControl(_ draft: AccountDraft) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(draft.base?.nature == "liability" || ["credit_card", "other_debt"].contains(draft.type)
+                     ? "accounts.amount.owed" : "accounts.amount")
+                    .font(ArgusStyle.body(14, relativeTo: .subheadline))
+                Spacer()
+                if draft.mode == .create { currencyControl }
+                else { Text(verbatim: draft.currency).foregroundStyle(ArgusStyle.secondary) }
+            }
+            HStack(spacing: 8) {
+                TextField("accounts.amount.placeholder", text: binding(\.amount))
+                    .keyboardType(.decimalPad).focused($amountFocused).monospacedDigit()
+                    .accessibilityIdentifier("accounts.amount")
+                Button {
+                    guard !locked else { return }
+                    let value = model.draft?.amount ?? ""
+                    model.draft?.amount = value.hasPrefix("-") ? String(value.dropFirst()) : "-" + value
+                } label: {
+                    Image(systemName: "plus.forwardslash.minus").frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("accounts.amount.sign")
+                .accessibilityIdentifier("accounts.amount.sign")
+            }
+            .padding(.leading, 14).frame(minHeight: 52)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
+            .disabled(locked)
+            Text(draft.mode == .opening && draft.base?.opening != nil ? "accounts.amount.unchanged" : "accounts.amount.optional")
+                .font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+        }
+    }
+
+    private var currencyControl: some View {
+        Menu {
+            Picker("accounts.currency", selection: binding(\.currency)) {
+                ForEach(["DOP", "USD"] + Locale.commonISOCurrencyCodes.filter { !["DOP", "USD"].contains($0) }.sorted(), id: \.self) { code in
+                    Text(verbatim: code).tag(code)
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(verbatim: model.draft?.currency ?? "")
+                Image(systemName: "chevron.down").font(.system(size: 10))
+            }
+            .font(ArgusStyle.body(13, relativeTo: .caption)).padding(.horizontal, 14)
+            .frame(minHeight: 44).background(ArgusStyle.surface, in: Capsule())
+        }
+        .disabled(locked).accessibilityLabel("accounts.currency").accessibilityIdentifier("accounts.currency")
+    }
+
     @ViewBuilder private func typeControl(_ draft: AccountDraft) -> some View {
         if draft.mode == .create && choosingType {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("accounts.type").font(ArgusStyle.display(22))
-                ForEach(primaryTypes, id: \.self) { type in typeButton(type) }
+            VStack(alignment: .leading, spacing: 10) {
+                Text("accounts.type").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                    ForEach(primaryTypes, id: \.self) { type in typeButton(type) }
+                }
                 DisclosureGroup("accounts.otherAssets", isExpanded: $otherAssets) {
                     ForEach(["property", "vehicle", "other_asset"], id: \.self) { type in typeButton(type) }
-                }.padding(.vertical, 12)
-            }
+                }.font(ArgusStyle.body(13, relativeTo: .caption)).padding(.top, 4)
+            }.disabled(locked)
+        } else if draft.mode == .create {
+            HStack(spacing: 12) {
+                Image(systemName: AccountPresentation.symbol(draft.type)).frame(width: 24)
+                Text(LocalizedStringKey("accounts.type." + draft.type))
+                Spacer()
+                Button("accounts.type.change") { choosingType = true }.frame(minHeight: 44)
+                    .accessibilityIdentifier("accounts.type.change")
+            }.disabled(locked)
         } else {
             Picker("accounts.type", selection: binding(\.type)) {
                 ForEach(primaryTypes + ["property", "vehicle", "other_asset"], id: \.self) { type in
                     Text(LocalizedStringKey("accounts.type." + type)).tag(type)
                 }
-            }.frame(minHeight: 48).accessibilityIdentifier("accounts.type")
+            }.frame(minHeight: 48).disabled(locked).accessibilityIdentifier("accounts.type")
         }
     }
 
     private func typeButton(_ type: String) -> some View {
-        Button { model.draft?.type = type; choosingType = false } label: {
-            Text(LocalizedStringKey("accounts.type." + type)).frame(maxWidth: .infinity, alignment: .leading).frame(minHeight: 48)
-        }.accessibilityIdentifier("accounts.type." + type)
+        Button {
+            guard !locked else { return }
+            model.draft?.type = type; choosingType = false
+        } label: {
+            VStack(spacing: 8) {
+                Image(systemName: AccountPresentation.symbol(type)).font(.system(size: 21))
+                Text(LocalizedStringKey("accounts.type." + type)).font(ArgusStyle.body(11, relativeTo: .caption))
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity).frame(minHeight: 72)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
+            .contentShape(RoundedRectangle(cornerRadius: 14))
+        }.buttonStyle(.plain).accessibilityIdentifier("accounts.type." + type)
+    }
+
+    @ViewBuilder private func savedDetails(_ draft: AccountDraft) -> some View {
+        if draft.mode == .metadata {
+            DisclosureGroup("accounts.ownership") {
+                field("accounts.share", text: binding(\.share), identifier: "accounts.share").keyboardType(.decimalPad)
+                Text("accounts.share.help").font(ArgusStyle.body(12, relativeTo: .caption))
+            }.disabled(locked)
+        } else {
+            DisclosureGroup("accounts.date.details") {
+                DatePicker("accounts.date", selection: dateBinding, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
+                    .environment(\.timeZone, TimeZone(identifier: draft.timeZone) ?? .gmt)
+                    .accessibilityIdentifier("accounts.date")
+                Picker("accounts.zone", selection: binding(\.timeZone)) {
+                    ForEach(TimeZone.knownTimeZoneIdentifiers, id: \.self) { zone in Text(verbatim: zone).tag(zone) }
+                }.frame(minHeight: 48).accessibilityIdentifier("accounts.zone")
+            }.disabled(locked)
+            if draft.base?.opening != nil {
+                field("accounts.reason", text: binding(\.reason), identifier: "accounts.reason")
+            }
+        }
     }
 
     private var dateBinding: Binding<Date> {
-        Binding(get: {
-            let parser = ISO8601DateFormatter()
-            parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let raw = model.draft?.asOf ?? ""
-            let fractional = parser.date(from: raw)
-            parser.formatOptions = [.withInternetDateTime]
-            return fractional ?? parser.date(from: raw) ?? Date()
-        }, set: { date in
-            guard !model.busy else { return }
+        Binding(get: { AccountPresentation.parseDate(model.draft?.asOf ?? "") ?? Date() }, set: { date in
+            guard !locked else { return }
             let formatter = ISO8601DateFormatter()
             formatter.timeZone = TimeZone(identifier: model.draft?.timeZone ?? "") ?? .gmt
             model.draft?.asOf = formatter.string(from: date)
@@ -132,15 +201,16 @@ struct AccountForm: View {
 
     private func binding(_ path: WritableKeyPath<AccountDraft, String>) -> Binding<String> {
         Binding(get: { model.draft?[keyPath: path] ?? "" }, set: { value in
-            guard !model.busy, !model.createIsFrozen else { return }
+            guard !locked else { return }
             model.draft?[keyPath: path] = value
         })
     }
     private func field(_ key: LocalizedStringKey, text: Binding<String>, identifier: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(key)
-            TextField(key, text: text).textFieldStyle(.roundedBorder).frame(minHeight: 48)
+            Text(key).font(ArgusStyle.body(14, relativeTo: .subheadline))
+            TextField(key, text: text).padding(.horizontal, 14).frame(minHeight: 52)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
                 .accessibilityIdentifier(identifier)
-        }.disabled(model.busy || model.createIsFrozen)
+        }.disabled(locked)
     }
 }

@@ -26,6 +26,7 @@ struct AccountsDestination: View {
 
 struct AccountsView: View {
     @ObservedObject var model: AccountsModel
+    @EnvironmentObject private var auth: ProfileAuthModel
     @Environment(\.locale) private var locale
 
     var body: some View {
@@ -43,11 +44,8 @@ struct AccountsView: View {
                     }
                     VStack(spacing: 0) {
                         ForEach(model.accounts, id: \.id) { account in
-                            Button { Task { await model.open(account) } } label: {
-                                AccountSummary(account: account)
-                                    .padding(.vertical, 16)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
+                            Button { Task { await model.open(account); await auth.financialLoop?.open(account) } } label: {
+                                AccountRow(account: account)
                             }.buttonStyle(.plain).accessibilityIdentifier("accounts.row.\(account.id)")
                         }
                     }
@@ -59,16 +57,19 @@ struct AccountsView: View {
                     Button("accounts.retry") { Task { await model.load() } }.frame(minHeight: 48)
                 }
                 if model.busy { ProgressView("accounts.loading") }
-                Text("accounts.scope").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+
             }.padding(24)
         }
-        .refreshable { await model.load() }
+        .refreshable { await model.load(); if let account = model.selected { await auth.financialLoop?.open(account) } }
         .task(id: model.identity?.revision) { await model.load() }
         .sheet(item: $model.draft) { _ in AccountForm(model: model) }
     }
 
     @ViewBuilder private func detail(_ account: FinancialAccount) -> some View {
         AccountSummary(account: account, large: true)
+        if let loop = auth.financialLoop {
+            AccountActivityView(loop: loop, account: account)
+        }
         Button("accounts.edit") { model.edit(account) }.buttonStyle(PillButtonStyle(primary: false))
             .accessibilityIdentifier("accounts.edit")
         Button(account.opening == nil ? "accounts.opening.add" : "accounts.opening.correct") { model.opening(account) }
@@ -111,6 +112,34 @@ struct AccountSummary: View {
 
 /// Separator-only presentation preserves every digit without floating-point conversion.
 enum AccountPresentation {
+    static func decimal(_ minor: Int64, digits: Int) -> String { decimal(String(minor), digits: digits) }
+    static func decimal(_ minor: String, digits: Int) -> String {
+        let negative = minor.hasPrefix("-")
+        let magnitude = negative ? String(minor.dropFirst()) : minor
+        let padded = String(repeating: "0", count: max(0, digits + 1 - magnitude.count)) + magnitude
+        let point = padded.index(padded.endIndex, offsetBy: -digits)
+        return (negative ? "-" : "") + (digits == 0 ? padded : String(padded[..<point]) + "." + String(padded[point...]))
+    }
+    static func symbol(_ type: String) -> String {
+        switch type {
+        case "cash": "banknote"
+        case "checking": "building.columns"
+        case "savings": "tray"
+        case "investment": "chart.line.uptrend.xyaxis"
+        case "credit_card": "creditcard"
+        case "other_debt": "doc.text"
+        case "property": "house"
+        case "vehicle": "car"
+        default: "square.stack"
+        }
+    }
+    static func parseDate(_ exact: String) -> Date? {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = parser.date(from: exact) { return date }
+        parser.formatOptions = [.withInternetDateTime]
+        return parser.date(from: exact)
+    }
     static func amount(_ exact: String, locale: Locale) -> String {
         let pieces = exact.split(separator: ".", omittingEmptySubsequences: false)
         var whole = String(pieces[0]); let negative = whole.hasPrefix("-")

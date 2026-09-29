@@ -23,6 +23,7 @@ enum FoundationSheet: String, Identifiable {
 
 struct FoundationShell: View {
     @Binding var appearance: AppearancePreference
+    @EnvironmentObject private var auth: ProfileAuthModel
     @State private var destination: AppDestination = .home
     @State private var sheet: FoundationSheet?
 
@@ -46,6 +47,9 @@ struct FoundationShell: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 8)
+        }
+        .background {
+            if let loop = auth.financialLoop { FinancialEditorPresenter(loop: loop, appearance: appearance) }
         }
         .sheet(item: $sheet) { selected in
             FoundationSheetView(sheet: selected, appearance: $appearance)
@@ -86,7 +90,10 @@ struct FoundationShell: View {
 
     @ViewBuilder private func destinationView(_ tab: AppDestination) -> some View {
         switch tab {
-        case .home: HomeSampleView(destination: $destination, showSample: { sheet = .sample })
+        case .home:
+            if auth.enabled {
+                FinancialHomeDestination(destination: $destination, showProfile: { sheet = .profile })
+            } else { HomeSampleView(destination: $destination, showSample: { sheet = .sample }) }
         case .accounts: AccountsDestination(showProfile: { sheet = .profile }, showSample: { sheet = .sample })
         case .argus: ChatSampleView(showSample: { sheet = .sample })
         case .plan: PlanSampleView()
