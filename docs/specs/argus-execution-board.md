@@ -33,9 +33,9 @@ agentic runtime, billing/growth, hosted records/settings and unapproved provider
 
 | Responsibility | Exclusive implementation ownership | Checkout | Current action |
 | --- | --- | --- | --- |
-| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Contract and command/projection checkpoint `0de85dca` has 54 passing tests; Postgres persistence and route wiring in progress |
-| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Source reconciled and baseline simulator build passed; repair inherited forms and connect the accepted contract |
-| Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Published checkpoint `ea3370606`: unsigned device build, 27 focused tests and four local production-route browser tests pass; independent review in progress |
+| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Local Auth/API/Postgres loop passed owner and captain runs; finishing guard tests, exact Home-delta assertions and durable checkpoint |
+| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Connected views compile; local checkpoint `b190881d`; actual API simulator journey and recovery checks in progress |
+| Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
 | Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Coordinate single writers and exercise assembled candidate |
 
 Throughput checkpoint: three implementation responsibilities, one financial
@@ -87,6 +87,18 @@ Decision trail for this batch stays in this manifest.
 - Device checkpoint `ea3370606` is published for review. Its proof uses an
   unsigned build and synthetic local CAPTCHA responses. It does not establish
   production login, a signed installation, or physical-phone acceptance.
+- Captain independently ran the core's local HTTP verification script against
+  synthetic Auth and Postgres: expense, correction, check, late included expense,
+  retry after intervening writes, unknown balance, second-owner refusal and
+  reopened read passed. Home amount-change assertions and native interaction
+  proof remain separate pending checks. This run used working source and is
+  provisional until the final candidate is revalidated.
+- Automatic approval review blocked the native worker's combined commit/push
+  because remote publication was treated as a reserved hosted change. Neither
+  command ran. The worker subsequently committed locally. Specific branch-push
+  and review-PR approval is pending; all further publication is paused while
+  local implementation and testing continue. Previously published device and
+  captain checkpoints remain preserved; no PR/integration merge occurred.
 
 
 ## Outcome and completion
