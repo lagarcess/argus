@@ -49,9 +49,9 @@ Do not change global simulator-tool defaults shared with another agent.
 - **Independent workstreams.** Read-only backend and native scouts inspect
   distinct owners. The captain prepares the isolated local stack and simulator.
 - **Shared mutable state.** One implementation writer owns the Search backend,
-  native navigation and tests on the delivery branch after the captain commits
-  this scope. The captain does not edit or run suites in that checkout while
-  the writer holds it. Detail editing keeps its existing domain owner.
+  native navigation and tests in the exclusive `connected-search-core` checkout
+  on `codex/connected-search-implementation`. The captain owns the separate
+  delivery/demo checkout and does not edit or run suites in the writer checkout. Detail editing keeps its existing domain owner.
 - **Smallest safe decomposition.** One coherent implementation owner avoids
   dividing search identity, pagination and return-state behavior across agents.
   The captain takes over assembled verification after handoff. One independent
@@ -80,7 +80,7 @@ and persistence owners.
 - [x] `how` over the affected subsystem. Two bounded code scouts plus captain synthesis.
 - [x] `architect` for parallel design exploration. Native and backend scouts compare reuse with domain-specific adapters; retain locked UI and existing detail owners.
 - [x] Write the throughput checkpoint as four todo items.
-- [ ] Delegate code-writing to a subagent using your configured feature model.
+- [x] Delegate code-writing to a subagent using your configured feature model. `search_implementation` owns the complete bounded implementation.
 - [ ] Verify on the matching surface.
 - [ ] Rebase into small, ordered commits. Skip rebasing published/evidenced work under repository policy; use ordered commits and one-way integration merge if needed.
 - [ ] If the design is contested, `interrogate` before shipping. Skip unless a concrete conflict appears; no new product choice is currently required.
@@ -92,6 +92,17 @@ chooses an exclusive writer, isolated stack and simulator. Prove It Works requir
 the assembled native journey against real local records, beyond unit tests and
 screenshots. The existing manifest is the specification and decision trail;
 no additional planning board or housekeeping PR is part of this assignment.
+
+September 29 contract checkpoint: existing `/search` returns conversation dossiers,
+so financial retrieval gets a separate `/financial-search` adapter behind the
+existing registered financial context. It reads canonical account, current logical
+activity and expectation projections. Transfers appear once and corrected text
+replaces old text. The client uses typed destinations, an owner-scoped search
+origin and one shared presentation owner for existing detail/edit screens.
+Category and currency filters narrow results without inventing bilingual domain
+aliases or money calculations. The first implementation reuses the existing
+owned financial snapshot; response pagination is bounded, but that snapshot
+still reads the owner's records. No new search index or embeddings are implied.
 
 Stop only for a concrete product conflict, inaccessible required tooling, or an
 action beyond the grant. Routine implementation choices and local fixes proceed.
