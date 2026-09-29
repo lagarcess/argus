@@ -90,7 +90,7 @@ the captain. This is local synthetic-user evidence, not physical-phone delivery.
 | --- | --- | --- |
 | `money_core` | `codex/personal-money-core`, recording domain, API, additive migration, backend tests, API/data contracts | Complete through `79032245`; five kinds, paired correction, refund rules, monthly Home, preserved legacy receipts and additive revision integrity. Final scoped core review clean |
 | `money_iphone` | `codex/personal-money-iphone`, Swift feature/transport/models, localization and model tests | Complete through `3a6e5873`, integrated as `2e678d3d4`; 47 package cases with four expected environment skips and nine model tests. Scoped native review clean; simulator acceptance also verified the full-row tap fix |
-| `money_demo_setup` | `codex/personal-money-acceptance`, connected UI tests, isolated launcher and new evidence; exclusive simulator owner | Complete through `5de47c00`; seven selected native cases passed, nine retained accounts checked against canonical reads, recording and restart guide committed; simulator released to captain |
+| `money_demo_setup` | `codex/personal-money-acceptance`, connected UI tests, isolated launcher and new evidence; exclusive simulator owner | Complete through `5de47c00`; original seven native cases plus the strengthened isolation case passed, nine original retained accounts checked against canonical reads, recording and restart guide committed; simulator released to captain |
 | Captain | `codex/personal-money-recording`, manifest, assembled source, independent proof and PR | Assembled source and independent HTTP proof complete; owns final CI/scoped review and retained local services; no merge |
 
 Design decision, September 29: two code-grounded alternatives and an independent
@@ -144,15 +144,25 @@ with zero threads and CI at `2e678d3d4` passed. Final-head CI/review are recorde
 in the PR terminal audit rather than duplicated as a moving SHA in this manifest.
 
 [Native verification](../reports/evidence/personal-money-recording/ios/verification.json)
-records seven passing selected cases: row taps; income/spending/refund corrections;
+records the original seven selected cases plus a strengthened isolation case: row taps; income/spending/refund corrections;
 paired transfer and wrong-account correction; card payment/refund/credit;
-per-account reconciliation, currencies, unknowns and identity isolation;
+per-account reconciliation, currencies, unknowns and Spanish presentation;
 committed-response loss with same-key recovery after process restart; and a
-read-only Home relaunch. The two fault-opt-in launcher tests also pass. Six long
+read-only Home relaunch; and pending-write isolation across loaded identities. The two fault-opt-in launcher tests also pass. Six long
 cases logged terminal passes but Xcode stalled finalizing their result bundles;
 they do not claim clean full-run exits. The final read-only run exited 0.
 Screenshots and canonical readbacks independently preserve the observations.
 The 2:55 recording is an explicitly edited demonstration, not the exhaustive test.
+
+The final scoped GitHub review found the original native isolation assertion could
+run before B loaded and had no pending A command. That claim is superseded by
+`testPendingMoneyWriteRemainsIsolatedAcrossIdentities` (`3106f2f6`, integrated as
+`b8aea0c0f`): a known B-owned account must load before absence assertions; an actual
+committed-response-loss A command stays absent from B, survives the switch back,
+and recovers once with the same record after reopening. This case passed in
+232.846 seconds with a clean test-runner exit. The fix changes tests and evidence
+only; no runtime defect was observed. Final CI and latest-delta review remain
+owned by the PR terminal audit.
 
 Application/backend source is unchanged after `2e678d3d4`; later commits add
 acceptance harness, evidence and documentation. Exact source provenance is retained
