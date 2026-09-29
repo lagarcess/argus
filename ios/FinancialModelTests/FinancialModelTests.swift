@@ -642,6 +642,53 @@ extension FinancialModelTests {
         XCTAssertNil(model.origin.currency)
     }
 
+    func testSearchRestorationWaitsForLayoutAndAllowsRemovedRowBoundary() {
+        let saved = FinancialSearchRestoration(anchor: "account.saved", offset: -51)
+        XCTAssertEqual(saved.adjustment(rowOffset: 0, contentOffset: 1000, minimum: 0, maximum: 1000), .waitForLayout)
+        XCTAssertEqual(saved.adjustment(rowOffset: 0, contentOffset: 1000, minimum: 0, maximum: 1100), .move(1051))
+        XCTAssertEqual(saved.adjustment(rowOffset: -51, contentOffset: 1051, minimum: 0, maximum: 1100), .complete)
+        let fallback = FinancialSearchRestoration(anchor: "account.survivor", offset: -51, permitsBoundaryFallback: true)
+        XCTAssertEqual(fallback.adjustment(rowOffset: 0, contentOffset: 800, minimum: 0, maximum: 800), .complete)
+    }
+
+    func testSearchRemovedAnchorAndExplicitScrollReleaseRestoration() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let name = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let model = FinancialSearchModel(controller: fixture.client, defaults: defaults)
+        model.bind(identity)
+        let first = UUID(), last = UUID()
+        await fixture.server.replies([(200, PresentationServer.searchPage([first, last]))])
+        await model.activate()
+        model.remember(anchor: model.items[1].id, offset: -51)
+        await fixture.server.replies([(200, PresentationServer.searchPage([first]))])
+        await model.refresh()
+        let replacement = try XCTUnwrap(model.restoration)
+        XCTAssertEqual(replacement.anchor, model.items[0].id)
+        XCTAssertTrue(replacement.permitsBoundaryFallback)
+        model.restored(replacement.id)
+        model.remember(anchor: model.items[0].id, offset: -10)
+        await fixture.server.replies([(200, PresentationServer.searchPage([first]))])
+        await model.refresh()
+        XCTAssertEqual(model.restoration?.permitsBoundaryFallback, false)
+        model.userScrolled()
+        model.remember(anchor: model.items[0].id, offset: -25)
+        XCTAssertNil(model.restoration)
+        XCTAssertEqual(model.origin.anchorOffset, -25)
+        let reopened = FinancialSearchModel(controller: fixture.client, defaults: defaults)
+        reopened.bind(identity)
+        XCTAssertEqual(reopened.origin.anchorOffset, -25, "User scrolling must persist after an interrupted restoration")
+        await fixture.server.replies([(200, PresentationServer.searchPage([first]))])
+        await model.refresh()
+        XCTAssertNotNil(model.restoration)
+        await fixture.server.replies([(200, PresentationServer.searchPage([]))])
+        await model.refresh()
+        XCTAssertNil(model.restoration, "An empty result must retire an obsolete scroll target")
+        XCTAssertNil(model.origin.anchor)
+    }
+
     func testSearchNewQueryAndOwnerRejectDelayedOldResults() async throws {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()

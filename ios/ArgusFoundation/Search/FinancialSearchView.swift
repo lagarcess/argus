@@ -103,9 +103,6 @@ struct FinancialSearchView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     SearchScrollProbe(controller: scroll).frame(height: 0)
-                    if model.loading || model.opening {
-                        ProgressView("accounts.loading").padding(.vertical, 12).accessibilityIdentifier("search.loading")
-                    }
                     if let error = model.destinationError {
                         Text(LocalizedStringKey(error)).padding(.vertical, 12).accessibilityIdentifier("search.destination.error")
                         Button("action.close") { model.dismissError() }.frame(minHeight: 44)
@@ -140,12 +137,20 @@ struct FinancialSearchView: View {
                 }.padding(.bottom, 24)
             }.coordinateSpace(name: "search.viewport").scrollDismissesKeyboard(.interactively)
                 .accessibilityIdentifier("search.results")
+                .overlay(alignment: .top) {
+                    if model.loading || model.opening {
+                        ProgressView("accounts.loading").padding(.vertical, 12)
+                            .frame(maxWidth: .infinity).background(ArgusStyle.background)
+                            .accessibilityIdentifier("search.loading").allowsHitTesting(false)
+                    }
+                }
+                .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.userScrolled() })
                 .refreshable { await model.refresh() }
                 .onPreferenceChange(SearchRowFrames.self) { frames in
                     scroll.frames = frames
                     if let restoration = model.restoration {
                         if let frame = frames[restoration.anchor],
-                           scroll.restore(currentRowOffset: frame.minY, desiredRowOffset: restoration.offset) {
+                           scroll.restore(restoration, currentRowOffset: frame.minY) {
                             model.restored(restoration.id)
                         }
                         return
@@ -213,17 +218,18 @@ private struct SearchRowFrames: PreferenceKey {
 private final class SearchScrollOffset: ObservableObject {
     weak var view: UIScrollView?
     var frames: [String: CGRect] = [:]
-    func restore(currentRowOffset: Double, desiredRowOffset: Double) -> Bool {
+    func restore(_ restoration: FinancialSearchRestoration, currentRowOffset: Double) -> Bool {
         guard let view else { return false }
-        let delta = currentRowOffset - desiredRowOffset
-        if abs(delta) < 0.5 { return true }
-        let maximum = max(-view.adjustedContentInset.top, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
-        let y = min(maximum, max(-view.adjustedContentInset.top, view.contentOffset.y + delta))
-        // Lazy rows can grow the content bounds after scrollTo. A clamped position
-        // is not proof that the saved row offset has been restored.
-        if abs(y - view.contentOffset.y) < 0.5 { return false }
-        view.setContentOffset(CGPoint(x: view.contentOffset.x, y: y), animated: false)
-        return false
+        let minimum = -view.adjustedContentInset.top
+        let maximum = max(minimum, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
+        switch restoration.adjustment(rowOffset: currentRowOffset, contentOffset: view.contentOffset.y,
+                                      minimum: minimum, maximum: maximum) {
+        case .complete: return true
+        case .waitForLayout: return false
+        case .move(let y):
+            view.setContentOffset(CGPoint(x: view.contentOffset.x, y: y), animated: false)
+            return false
+        }
     }
 }
 

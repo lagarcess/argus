@@ -14,6 +14,19 @@ struct FinancialSearchRestoration: Equatable {
     let id = UUID()
     let anchor: String
     let offset: Double
+    var permitsBoundaryFallback = false
+
+    enum Adjustment: Equatable { case complete, move(Double), waitForLayout }
+
+    func adjustment(rowOffset: Double, contentOffset: Double, minimum: Double, maximum: Double) -> Adjustment {
+        let delta = rowOffset - offset
+        if abs(delta) < 0.5 { return .complete }
+        let target = min(maximum, max(minimum, contentOffset + delta))
+        if abs(target - contentOffset) < 0.5 {
+            return permitsBoundaryFallback ? .complete : .waitForLayout
+        }
+        return .move(target)
+    }
 }
 
 @MainActor
@@ -83,6 +96,8 @@ final class FinancialSearchModel: ObservableObject {
         restoration = nil
     }
 
+    func userScrolled() { restoration = nil }
+
     func invalidate() { dirty = true }
     func activate() async { if !loaded || dirty { await refresh() } }
     func refresh() async { await load(append: false) }
@@ -121,13 +136,16 @@ final class FinancialSearchModel: ObservableObject {
             cursor = nextCursor
             origin.pages = append && !restarted ? descriptor.pages + count : count
             origin.pages = max(1, origin.pages)
-            if let anchor = descriptor.anchor, !items.contains(where: { $0.id == anchor }) {
+            let anchorRemoved = descriptor.anchor.map { anchor in !items.contains(where: { $0.id == anchor }) } ?? false
+            if let anchor = descriptor.anchor, anchorRemoved {
                 let index = oldItems.firstIndex { $0.id == anchor } ?? 0
                 origin.anchor = items.isEmpty ? nil : items[min(index, items.count - 1)].id
             }
             loaded = true; dirty = false; persist()
-            if (!append || restarted), let anchor = origin.anchor {
-                restoration = FinancialSearchRestoration(anchor: anchor, offset: origin.anchorOffset)
+            if !append || restarted {
+                restoration = origin.anchor.map {
+                    FinancialSearchRestoration(anchor: $0, offset: origin.anchorOffset, permitsBoundaryFallback: anchorRemoved)
+                }
             }
         } catch {
             guard request == ticket else { return }
