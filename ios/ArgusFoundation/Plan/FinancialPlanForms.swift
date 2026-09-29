@@ -128,10 +128,21 @@ struct FinancialPlanSelectionView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("plan.selection.hint").foregroundStyle(ArgusStyle.secondary)
-                    ForEach(projection.accounts.filter { !$0.archived && ["cash", "checking", "savings"].contains($0.type) }) { account in
+                    ForEach(projection.accounts.filter {
+                        projection.selection.accountIds.contains($0.id) || (!$0.archived && ["cash", "checking", "savings"].contains($0.type))
+                    }) { account in
                         Toggle(isOn: Binding(get: { ids.contains(account.id) }, set: { included in
                             if included { ids.insert(account.id) } else { ids.remove(account.id) }
-                        })) { AccountRow(account: account) }.accessibilityIdentifier("plan.selection." + account.id.uuidString)
+                        })) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                AccountRow(account: account)
+                                if account.archived { Text("accounts.archived").font(ArgusStyle.body(12, relativeTo: .caption)) }
+                                if !["cash", "checking", "savings"].contains(account.type) {
+                                    Text("plan.selection.unavailable").font(ArgusStyle.body(12, relativeTo: .caption))
+                                }
+                            }
+                        }.accessibilityIdentifier("plan.selection." + account.id.uuidString)
+                            .disabled(!["cash", "checking", "savings"].contains(account.type) && !ids.contains(account.id))
                     }
                     Picker("plan.timeZone", selection: $zone) {
                         ForEach(Array(Set([projection.selection.timeZone, TimeZone.current.identifier, "America/Santo_Domingo"])).sorted(), id: \.self) {

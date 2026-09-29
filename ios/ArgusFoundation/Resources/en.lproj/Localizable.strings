@@ -400,3 +400,5 @@
 "plan.error.account" = "Choose an included cash or bank account for this expectation.";
 "plan.asOf" = "Balances as of";
 "plan.exclusion.account_changed" = "The account changed. Choose a compatible cash or bank account.";
+
+"plan.selection.unavailable" = "Not a cash account. Remove it from this forecast.";

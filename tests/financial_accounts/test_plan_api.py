@@ -83,3 +83,17 @@ def test_plan_http_round_trip_selection_cutover_and_access(client):
     )
     assert unsafe.status_code == 422 and unsafe.json()["code"] == "plan_cutover_unsafe"
     assert "earliest_effective_date" in unsafe.json()
+
+    native_body = {"expected_version": 1, "amount": "30"}
+    for identifier, replayed in [
+        (expectation["id"].upper(), False),
+        (expectation["id"], True),
+    ]:
+        native_edit = client.patch(
+            "/api/v1/financial-plan/expectations/" + identifier,
+            headers=headers | {"Idempotency-Key": "native-edit"},
+            json=native_body,
+        )
+        assert native_edit.status_code == 200, native_edit.text
+        assert native_edit.json()["expectation"]["amount"] == "30.00"
+        assert native_edit.json()["replayed"] is replayed

@@ -400,3 +400,5 @@
 "plan.error.account" = "Elige una cuenta de efectivo o banco incluida para esta expectativa.";
 "plan.asOf" = "Saldos al";
 "plan.exclusion.account_changed" = "La cuenta cambió. Elige una cuenta de efectivo o banco compatible.";
+
+"plan.selection.unavailable" = "No es una cuenta de efectivo. Quítala de esta proyección.";

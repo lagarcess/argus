@@ -2,6 +2,7 @@
 
 from datetime import date, timedelta
 from typing import Any
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from argus.domain.backtest_admission import canonical_hash
@@ -76,6 +77,11 @@ class PlanService:
     def edit(
         self, user_id: str, eid: str, body: ExpectationEdit, key: str
     ) -> dict[str, Any]:
+        try:
+            eid = str(UUID(eid))
+        except ValueError:
+            raise AccountNotFound() from None
+
         def action(state: dict[str, Any], accounts: list) -> tuple:
             item = state["expectations"].get(eid)
             if item is None:

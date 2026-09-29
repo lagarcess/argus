@@ -108,6 +108,21 @@ sign-in/relaunch/sign-out UI acceptance passed with a clean Xcode exit on this
 allocation. This establishes the local foundation only; connected Plan proof
 is still pending implementation. Existing `584xx` and `585xx` demos are intact.
 
+September 29 implementation checkpoint: [PR #749](https://github.com/lagarcess/argus/pull/749)
+contains the connected backend and native implementation. Plan and recorded Home
+now derive from one repeatable-read snapshot using the existing Home calculator.
+The real local HTTP journey passed 16 checks; 209 focused backend checks passed
+after review fixes, including Postgres races, rollback, RLS, Auth/API and
+fractional-ownership rounding continuity. Native package/model checks passed;
+assembled simulator acceptance is still in progress. The fresh-context
+independent reviewer inspected `196ccea2` once and found three concrete issues:
+expectation UUID casing, partial-share forecast continuity and removal of selected
+accounts after archiving/type changes. Fixes and affected verification are in
+progress; the [review record](../reports/evidence/connected-plan-home/review.md)
+retains the exact scope. A simulator check also found a Home accessibility
+identifier overriding its child controls; the identifier now belongs only to
+the section heading. No merge readiness or full Plan completion is claimed yet.
+
 ## Personal money-recording batch
 
 **Founder authorization, September 29, 2026:** Deliver received income, spending,

@@ -270,7 +270,7 @@ struct FinancialComingUpView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("home.coming").font(ArgusStyle.display(23))
+                Text("home.coming").font(ArgusStyle.display(23)).accessibilityIdentifier("home.comingUp")
                 Spacer()
                 Button("home.viewplan", action: viewPlan).font(ArgusStyle.body(12, relativeTo: .caption))
                     .frame(minHeight: 44).accessibilityIdentifier("home.viewPlan")
@@ -294,6 +294,6 @@ struct FinancialComingUpView: View {
                 Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                 Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
             }
-        }.accessibilityIdentifier("home.comingUp")
+        }
     }
 }

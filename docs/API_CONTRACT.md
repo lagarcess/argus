@@ -7079,3 +7079,12 @@ cash total. Archived cash accounts remain included, consistent with recorded Hom
 totals and recent activity, derived from the same repeatable-read snapshot as the
 forecast. Native Home consumes this field with the forecast. The standalone financial-home
 route remains compatible for other callers.
+
+Forecast positions use the same per-account ownership attribution and rounding as
+recorded Home. Each expected whole-account movement changes that account's projected
+whole balance before attribution; its attributed delta supplies forecast totals.
+This keeps fulfillment continuous even at fractional-share minor-unit boundaries.
+Unknown account starting balances remain unknown and are excluded from known
+subtotals; their expected attributed movements remain visible without inventing a
+starting position. Saved selected accounts remain removable if archived or no
+longer eligible. Expectation UUID paths normalize before lookup and receipt scoping.

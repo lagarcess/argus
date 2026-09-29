@@ -15,6 +15,10 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.staticTexts["plan.shortfall.DOP"].exists)
         capture("plan-shortfall-before-later-income")
         assertHome(baseline + 100)
+        for _ in 0..<8 {
+            if app.buttons["home.viewPlan"].exists { break }
+            app.scrollViews["screen.home"].swipeUp()
+        }
         tapVisible(app.buttons["home.viewPlan"])
         openPlanOccurrence(bill)
         tapVisible(app.buttons["plan.record"])
@@ -122,6 +126,35 @@ extension FinancialLoopUITests {
         app.terminate(); try signIn()
     }
 
+    func testPlanCanRemoveArchivedAndChangedSelectedAccounts() throws {
+        try signIn()
+        let stamp = String(UUID().uuidString.prefix(4))
+        let archived = createMoneyAccount("Archived plan " + stamp, type: "checking", amount: "100")
+        selectPlanAccounts([archived])
+        openMoneyAccount(archived)
+        tapVisible(app.buttons["accounts.archive"])
+        XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
+        selectPlanAccounts([])
+        XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
+        let changed = createMoneyAccount("Changed plan " + stamp, type: "checking")
+        selectPlanAccounts([changed])
+        openMoneyAccount(changed)
+        tapVisible(app.buttons["accounts.edit"])
+        tapVisible(app.buttons["accounts.type.change"])
+        tapVisible(app.buttons["accounts.type.investment"])
+        tapVisible(app.buttons["accounts.save"])
+        XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 10))
+        app.buttons["tab.plan"].tap()
+        tapVisible(app.buttons["plan.accounts"])
+        assertText("Not a cash account. Remove it from this forecast.")
+        let toggle = app.switches["plan.selection." + changed.id.uppercased()]
+        tapVisible(toggle)
+        capture("plan-changed-account-remains-removable")
+        tapVisible(app.buttons["plan.selection.save"])
+        XCTAssertTrue(app.buttons["plan.selection.save"].waitForNonExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
+    }
+
     func addPlanExpectation(_ title: String, kind: String, amount: String, account: MoneyAccount,
                             daysAhead: Int = 0, cadence: String = "Once", currency: String = "DOP") {
         app.buttons["tab.plan"].tap()
@@ -185,6 +218,6 @@ extension FinancialLoopUITests {
         let day = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", formatter.string(from: target))).firstMatch
         if !day.exists { app.buttons["Next Month"].tap() }
         XCTAssertTrue(day.waitForExistence(timeout: 5)); day.tap()
-        app.tap()
+        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5)).tap()
     }
 }

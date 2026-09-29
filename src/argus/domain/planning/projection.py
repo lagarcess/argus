@@ -93,6 +93,7 @@ def projection(
     )
     selected = set(state["selection"]["account_ids"])
     currencies = {}
+    projected_balances: dict[str, int | None] = {}
     for stored in accounts:
         if stored.account.id not in selected or stored.account.type not in CASH_TYPES:
             continue
@@ -112,6 +113,7 @@ def projection(
         )
         group["account_ids"].append(stored.account.id)
         balance = account_response(stored).balance
+        projected_balances[stored.account.id] = balance.amount_minor
         if balance.state == "unknown":
             group["unknown_account_ids"].append(stored.account.id)
         else:
@@ -146,11 +148,20 @@ def projection(
             ):
                 continue
             income = row["kind"] == "income"
-            group["expected_income_minor" if income else "expected_bills_minor"] += row[
-                "amount_minor"
-            ]
-            change = row["amount_minor"] if income else -row["amount_minor"]
-            known += change
+            account_id = row["account_id"]
+            share = by_id[account_id].ownership_share_bps
+            whole_change = row["amount_minor"] if income else -row["amount_minor"]
+            before = projected_balances[account_id]
+            if before is None:
+                change = _personal(whole_change, share)
+            else:
+                after = before + whole_change
+                change = _personal(after, share) - _personal(before, share)
+                projected_balances[account_id] = after
+                known += change
+            group["expected_income_minor" if income else "expected_bills_minor"] += abs(
+                change
+            )
             points.append(
                 {
                     "date": row["projection_date"],

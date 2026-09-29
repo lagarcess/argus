@@ -20,6 +20,7 @@ from argus.domain.recording.errors import (
 )
 from argus.domain.recording.money_schemas import MoneyRequest
 from argus.domain.recording.money_service import MoneyService
+from argus.domain.recording.schemas import EditFinancialAccountRequest
 from faker import Faker
 
 from tests.financial_accounts import test_loop_commands as shared
@@ -378,3 +379,33 @@ def test_earlier_new_cutover_cannot_overlap_previous_schedule_segments(scene):
     )
     dates = [r["due_date"] for r in planner.read(scene[1])["occurrences"]]
     assert len(dates) == len(set(dates))
+
+
+@pytest.mark.parametrize(
+    "opening,amount,share",
+    [("100", "60", 5000), ("100.01", "0.02", 5000), ("100.01", "0.01", 3333)],
+)
+@pytest.mark.parametrize("kind", ["bill", "income"])
+def test_forecast_ownership_and_rounding_survive_identical_fulfillment(
+    scene, opening, amount, share, kind
+):
+    service, user, _ = scene
+    aid = account(scene, amount=opening)
+    service.edit(
+        user_id=user,
+        account_id=aid,
+        request=EditFinancialAccountRequest(
+            expected_version=1, ownership_share_bps=share
+        ),
+    )
+    planner, _, _, occurrence = setup_plan(scene, amount=amount, kind=kind, aid=aid)
+    expected = planner.read(user)["currencies"][0]
+    planner.fulfill(
+        user,
+        occurrence["id"],
+        confirmed(planner, user, occurrence, amount=amount),
+        str(uuid4()),
+    )
+    actual = planner.read(user)["currencies"][0]
+    assert actual["ending_minor"] == expected["ending_minor"]
+    assert actual["first_shortfall_date"] == expected["first_shortfall_date"]
