@@ -99,7 +99,7 @@ struct FinancialSearchView: View {
     }
 
     private var results: some View {
-        ScrollViewReader { reader in
+        Group {
             ScrollView {
                 // Loaded pages need measured row heights before restoring a partial row.
                 VStack(alignment: .leading, spacing: 0) {
@@ -171,10 +171,10 @@ struct FinancialSearchView: View {
                         #if DEBUG
                         searchRestorationLog.info("start cachedTargetY=\(scroll.frames[restoration.anchor]?.minY ?? -9999, privacy: .public) desired=\(restoration.offset, privacy: .public) bound=\(scroll.view != nil, privacy: .public)")
                         #endif
-                        if let frame = scroll.frames[restoration.anchor], abs(frame.minY - restoration.offset) < 0.5 {
+                        scroll.view?.layoutIfNeeded()
+                        if let frame = scroll.frames[restoration.anchor],
+                           scroll.restore(restoration, currentRowOffset: frame.minY) {
                             model.restored(restoration.id)
-                        } else {
-                            reader.scrollTo(restoration.anchor, anchor: .top)
                         }
                     }
                 }
