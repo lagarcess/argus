@@ -61,9 +61,12 @@ final class FinancialSearchModel: ObservableObject {
     }
 
     func update(query: String? = nil, kind: FinancialSearchKind?? = nil, currency: String?? = nil) {
-        if let query { origin.query = String(query.prefix(512)) }
-        if let kind { origin.kind = kind }
-        if let currency { origin.currency = currency }
+        var next = origin
+        if let query { next.query = String(query.prefix(512)) }
+        if let kind { next.kind = kind }
+        if let currency { next.currency = currency }
+        guard next != origin else { return }
+        origin = next
         detailRequest = UUID(); opening = false; destinationError = nil; destination = nil; restoration = nil
         origin.pages = 1; origin.anchor = nil; origin.anchorOffset = 0
         request = UUID(); loading = false; items = []; cursor = nil; loaded = false; dirty = true; errorKey = nil

@@ -73,11 +73,9 @@ struct AccountsView: View {
                             .buttonStyle(PillButtonStyle()).accessibilityIdentifier("accounts.add")
                     }
                 }
-                if let error = model.errorKey, model.draft == nil {
-                    Text(LocalizedStringKey(error)).accessibilityIdentifier("accounts.error")
-                    Button("accounts.retry") { Task { await model.load() } }.frame(minHeight: 48)
+                if model.selected == nil {
+                    AccountRequestStatus(model: model) { await model.load() }
                 }
-                if model.busy { ProgressView("accounts.loading") }
 
             }.padding(24)
         }
@@ -130,6 +128,21 @@ struct AccountDetailView: View {
         }
         Button(account.archived ? "accounts.restore" : "accounts.archive") { Task { await model.archive(account) } }
             .buttonStyle(PillButtonStyle(primary: false)).disabled(model.busy).accessibilityIdentifier("accounts.archive")
+        AccountRequestStatus(model: model) { await model.refresh(account.id) }
+    }
+}
+
+private struct AccountRequestStatus: View {
+    @ObservedObject var model: AccountsModel
+    let retry: () async -> Void
+
+    var body: some View {
+        if let error = model.errorKey, model.draft == nil {
+            Text(LocalizedStringKey(error)).accessibilityIdentifier("accounts.error")
+            Button("accounts.retry") { Task { await retry() } }
+                .frame(minHeight: 48).disabled(model.busy).accessibilityIdentifier("accounts.retry")
+        }
+        if model.busy { ProgressView("accounts.loading").accessibilityIdentifier("accounts.loading") }
     }
 }
 

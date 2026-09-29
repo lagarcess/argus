@@ -45,7 +45,11 @@ final class AccountsModel: ObservableObject {
     func open(_ account: FinancialAccount) async {
         guard !busy else { return }
         select(account)
-        await run { identity in let value = try await self.controller.financialAccount(id: account.id, expectedIdentity: identity)
+        await refresh(account.id)
+    }
+
+    func refresh(_ accountID: UUID) async {
+        await run(targetAccountID: accountID) { identity in let value = try await self.controller.financialAccount(id: accountID, expectedIdentity: identity)
             if self.current(identity) { self.upsert(value) } }
     }
 
@@ -123,7 +127,7 @@ final class AccountsModel: ObservableObject {
     var createIsFrozen: Bool { pendingCreate != nil }
 
     func archive(_ account: FinancialAccount) async {
-        await run { identity in
+        await run(targetAccountID: account.id) { identity in
             let saved = try await self.controller.updateFinancialAccount(id: account.id,
                 request: EditFinancialAccountRequest(expectedVersion: account.version, archived: !account.archived), expectedIdentity: identity)
             if self.current(identity) { self.accept(saved) }
@@ -151,7 +155,7 @@ final class AccountsModel: ObservableObject {
         financialChanged?()
     }
 
-    private func run(_ operation: (SessionSnapshot) async throws -> Void) async {
+    private func run(targetAccountID: UUID? = nil, _ operation: (SessionSnapshot) async throws -> Void) async {
         guard let identity, !busy else { return }
         let ticket = generation
         busy = true; errorKey = nil
@@ -180,8 +184,8 @@ final class AccountsModel: ObservableObject {
                     guard await synchronize(identity, ticket: ticket) else { return }
                     latest = value
                 }
-            } else if draft == nil, let selected, Self.requiresReview(error) {
-                let value = try? await controller.financialAccount(id: selected.id, expectedIdentity: identity)
+            } else if draft == nil, let targetAccountID, Self.requiresReview(error) {
+                let value = try? await controller.financialAccount(id: targetAccountID, expectedIdentity: identity)
                 if await synchronize(identity, ticket: ticket), let value { self.upsert(value) }
             }
         }
