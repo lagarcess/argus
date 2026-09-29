@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** one [connected Plan and Home lane](#connected-plan-and-home-lane), implemented in PR #749 with local acceptance and review evidence below. #747 personal money recording and its #748 landing are complete. No merge or physical-phone delivery is authorized by this lane.
+**Execution state:** [connected Plan and Home](#connected-plan-and-home-lane) landed through PR #749 with local acceptance and clean independent review. #747 personal money recording and its #748 landing are complete. The founder authorized #749 and its bounded documentation landing; no further implementation lane is active. Physical-phone delivery remains pending.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -12,7 +12,7 @@ Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
 ## Connected Plan and Home lane
 
-**Founder authorization, September 29, 2026:** deliver commitments, recurrence,
+**Original implementation authorization, September 29, 2026:** deliver commitments, recurrence,
 fulfillment and the connected cash forecast as one local iPhone journey. Own
 implementation, local builds/tests, commits, pushes and one reviewable PR with
 existing automatic PR previews. No merge, deployment, signing changes, hosted
@@ -141,8 +141,8 @@ use that owner's minor-unit rounding; no second balance ledger exists.
 - Original base and refreshed integration are both
   `21309f0832d438fd18651f47209e8c789a8fcc53`. Integration has not advanced;
   no reconciliation merge or semantic overlap invalidates retained evidence.
-  Modularity passes on the would-be merged tree. CI passed on `36abc0bc`;
-  the final publication head must also reach terminal applicable checks.
+  Modularity passes on the would-be merged tree. Final publication head
+  `a2b6ed2b` reached green applicable CI and local-smoke checks before merge.
 
 **Remaining across the MVEE:** this delivers commitments, recurrence,
 fulfillment and the connected forecast locally. Budgets, savings goals and
@@ -156,6 +156,37 @@ not equal time intervals; the readout names date/currency and the included accou
 should tighten long occurrence lists and reduce repeated account/expectation copy
 without losing the distinction between planned and actual amounts. This does not
 reopen the web remake or authorize a broader redesign.
+
+### PR #749 integration landing
+
+The founder subsequently authorized merging the approved head and a necessary
+docs-only landing PR after checks, with deployment and hosted configuration
+changes still excluded. [PR #749](https://github.com/lagarcess/argus/pull/749)
+squash-merged on September 29, 2026 at 19:52 UTC as
+`88d513c0ef2791b4277eb571ce6b1f4f291d3a5c`, from approved head
+`a2b6ed2bf849582de19aceedd61a3861d1c768e2` onto unchanged integration
+`21309f0832d438fd18651f47209e8c789a8fcc53`.
+
+- Integration had not advanced; no reconciliation merge was necessary. The
+  approved-head and merge trees are identical, preserving all local acceptance
+  and independent review evidence. No application behavior changed at landing.
+- Applicable PR checks were green, the independent review was clean, and zero
+  unresolved threads remained. The [terminal audit](https://github.com/lagarcess/argus/pull/749#issuecomment-5897315197)
+  records the source checkpoints and review. Exact post-merge CI, the docs-only
+  landing PR and final integration parity are recorded in the merged PR landing
+  comment after their checks finish.
+- There are no linked closing issues. The landing changes only this manifest
+  and the integration ledger; it activates no other MVEE work.
+- No production configuration was added. Financial exposure remains default-off
+  in the existing environment template and Render declaration. The new
+  `ARGUS_TEST_FAULT_URL` belongs only to the local recovery test launcher. The
+  additive Plan migration is covered by local database and authorized automatic
+  PR-preview checks; landing applies no hosted migration or configuration change.
+- The 584xx financial loop, 585xx money-recording demo and 586xx connected Plan
+  demo are preserved. The [recording and restart guide](../reports/evidence/connected-plan-home/README.md)
+  remain the entry point for the runnable Plan simulator. Signing, physical-phone
+  installation and internet delivery remain pending; budgets, savings goals and
+  debt-plan lifecycles remain in D06. No deployment or main promotion occurred.
 
 ## Personal money-recording batch
 
@@ -916,8 +947,8 @@ sequence rather than a separate deferral policy in this document.
 | [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 native account/opening lifecycle and real local API | Extend saved assets and ownership/space behavior; verify existing lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
-| [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 locally connects commitments and dated cash forecast (unmerged) | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 locally verifies commitments, recurrence, fulfillment and forecast (unmerged) | Budgets, savings goals, debt-plan lifecycles and their actual/projection adapters; shared variants and physical-phone proof | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | Budgets, savings goals, debt-plan lifecycles and their actual/projection adapters; shared variants and physical-phone proof | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
