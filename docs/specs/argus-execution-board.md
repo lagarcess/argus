@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** Local financial loop LANDED through PR #745. The founder authorized bounded landing documentation/verification through PR #746; its terminal result is recorded in the linked landing comment below. Signing, physical-phone installation and deployment are deferred. Other MVEE work remains stopped.
+**Execution state:** ACTIVE for the [personal money-recording batch](#personal-money-recording-batch). #745 and its #746 landing are complete. Signing, physical-phone installation, deployment and other MVEE implementation remain outside this authorization.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -10,7 +10,80 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
-## Financial-loop batch
+## Personal money-recording batch
+
+**Founder authorization, September 29, 2026:** Deliver received income, spending,
+transfers between owned accounts, credit-card payments and purchase refunds as
+one personal journey, including inspection, corrections and reconciliation with
+existing balance checks. Own backend, database and iPhone through a runnable
+simulator demonstration and a merge-ready PR. Publication and existing automatic
+PR previews are authorized. Merge, deployment, signing, production changes,
+paid-provider calls, web, imports, household and chat-runtime work are not.
+Do not invent exchange rates or unresolved loan rules. The earlier loop's scoped
+stop statements below are historical; this grant activates only the work here.
+
+**Integration base:** freshly fetched
+`b4fed10fe5cd325a7cd3e6ac21b87e9fbf5eb819` (#745 plus #746).
+**Delivery branch:** `codex/personal-money-recording`.
+**Goal:** a person uses the native app with the real local API/Postgres to receive
+income, spend, move money between owned accounts, pay a card and record a refund;
+Accounts and Home agree after inspection, corrections and reopening. Unknown
+balances stay unknown, currencies stay separate, linked movements commit once
+and together, and earlier activity respects each account's balance-check answers.
+
+### Delivery ownership and throughput
+
+The captain owns the shared contract decision, this manifest, assembled branch,
+independent acceptance, publication and scoped review. One backend writer owns
+recording domain/API/storage/migrations and API/data documentation. One native
+writer owns Swift features, localized presentation and native tests. Writers use
+separate branches; neither duplicates money rules or edits the other's surface.
+A bounded design comparison precedes the shared contract. Native presentation
+planning and local harness preparation can proceed alongside backend grounding;
+wire-dependent implementation consumes the accepted contract. Integration and
+simulator ownership are serialized by the captain.
+
+The main risk is atomic paired corrections and purchase/refund limits under
+concurrent writes, not account setup. Prove those with real Postgres before
+calling the assembled journey complete. Reuse existing auth, preview tokens,
+version checks, durable receipts and observation coverage. Preserve the previous
+runnable demo and its synthetic database while preparing this slice.
+
+### Acceptance and checkpoints
+
+| User outcome | Inherit | Remaining delivery | Owner / real dependency | Observable proof |
+| --- | --- | --- | --- | --- |
+| Receive income and record spending | Account CRUD, expense preview/confirm, append-only correction/history | Typed income with optional source; connected recording and Home reads | Core and native; canonical activity contract | Native create/inspect/correct/reopen against real local DB; income does not become expense |
+| Move money between owned accounts, including cash withdrawal | Signed balances, versioning, coverage | One atomic movement with linked legs and per-account review; same-currency validation | Core owns linked mutation; native consumes preview | Both accounts and Home agree; no spending/income; one-sided failure writes neither leg; duplicate retry writes once |
+| Pay a credit card | Liability sign and credit-balance presentation | Payment from owned cash/bank to card, both sides correctable together | Same paired movement owner | Cash and debt change once; purchases remain the spending event; credit in favor stays explicit |
+| Record money returned | Stable expense identity and category catalog | Linked partial/multiple refunds, actual destination, absent-purchase path and received-month reporting | Core owns purchase/refund cap and category; native review | Refund is separate from purchase and income; cumulative cap survives concurrent corrections; negative net spending remains visible |
+| Reconcile and recover every supported activity | Immutable observations, explicit coverage, idempotency and session recovery | Multi-account coverage, revision consistency and native uncertain-write recovery | Shared core then assembled app | Existing check remains authoritative only for explicitly included activity; reopen, interrupted response and retry preserve one result; another identity sees nothing |
+| Click through a complete local demo | Installed prior build, local stack and capture harness | Integrated build, short recording, restart recipe, durable evidence, CI and scoped review | Captain after component integration | Real simulator actions and DB readbacks; exact source provenance; merge-ready PR with zero unresolved findings |
+
+Currency conversion and loan principal/interest allocation are not authorized.
+The recorded peso/dollar transfer boundary remains blocked; a foreign-currency
+refund uses the actual received amount with an explicitly unlinked purchase.
+Existing technical limitations must remain visible and must not be relabeled as
+founder-approved MVEE deferrals. The full MVEE coverage below remains the broader
+assignment, not a claim that this slice completes the ecosystem.
+
+### Execution checklist and decision trail
+
+- [x] Read the Principles section of poteto-mode.
+- [x] Phase A: Frame. Recover approved rules and the freshly fetched base; bind this bounded authorization and verification predicate.
+- [ ] Phase B: Design the workflow. Trace the inherited owners, compare contract shapes, record one accepted contract and isolated writers.
+- [ ] Phase C: Run the loop. Implement and verify the core and native journey in bounded units, then integrate on this branch.
+- [ ] Phase D: Keep the audit trail. Update this section with decisions, named owners, evidence and exact remaining work.
+- [ ] Phase E: Verify and hand back. Deliver the runnable simulator, recording, restart instructions and merge-ready PR after CI and scoped review.
+
+Current checkpoint: read-only core/native grounding is in progress. No financial
+implementation or hosted configuration has changed. The earlier demo remains
+owned by its preserved worktrees. Model the Domain requires one typed financial
+activity representation; Separate Before Serializing Shared State requires
+isolated writers; Prove It Works requires real local database and simulator
+acceptance rather than component-only completion.
+
+## Landed financial-loop batch (historical authorization)
 
 The founder authorized this batch on September 29, 2026 after PR #744 merged.
 The restart covers implementation, local verification, simulator builds, device
@@ -251,7 +324,7 @@ instructions; the landing checkpoint above owns current status.
   independent reviewers have completed their assigned local work. The captain
   retains signing, hosted compatibility, publication and physical acceptance.
 
-### Current handoff
+### Financial-loop landing handoff
 
 The locally verified loop is merged through #745. Keep its
 simulator/local-backend demonstration runnable. PR #746 carries the
