@@ -1773,9 +1773,101 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/financial-accounts/{account_id}/opening:
-    put:
+  /api/v1/financial-accounts/{account_id}/activity:
+    get:
       tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityPageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityOperationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/activity/preview:
+    post:
+      tags:
+      - financial-accounts
       - financial-accounts
       parameters:
       - name: account_id
@@ -1788,7 +1880,361 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WriteOpeningRequest'
+              $ref: '#/components/schemas/ActivityRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/activity/{record_id}:
+    get:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityOperationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/activity/{record_id}/history:
+    get:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityPageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/activity/{record_id}/preview:
+    post:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: record_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/balance-checks:
+    get:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckPageResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckOperationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/balance-checks/preview:
+    post:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/opening:
+    put:
+      tags:
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoopOpeningRequest'
       responses:
         '200':
           description: Successful Response
@@ -1802,6 +2248,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/opening/preview:
+    post:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoopOpeningRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpeningPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-categories:
+    get:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriesResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-home:
+    get:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeResponse'
         '503':
           $ref: '#/components/responses/AuthSessionVerificationUnavailable'
         '500':
@@ -2717,6 +3241,170 @@ components:
       - can_search_current_workspace
       - can_use_grounded_discovery
       - can_submit_feedback
+    ActivityOperationResponse:
+      properties:
+        account:
+          $ref: '#/components/schemas/FinancialAccountResponse'
+        activity:
+          $ref: '#/components/schemas/ActivityResponse'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - account
+      - activity
+      - replayed
+    ActivityPageResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ActivityResponse'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+      - next_cursor
+    ActivityPreviewResponse:
+      properties:
+        account_version:
+          type: integer
+        ready:
+          type: boolean
+        observations:
+          items:
+            $ref: '#/components/schemas/ObservationQuestion'
+          type: array
+        before:
+          $ref: '#/components/schemas/BalanceResponse'
+        after:
+          anyOf:
+          - $ref: '#/components/schemas/BalanceResponse'
+          - type: 'null'
+        preview_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - account_version
+      - ready
+      - observations
+      - before
+      - after
+      - preview_token
+    ActivityRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        expected_revision:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+        amount:
+          type: string
+          maxLength: 40
+        occurred_at:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+          maxLength: 64
+          default: America/Santo_Domingo
+        note:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        coverage:
+          items:
+            $ref: '#/components/schemas/CoverageAnswer'
+          type: array
+          maxItems: 1000
+        preview_token:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - amount
+      - occurred_at
+    ActivityResponse:
+      properties:
+        record_id:
+          type: string
+        revision:
+          type: integer
+        kind:
+          type: string
+          const: expense
+          default: expense
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        balance_movement_minor:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+        coverage:
+          items:
+            $ref: '#/components/schemas/CoverageAnswer'
+          type: array
+      type: object
+      required:
+      - record_id
+      - revision
+      - amount_minor
+      - amount
+      - balance_movement_minor
+      - occurred_at
+      - time_zone
+      - note
+      - category_id
+      - reason
+      - recorded_at
+      - recorded_by
+      - coverage
     AnswerDecisionAction:
       properties:
         type:
@@ -3096,7 +3784,9 @@ components:
         basis:
           anyOf:
           - type: string
-            const: opening
+            enum:
+            - opening
+            - balance_check
           - type: 'null'
         activity_since_tracking_minor:
           type: integer
@@ -3114,6 +3804,26 @@ components:
       required:
       - success
       - deleted_count
+    CategoriesResponse:
+      properties:
+        categories:
+          items:
+            $ref: '#/components/schemas/CategoryResponse'
+          type: array
+      type: object
+      required:
+      - categories
+    CategoryResponse:
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          const: expense
+      type: object
+      required:
+      - id
+      - kind
     ChatActionPayload:
       properties:
         type:
@@ -3266,6 +3976,163 @@ components:
       type: object
       required:
       - conversation_id
+    CheckOperationResponse:
+      properties:
+        account:
+          $ref: '#/components/schemas/FinancialAccountResponse'
+        check:
+          $ref: '#/components/schemas/CheckResponse'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - account
+      - check
+      - replayed
+    CheckPageResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/CheckResponse'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+      - next_cursor
+    CheckPreviewResponse:
+      properties:
+        account_version:
+          type: integer
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        expected_amount_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        observed_amount_minor:
+          type: integer
+        difference_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        preview_token:
+          type: string
+      type: object
+      required:
+      - account_version
+      - currency
+      - currency_fraction_digits
+      - expected_amount_minor
+      - observed_amount_minor
+      - difference_minor
+      - as_of
+      - time_zone
+      - preview_token
+    CheckRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        amount:
+          type: string
+          maxLength: 40
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+          maxLength: 64
+          default: America/Santo_Domingo
+        source:
+          type: string
+          const: manual
+          default: manual
+        note:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        preview_token:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - amount
+      - as_of
+    CheckResponse:
+      properties:
+        record_id:
+          type: string
+        revision:
+          type: integer
+        kind:
+          type: string
+          enum:
+          - balance_check
+          - value_update
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        source:
+          type: string
+          const: manual
+        expected_amount_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        observed_amount_minor:
+          type: integer
+        difference_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        unexplained_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - record_id
+      - revision
+      - kind
+      - as_of
+      - time_zone
+      - source
+      - expected_amount_minor
+      - observed_amount_minor
+      - difference_minor
+      - unexplained_minor
+      - note
+      - recorded_at
+      - recorded_by
     ComparedAnswer:
       properties:
         conversation_id:
@@ -3787,6 +4654,17 @@ components:
       type: object
       required:
       - conversation
+    CoverageAnswer:
+      properties:
+        observation_id:
+          type: string
+        included:
+          type: boolean
+      additionalProperties: false
+      type: object
+      required:
+      - observation_id
+      - included
     CreateFinancialAccountRequest:
       properties:
         type:
@@ -3835,6 +4713,46 @@ components:
       required:
       - type
       - currency
+    CurrencySummaryResponse:
+      properties:
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        assets_minor:
+          type: string
+        cash_minor:
+          type: string
+        other_assets_minor:
+          type: string
+        debts_minor:
+          type: string
+        net_worth_minor:
+          type: string
+        known_accounts:
+          type: integer
+        unknown_accounts:
+          type: integer
+        recorded_spending_minor:
+          type: string
+        as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+      required:
+      - currency
+      - currency_fraction_digits
+      - assets_minor
+      - cash_minor
+      - other_assets_minor
+      - debts_minor
+      - net_worth_minor
+      - known_accounts
+      - unknown_accounts
+      - recorded_spending_minor
+      - as_of
     DecisionCalculation:
       properties:
         kind:
@@ -4572,6 +5490,24 @@ components:
       - created_at
       - conversation_id
       - expires_at
+    HomeResponse:
+      properties:
+        currencies:
+          items:
+            $ref: '#/components/schemas/CurrencySummaryResponse'
+          type: array
+        recent_activity:
+          items:
+            $ref: '#/components/schemas/RecentActivityResponse'
+          type: array
+        recorded_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - currencies
+      - recent_activity
+      - recorded_at
     JsonValue: {}
     LocalizedText:
       properties:
@@ -4607,6 +5543,50 @@ components:
       - email
       - password
       - captcha_token
+    LoopOpeningRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        expected_revision:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+        as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        time_zone:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 1000
+          - type: 'null'
+        coverage:
+          items:
+            $ref: '#/components/schemas/OpeningCoverageAnswer'
+          type: array
+          maxItems: 1000
+        preview_token:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
     MarketSession:
       properties:
         phase:
@@ -5156,6 +6136,35 @@ components:
       type: object
       required:
       - decision
+    ObservationQuestion:
+      properties:
+        observation_id:
+          type: string
+        kind:
+          type: string
+          enum:
+          - opening
+          - balance_check
+          - value_update
+        as_of:
+          type: string
+          format: date-time
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        included:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+      type: object
+      required:
+      - observation_id
+      - kind
+      - as_of
+      - amount_minor
+      - amount
+      - included
     OnboardingState:
       properties:
         completed:
@@ -5192,6 +6201,72 @@ components:
         old profile rows carry it and deployed clients may still read the `/me`
 
         shape during a rollout.'
+    OpeningActivityQuestion:
+      properties:
+        activity_id:
+          type: string
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        included:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+      type: object
+      required:
+      - activity_id
+      - amount_minor
+      - amount
+      - occurred_at
+      - note
+      - included
+    OpeningCoverageAnswer:
+      properties:
+        activity_id:
+          type: string
+        included:
+          type: boolean
+      additionalProperties: false
+      type: object
+      required:
+      - activity_id
+      - included
+    OpeningPreviewResponse:
+      properties:
+        account_version:
+          type: integer
+        ready:
+          type: boolean
+        activities:
+          items:
+            $ref: '#/components/schemas/OpeningActivityQuestion'
+          type: array
+        before:
+          $ref: '#/components/schemas/BalanceResponse'
+        after:
+          anyOf:
+          - $ref: '#/components/schemas/BalanceResponse'
+          - type: 'null'
+        preview_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - account_version
+      - ready
+      - activities
+      - before
+      - after
+      - preview_token
     OpeningResponse:
       properties:
         record_id:
@@ -6715,6 +7790,79 @@ components:
           - type: 'null'
       additionalProperties: false
       type: object
+    RecentActivityResponse:
+      properties:
+        record_id:
+          type: string
+        revision:
+          type: integer
+        kind:
+          type: string
+          const: expense
+          default: expense
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        balance_movement_minor:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+        coverage:
+          items:
+            $ref: '#/components/schemas/CoverageAnswer'
+          type: array
+        account_id:
+          type: string
+        account_nickname:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+      type: object
+      required:
+      - record_id
+      - revision
+      - amount_minor
+      - amount
+      - balance_movement_minor
+      - occurred_at
+      - time_zone
+      - note
+      - category_id
+      - reason
+      - recorded_at
+      - recorded_by
+      - coverage
+      - account_id
+      - account_nickname
+      - currency
+      - currency_fraction_digits
     ResultReadoutContent:
       properties:
         schema_version:
@@ -7440,40 +8588,6 @@ components:
       - guest
       - capabilities
       - public_account_access_enabled
-    WriteOpeningRequest:
-      properties:
-        expected_version:
-          type: integer
-          minimum: 1.0
-        expected_revision:
-          anyOf:
-          - type: integer
-            minimum: 1.0
-          - type: 'null'
-        amount:
-          anyOf:
-          - type: string
-            maxLength: 40
-          - type: 'null'
-        as_of:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-        time_zone:
-          anyOf:
-          - type: string
-            maxLength: 64
-          - type: 'null'
-        reason:
-          anyOf:
-          - type: string
-            maxLength: 1000
-          - type: 'null'
-      additionalProperties: false
-      type: object
-      required:
-      - expected_version
   responses:
     AuthSessionVerificationUnavailable:
       description: Bounded Supabase session verification is temporarily unavailable; retry

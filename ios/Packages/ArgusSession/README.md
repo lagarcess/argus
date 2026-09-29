@@ -3,7 +3,8 @@
 Registered-session ownership for the iPhone app. The package depends on the
 `Auth` product from official `supabase-swift` **2.55.2**; `Package.resolved` pins
 transitive dependencies. It contains no SwiftUI, financial rules, guest entry,
-account-management endpoints, CAPTCHA acquisition or recovery callbacks.
+auth-account management endpoints, CAPTCHA acquisition or recovery callbacks.
+It transports the landed financial-account API without storing financial data.
 
 ## App boundary
 
@@ -81,3 +82,42 @@ login and confirmation-required signup. It consumes four login attempts and one
 signup; coordinate the shared local attempt limit before running. The public
 CAPTCHA test token exists only in the test target. Simulator/process-relaunch,
 CAPTCHA widget, browser recovery and real-device proof belong to the app lane.
+
+## Financial accounts
+
+The five bounded account methods require `expectedIdentity: SessionSnapshot`
+from the displayed authenticated session. UUID account ids cannot inject paths.
+The session owner attaches credentials through the same authenticated transport
+as `/me`; callers never receive a token. Identity retirement rejects both late
+successes and failures, and an old form cannot send under a newly signed-in user.
+After a failure, read `snapshot()` and clear UI records/drafts if the session
+phase or identity epoch changed. Clear them immediately when initiating sign-out.
+
+`FinancialAccount` and related values preserve decimal amounts and offset dates
+as strings, signed minor units as `Int64`, and stored IANA zones unchanged.
+Unknown balances retain nil amounts. These are wire types, not a financial cache
+or a second owner of accounting rules.
+
+Keep the immutable `CreateFinancialAccountRequest` for uncertain-delivery retries:
+its generated UUID key and sorted JSON body remain identical. For PATCH/PUT,
+retain the version/revision originally viewed. On conflict or uncertain delivery,
+reread explicitly; never auto-upgrade tokens and resubmit. An empty nickname
+explicitly clears it; nil omits the edit. Omit unchanged opening amount/date/zone.
+Liability GET amounts are signed to the owner, whereas entered write amounts
+are positive owed: a date-only debt correction must not replay its GET amount.
+
+Deterministic tests cover precision, unknown/zero, frozen create retry bodies,
+both concurrency tokens, bounded errors, one refresh, and retired identities.
+Run the separate one-login real-service financial journey only after starting
+and reserving the isolated accounts stack:
+
+```bash
+ARGUS_SESSION_LIVE_CONFIG="$PWD/ios/.build/accounts-local/client.json" \
+  swift test --package-path ios/Packages/ArgusSession --filter LiveFinancialAccountTests
+```
+
+This proves production Swift transport against real local auth and Postgres:
+create/replay, unknown/zero, nickname clearing, initial opening, debt amount and
+date-only correction, history, stale save, archive/restore, and new-controller
+Keychain restoration with authoritative reread. It does not itself restart the
+API process or app process; those acceptance checks belong to the app lane.

@@ -14,13 +14,14 @@ from argus.api.financial_accounts import (
     domain_problem,
     require_financial_accounts_context,
 )
+from argus.api.routers.financial_loop import router as loop_router
 from argus.domain import backtest_admission
+from argus.domain.recording.loop_schemas import LoopOpeningRequest
 from argus.domain.recording.schemas import (
     CreateFinancialAccountRequest,
     EditFinancialAccountRequest,
     FinancialAccountListResponse,
     FinancialAccountResponse,
-    WriteOpeningRequest,
     account_response,
 )
 
@@ -96,13 +97,25 @@ def edit_financial_account(
 def write_financial_opening(
     request: Request,
     account_id: str,
-    body: WriteOpeningRequest,
+    body: LoopOpeningRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
 ) -> FinancialAccountResponse:
     try:
-        stored = context.service.write_opening(
-            user_id=context.user_id, account_id=account_id, request=body
-        )
+        current = context.service.get(user_id=context.user_id, account_id=account_id)
+        if current.expenses or current.checks or body.preview_token:
+            key = _required_idempotency_key(request, idempotency_key)
+            result = context.service.loop.write_opening(
+                user_id=context.user_id,
+                account_id=account_id,
+                request=body,
+                idempotency_key=key,
+            )
+            stored = result.stored
+        else:
+            stored = context.service.write_opening(
+                user_id=context.user_id, account_id=account_id, request=body
+            )
     except Exception as error:
         raise domain_problem(request, error) from None
     return account_response(stored)
@@ -127,3 +140,6 @@ def _required_idempotency_key(request: Request, raw: str | None) -> str:
         title="Idempotency Key Required",
         detail="POST /financial-accounts requires an Idempotency-Key header.",
     )
+
+
+router.include_router(loop_router)

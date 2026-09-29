@@ -21,6 +21,8 @@ from argus.domain.recording.errors import (
     RegisteredAccountRequired,
     StaleVersion,
 )
+from argus.domain.recording.loop_postgres import hydrate, mutate
+from argus.domain.recording.loop_storage import OperationResult, Planner
 from argus.domain.recording.records import (
     OPENING_KIND,
     OpeningRecord,
@@ -82,16 +84,21 @@ class PostgresFinancialAccountRepository:
 
     def list_accounts(self, *, user_id: str) -> list[StoredAccount]:
         with self._pool.connection() as connection:
+            connection.execute("set transaction isolation level repeatable read")
             rows = connection.execute(
                 f"select {_ACCOUNT_COLUMNS} from public.financial_accounts"
                 " where user_id = %s order by created_at asc, id asc",
                 (user_id,),
             ).fetchall()
             openings = self._openings(connection, user_id, [str(row[0]) for row in rows])
-        return [StoredAccount(_facts(row), openings.get(str(row[0]))) for row in rows]
+            return [
+                hydrate(connection, StoredAccount(_facts(row), openings.get(str(row[0]))))
+                for row in rows
+            ]
 
     def get_account(self, *, user_id: str, account_id: str) -> StoredAccount | None:
         with self._pool.connection() as connection:
+            connection.execute("set transaction isolation level repeatable read")
             return self._load(connection, user_id, account_id)
 
     def update_account(
@@ -125,7 +132,7 @@ class PostgresFinancialAccountRepository:
                         (account_id, user_id),
                     ).fetchone()
                     raise StaleVersion() if exists else AccountNotFound()
-            stored = self._load(connection, user_id, account_id)
+                stored = self._load(connection, user_id, account_id)
         if stored is None:  # pragma: no cover - the row was just updated
             raise AccountNotFound()
         return stored
@@ -165,6 +172,26 @@ class PostgresFinancialAccountRepository:
             raise AccountNotFound()
         return stored
 
+    def mutate(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        idempotency_key: str,
+        identity_hash: str,
+        expected_version: int,
+        planner: Planner,
+    ) -> OperationResult:
+        return mutate(
+            self,
+            user_id=user_id,
+            account_id=account_id,
+            idempotency_key=idempotency_key,
+            identity_hash=identity_hash,
+            expected_version=expected_version,
+            planner=planner,
+        )
+
     def _load(self, connection, user_id: str, account_id: str) -> StoredAccount | None:  # noqa: ANN001
         row = connection.execute(
             f"select {_ACCOUNT_COLUMNS} from public.financial_accounts"
@@ -173,8 +200,9 @@ class PostgresFinancialAccountRepository:
         ).fetchone()
         if row is None:
             return None
+        account_id = str(row[0])
         openings = self._openings(connection, user_id, [account_id])
-        return StoredAccount(_facts(row), openings.get(account_id))
+        return hydrate(connection, StoredAccount(_facts(row), openings.get(account_id)))
 
     def _openings(
         self,

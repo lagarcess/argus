@@ -1,8 +1,10 @@
 # Native registered sessions
 
 Authentication is **off by default**. Profile can connect to existing Argus
-signup/login and `/me`; the five financial destinations remain local samples.
-No guest bootstrap, financial records, calculations or provider calls are added.
+signup/login and `/me`. The [account continuation](ACCOUNTS_SETUP.md) reuses that
+same session for canonical Home, Accounts, expense corrections and balance checks.
+Argus, Plan and Search remain local sample destinations in this bounded build.
+The auth adapter adds no guest bootstrap, calculations or provider calls.
 
 ## Configuration
 
@@ -20,7 +22,9 @@ CAPTCHA hosting, identity, signing team and callbacks remain unapproved.
 The simulator uses an **ad-hoc signature with no account/team**, with
 `application-identifier` derived from the replaceable local bundle identity.
 This lets Keychain work; an unsigned simulator executable fails with -34018.
-The project remains simulator-only. This is not production signing configuration.
+The default project configuration remains simulator-only. The opt-in
+[device configuration](../docs/reports/financial-loop-device-preparation.md)
+requires approved signing access.
 
 ## Session behavior
 
@@ -101,6 +105,7 @@ Stop own terminal processes with Ctrl-C, then
 `python3 ios/scripts/auth/local_stack.py stop`. This stops only `ios-auth-8be2`
 and retains its local data. Shut down only assigned simulators; never erase a
 shared device or stop unrelated containers. Local synthetic evidence is not
-hosted readiness. Guest transfer, resend, callbacks and financial wiring remain
-separate work. See the [lane spec](../docs/superpowers/specs/2026-09-28-ios-auth-session.md)
+hosted readiness. Guest transfer, resend and callbacks remain separate work.
+Financial wiring has its own [setup and evidence](ACCOUNTS_SETUP.md).
+See the [lane spec](../docs/superpowers/specs/2026-09-28-ios-auth-session.md)
 for ownership and exact integration/design/auth reference commits.

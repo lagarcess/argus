@@ -122,6 +122,8 @@ def test_migration_objects_exist_on_the_integration_schema() -> None:
         assert [row[0] for row in tables] == [
             "financial_account_idempotency",
             "financial_accounts",
+            "financial_observation_coverage",
+            "financial_operation_receipts",
             "financial_record_revisions",
             "financial_records",
         ]

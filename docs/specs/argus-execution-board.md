@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** PLANNING ONLY. Implementation remains STOPPED. No worker dispatch or hosted changes are authorized.
+**Execution state:** ACTIVE for the complete first financial loop only. Other MVEE work remains stopped. Merges and hosted changes require founder approval.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,224 @@
 commit and push on September 29, 2026. This authorizes documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Active financial-loop batch
+
+The founder authorized this batch on September 29, 2026 after PR #744 merged.
+The restart covers implementation, local verification, simulator builds, device
+preparation and coordination for the first financial loop only. The full MVEE
+map below remains the recovery map; no other journey is activated by this grant.
+Merges, signing/account actions, deployment, hosted mutations and spending still
+require specific approval. Local implementation and simulator proof exist; signed
+installation, hosted rollout and physical-phone proof remain outstanding.
+
+**GitHub publication authorized:** The founder explicitly approved pushing
+`codex/financial-loop-delivery`, opening its review PR, and completing CI and
+scoped review, including its existing automatic Supabase preview. Physical-device
+signing, installation, Render login and deployment are deferred. Keep the simulator/local-backend
+demonstration runnable with retained synthetic data and restart instructions.
+
+**Current review deliverable:** The founder subsequently made the complete loop
+working in the simulator against the real local API/database the acceptance target
+for PR #745, with a short recording, restart instructions and honest limitations.
+Own CI and scoped review through a merge-ready verdict without routine approvals;
+do not merge or deploy. Physical signing, installation and deployment are deferred.
+
+**Overall delivery goal:** Deliver the loop defined under [full-scope execution and early demonstration](#full-scope-execution-and-early-demonstration)
+on the founder's physical iPhone over the internet using the existing user when
+those deferred actions are authorized.
+Preserve the [locked design](../reports/mobile-design-lock-2026-09-28.md).
+Simulator acceptance closes the current local deliverable, not the full MVEE or
+physical-phone outcome. Unknown balances, corrections, reconciliation, retry, persistence and
+identity isolation follow the linked canonical requirements and technical handoff.
+
+**Base:** freshly fetched `fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`.
+**Captain:** main delivery agent on `codex/financial-loop-delivery`.
+**No-touch:** production web/remake, Android implementation, new MVEE pillars,
+agentic runtime, billing/growth, hosted records/settings and unapproved providers.
+
+| Responsibility | Exclusive implementation ownership | Checkout | Current action |
+| --- | --- | --- | --- |
+| Financial core (`loop_core`) | Recording domain, financial routers/repositories, financial migrations/tests, relevant API/data contract sections | `codex/financial-loop-core` in `financial-loop-core` | Source `c2425f2e2` includes reviewed timezone/type-lock corrections; 126 focused checks, including real local Postgres, pass on published delivery source; earlier exact HTTP/Home proof retained |
+| iPhone (`loop_iphone`) | Native feature/session/navigation code, native tests and localized copy; excludes project/signing configuration | `codex/financial-loop-iphone` in `financial-loop-iphone`, recovered from preserved iOS checkpoint | Source `bbfb3bff` with archive evidence in `129d2c876`: three original actual API/Postgres journeys plus focused archive/restore pass; six model tests and 39 session tests pass; four environment-gated session tests explicitly skipped |
+| Device preparation (`loop_device`) | iOS project/signing/configuration, local release setup, narrow existing-web CAPTCHA adapter and approval evidence; no feature Swift files | `codex/financial-loop-device` in `financial-loop-device` | Checkpoint `ea3370606` independently reviewed clean and assembled as `78ec38464` on delivery branch; signing and hosted approval remain pending |
+| Captain and independent acceptance | This manifest, contract synthesis, integration candidate and cross-owner verification | `5a42` | Publish authorized delivery branch and review PR, complete CI/scoped review, and retain runnable local demonstration; signing, Render login and deployment deferred |
+
+### PR #745 review checkpoint
+
+[Review PR #745](https://github.com/lagarcess/argus/pull/745) is open against
+`codex/private-alpha-next`. Original reviewed head `b5cfedef998079f3978f9282e60bc287afa7dc25`
+passed [CI](https://github.com/lagarcess/argus/actions/runs/36549243112) and
+[local smoke](https://github.com/lagarcess/argus/actions/runs/36549243153).
+The original and freshly fetched integration base remain `fcbb70cc2`; no
+reconciliation merge or intervening integration overlap exists.
+
+The first Codex review found three confirmed defects. Each has a thumbs-up and
+an evidence-backed reply. All fixes below were published in `6d3f8e066`; this
+documentation follow-up changes no product/test source. The PR's terminal audit
+will record final exact-head CI, thread resolution and the scoped review result
+after they finish; this checkpoint does not pre-empt that verdict.
+
+| Finding | Published correction and verification | Delivery commit |
+| --- | --- | --- |
+| Balance timestamps used the opening's timezone regardless of source | Canonical position retains its source revision's IANA zone; Home orders freshness by UTC instant, including repeated DST hours. Memory and real-Postgres regressions cover preview/save/reopen | `71ea905a7` from core `c2425f2e2` |
+| Account type remained editable after a check without expenses | Existing type lock includes balance checks/value updates; opening-only behavior preserved | `71ea905a7` |
+| Archived accounts remained in the active list | Active list filters archived rows; Manage accounts retains Active/Archived groups and existing Restore. Six model checks and one real-API simulator archive/restore journey passed, with unchanged Home and same record ID | `632ea5f49`, `08254e668`; [visual/behavior evidence](../reports/evidence/financial-loop/ios/archive-review.md) in `abd955f3c` |
+
+The assembled local correction candidate `08254e668` passed 126 focused backend
+checks including real Postgres, full Ruff and modularity checks. The original
+financial-loop evidence remains historical at its recorded sources; the changed
+timezone/type-lock and account-list surfaces have the focused replacement proof
+above. At published head `6d3f8e066`, all 126 backend checks and all six native model
+tests passed again. Modularity passed against the current integration descendant;
+product/test source is unchanged from `08254e668`. Native sources match `bbfb3bff`
+and financial sources match `c2425f2e2`, explicitly revalidating the focused
+simulator and source-timezone/type-lock evidence for the published candidate.
+
+**Preview cleanup and publication authorization:** the founder authorized
+verification, removal of only PR #745's disposable preview, and disabling
+automatic previews only for this PR. CLI and connected Supabase branch inventories
+confirmed a real environment, not a skipped-preview notice: branch
+`4d58c555-c26d-4a51-bdfb-c1765042aca3`, preview project
+`yjuknxqpmgddgswvtgwk`, git branch `codex/financial-loop-delivery`, PR `745`,
+non-default, non-persistent, and created without production data.
+
+The existing integration checkout's environment credential authenticated CLI
+reads, but CLI deletion lacked `branching_development_delete`. The connected
+Supabase tool successfully deleted that exact branch. A fresh inventory confirmed
+only the unchanged default branch remains on existing project
+`lgdhvepyrzbnscqssgqq`. No new token, other branch deletion, main-project mutation,
+or integration-setting change was made.
+
+After reviewing the expected cost and isolation, the founder explicitly authorized
+PR #745's existing automatic Supabase preview as a side effect of publishing its
+fixes. The publication blocker is resolved. Preserve Automatic branching and all
+other integration settings. No further infrastructure investigation, production
+changes or application deployment is authorized. No new token is needed.
+
+Publish the local fixes, wait for exact-head CI, resolve the addressed threads and
+request only a review of this correction delta. Report a merge-ready verdict after
+the scoped review returns clean and unresolved threads reach zero; do not merge.
+The preview's green check is automation evidence, not application delivery or
+physical-phone acceptance. Keep the broader MVEE and deferred physical-phone
+work pending under their existing authority boundaries.
+
+**Runnable local demonstration:** the retained database and synthetic identities
+are running again. Native `bbfb3bff` and core `c2425f2e2` are the locally verified
+review corrections. Keep the owned API 58400, CAPTCHA 58405 and Supabase/Postgres
+58401/58402 alive for founder use; restart instructions are in the
+[evidence README](../reports/evidence/financial-loop/ios/README.md#reproduce-and-resume).
+No physical-iPhone, signing, Render login or deployment work is active.
+
+Throughput checkpoint: three implementation responsibilities, one financial
+contract owner and one integration owner. Device access must not block local
+financial/native work. CPU-heavy Xcode and database suites use separate owners;
+shared simulator control is exclusive to the native owner until handed to QA.
+The first stop requiring the founder is a concrete signing or hosted action,
+not a routine engineering decision. Physical-phone completion remains unverified;
+it is deferred beyond this explicitly authorized local review deliverable.
+
+The execution checklist adapts poteto's figure-it-out workflow into this existing
+manifest rather than creating another board.
+
+- [x] Read the Principles section of the poteto-mode skill.
+- [x] Phase A: Frame. Scope and authority recorded above.
+- [x] Phase B: Design the workflow. Trace existing owners and settle the consumed contract.
+- [ ] Phase C: Run the loop. Implement and verify each integrated increment.
+- [x] Recover the native baseline and capture locked-reference comparisons.
+- [x] Implement durable activity, corrections, reconciliation and shared reads.
+- [x] Connect the native loop and verify it against a local API/database.
+- [ ] Prepare signing/install and exact hosted rollout actions for approval.
+- [ ] Verify the approved installed candidate on the physical phone over the internet.
+- [x] Phase D: Keep the audit trail. Record decisions and evidence here as work advances.
+- [ ] Phase E: Verify and hand back. Report phone-proven behavior and remaining MVEE gaps.
+
+Decision trail for this batch stays in this manifest.
+
+- Restart uses three isolated writers and recovers the preserved iOS lineage.
+  The fetched base and recovery checkpoint above identify their source. The
+  native baseline builds and runs but still shows fixtures.
+- Financial design extends the existing record/revision graph and one domain
+  projection. Explicit inclusion decisions cover opening/check boundaries;
+  immutable check confirmation facts remain separate from current residuals.
+  The financial owner records the consumed wire contract in API_CONTRACT and
+  data shape in DATA_MODEL before client integration.
+- A dedicated existing-web `/auth/native-captcha` adapter may reuse the current
+  challenge owner for native login. It contains no password or session state.
+  This is a required auth connection, not web remake work. Its deployment still
+  requires approval.
+- Read-only access inventory found no valid local signing identity, a known
+  but unavailable iPhone 15, and an expired Render CLI session. The existing
+  Supabase project is healthy on its current Free plan; its applied migration
+  inventory does not yet include the financial-account migration. Founder
+  access work is now explicitly deferred. No hosted mutation or provisioning occurred.
+- The consumed API contract is committed on the financial branch in
+  `ee77772c9` and amended in `0de85dca`. Home aggregates use exact decimal-integer
+  strings; one backend projection owns totals and ownership-share rounding.
+  Native clients format those values without recomputing financial rules.
+- Device checkpoint `ea3370606` is published for review. Its proof uses an
+  unsigned build and synthetic local CAPTCHA responses. It does not establish
+  production login, a signed installation, or physical-phone acceptance.
+- Captain independently ran the core's local HTTP verification script against
+  synthetic Auth and Postgres: expense, correction, check, late included expense,
+  retry after intervening writes, unknown balance, second-owner refusal and
+  reopened read passed. That provisional run was superseded by the final-source
+  HTTP/Home proof and native simulator evidence recorded below.
+- Automatic approval review blocked the native worker's combined commit/push
+  because remote publication was treated as a reserved hosted change. Neither
+  command ran. The worker subsequently committed locally. The founder later
+  explicitly approved publication of the assembled delivery branch and its
+  review PR, resolving that publication blocker only. Previously published
+  device and captain checkpoints remain preserved; no PR/integration merge occurred.
+- Financial checkpoint `92020058d` passed independent review after fixes for
+  stale metadata planning and native uppercase UUIDs. The captain reran the
+  complete HTTP loop on a separate synthetic identity, including exact Home
+  position/spending deltas after each write and replay. The five core commits
+  are assembled locally; [component evidence](../reports/evidence/financial-loop/core-verification.json)
+  records the source and limits. The owned local API/database supported native
+  acceptance and were then stopped with their data retained. Integration was
+  fetched again and remains `fcbb70cc2`.
+- Native checkpoint `d5299f65` passed three real local API/Postgres simulator
+  journeys: unknown balance through spending and an explicitly reviewed opening;
+  known balance through expense, correction, check, included late expense and
+  reopen; and Spanish Home/check review. Numeric Home deltas and foreground
+  recovery are asserted. Session tests executed 39 passes with four explicit
+  environment skips; five tests compile and exercise the actual native models.
+  Independent review is clean after fixing expired-session recovery, editable
+  inclusion review, and the foreground auth race that blocked Home refreshes.
+- The captain assembled device, core and native source at `ba69fecd6`, reran
+  108 backend checks and the modularity budget (all pass), and compiled the full
+  app for generic physical iOS with signing disabled. The temporary unsigned
+  device override was removed. Native feature/test sources match `d5299f65`;
+  only the reviewed opt-in device configuration and setup documentation differ.
+  Home, entry, check-review and reopened-account captures were compared with
+  the locked visual reference. This supports local visual acceptance, not
+  physical-device fidelity or internet completion.
+- Post-merge integration CI and release smoke are green for exact integration
+  `fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`:
+  [CI](https://github.com/lagarcess/argus/actions/runs/36537496516) and
+  [smoke](https://github.com/lagarcess/argus/actions/runs/36537496519).
+  These results do not cover the unpublished implementation candidate.
+- [Simulator demonstration and acceptance evidence](../reports/evidence/financial-loop/ios/README.md)
+  were assembled in evidence-only commit `9b94c65c3`, preserving the tested
+  application source. The recording, seven captures and sanitized XCTest results
+  are committed locally and included in the authorized review publication.
+  The evidence README records the exact existing-stack restart commands. All
+  worker-owned build/recording/API/database processes are stopped; synthetic data,
+  fixtures, worktrees and the installed simulator app are preserved. Writers and
+  independent reviewers have completed their assigned local work. The captain
+  retains signing, hosted compatibility, publication and physical acceptance.
+
+**Current review outcome:** publish the locally verified loop for review and
+keep its simulator/local-backend demonstration runnable. Physical-device signing,
+Render login and deployment are explicitly deferred. No functionality on the
+founder's phone is yet proved by this batch. When those actions are resumed, the
+[device preparation evidence](../reports/financial-loop-device-preparation.md)
+identifies the access needed; actual deployed API/web SHAs are required before fixing
+the minimal deployment candidate. Account and loop migrations are
+`20260928200000_financial_accounts_first_slice.sql` and
+`20260929090000_financial_loop.sql`; neither is approved for hosted application.
+
 
 ## Outcome and completion
 
@@ -29,16 +247,19 @@ A release manifest under `docs/release-manifests/` remains the evidence for one
 specific deployment, not a competing product plan.
 
 The founder assigns the full MVEE private iPhone outcome to this delivery captain.
-Execution remains stopped until the one restart authorization. That authorization
-covers continuous delivery across the full non-deferred scope below, not only the
-first demonstration. Record named owners and each consumed technical contract
+The full-scope execution proposal below remains recorded. The current restart
+authorizes only the first financial loop; additional MVEE work remains stopped. Record named owners and each consumed technical contract
 before implementation of that dependency. Routine progression does not require
 new batch approvals. No 24-hour delivery promise has been made.
 
 ## Verified starting point
 
-Refreshed by fetch on September 29. Current integration is
-`12bccd4d6e173a5d8805e495fd30b7ead36741c6`, the #743 merge. The original
+The active batch starts from integration
+`fcbb70cc2899ca6a05c03c49316e9a4e4cbf5333`, the #744 merge. Its exact-commit
+[CI](https://github.com/lagarcess/argus/actions/runs/36537496516) and
+[Private Alpha Local Smoke](https://github.com/lagarcess/argus/actions/runs/36537496519)
+were refreshed on September 29 and both succeeded. The earlier planning snapshot
+used `12bccd4d6e173a5d8805e495fd30b7ead36741c6`, the #743 merge. The original
 publication inspected `de8729843b726a3fd03210cebcedede5e44227c8`.
 The account product commit is `296195e86c972e846c251d256b3cc211975bfd57`.
 GitHub merge/closure state and the linked repository documents were inspected.
@@ -162,7 +383,7 @@ inspection, not a new hosted verification.
 
 ## Full-scope execution and early demonstration
 
-**State remains stopped pending one explicit founder restart.** The first usable
+**Only this first loop is now authorized under the active batch above.** The first usable
 outcome is a complete financial loop on the physical iPhone over the internet,
 using the founder's existing user. Establish an account balance, record an
 expense, see Accounts and Home reflect it, correct it, reconcile a checked
@@ -272,7 +493,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below are the September 29 inspection
-snapshot. Every implementation row is stopped until restart. Proposed owners
+snapshot. Only work required by the active financial-loop batch is restarted. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -395,7 +616,8 @@ for handoff; stale chat status is not proof a writer is alive.
 
 ## Parallel delivery across the full scope
 
-On the single restart authorization, activate full-scope ownership from the
+This is the proposed full-scope sequence, not the current batch authorization.
+When separately authorized, activate full-scope ownership from the
 coverage table. Begin the device/hosted, financial backend and native core-loop
 responsibilities together. Also start independent household membership/invitation,
 intake capture/preview, inherited conversation, existing profile/settings and

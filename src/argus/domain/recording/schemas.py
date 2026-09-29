@@ -20,7 +20,8 @@ from argus.domain.recording.accounts import (
     Nature,
 )
 from argus.domain.recording.currency import currency_exponent, format_minor_units
-from argus.domain.recording.records import Balance, OpeningRecord, balance_of
+from argus.domain.recording.loop import position
+from argus.domain.recording.records import Balance, OpeningRecord
 from argus.domain.recording.repository import StoredAccount
 
 
@@ -69,7 +70,7 @@ class BalanceResponse(BaseModel):
     amount_minor: int | None = None
     amount: str | None = None
     as_of: datetime | None = None
-    basis: Literal["opening"] | None = None
+    basis: Literal["opening", "balance_check"] | None = None
     activity_since_tracking_minor: int = 0
 
 
@@ -130,23 +131,28 @@ def account_response(stored: StoredAccount) -> FinancialAccountResponse:
         version=facts.version,
         created_at=facts.created_at,
         updated_at=facts.updated_at,
-        balance=_balance_response(balance_of(stored.opening), stored.opening, facts),
+        balance=_balance_response(
+            position(stored.opening, stored.checks, stored.expenses, stored.coverage),
+            facts,
+        ),
         opening=_opening_response(stored.opening, facts),
     )
 
 
-def _balance_response(
-    balance: Balance, opening: OpeningRecord | None, facts: AccountFacts
-) -> BalanceResponse:
-    if balance.state == "unknown" or opening is None:
-        return BalanceResponse(state="unknown")
+def _balance_response(balance: Balance, facts: AccountFacts) -> BalanceResponse:
+    if balance.state == "unknown":
+        return BalanceResponse(
+            state="unknown",
+            activity_since_tracking_minor=balance.activity_since_tracking_minor,
+        )
     assert balance.amount_minor is not None and balance.as_of is not None
     return BalanceResponse(
         state="known",
         amount_minor=balance.amount_minor,
         amount=format_minor_units(balance.amount_minor, facts.currency),
-        as_of=balance.as_of.astimezone(ZoneInfo(opening.current.time_zone)),
+        as_of=balance.as_of,
         basis=balance.basis,
+        activity_since_tracking_minor=balance.activity_since_tracking_minor,
     )
 
 

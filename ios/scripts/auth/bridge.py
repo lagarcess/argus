@@ -1,8 +1,13 @@
 """Serve only the lane's public CAPTCHA test page on loopback; never log tokens."""
 
+import argparse
+
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
+
+
+WORK = Path(__file__).resolve().parents[2] / ".build/auth-local"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -13,7 +18,7 @@ class Handler(BaseHTTPRequestHandler):
         if urlsplit(self.path).path != "/captcha.html":
             self.send_error(404)
             return
-        mode_file = Path(__file__).resolve().parents[2] / ".build/auth-local/captcha-mode"
+        mode_file = WORK / "captcha-mode"
         mode = mode_file.read_text().strip() if mode_file.exists() else "pass"
         if mode not in {"pass", "fail", "hold"}:
             self.send_error(503)
@@ -34,4 +39,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--accounts", action="store_true")
+    if parser.parse_args().accounts:
+        WORK = Path(__file__).resolve().parents[2] / ".build/accounts-local"
     HTTPServer(("127.0.0.1", 58405), Handler).serve_forever()

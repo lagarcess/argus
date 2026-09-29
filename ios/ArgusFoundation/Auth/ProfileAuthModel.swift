@@ -9,6 +9,8 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var profile: SessionProfile?
     @Published private(set) var confirmationRequired = false
     @Published private(set) var errorKey: String?
+    @Published private(set) var accounts: AccountsModel?
+    @Published private(set) var financialLoop: FinancialLoopModel?
     let configuration: NativeAuthConfiguration?
     private let controller: SessionController?
     private var started = false
@@ -30,6 +32,14 @@ final class ProfileAuthModel: ObservableObject {
         configuration = loadedConfiguration
         controller = loadedController
         state = initialState
+        if let loadedController {
+            accounts = AccountsModel(controller: loadedController)
+            accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
+            if let accounts {
+                financialLoop = FinancialLoopModel(controller: loadedController, accounts: accounts)
+                financialLoop?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
+            }
+        }
     }
 
     var enabled: Bool { state != .disabled }
@@ -42,7 +52,10 @@ final class ProfileAuthModel: ObservableObject {
 
     func restore() async {
         guard let controller, !busy else { return }
-        await perform { try await controller.restore() }
+        await perform {
+            if state == .authenticated { return try await controller.profile() }
+            return try await controller.restore()
+        }
     }
 
     func authenticate(email: String, password: String, captchaToken: String, signup: Bool, language: String, displayName: String) async {
@@ -72,6 +85,8 @@ final class ProfileAuthModel: ObservableObject {
 
     func signOut() async {
         guard let controller else { return }
+        accounts?.bind(nil)
+        financialLoop?.bind(nil)
         await perform { try await controller.signOut() }
     }
 
@@ -100,6 +115,8 @@ final class ProfileAuthModel: ObservableObject {
     }
 
     private func accept(_ snapshot: SessionSnapshot) {
+        accounts?.bind(snapshot)
+        financialLoop?.bind(snapshot)
         profile = snapshot.profile
         switch snapshot.phase {
         case .signedOut: state = .signedOut

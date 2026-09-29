@@ -48,7 +48,7 @@ class Balance:
     state: Literal["known", "unknown"]
     amount_minor: int | None = None
     as_of: datetime | None = None
-    basis: Literal["opening"] | None = None
+    basis: Literal["opening", "balance_check"] | None = None
     # No activity can exist in this slice, so the unknown read always reports 0
     # recorded since tracking began. The field keeps the read shape stable.
     activity_since_tracking_minor: int = 0
