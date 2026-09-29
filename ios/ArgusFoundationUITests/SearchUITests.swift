@@ -57,7 +57,7 @@ extension FinancialLoopUITests {
     }
 
     func testSearchMultiplePagesKeepScrollOnBackAndRelaunch() throws {
-        try signIn()
+        try signIn(fresh: true)
         let query: String
         if let seeded = ProcessInfo.processInfo.environment["ARGUS_TEST_SEARCH_QUERY"] { query = seeded }
         else {
