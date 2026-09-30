@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Independent native design canvas. Sample values never reach financial services.
 struct CuadraoHomeCanvas: View {
+    @AppStorage("cuadrao.design.home-section-order") private var homeOrder = CuadraoHomeSection.defaultOrder
     @State private var populated = ProcessInfo.processInfo.arguments.contains("--home-populated")
     @State private var selectedTab: CuadraoTab = .home
     @State private var navigationScroll = CuadraoNavigationScroll()
@@ -16,7 +17,7 @@ struct CuadraoHomeCanvas: View {
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
-        case add, options, archived, updates, spaces
+        case add, options, archived, updates, spaces, customize
         case actions(UUID), rename(UUID), record(UUID)
         var id: String { "home-modal" }
     }
@@ -30,10 +31,13 @@ struct CuadraoHomeCanvas: View {
                             header
                             CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
                         }
-                        CuadraoHomeOverview(data: data, spanish: spanish)
-                        accounts
-                        if !data.visibleActivity.isEmpty { activity }
-                        if populated && data.selectedSpace.kind == .personal { upcoming }
+                        ForEach(CuadraoHomeSection.decode(homeOrder)) { section in
+                            homeSection(section)
+                        }
+                        Button { ordering = false; sheet = .customize } label: {
+                            Label(spanish ? "Personalizar Inicio" : "Customize Home", systemImage: "slider.horizontal.3")
+                                .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
+                        }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
                     }
                     .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
                 }
@@ -82,6 +86,15 @@ struct CuadraoHomeCanvas: View {
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
                     .padding(.horizontal, 20).padding(.bottom, 90)
             }
+        }
+    }
+
+    @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
+        switch section {
+        case .overview: CuadraoHomeOverview(data: data, spanish: spanish)
+        case .accounts: accounts
+        case .activity: if !data.visibleActivity.isEmpty { activity }
+        case .upcoming: if populated && data.selectedSpace.kind == .personal { upcoming }
         }
     }
 
@@ -230,6 +243,7 @@ struct CuadraoHomeCanvas: View {
 
     @ViewBuilder private func modal(_ item: HomeSheet) -> some View {
         switch item {
+        case .customize: CuadraoHomeLayoutSheet(savedOrder: $homeOrder, spanish: spanish)
         case .spaces: CuadraoSpacesSheet(data: data, spanish: spanish)
         case .add: CuadraoFirstAccountSheet(data: data, spanish: spanish)
         case .archived: CuadraoArchivedAccounts(data: data, spanish: spanish)

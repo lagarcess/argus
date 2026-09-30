@@ -91,3 +91,16 @@ Reference: [Wise's Transactions list](https://mobbin.com/screens/47d57013-eb4e-4
 contains money entries; [Monzo's All activity feed](https://mobbin.com/screens/8f921563-4da7-4e2b-98ea-e3e5e47b9229)
 includes payments and nonfinancial events. The inspected captures were English;
 the Spanish labels are Cuadrao's own approved wording, not attributed translations.
+
+## Home customization — September 30, 2026
+
+Founder approved Personalizar Inicio → drag whole sections → Listo. Panorama,
+Próximamente, Cuentas and Movimientos can be reordered; logo, space selector and
+menu bar remain fixed. The starting order is a default, not a user restriction.
+Account long press continues to open account actions.
+
+The native canvas provides an explicit compact reorder sheet from Home's footer,
+with Cancel, Done and Reset. A saved local order applies across spaces and survives
+relaunch. Empty sections retain their place without adding empty feed content.
+[Implementation evidence](../reports/evidence/cuadrao-native-design/home-layout/README.md).
+This is a presentation preference, not a new financial backend flow.
