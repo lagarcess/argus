@@ -69,6 +69,8 @@ def validate(
         account = by_id.get(aid)
         if account is None:
             raise AccountNotFound()
+        if item["archived"]:
+            continue
         if account.type not in ELIGIBILITY["expense"]:
             model.fail("account_ineligible", "Choose an account that supports expenses.")
         if account.currency != item["currency"]:
