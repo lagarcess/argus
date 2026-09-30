@@ -24,6 +24,10 @@ struct ArgusFoundationApp: App {
 
     var body: some Scene {
         WindowGroup {
+            if ProcessInfo.processInfo.arguments.contains("--cuadrao-design") {
+                CuadraoCanvas()
+                    .preferredColorScheme(.light)
+            } else {
             FoundationShell(appearance: $appearance)
                 .environmentObject(auth)
                 .task { await auth.start() }
@@ -34,6 +38,7 @@ struct ArgusFoundationApp: App {
                 .tint(ArgusStyle.ink)
                 .foregroundStyle(ArgusStyle.ink)
                 .font(ArgusStyle.body())
+            }
         }
     }
 }

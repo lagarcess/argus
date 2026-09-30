@@ -703,3 +703,12 @@ Recents, account activity and global Search retain the shared quiet search
 language. Empty Chats and no matching results offer an explicit New chat action.
 No additional visual exploration is required by this freeze; later changes
 need an explicit request and a new dated checkpoint.
+
+
+### Cuadrao native Accounts decisions · September 30, 2026
+
+The founder-approved [Cuadrao Accounts lock](../../../docs/specs/cuadrao-accounts-design-lock.md)
+owns the native design iteration's Accounts-in-Home, management, entry and
+navigation decisions. For that canvas it supersedes this document's older
+three-row Home preview and separate Accounts-tab assumptions. Existing connected
+financial contracts and reconciliation behavior remain unchanged.
