@@ -133,6 +133,12 @@ class GoalContribution(BaseModel):
     activity: MoneyActivityResponse | None
 
 
+class GoalComponent(BaseModel):
+    account_id: str
+    assigned_minor: str
+    supported_minor: str | None
+
+
 class GoalProgress(BaseModel):
     goal: GoalDefinition
     assigned_minor: str
@@ -143,6 +149,7 @@ class GoalProgress(BaseModel):
     reasons: list[str]
     pools: list[GoalPool]
     contributions: list[GoalContribution]
+    components: list[GoalComponent]
     planned_minor: str
     projected_minor: str | None
     projection_end_date: date

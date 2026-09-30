@@ -7240,3 +7240,9 @@ recurrence and cutover. Forecasts apply selected signed account legs with curren
 personal-share rounding and report transfer_effect_minor separately from income,
 bills and spending. Fulfilled and disputed links exclude another forecast payment.
 Planned/projection values remain separate from supported actual savings.
+
+Each GoalProgress also supplies `components:[{account_id,assigned_minor,
+supported_minor}]`. Allocation editors display these server-derived current
+per-account assignments and send explicit replacement intentions; clients do not
+reconstruct linked amounts or pool support. `GoalPool.account_name` is nullable,
+matching the existing optional Recording nickname.

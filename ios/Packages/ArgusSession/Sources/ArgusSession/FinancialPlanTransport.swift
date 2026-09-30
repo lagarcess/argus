@@ -19,6 +19,10 @@ extension SessionController {
     public func sendPlanConfirmation(_ write: PendingFinancialConfirmation, expectedIdentity: SessionSnapshot) async throws {
         let operation = try validatedPlanOperation(write, identity: expectedIdentity)
         switch operation {
+        case .createGoal, .editGoal, .linkGoal, .releaseGoal:
+            let _: FinancialGoalReceipt = try await planResponse(path: operation.path, method: operation.method, body: write.body, key: write.key, identity: expectedIdentity)
+        case .allocateGoals:
+            let _: FinancialGoalAllocationReceipt = try await planResponse(path: operation.path, method: operation.method, body: write.body, key: write.key, identity: expectedIdentity)
         case .createBudget, .editBudget:
             let _: FinancialBudgetReceipt = try await planResponse(path: operation.path, method: operation.method,
                 body: write.body, key: write.key, identity: expectedIdentity)
@@ -31,13 +35,13 @@ extension SessionController {
         case .link:
             let _: FinancialPlanLinkReceipt = try await planResponse(path: operation.path, method: operation.method,
                 body: write.body, key: write.key, identity: expectedIdentity)
-        case .fulfill: throw SessionFailure.invalidResponse
+        case .fulfill, .recordGoal: throw SessionFailure.invalidResponse
         }
     }
 
     public func sendPlanFulfillment(_ write: PendingFinancialConfirmation, expectedIdentity: SessionSnapshot) async throws -> FinancialActivityReceipt {
         let operation = try validatedPlanOperation(write, identity: expectedIdentity)
-        guard case .fulfill = operation else { throw SessionFailure.invalidResponse }
+        guard operation.recordsActivity else { throw SessionFailure.invalidResponse }
         return try await planResponse(path: operation.path, method: operation.method, body: write.body,
                                        key: write.key, identity: expectedIdentity)
     }
@@ -49,7 +53,7 @@ extension SessionController {
         return operation
     }
 
-    private func planResponse<Value: Decodable>(path: String = "", method: String = "GET", body: Data? = nil,
+    func planResponse<Value: Decodable>(path: String = "", method: String = "GET", body: Data? = nil,
         key: UUID? = nil, query: [URLQueryItem] = [], identity: SessionSnapshot) async throws -> Value {
         let data = try await financialRequest(route: "financial-plan", path: path, method: method, body: body,
                                               key: key?.uuidString, query: query, expectedIdentity: identity)

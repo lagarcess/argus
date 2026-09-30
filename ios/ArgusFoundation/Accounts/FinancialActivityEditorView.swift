@@ -76,7 +76,7 @@ struct FinancialActivityEditorView: View {
 
     private var entry: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if !model.isCorrection && model.planOccurrence == nil {
+            if !model.isCorrection && model.planOccurrence == nil && model.goal == nil {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("loop.activity.kind")
                     ScrollView(.horizontal) {

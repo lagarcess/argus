@@ -140,6 +140,7 @@ def project(
         support, independent = 0, 0
         resolved = not reasons
         components = []
+        allocation_components = []
         for aid, assigned in amounts[gid].items():
             pool = pools.get(aid)
             if pool is None or pool["currency"] != item["currency"]:
@@ -147,6 +148,22 @@ def project(
                 resolved = False
                 continue
             components.append(pool)
+            component_support = (
+                assigned
+                if pool["state"] == "backed"
+                else min(assigned, int(pool["backing_minor"]))
+                if pool["state"] == "shortfall" and len(pool["affected_goal_ids"]) == 1
+                else None
+            )
+            allocation_components.append(
+                {
+                    "account_id": aid,
+                    "assigned_minor": str(assigned),
+                    "supported_minor": str(component_support)
+                    if component_support is not None
+                    else None,
+                }
+            )
             if assigned == 0:
                 continue
             if pool["state"] == "backed":
@@ -201,6 +218,7 @@ def project(
                 "reasons": sorted(set(reasons)),
                 "pools": components,
                 "contributions": linked[gid],
+                "components": allocation_components,
                 "planned_minor": str(planned),
                 "projected_minor": str(actual + planned)
                 if actual is not None and planned_valid

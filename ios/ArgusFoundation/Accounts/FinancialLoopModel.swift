@@ -28,6 +28,7 @@ final class FinancialLoopModel: ObservableObject {
     private var generation = UUID()
     var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
+    lazy var goals = FinancialGoalModel(controller: controller, loop: self)
     lazy var budgets = FinancialBudgetModel(controller: controller, loop: self)
     lazy var plan = FinancialPlanModel(controller: controller, accounts: accounts, loop: self)
 
@@ -46,6 +47,7 @@ final class FinancialLoopModel: ObservableObject {
         } else { pendingConfirmation = nil }
         plan.bind(snapshot)
         budgets.bind(snapshot)
+        goals.bind(snapshot)
     }
 
     func refresh() async {
@@ -149,10 +151,10 @@ final class FinancialLoopModel: ObservableObject {
         record(account, correcting: activity)
     }
 
-    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil) {
+    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil) {
         guard let identity, pendingConfirmation == nil else { return }
         let ticket = generation
-        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, controller: controller,
+        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, goal: goal, goalOccurrenceId: goalOccurrenceId, controller: controller,
             journal: journal, identity: identity, started: { [weak self] write in
                 guard let self, self.generation == ticket else { return }
                 self.pendingConfirmation = write
@@ -176,7 +178,7 @@ final class FinancialLoopModel: ObservableObject {
             let current = await controller.snapshot()
             guard generation == ticket, current == identity else { throw SessionFailure.staleOperation }
             if let operation = write.planOperation {
-                if case .fulfill = operation {
+                if operation.recordsActivity {
                     let receipt = try await controller.sendPlanFulfillment(write, expectedIdentity: identity)
                     guard generation == ticket else { return }
                     try journal.clear(write, for: identity); pendingConfirmation = nil
@@ -189,6 +191,7 @@ final class FinancialLoopModel: ObservableObject {
                     guard generation == ticket else { return }
                     plan.confirmed(operation)
                     budgets.confirmed(operation)
+                    goals.confirmed(operation)
                 }
             } else {
                 let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
@@ -242,6 +245,7 @@ final class FinancialLoopModel: ObservableObject {
     var pendingTitle: String {
         guard let operation = pendingConfirmation?.planOperation else { return "loop.pending.title" }
         switch operation {
+        case .createGoal, .editGoal, .allocateGoals, .linkGoal, .recordGoal, .releaseGoal: return "goal.pending"
         case .createBudget, .editBudget: return "budget.pending"
         case .createExpectation, .editExpectation: return "plan.pending.expectation"
         case .selection: return "plan.pending.selection"

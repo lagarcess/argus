@@ -43,12 +43,17 @@ public struct FinancialPlanSelection: Codable, Equatable, Sendable {
     enum CodingKeys: String, CodingKey { case version, accountIds = "account_ids", timeZone = "time_zone" }
 }
 
+public enum FinancialOccurrenceKind: String, Codable, Sendable { case income, bill, goalTransfer = "goal_transfer" }
+
 public struct FinancialPlanOccurrence: Codable, Equatable, Sendable, Identifiable {
     public enum Status: String, Codable, Sendable { case planned, fulfilled, needsReview = "needs_review" }
     public let id: String
-    public let expectationId: UUID
+    public let expectationId: UUID?
+    public let goalId: UUID?
+    public let sourceAccountId: UUID?
+    public let destinationAccountId: UUID?
     public let expectationVersion: Int
-    public let kind: FinancialExpectationKind
+    public let kind: FinancialOccurrenceKind
     public let title: String
     public let currency: String
     public let currencyFractionDigits: Int
@@ -64,6 +69,7 @@ public struct FinancialPlanOccurrence: Codable, Equatable, Sendable, Identifiabl
     public let overdue: Bool
     enum CodingKeys: String, CodingKey {
         case id, kind, title, currency, amount, status, overdue
+        case goalId = "goal_id", sourceAccountId = "source_account_id", destinationAccountId = "destination_account_id"
         case expectationId = "expectation_id", expectationVersion = "expectation_version"
         case currencyFractionDigits = "currency_fraction_digits", amountMinor = "amount_minor"
         case accountId = "account_id", dueDate = "due_date", projectionDate = "projection_date"
@@ -80,6 +86,7 @@ public struct FinancialForecastCurrency: Decodable, Sendable, Identifiable {
     public let startingMinor: String?
     public let expectedIncomeMinor: String
     public let expectedBillsMinor: String
+    public let transferEffectMinor: String?
     public let netCashChangeMinor: String
     public let endingMinor: String?
     public let firstShortfallDate: String?
@@ -103,6 +110,7 @@ public struct FinancialForecastCurrency: Decodable, Sendable, Identifiable {
         case accountIds = "account_ids", unknownAccountIds = "unknown_account_ids"
         case knownStartingMinor = "known_starting_minor", startingMinor = "starting_minor"
         case expectedIncomeMinor = "expected_income_minor", expectedBillsMinor = "expected_bills_minor"
+        case transferEffectMinor = "transfer_effect_minor"
         case netCashChangeMinor = "net_cash_change_minor", endingMinor = "ending_minor", firstShortfallDate = "first_shortfall_date"
     }
 }
@@ -119,8 +127,11 @@ public struct FinancialPlanProjection: Decodable, Sendable {
     public let coverage: String
     public let hasExpectations: Bool
     public let budgets: [FinancialBudgetProgress]
+    public let goals: [FinancialGoalProgress]?
+    public let goalPools: [FinancialGoalPool]?
     enum CodingKeys: String, CodingKey {
-        case home, selection, accounts, expectations, occurrences, currencies, coverage, budgets
+        case home, selection, accounts, expectations, occurrences, currencies, coverage, budgets, goals
+        case goalPools = "goal_pools"
         case startDate = "start_date", endDate = "end_date", hasExpectations = "has_expectations"
     }
 }
@@ -188,6 +199,12 @@ public struct FinancialPlanFulfillmentPreview: Decodable, Sendable {
 }
 
 public enum FinancialPlanOperation: Codable, Equatable, Sendable {
+    case createGoal
+    case editGoal(id: UUID, version: Int)
+    case allocateGoals
+    case linkGoal(id: UUID, version: Int)
+    case recordGoal(id: UUID, version: Int)
+    case releaseGoal(id: UUID, claimId: UUID, version: Int)
     case createExpectation
     case createBudget
     case editBudget(id: UUID, version: Int)
@@ -198,6 +215,12 @@ public enum FinancialPlanOperation: Codable, Equatable, Sendable {
 
     public var path: String {
         switch self {
+        case .createGoal: "/goals"
+        case .editGoal(let id, _): "/goals/" + id.uuidString
+        case .allocateGoals: "/goals/allocations"
+        case .linkGoal(let id, _): "/goals/" + id.uuidString + "/contributions/link"
+        case .recordGoal(let id, _): "/goals/" + id.uuidString + "/contributions"
+        case .releaseGoal(let id, let claimId, _): "/goals/" + id.uuidString + "/contributions/" + claimId.uuidString + "/release"
         case .createBudget: "/budgets"
         case .editBudget(let id, _): "/budgets/" + id.uuidString
         case .createExpectation: "/expectations"
@@ -207,8 +230,11 @@ public enum FinancialPlanOperation: Codable, Equatable, Sendable {
         case .link(let id, _): "/occurrences/" + id + "/link"
         }
     }
+    public var recordsActivity: Bool {
+        switch self { case .fulfill, .recordGoal: true; default: false }
+    }
     public var method: String {
-        switch self { case .editExpectation, .editBudget: "PATCH"; case .selection: "PUT"; default: "POST" }
+        switch self { case .editExpectation, .editBudget, .editGoal: "PATCH"; case .selection, .allocateGoals: "PUT"; default: "POST" }
     }
 }
 
