@@ -24,10 +24,18 @@ production data, paid providers, signing changes or phone installation.
 including savings #755/#756. **Recovery branch:** `codex/connected-debt-plans`.
 **Delivery checkout:**
 `/Users/garces/.codex/worktrees/connected-debt-plans/private-alpha-next`.
-**Current state:** policy recovery is complete and implementation is starting.
-The inherited provider-free baseline has 99 passes. Its 75 Postgres variants
-were skipped because this lane's isolated database was not yet configured.
-These results do not prove the new debt journey.
+**Current state:** backend/API/database acceptance is locally verified; native
+integration is in progress. Delivery commits `c4020da5d` and `74ad83758` connect
+payment truth and repair the shared Home activity type. The independent real
+HTTP/Postgres journey covers partial/extra payments, corrections, dated returns,
+card and loan types, unknown/currency isolation, budgets/savings, archive/restore,
+owner and stale guards, reconciliation, explicit payoff models and a committed
+response-loss retry. Evidence and retained restart instructions live in
+[connected-debt-plans](../reports/evidence/connected-debt-plans/README.md).
+Native demonstration, applicable CI and fresh independent review remain pending.
+The earlier provider-free baseline had 99 passes/75 Postgres skips; it is not
+claimed as proof of the new journey. GitHub CLI is the publication fallback
+because Origin CLI is unavailable.
 
 ### Approved money rule and shared owners
 
@@ -57,6 +65,44 @@ fresh reviewer do not write implementation. No competing board is introduced.
 | Archive, restore and reopen | Plan lifecycle, native journals and origins | Same owner: debt lifecycle and durable context | Stable definition and occurrence identities | Relaunch, lost response, exact retry and stale edit |
 | Find and return through Search | Typed financial Search and existing detail navigation | Same owner: debt hit and owning detail | Canonical debt reads | Query, filters and scroll survive; edits refresh results |
 | See Accounts, Plan and Home agree | Shared forecast, budgets and savings support | Same owner: debt movements and concise summaries | Recording and one Plan snapshot | Partial, missed, extra, cleared/reopened debt; budget and goal regressions |
+
+### Chosen implementation shape
+
+Two bounded readers compared a single canonical payment with a parent aggregate
+of separate principal and cost entries. A fresh judge favored the single activity
+(25/30 versus 18/30). The captain selected it because every existing reader can
+keep using the same identity, receipt, revision and account-leg ownership.
+Recording extends its paired activity to explicit unequal loan movements and
+one derived spending contribution. Planning extends its existing definition,
+claims and repeatable-read snapshot. No new ledger or receipt owner is added.
+
+An actual returned payment is a new dated inverse activity linked to the original
+payment. The original and its original-period costs remain. Explicit component
+limits prevent returning principal, interest or fees twice. Correcting an
+erroneous entry remains its existing revision operation. Partial debt payments
+leave the unpaid occurrence amount outstanding; extras do not automatically
+fulfill future dates. Existing bill and savings occurrence behavior is preserved.
+
+The native payment editor is shared by account-first recording and Plan-origin
+fulfillment. Optional payoff estimates reuse compatible local calculations with
+stated terms and visible assumptions. Missing terms yield no invented estimate.
+The alternative's hidden child activities and separate lifecycle/receipt stores
+were rejected. Additional future-payment split fields are unnecessary for the
+short initial flow.
+
+**Owners:** `debt_implementation` is the sole code/contract writer on
+`codex/connected-debt-plans-core`; its commits enter the delivery branch in
+verified units. This includes the existing `ios/Packages/ArgusSession` types,
+transport and journal. The captain owns acceptance scripts, runtime, evidence,
+manifest and publication. Design readers/judge have completed and stopped.
+
+**Isolated local allocation:** API 59200, Supabase 59201, Postgres 59202,
+synthetic CAPTCHA 59205, optional response-loss proxy 59212 and mirror 59213.
+The two synthetic users are retained privately in the ignored allocation folder.
+Reuse idle **Argus Foundation Compact** simulator
+`1A90F684-345F-465C-AA50-6A5298F34156` with separate bundle
+`local.argus.debt-demo`. Its prior foundation bundle/data stays preserved. No
+additional simulator is created. All earlier demo allocations stay untouched.
 
 ### Delivery sequence and acceptance
 
