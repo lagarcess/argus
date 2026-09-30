@@ -22,7 +22,8 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["goal.record"])
         chooseMoneyAccount("loop.source", account: source)
         replaceMoneyField("loop.amount", with: "200")
-        dismissMoneyKeyboard(); confirmMoney()
+        dismissMoneyKeyboard(); reviewMoney(); tapVisible(app.buttons["loop.confirm"])
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
         assertGoal("DOP 800.00")
         capture("goal-recorded-contribution-once")
         let contribution = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.activity.' AND identifier != 'goal.activity.back'")).firstMatch
