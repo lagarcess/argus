@@ -137,13 +137,15 @@ These steps live here instead of a competing task board.
 - [x] Resolve the financial policy gate and bind `budgets_implementation` as the
   sole contract, backend, native and test writer in its existing exclusive checkout.
 - [x] Delegate code-writing to `budgets_implementation` in its exclusive worktree.
-- [ ] Verify on the matching surface with real API/Postgres and simulator.
-- [ ] Sequence verified commits. Skip rebasing published/evidenced branches;
+- [x] Verify on the matching surface with real API/Postgres and simulator.
+  The final recorded rerun revalidates the contributor amount layout fix.
+- [x] Sequence verified commits. Skip rebasing published/evidenced branches;
   repository one-way integration merges override Feature's rebase step.
-- [ ] If the design is contested, `interrogate` before shipping. Skip another
-  architecture round unless implementation demonstrates a disputed contract.
-- [ ] Run Opening a PR and the scoped review/CI loop.
-- [ ] Re-fetch integration, audit semantic overlap, reconcile one-way if needed,
+- [x] Design follows the locked reference. No disputed contract requires another
+  architecture round; the demonstrated contributor clipping received a focused fix.
+- [x] Publish [PR #753](https://github.com/lagarcess/argus/pull/753). Full independent
+  review and affected fixes are clean; terminal CI belongs to its exact-head audit.
+- [x] Re-fetch integration, audit semantic overlap, reconcile one-way if needed,
   rerun affected checks and modularity budgets, then report merge readiness.
 
 | Decision checkpoint | Evidence | State |
@@ -162,13 +164,37 @@ The [budget environment restart guide](../reports/evidence/connected-budgets/REA
 preserves the clickable mirror and synthetic records. The lane-owned local stack
 is running with retained records. Backend and native implementation are integrated;
 236 focused money/Plan/Search/budget checks pass against DB59002 with zero skips.
-The independent full-diff review covered `538626c583c59aa5baa6c0fafb24aa95b779e893`;
-two bounded fixes passed affected-delta review at
-`d98803bad79c8d7cca38d77cc75aa878519b4a1f`. Archive tolerates changed account
-eligibility while restoration validates scope; contributor restoration waits for
-loaded rows. The captain is exercising native acceptance, fault recovery and
-recording before a merge-ready verdict. CI and terminal publication evidence
-remain pending.
+The full [independent review](../reports/evidence/connected-budgets/review-proof.json)
+covered `538626c583c59aa5baa6c0fafb24aa95b779e893`; confirmed findings were fixed
+at their shared causes and subsequent review covered affected deltas only. The
+source review is clean through `ced256196c04eae6cfcd18f456f3dc00017315c7`.
+Archive tolerates changed account eligibility while restoration validates scope;
+contributor restoration waits for loaded rows. Native detail controls retain their
+identifiers, contributor amounts retain all digits, and test locators address the
+visible destination. The founder-approved fresh independent reviewer substitutes
+for unavailable Codex capacity; no Codex-clean claim or paid review is made.
+
+The complete native connected journey passes, including spending/correction/refund,
+contributor position, budget edit/archive/restore, live Search/back, reopen and
+Spanish presentation. The committed-response-loss test also passes: relaunch and
+retry recover one canonical budget from the saved command. Durable images, the
+short recording and [native proof](../reports/evidence/connected-budgets/native-proof.json)
+record the source and scope. The recorded run revalidates the last amount
+layout fix and financial lifecycle. Its preserved-query test setup was corrected;
+the affected Home/Search/reopen/Spanish test then passed at `ced256196`. The ordinary demo uses direct API59000 after proxy acceptance.
+[PR #753](https://github.com/lagarcess/argus/pull/753) retains publication,
+applicable CI and the terminal exact-head merge-readiness audit. The first CI
+attempt identified a stale generated OpenAPI artifact; regenerating it from the
+canonical API passed all 23 compatibility checks. A merge-ready verdict requires
+green applicable checks and zero unresolved findings at the published head.
+
+Original base and freshly fetched integration both remain
+`9f51912198c2c77e239f670a2b3f78da2942afed`; no reconciliation merge or semantic
+overlap is required. The would-be merged tree passes modularity budgets. The PR
+terminal audit records final fetch, exact head, retained evidence and CI state.
+Personal budgets are locally assembled; physical-phone internet delivery remains
+pending. The inherited full-owner snapshot is still the scaling limit. Other
+Plan/MVEE outcomes remain in the coverage map; no additional slice starts here.
 
 The [real API/database budget proof](../reports/evidence/connected-budgets/budget-api-proof.json)
 records independently specified 120 → 200 → 180 → 155 spending, a limit edit to
@@ -1289,7 +1315,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
-landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are the only active implementation assignment. Proposed owners
+landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are locally verified in PR #753; its terminal review/CI audit owns the merge-ready verdict. No further implementation slice is assigned. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -1301,7 +1327,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | Connected personal spending budgets are active above; savings goals, debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 connects personal monthly budgets with actual progress, contributors and Search; savings goals, debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
