@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** [connected Search on iPhone](#pr-751-integration-landing) is landed through [PR #751](https://github.com/lagarcess/argus/pull/751), with its locally verified demonstration preserved. No next slice is authorized. Connected Plan/Home (#749/#750) and personal money recording (#747/#748) are landed. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** [connected personal spending budgets](#connected-personal-spending-budgets-lane) are authorized through a merge-ready local iPhone demonstration. Financial policy confirmation is pending; independent environment preparation is progressing. Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,143 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected personal spending budgets lane
+
+**Founder authorization, September 29, 2026:** deliver personal spending budgets
+through implementation, real local API/Postgres and iPhone simulator acceptance,
+review fixes and a merge-ready PR. Commits, publication and existing automatic PR
+previews are authorized. Merge and deployment require separate approval. No
+hosted changes, production data, paid providers, signing or phone installation.
+Household, goals, debt plans, imports, voice, runtime redesign, web, billing and
+analytics are excluded. Those MVEE outcomes remain in the coverage map.
+
+**Integration base:** freshly fetched
+`9f51912198c2c77e239f670a2b3f78da2942afed`, including #751 and #752.
+**Delivery branch:** `codex/connected-budgets`.
+**Delivery checkout:**
+`/Users/garces/.codex/worktrees/connected-budgets/private-alpha-next`.
+**Isolation:** API 59000, Supabase 59001, Postgres 59002, synthetic CAPTCHA
+59005; dedicated iPhone 17e simulator
+`CC81C737-2F0A-48EA-961C-D9ECFFACA219`, named `Argus Connected Budgets`.
+The optional fault proxy and mirror use 59012 and 59013. All earlier demos,
+synthetic records, checkouts and services remain intact. Ports 58700-58749 and
+the separate physical-phone environment are forbidden. Global simulator-tool
+settings are shared and must not change.
+
+### Budget contract and policy gate
+
+The [MVEE Plan rules][mvee-plan] own the journey. Expenses minus received refunds
+are actual spending; transfers and card payments are zero spending. A budget
+limit never creates a forecast cash movement. Actual amounts remain full recorded
+transaction amounts; account-share position attribution is a different result.
+Negative net spending is valid. Corrections re-evaluate current activity, while a
+refund never reopens a fulfilled bill. Existing Recording owns refund category,
+link validity, caps and currency rules. No editable spending total is introduced.
+
+The locked prototype demonstrates a calendar-month category/currency budget,
+no rollover, contributing-entry navigation, create/edit/confirmed removal and
+prevention of duplicate buckets. Its `JOURNEY-EXPANSION.md` explicitly leaves
+production period/time-zone, account coverage, uncategorized and retention
+contracts open. These are not approved product deferrals.
+
+**One material product question is pending.** The proposed policy is a calendar
+month in the saved Plan reporting zone, one currency, explicit selected accounts
+and categories including an explicit uncategorized option, and no rollover.
+Linked refunds reduce matching spending in the month received using the current
+original purchase's account/category even when received in a different account.
+Unlinked refunds use their recorded account/category. The founder can instead
+choose all matching accounts or different rules. No dependent rules are coded
+before the answer. The saved zone and resolved interval must remain visible;
+changing that shared zone re-evaluates month boundaries rather than changing
+recorded timestamps.
+
+Removal should reuse Plan's reversible archive/restore command pattern, retaining
+the definition ID, activity and receipts. This is a proposed technical lifecycle,
+not a new permanent-deletion or retention promise. Exact duplicate active scopes
+need one storage guard as well as domain validation; restoration must report a
+conflict instead of silently replacing an existing definition.
+
+**Named data shapes:** `BudgetDefinition` stores stable ID, owner, version,
+name, limit in integer minor units, currency, explicit account/category scope,
+month and lifecycle. `BudgetProgress` derives the visible interval, purchases,
+refunds, net spent, remaining, over-budget amount and contributing logical
+activity IDs from current canonical records. None of those totals is persisted.
+Budget definitions belong to Planning; actual spending rules belong to Recording.
+
+| Architecture candidate | Decision and reason |
+| --- | --- |
+| Extend the existing Plan snapshot | Selected. Definitions, accounts, activity, Home and Plan share the existing repeatable-read transaction and command receipts. One Recording-owned spending reducer feeds Home and budget progress. |
+| Add budget-specific indexed activity queries | Not selected for this implementation. No measured scale requirement justifies a second current-activity query and consistency boundary. The existing full-owner snapshot limitation remains explicit. |
+
+Budget create/edit/lifecycle commands extend the existing scoped idempotency and
+version-check owner. One additive owner-scoped definition table has registered
+owner read isolation and service-only writes. Detail totals and contributing rows
+come from the same matched collection. Existing financial activity detail and
+correction screens retain money-write ownership. Search receives a typed budget
+hit and live budget destination, using its existing origin/back and refresh rules.
+API and data contracts change in the same implementation PR.
+
+### Budget ownership and throughput
+
+- **Blocking first steps.** Recover canon and locked design, resolve the one
+  material policy question, then commit the bounded contract before code.
+- **Independent workstreams.** Backend/native scouts and architecture synthesis
+  are read-only. The captain prepares isolated services, simulator and acceptance.
+- **Shared mutable state.** One implementation writer owns budget backend,
+  native connections and tests in an exclusive branch/checkout. The captain owns
+  the separate delivery/demo checkout and this manifest. No concurrent writer or
+  suite runs in the implementation checkout.
+- **Smallest safe decomposition.** One coherent owner keeps budget inclusion,
+  summaries, detail and Search consistent. The captain verifies the assembled
+  result after handoff. One fresh independent reviewer replaces unavailable
+  Codex review capacity; subsequent review covers affected fixes only.
+
+`budget_financial_scout`, `budget_native_scout` and `budget_architecture_judge`
+completed read-only reports at the integration base and relinquished ownership.
+Implementation ownership is bound only after the policy gate. The captain owns
+scope, financial contracts, integration, acceptance, publication and readiness.
+All agents have bounded outputs and are stopped after their handoffs.
+
+### Budget acceptance and execution checklist
+
+| User outcome | Inherited capability | Connected work | Observable acceptance |
+| --- | --- | --- | --- |
+| Create, inspect and edit a scoped monthly limit | Plan tabs, account/category catalog and versioned writes | Durable definition, visible scope/interval and canonical progress | Existing eligible expense 120 gives spent 120 and remaining 30 for a limit of 150; definition writes leave balances unchanged. |
+| Spend, correct and refund once | Canonical recording/corrections/refunds | Shared spending reduction in Plan, Home and detail | Add 80 gives spent 200/over 50; correct it to 60 gives 180/over 30; refund 25 gives 155/over 5. Independently specified expectations, not reducer-generated values. |
+| Exclude other activity and preserve cash truth | Transfer/payment, currency and forecast contracts | Scope and interval filtering | Transfers, card payments and other currencies/accounts/categories add zero; card purchases count; limit creates no forecast movement; unknown balances remain unknown. |
+| Inspect contributors and return | Existing activity detail/correction and Search origin | Budget-to-activity/back and budget Search hit | Correct a contributing entry through its real screen; return to refreshed progress, same budget and preserved list/query/scroll context. |
+| Reopen and recover writes | Owner-scoped write journal and receipts | Budget commands and persisted navigation | Relaunch retains definitions/current progress; interrupted committed responses replay once; stale versions fail without mutation; owner B cannot read or write owner A's budget. |
+| Understand the same result in both languages | Native design, currency formatting and localization | Budget copy/controls and error states | English and Spanish screenshots and a short connected recording; month/zone boundaries, received-month negative refund and over-budget presentation verified. |
+
+The bespoke delivery workflow follows poteto-mode Feature and figure-it-out.
+These steps live here instead of a competing task board.
+
+- [x] Read the poteto-mode principles and frame the completion predicate.
+- [x] `how` over the affected subsystem.
+- [x] `architect` for parallel design exploration.
+- [x] Write the throughput checkpoint as four todo items.
+- [ ] Resolve the financial policy gate and bind the implementation owner.
+- [ ] Delegate code-writing to a subagent in its exclusive worktree.
+- [ ] Verify on the matching surface with real API/Postgres and simulator.
+- [ ] Sequence verified commits. Skip rebasing published/evidenced branches;
+  repository one-way integration merges override Feature's rebase step.
+- [ ] If the design is contested, `interrogate` before shipping. Skip another
+  architecture round unless implementation demonstrates a disputed contract.
+- [ ] Run Opening a PR and the scoped review/CI loop.
+- [ ] Re-fetch integration, audit semantic overlap, reconcile one-way if needed,
+  rerun affected checks and modularity budgets, then report merge readiness.
+
+| Decision checkpoint | Evidence | State |
+| --- | --- | --- |
+| Preserve integration and existing demos | Fresh integration `9f51912198c2c77e239f670a2b3f78da2942afed`; prior demo guides below | New 590xx allocation and dedicated simulator created; no prior environment changed. |
+| Keep one financial owner | Existing Recording/Planning contracts and the three bounded scout reports | Snapshot architecture selected; policy answer pending. |
+| Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Native sign-in/relaunch acceptance is running, not yet verified. |
+
+Completion requires the full assigned journey, durable visual/interaction evidence,
+runnable restart instructions, green applicable CI, clean independent scoped review
+and zero unresolved findings. Simulator verification is local delivery only;
+physical-phone internet delivery remains pending under its separate owner.
 
 ## PR #751 integration landing
 
@@ -1122,8 +1259,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
-landed #747 personal recording journey. This local batch is complete; its named
-owners and evidence are recorded above. The connected Plan/Home lane above is active; no other MVEE batch is active. Proposed owners
+landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are the only active implementation assignment. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -1135,7 +1271,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | Budgets, savings goals, debt-plan lifecycles and their actual/projection adapters; shared variants and physical-phone proof | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | Connected personal spending budgets are active above; savings goals, debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
