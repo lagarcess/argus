@@ -143,7 +143,7 @@ These steps live here instead of a competing task board.
 | --- | --- | --- |
 | Preserve integration and existing demos | Fresh integration `9f51912198c2c77e239f670a2b3f78da2942afed`; prior demo guides below | New 590xx allocation and dedicated simulator created; no prior environment changed. |
 | Keep one financial owner | Existing Recording/Planning contracts and the three bounded scout reports | Snapshot architecture selected; policy answer pending. |
-| Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Inherited registered sign-in, relaunch, sign-out and signed-out relaunch passed on the dedicated simulator against real local Auth/API/Postgres. Result `ui-20260930T001256Z.xcresult` is ignored local diagnostics. Budget implementation has not started. |
+| Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Inherited registered sign-in, relaunch, sign-out and signed-out relaunch passed on the dedicated simulator against real local Auth/API/Postgres. Result `ui-20260930T001256Z.xcresult` is ignored local diagnostics. The inherited recording, Plan and Search baseline also passed 203 tests with zero skips against this lane's disposable Postgres. Budget implementation has not started. |
 
 Completion requires the full assigned journey, durable visual/interaction evidence,
 runnable restart instructions, green applicable CI, clean independent scoped review
