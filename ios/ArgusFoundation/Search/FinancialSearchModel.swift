@@ -170,6 +170,8 @@ final class FinancialSearchModel: ObservableObject {
                 await accounts.load()
                 guard detailRequest == ticket, self.identity == identity else { return }
                 destination = .activity(activity.activityId)
+            case .budget(let budget):
+                await loop.budgets.open(budget.id, origin: .search)
             case .expectation(let expectation):
                 let live = try await controller.financialExpectation(expectation.id, expectedIdentity: identity)
                 guard detailRequest == ticket, self.identity == identity else { return }
