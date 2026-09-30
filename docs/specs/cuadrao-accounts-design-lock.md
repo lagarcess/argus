@@ -94,7 +94,7 @@ the Spanish labels are Cuadrao's own approved wording, not attributed translatio
 
 ## Home customization — September 30, 2026
 
-Founder approved Personalizar Inicio → drag whole sections → Listo. Panorama,
+Founder approved Ordenar Inicio → drag whole sections → Listo. Panorama,
 Próximamente, Cuentas and Movimientos can be reordered; logo, space selector and
 menu bar remain fixed. The starting order is a default, not a user restriction.
 Account long press continues to open account actions.
@@ -104,3 +104,6 @@ with Cancel, Done and Reset. A saved local order applies across spaces and survi
 relaunch. Empty sections retain their place without adding empty feed content.
 [Implementation evidence](../reports/evidence/cuadrao-native-design/home-layout/README.md).
 This is a presentation preference, not a new financial backend flow.
+
+Label refinement: **Ordenar Inicio** / **Reorder Home** replaces Personalizar Inicio /
+Customize Home. This control changes section order only.

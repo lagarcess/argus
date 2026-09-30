@@ -67,7 +67,7 @@ struct CuadraoHomeLayoutSheet: View {
                         .frame(minHeight: 44)
                 }
             }.environment(\.editMode, .constant(.active))
-                .navigationTitle(spanish ? "Personalizar Inicio" : "Customize Home")
+                .navigationTitle(spanish ? "Ordenar Inicio" : "Reorder Home")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {

@@ -35,7 +35,7 @@ struct CuadraoHomeCanvas: View {
                             homeSection(section)
                         }
                         Button { ordering = false; sheet = .customize } label: {
-                            Label(spanish ? "Personalizar Inicio" : "Customize Home", systemImage: "slider.horizontal.3")
+                            Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
                                 .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
                         }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
                     }
