@@ -72,3 +72,22 @@ The existing account interactions apply within the selected context.
 [Native implementation and evidence](../reports/evidence/cuadrao-native-design/spaces/README.md)
 records the scoped sample-data behavior, design references and remaining limits.
 Household authorization and financial contracts are not implemented by this work.
+
+## Home feed language — September 30, 2026
+
+Founder-approved after reviewing the feed labels:
+
+- **Movimientos** (English: **Activity**) labels recorded money changes: spending,
+  income, transfers, payments, refunds and adjustments. Do not rename this money
+  list to Transacciones or Actividades.
+- **Próximamente** (English: **Coming up**) labels upcoming commitments and expected
+  items. Keep these separate from recorded movements; intentions are not actuals.
+- **Actividad** is suitable for a future mixed event feed, if separately designed;
+  this decision does not create that feed or add invitations/app updates to Movimientos.
+- This locks the labels and content distinction, not the remaining Home layout,
+  section order or financial implementation.
+
+Reference: [Wise's Transactions list](https://mobbin.com/screens/47d57013-eb4e-4b53-bda0-f1d83c5dd280)
+contains money entries; [Monzo's All activity feed](https://mobbin.com/screens/8f921563-4da7-4e2b-98ea-e3e5e47b9229)
+includes payments and nonfinancial events. The inspected captures were English;
+the Spanish labels are Cuadrao's own approved wording, not attributed translations.
