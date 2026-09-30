@@ -118,9 +118,10 @@ def edit(
         item["name"] = body.name.strip()
     if body.target is not None:
         item["target_minor"] = model.positive(body.target, item["currency"])
-    for key in ("target_date", "archived"):
-        if key in body.model_fields_set:
-            item[key] = body.model_dump(mode="json")[key]
+    if "target_date" in body.model_fields_set:
+        item["target_date"] = body.model_dump(mode="json")["target_date"]
+    if body.archived is not None:
+        item["archived"] = body.archived
     if body.model_fields_set & {"destination_account_id", "contribution_plan"}:
         cutover = body.effective_date or earliest(item, state, today)
         if cutover < earliest(item, state, today):
