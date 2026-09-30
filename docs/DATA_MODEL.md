@@ -2651,7 +2651,8 @@ versions and receipt commit atomically. Metadata/opening/check writers stay acco
 none acquires owner lock after account lock. Reads use repeatable-read snapshots.
 Money rules stay in domain code. Owner serialization protects refund/purchase races.
 Group/membership SELECT RLS is registered-owner only, writes service-only; receipts
-have no client grants. Home derives monthly totals from current primary legs.
+have no client grants. Home derives monthly totals from current logical activities
+through the shared Recording spending reducer.
 
 financial_activity_revisions is only the owner-qualified group revision identity;
 it stores no duplicate money facts. Group current revision, memberships and receipts
@@ -2693,10 +2694,13 @@ without client grants. Budget commands use the existing owner advisory lock,
 replay-before-version checks, account locks, and atomic transaction. Plan, Home,
 budget detail, and Search read the same repeatable-read owner snapshot.
 
-Recording's spending reducer derives full-amount purchases and received refunds
-from current logical activity. Linked refunds inherit scope from the current
-original purchase, while their received timestamp owns period membership.
-Unlinked refunds use their recorded scope. Negative net spending is valid.
+Recording's spending reducer derives full expense/refund amounts and loan interest/fee
+costs from current logical activity. Principal, transfers and card payments contribute
+zero. Linked refunds inherit scope from the current original purchase; linked payment
+returns retain the original cost scope. Their actual received timestamp owns period
+membership. Unlinked refunds use their recorded scope. Negative net spending is valid.
+Home's compatibility recorded_spending_minor field remains lifetime gross active
+expense activity only; monthly gross/net spending includes canonical loan costs.
 Archived accounts remain explicit scope members. Definition changes never write
 account records, cash forecasts, or bill-fulfillment links.
 
@@ -2728,3 +2732,5 @@ repeatable-read snapshots own goal writes/reads and atomic contribution posting.
 Loan source record revisions retain total movement and `details.interest_minor`. Destination movement retains principal, including zero principal. Fees derive losslessly as source total minus principal minus interest through the single Recording payment decoder. There is no second payment ledger. Real `payment_reversal` activity revisions retain inverse signed cash/debt movements, the explicit returned split, and generated owner-qualified original activity/revision FKs. Both original and dated return remain canonical activities. Paired corrections append revisions atomically and preserve former observation coverage. Current linked caps and account/date/category guards prevent contradictory corrections.
 
 Recording position and spending remain the actual owners. Loan interest and fees contribute once, scoped to funding account and selected/default existing category. Return costs reduce spending in the return period; principal and cards do not count. Debt progress, forecast remainders, recorded clear/reopening and savings backing concerns derive from current canonical revisions. Conditional payoff remains an explicit monthly model, separate from actual position and scheduled cash commitments.
+
+Debt-plan archive preserves canonical payments and claimed occurrence snapshots. The shared occurrence projection marks retained archived intentions `plan_archived`, suppressing only residual forecast movement. Restore derives the same residual from current canonical activity.

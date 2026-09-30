@@ -71,7 +71,9 @@ def occurrence(
         "activity_revision": linked[0]["activity"]["revision"]
         if len(linked) == 1 and linked[0]["activity"]
         else None,
-        "exclusion_reason": "link_needs_review"
+        "exclusion_reason": "plan_archived"
+        if state["debts"][item["debt_plan_id"]]["archived"]
+        else "link_needs_review"
         if invalid
         else "account_not_selected"
         if item["source_account_id"] not in state["selection"]["account_ids"]

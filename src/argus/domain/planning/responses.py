@@ -66,6 +66,7 @@ class Occurrence(BaseModel):
             "link_needs_review",
             "account_changed",
             "recorded_clear",
+            "plan_archived",
         ]
         | None
     )

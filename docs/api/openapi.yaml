@@ -9506,6 +9506,7 @@ components:
             - link_needs_review
             - account_changed
             - recorded_clear
+            - plan_archived
           - type: 'null'
         overdue:
           type: boolean

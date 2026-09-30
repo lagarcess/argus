@@ -30,7 +30,7 @@ def save(scene, **values):
     return money.write(user_id=scene[1], request=request, idempotency_key=str(uuid4()))
 
 
-def setup(scene):
+def setup(scene, *, due=None, cadence="monthly"):
     cash = account(scene, amount="2000")
     loan = account(scene, "other_debt", amount="1000")
     debts = DebtService(PlanService(scene[0]))
@@ -41,7 +41,7 @@ def setup(scene):
             name="Loan",
             source_account_id=cash,
             amount="500",
-            schedule={"cadence": "monthly", "start_date": NOW.date()},
+            schedule={"cadence": cadence, "start_date": due or NOW.date()},
         ),
         str(uuid4()),
     )["debt"]
@@ -421,3 +421,56 @@ def test_missed_debt_occurrence_uses_selected_timezone_and_only_partial_remainde
     row = next(r for r in debts.planner.read(scene[1])["occurrences"] if r["id"] == oid)
     assert row["overdue"] and row["projection_date"] == "2026-09-21"
     assert row["remaining_minor"] == 15000 and row["paid_minor"] == 35000
+
+
+def test_archive_removes_claimed_future_remainder_and_restore_recovers_it(scene):
+    from argus.domain.planning.schemas import SelectionWrite
+
+    due = NOW.date() + timedelta(days=10)
+    debts, cash, loan, progress = setup(scene, due=due, cadence="once")
+    oid = progress["occurrences"][0]["id"]
+    saved = record(scene, debts, progress, cash, loan, "100", "80", "15", "5", oid)
+    debts.planner.selection(
+        scene[1],
+        SelectionWrite(
+            expected_version=0, account_ids=[cash], time_zone="America/Santo_Domingo"
+        ),
+        str(uuid4()),
+    )
+
+    def read():
+        projection = debts.planner.read(scene[1], end=due)
+        row = next(r for r in projection["occurrences"] if r["id"] == oid)
+        return projection["currencies"][0], row
+
+    before, row = read()
+    assert before["starting_minor"] == "190000" and before["ending_minor"] == "150000"
+    assert before["net_cash_change_minor"] == "-40000"
+    assert row["paid_minor"] == 10000 and row["remaining_minor"] == 40000
+    archived = debts.edit(
+        scene[1],
+        progress["debt"]["id"],
+        DebtEdit(expected_version=saved["debt"]["debt"]["version"], archived=True),
+        str(uuid4()),
+    )["debt"]
+    after, retained = read()
+    assert after["starting_minor"] == "190000" and after["ending_minor"] == "190000"
+    assert after["net_cash_change_minor"] == "0" and after["expected_bills_minor"] == "0"
+    assert retained["exclusion_reason"] == "plan_archived"
+    assert retained["paid_minor"] == 10000 and retained["remaining_minor"] == 40000
+    assert archived["balance"]["amount_minor"] == -92000
+    assert archived["payments"][0]["activity"]["revision"] == 1
+    assert archived["occurrences"][0]["exclusion_reason"] == "plan_archived"
+    debts.edit(
+        scene[1],
+        progress["debt"]["id"],
+        DebtEdit(expected_version=archived["debt"]["version"], archived=False),
+        str(uuid4()),
+    )
+    restored, restored_row = read()
+    assert (
+        restored["ending_minor"] == "150000"
+        and restored["net_cash_change_minor"] == "-40000"
+    )
+    assert restored_row["id"] == oid and restored_row["exclusion_reason"] is None
+    assert restored_row["activity_id"] == saved["activity"]["activity_id"]
