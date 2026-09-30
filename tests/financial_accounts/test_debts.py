@@ -314,6 +314,15 @@ def test_explicit_monthly_model_uses_recorded_debt_without_clearing_it(
         result["payoff_date"] == "2026-12-20" and result["total_interest_minor"] == "1525"
     )
     assert balance.amount_minor == -100000
+    from datetime import timedelta
+
+    assert (
+        payoff(item, balance, [], NOW.date() + timedelta(days=1), account_type) == result
+    )
+    assert (
+        payoff(item, balance, [], NOW.date() + timedelta(days=31), account_type)["state"]
+        == "unavailable"
+    )
     item["assumptions"] = None
     assert (
         payoff(item, balance, [], NOW.date(), account_type)["reason"] == "terms_missing"

@@ -118,7 +118,7 @@ def payoff(
     if (
         not future
         or expected != future[0]
-        or boundary < today
+        or boundary > today
         or balance.as_of is None
         or balance.as_of.date() != boundary
     ):
