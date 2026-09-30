@@ -152,16 +152,30 @@ These steps live here instead of a competing task board.
 | Keep one financial owner | Existing Recording/Planning contracts and the three bounded scout reports | Snapshot architecture selected; original policy approved by the founder. Contract commit `b60e416d3` precedes implementation. |
 | Resume preserved local acceptance | Existing 590xx allocation and the [restart guide](../reports/evidence/connected-budgets/README.md) | Restored without reset or seed. Additive budget migration `278d94a8b` applied only to DB59002; all 15 baseline API readbacks still pass. The captain owns independent API acceptance; the sole writer owns backend/native/tests. |
 | Continue independent acceptance preparation | [Fixture API/database proof](../reports/evidence/connected-budgets/fixture-api-proof.json) and [retained Home](../reports/evidence/connected-budgets/pre-implementation-home.png) | Five accounts/eight canonical activities remain after two setup runs; 15 real API readbacks and native Home reopening pass. One unknown balance remains unknown; DOP spending 140 and USD spending 50 stay separate. No budget progress is claimed. |
-| Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Inherited registered sign-in, relaunch, sign-out and signed-out relaunch passed on the dedicated simulator against real local Auth/API/Postgres. Result `ui-20260930T001256Z.xcresult` is ignored local diagnostics. The inherited recording, Plan and Search baseline also passed 203 tests with zero skips against this lane's disposable Postgres. Budget implementation has not started. |
+| Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Inherited registered sign-in, relaunch, sign-out and signed-out relaunch passed on the dedicated simulator against real local Auth/API/Postgres. Result `ui-20260930T001256Z.xcresult` is ignored local diagnostics. The inherited recording, Plan and Search baseline also passed 203 tests with zero skips against this lane's disposable Postgres. Budget implementation followed this inherited baseline; it is not budget acceptance. |
 
 Completion requires the full assigned journey, durable visual/interaction evidence,
 runnable restart instructions, green applicable CI, clean independent scoped review
 and zero unresolved findings. Simulator verification is local delivery only;
 physical-phone internet delivery remains pending under its separate owner.
 The [budget environment restart guide](../reports/evidence/connected-budgets/README.md)
-preserves the clickable mirror and synthetic records. Lane-owned services were
-stopped without deleting data and will restart for implementation acceptance. Budget implementation, connected acceptance, recording, review and CI
-remain incomplete. No budget PR has been opened.
+preserves the clickable mirror and synthetic records. The lane-owned local stack
+is running with retained records. Backend and native implementation are integrated;
+236 focused money/Plan/Search/budget checks pass against DB59002 with zero skips.
+The independent full-diff review covered `538626c583c59aa5baa6c0fafb24aa95b779e893`;
+two bounded fixes passed affected-delta review at
+`d98803bad79c8d7cca38d77cc75aa878519b4a1f`. Archive tolerates changed account
+eligibility while restoration validates scope; contributor restoration waits for
+loaded rows. The captain is exercising native acceptance, fault recovery and
+recording before a merge-ready verdict. CI and terminal publication evidence
+remain pending.
+
+The [real API/database budget proof](../reports/evidence/connected-budgets/budget-api-proof.json)
+records independently specified 120 → 200 → 180 → 155 spending, a limit edit to
+160, four canonical contributors, scope/currency isolation, owner rejection and
+accepted-response loss followed by one replay. Read-only SQL counts confirmed
+one definition/activity per command. This proves backend assembly, not native
+interaction or physical-phone delivery.
 
 ## PR #751 integration landing
 
