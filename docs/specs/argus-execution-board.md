@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** [connected personal savings goals](#connected-personal-savings-goals-lane) are assigned through local acceptance and merge readiness. The founder-approved allocation policy is implemented and the complete local native journey passes. [PR #755](https://github.com/lagarcess/argus/pull/755) owns current exact-head checks and the terminal readiness audit. No merge or deployment is authorized. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** [connected personal savings goals](#pr-755-integration-landing) are landed through [PR #755](https://github.com/lagarcess/argus/pull/755), with the locally verified native journey and runnable demonstration preserved. The founder authorized this merge and its bounded integration landing. No next slice or deployment is authorized. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,49 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## PR #755 integration landing
+
+The founder authorized merging #755 at its verified head, completing integration
+landing and the necessary bounded documentation PR, then verifying CI and
+local/remote parity. No deployment, hosted configuration change, next slice,
+signing or phone-environment action is authorized.
+
+- [PR #755](https://github.com/lagarcess/argus/pull/755) squash-merged at
+  **September 30, 2026, 11:32:38 a.m. America/Chicago** as
+  `dc48c074b457cfb461e128aee2dcc58f9db3a342`, from verified head
+  `f6dfd482a1e4dc802f0d64eba22bc91a4f01d48f` onto unchanged integration
+  `6a9d0338d2b2e7106877e0e5d1f9f5aaa70d67ec` (also the original base).
+  There is no intervening semantic overlap or reconciliation merge. The approved
+  head and integration merge trees are identical; canonical integration
+  fast-forwarded cleanly and merged-tree modularity passes.
+- The [terminal readiness audit](https://github.com/lagarcess/argus/pull/755#issuecomment-5906057156)
+  retains green applicable PR/push CI and smoke, clean fresh independent review
+  after the bounded lifecycle/harness fixes, and zero unresolved findings.
+  Four native journeys, 310 assembled financial/API/OpenAPI/Postgres passes,
+  recovery/localization evidence, 13 screenshots and the 62-second recording
+  remain valid across the identical merge tree. Landing changes documentation
+  only and does not repeat the accepted journey.
+- Exact merge [integration CI](https://github.com/lagarcess/argus/actions/runs/36744979395)
+  and [local smoke](https://github.com/lagarcess/argus/actions/runs/36744979517),
+  the checked documentation PR and final clean local/remote integration parity
+  are recorded in the merged PR's final landing comment after terminal checks.
+- There are no linked closing issues. Only this manifest and the integration
+  ledger need landing updates; API/data/OpenAPI contracts already landed with
+  the implementation. No current document needs archiving.
+- No new production environment variable or tracked-template change is needed.
+  The inherited `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` remains default-off in
+  `.env.example` and `render.yaml`. `ARGUS_TEST_GOAL_SUPPORTED` is a synthetic
+  native-test assertion input, not hosted configuration. The additive
+  `20260930170000_connected_savings_goals.sql` migration was verified locally
+  and by the existing automatic PR preview; landing applies no hosted migration.
+- The [savings demonstration and restart guide](../reports/evidence/connected-savings-goals/README.md)
+  remain on `codex/connected-savings-goals` in its unchanged delivery checkout,
+  using the dedicated simulator and 591xx services. Every prior demonstration,
+  synthetic record and the separate physical-phone environment (58700–58749)
+  remain preserved. Physical-iPhone internet delivery and the whole MVEE are
+  still incomplete; remaining debt-plan, shared and other journeys stay mapped
+  below. No further implementation is assigned.
 
 ## Connected personal savings goals lane
 
@@ -31,9 +74,9 @@ record/link, original correction, withdrawal/shared-shortfall recovery,
 lifecycle, Home/Plan/Search, relaunch and English/Spanish are connected.
 Implementation owner has relinquished a clean source tree. Independent review
 is clean after one confirmed lifecycle-input fix and one native harness fix.
-[PR #755](https://github.com/lagarcess/argus/pull/755) is published for review.
-Its check suite and terminal audit own current exact-head CI and readiness;
-the captain completes those gates without additional routine approval.
+[PR #755](https://github.com/lagarcess/argus/pull/755) is merged;
+[the landing checkpoint](#pr-755-integration-landing) owns current integration
+CI/parity. Its accepted source, review and demonstration remain preserved.
 All existing demos, synthetic data and phone resources are preserved. Ports
 58700–58749 and the phone owner's checkout, services and signing are forbidden.
 
@@ -175,9 +218,9 @@ records source/environment; no goal acceptance is claimed by those checks.
   independent grounded selection resolved the invariant without a contested design.
 - [x] Run Opening a PR and the approved independent review/fix loop.
   Exact-head applicable CI and the terminal audit are owned by
-  [PR #755](https://github.com/lagarcess/argus/pull/755), which remains open;
-  readiness requires green applicable checks and zero unresolved findings.
-  No merge or deployment.
+  [PR #755](https://github.com/lagarcess/argus/pull/755). Its terminal
+  readiness audit is green with zero unresolved findings; the authorized merge
+  is recorded in the landing checkpoint. No deployment or next slice.
 
 
 1. **Blocking first steps:** the founder policy is settled. Select the bounded
@@ -270,7 +313,8 @@ Retain it for the existing visual-polish work; there is no demonstrated money or
 navigation failure. The unfinished Cuadrao identity and broader native polish
 retain their existing owners; this lane did not rebrand or redesign navigation.
 Physical-iPhone internet proof, debt-plan lifecycles and all other MVEE work
-remain tracked below. No merge, deployment or next slice occurs in this lane.
+remain tracked below. The authorized merge and bounded documentation landing
+are recorded above; no deployment or next slice occurs.
 
 ## PR #753 integration landing
 
@@ -1626,7 +1670,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; connected personal savings goals pass local native/API/database acceptance with approved account-backed allocations, published as PR #755; debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
