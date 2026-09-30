@@ -48,13 +48,16 @@ final class FinancialDebtDraft: ObservableObject, Identifiable {
         let unchangedAnchor = old?.cadence == .monthly && old?.monthDays.isEmpty == true && old?.startDate == PlanPresentation.day(start) && firstDay == PlanPresentation.monthDay(PlanPresentation.day(start))
         let days = cadence == .twiceMonthly ? [firstDay, secondDay] : cadence == .monthly && !unchangedAnchor ? [firstDay] : []
         let schedule = FinancialPlanSchedule(cadence: cadence, startDate: PlanPresentation.day(start), endDate: hasEnd ? PlanPresentation.day(end) : nil, monthDays: days)
-        let changed = existing.map { $0.sourceAccountId != sourceID || $0.amount != exact || $0.schedule != schedule } ?? true
+        let sourceChanged = existing.map { $0.sourceAccountId != sourceID } ?? true
+        let amountChanged = existing.map { $0.amount != exact } ?? true
+        let scheduleChanged = existing.map { $0.schedule != schedule } ?? true
+        let changed = sourceChanged || amountChanged || scheduleChanged
         let assumptions: FinancialDebtAssumptions?
         if estimate, let rate = try AccountEntry.amount(rate, locale: locale), let fees = try AccountEntry.amount(fees, locale: locale) {
             assumptions = .init(annualRatePercent: rate, recurringFees: fees, firstPeriodStart: PlanPresentation.day(periodStart))
         } else { assumptions = nil }
-        return .init(name: name, debtAccountId: existing == nil ? debtAccountID : nil, sourceAccountId: changed ? sourceID : nil,
-                     amount: changed ? exact : nil, schedule: changed ? schedule : nil, assumptions: assumptions,
+        return .init(name: name, debtAccountId: existing == nil ? debtAccountID : nil, sourceAccountId: sourceChanged ? sourceID : nil,
+                     amount: amountChanged ? exact : nil, schedule: scheduleChanged ? schedule : nil, assumptions: assumptions,
                      expectedVersion: existing?.version, effectiveDate: existing != nil && changed ? PlanPresentation.day(effective) : nil)
     }
 }
