@@ -6,7 +6,15 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-ActivityKind = Literal["expense", "income", "transfer", "card_payment", "refund"]
+ActivityKind = Literal[
+    "expense",
+    "income",
+    "transfer",
+    "card_payment",
+    "refund",
+    "debt_payment",
+    "payment_reversal",
+]
 SOURCE_IDS = ("salary", "remittance", "interest", "other")
 LIQUID_TYPES = ("cash", "checking", "savings", "investment")
 ELIGIBILITY = {
@@ -15,6 +23,8 @@ ELIGIBILITY = {
     "refund": ("cash", "checking", "savings", "credit_card"),
     "transfer": LIQUID_TYPES,
     "card_payment": LIQUID_TYPES,
+    "debt_payment": ("cash", "checking", "savings"),
+    "payment_reversal": LIQUID_TYPES,
 }
 
 
@@ -37,6 +47,10 @@ class MoneyRequest(BaseModel):
     source_account_id: str | None = None
     destination_account_id: str | None = None
     amount: str = Field(max_length=40)
+    principal: str | None = Field(default=None, max_length=40)
+    interest: str | None = Field(default=None, max_length=40)
+    fees: str | None = Field(default=None, max_length=40)
+    reversal_of_activity_id: str | None = None
     occurred_at: datetime
     time_zone: str = Field(default="America/Santo_Domingo", max_length=64)
     note: str | None = Field(default=None, max_length=200)
@@ -54,6 +68,7 @@ class MoneyRequest(BaseModel):
         "source_account_id",
         "destination_account_id",
         "purchase_activity_id",
+        "reversal_of_activity_id",
     )
     @classmethod
     def uuid_value(cls, value: str | None) -> str | None:

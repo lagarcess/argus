@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
+from argus.domain.planning.debt_schemas import DebtProgress
 from argus.domain.planning.goal_schemas import GoalProgress
 from argus.domain.planning.schemas import Input
 from argus.domain.recording.loop_schemas import HomeResponse, ReportingPeriod
@@ -71,4 +72,5 @@ class BudgetReceipt(BaseModel):
 
 class BudgetHomeResponse(HomeResponse):
     budgets: list[BudgetProgress] = Field(default_factory=list)
+    debts: list[DebtProgress] = Field(default_factory=list)
     goals: list[GoalProgress] = Field(default_factory=list)

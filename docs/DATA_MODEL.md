@@ -2717,3 +2717,14 @@ cannot enter expectation-only readers. Accepted original personal amounts are
 provenance, never current-value fallback. Goal rows use registered-owner SELECT
 RLS and service-only writes. Existing Plan receipts, owner/account locks and
 repeatable-read snapshots own goal writes/reads and atomic contribution posting.
+
+
+## Connected debt intentions and dated payment returns
+
+`financial_debt_plans(id,user_id,debt_account_id,body)` stores only versioned intentions and explicit scenario assumptions, with an owner-qualified account FK, registered-owner SELECT RLS and service-only writes. A partial unique index permits one active plan per debt account; restoration checks that constraint. Balances and cumulative payment/cost counters are never stored here.
+
+`financial_plan_links.debt_plan_id` adds a mutually exclusive debt purpose to existing expectation/goal claims. Debt claims retain activity revision provenance and stable occurrence snapshots. Global owner/activity uniqueness remains. Non-debt occurrence uniqueness remains through a partial index; debt occurrences allow multiple payment claims. Extras have no occurrence. Every writer uses the existing Plan receipt, shared owner advisory lock, sorted account locks and current version checks.
+
+Loan source record revisions retain total movement and `details.interest_minor`. Destination movement retains principal, including zero principal. Fees derive losslessly as source total minus principal minus interest through the single Recording payment decoder. There is no second payment ledger. Real `payment_reversal` activity revisions retain inverse signed cash/debt movements, the explicit returned split, and generated owner-qualified original activity/revision FKs. Both original and dated return remain canonical activities. Paired corrections append revisions atomically and preserve former observation coverage. Current linked caps and account/date/category guards prevent contradictory corrections.
+
+Recording position and spending remain the actual owners. Loan interest and fees contribute once, scoped to funding account and selected/default existing category. Return costs reduce spending in the return period; principal and cards do not count. Debt progress, forecast remainders, recorded clear/reopening and savings backing concerns derive from current canonical revisions. Conditional payoff remains an explicit monthly model, separate from actual position and scheduled cash commitments.

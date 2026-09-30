@@ -29,7 +29,10 @@ def spending(
     by_id = {a["activity_id"]: a for a in activities}
     contributors = []
     for item in activities:
-        if item["kind"] not in {"expense", "refund"} or item["currency"] != currency:
+        if (
+            item["kind"] not in {"expense", "refund", "debt_payment", "payment_reversal"}
+            or item["currency"] != currency
+        ):
             continue
         if not start <= item["occurred_at"] < end:
             continue
@@ -45,10 +48,23 @@ def spending(
                 category is None and include_uncategorized
             ):
                 continue
-        contributors.append(item)
+        counted = item["amount_minor"]
+        if item["kind"] in {"debt_payment", "payment_reversal"}:
+            if item["principal_minor"] is None:
+                continue
+            counted = item["interest_minor"] + item["fees_minor"]
+        contributors.append(item | {"counted_spending_minor": counted})
     contributors.sort(key=lambda a: (a["occurred_at"], a["activity_id"]), reverse=True)
     return Spending(
         contributors,
-        sum(a["amount_minor"] for a in contributors if a["kind"] == "expense"),
-        sum(a["amount_minor"] for a in contributors if a["kind"] == "refund"),
+        sum(
+            a["counted_spending_minor"]
+            for a in contributors
+            if a["kind"] in {"expense", "debt_payment"}
+        ),
+        sum(
+            a["counted_spending_minor"]
+            for a in contributors
+            if a["kind"] in {"refund", "payment_reversal"}
+        ),
     )

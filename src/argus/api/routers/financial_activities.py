@@ -58,6 +58,8 @@ def options(
             "destination_eligibility": {
                 "transfer": LIQUID_TYPES,
                 "card_payment": ["credit_card"],
+                "debt_payment": ["other_debt"],
+                "payment_reversal": ["credit_card", "other_debt"],
             },
             "categories": CATEGORY_IDS,
             "sources": SOURCE_IDS,

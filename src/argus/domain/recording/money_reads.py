@@ -49,7 +49,7 @@ def render_activity(
     )
     stored, _, r = legs[0]
     currency = stored.account.currency
-    return {
+    result = {
         "activity_id": activity_id,
         "revision": number,
         "kind": r.kind,
@@ -64,6 +64,8 @@ def render_activity(
         "source_id": r.source_id,
         "purchase_activity_id": r.purchase_activity_id,
         "purchase_revision": r.purchase_revision,
+        "reversal_of_activity_id": r.reversal_of_activity_id,
+        "reversal_of_revision": r.reversal_of_revision,
         "reason": r.reason,
         "recorded_at": r.recorded_at,
         "recorded_by": r.recorded_by,
@@ -79,6 +81,9 @@ def render_activity(
             for s, record, rev in legs
         ],
     }
+    from argus.domain.recording.payments import breakdown
+
+    return result | breakdown(legs)
 
 
 def current_activities(accounts: list[StoredAccount]) -> list[dict[str, Any]]:
