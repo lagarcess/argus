@@ -52,7 +52,7 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard(); tapVisible(app.buttons["budget.save"])
         assertBudget(spent: "155.00", status: "5.00")
         tapVisible(app.buttons["budget.remove"])
-        app.buttons["budget.remove.confirm"].tap()
+        app.buttons.matching(identifier: "budget.remove.confirm").firstMatch.tap()
         XCTAssertTrue(app.buttons["budget.restore"].waitForExistence(timeout: 15))
         capture("budget-reversible-removal")
         tapVisible(app.buttons["budget.restore"])
