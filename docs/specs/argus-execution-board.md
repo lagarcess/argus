@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** [connected personal spending budgets](#connected-personal-spending-budgets-lane) are authorized through a merge-ready local iPhone demonstration. The founder approved the original budget policy and resumed implementation; isolated acceptance preparation is preserved. Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** [connected personal spending budgets](#pr-753-integration-landing) are landed through [PR #753](https://github.com/lagarcess/argus/pull/753), with the locally verified demonstration preserved. No next slice is authorized. Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,42 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## PR #753 integration landing
+
+The founder authorized the owner to merge #753 after rechecking its head and
+integration, then complete the bounded landing workflow. No next slice,
+deployment, hosted configuration change, signing or phone-environment action
+is authorized.
+
+- [PR #753](https://github.com/lagarcess/argus/pull/753) squash-merged at
+  `2026-09-30T03:53:28Z` as `ff1d9795af50ad1566d59e7e986e2cc31be2ca82`, from
+  verified head `55d211636bc187cda2fe88fba152c5724a95907c` onto unchanged
+  integration `9f51912198c2c77e239f670a2b3f78da2942afed`. Approved-head and
+  merge trees are identical; no reconciliation or semantic overlap arose.
+- Applicable PR/push CI and smoke were green, independent review was clean
+  through `ced256196c04eae6cfcd18f456f3dc00017315c7`, and zero unresolved
+  findings remained. The [terminal audit](https://github.com/lagarcess/argus/pull/753#issuecomment-5903364607)
+  records exact-head simulator acceptance and retained API, recovery, visual and
+  review evidence. No application behavior changed during landing.
+- The canonical integration checkout fast-forwarded cleanly to the merge.
+  Exact post-merge [CI](https://github.com/lagarcess/argus/actions/runs/36666427091),
+  [smoke](https://github.com/lagarcess/argus/actions/runs/36666427084), landing
+  housekeeping and final local/remote parity are recorded in the merged PR's
+  landing comment after terminal verification.
+- No linked closing issues require reconciliation. There is one additive
+  owner-scoped budget migration; real local Postgres and the authorized automatic
+  PR preview verified it. No new production environment variable or template
+  change is needed. The inherited UI-test query input remains test-only.
+  Financial exposure remains default-off; landing applies no hosted migration.
+- The [budget demo, recording and restart guide](../reports/evidence/connected-budgets/README.md)
+  remain runnable from the existing delivery checkout, direct API 59000 and
+  loopback mirror 59013. Records, journals, installed simulator and all earlier
+  demos remain preserved. The separate phone-testing environment, including
+  ports 58700–58749, is untouched.
+- This completes the assigned personal-budget journey locally. Physical-iPhone
+  internet proof, other Plan lifecycles and remaining MVEE coverage remain with
+  their existing owners; no deployment, main promotion or next slice occurred.
 
 ## Connected personal spending budgets lane
 
@@ -1315,7 +1351,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
-landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are locally verified in PR #753; its terminal review/CI audit owns the merge-ready verdict. No further implementation slice is assigned. Proposed owners
+landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are landed through PR #753; its terminal audit and landing record retain the local evidence. No further implementation slice is assigned. Proposed owners
 must be bound to named workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -1327,7 +1363,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 connects personal monthly budgets with actual progress, contributors and Search; savings goals, debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; savings goals, debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
