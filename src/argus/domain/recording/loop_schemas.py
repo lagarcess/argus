@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from argus.domain.recording.money_schemas import ActivityKind
 from argus.domain.recording.schemas import (
     BalanceResponse,
     FinancialAccountResponse,
@@ -79,7 +80,7 @@ class LoopOpeningRequest(WriteOpeningRequest):
 class ActivityResponse(BaseModel):
     record_id: str
     revision: int
-    kind: Literal["expense", "income", "transfer", "card_payment", "refund"] = "expense"
+    kind: ActivityKind = "expense"
     activity_id: str | None = None
     role: str = "single"
     active: bool = True

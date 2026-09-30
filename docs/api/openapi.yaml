@@ -4867,6 +4867,8 @@ components:
           - transfer
           - card_payment
           - refund
+          - debt_payment
+          - payment_reversal
           default: expense
         activity_id:
           anyOf:
@@ -11423,6 +11425,8 @@ components:
           - transfer
           - card_payment
           - refund
+          - debt_payment
+          - payment_reversal
           default: expense
         activity_id:
           anyOf:
