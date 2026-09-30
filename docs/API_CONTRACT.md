@@ -7285,7 +7285,7 @@ The server applies the account's ownership share once using existing rounding.
 
 `POST /financial-accounts/{id}/asset-estimates/preview` reviews a new estimate
 or correction. `POST /financial-accounts/{id}/asset-estimates` confirms the same
-body with `Idempotency-Key`. Both require `expected_version`, `amount`, `as_of`,
+body with `Idempotency-Key` and the returned `preview_token`. Both require `expected_version`, `amount`, `as_of`,
 `time_zone`, optional `estimate_basis` (200 characters), and optional `reason`.
 To correct, also provide `record_id` and `expected_revision`; both are required
 together, and a correction requires a reason. Without them a new value-update

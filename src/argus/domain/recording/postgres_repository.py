@@ -9,12 +9,16 @@ transaction. Reads and the account edit are plain statements scoped by
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from argus.domain.recording.assets import AssetDetailsResult
 
 from psycopg import sql
 from psycopg_pool import ConnectionPool
 
 from argus.domain.recording.accounts import AccountFacts
+from argus.domain.recording.asset_schemas import AssetDetailsRequest
 from argus.domain.recording.errors import (
     AccountNotFound,
     IdempotencyConflict,
@@ -123,6 +127,21 @@ class PostgresFinancialAccountRepository:
         ).format(sql.SQL(", ").join(assignments))
         with self._pool.connection() as connection:
             with connection.transaction():
+                from argus.domain.recording.asset_postgres import lock_owner
+                from argus.domain.recording.asset_storage import validate_type_change
+
+                lock_owner(connection, user_id)
+                current = self._load(connection, user_id, account_id)
+                if current is None:
+                    raise AccountNotFound()
+                linked = (
+                    connection.execute(
+                        "select 1 from public.financial_asset_details where user_id=%s and (account_id=%s and related_debt_account_id is not null or related_debt_account_id=%s)",
+                        (user_id, account_id, account_id),
+                    ).fetchone()
+                    is not None
+                )
+                validate_type_change(current, changes, linked)
                 updated = connection.execute(
                     statement, (*params, account_id, user_id, expected_version)
                 ).fetchone()
@@ -167,6 +186,18 @@ class PostgresFinancialAccountRepository:
                 raise StaleVersion()
             if decision == "registered_required":
                 raise RegisteredAccountRequired()
+            if write.estimate_basis is not None:
+                from psycopg.types.json import Jsonb
+
+                connection.execute(
+                    "update public.financial_record_revisions v set details=details || %s where v.record_id=(select id from public.financial_records where account_id=%s and user_id=%s and record_kind='opening_balance') and v.revision=%s",
+                    (
+                        Jsonb({"estimate_basis": write.estimate_basis}),
+                        account_id,
+                        user_id,
+                        (expected_revision or 0) + 1,
+                    ),
+                )
             stored = self._load(connection, user_id, account_id)
         if stored is None:  # pragma: no cover - the function just wrote it
             raise AccountNotFound()
@@ -192,6 +223,26 @@ class PostgresFinancialAccountRepository:
             planner=planner,
         )
 
+    def write_asset_details(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        request: AssetDetailsRequest,
+        idempotency_key: str,
+        identity_hash: str,
+    ) -> AssetDetailsResult:
+        from argus.domain.recording.asset_postgres import write_details
+
+        return write_details(
+            self,
+            user_id=user_id,
+            account_id=account_id,
+            request=request,
+            idempotency_key=idempotency_key,
+            identity_hash=identity_hash,
+        )
+
     def _load(self, connection, user_id: str, account_id: str) -> StoredAccount | None:  # noqa: ANN001
         row = connection.execute(
             f"select {_ACCOUNT_COLUMNS} from public.financial_accounts"
@@ -215,7 +266,7 @@ class PostgresFinancialAccountRepository:
             return {}
         rows = connection.execute(
             "select r.id, r.account_id, v.revision, v.amount_minor, v.as_of, v.as_of_zone,"
-            " v.reason, v.recorded_by, v.recorded_at"
+            " v.reason, v.recorded_by, v.recorded_at, v.details"
             " from public.financial_records r"
             " join public.financial_record_revisions v on v.record_id = r.id"
             " where r.user_id = %s and r.record_kind = %s and r.account_id = any(%s)"
@@ -223,7 +274,18 @@ class PostgresFinancialAccountRepository:
             (user_id, OPENING_KIND, ids),
         ).fetchall()
         grouped: dict[str, tuple[str, list[OpeningRevision]]] = {}
-        for record_id, account_id, revision, amount, as_of, zone, reason, by, at in rows:
+        for (
+            record_id,
+            account_id,
+            revision,
+            amount,
+            as_of,
+            zone,
+            reason,
+            by,
+            at,
+            details,
+        ) in rows:
             entry = grouped.setdefault(str(account_id), (str(record_id), []))
             entry[1].append(
                 OpeningRevision(
@@ -234,6 +296,7 @@ class PostgresFinancialAccountRepository:
                     reason=reason,
                     recorded_by=str(by) if by is not None else None,
                     recorded_at=at,
+                    estimate_basis=details.get("estimate_basis"),
                 )
             )
         return {

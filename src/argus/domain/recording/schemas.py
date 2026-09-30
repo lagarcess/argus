@@ -19,6 +19,7 @@ from argus.domain.recording.accounts import (
     AccountType,
     Nature,
 )
+from argus.domain.recording.asset_schemas import AssetProjection
 from argus.domain.recording.currency import currency_exponent, format_minor_units
 from argus.domain.recording.loop import position
 from argus.domain.recording.records import Balance, OpeningRecord
@@ -112,6 +113,7 @@ class FinancialAccountResponse(BaseModel):
     updated_at: datetime
     balance: BalanceResponse
     opening: OpeningResponse | None
+    asset: AssetProjection | None = None
 
 
 class FinancialAccountListResponse(BaseModel):
@@ -119,6 +121,8 @@ class FinancialAccountListResponse(BaseModel):
 
 
 def account_response(stored: StoredAccount) -> FinancialAccountResponse:
+    from argus.domain.recording.asset_reads import asset_projection
+
     facts = stored.account
     return FinancialAccountResponse(
         id=facts.id,
@@ -137,6 +141,7 @@ def account_response(stored: StoredAccount) -> FinancialAccountResponse:
             facts,
         ),
         opening=_opening_response(stored.opening, facts),
+        asset=asset_projection(stored),
     )
 
 
