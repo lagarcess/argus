@@ -337,3 +337,28 @@ def test_contribution_preview_exposes_source_pool_shortfall_without_writing(scen
     assert result["goal"]["supported_minor"] == "20000"
     assert service.get(scene[1], source_goal["id"])["supported_minor"] == "90000"
     assert service.get(scene[1], destination_goal["id"])["supported_minor"] == "0"
+
+
+def test_contribution_candidates_exclude_non_cash_funding(scene):
+    service, dest, goal = setup_goal(scene)
+    investment = account(scene, kind="investment", amount="1000")
+    save(
+        scene,
+        kind="transfer",
+        source_account_id=investment,
+        destination_account_id=dest,
+        amount="100",
+    )
+    assert service.candidates(scene[1], goal["id"])["items"] == []
+    cash = account(scene, kind="checking", amount="1000")
+    eligible = save(
+        scene,
+        kind="transfer",
+        source_account_id=cash,
+        destination_account_id=dest,
+        amount="50",
+    )["activity"]
+    assert [
+        entry["activity_id"]
+        for entry in service.candidates(scene[1], goal["id"])["items"]
+    ] == [eligible["activity_id"]]
