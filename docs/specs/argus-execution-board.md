@@ -59,9 +59,12 @@ approval is needed for routine technical choices within this policy.
 ### Ownership, dependency and acceptance map
 
 The captain owns delivery, integration, manifest and independent acceptance.
-One bounded implementation writer will own the shared contracts, Planning goal
-service/storage, Recording adapters, native goal module and integration tests in
-an exclusive worktree. Recording remains the only actual-money owner; Planning
+Implementation owner `goals_implementation` owns the shared contracts, Planning
+goal service/storage, Recording adapters, native goal module and integration
+tests in exclusive branch `codex/connected-savings-goals-core`, checkout
+`/Users/garces/.codex/worktrees/connected-savings-goals-core/private-alpha-next`.
+The captain integrates its ordered commits into the delivery branch and owns
+the simulator, local services, evidence and independent acceptance. Recording remains the only actual-money owner; Planning
 owns goal intentions, allocation/linking and projections. Clients render server
 results. Existing account and activity detail/correction screens remain the
 money-edit controls. A fresh independent reviewer reviews the finished diff once
@@ -77,6 +80,77 @@ and only affected fixes afterward. Codex availability is not a dependency.
 | Find a goal and return with context; English/Spanish | Typed Search, persisted query/filter/anchor, native localization | Goal hit and actual detail destination; localized controls | Real goal projection/detail | Search to goal to original contribution and back retains origin and refreshes edits; relaunch preserves state |
 | Recover durable writes with owner isolation | Exact command journal, replay-before-CAS, repeatable-read Postgres, auth/RLS | Goal-specific transaction, API, package and simulator cases | Implemented shared command contract; dedicated local stack | Response loss/retry and concurrent writes commit once; stale update is explicit; another identity cannot read or mutate goals/allocations |
 
+### Selected goal contract and architecture
+
+**Named shapes:** `GoalDefinition` stores target/setup/lifecycle and explicit
+unlinked allocation residuals. `GoalContribution` points at one current canonical
+transfer and optionally its own planned occurrence. `GoalPool` derives backing,
+claims, available money and shortfall for one owner/account/currency.
+`GoalProgress` derives assigned intention, supported actual, remaining, review
+reasons and separate planned/projection data. No actual saved total or balance
+copy is persisted. The existing Plan snapshot, owner lock, receipts and CAS own
+both reads and commands; Recording supplies current position, activity and the
+single ownership-share rounding function.
+
+| Candidate | Independent assessment | Captain decision |
+| --- | --- | --- |
+| Current goal intentions and linked attribution in Plan snapshot | 5/5 money truth, 5/5 contribution correction, 5/5 existing owner reuse, 4/5 interface/storage | Selected; fewer persistence/replay stages and correct included-credit correction. |
+| Append-only allocation intention events | 4/5 money truth, 1/5 included correction, 4/5 reuse, 2/5 interface/storage | Rejected; no separate allocation-history requirement justifies the extra fold, and provenance-only inclusion leaves old contribution credit in the assignment. |
+
+The independent architecture reviewer was `goals_architecture_judge` in a fresh
+context. This is design judgment, not implementation review. The captain grafted
+its explicit deficit-improvement rule: reduction of existing claims remains
+admissible while underfunded; new/increased claims require known sufficient
+backing. No event history or partial activity split is introduced.
+
+- Cash, checking and savings are the backing/funding/destination accounts in
+  this slice, following the locked design. Capacity uses personally attributable
+  current known positive position; unknown is not zero. Per-account pools prevent
+  unrelated accounts or currencies silently rescuing a shortage. Account archive
+  retains backing; goal archive retains claims and suspends pending goal schedule.
+  Restore retains identity and derives current support, including Needs review.
+- An eligible contribution is one current transfer into an allowed same-currency
+  destination, assigned wholly to one goal. Income received directly can be
+  allocated as existing money; it is not another goal transaction kind. Source,
+  destination, currency and current revision remain reviewable.
+- **Already included** partitions an existing unlinked allocation. Allocated 600,
+  linked transfer 200 already included becomes residual 400 plus current transfer
+  200, still 600. Correcting that transfer to 150 yields 550; to 250 yields 650.
+  Accepted original amount is provenance only. Linking never posts money. A new
+  transfer plus its allocation/optional fulfillment commits in one transaction.
+- One shared activity claim owns attribution and optional occurrence fulfillment.
+  Preserve existing expectation links, owner-qualified references and uniqueness.
+  Ad hoc goal claims must not enter income/bill-only readers. Release of counting
+  leaves fulfillment intact; it does not recreate a completed forecast movement.
+  Changed/unavailable activity shows review, never an older fallback amount.
+- A reverse-direction transfer is new canonical activity that changes backing,
+  not evidence that the original transfer never happened. No amount/date matching
+  invents a reversal. The lane adds no global financial-activity remove/restore
+  API; acceptance uses original correction, reverse transfers and goal recovery.
+- A fully backed component supports its assigned amount. A known shortfall with
+  one claimant goal supports `min(assigned,backing)` and Needs review. A shared
+  shortfall or unknown/ineligible backing leaves affected component support null.
+  Any unresolved component leaves the goal total null; separately backed portions
+  remain inspectable as partial support. Reached requires resolved support and
+  no review issue. Count distinct goals, including archived goals, rather than
+  contribution rows when deciding whether backing is shared.
+- Goal-owned optional transfer schedules derive occurrences through the existing
+  recurrence/cutover owner; no duplicate editable expectation. Two selected fully
+  owned cash legs net zero. With one selected side or differing ownership shares,
+  show the actual selected/personal cash effect without classifying it as income,
+  bills or spending. Fulfilled or disputed linked occurrences do not silently
+  create another payment. Planned contributions never become actual savings.
+
+**Local allocation:** API 59100, Supabase 59101, Postgres 59102, synthetic CAPTCHA
+59105; optional response-loss proxy 59112 and simulator mirror 59113. Dedicated
+simulator `A466756C-1478-4FA9-8604-3D9FEE15A601`, iPhone 17e/iOS 27, named
+`Argus Connected Savings Goals`. Ignored local users/config belong only to this
+checkout. Restart existing services; never remint users or reset the database.
+The read-only inherited baseline passed 236 financial/Plan/Budget/Search tests
+with zero skips and native registered sign-in/relaunch/sign-out acceptance.
+[Baseline evidence](../reports/evidence/connected-savings-goals/baseline.json)
+records source/environment; no goal acceptance is claimed by those checks.
+
 ### Delivery workflow and throughput checkpoint
 
 - [x] Read the Principles section of poteto-mode; frame the falsifiable local
@@ -84,12 +158,12 @@ and only affected fixes afterward. Codex availability is not a dependency.
 - [x] `how` over the affected subsystem. Financial/native scouts recovered the
   canonical Recording, Plan snapshot/receipts, native detail/journal and Search
   flow without rebuilding them.
-- [ ] `architect` for parallel design exploration. Two bounded, read-only
-  candidates compare current allocation intentions with allocation change events;
-  the captain chooses one after independent cross-judgment.
-- [ ] Write the throughput checkpoint as four todo items, below; update it at
+- [x] `architect` for parallel design exploration. Two bounded read-only
+  candidates compared current intentions with allocation events. Independent
+  cross-judgment and captain selected current intentions; synthesis below.
+- [x] Write the throughput checkpoint as four todo items, below; update it at
   ownership handoff.
-- [ ] Delegate code-writing to one exclusive implementation writer/worktree.
+- [x] Delegate code-writing to one exclusive implementation writer/worktree.
 - [ ] Verify on the matching surface: real local API/Postgres and native simulator.
 - [ ] Deliver small ordered commits, verifying each unit before the next.
   Repository one-way integration merges override the playbook's rebase step.
@@ -100,10 +174,13 @@ and only affected fixes afterward. Codex availability is not a dependency.
 
 
 1. **Blocking first steps:** the founder policy is settled. Select the bounded
-   allocation/link/lifecycle contract before writing dependent code.
+   allocation/link/lifecycle contract before writing dependent code. Selection
+   is complete; the shared contract is handed to the single writer.
 2. **Independent workstreams:** read-only financial/native recovery is complete.
    Local acceptance preparation runs alongside the implementation writer
    without editing its checkout; independent review follows the finished diff.
+   Backend/native changes stay with one writer because contribution attribution,
+   activity claims and forecast fulfillment are one code-coupled feature.
 3. **Shared mutable state:** Planning snapshot, receipts, financial owner lock,
    activity links, Swift response types, Search union and localization each have
    one writer. No parallel ledger, editable saved total, web or rebrand work.
