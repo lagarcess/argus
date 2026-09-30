@@ -327,3 +327,97 @@ def test_explicit_monthly_model_uses_recorded_debt_without_clearing_it(
     assert (
         payoff(item, balance, [], NOW.date(), account_type)["reason"] == "terms_missing"
     )
+
+
+def test_actual_return_reverses_costs_only_in_its_recorded_month(scene, monkeypatch):
+    debts, cash, loan, progress = setup(scene)
+    original = record(scene, debts, progress, cash, loan, "350", "300", "40", "10")
+    monkeypatch.setattr(scene[0], "_clock", lambda: NOW + timedelta(days=40))
+    returned_at = NOW.replace(month=10, day=1, hour=0)
+    save(
+        scene,
+        kind="payment_reversal",
+        source_account_id=cash,
+        destination_account_id=loan,
+        amount="100",
+        principal="80",
+        interest="15",
+        fees="5",
+        reversal_of_activity_id=original["activity"]["activity_id"],
+        occurred_at=returned_at,
+    )
+    actual = current_activities(scene[0].list_accounts(user_id=scene[1]))
+    september = spending(
+        actual, currency="DOP", start=NOW.replace(day=1, hour=0), end=returned_at
+    )
+    october = spending(
+        actual, currency="DOP", start=returned_at, end=returned_at.replace(month=11)
+    )
+    assert (september.purchases, september.refunds, september.net) == (5000, 0, 5000)
+    assert (october.purchases, october.refunds, october.net) == (0, 2000, -2000)
+    assert october.contributors[0]["amount_minor"] == 10000
+    assert october.contributors[0]["counted_spending_minor"] == 2000
+    assert (
+        MoneyService(scene[0]).detail(
+            user_id=scene[1], activity_id=original["activity"]["activity_id"]
+        )["revision"]
+        == 1
+    )
+
+
+def test_corrected_funding_account_marks_original_occurrence_for_review(scene):
+    debts, cash, loan, progress = setup(scene)
+    oid = progress["occurrences"][0]["id"]
+    original = record(scene, debts, progress, cash, loan, "350", "300", "40", "10", oid)[
+        "activity"
+    ]
+    other = account(scene, amount="600")
+    request = MoneyRequest(
+        kind="debt_payment",
+        source_account_id=other,
+        destination_account_id=loan,
+        amount="350",
+        principal="300",
+        interest="40",
+        fees="10",
+        occurred_at=NOW,
+        expected_revision=1,
+        reason="Paid from another account",
+    )
+    money = MoneyService(scene[0])
+    preview = money.preview(
+        user_id=scene[1], request=request, activity_id=original["activity_id"]
+    )
+    assert preview["ready"]
+    reviewed = MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
+        update={"preview_token": preview["preview_token"]}
+    )
+    money.write(
+        user_id=scene[1],
+        request=reviewed,
+        activity_id=original["activity_id"],
+        idempotency_key=str(uuid4()),
+    )
+    current = debts.get(scene[1], progress["debt"]["id"])
+    assert current["payments"][0]["status"] == "needs_review"
+    row = next(r for r in current["occurrences"] if r["id"] == oid)
+    assert row["status"] == "needs_review" and row["paid_minor"] == 0
+    assert row["source_account_id"] == cash and row["remaining_minor"] == 50000
+    assert current["balance"]["amount_minor"] == -70000
+
+
+def test_missed_debt_occurrence_uses_selected_timezone_and_only_partial_remainder(
+    scene, monkeypatch
+):
+    debts, cash, loan, progress = setup(scene)
+    oid = progress["occurrences"][0]["id"]
+    record(scene, debts, progress, cash, loan, "350", "300", "40", "10", oid)
+    monkeypatch.setattr(scene[0], "_clock", lambda: NOW.replace(day=21, hour=2))
+    before = next(
+        r for r in debts.planner.read(scene[1])["occurrences"] if r["id"] == oid
+    )
+    assert not before["overdue"] and before["projection_date"] == "2026-09-20"
+    monkeypatch.setattr(scene[0], "_clock", lambda: NOW.replace(day=21, hour=5))
+    row = next(r for r in debts.planner.read(scene[1])["occurrences"] if r["id"] == oid)
+    assert row["overdue"] and row["projection_date"] == "2026-09-21"
+    assert row["remaining_minor"] == 15000 and row["paid_minor"] == 35000
