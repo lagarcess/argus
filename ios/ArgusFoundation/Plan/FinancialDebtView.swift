@@ -201,7 +201,7 @@ struct FinancialDebtLinkView: View {
                     if let key = model.errorKey { Text(LocalizedStringKey(key)).accessibilityIdentifier("debt.error") }
                     if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                 }.padding(24)
-            }.navigationTitle("debt.link").toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving) } }
+            }.navigationTitle("debt.link").toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving).accessibilityIdentifier("debt.action.cancel") } }
         }
     }
 }
