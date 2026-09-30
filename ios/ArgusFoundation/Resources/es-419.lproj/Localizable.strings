@@ -541,7 +541,7 @@
 "debt.state.recorded_clear" = "Saldo registrado liquidado";
 "debt.state.needs_review" = "Necesita revisión";
 "debt.funding" = "Cuenta de fondos";
-"debt.funding.recorded" = "Dinero registrado de tu parte";
+"debt.funding.recorded" = "Dinero registrado";
 "debt.funding.available" = "Dinero sin asignar";
 "debt.record" = "Registrar pago";
 "debt.extra" = "Pago extra";
@@ -593,3 +593,7 @@
 "debt.payoff.period_boundary_required" = "Usa un saldo registrado al inicio del período y un primer pago un mes después.";
 "debt.payoff.payment_insufficient" = "Este pago no cubre los intereses y cargos del modelo.";
 "debt.payoff.schedule_insufficient" = "El calendario termina antes de la liquidación estimada.";
+
+"plan.exclusion.plan_archived" = "Plan archivado";
+
+"debt.funding.assigned" = "Asignado a metas de ahorro";

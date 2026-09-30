@@ -541,7 +541,7 @@
 "debt.state.recorded_clear" = "Recorded balance cleared";
 "debt.state.needs_review" = "Needs review";
 "debt.funding" = "Funding account";
-"debt.funding.recorded" = "Recorded money for your share";
+"debt.funding.recorded" = "Recorded money";
 "debt.funding.available" = "Unassigned money";
 "debt.record" = "Record payment";
 "debt.extra" = "Extra payment";
@@ -593,3 +593,7 @@
 "debt.payoff.period_boundary_required" = "Use a recorded period-start balance and a first payment one month later.";
 "debt.payoff.payment_insufficient" = "This payment does not cover the modeled interest and fees.";
 "debt.payoff.schedule_insufficient" = "The schedule ends before the modeled payoff.";
+
+"plan.exclusion.plan_archived" = "Plan archived";
+
+"debt.funding.assigned" = "Assigned to savings goals";

@@ -50,14 +50,19 @@ struct FinancialDebtFunding: View {
     @Environment(\.locale) private var locale
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("debt.funding").font(ArgusStyle.display(21))
-            PlanValueRow(title: "debt.funding.recorded", value: money(pool.backingMinor))
-            PlanValueRow(title: "goal.assigned", value: money(pool.assignedMinor))
-            PlanValueRow(title: "debt.funding.available", value: money(pool.availableMinor)).accessibilityIdentifier("debt.funding.available")
+            DisclosureGroup("debt.funding") {
+                VStack(alignment: .leading, spacing: 10) {
+                    PlanValueRow(title: "debt.funding.recorded", value: money(pool.backingMinor))
+                    PlanValueRow(title: "debt.funding.assigned", value: money(pool.assignedMinor))
+                    PlanValueRow(title: "debt.funding.available", value: money(pool.availableMinor)).accessibilityIdentifier("debt.funding.available")
+                    if pool.state == "shortfall" {
+                        PlanValueRow(title: "goal.shortfall", value: money(pool.shortfallMinor))
+                        Text(pool.affectedGoalNames.joined(separator: " · "))
+                    }
+                }.padding(.top, 12)
+            }
             if pool.state == "shortfall" {
-                Text("goal.reason.pool_shortfall").foregroundStyle(ArgusStyle.negative)
-                PlanValueRow(title: "goal.shortfall", value: money(pool.shortfallMinor))
-                Text(pool.affectedGoalNames.joined(separator: " · "))
+                Text("goal.reason.pool_shortfall").foregroundStyle(ArgusStyle.negative).accessibilityIdentifier("debt.funding.shortfall")
             }
         }
     }
@@ -76,7 +81,7 @@ struct FinancialDebtPresenter: View {
                 FinancialDebtDetail(model: model, loop: loop) {
                     switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .search: destination = .search; case .account: destination = .accounts; case nil: break }
                     model.close(); Task { await search?.refresh() }
-                }.background(ArgusStyle.background).clipShape(RoundedRectangle(cornerRadius: 24)).padding(12).accessibilityIdentifier("debt.detail")
+                }.background(ArgusStyle.background).clipShape(RoundedRectangle(cornerRadius: 24)).padding(12).accessibilityElement(children: .contain).accessibilityIdentifier("debt.detail")
             } else { Color.clear.allowsHitTesting(false) }
         }
         .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in FinancialDebtForm(model: model, loop: loop, draft: draft) }
@@ -192,7 +197,7 @@ struct FinancialDebtLinkView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("debt.link.disclosure").foregroundStyle(ArgusStyle.secondary)
                     if model.loading { ProgressView("accounts.loading") }
-                    if model.candidates.isEmpty && !model.loading { Text("debt.link.empty") }
+                    if model.candidates.isEmpty && !model.loading { Text("debt.link.empty").accessibilityIdentifier("debt.link.empty") }
                     ForEach(model.candidates) { entry in
                         Button { Task { await model.link(entry) } } label: {
                             HStack { Text(entry.note ?? NSLocalizedString("debt.payment", comment: "")); Spacer(); Text(verbatim: entry.currency + " " + AccountPresentation.amount(entry.amount, locale: locale)) }.frame(minHeight: 48)
