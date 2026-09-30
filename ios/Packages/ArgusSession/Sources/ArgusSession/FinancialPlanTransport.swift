@@ -19,6 +19,8 @@ extension SessionController {
     public func sendPlanConfirmation(_ write: PendingFinancialConfirmation, expectedIdentity: SessionSnapshot) async throws {
         let operation = try validatedPlanOperation(write, identity: expectedIdentity)
         switch operation {
+        case .createDebt, .editDebt, .linkDebt:
+            let _: FinancialDebtReceipt = try await planResponse(path: operation.path, method: operation.method, body: write.body, key: write.key, identity: expectedIdentity)
         case .createGoal, .editGoal, .linkGoal, .releaseGoal:
             let _: FinancialGoalReceipt = try await planResponse(path: operation.path, method: operation.method, body: write.body, key: write.key, identity: expectedIdentity)
         case .allocateGoals:
@@ -35,7 +37,7 @@ extension SessionController {
         case .link:
             let _: FinancialPlanLinkReceipt = try await planResponse(path: operation.path, method: operation.method,
                 body: write.body, key: write.key, identity: expectedIdentity)
-        case .fulfill, .recordGoal: throw SessionFailure.invalidResponse
+        case .fulfill, .recordGoal, .recordDebt: throw SessionFailure.invalidResponse
         }
     }
 

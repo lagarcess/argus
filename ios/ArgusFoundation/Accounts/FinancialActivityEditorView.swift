@@ -76,7 +76,7 @@ struct FinancialActivityEditorView: View {
 
     private var entry: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if !model.isCorrection && model.planOccurrence == nil && model.goal == nil {
+            if !model.isCorrection && model.planOccurrence == nil && model.goal == nil && model.debt == nil && model.returning == nil {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("loop.activity.kind")
                     ScrollView(.horizontal) {
@@ -111,6 +111,13 @@ struct FinancialActivityEditorView: View {
                 }.padding(.horizontal, 14).frame(minHeight: 52)
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
             }
+            if model.needsLoanSplit {
+                splitField("debt.principal", "loop.principal", $model.principal)
+                splitField("debt.interest", "loop.interest", $model.interest)
+                splitField("debt.fees", "loop.fees", $model.fees)
+                Text("debt.split.disclosure").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+            }
+            if model.returning != nil { Text("debt.return.disclosure").foregroundStyle(ArgusStyle.secondary) }
             DatePicker("loop.date", selection: $model.date, in: ...Date(), displayedComponents: .date)
                 .accessibilityIdentifier("loop.date")
             if model.kind == .income {
@@ -160,6 +167,10 @@ struct FinancialActivityEditorView: View {
                 }
             }
         }.disabled(model.busy)
+    }
+
+    private func splitField(_ title: LocalizedStringKey, _ id: String, _ text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 8) { Text(title); TextField("0.00", text: text).keyboardType(.decimalPad).focused($focused).padding(14).overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line)).accessibilityIdentifier(id) }
     }
 
     private func accountPicker(_ title: LocalizedStringKey, value: Binding<UUID?>,
@@ -220,6 +231,8 @@ struct FinancialActivityEditorView: View {
                     }
                 }
             }
+            if let result = model.debtPreview, preview.ready, let pool = result.debt.fundingPool { FinancialDebtFunding(pool: pool, digits: result.debt.debt.currencyFractionDigits) }
+            if model.kind == .debtPayment { Text("debt.cost.disclosure").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary) }
             if model.kind == .transfer || model.kind == .cardPayment {
                 Text("loop.activity.pairNote").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
             }
@@ -257,7 +270,8 @@ struct FinancialActivityEditorView: View {
         case .expense: "arrow.up.right"
         case .income: "arrow.down.left"
         case .transfer: "arrow.left.arrow.right"
-        case .cardPayment: "creditcard"
+        case .cardPayment, .debtPayment: "creditcard"
+        case .paymentReversal: "arrow.uturn.backward"
         case .refund: "arrow.uturn.backward"
         }
     }

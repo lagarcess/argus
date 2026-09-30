@@ -28,6 +28,7 @@ final class FinancialLoopModel: ObservableObject {
     private var generation = UUID()
     var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
+    lazy var debts = FinancialDebtModel(controller: controller, loop: self)
     lazy var goals = FinancialGoalModel(controller: controller, loop: self)
     lazy var budgets = FinancialBudgetModel(controller: controller, loop: self)
     lazy var plan = FinancialPlanModel(controller: controller, accounts: accounts, loop: self)
@@ -48,6 +49,7 @@ final class FinancialLoopModel: ObservableObject {
         plan.bind(snapshot)
         budgets.bind(snapshot)
         goals.bind(snapshot)
+        debts.bind(snapshot)
     }
 
     func refresh() async {
@@ -151,10 +153,10 @@ final class FinancialLoopModel: ObservableObject {
         record(account, correcting: activity)
     }
 
-    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil) {
+    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil) {
         guard let identity, pendingConfirmation == nil else { return }
         let ticket = generation
-        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, goal: goal, goalOccurrenceId: goalOccurrenceId, controller: controller,
+        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, goal: goal, goalOccurrenceId: goalOccurrenceId, debt: debt, debtOccurrenceId: debtOccurrenceId, returning: returning, controller: controller,
             journal: journal, identity: identity, started: { [weak self] write in
                 guard let self, self.generation == ticket else { return }
                 self.pendingConfirmation = write
@@ -167,6 +169,11 @@ final class FinancialLoopModel: ObservableObject {
             }) { [weak self] receipt in
                 await self?.accepted(receipt, ticket: ticket)
             }
+    }
+
+    func returnPayment(_ activity: FinancialActivityDetail) {
+        guard let source = activity.legs.first(where: { $0.role == "source" })?.accountId, let account = accounts.accounts.first(where: { $0.id == source }) else { return }
+        record(account, returning: activity)
     }
 
     func retryPending() async {
@@ -192,6 +199,7 @@ final class FinancialLoopModel: ObservableObject {
                     plan.confirmed(operation)
                     budgets.confirmed(operation)
                     goals.confirmed(operation)
+                    debts.confirmed(operation)
                 }
             } else {
                 let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
@@ -246,6 +254,7 @@ final class FinancialLoopModel: ObservableObject {
         guard let operation = pendingConfirmation?.planOperation else { return "loop.pending.title" }
         switch operation {
         case .createGoal, .editGoal, .allocateGoals, .linkGoal, .recordGoal, .releaseGoal: return "goal.pending"
+        case .createDebt, .editDebt, .linkDebt, .recordDebt: return "debt.pending"
         case .createBudget, .editBudget: return "budget.pending"
         case .createExpectation, .editExpectation: return "plan.pending.expectation"
         case .selection: return "plan.pending.selection"

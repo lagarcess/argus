@@ -5,6 +5,7 @@ struct AccountActivityView: View {
     @ObservedObject var loop: FinancialLoopModel
     let account: FinancialAccount
     @State private var pendingCorrection: FinancialActivityDetail?
+    @State private var pendingReturn: FinancialActivityDetail?
     @State private var inspected: FinancialActivity?
     @Environment(\.locale) private var locale
 
@@ -15,6 +16,11 @@ struct AccountActivityView: View {
             Button { loop.record(account) } label: {
                 Label("loop.record", systemImage: "plus").frame(maxWidth: .infinity)
             }.buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("accounts.record")
+            if ["credit_card", "other_debt"].contains(account.type) {
+                if let progress = loop.plan.projection?.debts?.first(where: { !$0.debt.archived && $0.debt.debtAccountId == account.id }) {
+                    Button("debt.view") { Task { await loop.debts.open(progress.id, origin: .account) } }.frame(minHeight: 44).accessibilityIdentifier("accounts.debt")
+                } else { Button("debt.add") { loop.debts.create(account) }.frame(minHeight: 44).accessibilityIdentifier("accounts.debt") }
+            }
             Button("loop.check.title") { loop.check(account) }.frame(minHeight: 44)
                 .accessibilityIdentifier("accounts.check")
             if let error = page.errorKey {
@@ -56,10 +62,11 @@ struct AccountActivityView: View {
         .task(id: account.version) { await loop.open(account) }
         .sheet(item: $inspected, onDismiss: {
             if let activity = pendingCorrection { pendingCorrection = nil; loop.record(account, correcting: activity) }
+            else if let activity = pendingReturn { pendingReturn = nil; loop.returnPayment(activity) }
         }) { activity in
             NavigationStack {
                 ScrollView {
-                    FinancialActivityDetailView(loop: loop, activityID: activity.activityId ?? activity.recordId) { current in
+                    FinancialActivityDetailView(loop: loop, activityID: activity.activityId ?? activity.recordId, returnPayment: { current in pendingReturn = current; inspected = nil }) { current in
                         pendingCorrection = current; inspected = nil
                     }.padding(24)
                 }.background(ArgusStyle.background)
@@ -73,6 +80,7 @@ struct AccountActivityView: View {
 struct FinancialActivityDetailView: View {
     @ObservedObject var loop: FinancialLoopModel
     let activityID: UUID
+    var returnPayment: ((FinancialActivityDetail) -> Void)? = nil
     let correct: (FinancialActivityDetail) -> Void
     @State private var detail: FinancialActivityDetail?
     @State private var revisions: [FinancialActivityDetail] = []
@@ -86,6 +94,10 @@ struct FinancialActivityDetailView: View {
                 Text(verbatim: detail.currency + " " + AccountPresentation.amount(detail.amount, locale: locale))
                     .font(ArgusStyle.display(30)).monospacedDigit()
                 Text(verbatim: AccountPresentation.date(detail.occurredAt, zone: detail.timeZone, locale: locale))
+                if let principal = detail.principalMinor { PlanValueRow(title: "debt.principal", value: minor(principal, detail)) }
+                if let interest = detail.interestMinor { PlanValueRow(title: "debt.interest", value: minor(interest, detail)) }
+                if let fees = detail.feesMinor { PlanValueRow(title: "debt.fees", value: minor(fees, detail)) }
+                if detail.kind == .paymentReversal { Text("debt.return.disclosure") }
                 if let category = detail.categoryId { Text(LocalizedStringKey("loop.category." + category)) }
                 if let source = detail.sourceId { Text(LocalizedStringKey("loop.source." + source)) }
                 if let note = detail.note, !note.isEmpty { Text(verbatim: note) }
@@ -107,6 +119,9 @@ struct FinancialActivityDetailView: View {
                         }
                     }
                 }
+                if detail.kind == .cardPayment || detail.kind == .debtPayment {
+                    Button("debt.return") { if let returnPayment { returnPayment(detail) } else { loop.returnPayment(detail) } }.buttonStyle(PillButtonStyle(primary: false)).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("activity.return")
+                }
                 Button("loop.correction.title") { correct(detail) }
                     .buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil)
                     .accessibilityIdentifier("activity.correct")
@@ -118,6 +133,7 @@ struct FinancialActivityDetailView: View {
         }.task(id: activityID) { await load() }
             .onChange(of: loop.activityEditor == nil) { _, closed in if closed { Task { await load() } } }
     }
+    private func minor(_ value: Int64, _ detail: FinancialActivityDetail) -> String { PlanPresentation.money(String(value), currency: detail.currency, digits: detail.currencyFractionDigits, locale: locale) }
     private func load() async {
         errorKey = nil
         do {
@@ -167,7 +183,8 @@ struct FinancialActivityRow: View {
         switch activity.kind {
         case "income": "arrow.down.left"
         case "transfer": "arrow.left.arrow.right"
-        case "card_payment": "creditcard"
+        case "card_payment", "debt_payment": "creditcard"
+        case "payment_reversal": "arrow.uturn.backward"
         case "refund": "arrow.uturn.backward"
         default: "arrow.up.right"
         }

@@ -43,6 +43,7 @@ struct FoundationShell: View {
         }
         .financialBudgetBackground(auth.financialLoop?.budgets)
         .financialGoalBackground(auth.financialLoop?.goals)
+        .financialDebtBackground(auth.financialLoop?.debts)
         .overlay {
             if let loop = auth.financialLoop {
                 FinancialBudgetPresenter(model: loop.budgets, loop: loop, destination: $destination, search: auth.financialSearch)
@@ -51,11 +52,15 @@ struct FoundationShell: View {
         .overlay {
             if let loop = auth.financialLoop { FinancialGoalPresenter(model: loop.goals, loop: loop, destination: $destination, search: auth.financialSearch) }
         }
+        .overlay {
+            if let loop = auth.financialLoop { FinancialDebtPresenter(model: loop.debts, loop: loop, destination: $destination, search: auth.financialSearch) }
+        }
         .background(ArgusStyle.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             FloatingNavigation(selection: $destination)
                 .financialBudgetBackground(auth.financialLoop?.budgets)
         .financialGoalBackground(auth.financialLoop?.goals)
+        .financialDebtBackground(auth.financialLoop?.debts)
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 8)

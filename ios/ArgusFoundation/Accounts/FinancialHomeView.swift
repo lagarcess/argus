@@ -78,6 +78,7 @@ struct FinancialHomeView: View {
                         }
                     }
                     FinancialGoalList(plan: plan, model: loop.goals, origin: .home, compact: true)
+                    FinancialDebtList(plan: plan, model: loop.debts, origin: .home, compact: true)
                     FinancialBudgetList(plan: plan, model: loop.budgets, origin: .home, compact: true)
                     FinancialComingUpView(model: loop.plan, viewPlan: { destination = .plan })
                     VStack(alignment: .leading, spacing: 16) {

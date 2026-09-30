@@ -56,6 +56,9 @@ struct FinancialPlanView: View {
                 } else if model.section == .goals {
                     if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                     FinancialGoalList(plan: model, model: loop.goals, origin: .plan)
+                } else if model.section == .debts {
+                    if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
+                    FinancialDebtList(plan: model, model: loop.debts, origin: .plan)
                 } else if model.section == .budgets {
                     if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                     FinancialBudgetList(plan: model, model: loop.budgets, origin: .plan)
