@@ -76,7 +76,7 @@ struct FinancialActivityEditorView: View {
 
     private var entry: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if !model.isCorrection && model.planOccurrence == nil {
+            if !model.isCorrection && model.planOccurrence == nil && model.goal == nil {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("loop.activity.kind")
                     ScrollView(.horizontal) {
@@ -207,6 +207,18 @@ struct FinancialActivityEditorView: View {
                     }
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
+            }
+            if let result = model.goalPreview, preview.ready {
+                Text("goal.afterContribution").font(ArgusStyle.display(21))
+                FinancialGoalSummary(progress: result.goal, compact: true)
+                ForEach(result.pools.filter { $0.state == "shortfall" && !$0.affectedGoalIds.isEmpty && ($0.accountId == model.sourceAccountId || $0.accountId == model.destinationAccountId) }) { pool in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(accountName(pool.accountId))
+                        Text("goal.reason.pool_shortfall").foregroundStyle(ArgusStyle.negative)
+                        Text(pool.affectedGoalNames.joined(separator: " · "))
+                        Text(PlanPresentation.money(pool.shortfallMinor ?? "0", currency: pool.currency, digits: result.goal.goal.currencyFractionDigits, locale: locale))
+                    }
+                }
             }
             if model.kind == .transfer || model.kind == .cardPayment {
                 Text("loop.activity.pairNote").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)

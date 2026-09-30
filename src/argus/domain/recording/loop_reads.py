@@ -134,7 +134,7 @@ def expense_record(stored: StoredAccount, record_id: str) -> ExpenseRecord:
     return record
 
 
-def _personal(amount: int, bps: int) -> int:
+def personal_share(amount: int, bps: int) -> int:
     quotient, remainder = divmod(abs(amount) * bps, 10000)
     if remainder > 5000 or remainder == 5000 and quotient % 2:
         quotient += 1
@@ -188,7 +188,7 @@ def home_response(
             group["unknown_accounts"] += 1
         else:
             group["known_accounts"] += 1
-            amount = _personal(balance.amount_minor, facts.ownership_share_bps)
+            amount = personal_share(balance.amount_minor, facts.ownership_share_bps)
             group["net_worth_minor"] += amount
             if amount >= 0:
                 group["assets_minor"] += amount

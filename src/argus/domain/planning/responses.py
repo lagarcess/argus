@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from argus.domain.planning.budget_schemas import BudgetHomeResponse, BudgetProgress
+from argus.domain.planning.goal_schemas import GoalPool, GoalProgress
 from argus.domain.planning.schemas import Schedule
 from argus.domain.recording.money_responses import (
     MoneyActivityResponse,
@@ -37,9 +38,12 @@ class Expectation(BaseModel):
 
 class Occurrence(BaseModel):
     id: str
-    expectation_id: str
+    expectation_id: str | None
+    goal_id: str | None = None
+    source_account_id: str | None = None
+    destination_account_id: str | None = None
     expectation_version: int
-    kind: Literal["income", "bill"]
+    kind: Literal["income", "bill", "goal_transfer"]
     title: str
     currency: str
     currency_fraction_digits: int
@@ -80,6 +84,7 @@ class ForecastCurrency(BaseModel):
     starting_minor: str | None
     expected_income_minor: str
     expected_bills_minor: str
+    transfer_effect_minor: str
     net_cash_change_minor: str
     ending_minor: str | None
     first_shortfall_date: date | None
@@ -91,6 +96,8 @@ class ForecastCurrency(BaseModel):
 class PlanResponse(BaseModel):
     home: BudgetHomeResponse
     budgets: list[BudgetProgress]
+    goals: list[GoalProgress]
+    goal_pools: list[GoalPool]
     selection: Selection
     accounts: list[FinancialAccountResponse]
     expectations: list[Expectation]

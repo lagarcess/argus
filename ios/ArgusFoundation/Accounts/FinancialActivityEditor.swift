@@ -11,6 +11,8 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     let origin: FinancialAccount
     let correcting: FinancialActivityDetail?
     let planOccurrence: FinancialPlanOccurrence?
+    let goal: FinancialGoal?
+    let goalOccurrenceId: String?
     @Published private(set) var kind: FinancialActivityKind
     @Published var accountId: UUID? { didSet { changed(accountId != oldValue) } }
     @Published var sourceAccountId: UUID? { didSet { changed(sourceAccountId != oldValue) } }
@@ -25,6 +27,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     @Published private(set) var options: FinancialActivityOptions?
     @Published private(set) var purchases: [FinancialActivityDetail] = []
     @Published private(set) var preview: FinancialActivityPreview?
+    @Published private(set) var goalPreview: FinancialGoalPreview?
     @Published private(set) var phase = Phase.editing
     @Published private(set) var errorKey: String?
 
@@ -41,12 +44,13 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     private let retired: (SessionSnapshot) -> Void
     private let completed: (FinancialActivityReceipt) async -> Void
 
-    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil, planOccurrence: FinancialPlanOccurrence? = nil,
+    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil, planOccurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil,
          controller: SessionController, journal: FinancialWriteJournal, identity: SessionSnapshot,
          started: @escaping (PendingFinancialConfirmation) -> Void = { _ in },
          resolved: @escaping () -> Void = {},
          retired: @escaping (SessionSnapshot) -> Void = { _ in },
          completed: @escaping (FinancialActivityReceipt) async -> Void) {
+        self.goal = goal; self.goalOccurrenceId = goalOccurrenceId
         self.origin = origin; self.correcting = correcting; self.planOccurrence = planOccurrence
         self.controller = controller; self.journal = journal; self.identity = identity
         self.started = started; self.resolved = resolved; self.retired = retired; self.completed = completed
@@ -66,6 +70,12 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         } else {
             if let planOccurrence { kind = planOccurrence.kind == .income ? .income : .expense }
             setAccounts(for: kind)
+            if let goal {
+                kind = .transfer; sourceAccountId = goal.contributionPlan?.sourceAccountId ?? origin.id
+                destinationAccountId = goal.destinationAccountId
+                amount = goal.contributionPlan.map { AccountPresentation.amount($0.amount, locale: .current) } ?? ""
+                note = goal.name
+            }
             if let planOccurrence {
                 amount = AccountPresentation.amount(planOccurrence.amount, locale: .current)
                 note = planOccurrence.title
@@ -97,7 +107,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         choices(types: options?.eligibility[kind.rawValue]).filter { $0.id != destinationAccountId }
     }
     var destinationChoices: [FinancialAccount] {
-        choices(types: options?.destinationEligibility[kind.rawValue]).filter { $0.id != sourceAccountId }
+        choices(types: options?.destinationEligibility[kind.rawValue]).filter { $0.id != sourceAccountId && (goal == nil || $0.id == goal?.destinationAccountId) }
     }
     var linkedPurchase: FinancialActivityDetail? { purchases.first { $0.activityId == purchaseActivityId } }
 
@@ -115,7 +125,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     }
 
     func setKind(_ next: FinancialActivityKind) {
-        guard !isCorrection, canEdit, availableKinds.contains(next) || options == nil else { return }
+        guard !isCorrection, goal == nil, planOccurrence == nil, canEdit, availableKinds.contains(next) || options == nil else { return }
         kind = next; categoryId = nil; sourceId = nil; purchaseActivityId = nil
         answers = []; invalidate(); setAccounts(for: next)
         if next == .refund { Task { await loadPurchases() } }
@@ -136,7 +146,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
 
     private func choices(types: [String]?) -> [FinancialAccount] {
         guard let options, let types else { return [] }
-        return options.accounts.filter { (planOccurrence == nil || $0.id == planOccurrence?.accountId) && !$0.archived && $0.currency == origin.currency && types.contains($0.type) }
+        return options.accounts.filter { (planOccurrence == nil || $0.id == planOccurrence?.accountId) && !$0.archived && $0.currency == origin.currency && types.contains($0.type) && (goal == nil || ["cash", "checking", "savings"].contains($0.type)) }
     }
 
     private func loadPurchases() async {
@@ -194,7 +204,11 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                 expectedRevision: correcting?.revision, reason: isCorrection ? reason : nil,
                 expectedVersions: versions, coverage: answers)
             let next: FinancialActivityPreview
-            if let occurrence = planOccurrence {
+            if let goal {
+                let result = try await controller.financialGoalPreview(goal.id, command: .init(expectedVersion: goal.version, activity: command, occurrenceId: goalOccurrenceId), expectedIdentity: identity)
+                guard !(await retireIfNeeded()) else { return }
+                goalPreview = result; next = result.money
+            } else if let occurrence = planOccurrence {
                 next = try await controller.financialPlanPreview(occurrenceId: occurrence.id,
                     command: .init(expectedVersion: occurrence.expectationVersion, activity: command), expectedIdentity: identity).money
             } else {
@@ -226,7 +240,10 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                     throw SessionFailure.invalidResponse
                 }
                 let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
-                if let occurrence = planOccurrence {
+                if let goal {
+                    let operation = FinancialPlanOperation.recordGoal(id: goal.id, version: goal.version)
+                    write = .init(ownerId: owner, originAccountId: origin.id, route: "financial-plan", path: operation.path, method: operation.method, body: try encoder.encode(FinancialGoalRecordCommand(expectedVersion: goal.version, activity: reviewedCommand, occurrenceId: goalOccurrenceId)), key: key, planOperation: operation)
+                } else if let occurrence = planOccurrence {
                     let operation = FinancialPlanOperation.fulfill(occurrenceId: occurrence.id, version: occurrence.expectationVersion)
                     write = .init(ownerId: owner, originAccountId: origin.id, route: "financial-plan", path: operation.path,
                         method: operation.method, body: try encoder.encode(FinancialPlanFulfillmentCommand(
@@ -286,6 +303,11 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         guard case SessionFailure.rejected(_, let code) = error else { return "loop.error.connection" }
         guard let code else { return "loop.error.validation" }
         switch code {
+        case "goal_backing_shortfall": return "goal.error.shortfall"
+        case "goal_backing_unknown", "goal_backing_ineligible": return "goal.error.backing"
+        case "goal_setup_required", "goal_setup_invalid", "goal_contribution_mismatch": return "goal.error.setup"
+        case "goal_release_required", "goal_included_exceeds_allocation": return "goal.error.allocation"
+        case "goal_allocation_negative", "goal_allocation_duplicate": return "goal.error.amount"
         case "budget_scope_conflict": return "budget.error.duplicate"
         case "budget_category_required", "budget_scope_duplicate", "budget_limit_required": return "budget.error.scope"
         case "plan_cutover_unsafe": return "plan.error.cutover"

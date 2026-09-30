@@ -53,6 +53,9 @@ struct FinancialPlanView: View {
                         Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                         Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
                     }
+                } else if model.section == .goals {
+                    if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
+                    FinancialGoalList(plan: model, model: loop.goals, origin: .plan)
                 } else if model.section == .budgets {
                     if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                     FinancialBudgetList(plan: model, model: loop.budgets, origin: .plan)
@@ -91,6 +94,7 @@ struct FinancialPlanView: View {
                     }
                     PlanValueRow(title: "plan.income", value: amount(currency.expectedIncomeMinor, currency))
                     PlanValueRow(title: "plan.bills", value: amount(currency.expectedBillsMinor, currency))
+                    if let effect = currency.transferEffectMinor { PlanValueRow(title: "goal.transferEffect", value: amount(effect, currency)) }
                     PlanValueRow(title: "plan.netChange", value: amount(currency.netCashChangeMinor, currency))
                     if let shortfall = currency.firstShortfallDate {
                         Label { Text("plan.shortfall") + Text(verbatim: " · " + PlanPresentation.dateLabel(shortfall, locale: locale)) }

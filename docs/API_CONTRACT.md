@@ -7175,3 +7175,78 @@ Financial Search adds `kind=budget` and `{kind:"budget",budget:BudgetDefinition}
 hits with the existing owner/filter/snapshot cursor contract and live detail
 route. The iPhone reuses the owner-scoped exact-command write journal for budget
 commands and retains budget/contributor navigation within its originating tab.
+
+## Connected personal savings goals
+
+Goals reuse the registered-owner `/financial-plan` gate, owner transaction and
+Idempotency-Key receipt replay before version checks. Inputs use decimal strings;
+stored amounts use integer minor units; derived aggregate amounts use strings.
+Currency is immutable. Goal commands never change money except an explicitly
+reviewed new contribution recorded through the existing Money command.
+
+`POST /financial-plan/goals` accepts `{name,currency,target,target_date?,
+destination_account_id?,contribution_plan?}`. The optional plan contains
+`{source_account_id,amount,schedule:Schedule}` and requires a destination.
+`PATCH /financial-plan/goals/{id}` accepts `{expected_version,name?,target?,
+target_date?,destination_account_id?,contribution_plan?,effective_date?,archived?}`.
+Null clears optional setup. Schedule cutover protects fulfilled/prepaid dates.
+Both return `{goal:GoalProgress,replayed}`. `GET /financial-plan/goals/{id}` returns
+GoalProgress. Plan adds `goals` and `goal_pools`; Home adds active `goals`.
+Search adds `kind=goal` with the same current goal detail projection.
+
+GoalProgress includes definition, assigned_minor, supported_minor,
+independently_backed_minor, remaining_minor, state, reasons, pools, contributions,
+planned_minor, projected_minor and projection_end_date. Unknown or shared-disputed
+support is null. Independently backed partial support is separately labeled.
+Reached requires resolved support at target with no review issue.
+
+`PUT /financial-plan/goals/allocations` accepts `{changes:[{goal_id,
+expected_version,account_id,amount,release_claim_ids:[]}],expected_account_versions}`.
+Version keys are account UUIDs. Each amount replaces that goal/account's assigned
+total. Explicit released links stop counting; retained linked components determine
+the remaining unlinked residual. All changes commit together and return
+`{goals,pools,replayed}`. Increased claims need known sufficient backing. Reductions
+remain allowed during a deficit. No allocation posts activity or changes balances.
+
+`GET /financial-plan/goals/{id}/contributions/candidates` returns eligible unclaimed
+current transfers. `POST /financial-plan/goals/{id}/contributions/link` accepts
+`{expected_version,activity_id,activity_revision,treatment:"add"|"included",
+occurrence_id?,expected_account_versions}` and returns `{goal,replayed}`. Included
+partitions unlinked assignment. Assigning 600 then including a transfer of 200
+leaves residual 400 plus current 200. Correction to 150 yields 550. The reviewed
+original amount is provenance only. One full destination personal amount belongs
+to one goal; its own occurrence can share that same claim without another credit.
+
+`POST /financial-plan/goals/{id}/contributions/preview` and `/contributions` accept
+`{expected_version,activity:MoneyRequest,occurrence_id?}`. Preview returns
+`{goal,money:MoneyPreviewResponse}`. Confirmation uses reviewed_request and
+preview_token and returns `{goal,activity,accounts,replayed}`. Recording and claim
+commit atomically. `POST /financial-plan/goals/{id}/contributions/{claim_id}/release`
+accepts `{expected_version}` and returns `{goal,replayed}`. Stop counting never
+changes money or reopens a fulfilled occurrence.
+
+Backing uses known current personal Recording position in same-currency cash,
+checking and savings. Account and goal archive retain backing/claims; goal archive
+suspends pending schedules. Pools report backing, assigned, available, shortfall
+and affected goals. Shared shortages make affected support null. One claimant
+supports min(claim,backing) with Needs review. Unknown cannot fund a new positive
+claim. Current original corrections propagate; incompatible or missing originals
+require review, never a stale-amount fallback. No general activity removal API is
+added. Reverse transfers change backing without inferring cancellation.
+
+Goal occurrences use kind `goal_transfer`, goal_id, nullable expectation_id and
+source/destination_account_id. The existing Schedule/occurrence owner handles
+recurrence and cutover. Forecasts apply selected signed account legs with current
+personal-share rounding and report transfer_effect_minor separately from income,
+bills and spending. Fulfilled and disputed links exclude another forecast payment.
+Planned/projection values remain separate from supported actual savings.
+
+Each GoalProgress also supplies `components:[{account_id,assigned_minor,
+supported_minor}]`. Allocation editors display these server-derived current
+per-account assignments and send explicit replacement intentions; clients do not
+reconstruct linked amounts or pool support. `GoalPool.account_name` is nullable,
+matching the existing optional Recording nickname.
+
+Contribution preview also returns `pools:[GoalPool]` for the reviewed projected
+account snapshot. The native money review shows supported goal progress after the
+contribution and any affected source-account shortfall before confirmation.

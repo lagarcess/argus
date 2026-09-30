@@ -2699,3 +2699,21 @@ original purchase, while their received timestamp owns period membership.
 Unlinked refunds use their recorded scope. Negative net spending is valid.
 Archived accounts remain explicit scope members. Definition changes never write
 account records, cash forecasts, or bill-fulfillment links.
+
+### Connected personal savings goals
+
+`financial_goals` stores owner-qualified versioned definitions, immutable currency,
+target, optional date/destination, explicit unlinked allocation residuals,
+reversible archive state and contribution schedule segments. No saved total or
+account balance is persisted. Current Recording position/activity and one shared
+personal ownership rounding function supply actual money.
+
+The additive goal migration extends `financial_plan_links` with stable claim_id,
+nullable occurrence_id/expectation_id, goal_id and attribution. Existing expectation
+identity/snapshot, unique owner/activity and owner-qualified exact activity-revision
+foreign keys remain. A goal claim has attribution and/or its own occurrence;
+released attribution persists explicitly and retains fulfillment. Ad hoc claims
+cannot enter expectation-only readers. Accepted original personal amounts are
+provenance, never current-value fallback. Goal rows use registered-owner SELECT
+RLS and service-only writes. Existing Plan receipts, owner/account locks and
+repeatable-read snapshots own goal writes/reads and atomic contribution posting.
