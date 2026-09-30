@@ -172,8 +172,8 @@
     }
   },
   "observational": false,
-  "readback_at": "2026-09-30T20:14:30.317434+00:00",
-  "readback_commit": "539852292e2bb10f7218b606f1447e892ea50142",
+  "readback_at": "2026-09-30T21:11:40.611147+00:00",
+  "readback_commit": "70e34fe94641806ca3e80ac9ac6fff9ad73603f3",
   "retained_state_verified": true,
   "stage": "api_complete",
   "suffix": "c801d065"
