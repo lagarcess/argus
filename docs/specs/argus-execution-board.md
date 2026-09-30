@@ -105,8 +105,10 @@ API and data contracts change in the same implementation PR.
 completed read-only reports at the integration base and relinquished ownership.
 The exclusive implementation checkout is
 `/Users/garces/.codex/worktrees/connected-budgets-core/private-alpha-next` on
-`codex/connected-budgets-implementation`. No writer is dispatched before the
-policy answer. The captain owns
+`codex/connected-budgets-implementation`. Budget policy implementation is not
+dispatched before the answer. A bounded acceptance-setup writer may prepare
+canonical synthetic financial records and the reusable HTTP fixture script
+without choosing budget behavior. The captain owns
 scope, financial contracts, integration, acceptance, publication and readiness.
 All agents have bounded outputs and are stopped after their handoffs.
 
@@ -128,6 +130,7 @@ These steps live here instead of a competing task board.
 - [x] `how` over the affected subsystem.
 - [x] `architect` for parallel design exploration.
 - [x] Write the throughput checkpoint as four todo items.
+- [ ] Prepare reusable canonical-activity acceptance fixtures independently.
 - [ ] Resolve the financial policy gate and bind the implementation owner.
 - [ ] Delegate code-writing to a subagent in its exclusive worktree.
 - [ ] Verify on the matching surface with real API/Postgres and simulator.
@@ -143,6 +146,7 @@ These steps live here instead of a competing task board.
 | --- | --- | --- |
 | Preserve integration and existing demos | Fresh integration `9f51912198c2c77e239f670a2b3f78da2942afed`; prior demo guides below | New 590xx allocation and dedicated simulator created; no prior environment changed. |
 | Keep one financial owner | Existing Recording/Planning contracts and the three bounded scout reports | Snapshot architecture selected; policy answer pending. |
+| Continue independent acceptance preparation | Existing recording API and exact minor-unit contracts | Prepare a replay-safe synthetic activity script; no budget rules or hosted calls. |
 | Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Inherited registered sign-in, relaunch, sign-out and signed-out relaunch passed on the dedicated simulator against real local Auth/API/Postgres. Result `ui-20260930T001256Z.xcresult` is ignored local diagnostics. The inherited recording, Plan and Search baseline also passed 203 tests with zero skips against this lane's disposable Postgres. Budget implementation has not started. |
 
 Completion requires the full assigned journey, durable visual/interaction evidence,
