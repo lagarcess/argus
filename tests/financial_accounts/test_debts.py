@@ -474,3 +474,79 @@ def test_archive_removes_claimed_future_remainder_and_restore_recovers_it(scene)
     )
     assert restored_row["id"] == oid and restored_row["exclusion_reason"] is None
     assert restored_row["activity_id"] == saved["activity"]["activity_id"]
+
+
+@pytest.mark.parametrize("requires_coverage", [False, True])
+def test_uppercase_debt_preview_preserves_canonical_identity_without_writing(
+    scene, requires_coverage
+):
+    from argus.domain.recording.schemas import account_response
+
+    debts, cash, loan, progress = setup(scene)
+    did = progress["debt"]["id"]
+    upper = did.upper()
+    before = debts.get(scene[1], upper)
+    accounts_before = {
+        s.account.id: account_response(s).model_dump(mode="json")
+        for s in scene[0].list_accounts(user_id=scene[1])
+    }
+    request = MoneyRequest(
+        kind="debt_payment",
+        source_account_id=cash,
+        destination_account_id=loan,
+        amount="100",
+        principal="80",
+        interest="15",
+        fees="5",
+        occurred_at=NOW - timedelta(days=10) if requires_coverage else NOW,
+    )
+    body = DebtRecord(
+        expected_version=1,
+        activity=request,
+        occurrence_id=progress["occurrences"][0]["id"].upper(),
+    )
+    preview = debts.preview(scene[1], upper, body)
+    assert preview["debt"]["debt"]["id"] == did
+    assert preview["money"]["ready"] is not requires_coverage
+    assert debts.get(scene[1], upper) == before
+    assert debts.candidates(scene[1], upper)["items"] == []
+    assert current_activities(scene[0].list_accounts(user_id=scene[1])) == []
+    assert {
+        s.account.id: account_response(s).model_dump(mode="json")
+        for s in scene[0].list_accounts(user_id=scene[1])
+    } == accounts_before
+    if requires_coverage:
+        answers = [
+            {
+                "account_id": effect["account_id"],
+                "observation_id": question["observation_id"],
+                "included": False,
+            }
+            for effect in preview["money"]["affected_accounts"]
+            for question in effect["observations"]
+        ]
+        assert len(answers) == 2
+        request = MoneyRequest.model_validate(
+            request.model_dump() | {"coverage": answers}
+        )
+        body = body.model_copy(update={"activity": request})
+        preview = debts.preview(scene[1], upper, body)
+        assert preview["money"]["ready"]
+        assert debts.get(scene[1], upper) == before
+    assert preview["debt"]["balance"]["amount_minor"] == -92000
+    reviewed = MoneyRequest.model_validate(
+        preview["money"]["reviewed_request"]
+    ).model_copy(update={"preview_token": preview["money"]["preview_token"]})
+    saved = debts.record(
+        scene[1], upper, body.model_copy(update={"activity": reviewed}), str(uuid4())
+    )
+    assert saved["debt"]["debt"]["id"] == did
+    assert saved["debt"]["debt"]["version"] == 2
+    assert saved["debt"]["balance"]["amount_minor"] == -92000
+    assert saved["debt"]["payments"][0]["activity_id"] == saved["activity"]["activity_id"]
+    assert debts.get(scene[1], upper) == debts.get(scene[1], did)
+    assert (
+        debts.candidates(scene[1], upper)["items"]
+        == debts.candidates(scene[1], did)["items"]
+        == []
+    )

@@ -179,6 +179,7 @@ class DebtService:
         confirming: bool,
     ) -> tuple[dict[str, Any], Any]:
         item = debt_model.get(state, did, body.expected_version)
+        did = item["id"]
         if (
             body.activity.kind not in {"card_payment", "debt_payment"}
             or body.activity.expected_revision is not None

@@ -56,6 +56,50 @@ def test_debt_commands_plan_home_search_and_owner_boundary(client):
     )
     assert search.status_code == 200, search.text
     assert search.json()["items"][0]["debt"]["debt"]["id"] == did
+    upper_path = path + "/" + did.upper()
+    record_body = {
+        "expected_version": 1,
+        "activity": {
+            "kind": "debt_payment",
+            "source_account_id": ids[0],
+            "destination_account_id": ids[1],
+            "amount": "100",
+            "principal": "80",
+            "interest": "15",
+            "fees": "5",
+            "occurred_at": "2026-09-02T12:00:00-04:00",
+        },
+    }
+    preview = client.post(
+        upper_path + "/payments/preview", headers=headers, json=record_body
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["debt"]["debt"]["id"] == did
+    unchanged = client.get(upper_path, headers=headers)
+    assert unchanged.status_code == 200, unchanged.text
+    assert (
+        unchanged.json()["balance"]["amount_minor"] == -100000
+        and unchanged.json()["payments"] == []
+    )
+    record_body["activity"] = preview.json()["money"]["reviewed_request"] | {
+        "preview_token": preview.json()["money"]["preview_token"]
+    }
+    saved = client.post(
+        upper_path + "/payments",
+        headers=headers | {"Idempotency-Key": str(uuid4())},
+        json=record_body,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["debt"]["debt"]["id"] == did
+    assert saved.json()["debt"]["balance"]["amount_minor"] == -92000
+    assert (
+        client.get(upper_path + "/payments/candidates", headers=headers).json()["items"]
+        == []
+    )
+    assert (
+        client.get(upper_path, headers=headers).json()
+        == client.get(path + "/" + did, headers=headers).json()
+    )
 
 
 def test_payment_and_actual_return_remain_readable_in_home_and_plan(client):
