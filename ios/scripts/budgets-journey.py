@@ -19,6 +19,12 @@ SPEC.loader.exec_module(scene)
 
 
 class Client(scene.Client):
+    def __init__(self, config, response_loss=False):
+        super().__init__(config)
+        self.origin = "http://127.0.0.1:59012/api/v1" if response_loss else scene.API
+        self.drop_budget_response = response_loss
+        self.response_loss_verified = False
+
     def api(self, owner, method, path, body=None, key=None):
         parsed = urlsplit(path)
         scene.require(not parsed.scheme and not parsed.netloc and not parsed.fragment
@@ -36,9 +42,25 @@ class Client(scene.Client):
                        "Authorization": "Bearer " + self.sessions[owner]["access_token"]}
             if key:
                 headers["Idempotency-Key"] = key
-            return self.raw(scene.API + path, method, body, headers)
+            return self.raw(self.origin + path, method, body, headers)
 
-        status, result = send()
+        drop = self.drop_budget_response and method == "POST" and path == "/financial-plan/budgets"
+        if drop:
+            before_status, before = self.raw("http://127.0.0.1:59012/__fault", "POST", None, {})
+            scene.require(before_status == 200 and before.get("armed") is True,
+                          "Local response-loss proxy is not ready")
+            self.drop_budget_response = False
+        try:
+            status, result = send()
+        except ConnectionError:
+            if not drop:
+                raise
+            status, result = send()
+            _, after = self.raw("http://127.0.0.1:59012/__fault", "GET", None, {})
+            scene.require(after.get("dropped") == before.get("dropped") + 1
+                          and result.get("replayed") is True,
+                          "Committed response-loss retry was not proved")
+            self.response_loss_verified = True
         if status == 401:
             self.refresh(owner)
             status, result = send()
@@ -196,6 +218,8 @@ def run(client, state, fixture):
         "q": edited["budget"]["name"], "kind": "budget", "currency": "DOP"}))
     scene.require(any(row["budget"]["id"] == budget_id for row in search["items"]),
                   "Search did not return the canonical budget")
+    if client.response_loss_verified:
+        state["committed_response_loss"] = "one accepted budget response dropped; exact bytes/key replayed once"
     state["complete"] = True
     scene.save_state(state)
 
@@ -210,18 +234,21 @@ def readback(client, state):
             "final_spent_minor": 15500, "final_limit_minor": 16000,
             "contributors": 4, "scope_checks": 5, "canonical_retries": 5,
             "owner_read_and_write_isolation": True,
+            "committed_response_loss": state.get("committed_response_loss", "not exercised"),
             "limitations": "Native UI, transport-loss recovery and boundary matrix recorded separately"}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("run", "readback"))
-    action = parser.parse_args().action
+    parser.add_argument("--response-loss", action="store_true", help="Drop the first accepted budget response through owned proxy59012")
+    args = parser.parse_args()
+    action = args.action
     config = scene.load_client()
     fixture = scene.load_state(create=False)
     scene.STATE = scene.WORK / "budgets-journey-private.json"
     state = scene.load_state(create=action == "run")
-    client = Client(config)
+    client = Client(config, response_loss=args.response_loss)
     if action == "run":
         run(client, state, fixture)
     print(json.dumps(readback(client, state), sort_keys=True))
