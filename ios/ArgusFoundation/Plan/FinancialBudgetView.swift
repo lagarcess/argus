@@ -17,7 +17,7 @@ struct FinancialBudgetList: View {
                         HStack { Text(verbatim: progress.budget.name); Spacer(); Image(systemName: "chevron.right").font(.system(size: 12)) }
                         FinancialBudgetSummary(progress: progress, compact: true)
                     }.padding(.vertical, 14).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityIdentifier("budget.row." + progress.id.uuidString)
+                }.buttonStyle(.plain).accessibilityIdentifier("budget.row." + origin.rawValue + "." + progress.id.uuidString)
             }
             if !compact {
                 Button("budget.add") { Task { await model.create() } }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("budget.add")

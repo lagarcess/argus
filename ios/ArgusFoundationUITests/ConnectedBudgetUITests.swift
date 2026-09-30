@@ -101,7 +101,7 @@ extension FinancialLoopUITests {
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("budget-exact-command-recovered-once")
         app.buttons["budget.close"].tap()
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.' AND label CONTAINS %@", title)).count, 1)
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.plan.' AND label CONTAINS %@", title)).count, 1)
     }
 
     func budgetExpense(amount: String, note: String) {
@@ -137,18 +137,19 @@ extension FinancialLoopUITests {
     func openBudget(_ title: String) {
         app.buttons["tab.plan"].tap()
         tapVisible(app.buttons["plan.budgets"])
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.' AND label CONTAINS %@", title)).firstMatch
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.plan.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(row)
         XCTAssertTrue(app.staticTexts["budget.spent"].waitForExistence(timeout: 15))
     }
 
     func assertBudget(spent: String, status: String, over: Bool = false) {
-        let amount = app.staticTexts["budget.spent"]
+        let detail = app.otherElements["budget.detail"]
+        let amount = detail.staticTexts["budget.spent"]
         let expected = NSPredicate(format: "label == %@", "DOP " + spent)
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: expected, object: amount)], timeout: 15), .completed)
-        assertText(over ? "over budget" : "remaining")
-        let remaining = app.otherElements["budget.remaining"]
-        if remaining.exists { XCTAssertTrue(remaining.label.contains(status)) }
-        else { assertText("DOP " + status) }
+        let remaining = detail.descendants(matching: .any)["budget.remaining"]
+        XCTAssertTrue(remaining.waitForExistence(timeout: 15))
+        XCTAssertTrue(remaining.label.contains(status))
+        XCTAssertTrue(remaining.label.contains(over ? "over budget" : "remaining"))
     }
 }
