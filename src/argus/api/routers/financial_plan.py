@@ -11,6 +11,13 @@ from argus.api.financial_accounts import (
     require_financial_accounts_context,
 )
 from argus.api.routers.financial_loop import _key
+from argus.domain.planning.budget_schemas import (
+    BudgetCreate,
+    BudgetEdit,
+    BudgetProgress,
+    BudgetReceipt,
+)
+from argus.domain.planning.budgets import BudgetService
 from argus.domain.planning.model import UnsafeCutover
 from argus.domain.planning.responses import (
     Candidates,
@@ -163,4 +170,42 @@ def link(
 def get_expectation(request: Request, context: Context, expectation_id: str) -> Any:
     return call(
         request, lambda: PlanService(context.service).get(context.user_id, expectation_id)
+    )
+
+
+@router.post("/budgets", response_model=BudgetReceipt, status_code=201)
+def create_budget(
+    request: Request, context: Context, body: BudgetCreate, idempotency_key: Key = None
+) -> Any:
+    return call(
+        request,
+        lambda: BudgetService(PlanService(context.service)).create(
+            context.user_id, body, _key(request, idempotency_key)
+        ),
+    )
+
+
+@router.patch("/budgets/{budget_id}", response_model=BudgetReceipt)
+def edit_budget(
+    request: Request,
+    context: Context,
+    budget_id: str,
+    body: BudgetEdit,
+    idempotency_key: Key = None,
+) -> Any:
+    return call(
+        request,
+        lambda: BudgetService(PlanService(context.service)).edit(
+            context.user_id, budget_id, body, _key(request, idempotency_key)
+        ),
+    )
+
+
+@router.get("/budgets/{budget_id}", response_model=BudgetProgress)
+def get_budget(request: Request, context: Context, budget_id: str) -> Any:
+    return call(
+        request,
+        lambda: BudgetService(PlanService(context.service)).get(
+            context.user_id, budget_id
+        ),
     )

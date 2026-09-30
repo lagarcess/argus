@@ -7153,7 +7153,9 @@ currency_fraction_digits,month,account_ids,category_ids,include_uncategorized,ar
 budgets. `BudgetProgress` is `{budget,period,gross_purchases_minor,refunds_minor,
 spent_minor,remaining_minor,over_budget_minor,contributors}`. Period uses the
 existing `{month,time_zone,start_at,end_at_exclusive}` shape. Aggregate minor-unit
-amounts are signed decimal strings. Contributors are current `MoneyActivityResponse`
+amounts are signed decimal strings. `remaining_minor` is limit minus spent;
+`over_budget_minor` is max(spent minus limit, zero). The UI shows overage when
+remaining is negative. Contributors are current `MoneyActivityResponse`
 rows; their matched collection owns both the totals and detail navigation.
 `GET /financial-plan` adds `budgets:[BudgetProgress]`; nested and standalone Home
 add the same active budget projections as `budgets`, from the same owner snapshot.
