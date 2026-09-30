@@ -243,6 +243,7 @@ final class FinancialLoopUITests: XCTestCase {
         continueAfterFailure = false
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-appearancePreference", "dark"]
         app.launch()
+        if app.buttons["budget.close"].waitForExistence(timeout: 2) { app.buttons["budget.close"].tap() }
         app.buttons["header.profile"].tap()
         if fresh, app.buttons["auth.signOut"].waitForExistence(timeout: 2) { app.buttons["auth.signOut"].tap() }
         if !app.buttons["auth.signOut"].waitForExistence(timeout: 5) {
