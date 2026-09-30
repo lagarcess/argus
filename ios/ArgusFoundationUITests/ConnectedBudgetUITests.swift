@@ -37,6 +37,16 @@ extension FinancialLoopUITests {
         assertBudget(spent: "155.00", status: "5.00", over: true)
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.activity.'")).count, 3)
         capture("budget-cross-account-refund")
+        let oldest = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.activity.' AND label CONTAINS %@", "Budget groceries " + stamp)).firstMatch
+        tapVisible(oldest)
+        app.buttons["budget.activity.back"].tap()
+        XCTAssertTrue(oldest.waitForExistence(timeout: 15))
+        let savedY = oldest.frame.minY
+        app.terminate(); app.launch()
+        XCTAssertTrue(oldest.waitForExistence(timeout: 15))
+        let restoredPosition = NSPredicate { _, _ in oldest.isHittable && abs(oldest.frame.minY - savedY) < 12 }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: restoredPosition, object: nil)], timeout: 15), .completed)
+        capture("budget-contributor-position-restored")
         tapVisible(app.buttons["budget.edit"])
         replaceMoneyField("budget.limit", with: "160")
         dismissMoneyKeyboard(); tapVisible(app.buttons["budget.save"])
@@ -112,6 +122,8 @@ extension FinancialLoopUITests {
         fillMoneyField("budget.name", with: title)
         fillMoneyField("budget.limit", with: "150")
         dismissMoneyKeyboard()
+        tapVisible(app.buttons["budget.currency"])
+        app.buttons["DOP"].tap()
         for account in accounts { tapVisible(app.switches["budget.account." + account.id]) }
         tapVisible(app.switches["budget.category.groceries"])
     }

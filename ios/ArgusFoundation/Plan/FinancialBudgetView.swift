@@ -141,7 +141,13 @@ struct FinancialBudgetDetailView: View {
                             }
                             if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                         }.padding(24).disabled(model.saving)
-                    }.onAppear { if let anchor = model.navigation?.anchor { reader.scrollTo(anchor, anchor: .top) } }
+                    }.task(id: model.detail?.contributors.map(\.activityId)) {
+                        guard let anchor = model.navigation?.anchor,
+                              model.detail?.contributors.contains(where: { $0.activityId == anchor }) == true else { return }
+                        await Task.yield()
+                        guard !Task.isCancelled else { return }
+                        reader.scrollTo(anchor, anchor: .top)
+                    }
                 }
             }
         }.background(ArgusStyle.background)
