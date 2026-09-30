@@ -48,9 +48,12 @@ final class FinancialGoalDraft: ObservableObject, Identifiable {
         guard ready, let exact = try AccountEntry.amount(target, locale: locale) else { throw AccountEntry.Failure.amount }
         let plan: FinancialGoalPlan?
         if hasPlan, let sourceID, let amount = try AccountEntry.amount(amount, locale: locale) {
+            let previous = existing?.contributionPlan?.schedule
+            let unchangedAnchor = previous?.cadence == .monthly && previous?.monthDays.isEmpty == true &&
+                previous?.startDate == PlanPresentation.day(start) && firstDay == PlanPresentation.monthDay(PlanPresentation.day(start))
+            let monthDays = cadence == .twiceMonthly ? [firstDay, secondDay] : cadence == .monthly && !unchangedAnchor ? [firstDay] : []
             plan = .init(sourceAccountId: sourceID, amount: amount, schedule: .init(cadence: cadence,
-                startDate: PlanPresentation.day(start), endDate: hasEnd ? PlanPresentation.day(end) : nil,
-                monthDays: cadence == .twiceMonthly ? [firstDay, secondDay] : cadence == .monthly ? [firstDay] : []))
+                startDate: PlanPresentation.day(start), endDate: hasEnd ? PlanPresentation.day(end) : nil, monthDays: monthDays))
         } else { plan = nil }
         let changed = existing.map { $0.destinationAccountId != destinationID || $0.contributionPlan != plan } ?? true
         return .init(name: name, currency: existing == nil ? currency : nil, target: exact,

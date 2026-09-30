@@ -515,3 +515,7 @@
 "goal.error.setup" = "Review the funding account, destination and transfer.";
 "goal.error.allocation" = "Review the unlinked assignment and release contributions explicitly if needed.";
 "goal.error.amount" = "Enter a nonnegative assignment for each goal and account.";
+"goal.afterContribution" = "After this contribution";
+"goal.of" = "of";
+
+"goal.loading" = "Loading goal…";

@@ -515,3 +515,7 @@
 "goal.error.setup" = "Revisa la cuenta de origen, el destino y la transferencia.";
 "goal.error.allocation" = "Revisa la asignación sin vincular y deja de contar aportes de forma explícita si hace falta.";
 "goal.error.amount" = "Ingresa una asignación de cero o más para cada meta y cuenta.";
+"goal.afterContribution" = "Después de este aporte";
+"goal.of" = "de";
+
+"goal.loading" = "Cargando meta…";

@@ -122,6 +122,7 @@ class GoalService:
         body: ContributionRecord,
         confirming: bool,
     ) -> tuple:
+        gid = goal_model.identifier(gid)
         item = goal_model.get(state, gid, body.expected_version)
         if (
             body.activity.kind != "transfer"
@@ -143,6 +144,9 @@ class GoalService:
             return {
                 "goal": self._view(state, accounts, gid),
                 "money": money.preview,
+                "pools": goal_projection.project(
+                    state, accounts, self.planner.today(state), self.planner.today(state)
+                )[1],
             }, None
         updated = storage.projected(accounts, money, self.planner.accounts._clock())
         actual = activity(updated, money.activity_id)
@@ -165,7 +169,13 @@ class GoalService:
                     account_response(s) for s in updated if s.account.id in money.affected
                 ],
             }, money
-        return {"goal": self._view(state, updated, gid), "money": money.preview}, None
+        return {
+            "goal": self._view(state, updated, gid),
+            "money": money.preview,
+            "pools": goal_projection.project(
+                state, updated, self.planner.today(state), self.planner.today(state)
+            )[1],
+        }, None
 
     def preview(self, owner: str, gid: str, body: ContributionRecord) -> dict[str, Any]:
         state, accounts = storage.read(self.planner.repository, owner)

@@ -55,6 +55,11 @@ struct FinancialGoalSummary: View {
                 }.frame(height: 4).accessibilityHidden(true)
             }
             Text(LocalizedStringKey("goal.state." + progress.state)).foregroundStyle(progress.state == "needs_review" ? ArgusStyle.negative : ArgusStyle.secondary).accessibilityIdentifier("goal.state")
+            if compact {
+                HStack(spacing: 4) { Text("goal.of"); Text(verbatim: amount(String(progress.goal.targetMinor))) }
+                    .font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                PlanValueRow(title: "goal.remaining", value: amount(progress.remainingMinor))
+            }
             if !compact {
                 PlanValueRow(title: "goal.target", value: amount(String(progress.goal.targetMinor)))
                 PlanValueRow(title: "goal.assigned", value: amount(progress.assignedMinor)).accessibilityIdentifier("goal.assigned")
@@ -168,7 +173,7 @@ struct FinancialGoalDetail: View {
                                     Button("goal.archive") { archiving = true }.frame(minHeight: 48).accessibilityIdentifier("goal.archive")
                                 }
                             }
-                            if model.loading { ProgressView("accounts.loading") }
+                            if model.loading { ProgressView("goal.loading") }
                             if let error = model.errorKey {
                                 Text(LocalizedStringKey(error)).accessibilityIdentifier("goal.error")
                                 Button("accounts.retry") { Task { await model.refreshIfOpen() } }
