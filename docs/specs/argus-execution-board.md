@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** [connected personal savings goals](#connected-personal-savings-goals-lane) are assigned through local acceptance and merge readiness. The founder-approved allocation policy is implemented and the complete local native journey passes. Publication and applicable PR checks complete merge readiness; no merge or deployment is authorized. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** [connected personal savings goals](#connected-personal-savings-goals-lane) are assigned through local acceptance and merge readiness. The founder-approved allocation policy is implemented and the complete local native journey passes. [PR #755](https://github.com/lagarcess/argus/pull/755) owns current exact-head checks and the terminal readiness audit. No merge or deployment is authorized. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -31,7 +31,9 @@ record/link, original correction, withdrawal/shared-shortfall recovery,
 lifecycle, Home/Plan/Search, relaunch and English/Spanish are connected.
 Implementation owner has relinquished a clean source tree. Independent review
 is clean after one confirmed lifecycle-input fix and one native harness fix.
-The captain owns publication, terminal applicable CI and the final PR audit.
+[PR #755](https://github.com/lagarcess/argus/pull/755) is published for review.
+Its check suite and terminal audit own current exact-head CI and readiness;
+the captain completes those gates without additional routine approval.
 All existing demos, synthetic data and phone resources are preserved. Ports
 58700–58749 and the phone owner's checkout, services and signing are forbidden.
 
@@ -171,8 +173,11 @@ records source/environment; no goal acceptance is claimed by those checks.
   Repository one-way integration merges override the playbook's rebase step.
 - [x] If the design is contested, interrogate before shipping. Skip: the
   independent grounded selection resolved the invariant without a contested design.
-- [ ] Run Opening a PR, exact-head applicable CI and the approved independent
-  review/fix loop, then record the terminal audit. No merge or deployment.
+- [x] Run Opening a PR and the approved independent review/fix loop.
+  Exact-head applicable CI and the terminal audit are owned by
+  [PR #755](https://github.com/lagarcess/argus/pull/755), which remains open;
+  readiness requires green applicable checks and zero unresolved findings.
+  No merge or deployment.
 
 
 1. **Blocking first steps:** the founder policy is settled. Select the bounded
@@ -200,7 +205,7 @@ one-way reconciliation when needed, assess semantic overlap, run affected
 acceptance and merged-tree modularity checks, finish applicable CI and record
 reviewed SHA and zero unresolved findings. Stop at merge-ready.
 
-### Local delivery evidence and remaining gates
+### Local delivery evidence and PR gates
 
 The assembled source is `83523335d43e6f6e98ac1ddd05fb47a0531ddc83`.
 [Runnable demo, short recording and restart instructions](../reports/evidence/connected-savings-goals/README.md)
@@ -1608,7 +1613,7 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
-landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are landed through PR #753; its terminal audit and landing record retain the local evidence. Connected personal savings goals are locally verified through the complete journey and await publication/PR gates for merge readiness, under
+landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are landed through PR #753; its terminal audit and landing record retain the local evidence. Connected personal savings goals are locally verified through the complete journey and are published in [PR #755](https://github.com/lagarcess/argus/pull/755), under
 the founder-approved account-backed allocation policy. Proposed owners must be bound to named
 workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
@@ -1621,7 +1626,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; connected personal savings goals pass local native/API/database acceptance with approved account-backed allocations and await PR gates; debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; connected personal savings goals pass local native/API/database acceptance with approved account-backed allocations, published as PR #755; debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |

@@ -129,7 +129,9 @@ plus 14 independent journal/launcher checks and the inherited 19 fault-proxy che
 The Swift package passed 55 tests with 4 inherited opt-in live-auth skips.
 [Independent review](review-proof.json) records one full fresh-context review and
 only affected fixes. Its confirmed null-lifecycle defect is fixed and regression
-covered. The PR terminal audit records final checks/head and evidence retention.
+covered. [PR #755](https://github.com/lagarcess/argus/pull/755) owns final checks/head,
+the terminal readiness audit and evidence retention. It remains open for
+founder merge approval.
 
 To verify the retained API scene without changing money:
 
@@ -160,7 +162,8 @@ valuation, household permissions or global transaction deletion is added.
 
 The inherited full-owner financial snapshot remains the scaling limit. Search
 and original-entry navigation retain surviving anchors; removed rows cannot
-retain a nonexistent position. A transient Xcode invalid-frame diagnostic occurred during the full native
+retain a nonexistent position. A transient Xcode invalid-frame diagnostic
+occurred during the full native
 journey; no visible failure occurred in the inspected goal frames. The existing
 manifest retains that visual-polish observation. No new ledger, saved counter or
 hidden allocation priority exists. Financial hosted exposure remains default-off.
