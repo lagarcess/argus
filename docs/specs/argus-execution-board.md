@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 29, 2026.
-**Execution state:** [connected personal spending budgets](#connected-personal-spending-budgets-lane) are authorized through a merge-ready local iPhone demonstration. Financial policy confirmation is pending; independent environment preparation is progressing. Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** [connected personal spending budgets](#connected-personal-spending-budgets-lane) are authorized through a merge-ready local iPhone demonstration. The founder approved the original budget policy and resumed implementation; isolated acceptance preparation is preserved. Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -49,20 +49,21 @@ prevention of duplicate buckets. Its `JOURNEY-EXPANSION.md` explicitly leaves
 production period/time-zone, account coverage, uncategorized and retention
 contracts open. These are not approved product deferrals.
 
-**One material product question is pending.** The proposed policy is a calendar
-month in the saved Plan reporting zone, one currency, explicit selected accounts
-and categories including an explicit uncategorized option, and no rollover.
+**Founder-approved policy, September 29, 2026.** The founder approved the
+original question and resumed this existing lane through merge readiness. Budgets
+use a calendar month in the saved Plan reporting zone, one currency, explicitly
+selected accounts and categories, an explicit uncategorized option, and no rollover.
 Linked refunds reduce matching spending in the month received using the current
 original purchase's account/category even when received in a different account.
-Unlinked refunds use their recorded account/category. The founder can instead
-choose all matching accounts or different rules. No dependent rules are coded
-before the answer. The saved zone and resolved interval must remain visible;
-changing that shared zone re-evaluates month boundaries rather than changing
-recorded timestamps.
+Unlinked refunds use their recorded account/category. The saved zone and resolved
+interval remain visible. Changing that shared zone re-evaluates month boundaries
+without changing recorded timestamps. The relevant existing API and data contracts
+record this policy before implementation. Routine engineering choices belong to
+the delivery owner; merge and deployment still require separate approvals.
 
-Removal should reuse Plan's reversible archive/restore command pattern, retaining
-the definition ID, activity and receipts. This is a proposed technical lifecycle,
-not a new permanent-deletion or retention promise. Exact duplicate active scopes
+Removal reuses Plan's reversible archive/restore command pattern, retaining
+the definition ID, activity and receipts. The delivery owner selects this existing reversible lifecycle without introducing
+a permanent-deletion or retention promise. Exact duplicate active scopes
 need one storage guard as well as domain validation; restoration must report a
 conflict instead of silently replacing an existing definition.
 
@@ -88,8 +89,8 @@ API and data contracts change in the same implementation PR.
 
 ### Budget ownership and throughput
 
-- **Blocking first steps.** Recover canon and locked design, resolve the one
-  material policy question, then commit the bounded contract before code.
+- **Blocking first steps.** Recover canon and locked design, record the approved
+  financial policy, then commit the bounded API/data contract before code.
 - **Independent workstreams.** Backend/native scouts and architecture synthesis
   are read-only. The captain prepares isolated services, simulator and acceptance.
 - **Shared mutable state.** One implementation writer owns budget backend,
@@ -105,8 +106,8 @@ API and data contracts change in the same implementation PR.
 completed read-only reports at the integration base and relinquished ownership.
 The exclusive implementation checkout is
 `/Users/garces/.codex/worktrees/connected-budgets-core/private-alpha-next` on
-`codex/connected-budgets-implementation`. Budget policy implementation is not
-dispatched before the answer. A bounded acceptance-setup writer may prepare
+`codex/connected-budgets-implementation`. The policy gate is resolved. One fresh implementation writer resumes the existing
+implementation branch. A bounded acceptance-setup writer prepared
 canonical synthetic financial records and the reusable HTTP fixture script
 without choosing budget behavior. `budget_acceptance_setup` completed that
 bounded task as `4a28bfa0d`; the captain integrated it as `95d54dc7f`, verified
@@ -133,7 +134,7 @@ These steps live here instead of a competing task board.
 - [x] `architect` for parallel design exploration.
 - [x] Write the throughput checkpoint as four todo items.
 - [x] Prepare reusable canonical-activity acceptance fixtures independently.
-- [ ] Resolve the financial policy gate and bind the implementation owner.
+- [x] Resolve the financial policy gate. Bind one fresh implementation owner.
 - [ ] Delegate code-writing to a subagent in its exclusive worktree.
 - [ ] Verify on the matching surface with real API/Postgres and simulator.
 - [ ] Sequence verified commits. Skip rebasing published/evidenced branches;
@@ -147,7 +148,7 @@ These steps live here instead of a competing task board.
 | Decision checkpoint | Evidence | State |
 | --- | --- | --- |
 | Preserve integration and existing demos | Fresh integration `9f51912198c2c77e239f670a2b3f78da2942afed`; prior demo guides below | New 590xx allocation and dedicated simulator created; no prior environment changed. |
-| Keep one financial owner | Existing Recording/Planning contracts and the three bounded scout reports | Snapshot architecture selected; policy answer pending. |
+| Keep one financial owner | Existing Recording/Planning contracts and the three bounded scout reports | Snapshot architecture selected; original policy approved by the founder. |
 | Continue independent acceptance preparation | [Fixture API/database proof](../reports/evidence/connected-budgets/fixture-api-proof.json) and [retained Home](../reports/evidence/connected-budgets/pre-implementation-home.png) | Five accounts/eight canonical activities remain after two setup runs; 15 real API readbacks and native Home reopening pass. One unknown balance remains unknown; DOP spending 140 and USD spending 50 stay separate. No budget progress is claimed. |
 | Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Inherited registered sign-in, relaunch, sign-out and signed-out relaunch passed on the dedicated simulator against real local Auth/API/Postgres. Result `ui-20260930T001256Z.xcresult` is ignored local diagnostics. The inherited recording, Plan and Search baseline also passed 203 tests with zero skips against this lane's disposable Postgres. Budget implementation has not started. |
 
@@ -156,8 +157,8 @@ runnable restart instructions, green applicable CI, clean independent scoped rev
 and zero unresolved findings. Simulator verification is local delivery only;
 physical-phone internet delivery remains pending under its separate owner.
 The [budget environment restart guide](../reports/evidence/connected-budgets/README.md)
-preserves the clickable mirror and synthetic records while the policy answer is
-pending. Budget implementation, connected acceptance, recording, review and CI
+preserves the clickable mirror and synthetic records. Lane-owned services were
+stopped without deleting data and will restart for implementation acceptance. Budget implementation, connected acceptance, recording, review and CI
 remain incomplete. No budget PR has been opened.
 
 ## PR #751 integration landing

@@ -2,8 +2,8 @@
 
 The [execution manifest](../../../specs/argus-execution-board.md#connected-personal-spending-budgets-lane)
 owns scope, decisions and delivery status. This guide preserves only the isolated
-local environment. Budget implementation is pending the material financial-policy
-answer. The installed app currently inherits the landed recording, Plan and Search
+local environment. The founder approved the original financial policy and resumed implementation.
+Budget implementation and connected acceptance are in progress. The installed app currently inherits the landed recording, Plan and Search
 features. This is not a completed budget demonstration or physical-phone proof.
 
 ## Preserve the environment
