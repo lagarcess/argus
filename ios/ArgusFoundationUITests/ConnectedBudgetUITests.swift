@@ -58,10 +58,32 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["budget.restore"])
         XCTAssertTrue(app.buttons["budget.edit"].waitForExistence(timeout: 15))
         app.buttons["budget.close"].tap()
+        verifyBudgetSearchAndReopen(title)
+    }
+
+    func testExistingBudgetHomeSearchAndReopen() throws {
+        guard let title = ProcessInfo.processInfo.environment["ARGUS_TEST_SEARCH_QUERY"] else {
+            throw XCTSkip("Requires a retained isolated budget journey.")
+        }
+        try signIn()
+        app.buttons["tab.home"].tap()
+        let home = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.home.' AND label CONTAINS %@", title)).firstMatch
+        tapVisible(home)
+        assertBudget(spent: "155.00", status: "5.00")
+        app.buttons["budget.close"].tap()
+        XCTAssertTrue(home.waitForExistence(timeout: 15))
+        XCTAssertTrue(home.isHittable)
+        capture("budget-home-progress-and-return")
+        verifyBudgetSearchAndReopen(title)
+    }
+
+    private func verifyBudgetSearchAndReopen(_ title: String) {
         app.buttons["tab.search"].tap()
         let query = app.textFields["search.query"]
         XCTAssertTrue(query.waitForExistence(timeout: 10))
-        query.tap(); query.typeText(title + "\n")
+        query.tap()
+        if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); query.tap() }
+        query.typeText(title + "\n")
         let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.budget.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(hit)
         assertBudget(spent: "155.00", status: "5.00")
