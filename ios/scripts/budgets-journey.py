@@ -52,7 +52,7 @@ class Client(scene.Client):
             self.drop_budget_response = False
         try:
             status, result = send()
-        except ConnectionError:
+        except (ConnectionError, scene.Refused):
             if not drop:
                 raise
             status, result = send()

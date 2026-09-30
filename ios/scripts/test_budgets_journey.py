@@ -47,6 +47,26 @@ class JourneyTests(unittest.TestCase):
                 self.assertEqual(target.stat().st_mode & 0o777, 0o600)
                 self.assertEqual(restored["operations"]["budget"]["result"]["budget"]["id"], "budget-one")
 
+    def test_proxy_drops_accepted_response_then_replays_same_command(self):
+        client = journey.Client({}, response_loss=True)
+        client.sessions[0] = {"access_token": "synthetic-token"}
+        calls = []
+
+        def request(url, method, body, headers):
+            if url.endswith("/__fault"):
+                return 200, {"armed": method == "POST", "dropped": 0 if method == "POST" else 1}
+            calls.append((url, method, body, headers))
+            if len(calls) == 1:
+                raise journey.scene.Refused("Local HTTP request failed; rerun setup to replay pending write")
+            return 201, {"budget": {"id": "budget-one"}, "replayed": True}
+
+        with patch.object(client, "raw", side_effect=request):
+            status, result = client.api(0, "POST", "/financial-plan/budgets", b'{"limit":"150"}', "same-key")
+        self.assertEqual(status, 201)
+        self.assertTrue(result["replayed"])
+        self.assertEqual(calls[0], calls[1])
+        self.assertTrue(client.response_loss_verified)
+
     def test_independent_total_detects_incorrect_calculation(self):
         with patch.object(journey.scene, "expect", return_value={
             "spent_minor": "15000", "remaining_minor": "1000", "over_budget_minor": "0"}):
