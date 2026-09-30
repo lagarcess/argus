@@ -2683,7 +2683,9 @@ account/category arrays, Uncategorized inclusion, and reversible archived state.
 The shared Plan selection owns the reporting time zone. Budget rows contain no
 actual totals. The account and category arrays are canonical sorted unique sets.
 A partial unique storage index rejects duplicate active owner/month/currency/
-account/category/Uncategorized scopes. Restoration observes the same constraint.
+account/category/Uncategorized scopes. Restoration observes the same constraint
+and current account eligibility. Archiving retains ownership checks even if an
+account no longer supports the definition's expense scope.
 
 Registered owners may SELECT their budget rows. Writes are service-only, and the
 existing financial_plan_receipts table retains exact accepted command results

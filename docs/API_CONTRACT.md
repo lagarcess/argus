@@ -7146,7 +7146,9 @@ any definition fields above, or `archived`. Both commands require Idempotency-Ke
 and return `{budget:BudgetDefinition,replayed}`. Exact active scope duplicates
 return `409 budget_scope_conflict`, including restoration conflicts. Removal is
 reversible archive, never deletion of activity. Missing and other-owner IDs share
-the existing financial-record 404. Replay precedes version checks.
+the existing financial-record 404. Replay precedes version checks. Archiving
+retains ownership checks but tolerates an account whose type/currency changed;
+restoring validates the current eligible scope before activation.
 
 `BudgetDefinition` is `{id,version,name,limit_minor,limit,currency,
 currency_fraction_digits,month,account_ids,category_ids,include_uncategorized,archived}`.
