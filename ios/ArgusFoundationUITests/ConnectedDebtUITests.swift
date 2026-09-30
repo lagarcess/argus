@@ -16,8 +16,28 @@ extension FinancialLoopUITests {
         assertDebt("DOP -1,000.00")
         tapVisible(app.buttons["debt.record"])
         debtSplit(total: "350", principal: "300", interest: "40", fees: "10")
-        reviewMoney(); tapVisible(app.buttons["loop.confirm"])
-        XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
+        reviewMoney()
+        if ProcessInfo.processInfo.environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == "true" {
+            let before = try faultStatus(arm: true)
+            tapVisible(app.buttons["loop.confirm"])
+            XCTAssertTrue(app.staticTexts["loop.error"].waitForExistence(timeout: 30))
+            XCTAssertFalse(app.buttons["Cancel"].isEnabled)
+            XCTAssertEqual(try faultStatus(arm: false), before + 1)
+            capture("debt-committed-payment-response-lost")
+            app.terminate(); app.launch()
+            let pending = app.buttons["loop.pending.retry"]
+            XCTAssertTrue(pending.waitForExistence(timeout: 20))
+            capture("debt-pending-payment-retained-after-relaunch")
+            tapVisible(pending)
+            XCTAssertTrue(pending.waitForNonExistence(timeout: 20))
+            assertDebt("DOP -700.00")
+            XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'debt.activity.' AND identifier != 'debt.activity.back'")).count, 1)
+            XCTAssertEqual(try faultStatus(arm: false), before + 1)
+            capture("debt-payment-recovered-once")
+        } else {
+            tapVisible(app.buttons["loop.confirm"])
+            XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
+        }
         assertDebt("DOP -700.00")
         capture("debt-partial-actual-payment")
         let payment = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'debt.activity.' AND identifier != 'debt.activity.back'")).firstMatch
@@ -121,9 +141,19 @@ extension FinancialLoopUITests {
         tapVisible(hit)
         if let balance { assertDebt(balance) }
         capture("debt-search-current-detail")
+        app.buttons["debt.close"].tap()
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        XCTAssertEqual(query.value as? String, title)
+        XCTAssertTrue(app.buttons["search.filter.debt"].isSelected)
+        XCTAssertTrue(hit.waitForExistence(timeout: 15))
+        tapVisible(hit)
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["debt.close"].waitForExistence(timeout: 15))
         app.buttons["debt.close"].tap()
-        XCTAssertTrue(app.textFields["search.query"].waitForExistence(timeout: 10))
+        XCTAssertTrue(query.waitForExistence(timeout: 10))
+        XCTAssertEqual(query.value as? String, title)
+        XCTAssertTrue(app.buttons["search.filter.debt"].isSelected)
+        XCTAssertTrue(hit.waitForExistence(timeout: 15))
+        capture("debt-search-query-and-filter-restored")
     }
 }
