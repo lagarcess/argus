@@ -177,7 +177,7 @@ struct FinancialBudgetDetailView: View {
             HStack {
                 Text(item.note ?? NSLocalizedString("loop.kind." + item.kind.rawValue, comment: ""))
                 Spacer(minLength: 12)
-                Text(verbatim: (item.kind == .refund ? "−" : "") + item.currency + " " + AccountPresentation.amount(item.amount, locale: locale)).monospacedDigit()
+                Text(verbatim: (item.kind == .refund ? "−" : "") + item.currency + " " + AccountPresentation.amount(item.amount, locale: locale)).monospacedDigit().fixedSize(horizontal: true, vertical: false).layoutPriority(1)
             }
             Text((item.legs.first.map { loop.accountName($0.accountId) } ?? "") + " · " + AccountPresentation.date(item.occurredAt, zone: item.timeZone, locale: locale))
                 .font(ArgusStyle.body(11, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
