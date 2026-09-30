@@ -107,3 +107,36 @@ This is a presentation preference, not a new financial backend flow.
 
 Label refinement: **Ordenar Inicio** / **Reorder Home** replaces Personalizar Inicio /
 Customize Home. This control changes section order only.
+
+## Home surface checkpoint — September 30, 2026
+
+Founder requested preserving the current structure and explicitly tracking what
+remains. Home is structurally settled for continued design work, not visually
+final or complete across all first-use and household states.
+
+**Preserve:** space selector; account section and approved account interactions;
+Movimientos versus Próximamente; reorderable sections with Ordenar Inicio; fixed
+brand/space/navigation controls. Revisit these only through an explicit design
+change, rather than reopening them during routine polish.
+
+**Remaining Home detail work:** headline Panorama meaning and presentation;
+final typography, spacing and visual rhythm; menu-bar motion; realistic and
+long content; larger text, VoiceOver and physical-device review. Final brand
+identity and dark mode remain app-wide decisions.
+
+**First-use and Household coverage, inspected in the native canvas:**
+
+| State or flow | Current design state | Remaining design work |
+| --- | --- | --- |
+| Personal Home with no accounts | Existing first-account invitation and native add form | Review first use through first recorded/unknown balance; missing versus zero; no premature empty feed sections |
+| Household Home with sample records | Shared-context header and joint-account examples | Complete meaningful shared summary/commitments; verify real-looking content and incomplete information states |
+| Household with no shared records | Reuses the generic first-account card | Design a purpose-specific empty state; distinguish no household, invitation pending, and joined but nothing shared |
+| Household creation and invitations | Add opens only an empty local context | Design create/invite, recipient acceptance, pending/expired/revoked invitation and recovery screens |
+| Explicit sharing | Not designed in this native pass | Choose an existing account or add a joint record; preview who sees what and editing rights; review/revoke sharing |
+| Household management | Not designed in this native pass | Members, invitation management, leave/remove and resulting access/history explanations, respecting unresolved production policies |
+
+The MVEE household section remains the owner of existing consent and privacy
+boundaries: joining alone does not share private records or create a joint
+account. This checkpoint does not approve a new permission model, invitation
+integration, financial rule or backend implementation. Household flow proposals
+still require the usual design-reference and founder review exercise.
