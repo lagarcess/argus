@@ -1202,7 +1202,7 @@ def dated_return(journal, client):
         not client.response_loss or journal.state.get("response_loss_verified"),
         "Response-loss run did not prove a committed retry",
     )
-    journal.state["api_complete"] = True
+    journal.state["history_complete"] = True
     journal.save()
 
 
@@ -1315,12 +1315,15 @@ def main():
             run(journal, client)
         if args.action == "run" and not journal.state.get("lifecycle_complete"):
             lifecycle(journal, client)
-        if args.action == "run" and not journal.state.get("api_complete"):
+        if args.action == "run" and not journal.state.get("history_complete"):
             dated_return(journal, client)
         if args.action == "run" and not journal.state["checks"].get(
             "interest_only_return"
         ):
             interest_only(journal, client)
+        if args.action == "run":
+            journal.state["api_complete"] = True
+            journal.save()
         result = observe(journal, client, observational=args.observe)
         PROOF.parent.mkdir(parents=True, exist_ok=True)
         target = PROOF.with_name("debt-api-observation.json") if args.observe else PROOF
