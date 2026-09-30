@@ -86,7 +86,7 @@ def earliest(expectation: dict[str, Any], links: dict[str, Any], today: date) ->
     protected = [
         date.fromisoformat(link["snapshot"]["due_date"]) + timedelta(days=1)
         for link in links.values()
-        if link["expectation_id"] == expectation["id"]
+        if link.get("expectation_id") == expectation["id"]
     ]
     return max([today, *protected])
 
@@ -203,6 +203,8 @@ def occurrences(state: dict[str, Any], until: date) -> dict[str, dict[str, Any]]
                     "due_date": due.isoformat(),
                 }
     for oid, link in state["links"].items():
+        if not link.get("expectation_id"):
+            continue
         snapshot = dict(link["snapshot"])
         snapshot["expectation_version"] = state["expectations"][link["expectation_id"]][
             "version"

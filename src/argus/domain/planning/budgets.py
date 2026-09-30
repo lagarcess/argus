@@ -1,9 +1,10 @@
 """Budget definitions own limits; Recording owns every actual amount."""
 
+from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from argus.domain.planning import model, storage
+from argus.domain.planning import goal_projection, model, storage
 from argus.domain.planning.budget_schemas import BudgetCreate, BudgetEdit
 from argus.domain.recording.currency import (
     currency_exponent,
@@ -195,7 +196,17 @@ class BudgetService:
             zone or state["selection"]["time_zone"],
             self.planner.accounts._clock(),
         ) | {
+            "goals": [
+                p
+                for p in goal_projection.project(
+                    state,
+                    accounts,
+                    self.planner.today(state),
+                    self.planner.today(state) + timedelta(days=30),
+                )[0]
+                if not p["goal"]["archived"]
+            ],
             "budgets": [
                 p for p in all_progress(state, accounts) if not p["budget"]["archived"]
-            ]
+            ],
         }

@@ -18,6 +18,20 @@ from argus.domain.planning.budget_schemas import (
     BudgetReceipt,
 )
 from argus.domain.planning.budgets import BudgetService
+from argus.domain.planning.goal_schemas import (
+    AllocationReceipt,
+    AllocationWrite,
+    ContributionLink,
+    ContributionPreview,
+    ContributionReceipt,
+    ContributionRecord,
+    ContributionRelease,
+    GoalCreate,
+    GoalEdit,
+    GoalProgress,
+    GoalReceipt,
+)
+from argus.domain.planning.goals import GoalService
 from argus.domain.planning.model import UnsafeCutover
 from argus.domain.planning.responses import (
     Candidates,
@@ -207,5 +221,126 @@ def get_budget(request: Request, context: Context, budget_id: str) -> Any:
         request,
         lambda: BudgetService(PlanService(context.service)).get(
             context.user_id, budget_id
+        ),
+    )
+
+
+@router.post("/goals", response_model=GoalReceipt)
+def create_goal(
+    request: Request, context: Context, body: GoalCreate, idempotency_key: Key = None
+) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).create(
+            context.user_id, body, _key(request, idempotency_key)
+        ),
+    )
+
+
+@router.put("/goals/allocations", response_model=AllocationReceipt)
+def allocate_goals(
+    request: Request, context: Context, body: AllocationWrite, idempotency_key: Key = None
+) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).allocate(
+            context.user_id, body, _key(request, idempotency_key)
+        ),
+    )
+
+
+@router.get("/goals/{goal_id}", response_model=GoalProgress)
+def get_goal(request: Request, context: Context, goal_id: str) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).get(context.user_id, goal_id),
+    )
+
+
+@router.patch("/goals/{goal_id}", response_model=GoalReceipt)
+def edit_goal(
+    request: Request,
+    context: Context,
+    goal_id: str,
+    body: GoalEdit,
+    idempotency_key: Key = None,
+) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).edit(
+            context.user_id, goal_id, body, _key(request, idempotency_key)
+        ),
+    )
+
+
+@router.get("/goals/{goal_id}/contributions/candidates", response_model=Candidates)
+def goal_candidates(request: Request, context: Context, goal_id: str) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).candidates(
+            context.user_id, goal_id
+        ),
+    )
+
+
+@router.post("/goals/{goal_id}/contributions/link", response_model=GoalReceipt)
+def link_goal(
+    request: Request,
+    context: Context,
+    goal_id: str,
+    body: ContributionLink,
+    idempotency_key: Key = None,
+) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).link(
+            context.user_id, goal_id, body, _key(request, idempotency_key)
+        ),
+    )
+
+
+@router.post("/goals/{goal_id}/contributions/preview", response_model=ContributionPreview)
+def preview_goal(
+    request: Request, context: Context, goal_id: str, body: ContributionRecord
+) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).preview(
+            context.user_id, goal_id, body
+        ),
+    )
+
+
+@router.post("/goals/{goal_id}/contributions", response_model=ContributionReceipt)
+def record_goal(
+    request: Request,
+    context: Context,
+    goal_id: str,
+    body: ContributionRecord,
+    idempotency_key: Key = None,
+) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).record(
+            context.user_id, goal_id, body, _key(request, idempotency_key)
+        ),
+    )
+
+
+@router.post(
+    "/goals/{goal_id}/contributions/{claim_id}/release", response_model=GoalReceipt
+)
+def release_goal(
+    request: Request,
+    context: Context,
+    goal_id: str,
+    claim_id: str,
+    body: ContributionRelease,
+    idempotency_key: Key = None,
+) -> Any:
+    return call(
+        request,
+        lambda: GoalService(PlanService(context.service)).release(
+            context.user_id, goal_id, claim_id, body, _key(request, idempotency_key)
         ),
     )

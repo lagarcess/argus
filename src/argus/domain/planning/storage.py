@@ -26,6 +26,7 @@ def empty() -> dict[str, Any]:
     return {
         "expectations": {},
         "budgets": {},
+        "goals": {},
         "links": {},
         "selection": {
             "version": 0,
@@ -38,6 +39,11 @@ def empty() -> dict[str, Any]:
 
 def load(connection: Any, user_id: str) -> dict[str, Any]:
     state = empty()
+    for gid, body in connection.execute(
+        "select id,body from public.financial_goals where user_id=%s order by id",
+        (user_id,),
+    ).fetchall():
+        state["goals"][str(gid)] = body
     for bid, body in connection.execute(
         "select id,body from public.financial_budgets where user_id=%s order by id",
         (user_id,),
@@ -48,15 +54,18 @@ def load(connection: Any, user_id: str) -> dict[str, Any]:
         (user_id,),
     ).fetchall():
         state["expectations"][str(eid)] = body
-    for oid, eid, aid, revision, snapshot in connection.execute(
-        "select occurrence_id,expectation_id,activity_id,activity_revision,snapshot from public.financial_plan_links where user_id=%s",
+    for cid, oid, eid, gid, aid, revision, snapshot, attribution in connection.execute(
+        "select claim_id,occurrence_id,expectation_id,goal_id,activity_id,activity_revision,snapshot,attribution from public.financial_plan_links where user_id=%s",
         (user_id,),
     ).fetchall():
-        state["links"][str(oid)] = {
-            "expectation_id": str(eid),
+        state["links"][str(cid)] = {
+            "occurrence_id": str(oid) if oid else None,
+            "expectation_id": str(eid) if eid else None,
+            "goal_id": str(gid) if gid else None,
             "activity_id": str(aid),
             "activity_revision": revision,
             "snapshot": snapshot,
+            "attribution": attribution,
         }
     row = connection.execute(
         "select body from public.financial_plan_selections where user_id=%s", (user_id,)
@@ -152,9 +161,15 @@ def write(
             (user_id,),
         ).fetchall()
         state = load(connection, user_id)
+        original_claims = set(state["links"])
         result, money = action(state, load_owner(repository, connection, user_id))
         if money:
             persist(connection, user_id, money)
+        for gid, body in state["goals"].items():
+            connection.execute(
+                "insert into public.financial_goals(id,user_id,body) values(%s,%s,%s) on conflict(id) do update set body=excluded.body",
+                (gid, user_id, Jsonb(body)),
+            )
         for bid, body in state["budgets"].items():
             connection.execute(
                 "insert into public.financial_budgets(id,user_id,body) values(%s,%s,%s) on conflict(id) do update set body=excluded.body",
@@ -169,16 +184,24 @@ def write(
             "insert into public.financial_plan_selections(user_id,body) values(%s,%s) on conflict(user_id) do update set body=excluded.body",
             (user_id, Jsonb(state["selection"])),
         )
-        for oid, link in state["links"].items():
+        for cid in original_claims - state["links"].keys():
             connection.execute(
-                "insert into public.financial_plan_links(user_id,occurrence_id,expectation_id,activity_id,activity_revision,snapshot) values(%s,%s,%s,%s,%s,%s) on conflict(user_id,occurrence_id) do update set activity_id=excluded.activity_id,activity_revision=excluded.activity_revision",
+                "delete from public.financial_plan_links where user_id=%s and claim_id=%s",
+                (user_id, cid),
+            )
+        for cid, link in state["links"].items():
+            connection.execute(
+                "insert into public.financial_plan_links(user_id,claim_id,occurrence_id,expectation_id,goal_id,activity_id,activity_revision,snapshot,attribution) values(%s,%s,%s,%s,%s,%s,%s,%s,%s) on conflict(user_id,claim_id) do update set occurrence_id=excluded.occurrence_id,activity_id=excluded.activity_id,activity_revision=excluded.activity_revision,snapshot=excluded.snapshot,attribution=excluded.attribution",
                 (
                     user_id,
-                    oid,
-                    link["expectation_id"],
+                    cid,
+                    link.get("occurrence_id", cid),
+                    link.get("expectation_id"),
+                    link.get("goal_id"),
                     link["activity_id"],
                     link["activity_revision"],
                     Jsonb(link["snapshot"]),
+                    Jsonb(link["attribution"]) if link.get("attribution") else None,
                 ),
             )
         result = jsonable_encoder(result) | {"replayed": False}

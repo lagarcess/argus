@@ -103,7 +103,7 @@ class GoalDefinition(BaseModel):
 
 class GoalPool(BaseModel):
     account_id: str
-    account_name: str
+    account_name: str | None
     currency: str
     account_version: int
     ownership_share_bps: int

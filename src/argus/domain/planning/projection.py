@@ -3,17 +3,25 @@
 from datetime import date, datetime
 from typing import Any
 
+from argus.domain.planning import claims, goal_model, goal_projection
 from argus.domain.planning.budgets import all_progress
 from argus.domain.planning.model import expectation_response, occurrences
 from argus.domain.planning.schemas import CASH_TYPES
 from argus.domain.recording.currency import currency_exponent
-from argus.domain.recording.loop_reads import _personal, home_response
+from argus.domain.recording.loop_reads import home_response, personal_share
 from argus.domain.recording.money_reads import current_activities
 from argus.domain.recording.repository import StoredAccount
 from argus.domain.recording.schemas import account_response
 
 
 def matches(occurrence: dict[str, Any], activity: dict[str, Any]) -> bool:
+    if occurrence["kind"] == "goal_transfer":
+        return goal_model.transfer_matches(
+            activity,
+            occurrence["source_account_id"],
+            occurrence["destination_account_id"],
+            occurrence["currency"],
+        )
     return (
         activity["kind"] == ("income" if occurrence["kind"] == "income" else "expense")
         and activity["currency"] == occurrence["currency"]
@@ -25,7 +33,7 @@ def matches(occurrence: dict[str, Any], activity: dict[str, Any]) -> bool:
 def occurrence_response(
     item: dict[str, Any], state: dict[str, Any], actual: dict[str, Any], start: date
 ) -> dict[str, Any]:
-    link = state["links"].get(item["id"])
+    link = claims.for_occurrence(state, item["id"])
     activity = actual.get(link["activity_id"]) if link else None
     status = (
         "planned"
@@ -40,7 +48,9 @@ def occurrence_response(
     elif status == "planned":
         if not item["account_id"]:
             reason = "account_unassigned"
-        elif item["account_id"] not in state["selection"]["account_ids"]:
+        elif not any(
+            aid in state["selection"]["account_ids"] for aid, _ in movement_legs(item)
+        ):
             reason = "account_not_selected"
     due = date.fromisoformat(item["due_date"])
     return item | {
@@ -63,20 +73,21 @@ def projection(
     actual = {a["activity_id"]: a for a in current_activities(accounts)}
     rows = [
         occurrence_response(item, state, actual, start)
-        for item in occurrences(state, end).values()
+        for item in (
+            occurrences(state, end) | goal_model.occurrences(state, end)
+        ).values()
         if date.fromisoformat(item["due_date"]) <= end
     ]
     by_id = {s.account.id: s.account for s in accounts}
     for row in rows:
-        selected_account = by_id.get(row["account_id"])
-        if (
-            row["status"] == "planned"
-            and row["account_id"]
+        if row["status"] == "planned" and any(
+            aid
             and (
-                selected_account is None
-                or selected_account.type not in CASH_TYPES
-                or selected_account.currency != row["currency"]
+                aid not in by_id
+                or by_id[aid].type not in CASH_TYPES
+                or by_id[aid].currency != row["currency"]
             )
+            for aid, _ in movement_legs(row)
         ):
             row["exclusion_reason"] = "account_changed"
     rows = [
@@ -109,6 +120,7 @@ def projection(
                 "known_starting_minor": 0,
                 "expected_income_minor": 0,
                 "expected_bills_minor": 0,
+                "transfer_effect_minor": 0,
                 "as_of": None,
             },
         )
@@ -118,7 +130,7 @@ def projection(
         if balance.state == "unknown":
             group["unknown_account_ids"].append(stored.account.id)
         else:
-            group["known_starting_minor"] += _personal(
+            group["known_starting_minor"] += personal_share(
                 balance.amount_minor, stored.account.ownership_share_bps
             )
             if balance.as_of and (
@@ -148,21 +160,30 @@ def projection(
                 or row["exclusion_reason"]
             ):
                 continue
-            income = row["kind"] == "income"
-            account_id = row["account_id"]
-            share = by_id[account_id].ownership_share_bps
-            whole_change = row["amount_minor"] if income else -row["amount_minor"]
-            before = projected_balances[account_id]
-            if before is None:
-                change = _personal(whole_change, share)
+            change = 0
+            for account_id, whole_change in movement_legs(row):
+                if account_id not in selected:
+                    continue
+                share = by_id[account_id].ownership_share_bps
+                before = projected_balances[account_id]
+                if before is None:
+                    leg_change = personal_share(whole_change, share)
+                else:
+                    after = before + whole_change
+                    leg_change = personal_share(after, share) - personal_share(
+                        before, share
+                    )
+                    projected_balances[account_id] = after
+                    known += leg_change
+                change += leg_change
+            if row["kind"] == "goal_transfer":
+                group["transfer_effect_minor"] += change
             else:
-                after = before + whole_change
-                change = _personal(after, share) - _personal(before, share)
-                projected_balances[account_id] = after
-                known += change
-            group["expected_income_minor" if income else "expected_bills_minor"] += abs(
-                change
-            )
+                group[
+                    "expected_income_minor"
+                    if row["kind"] == "income"
+                    else "expected_bills_minor"
+                ] += abs(change)
             points.append(
                 {
                     "date": row["projection_date"],
@@ -178,7 +199,9 @@ def projection(
             points=points,
             ending_minor=str(known) if complete else None,
             net_cash_change_minor=str(
-                group["expected_income_minor"] - group["expected_bills_minor"]
+                group["expected_income_minor"]
+                - group["expected_bills_minor"]
+                + group["transfer_effect_minor"]
             ),
             order="bills_before_income",
         )
@@ -186,15 +209,22 @@ def projection(
             "known_starting_minor",
             "expected_income_minor",
             "expected_bills_minor",
+            "transfer_effect_minor",
         ):
             group[key] = str(group[key])
     budgets = all_progress(state, accounts)
+    goals, pools = goal_projection.project(state, accounts, start, end)
     return {
         "budgets": budgets,
+        "goals": goals,
+        "goal_pools": pools,
         "home": home_response(
             accounts, time_zone=state["selection"]["time_zone"], now=now
         )
-        | {"budgets": [p for p in budgets if not p["budget"]["archived"]]},
+        | {
+            "budgets": [p for p in budgets if not p["budget"]["archived"]],
+            "goals": [p for p in goals if not p["goal"]["archived"]],
+        },
         "selection": state["selection"],
         "accounts": [account_response(s).model_dump(mode="json") for s in accounts],
         "expectations": [
@@ -210,3 +240,13 @@ def projection(
             not e["archived"] for e in state["expectations"].values()
         ),
     }
+
+
+def movement_legs(row: dict[str, Any]) -> list[tuple[str | None, int]]:
+    amount = row["amount_minor"]
+    if row["kind"] == "goal_transfer":
+        return [
+            (row["source_account_id"], -amount),
+            (row["destination_account_id"], amount),
+        ]
+    return [(row["account_id"], amount if row["kind"] == "income" else -amount)]
