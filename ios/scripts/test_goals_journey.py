@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlsplit
 
 SPEC = importlib.util.spec_from_file_location(
     "goals_journey", Path(__file__).with_name("goals-journey.py")
@@ -202,6 +203,158 @@ class JournalTests(unittest.TestCase):
         with patch.object(client, "raw", side_effect=request):
             client.api(0, "POST", journey.GOALS, b'{"target":"1000"}', "stable-key")
         self.assertTrue(self.journal.state["response_loss_verified"])
+
+
+class RetainedReadbackTests(unittest.TestCase):
+    def test_extra_owner_home_data_does_not_change_scoped_retained_acceptance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = journey.Journal(Path(directory) / "private.json", create=True)
+            journal.state["complete"] = True
+            accounts = {
+                "savings": "savings-id",
+                "bank": "bank-id",
+                "usd": "usd-id",
+                "unknown": "unknown-id",
+            }
+            activities = {
+                name: {"activity_id": name + "-id", "revision": 2}
+                for name in (
+                    "historical",
+                    "contribution",
+                    "withdraw700",
+                    "archive_withdraw20",
+                )
+            }
+            pool = {
+                "account_id": accounts["savings"],
+                "backing_minor": "41000",
+                "available_minor": "0",
+                "shortfall_minor": "0",
+            }
+            main = {
+                "goal": {"id": "goal-a", "target_minor": 100000, "archived": False},
+                "assigned_minor": "40000",
+                "supported_minor": "40000",
+                "remaining_minor": "60000",
+                "independently_backed_minor": "40000",
+                "planned_minor": "10000",
+                "state": "active",
+                "pools": [pool],
+                "contributions": [
+                    {
+                        "activity_id": row["activity_id"],
+                        "activity_revision": 2,
+                        "activity": row,
+                    }
+                    for name, row in activities.items()
+                    if name in ("historical", "contribution")
+                ],
+            }
+            second = {
+                **main,
+                "goal": {"id": "goal-b"},
+                "assigned_minor": "1000",
+                "supported_minor": "1000",
+                "remaining_minor": "49000",
+                "independently_backed_minor": "1000",
+                "contributions": [],
+            }
+            unrelated = {"goal": {"id": "native-fixture"}}
+            home = {
+                "goals": [main, second, unrelated],
+                "currencies": [
+                    {
+                        "currency": "DOP",
+                        "net_worth_minor": "900000",
+                        "net_spending_minor": "12000",
+                    }
+                ],
+            }
+            snapshot = {
+                "goals": home["goals"],
+                "home": home,
+                "currencies": [
+                    {
+                        "currency": "DOP",
+                        "known_starting_minor": "200000",
+                        "ending_minor": "200000",
+                        "transfer_effect_minor": "0",
+                    }
+                ],
+            }
+            operations = journal.state["operations"]
+            for label, identity in accounts.items():
+                operations["account_" + label] = {"result": {"id": identity}}
+            for label, detail in (("a", main), ("b", second)):
+                operations["goal_" + label] = {"result": {"goal": detail}}
+            for name, activity in activities.items():
+                operations[name] = {"result": {"activity": activity}}
+
+            def api(owner, method, path, body=None, key=None):
+                self.assertEqual(method, "GET")
+                root = urlsplit(path).path
+                if root == "/financial-search":
+                    if owner == 1:
+                        return 200, {"items": []}
+                    kind = parse_qs(urlsplit(path).query)["kind"][0]
+                    items = (
+                        [{"goal": main}, {"goal": second}]
+                        if kind == "goal"
+                        else [{"activity": row} for row in activities.values()]
+                    )
+                    return 200, {"items": items}
+                if root.startswith(journey.GOALS + "/"):
+                    return (
+                        (404, {})
+                        if owner == 1
+                        else (200, main if root.endswith("goal-a") else second)
+                    )
+                if root == "/financial-plan":
+                    return 200, snapshot
+                if root == "/financial-home":
+                    return 200, home
+                if root.startswith("/financial-activities/"):
+                    return 200, next(
+                        row
+                        for row in activities.values()
+                        if path.endswith(row["activity_id"])
+                    )
+                balances = {
+                    accounts["savings"]: 41000,
+                    accounts["bank"]: 159000,
+                    accounts["usd"]: 10000,
+                    accounts["unknown"]: None,
+                }
+                amount = balances[root.rsplit("/", 1)[1]]
+                return 200, {
+                    "balance": {
+                        "state": "unknown" if amount is None else "known",
+                        "amount_minor": amount,
+                    }
+                }
+
+            client = Mock(api=Mock(side_effect=api))
+            proof = journey.readback(journal, client)
+            self.assertEqual(proof["mode"], "initial_retained_scene")
+            self.assertEqual(proof["main_supported_minor"], "40000")
+            self.assertEqual(proof["canonical_activity_count"], 4)
+            self.assertEqual(
+                proof["scenario_checks"]["readback"]["b_supported_minor"], 1000
+            )
+            with self.assertRaisesRegex(journey.Refused, "combined recorded position"):
+                journey.check(
+                    journal,
+                    client,
+                    "initial_run",
+                    (40000, 40000, 60000),
+                    (1000, 1000, 49000),
+                    41000,
+                    159000,
+                    0,
+                )
+            main["supported_minor"] = "40001"
+            with self.assertRaisesRegex(journey.Refused, "independent literal"):
+                journey.readback(journal, client)
 
 
 class BoundaryTests(unittest.TestCase):
