@@ -7246,3 +7246,7 @@ supported_minor}]`. Allocation editors display these server-derived current
 per-account assignments and send explicit replacement intentions; clients do not
 reconstruct linked amounts or pool support. `GoalPool.account_name` is nullable,
 matching the existing optional Recording nickname.
+
+Contribution preview also returns `pools:[GoalPool]` for the reviewed projected
+account snapshot. The native money review shows supported goal progress after the
+contribution and any affected source-account shortfall before confirmation.

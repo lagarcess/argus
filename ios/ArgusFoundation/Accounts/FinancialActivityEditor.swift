@@ -27,6 +27,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     @Published private(set) var options: FinancialActivityOptions?
     @Published private(set) var purchases: [FinancialActivityDetail] = []
     @Published private(set) var preview: FinancialActivityPreview?
+    @Published private(set) var goalPreview: FinancialGoalPreview?
     @Published private(set) var phase = Phase.editing
     @Published private(set) var errorKey: String?
 
@@ -106,7 +107,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         choices(types: options?.eligibility[kind.rawValue]).filter { $0.id != destinationAccountId }
     }
     var destinationChoices: [FinancialAccount] {
-        choices(types: options?.destinationEligibility[kind.rawValue]).filter { $0.id != sourceAccountId }
+        choices(types: options?.destinationEligibility[kind.rawValue]).filter { $0.id != sourceAccountId && (goal == nil || $0.id == goal?.destinationAccountId) }
     }
     var linkedPurchase: FinancialActivityDetail? { purchases.first { $0.activityId == purchaseActivityId } }
 
@@ -124,7 +125,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     }
 
     func setKind(_ next: FinancialActivityKind) {
-        guard !isCorrection, canEdit, availableKinds.contains(next) || options == nil else { return }
+        guard !isCorrection, goal == nil, planOccurrence == nil, canEdit, availableKinds.contains(next) || options == nil else { return }
         kind = next; categoryId = nil; sourceId = nil; purchaseActivityId = nil
         answers = []; invalidate(); setAccounts(for: next)
         if next == .refund { Task { await loadPurchases() } }
@@ -145,7 +146,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
 
     private func choices(types: [String]?) -> [FinancialAccount] {
         guard let options, let types else { return [] }
-        return options.accounts.filter { (planOccurrence == nil || $0.id == planOccurrence?.accountId) && !$0.archived && $0.currency == origin.currency && types.contains($0.type) }
+        return options.accounts.filter { (planOccurrence == nil || $0.id == planOccurrence?.accountId) && !$0.archived && $0.currency == origin.currency && types.contains($0.type) && (goal == nil || ["cash", "checking", "savings"].contains($0.type)) }
     }
 
     private func loadPurchases() async {
@@ -204,7 +205,9 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                 expectedVersions: versions, coverage: answers)
             let next: FinancialActivityPreview
             if let goal {
-                next = try await controller.financialGoalPreview(goal.id, command: .init(expectedVersion: goal.version, activity: command, occurrenceId: goalOccurrenceId), expectedIdentity: identity).money
+                let result = try await controller.financialGoalPreview(goal.id, command: .init(expectedVersion: goal.version, activity: command, occurrenceId: goalOccurrenceId), expectedIdentity: identity)
+                guard !(await retireIfNeeded()) else { return }
+                goalPreview = result; next = result.money
             } else if let occurrence = planOccurrence {
                 next = try await controller.financialPlanPreview(occurrenceId: occurrence.id,
                     command: .init(expectedVersion: occurrence.expectationVersion, activity: command), expectedIdentity: identity).money

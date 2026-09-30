@@ -46,10 +46,24 @@ def earliest(item: dict[str, Any], state: dict[str, Any], today: date) -> date:
     )
 
 
-def setup(item: dict[str, Any], accounts: list[StoredAccount]) -> None:
+def current_plan(item: dict[str, Any]) -> dict[str, Any] | None:
+    active = next(
+        (part for part in reversed(item["segments"]) if part["until"] is None), None
+    )
+    if active is None:
+        return None
+    return {
+        "source_account_id": active["source_account_id"],
+        "amount": format_minor_units(active["amount_minor"], item["currency"]),
+        "schedule": active["schedule"],
+    }
+
+
+def setup(
+    item: dict[str, Any], accounts: list[StoredAccount], plan: dict[str, Any] | None
+) -> None:
     destination = item["destination_account_id"]
     model.cash_account(accounts, destination, item["currency"])
-    plan = item["contribution_plan"]
     if plan:
         if not destination or plan["source_account_id"] == destination:
             model.fail(
@@ -59,8 +73,7 @@ def setup(item: dict[str, Any], accounts: list[StoredAccount]) -> None:
         model.positive(plan["amount"], item["currency"])
 
 
-def segment(item: dict[str, Any]) -> dict[str, Any]:
-    plan = item["contribution_plan"]
+def segment(item: dict[str, Any], plan: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(uuid4()),
         "source_account_id": plan["source_account_id"],
@@ -72,7 +85,7 @@ def segment(item: dict[str, Any]) -> dict[str, Any]:
 
 
 def create(body: GoalCreate, accounts: list[StoredAccount]) -> dict[str, Any]:
-    item = body.model_dump(mode="json", exclude={"target"}) | {
+    item = body.model_dump(mode="json", exclude={"target", "contribution_plan"}) | {
         "id": str(uuid4()),
         "version": 1,
         "archived": False,
@@ -81,9 +94,12 @@ def create(body: GoalCreate, accounts: list[StoredAccount]) -> dict[str, Any]:
     }
     item["currency"] = normalize_currency(body.currency)
     item["target_minor"] = model.positive(body.target, item["currency"])
-    setup(item, accounts)
-    if item["contribution_plan"]:
-        item["segments"].append(segment(item))
+    plan = (
+        body.contribution_plan.model_dump(mode="json") if body.contribution_plan else None
+    )
+    setup(item, accounts, plan)
+    if plan:
+        item["segments"].append(segment(item, plan))
     return item
 
 
@@ -109,12 +125,20 @@ def edit(
         cutover = body.effective_date or earliest(item, state, today)
         if cutover < earliest(item, state, today):
             raise model.UnsafeCutover(earliest(item, state, today))
-        for key in ("destination_account_id", "contribution_plan"):
-            if key in body.model_fields_set:
-                item[key] = body.model_dump(mode="json")[key]
-        setup(item, accounts)
-        if item["contribution_plan"]:
-            schedule = Schedule.model_validate(item["contribution_plan"]["schedule"])
+        plan = current_plan(item)
+        if "destination_account_id" in body.model_fields_set:
+            item["destination_account_id"] = (
+                str(body.destination_account_id) if body.destination_account_id else None
+            )
+        if "contribution_plan" in body.model_fields_set:
+            plan = (
+                body.contribution_plan.model_dump(mode="json")
+                if body.contribution_plan
+                else None
+            )
+        setup(item, accounts, plan)
+        if plan:
+            schedule = Schedule.model_validate(plan["schedule"])
             if schedule.start_date < cutover:
                 if body.contribution_plan is not None:
                     raise model.UnsafeCutover(cutover)
@@ -127,7 +151,7 @@ def edit(
                     model.fail(
                         "schedule_finished", "Choose a future contribution schedule."
                     )
-                item["contribution_plan"]["schedule"] = schedule.model_copy(
+                plan["schedule"] = schedule.model_copy(
                     update={
                         "start_date": upcoming[0],
                         "month_days": schedule.month_days
@@ -141,15 +165,21 @@ def edit(
         for old in item["segments"]:
             boundary = (cutover - timedelta(days=1)).isoformat()
             old["until"] = min(old["until"], boundary) if old["until"] else boundary
-        if item["contribution_plan"]:
-            item["segments"].append(segment(item))
+        if plan:
+            item["segments"].append(segment(item, plan))
+    item.pop("contribution_plan", None)
     item["version"] += 1
 
 
 def definition(
     item: dict[str, Any], state: dict[str, Any], today: date
 ) -> dict[str, Any]:
-    return {key: value for key, value in item.items() if key != "segments"} | {
+    return {
+        key: value
+        for key, value in item.items()
+        if key not in {"segments", "contribution_plan"}
+    } | {
+        "contribution_plan": current_plan(item),
         "target": format_minor_units(item["target_minor"], item["currency"]),
         "currency_fraction_digits": currency_exponent(item["currency"]),
         "earliest_effective_date": earliest(item, state, today).isoformat(),

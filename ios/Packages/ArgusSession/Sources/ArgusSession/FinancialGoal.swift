@@ -190,7 +190,7 @@ public struct FinancialGoalReleaseCommand: Encodable, Sendable {
     enum CodingKeys: String, CodingKey { case expectedVersion = "expected_version" }
 }
 
-public struct FinancialGoalPreview: Decodable, Sendable { public let goal: FinancialGoalProgress; public let money: FinancialActivityPreview }
+public struct FinancialGoalPreview: Decodable, Sendable { public let goal: FinancialGoalProgress; public let pools: [FinancialGoalPool]; public let money: FinancialActivityPreview }
 struct FinancialGoalReceipt: Decodable { let goal: FinancialGoalProgress; let replayed: Bool }
 struct FinancialGoalAllocationReceipt: Decodable { let goals: [FinancialGoalProgress]; let pools: [FinancialGoalPool]; let replayed: Bool }
 

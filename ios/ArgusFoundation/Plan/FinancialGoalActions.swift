@@ -55,7 +55,7 @@ struct FinancialGoalAllocationView: View {
             }.background(ArgusStyle.background).scrollDismissesKeyboard(.interactively)
                 .navigationTitle("goal.allocate").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving) }
+                    ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving).accessibilityIdentifier("goal.action.cancel") }
                     ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
                 }.interactiveDismissDisabled(model.saving)
                 .onAppear { accountID = detail.goal.destinationAccountId ?? pools.first?.accountId; load() }
@@ -123,7 +123,7 @@ struct FinancialGoalLinkView: View {
                             Text(PlanPresentation.dateLabel(row.dueDate, locale: locale)).tag(Optional(row.id))
                         }
                     }.accessibilityIdentifier("goal.link.occurrence")
-                    if model.loading { ProgressView("accounts.loading") }
+                    if model.loading { ProgressView("goal.loading") }
                     if let error = model.errorKey { Text(LocalizedStringKey(error)).accessibilityIdentifier("goal.error") }
                     if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                     else {
@@ -135,7 +135,7 @@ struct FinancialGoalLinkView: View {
                     }
                 }.padding(24).font(ArgusStyle.body())
             }.background(ArgusStyle.background).navigationTitle("goal.link").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving) } }
+                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving).accessibilityIdentifier("goal.action.cancel") } }
                 .interactiveDismissDisabled(model.saving).onAppear { occurrenceID = model.navigation?.occurrenceID }
         }
     }

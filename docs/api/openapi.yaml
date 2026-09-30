@@ -2902,6 +2902,372 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalCreate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals/allocations:
+    put:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllocationWrite'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllocationReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals/{goal_id}:
+    get:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: goal_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalProgress'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: goal_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalEdit'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals/{goal_id}/contributions:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: goal_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionRecord'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributionReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals/{goal_id}/contributions/candidates:
+    get:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: goal_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidates'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals/{goal_id}/contributions/link:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: goal_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionLink'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals/{goal_id}/contributions/preview:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: goal_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionRecord'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContributionPreview'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/goals/{goal_id}/contributions/{claim_id}/release:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: goal_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: claim_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContributionRelease'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-plan/occurrences/{occurrence_id}/candidates:
     get:
       tags:
@@ -3125,6 +3491,7 @@ paths:
             - activity
             - expectation
             - budget
+            - goal
             type: string
           - type: 'null'
       - name: currency
@@ -4283,6 +4650,69 @@ components:
       - recorded_at
       - recorded_by
       - coverage
+    AllocationChange:
+      properties:
+        goal_id:
+          type: string
+          format: uuid
+        expected_version:
+          type: integer
+          minimum: 1.0
+        account_id:
+          type: string
+          format: uuid
+        amount:
+          type: string
+          maxLength: 40
+        release_claim_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 100
+      additionalProperties: false
+      type: object
+      required:
+      - goal_id
+      - expected_version
+      - account_id
+      - amount
+    AllocationReceipt:
+      properties:
+        goals:
+          items:
+            $ref: '#/components/schemas/GoalProgress'
+          type: array
+        pools:
+          items:
+            $ref: '#/components/schemas/GoalPool'
+          type: array
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - goals
+      - pools
+      - replayed
+    AllocationWrite:
+      properties:
+        changes:
+          items:
+            $ref: '#/components/schemas/AllocationChange'
+          type: array
+          maxItems: 100
+          minItems: 1
+        expected_account_versions:
+          additionalProperties:
+            type: integer
+          propertyNames:
+            format: uuid
+          type: object
+      additionalProperties: false
+      type: object
+      required:
+      - changes
+      - expected_account_versions
     AnswerDecisionAction:
       properties:
         type:
@@ -4846,6 +5276,10 @@ components:
         budgets:
           items:
             $ref: '#/components/schemas/BudgetProgress'
+          type: array
+        goals:
+          items:
+            $ref: '#/components/schemas/GoalProgress'
           type: array
       type: object
       required:
@@ -5558,6 +5992,116 @@ components:
       - conversation
       - message_id
       description: The new chat and the one message that carries the continued result.
+    ContributionLink:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        activity_id:
+          type: string
+          format: uuid
+        activity_revision:
+          type: integer
+          minimum: 1.0
+        treatment:
+          type: string
+          enum:
+          - add
+          - included
+        occurrence_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        expected_account_versions:
+          additionalProperties:
+            type: integer
+          propertyNames:
+            format: uuid
+          type: object
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - activity_id
+      - activity_revision
+      - treatment
+      - expected_account_versions
+    ContributionPlan:
+      properties:
+        source_account_id:
+          type: string
+          format: uuid
+        amount:
+          type: string
+          maxLength: 40
+        schedule:
+          $ref: '#/components/schemas/Schedule'
+      additionalProperties: false
+      type: object
+      required:
+      - source_account_id
+      - amount
+      - schedule
+    ContributionPreview:
+      properties:
+        goal:
+          $ref: '#/components/schemas/GoalProgress'
+        pools:
+          items:
+            $ref: '#/components/schemas/GoalPool'
+          type: array
+        money:
+          $ref: '#/components/schemas/MoneyPreviewResponse'
+      type: object
+      required:
+      - goal
+      - pools
+      - money
+    ContributionReceipt:
+      properties:
+        goal:
+          $ref: '#/components/schemas/GoalProgress'
+        replayed:
+          type: boolean
+        activity:
+          $ref: '#/components/schemas/MoneyActivityResponse'
+        accounts:
+          items:
+            $ref: '#/components/schemas/FinancialAccountResponse'
+          type: array
+      type: object
+      required:
+      - goal
+      - replayed
+      - activity
+      - accounts
+    ContributionRecord:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        activity:
+          $ref: '#/components/schemas/MoneyRequest'
+        occurrence_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - activity
+    ContributionRelease:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
     Conversation:
       properties:
         id:
@@ -6511,6 +7055,8 @@ components:
           type: string
         expected_bills_minor:
           type: string
+        transfer_effect_minor:
+          type: string
         net_cash_change_minor:
           type: string
         ending_minor:
@@ -6544,6 +7090,7 @@ components:
       - starting_minor
       - expected_income_minor
       - expected_bills_minor
+      - transfer_effect_minor
       - net_cash_change_minor
       - ending_minor
       - first_shortfall_date
@@ -6590,6 +7137,366 @@ components:
       - replayed
       - activity
       - accounts
+    GoalAllocation:
+      properties:
+        account_id:
+          type: string
+        unlinked_minor:
+          type: integer
+      type: object
+      required:
+      - account_id
+      - unlinked_minor
+    GoalComponent:
+      properties:
+        account_id:
+          type: string
+        assigned_minor:
+          type: string
+        supported_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - account_id
+      - assigned_minor
+      - supported_minor
+    GoalContribution:
+      properties:
+        id:
+          type: string
+        activity_id:
+          type: string
+        activity_revision:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        occurrence_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        source_account_id:
+          type: string
+        destination_account_id:
+          type: string
+        treatment:
+          type: string
+          enum:
+          - add
+          - included
+        reviewed_personal_minor:
+          type: string
+        current_personal_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        counting:
+          type: boolean
+        status:
+          type: string
+          enum:
+          - current
+          - needs_review
+          - released
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        activity:
+          anyOf:
+          - $ref: '#/components/schemas/MoneyActivityResponse'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - activity_id
+      - activity_revision
+      - occurrence_id
+      - source_account_id
+      - destination_account_id
+      - treatment
+      - reviewed_personal_minor
+      - current_personal_minor
+      - counting
+      - status
+      - reason
+      - activity
+    GoalCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+        currency:
+          type: string
+          maxLength: 3
+        target:
+          type: string
+          maxLength: 40
+        target_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        destination_account_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        contribution_plan:
+          anyOf:
+          - $ref: '#/components/schemas/ContributionPlan'
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - currency
+      - target
+    GoalDefinition:
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+        name:
+          type: string
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        target_minor:
+          type: integer
+        target:
+          type: string
+        target_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        destination_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        contribution_plan:
+          anyOf:
+          - $ref: '#/components/schemas/ContributionPlan'
+          - type: 'null'
+        allocations:
+          items:
+            $ref: '#/components/schemas/GoalAllocation'
+          type: array
+        archived:
+          type: boolean
+        earliest_effective_date:
+          type: string
+          format: date
+      type: object
+      required:
+      - id
+      - version
+      - name
+      - currency
+      - currency_fraction_digits
+      - target_minor
+      - target
+      - target_date
+      - destination_account_id
+      - contribution_plan
+      - allocations
+      - archived
+      - earliest_effective_date
+    GoalEdit:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        name:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+        target:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+        target_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        destination_account_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        contribution_plan:
+          anyOf:
+          - $ref: '#/components/schemas/ContributionPlan'
+          - type: 'null'
+        effective_date:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+        archived:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+    GoalHit:
+      properties:
+        kind:
+          type: string
+          const: goal
+          default: goal
+        goal:
+          $ref: '#/components/schemas/GoalProgress'
+      type: object
+      required:
+      - goal
+    GoalPool:
+      properties:
+        account_id:
+          type: string
+        account_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          type: string
+        account_version:
+          type: integer
+        ownership_share_bps:
+          type: integer
+        as_of:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        backing_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        assigned_minor:
+          type: string
+        available_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        shortfall_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        state:
+          type: string
+          enum:
+          - backed
+          - shortfall
+          - unknown
+          - ineligible
+        affected_goal_ids:
+          items:
+            type: string
+          type: array
+        affected_goal_names:
+          items:
+            type: string
+          type: array
+      type: object
+      required:
+      - account_id
+      - account_name
+      - currency
+      - account_version
+      - ownership_share_bps
+      - as_of
+      - backing_minor
+      - assigned_minor
+      - available_minor
+      - shortfall_minor
+      - state
+      - affected_goal_ids
+      - affected_goal_names
+    GoalProgress:
+      properties:
+        goal:
+          $ref: '#/components/schemas/GoalDefinition'
+        assigned_minor:
+          type: string
+        supported_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        independently_backed_minor:
+          type: string
+        remaining_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        state:
+          type: string
+          enum:
+          - unconfigured
+          - active
+          - reached
+          - needs_review
+        reasons:
+          items:
+            type: string
+          type: array
+        pools:
+          items:
+            $ref: '#/components/schemas/GoalPool'
+          type: array
+        contributions:
+          items:
+            $ref: '#/components/schemas/GoalContribution'
+          type: array
+        components:
+          items:
+            $ref: '#/components/schemas/GoalComponent'
+          type: array
+        planned_minor:
+          type: string
+        projected_minor:
+          anyOf:
+          - type: string
+          - type: 'null'
+        projection_end_date:
+          type: string
+          format: date
+      type: object
+      required:
+      - goal
+      - assigned_minor
+      - supported_minor
+      - independently_backed_minor
+      - remaining_minor
+      - state
+      - reasons
+      - pools
+      - contributions
+      - components
+      - planned_minor
+      - projected_minor
+      - projection_end_date
+    GoalReceipt:
+      properties:
+        goal:
+          $ref: '#/components/schemas/GoalProgress'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - goal
+      - replayed
     GuestAccountSignupRequest:
       properties:
         email:
@@ -7876,7 +8783,21 @@ components:
         id:
           type: string
         expectation_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
+        goal_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        source_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        destination_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
         expectation_version:
           type: integer
         kind:
@@ -7884,6 +8805,7 @@ components:
           enum:
           - income
           - bill
+          - goal_transfer
         title:
           type: string
         currency:
@@ -8215,6 +9137,14 @@ components:
           items:
             $ref: '#/components/schemas/BudgetProgress'
           type: array
+        goals:
+          items:
+            $ref: '#/components/schemas/GoalProgress'
+          type: array
+        goal_pools:
+          items:
+            $ref: '#/components/schemas/GoalPool'
+          type: array
         selection:
           $ref: '#/components/schemas/Selection'
         accounts:
@@ -8248,6 +9178,8 @@ components:
       required:
       - home
       - budgets
+      - goals
+      - goal_pools
       - selection
       - accounts
       - expectations
@@ -10253,6 +11185,7 @@ components:
             - $ref: '#/components/schemas/ActivityHit'
             - $ref: '#/components/schemas/ExpectationHit'
             - $ref: '#/components/schemas/BudgetHit'
+            - $ref: '#/components/schemas/GoalHit'
             discriminator:
               propertyName: kind
               mapping:
@@ -10260,6 +11193,7 @@ components:
                 activity: '#/components/schemas/ActivityHit'
                 budget: '#/components/schemas/BudgetHit'
                 expectation: '#/components/schemas/ExpectationHit'
+                goal: '#/components/schemas/GoalHit'
           type: array
         next_cursor:
           anyOf:

@@ -168,6 +168,7 @@ class AllocationReceipt(BaseModel):
 
 class ContributionPreview(BaseModel):
     goal: GoalProgress
+    pools: list[GoalPool]
     money: MoneyPreviewResponse
 
 
