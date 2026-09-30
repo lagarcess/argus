@@ -32,6 +32,7 @@ struct CuadraoFirstAccountSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
+                    Text(data.selectedSpace.title(spanish)).font(.subheadline).foregroundStyle(.secondary)
                     typePicker
                     VStack(alignment: .leading, spacing: 10) {
                         fieldLabel(spanish ? "Nombre" : "Name")
@@ -91,6 +92,10 @@ struct CuadraoFirstAccountSheet: View {
                     RegistrationButton(title: existing == nil ? (spanish ? "Añadir" : "Add") : (spanish ? "Guardar" : "Save"), enabled: hint == nil) {
                         guard let kind else { return }
                         var account = existing ?? CanvasAccount(name: "", kind: kind)
+                        if existing == nil {
+                            account.spaceID = data.selectedSpaceID
+                            account.sharedWithHousehold = data.selectedSpace.kind == .household
+                        }
                         account.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
                         account.kind = kind; account.currency = currency
                         account.balance = Decimal(string: amount); account.share = sharingCustom ? (Int(customShare) ?? 100) : share

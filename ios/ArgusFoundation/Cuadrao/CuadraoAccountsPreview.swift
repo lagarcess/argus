@@ -29,6 +29,8 @@ struct CanvasAccount: Identifiable {
     var balance: Decimal?
     var share = 100
     var archived = false
+    var spaceID = CanvasSpace.personalID
+    var sharedWithHousehold = false
     func displayName(_ es: Bool) -> String { name.isEmpty ? kind.title(es) : name }
     func balanceLabel(_ es: Bool) -> String {
         kind.isDebt ? (es ? "Monto pendiente" : "Amount owed") : kind.isAsset
@@ -48,9 +50,11 @@ struct CanvasActivity: Identifiable {
 @Observable final class CuadraoAccountsPreview {
     var accounts: [CanvasAccount] = []
     var activity: [CanvasActivity] = []
+    var spaces: [CanvasSpace] = []
+    var selectedSpaceID = CanvasSpace.personalID
     init(populated: Bool, spanish: Bool) { reset(populated: populated, spanish: spanish) }
-    var active: [CanvasAccount] { accounts.filter { !$0.archived } }
-    var archived: [CanvasAccount] { accounts.filter(\.archived) }
+    var active: [CanvasAccount] { scopedAccounts.filter { !$0.archived } }
+    var archived: [CanvasAccount] { scopedAccounts.filter(\.archived) }
     func account(_ id: UUID) -> CanvasAccount? { accounts.first { $0.id == id } }
     func replace(_ account: CanvasAccount) {
         if let i = accounts.firstIndex(where: { $0.id == account.id }) { accounts[i] = account }
@@ -63,20 +67,35 @@ struct CanvasActivity: Identifiable {
     func move(from: IndexSet, to: Int) {
         var visible = active
         visible.move(fromOffsets: from, toOffset: to)
-        accounts = visible + archived
+        var iterator = visible.makeIterator()
+        let ids = Set(visible.map(\.id))
+        accounts = accounts.map { ids.contains($0.id) ? iterator.next()! : $0 }
     }
     func reset(populated: Bool, spanish: Bool) {
+        selectedSpaceID = CanvasSpace.personalID
+        spaces = [CanvasSpace(id: CanvasSpace.personalID, kind: .personal, name: "")]
+        if populated { spaces.append(CanvasSpace(id: CanvasSpace.householdID, kind: .household, name: "")) }
         accounts = populated ? [
             CanvasAccount(name: spanish ? "Día a día" : "Everyday", kind: .checking, balance: 39400),
             CanvasAccount(name: "", kind: .cash, balance: 3020),
             CanvasAccount(name: spanish ? "Mi tranquilidad" : "Peace of mind", kind: .savings, balance: 68000)
         ] : []
+        if populated {
+            accounts.append(CanvasAccount(name: spanish ? "Gastos de casa" : "Household spending",
+                kind: .checking, balance: 18500, spaceID: CanvasSpace.householdID, sharedWithHousehold: true))
+            accounts.append(CanvasAccount(name: spanish ? "Fondo de la casa" : "Household fund",
+                kind: .savings, balance: 25000, spaceID: CanvasSpace.householdID, sharedWithHousehold: true))
+        }
         activity = []
         if let first = accounts.first, let cash = accounts.last(where: { $0.kind == .cash }) {
             activity = [
                 CanvasActivity(accountID: first.id, title: spanish ? "Almuerzo" : "Lunch", amount: 650, date: .now, income: false),
                 CanvasActivity(accountID: cash.id, title: spanish ? "Café" : "Coffee", amount: 180, date: .now, income: false)
             ]
+        }
+        if let shared = accounts.first(where: { $0.sharedWithHousehold }) {
+            activity.append(CanvasActivity(accountID: shared.id, title: spanish ? "Supermercado" : "Groceries",
+                amount: 2450, date: .now, income: false))
         }
     }
 }
@@ -133,7 +152,8 @@ struct CanvasAccountRow: View {
                 .background(WelcomePalette.sage.opacity(0.65), in: RoundedRectangle(cornerRadius: 13))
             VStack(alignment: .leading, spacing: 5) {
                 Text(account.displayName(spanish)).font(.body.weight(.medium))
-                Text(account.kind.title(spanish)).font(.caption).foregroundStyle(.secondary)
+                Text(account.kind.title(spanish) + (account.sharedWithHousehold ? (spanish ? " · Conjunta" : " · Joint") : ""))
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 5) {

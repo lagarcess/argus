@@ -16,7 +16,7 @@ struct CuadraoHomeCanvas: View {
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
-        case add, options, archived, updates
+        case add, options, archived, updates, spaces
         case actions(UUID), rename(UUID), record(UUID)
         var id: String { "home-modal" }
     }
@@ -26,13 +26,14 @@ struct CuadraoHomeCanvas: View {
             NavigationStack(path: $accountPath) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 36) {
-                        header
-                        overview
-                        accounts
-                        if populated {
-                            activity
-                            upcoming
+                        VStack(alignment: .leading, spacing: 18) {
+                            header
+                            CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
                         }
+                        CuadraoHomeOverview(data: data, spanish: spanish)
+                        accounts
+                        if !data.visibleActivity.isEmpty { activity }
+                        if populated && data.selectedSpace.kind == .personal { upcoming }
                     }
                     .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
                 }
@@ -64,6 +65,9 @@ struct CuadraoHomeCanvas: View {
         }
         .tint(WelcomePalette.pine).foregroundStyle(Color(white: 0.08))
         .sheet(item: $sheet) { item in modal(item) }
+        .onChange(of: data.selectedSpaceID) { _, _ in
+            ordering = false; archivedID = nil; accountPath = []; navigationScroll = CuadraoNavigationScroll()
+        }
         .overlay(alignment: .bottom) {
             if let archivedID {
                 HStack {
@@ -97,33 +101,6 @@ struct CuadraoHomeCanvas: View {
                 Image(systemName: "bell").font(.title3).frame(width: 44, height: 44)
             }
             .accessibilityLabel(spanish ? "Novedades" : "Updates")
-        }
-    }
-
-    private var overview: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(spanish ? "Personal" : "Personal")
-                .font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-            if populated {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(spanish ? "Tu panorama." : "Your overview.")
-                        .font(.system(.largeTitle, design: .serif))
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text("DOP").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                        Text(CanvasMoney.format(data.accounts.filter { $0.currency == "DOP" }.reduce(Decimal.zero) { total, account in
-                            total + (account.balance ?? 0) * (account.kind.isDebt ? -1 : 1) * Decimal(account.kind.isAsset ? account.share : 100) / 100
-                        }, currency: "DOP")).font(.system(size: 38, weight: .medium, design: .rounded))
-                            .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
-                    }
-                    Text(spanish ? "Balance registrado" : "Recorded balance")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-            } else {
-                Text(data.active.isEmpty
-                     ? (spanish ? "Un lugar para\ntus finanzas." : "A place for\nyour finances.")
-                     : (spanish ? "Ya tienes\npor dónde empezar." : "You’re ready\nto get started."))
-                    .font(.system(.largeTitle, design: .serif)).fixedSize(horizontal: false, vertical: true)
-            }
         }
     }
 
@@ -204,7 +181,7 @@ struct CuadraoHomeCanvas: View {
                 }.accessibilityLabel(spanish ? "Añadir movimiento" : "Add activity")
             }
             Text(spanish ? "Hoy" : "Today").font(.footnote).foregroundStyle(.secondary)
-            ForEach(data.activity.prefix(3)) { entry in
+            ForEach(data.visibleActivity.prefix(3)) { entry in
                 if let account = data.account(entry.accountID) {
                     feedRow(entry.title, detail: account.displayName(spanish),
                         amount: (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
@@ -253,6 +230,7 @@ struct CuadraoHomeCanvas: View {
 
     @ViewBuilder private func modal(_ item: HomeSheet) -> some View {
         switch item {
+        case .spaces: CuadraoSpacesSheet(data: data, spanish: spanish)
         case .add: CuadraoFirstAccountSheet(data: data, spanish: spanish)
         case .archived: CuadraoArchivedAccounts(data: data, spanish: spanish)
         case .options:

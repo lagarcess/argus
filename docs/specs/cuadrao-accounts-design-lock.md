@@ -60,3 +60,15 @@ keeps object-specific actions out of the main layout. The founder's leading-icon
 sheet choice is preserved using native presentation rather than web dialogs.
 
 Implementation/evidence: [Accounts evidence](../reports/evidence/cuadrao-native-design/accounts/README.md).
+
+## Home spaces continuation — September 30, 2026
+
+Founder explicitly retained the original quiet horizontal selector: Personal /
+Household / +, with additional named spaces in the same row. Spaces change Home's
+context; they are not stacked account groups or new menu-bar destinations. This
+restores the existing MVEE/DESIGN direction within the Cuadrao native canvas.
+The existing account interactions apply within the selected context.
+
+[Native implementation and evidence](../reports/evidence/cuadrao-native-design/spaces/README.md)
+records the scoped sample-data behavior, design references and remaining limits.
+Household authorization and financial contracts are not implemented by this work.
