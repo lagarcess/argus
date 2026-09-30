@@ -149,7 +149,7 @@ def domain_problem(request: Request, error: Exception) -> HTTPException:
     if isinstance(error, RecordingInputError):
         return problem(
             request,
-            status_code=422,
+            status_code=409 if error.code == "budget_scope_conflict" else 422,
             code=error.code,
             title=error.code.replace("_", " ").capitalize(),
             detail=error.detail,

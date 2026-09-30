@@ -7,11 +7,13 @@ from argus.api.financial_accounts import (
     domain_problem,
     require_financial_accounts_context,
 )
+from argus.domain.planning.budget_schemas import BudgetHomeResponse
+from argus.domain.planning.budgets import BudgetService
+from argus.domain.planning.service import PlanService
 from argus.domain.recording.loop_reads import (
     activity_response,
     check_response,
     expense_record,
-    home_response,
     operation_response,
     page,
 )
@@ -27,7 +29,6 @@ from argus.domain.recording.loop_schemas import (
     CheckPageResponse,
     CheckPreviewResponse,
     CheckRequest,
-    HomeResponse,
     LoopOpeningRequest,
     OpeningPreviewResponse,
 )
@@ -55,17 +56,17 @@ def categories(
     return {"categories": [{"id": key, "kind": "expense"} for key in CATEGORY_IDS]}
 
 
-@router.get("/financial-home", response_model=HomeResponse)
+@router.get("/financial-home", response_model=BudgetHomeResponse)
 def home(
     request: Request,
     month: str | None = None,
-    time_zone: str = "America/Santo_Domingo",
+    time_zone: str | None = None,
     context: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
 ):
     return _call(
         request,
-        lambda: home_response(
-            context.service.list_accounts(user_id=context.user_id), month, time_zone
+        lambda: BudgetService(PlanService(context.service)).home(
+            context.user_id, month, time_zone
         ),
     )
 
