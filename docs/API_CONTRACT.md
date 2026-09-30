@@ -6919,8 +6919,8 @@ Canonical routes, all under `/api/v1` and the existing registered-owner/default-
 - `GET /financial-activities/options`: `{accounts:[FinancialAccountResponse],eligibility:{kind:[account_type]},destination_eligibility:{paired_kind:[account_type]},categories:[string],sources:[string]}`.
 - `GET /financial-activities/purchases?currency=DOP`: `{items:[Activity]}`; each purchase adds `refunded_minor` and `refundable_minor`.
 
-The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
-Kind is `expense|income|transfer|card_payment|refund`, immutable on correction.
+The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,principal?,interest?,fees?,reversal_of_activity_id?,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
+Kind is `expense|income|transfer|card_payment|refund|debt_payment|payment_reversal`, immutable on correction. Loan splits and payment-return references follow the connected debt-payment contract below.
 Singles use account_id; pairs use source/destination. Irrelevant non-null fields fail.
 Amount is a positive decimal string; occurred_at requires an offset and cannot be
 future. Zone defaults to America/Santo_Domingo. Note/reason max 200 characters.
@@ -6946,7 +6946,7 @@ revision and token must match under locks; stale writes change nothing.
 
 Activity is `{activity_id,revision,kind,amount_minor,amount,currency,
 currency_fraction_digits,occurred_at,time_zone,note,category_id,source_id,
-purchase_activity_id,purchase_revision,reason,recorded_at,recorded_by,legs}`.
+purchase_activity_id,purchase_revision,principal_minor,interest_minor,fees_minor,reversal_of_activity_id,reversal_of_revision,reason,recorded_at,recorded_by,legs}`.
 Leg is `{record_id,record_revision,account_id,role,balance_movement_minor,coverage}`;
 role is `single|source|destination`; coverage uses legacy CoverageAnswer.
 Write returns `{activity,accounts:[FinancialAccountResponse],replayed}`: accepted
@@ -6958,7 +6958,8 @@ Home recent activity shows each paired operation once.
 Income admits cash/checking/savings/investment; expense/refund cash/checking/savings/
 credit_card. Transfer connects distinct cash/checking/savings/investment accounts;
 card payment uses those sources and credit_card destination. Pairs and linked refunds
-require same currency. No FX/loan allocation. Positive card balance exposes credit_minor
+require same currency. No FX conversion. Loan principal, interest and fees use the explicit
+`debt_payment` split below; no missing allocation is inferred. Positive card balance exposes credit_minor
 in BalanceResponse. Unknown remains unknown after activity.
 
 Linked refunds target owned expenses, cannot precede purchase local financial date,
@@ -6973,9 +6974,13 @@ currency string integers gross_income_minor, gross_purchases_minor, refunds_mino
 net_spending_minor. Default month uses the clock in the requested zone. Omitted
 zone uses the saved Plan reporting zone, initially America/Santo_Domingo. The
 half-open monthly interval controls received-month refund attribution. Net
-may be negative. Transfers/payments contribute zero. Existing recorded_spending_minor
-remains lifetime gross purchases. Activity uses full transaction amounts; position
-retains personal shares. Archived accounts remain in summaries.
+may be negative. Transfers and card payments contribute zero. Loan payments contribute
+only interest plus fees to gross_purchases_minor; returned loan costs contribute
+to refunds_minor in their actual return month. Principal never counts as spending.
+The compatibility field recorded_spending_minor remains lifetime gross active expense
+activity only, excluding refunds and loan-payment costs; it is distinct from the
+shared monthly gross/net spending fields. Activity uses full transaction amounts;
+position retains personal shares. Archived accounts remain in summaries.
 
 Legacy expense URLs, IDs and request receipt hashes stay replayable through the same
 planner/projection. Moved/retired legs cannot be independently corrected. Existing
@@ -6984,7 +6989,8 @@ check/opening coverage behavior stays exact-revision and append-only.
 ## Connected personal Plan and Home (September 29, 2026)
 
 All `/api/v1/financial-plan` routes reuse the financial-account exposure and registered-owner
-boundary. Cash expectations do not write balances. There is no FX or card-debt plan here.
+boundary. Cash expectations do not write balances. There is no FX conversion;
+connected debt-payment plans extend this same projection as specified below.
 
 `GET /financial-plan?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` returns the shared
 Plan/Home projection. Defaults are today through 30 days later in the saved time zone;
@@ -7250,3 +7256,16 @@ matching the existing optional Recording nickname.
 Contribution preview also returns `pools:[GoalPool]` for the reviewed projected
 account snapshot. The native money review shows supported goal progress after the
 contribution and any affected source-account shortfall before confirmation.
+
+
+## Connected personal debt-payment plans
+
+Registered owners use `POST /financial-plan/debts`, `GET/PATCH /financial-plan/debts/{id}` and `GET /{id}/payments/candidates`, `POST /{id}/payments/link`, `POST /{id}/payments/preview`, `POST /{id}/payments` under that debt prefix. Writes require `Idempotency-Key` and use existing owner-serialized Plan receipts. Debt creation takes `debt_account_id`, `name`, `source_account_id`, exact decimal `amount`, existing `schedule`, optional `assumptions`. Currency derives from the immutable debt account. Edits take `expected_version`, optional name/funding/amount/schedule/archive/assumptions and `effective_date`; schedule cutover preserves every claimed occurrence.
+
+Optional scenario assumptions take `annual_rate_percent`, explicit `recurring_fees`, `first_period_start`, `no_new_borrowing:true`. This is a fixed monthly arrears model for the recorded amount owed, including cards; it does not reproduce card billing rules. Unknown balance/terms, unsupported cadence, ambiguous period boundaries, overdue/review-needed payments or insufficient scheduled payments produce typed `payoff.state=unavailable` and a reason. Conditional payoff never records payment splits or clears actual debt. Explicit zero rate and fees are supported; absent values are not zero.
+
+Payment record/preview takes `expected_version`, canonical `activity`, optional `occurrence_id`. Linking takes `expected_version`, `activity_id`, `activity_revision`, optional `occurrence_id`, `expected_account_versions`. Linking changes no balances. Multiple payments can fulfill one debt occurrence. Extras reduce recorded debt without fulfilling future dates. Debt progress returns `debt`, Recording `balance`, `state` (`active`, `unknown`, `recorded_clear`, `needs_review`), `payoff`, `payments`, `occurrences`. Each debt occurrence carries `debt_plan_id`, `paid_minor`, `remaining_minor`. Shared Home/Plan forecasts use only that remainder. Known zero/credit is recorded clear; a later current correction/return reopens it. Archive suppresses future intentions and preserves actuals/history. Claimed debt occurrences remain readable with their current paid/remainder amounts and `exclusion_reason: plan_archived`; their remainder is excluded from forecast totals until restoration.
+
+Money activities add `debt_payment` and `payment_reversal`. A loan payment requires explicit decimal `amount`, `principal`, `interest`, `fees`, two same-currency accounts and ordinary preview/confirm coverage. Total must equal the nonnegative split. Funding loses total; other debt gains principal. The existing `interest_fees` category is the default cost scope; an existing explicit category override is retained. Card payment remains an equal-leg movement with no spending. A real return is a NEW dated `payment_reversal` referencing `reversal_of_activity_id` and original accounts. Loan return components are explicit; card returns use amount only. Cumulative returns are capped component by component against the current original. Original and return corrections enforce current linked caps and dates. Returns restore cash, increase debt and reverse costs in their own period. They never erase or zero the historical payment.
+
+Canonical activity responses add `principal_minor`, `interest_minor`, `fees_minor`, `reversal_of_activity_id`, `reversal_of_revision`. Spending contributors also expose `counted_spending_minor`, the contextual amount counted by the shared Recording spending owner. Payment total remains visible independently. Registered financial Search adds a typed `debt` hit carrying canonical debt progress and the existing owner-scoped snapshot/cursor rules.

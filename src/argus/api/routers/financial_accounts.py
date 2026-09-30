@@ -15,6 +15,7 @@ from argus.api.financial_accounts import (
     require_financial_accounts_context,
 )
 from argus.api.routers.financial_activities import router as money_router
+from argus.api.routers.financial_debts import router as debt_router
 from argus.api.routers.financial_loop import router as loop_router
 from argus.api.routers.financial_plan import router as plan_router
 from argus.api.routers.financial_search import router as search_router
@@ -150,5 +151,6 @@ router.include_router(loop_router)
 router.include_router(money_router)
 
 router.include_router(plan_router)
+router.include_router(debt_router)
 
 router.include_router(search_router)

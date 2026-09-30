@@ -67,6 +67,9 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
                 "source_id",
                 "purchase_activity_id",
                 "purchase_revision",
+                "interest_minor",
+                "reversal_of_activity_id",
+                "reversal_of_revision",
             )
         }
         connection.execute(

@@ -9,9 +9,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from argus.domain.planning import goal_projection, storage
+from argus.domain.planning import debt_projection, goal_projection, storage
 from argus.domain.planning.budget_schemas import BudgetDefinition
 from argus.domain.planning.budgets import definition
+from argus.domain.planning.debt_schemas import DebtProgress
 from argus.domain.planning.goal_schemas import GoalProgress
 from argus.domain.planning.model import expectation_response
 from argus.domain.planning.responses import Expectation
@@ -22,7 +23,7 @@ from argus.domain.recording.schemas import FinancialAccountResponse, account_res
 from argus.domain.recording.service import FinancialAccountService
 from argus.domain.search_text import normalize_search_text
 
-Kind = Literal["account", "activity", "expectation", "budget", "goal"]
+Kind = Literal["account", "activity", "expectation", "budget", "goal", "debt"]
 
 
 class AccountHit(BaseModel):
@@ -51,8 +52,13 @@ class GoalHit(BaseModel):
     goal: GoalProgress
 
 
+class DebtHit(BaseModel):
+    kind: Literal["debt"] = "debt"
+    debt: DebtProgress
+
+
 Hit = Annotated[
-    AccountHit | ActivityHit | ExpectationHit | BudgetHit | GoalHit,
+    AccountHit | ActivityHit | ExpectationHit | BudgetHit | GoalHit | DebtHit,
     Field(discriminator="kind"),
 ]
 
@@ -163,6 +169,11 @@ def search(
     )[0]:
         item = GoalProgress.model_validate(goal)
         add(GoalHit(goal=item), item.goal.name, item.goal.id, item.goal.currency)
+    for debt in debt_projection.project(
+        state, accounts, today, today + timedelta(days=30)
+    ):
+        item = DebtProgress.model_validate(debt)
+        add(DebtHit(debt=item), item.debt.name, item.debt.id, item.debt.currency)
     rows.sort(key=lambda row: row[:3])
     items = [row[3] for row in rows]
     scope = digest([owner, query, kind, currency])

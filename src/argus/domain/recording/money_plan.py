@@ -69,7 +69,12 @@ def request_identity(request: MoneyRequest, activity_id: str | None) -> str:
 
 
 def selected(request: MoneyRequest) -> dict[str, str]:
-    pair = request.kind in {"transfer", "card_payment"}
+    pair = request.kind in {
+        "transfer",
+        "card_payment",
+        "debt_payment",
+        "payment_reversal",
+    }
     if pair:
         if (
             request.account_id
@@ -119,12 +124,23 @@ def plan(
     reason = _normalize_reason(request.reason, required=old is not None)
     stamp = _stamp(request.occurred_at, request.time_zone, now)
     targets = selected(request)
+    existing = current_activities(accounts)
+    return_original = next(
+        (a for a in existing if a["activity_id"] == request.reversal_of_activity_id), None
+    )
     for aid, selected_role in targets.items():
         if aid not in by_id:
             raise AccountNotFound()
         allowed = (
-            ("credit_card",)
-            if request.kind == "card_payment" and selected_role == "destination"
+            (
+                ("credit_card",)
+                if request.kind == "card_payment"
+                or return_original
+                and return_original["kind"] == "card_payment"
+                else ("other_debt",)
+            )
+            if request.kind in {"card_payment", "debt_payment", "payment_reversal"}
+            and selected_role == "destination"
             else ELIGIBILITY[request.kind]
         )
         if by_id[aid].account.type not in allowed and not (
@@ -139,12 +155,33 @@ def plan(
     amount = parse_minor_units(request.amount, currency)
     if amount <= 0:
         problem("amount_positive_required", "Enter a positive amount.")
+    from argus.domain.recording.payments import validate as payment_validate
+
+    if request.kind == "debt_payment" and request.category_id is None:
+        request = request.model_copy(update={"category_id": "interest_fees"})
+    if return_original and request.category_id is None:
+        request = request.model_copy(
+            update={"category_id": return_original["category_id"]}
+        )
+    payment = payment_validate(request, currency, amount, old, existing, stamp, targets)
+    if return_original:
+        if (
+            request.category_id is not None
+            and request.category_id != return_original["category_id"]
+        ):
+            problem(
+                "payment_return_category",
+                "A payment return uses the original cost category.",
+            )
+        request = request.model_copy(
+            update={"category_id": return_original["category_id"]}
+        )
     if request.category_id is not None and request.category_id not in CATEGORY_IDS:
         problem("category_unknown", "Choose an available category.")
     if request.source_id is not None and request.source_id not in SOURCE_IDS:
         problem("source_unknown", "Choose an available income source.")
     if (
-        request.kind not in {"expense", "refund"}
+        request.kind not in {"expense", "refund", "debt_payment", "payment_reversal"}
         and request.category_id is not None
         or request.kind != "income"
         and request.source_id is not None
@@ -165,7 +202,12 @@ def plan(
         assert purchase_id is not None
         purchase = activity(accounts, purchase_id)
         affected.update(leg["account_id"] for leg in purchase["legs"])
-    existing = current_activities(accounts)
+    for reference in {
+        request.reversal_of_activity_id,
+        old.get("reversal_of_activity_id") if old else None,
+    } - {None}:
+        original = activity(accounts, reference)
+        affected.update(leg["account_id"] for leg in original["legs"])
     if request.purchase_activity_id:
         purchase = activity(accounts, request.purchase_activity_id)
         if purchase["kind"] != "expense" or purchase["currency"] != currency:
@@ -264,7 +306,7 @@ def plan(
             )
             revision = ExpenseRevision(
                 (current.current.revision if current else 0) + 1,
-                amount if role else 0,
+                payment.leg(role) if role else 0,
                 stamp,
                 request.time_zone,
                 reviewed.note,
@@ -280,6 +322,9 @@ def plan(
                 request.source_id,
                 request.purchase_activity_id,
                 purchase_revision,
+                payment.interest if role == "source" else None,
+                payment.reference,
+                payment.reference_revision,
             )
             record = ExpenseRecord(
                 rid, aid, (*current.revisions, revision) if current else (revision,)

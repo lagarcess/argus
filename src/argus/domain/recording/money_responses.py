@@ -34,6 +34,12 @@ class MoneyActivityResponse(BaseModel):
     source_id: str | None
     purchase_activity_id: str | None
     purchase_revision: int | None
+    principal_minor: int | None = None
+    interest_minor: int | None = None
+    fees_minor: int | None = None
+    reversal_of_activity_id: str | None = None
+    reversal_of_revision: int | None = None
+    counted_spending_minor: int | None = None
     reason: str | None
     recorded_at: datetime
     recorded_by: str | None

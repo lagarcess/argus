@@ -49,6 +49,7 @@ final class FinancialPlanModel: ObservableObject {
             loop.acceptPlanHome(next.home)
             await loop.budgets.refreshIfOpen()
             await loop.goals.refreshIfOpen()
+            await loop.debts.refreshIfOpen()
             guard generation == ticket, request == query else { return }
             if let selectedOccurrence { self.selectedOccurrence = next.occurrences.first { $0.id == selectedOccurrence.id } }
         } catch { if request == query { await failed(error, ticket: ticket) } }
@@ -91,6 +92,9 @@ final class FinancialPlanModel: ObservableObject {
     }
 
     func open(_ occurrence: FinancialPlanOccurrence) async {
+        if let debtId = occurrence.debtPlanId {
+            await loop.debts.open(debtId, origin: .plan, occurrenceId: occurrence.id); return
+        }
         if let goalId = occurrence.goalId {
             await loop.goals.open(goalId, origin: .plan, occurrenceId: occurrence.id); return
         }

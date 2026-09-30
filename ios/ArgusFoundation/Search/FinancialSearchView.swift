@@ -207,10 +207,11 @@ struct FinancialSearchRow: View {
         case .expectation(let expectation): Text(verbatim: expectation.title)
         case .budget(let budget): Text(verbatim: budget.name)
         case .goal(let goal): Text(verbatim: goal.goal.name)
+        case .debt(let debt): Text(verbatim: debt.debt.name)
         }
     }
     private var symbol: String {
-        switch hit { case .account(let account): AccountPresentation.symbol(account.type); case .activity: "arrow.left.arrow.right"; case .expectation: "calendar"; case .budget: "chart.bar"; case .goal: "target" }
+        switch hit { case .account(let account): AccountPresentation.symbol(account.type); case .activity: "arrow.left.arrow.right"; case .expectation: "calendar"; case .budget: "chart.bar"; case .goal: "target"; case .debt: "creditcard" }
     }
 }
 

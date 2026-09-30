@@ -1,0 +1,64 @@
+"""Run the production debt draft directly, without an app or simulator."""
+
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[2]
+with tempfile.TemporaryDirectory(prefix="argus-debt-draft-tests-") as temporary:
+    package = Path(temporary)
+    source = package / "Sources/FinancialDebtModels"
+    tests = package / "Tests/FinancialDebtDraftTests"
+    source.mkdir(parents=True)
+    tests.mkdir(parents=True)
+    # Follow the existing model harness: copy the exact production declarations.
+    draft = (root / "ios/ArgusFoundation/Plan/FinancialDebtForm.swift").read_text()
+    (source / "FinancialDebtDraft.swift").write_text(
+        draft.split("struct FinancialDebtForm: View {")[0]
+    )
+    shutil.copy(root / "ios/ArgusFoundation/Accounts/AccountEntry.swift", source)
+    for filename, declaration, target in [
+        (
+            "Accounts/AccountsView.swift",
+            "enum AccountPresentation {",
+            "AccountPresentation.swift",
+        ),
+        (
+            "Plan/FinancialPlanModel.swift",
+            "enum PlanPresentation {",
+            "PlanPresentation.swift",
+        ),
+    ]:
+        text = (root / "ios/ArgusFoundation" / filename).read_text()
+        (source / target).write_text(
+            "import Foundation\nimport ArgusSession\n" + text[text.index(declaration) :]
+        )
+    shutil.copy(Path(__file__).with_name("FinancialDebtDraftTests.swift"), tests)
+    dependency = root / "ios/Packages/ArgusSession"
+    (package / "Package.swift").write_text(
+        '''// swift-tools-version: 6.0
+import PackageDescription
+let package = Package(name: "FinancialDebtModels", platforms: [.macOS(.v14)],
+    dependencies: [.package(path: "'''
+        + str(dependency)
+        + """")], targets: [
+    .target(name: "FinancialDebtModels", dependencies: [.product(name: "ArgusSession", package: "ArgusSession")]),
+    .testTarget(name: "FinancialDebtDraftTests", dependencies: ["FinancialDebtModels", .product(name: "ArgusSession", package: "ArgusSession")])
+])
+"""
+    )
+    shutil.copy(dependency / "Package.resolved", package)
+    subprocess.run(
+        [
+            "swift",
+            "test",
+            "--package-path",
+            str(package),
+            "--scratch-path",
+            "/private/tmp/argus-debt-draft-build",
+            "--disable-sandbox",
+            "--disable-automatic-resolution",
+        ],
+        check=True,
+    )

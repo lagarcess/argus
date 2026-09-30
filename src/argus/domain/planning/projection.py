@@ -3,7 +3,13 @@
 from datetime import date, datetime
 from typing import Any
 
-from argus.domain.planning import claims, goal_model, goal_projection
+from argus.domain.planning import (
+    claims,
+    debt_model,
+    debt_projection,
+    goal_model,
+    goal_projection,
+)
 from argus.domain.planning.budgets import all_progress
 from argus.domain.planning.model import expectation_response, occurrences
 from argus.domain.planning.schemas import CASH_TYPES
@@ -33,6 +39,8 @@ def matches(occurrence: dict[str, Any], activity: dict[str, Any]) -> bool:
 def occurrence_response(
     item: dict[str, Any], state: dict[str, Any], actual: dict[str, Any], start: date
 ) -> dict[str, Any]:
+    if item["kind"] == "debt_payment":
+        return debt_projection.occurrence(item, state, actual, start)
     link = claims.for_occurrence(state, item["id"])
     activity = actual.get(link["activity_id"]) if link else None
     status = (
@@ -74,10 +82,24 @@ def projection(
     rows = [
         occurrence_response(item, state, actual, start)
         for item in (
-            occurrences(state, end) | goal_model.occurrences(state, end)
+            occurrences(state, end)
+            | goal_model.occurrences(state, end)
+            | debt_model.occurrences(state, end)
         ).values()
         if date.fromisoformat(item["due_date"]) <= end
     ]
+    debts = debt_projection.project(state, accounts, start, end)
+    debt_states = {p["debt"]["id"]: p["state"] for p in debts}
+    for row in rows:
+        if row["kind"] == "debt_payment" and debt_states[row["debt_plan_id"]] in {
+            "recorded_clear",
+            "needs_review",
+        }:
+            row["exclusion_reason"] = (
+                "recorded_clear"
+                if debt_states[row["debt_plan_id"]] == "recorded_clear"
+                else "account_changed"
+            )
     by_id = {s.account.id: s.account for s in accounts}
     for row in rows:
         if row["status"] == "planned" and any(
@@ -215,6 +237,7 @@ def projection(
     budgets = all_progress(state, accounts)
     goals, pools = goal_projection.project(state, accounts, start, end)
     return {
+        "debts": debts,
         "budgets": budgets,
         "goals": goals,
         "goal_pools": pools,
@@ -222,6 +245,7 @@ def projection(
             accounts, time_zone=state["selection"]["time_zone"], now=now
         )
         | {
+            "debts": [p for p in debts if not p["debt"]["archived"]],
             "budgets": [p for p in budgets if not p["budget"]["archived"]],
             "goals": [p for p in goals if not p["goal"]["archived"]],
         },
@@ -243,7 +267,7 @@ def projection(
 
 
 def movement_legs(row: dict[str, Any]) -> list[tuple[str | None, int]]:
-    amount = row["amount_minor"]
+    amount = row.get("remaining_minor", row["amount_minor"])
     if row["kind"] == "goal_transfer":
         return [
             (row["source_account_id"], -amount),

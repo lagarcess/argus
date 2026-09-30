@@ -11,6 +11,9 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     let origin: FinancialAccount
     let correcting: FinancialActivityDetail?
     let planOccurrence: FinancialPlanOccurrence?
+    let debt: FinancialDebt?
+    let debtOccurrenceId: String?
+    let returning: FinancialActivityDetail?
     let goal: FinancialGoal?
     let goalOccurrenceId: String?
     @Published private(set) var kind: FinancialActivityKind
@@ -18,6 +21,10 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     @Published var sourceAccountId: UUID? { didSet { changed(sourceAccountId != oldValue) } }
     @Published var destinationAccountId: UUID? { didSet { changed(destinationAccountId != oldValue) } }
     @Published var amount = "" { didSet { changed(amount != oldValue) } }
+    @Published var principal = "" { didSet { changed(principal != oldValue) } }
+    @Published var interest = "" { didSet { changed(interest != oldValue) } }
+    @Published var fees = "" { didSet { changed(fees != oldValue) } }
+    @Published private(set) var debtPreview: FinancialDebtPreview?
     @Published var note = "" { didSet { changed(note != oldValue) } }
     @Published var date = Date() { didSet { changed(date != oldValue) } }
     @Published var categoryId: String? { didSet { changed(categoryId != oldValue) } }
@@ -44,20 +51,24 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     private let retired: (SessionSnapshot) -> Void
     private let completed: (FinancialActivityReceipt) async -> Void
 
-    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil, planOccurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil,
+    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil, planOccurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil,
          controller: SessionController, journal: FinancialWriteJournal, identity: SessionSnapshot,
          started: @escaping (PendingFinancialConfirmation) -> Void = { _ in },
          resolved: @escaping () -> Void = {},
          retired: @escaping (SessionSnapshot) -> Void = { _ in },
          completed: @escaping (FinancialActivityReceipt) async -> Void) {
+        self.debt = debt; self.debtOccurrenceId = debtOccurrenceId; self.returning = returning
         self.goal = goal; self.goalOccurrenceId = goalOccurrenceId
         self.origin = origin; self.correcting = correcting; self.planOccurrence = planOccurrence
         self.controller = controller; self.journal = journal; self.identity = identity
         self.started = started; self.resolved = resolved; self.retired = retired; self.completed = completed
-        kind = correcting?.kind ?? (origin.type == "credit_card" ? .cardPayment : origin.type == "investment" ? .transfer : .expense)
+        kind = correcting?.kind ?? (origin.type == "credit_card" ? .cardPayment : origin.type == "other_debt" ? .debtPayment : origin.type == "investment" ? .transfer : .expense)
         timeZone = correcting?.timeZone ?? TimeZone.current.identifier
         if let correcting {
             amount = AccountPresentation.amount(correcting.amount, locale: .current)
+            principal = correcting.principalMinor.map { AccountPresentation.amount(AccountPresentation.decimal($0, digits: correcting.currencyFractionDigits), locale: .current) } ?? ""
+            interest = correcting.interestMinor.map { AccountPresentation.amount(AccountPresentation.decimal($0, digits: correcting.currencyFractionDigits), locale: .current) } ?? ""
+            fees = correcting.feesMinor.map { AccountPresentation.amount(AccountPresentation.decimal($0, digits: correcting.currencyFractionDigits), locale: .current) } ?? ""
             note = correcting.note ?? ""; categoryId = correcting.categoryId
             sourceId = correcting.sourceId; purchaseActivityId = correcting.purchaseActivityId
             date = AccountPresentation.parseDate(correcting.occurredAt) ?? Date()
@@ -70,6 +81,16 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         } else {
             if let planOccurrence { kind = planOccurrence.kind == .income ? .income : .expense }
             setAccounts(for: kind)
+            if let returning {
+                kind = .paymentReversal; accountId = nil
+                sourceAccountId = returning.legs.first(where: { $0.role == "source" })?.accountId
+                destinationAccountId = returning.legs.first(where: { $0.role == "destination" })?.accountId
+                categoryId = returning.categoryId
+            }
+            if let debt {
+                kind = origin.id == debt.debtAccountId && origin.type == "credit_card" ? .cardPayment : .debtPayment
+                accountId = nil; sourceAccountId = debt.sourceAccountId; destinationAccountId = debt.debtAccountId; note = debt.name
+            }
             if let goal {
                 kind = .transfer; sourceAccountId = goal.contributionPlan?.sourceAccountId ?? origin.id
                 destinationAccountId = goal.destinationAccountId
@@ -83,12 +104,13 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         }
     }
 
+    var needsLoanSplit: Bool { kind == .debtPayment || kind == .paymentReversal && (returning?.principalMinor != nil || correcting?.principalMinor != nil) }
     var isCorrection: Bool { correcting != nil }
     var busy: Bool { phase == .loading || phase == .saving }
     var canEdit: Bool { phase == .editing || (phase == .review && preview?.ready == false) }
     var canConfirm: Bool { phase == .uncertain || (phase == .review && preview?.ready == true && reviewedCommand != nil) }
     var readyToReview: Bool {
-        !amount.isEmpty && note.unicodeScalars.count <= 200 &&
+        !amount.isEmpty && (!needsLoanSplit || (!principal.isEmpty && !interest.isEmpty && !fees.isEmpty)) && note.unicodeScalars.count <= 200 &&
         (!isCorrection || !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
         (kind.isPaired ? sourceAccountId != nil && destinationAccountId != nil && sourceAccountId != destinationAccountId : accountId != nil)
     }
@@ -96,6 +118,9 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     var availableKinds: [FinancialActivityKind] {
         guard let options else { return [] }
         return FinancialActivityKind.allCases.filter { kind in
+            if returning != nil { return kind == .paymentReversal }
+            if let debt { return kind == (options.accounts.first(where: { $0.id == debt.debtAccountId })?.type == "credit_card" ? .cardPayment : .debtPayment) }
+            if kind == .paymentReversal { return false }
             if let planOccurrence { return kind == (planOccurrence.kind == .income ? .income : .expense) }
             return options.eligibility[kind.rawValue]?.contains(origin.type) == true ||
             (kind.isPaired && options.destinationEligibility[kind.rawValue]?.contains(origin.type) == true)
@@ -104,10 +129,10 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
 
     var singleChoices: [FinancialAccount] { choices(types: options?.eligibility[kind.rawValue]) }
     var sourceChoices: [FinancialAccount] {
-        choices(types: options?.eligibility[kind.rawValue]).filter { $0.id != destinationAccountId }
+        choices(types: options?.eligibility[kind.rawValue]).filter { $0.id != destinationAccountId && (returning == nil || $0.id == sourceAccountId) }
     }
     var destinationChoices: [FinancialAccount] {
-        choices(types: options?.destinationEligibility[kind.rawValue]).filter { $0.id != sourceAccountId && (goal == nil || $0.id == goal?.destinationAccountId) }
+        choices(types: options?.destinationEligibility[kind.rawValue]).filter { $0.id != sourceAccountId && (goal == nil || $0.id == goal?.destinationAccountId) && (debt == nil || $0.id == debt?.debtAccountId) && (returning == nil || $0.id == destinationAccountId) }
     }
     var linkedPurchase: FinancialActivityDetail? { purchases.first { $0.activityId == purchaseActivityId } }
 
@@ -116,6 +141,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
             let loaded = try await controller.financialActivityOptions(expectedIdentity: identity)
             guard !(await retireIfNeeded()) else { return }
             options = loaded
+            if let debt, !isCorrection { kind = loaded.accounts.first(where: { $0.id == debt.debtAccountId })?.type == "credit_card" ? .cardPayment : .debtPayment }
             if !availableKinds.contains(kind), !isCorrection, let first = availableKinds.first { setKind(first) }
             if kind == .refund { await loadPurchases() }
         } catch {
@@ -125,7 +151,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     }
 
     func setKind(_ next: FinancialActivityKind) {
-        guard !isCorrection, goal == nil, planOccurrence == nil, canEdit, availableKinds.contains(next) || options == nil else { return }
+        guard !isCorrection, goal == nil, debt == nil, returning == nil, planOccurrence == nil, canEdit, availableKinds.contains(next) || options == nil else { return }
         kind = next; categoryId = nil; sourceId = nil; purchaseActivityId = nil
         answers = []; invalidate(); setAccounts(for: next)
         if next == .refund { Task { await loadPurchases() } }
@@ -134,7 +160,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     private func setAccounts(for kind: FinancialActivityKind) {
         if kind.isPaired {
             accountId = nil
-            if kind == .cardPayment && origin.type == "credit_card" {
+            if (kind == .cardPayment && origin.type == "credit_card") || (kind == .debtPayment && origin.type == "other_debt") {
                 sourceAccountId = nil; destinationAccountId = origin.id
             } else {
                 sourceAccountId = origin.id; destinationAccountId = nil
@@ -198,13 +224,21 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                 destinationAccountId: kind.isPaired ? destinationAccountId : nil,
                 amount: exact, occurredAt: formatter.string(from: date), timeZone: timeZone,
                 note: note.isEmpty ? nil : note,
-                categoryId: kind == .expense || (kind == .refund && purchaseActivityId == nil) ? categoryId : nil,
+                categoryId: kind == .debtPayment || kind == .paymentReversal || kind == .expense || (kind == .refund && purchaseActivityId == nil) ? categoryId : nil,
                 sourceId: kind == .income ? sourceId : nil,
                 purchaseActivityId: kind == .refund ? purchaseActivityId : nil,
                 expectedRevision: correcting?.revision, reason: isCorrection ? reason : nil,
-                expectedVersions: versions, coverage: answers)
+                expectedVersions: versions, coverage: answers,
+                principal: needsLoanSplit ? try AccountEntry.amount(principal, locale: locale) : nil,
+                interest: needsLoanSplit ? try AccountEntry.amount(interest, locale: locale) : nil,
+                fees: needsLoanSplit ? try AccountEntry.amount(fees, locale: locale) : nil,
+                reversalOfActivityId: returning?.activityId ?? correcting?.reversalOfActivityId)
             let next: FinancialActivityPreview
-            if let goal {
+            if let debt {
+                let result = try await controller.financialDebtPreview(debt.id, command: .init(expectedVersion: debt.version, activity: command, occurrenceId: debtOccurrenceId), expectedIdentity: identity)
+                guard !(await retireIfNeeded()) else { return }
+                debtPreview = result; next = result.money
+            } else if let goal {
                 let result = try await controller.financialGoalPreview(goal.id, command: .init(expectedVersion: goal.version, activity: command, occurrenceId: goalOccurrenceId), expectedIdentity: identity)
                 guard !(await retireIfNeeded()) else { return }
                 goalPreview = result; next = result.money
@@ -240,7 +274,10 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                     throw SessionFailure.invalidResponse
                 }
                 let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
-                if let goal {
+                if let debt {
+                    let operation = FinancialPlanOperation.recordDebt(id: debt.id, version: debt.version)
+                    write = .init(ownerId: owner, originAccountId: origin.id, route: "financial-plan", path: operation.path, method: operation.method, body: try encoder.encode(FinancialDebtRecordCommand(expectedVersion: debt.version, activity: reviewedCommand, occurrenceId: debtOccurrenceId)), key: key, planOperation: operation)
+                } else if let goal {
                     let operation = FinancialPlanOperation.recordGoal(id: goal.id, version: goal.version)
                     write = .init(ownerId: owner, originAccountId: origin.id, route: "financial-plan", path: operation.path, method: operation.method, body: try encoder.encode(FinancialGoalRecordCommand(expectedVersion: goal.version, activity: reviewedCommand, occurrenceId: goalOccurrenceId)), key: key, planOperation: operation)
                 } else if let occurrence = planOccurrence {
@@ -303,6 +340,11 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         guard case SessionFailure.rejected(_, let code) = error else { return "loop.error.connection" }
         guard let code else { return "loop.error.validation" }
         switch code {
+        case "debt_plan_exists": return "debt.error.exists"
+        case "debt_setup_invalid", "debt_payment_mismatch": return "debt.error.setup"
+        case "payment_split_required", "payment_split_invalid": return "debt.error.split"
+        case "payment_return_limit": return "debt.error.returnLimit"
+        case "payment_reference_invalid", "payment_reference_immutable", "payment_return_mismatch", "payment_return_category", "linked_payment_return", "return_before_payment": return "debt.error.return"
         case "goal_backing_shortfall": return "goal.error.shortfall"
         case "goal_backing_unknown", "goal_backing_ineligible": return "goal.error.backing"
         case "goal_setup_required", "goal_setup_invalid", "goal_contribution_mismatch": return "goal.error.setup"

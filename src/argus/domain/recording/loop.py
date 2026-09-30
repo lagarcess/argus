@@ -30,11 +30,16 @@ class ExpenseRevision:
     source_id: str | None = None
     purchase_activity_id: str | None = None
     purchase_revision: int | None = None
+    interest_minor: int | None = None
+    reversal_of_activity_id: str | None = None
+    reversal_of_revision: int | None = None
 
     @property
     def movement_minor(self) -> int:
         if not self.active:
             return 0
+        if self.kind == "payment_reversal":
+            return self.amount_minor if self.role == "source" else -self.amount_minor
         return (
             -self.amount_minor
             if self.kind == "expense" or self.role == "source"

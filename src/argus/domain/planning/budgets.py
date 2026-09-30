@@ -4,7 +4,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from argus.domain.planning import goal_projection, model, storage
+from argus.domain.planning import debt_projection, goal_projection, model, storage
 from argus.domain.planning.budget_schemas import BudgetCreate, BudgetEdit
 from argus.domain.recording.currency import (
     currency_exponent,
@@ -196,6 +196,16 @@ class BudgetService:
             zone or state["selection"]["time_zone"],
             self.planner.accounts._clock(),
         ) | {
+            "debts": [
+                p
+                for p in debt_projection.project(
+                    state,
+                    accounts,
+                    self.planner.today(state),
+                    self.planner.today(state) + timedelta(days=30),
+                )
+                if not p["debt"]["archived"]
+            ],
             "goals": [
                 p
                 for p in goal_projection.project(

@@ -1,9 +1,9 @@
 import Foundation
 
 public enum FinancialActivityKind: String, Codable, CaseIterable, Sendable {
-    case expense, income, transfer, cardPayment = "card_payment", refund
+    case expense, income, transfer, cardPayment = "card_payment", refund, debtPayment = "debt_payment", paymentReversal = "payment_reversal"
 
-    public var isPaired: Bool { self == .transfer || self == .cardPayment }
+    public var isPaired: Bool { self == .transfer || self == .cardPayment || self == .debtPayment || self == .paymentReversal }
 }
 
 public struct FinancialAccountCoverage: Codable, Equatable, Sendable {
@@ -26,6 +26,10 @@ public struct FinancialActivityCommand: Codable, Equatable, Sendable {
     public var sourceAccountId: UUID?
     public var destinationAccountId: UUID?
     public var amount: String
+    public var principal: String?
+    public var interest: String?
+    public var fees: String?
+    public var reversalOfActivityId: UUID?
     public var occurredAt: String
     public var timeZone: String
     public var note: String?
@@ -44,7 +48,8 @@ public struct FinancialActivityCommand: Codable, Equatable, Sendable {
                 sourceId: String? = nil, purchaseActivityId: UUID? = nil,
                 expectedRevision: Int? = nil, reason: String? = nil,
                 expectedVersions: [String: Int] = [:], coverage: [FinancialAccountCoverage] = [],
-                previewToken: String? = nil) {
+                previewToken: String? = nil, principal: String? = nil, interest: String? = nil, fees: String? = nil, reversalOfActivityId: UUID? = nil) {
+        self.principal = principal; self.interest = interest; self.fees = fees; self.reversalOfActivityId = reversalOfActivityId
         self.kind = kind; self.accountId = accountId; self.sourceAccountId = sourceAccountId
         self.destinationAccountId = destinationAccountId; self.amount = amount
         self.occurredAt = occurredAt; self.timeZone = timeZone; self.note = note
@@ -55,7 +60,8 @@ public struct FinancialActivityCommand: Codable, Equatable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case kind, amount, note, reason, coverage
+        case kind, amount, note, reason, coverage, principal, interest, fees
+        case reversalOfActivityId = "reversal_of_activity_id"
         case accountId = "account_id", sourceAccountId = "source_account_id"
         case destinationAccountId = "destination_account_id", occurredAt = "occurred_at"
         case timeZone = "time_zone", categoryId = "category_id", sourceId = "source_id"
@@ -70,6 +76,8 @@ public struct FinancialActivityCommand: Codable, Equatable, Sendable {
         try value.encode(sourceAccountId, forKey: .sourceAccountId)
         try value.encode(destinationAccountId, forKey: .destinationAccountId)
         try value.encode(amount, forKey: .amount)
+        try value.encode(principal, forKey: .principal); try value.encode(interest, forKey: .interest); try value.encode(fees, forKey: .fees)
+        try value.encode(reversalOfActivityId, forKey: .reversalOfActivityId)
         try value.encode(occurredAt, forKey: .occurredAt)
         try value.encode(timeZone, forKey: .timeZone)
         try value.encode(note, forKey: .note)
@@ -161,6 +169,12 @@ public struct FinancialActivityDetail: Codable, Equatable, Sendable, Identifiabl
     public let recordedAt: String
     public let recordedBy: String?
     public let legs: [FinancialActivityLeg]
+    public let principalMinor: Int64?
+    public let interestMinor: Int64?
+    public let feesMinor: Int64?
+    public let reversalOfActivityId: UUID?
+    public let reversalOfRevision: Int?
+    public let countedSpendingMinor: Int64?
     public let refundedMinor: Int64?
     public let refundableMinor: Int64?
     public var id: UUID { activityId }
@@ -172,6 +186,8 @@ public struct FinancialActivityDetail: Codable, Equatable, Sendable, Identifiabl
         case categoryId = "category_id", sourceId = "source_id"
         case purchaseActivityId = "purchase_activity_id", purchaseRevision = "purchase_revision"
         case recordedAt = "recorded_at", recordedBy = "recorded_by"
+        case principalMinor = "principal_minor", interestMinor = "interest_minor", feesMinor = "fees_minor"
+        case reversalOfActivityId = "reversal_of_activity_id", reversalOfRevision = "reversal_of_revision", countedSpendingMinor = "counted_spending_minor"
         case refundedMinor = "refunded_minor", refundableMinor = "refundable_minor"
     }
 }

@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** [connected personal savings goals](#pr-755-integration-landing) are landed through [PR #755](https://github.com/lagarcess/argus/pull/755), with the locally verified native journey and runnable demonstration preserved. The founder authorized this merge and its bounded integration landing. No next slice or deployment is authorized. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** connected personal debt-payment plans are locally verified in the native simulator and published in PR #757; final exact-head CI/readiness is recorded on that PR. The founder approved the principal-based loan rule below. Savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. No merge or deployment is authorized for debt plans. Physical-iPhone testing belongs to its separate owner.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,139 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected personal debt-payment plans lane
+
+**Founder assignment and policy approval, September 30, 2026.** Deliver the
+complete personal debt-plan journey through a runnable native iPhone simulator
+against isolated real local Auth/API/Postgres, a short recording, durable
+screenshots, restart instructions, applicable green CI and a clean fresh
+independent review. Publication and existing isolated automatic PR previews are
+authorized. Stop at merge-ready. No merge, deployment, hosted settings,
+production data, paid providers, signing changes or phone installation.
+
+**Fresh integration base:** `7c29b2a9b3f4680f6804a2abc8378df45b05540c`,
+including savings #755/#756. **Recovery branch:** `codex/connected-debt-plans`.
+**Delivery checkout:**
+`/Users/garces/.codex/worktrees/connected-debt-plans/private-alpha-next`.
+**Current state:** locally verified through [PR #757](https://github.com/lagarcess/argus/pull/757).
+Assembled source `70e34fe94641806ca3e80ac9ac6fff9ad73603f3` passed three
+native journeys, 343 real-Postgres/financial/API/OpenAPI checks with zero skips,
+three production native command tests, retained registered-auth acceptance and
+fresh scoped independent review with zero unresolved confirmed findings.
+Loan create/payment/response-loss/retry/correction/actual return/edit/archive/
+restore/Search/reopen, existing card-payment linking/return, and Spanish
+Home/Search/back/relaunch passed. The canonical-ID preview bug found by the
+simulator is fixed at the shared payment boundary and regression-covered.
+
+A 90-second recording, sixteen financial screenshots, exact native/review/API
+proof and retained restart instructions live in
+[connected-debt-plans](../reports/evidence/connected-debt-plans/README.md).
+The signed-in English/dark app remains runnable against direct API59200. Its
+temporary fault proxy and recording helpers are stopped. Existing demos and the
+phone-testing environment are preserved. Fresh integration remains the original
+base, so no reconciliation merge or intervening semantic overlap exists. Later
+preservation commits affect docs/evidence only; source evidence is retained after
+runtime-equivalence verification. Final PR head, terminal applicable CI and local/
+remote parity are recorded in the PR terminal audit. Merge remains unauthorized.
+
+**Remaining limits and visual polish:** optional payoff supports stated monthly
+constant-rate terms, not guessed breakdowns, variable rates, lender billing or
+automatic actual accrual. Missing/unsupported terms show no invented estimate.
+Existing full-owner snapshots retain their scale limit. Passing loan/card native
+cases emit the invalid-frame warning also present in retained savings acceptance;
+no visible failure was observed, and shared layout polish stays tracked here.
+Physical-iPhone internet delivery, shared Plan variants and the other MVEE
+outcomes remain unfinished. No additional slice is started. GitHub CLI remains
+the publication fallback because Origin CLI is unavailable.
+
+### Approved money rule and shared owners
+
+Other-debt balances mean remaining principal. An actual loan payment uses the
+person's explicit principal, interest and fee breakdown. Cash falls by the total,
+debt falls by principal, and interest and fees count as spending once. Missing
+amounts are never guessed. Cards retain the landed card-payment contract.
+
+Recording owns actual activity, signed account movements, corrections and
+spending. Planning owns payment intentions, recurrence, fulfillment and
+conditional projections. Native clients render canonical results. Creating or
+editing a plan changes no recorded balance. Unknown debt remains unknown, and
+currencies never convert. Existing savings pools remain the allocation owner.
+Payoff assumptions stay visible and cannot establish an actual cleared balance.
+
+The release captain owns integration, the existing manifest, independent
+acceptance and publication. One implementation writer owns the coupled financial,
+API, persistence and native surfaces. Temporary architecture readers and the
+fresh reviewer do not write implementation. No competing board is introduced.
+
+| User outcome | Inherited capability | Delivered work and owner | Dependencies | Assembled proof |
+| --- | --- | --- | --- | --- |
+| Create and edit a debt plan | Debt accounts, native Plan controls, Schedule | Implementation owner: canonical definition, funding and schedule connected | Canonical account and recurrence contracts | Create for card and loan; intentions change no balances |
+| Understand debt and payoff | Recording position, local TVM calculators | Same owner: recorded debt, optional conditional payoff and explicit missing terms connected | Known balance and stated supported terms for an estimate | Unknown stays unknown; assumptions and actual remain distinct |
+| Record or link a payment | Card payments, preview/confirm, atomic Plan receipts | Same owner: explicit loan split, eligible linking and occurrence progress connected | One Recording command and shared owner transaction | Cash, principal, costs and forecast update once |
+| Inspect, correct and recover | Original activity editor, revisions, balance checks | Same owner: original split corrections, dated returns, partial and extra payments connected | Current original revision and account versions | Independent totals; correction/reversal re-evaluates links |
+| Archive, restore and reopen | Plan lifecycle, native journals and origins | Same owner: debt lifecycle and durable context connected | Stable definition and occurrence identities | Relaunch, lost response, exact retry and stale edit |
+| Find and return through Search | Typed financial Search and existing detail navigation | Same owner: typed debt hit and owning detail connected | Canonical debt reads | Query, filters and scroll survive; edits refresh results |
+| See Accounts, Plan and Home agree | Shared forecast, budgets and savings support | Same owner: shared debt movements and concise summaries connected | Recording and one Plan snapshot | Partial, missed, extra, cleared/reopened debt; budget and goal regressions |
+
+### Chosen implementation shape
+
+Two bounded readers compared a single canonical payment with a parent aggregate
+of separate principal and cost entries. A fresh judge favored the single activity
+(25/30 versus 18/30). The captain selected it because every existing reader can
+keep using the same identity, receipt, revision and account-leg ownership.
+Recording extends its paired activity to explicit unequal loan movements and
+one derived spending contribution. Planning extends its existing definition,
+claims and repeatable-read snapshot. No new ledger or receipt owner is added.
+
+An actual returned payment is a new dated inverse activity linked to the original
+payment. The original and its original-period costs remain. Explicit component
+limits prevent returning principal, interest or fees twice. Correcting an
+erroneous entry remains its existing revision operation. Partial debt payments
+leave the unpaid occurrence amount outstanding; extras do not automatically
+fulfill future dates. Existing bill and savings occurrence behavior is preserved.
+
+The native payment editor is shared by account-first recording and Plan-origin
+fulfillment. Optional payoff estimates reuse compatible local calculations with
+stated terms and visible assumptions. Missing terms yield no invented estimate.
+The alternative's hidden child activities and separate lifecycle/receipt stores
+were rejected. Additional future-payment split fields are unnecessary for the
+short initial flow.
+
+**Owners:** `debt_implementation` is the sole code/contract writer on
+`codex/connected-debt-plans-core`; its commits enter the delivery branch in
+verified units. This includes the existing `ios/Packages/ArgusSession` types,
+transport and journal. The captain owns acceptance scripts, runtime, evidence,
+manifest and publication. Design readers/judge have completed and stopped.
+
+**Isolated local allocation:** API 59200, Supabase 59201, Postgres 59202,
+synthetic CAPTCHA 59205, optional response-loss proxy 59212 and mirror 59213.
+The two synthetic users are retained privately in the ignored allocation folder.
+Reuse idle **Argus Foundation Compact** simulator
+`1A90F684-345F-465C-AA50-6A5298F34156` with separate bundle
+`local.argus.debt-demo`. Its prior foundation bundle/data stays preserved. No
+additional simulator is created. All earlier demo allocations stay untouched.
+
+### Delivery sequence and acceptance
+
+1. Compare two compact storage designs and select the smallest canonical shape.
+2. Implement payment truth and debt-plan lifecycle together with meaningful
+   domain, API and Postgres tests and updated API/data/OpenAPI contracts.
+3. Connect the native flow, Home and Search using existing components and
+   English/Spanish. Demonstrate the journey as it becomes runnable.
+4. Independently exercise payment linking, corrections, partial/extra/reversed
+   payments, explicit interest/fees, payoff/reopening, balance-check consistency,
+   currency/unknown behavior, identity isolation and budget/savings regressions.
+5. Preserve screenshots and a short recording. Verify interrupted writes,
+   duplicate retries, stale edits, Search/back and relaunch. Reconcile fresh
+   integration one way, run merged-tree modularity and required checks, obtain
+   one fresh scoped review, fix confirmed causes, then publish readiness.
+
+Keep the short payment flow and locked native design. No web, rebrand,
+navigation redesign, household, imports, notifications, voice or runtime work.
+Preserve every existing demo and synthetic record. Phone ports 58700–58749 and
+its checkout, services, simulator/device, certificates and signing are forbidden.
+Temporary helpers belong only to this lane and are cleaned up after verification.
 
 ## PR #755 integration landing
 
@@ -1670,7 +1803,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 locally verifies personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
