@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** connected personal debt-payment plans are locally verified in the native simulator and published in PR #757; final exact-head CI/readiness is recorded on that PR. The founder approved the principal-based loan rule below. Savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. No merge or deployment is authorized for debt plans. Physical-iPhone testing belongs to its separate owner.
+**Execution state:** connected personal debt-payment plans landed through PR #757 at `63b73ea80df9af2a61aa99f83afb9595408d0370`, preserving the locally verified native journey and approved principal-based loan rule. The founder authorized this merge and its bounded documentation landing only. Savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) remain landed with their demonstrations preserved. No deployment, hosted configuration change or next slice is authorized. Physical-iPhone testing belongs to its separate owner.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -10,9 +10,51 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
+## PR #757 integration landing
+
+The founder authorized merging #757 at the verified head, completing integration
+landing and a bounded documentation PR if required. No deployment, hosted
+configuration change, next slice or phone-environment action is authorized.
+
+- [PR #757](https://github.com/lagarcess/argus/pull/757) squash-merged at
+  **September 30, 2026, 5:16:18 p.m. America/Chicago** as
+  `63b73ea80df9af2a61aa99f83afb9595408d0370`, from verified head
+  `563c7011c8e37905d148d027665f4449971014d7` onto unchanged integration
+  `7c29b2a9b3f4680f6804a2abc8378df45b05540c` (also the original base).
+  No intervening semantic overlap or reconciliation merge exists. Approved-head
+  and squash-merge trees are identical; canonical integration fast-forwarded
+  cleanly and merged-tree modularity passes.
+- The [terminal readiness audit](https://github.com/lagarcess/argus/pull/757#issuecomment-5920292387)
+  retains green applicable PR/push CI and smoke, clean fresh independent review
+  through source `70e34fe94641806ca3e80ac9ac6fff9ad73603f3`, and zero unresolved
+  findings. The final preservation delta changed only documentation/evidence;
+  runtime equivalence was verified. Three assembled native journeys, 343 real
+  financial/API/OpenAPI/Postgres passes, sixteen screenshots and the 90-second
+  recording remain valid across the identical merge tree. Landing does not
+  repeat the accepted journey.
+- Exact merge [integration CI](https://github.com/lagarcess/argus/actions/runs/36784593250)
+  and [local smoke](https://github.com/lagarcess/argus/actions/runs/36784593078),
+  the checked documentation PR and final clean local/remote parity are recorded
+  in the merged PR's landing comment after terminal checks.
+- No linked closing issues or obsolete documents require closure or archiving.
+  Only this manifest and the integration ledger need landing updates; API/data/
+  OpenAPI contracts already landed with the implementation.
+- No new production environment variable or tracked-template update is needed.
+  `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` stays default-off in `.env.example` and
+  `render.yaml`. Synthetic native assertion/proxy inputs are test-only. The
+  additive `20260930210000_connected_debt_plans.sql` migration was locally and
+  ordinary-preview verified; landing applies no hosted migration or activation.
+- The [debt demonstration and restart guide](../reports/evidence/connected-debt-plans/README.md)
+  remain on `codex/connected-debt-plans` in its unchanged delivery checkout,
+  using the dedicated simulator and 592xx services. All earlier demos, synthetic
+  records and the physical-phone environment (58700–58749) remain preserved.
+  Personal Plan debt lifecycles are locally delivered; physical-iPhone internet
+  proof, shared variants and the other MVEE outcomes remain incomplete. No
+  additional implementation is assigned.
+
 ## Connected personal debt-payment plans lane
 
-**Founder assignment and policy approval, September 30, 2026.** Deliver the
+**Original implementation assignment and policy approval, September 30, 2026 (historical authority; subsequent merge grant above).** Deliver the
 complete personal debt-plan journey through a runnable native iPhone simulator
 against isolated real local Auth/API/Postgres, a short recording, durable
 screenshots, restart instructions, applicable green CI and a clean fresh
@@ -24,7 +66,7 @@ production data, paid providers, signing changes or phone installation.
 including savings #755/#756. **Recovery branch:** `codex/connected-debt-plans`.
 **Delivery checkout:**
 `/Users/garces/.codex/worktrees/connected-debt-plans/private-alpha-next`.
-**Current state:** locally verified through [PR #757](https://github.com/lagarcess/argus/pull/757).
+**Current state:** locally verified and landed through [PR #757](https://github.com/lagarcess/argus/pull/757); the integration landing above owns subsequent merge authority.
 Assembled source `70e34fe94641806ca3e80ac9ac6fff9ad73603f3` passed three
 native journeys, 343 real-Postgres/financial/API/OpenAPI checks with zero skips,
 three production native command tests, retained registered-auth acceptance and
@@ -43,7 +85,7 @@ phone-testing environment are preserved. Fresh integration remains the original
 base, so no reconciliation merge or intervening semantic overlap exists. Later
 preservation commits affect docs/evidence only; source evidence is retained after
 runtime-equivalence verification. Final PR head, terminal applicable CI and local/
-remote parity are recorded in the PR terminal audit. Merge remains unauthorized.
+remote parity are recorded in the PR terminal audit. The subsequent authorized merge is recorded above.
 
 **Remaining limits and visual polish:** optional payoff supports stated monthly
 constant-rate terms, not guessed breakdowns, variable rates, lender billing or
@@ -1803,7 +1845,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 locally verifies personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
