@@ -80,7 +80,7 @@ struct FinancialBudgetPresenter: View {
                     model.close()
                     Task { await search?.refresh() }
                 }.background(ArgusStyle.background).clipShape(RoundedRectangle(cornerRadius: 24))
-                    .padding(12).accessibilityIdentifier("budget.detail")
+                    .padding(12).accessibilityElement(children: .contain).accessibilityIdentifier("budget.detail")
             } else { Color.clear.allowsHitTesting(false) }
         }
         .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
