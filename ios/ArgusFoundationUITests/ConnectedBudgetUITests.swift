@@ -94,7 +94,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["loop.pending.retry"].waitForExistence(timeout: 30))
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         app.terminate(); app.launch()
-        tapVisible(app.buttons["loop.pending.retry"])
+        tapVisible(app.scrollViews["screen.plan"].buttons["loop.pending.retry"])
         XCTAssertTrue(app.buttons["loop.pending.retry"].waitForNonExistence(timeout: 20))
         openBudget(title)
         assertBudget(spent: "0.00", status: "150.00")
