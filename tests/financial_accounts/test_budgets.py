@@ -15,6 +15,7 @@ from argus.domain.recording.errors import (
 )
 from argus.domain.recording.money_schemas import MoneyCoverage, MoneyRequest
 from argus.domain.recording.money_service import MoneyService
+from argus.domain.recording.schemas import EditFinancialAccountRequest
 from faker import Faker
 from pydantic import ValidationError
 
@@ -343,3 +344,62 @@ def test_month_half_open_dst_and_date_correction(scene, zone, month, start, end)
         reason=fake.sentence(),
     )
     assert service.get(scene[1], budget["id"])["spent_minor"] == "700"
+
+
+@pytest.mark.parametrize(
+    "changes,error_code",
+    [
+        ({"type": "investment"}, "account_ineligible"),
+        ({"currency": "USD"}, "currency_mismatch"),
+    ],
+)
+def test_archive_survives_account_scope_change_but_restore_revalidates(
+    scene, changes, error_code
+):
+    aid = account(scene, "checking", amount=None)
+    service, _, budget, _ = setup_budget(scene, aid=aid)
+    scene[0].edit(
+        user_id=scene[1],
+        account_id=aid,
+        request=EditFinancialAccountRequest(expected_version=1, **changes),
+    )
+    command = BudgetEdit(expected_version=1, archived=True)
+    archived = service.edit(scene[1], budget["id"], command, "archive-changed-account")
+    assert archived["budget"]["archived"] and archived["budget"]["version"] == 2
+    replay = service.edit(scene[1], budget["id"], command, "archive-changed-account")
+    assert replay["replayed"] and replay["budget"] == archived["budget"]
+    with pytest.raises(StaleVersion):
+        service.edit(scene[1], budget["id"], command, "stale-archive")
+    with pytest.raises(RecordingInputError) as error:
+        service.edit(
+            scene[1],
+            budget["id"],
+            BudgetEdit(expected_version=2, archived=False),
+            "restore-changed-account",
+        )
+    assert error.value.code == error_code
+    assert service.get(scene[1], budget["id"])["budget"] == archived["budget"]
+    with pytest.raises(AccountNotFound):
+        service.edit(
+            scene[1],
+            budget["id"],
+            BudgetEdit(expected_version=2, account_ids=[uuid4()]),
+            "foreign-scope",
+        )
+    with pytest.raises(RecordingInputError, match="budget_category_required"):
+        service.edit(
+            scene[1],
+            budget["id"],
+            BudgetEdit(expected_version=2, category_ids=[]),
+            "empty-scope",
+        )
+    replacement = account(scene, "checking", amount=None)
+    restored = service.edit(
+        scene[1],
+        budget["id"],
+        BudgetEdit(expected_version=2, archived=False, account_ids=[replacement]),
+        "restore-changed-account",
+    )
+    assert not restored["budget"]["archived"]
+    assert restored["budget"]["version"] == 3
+    assert restored["budget"]["account_ids"] == [replacement]
