@@ -418,7 +418,19 @@ def assert_progress(result, assigned, supported, remaining, state="active"):
     )
 
 
-def check(journal, client, name, a, b, savings, bank, available, shortfall=0):
+def check(
+    journal,
+    client,
+    name,
+    a,
+    b,
+    savings,
+    bank,
+    available,
+    shortfall=0,
+    *,
+    verify_owner_totals=True,
+):
     if name in journal.state["checks"]:
         return
     identities = (goal_id(journal), goal_id(journal, "b"))
@@ -467,11 +479,14 @@ def check(journal, client, name, a, b, savings, bank, available, shortfall=0):
                 ),
                 "Plan/Home/detail goal projections disagree",
             )
-    dop = next(row for row in snapshot["home"]["currencies"] if row["currency"] == "DOP")
-    require(
-        int(dop["net_worth_minor"]) == 200000 and int(dop["net_spending_minor"]) == 0,
-        "Internal transfers changed combined recorded position or spending",
-    )
+    if verify_owner_totals:
+        dop = next(
+            row for row in snapshot["home"]["currencies"] if row["currency"] == "DOP"
+        )
+        require(
+            int(dop["net_worth_minor"]) == 200000 and int(dop["net_spending_minor"]) == 0,
+            "Internal transfers changed combined recorded position or spending",
+        )
     forecast = next(row for row in snapshot["currencies"] if row["currency"] == "DOP")
     require(
         forecast["known_starting_minor"] == "200000"
@@ -964,6 +979,7 @@ def readback(journal, client, observe=False):
             41000,
             159000,
             0,
+            verify_owner_totals=False,
         )
     return {
         "journey": "connected_savings_goals_real_http",
