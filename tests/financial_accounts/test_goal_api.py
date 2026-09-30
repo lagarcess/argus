@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+import pytest
+
 from financial_accounts.conftest import ALICE, BOB, GUEST
 
 
@@ -78,3 +80,49 @@ def test_goal_http_commands_snapshot_search_and_owner_boundary(client):
         json={"expected_version": 2, "archived": True},
     ).json()["goal"]["goal"]["archived"]
     assert client.get("/api/v1/financial-home", headers=headers).json()["goals"] == []
+
+
+@pytest.mark.parametrize("clear_date", [False, True])
+def test_null_archive_edit_keeps_goal_reads_valid_and_date_clearable(client, clear_date):
+    headers = {"Authorization": f"Bearer {ALICE}", "Idempotency-Key": str(uuid4())}
+    created = client.post(
+        "/api/v1/financial-plan/goals",
+        headers=headers,
+        json={
+            "name": "Reserve",
+            "currency": "DOP",
+            "target": "1500",
+            "target_date": "2026-12-01",
+        },
+    )
+    assert created.status_code == 200, created.text
+    gid = created.json()["goal"]["goal"]["id"]
+    body = {"expected_version": 1, "archived": None}
+    if clear_date:
+        body["target_date"] = None
+    edited = client.patch(
+        "/api/v1/financial-plan/goals/" + gid,
+        headers=headers,
+        json=body,
+    )
+    assert edited.status_code == 200, edited.text
+    results = [edited.json()["goal"]]
+    for path, collection in [
+        ("/api/v1/financial-plan/goals/" + gid, None),
+        ("/api/v1/financial-home", "goals"),
+        ("/api/v1/financial-plan", "goals"),
+        ("/api/v1/financial-search?kind=goal&q=reserve", "items"),
+    ]:
+        response = client.get(path, headers=headers)
+        assert response.status_code == 200, response.text
+        value = response.json()
+        if collection:
+            value = value[collection][0]
+        results.append(value["goal"] if collection == "items" else value)
+    for result in results:
+        assert result["goal"]["id"] == gid
+        assert result["goal"]["version"] == 2
+        assert result["goal"]["archived"] is False
+        assert result["goal"]["target_date"] == (None if clear_date else "2026-12-01")
+        assert result["supported_minor"] == "0"
+        assert result["remaining_minor"] == "150000"
