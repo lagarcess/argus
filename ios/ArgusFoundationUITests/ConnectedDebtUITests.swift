@@ -16,7 +16,7 @@ extension FinancialLoopUITests {
         assertDebt("DOP -1,000.00")
         tapVisible(app.buttons["debt.record"])
         debtSplit(total: "350", principal: "300", interest: "40", fees: "10")
-        reviewMoney()
+        reviewDebtPayment()
         if ProcessInfo.processInfo.environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == "true" {
             let before = try faultStatus(arm: true)
             tapVisible(app.buttons["loop.confirm"])
@@ -44,12 +44,13 @@ extension FinancialLoopUITests {
         tapVisible(payment); tapVisible(app.buttons["activity.correct"])
         debtSplit(total: "300", principal: "250", interest: "40", fees: "10")
         fillMoneyField("loop.reason", with: "Actual receipt correction")
-        dismissMoneyKeyboard(); reviewMoney(); tapVisible(app.buttons["loop.confirm"])
+        dismissMoneyKeyboard(); reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
         tapVisible(app.buttons["debt.activity.back"]); assertDebt("DOP -750.00")
         tapVisible(payment); tapVisible(app.buttons["activity.return"])
+        assertReturnedMoneyDirection(from: "Loan " + stamp, to: funding.name)
         debtSplit(total: "100", principal: "80", interest: "15", fees: "5")
-        reviewMoney(); tapVisible(app.buttons["loop.confirm"])
+        reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
         tapVisible(app.buttons["debt.activity.back"]); assertDebt("DOP -830.00")
         capture("debt-return-preserves-original-payment")
@@ -57,7 +58,7 @@ extension FinancialLoopUITests {
         assertDebt("DOP -830.00")
         tapVisible(app.buttons["debt.record"])
         debtSplit(total: "300", principal: "280", interest: "15", fees: "5")
-        reviewMoney(); tapVisible(app.buttons["loop.confirm"])
+        reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
         assertDebt("DOP -550.00")
         tapVisible(app.buttons["debt.link"])
@@ -81,7 +82,15 @@ extension FinancialLoopUITests {
         let bank = createMoneyAccount("Card funding " + stamp, type: "checking", amount: "1000")
         let card = createMoneyAccount("Card " + stamp, type: "credit_card", amount: "400")
         let note = "Recorded card payment " + stamp
-        recordMoney(kind: "card_payment", amount: "100", note: note, source: bank, destination: card)
+        tapVisible(app.buttons["accounts.record"])
+        tapVisible(app.buttons["loop.kind.card_payment"])
+        chooseMoneyAccount("loop.source", account: bank)
+        chooseMoneyAccount("loop.destination", account: card)
+        fillMoneyField("loop.amount", with: "100")
+        fillMoneyField("loop.note", with: note)
+        dismissMoneyKeyboard(); reviewDebtPayment()
+        tapVisible(app.buttons["loop.confirm"])
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
         assertText("DOP -300.00")
         openMoneyAccount(bank); assertText("DOP 900.00")
         openMoneyAccount(card)
@@ -112,9 +121,10 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["debt.action.cancel"])
         let payment = payments.firstMatch
         tapVisible(payment); tapVisible(app.buttons["activity.return"])
+        assertReturnedMoneyDirection(from: card.name, to: bank.name)
         XCTAssertFalse(app.textFields["loop.principal"].exists)
         fillMoneyField("loop.amount", with: "100"); dismissMoneyKeyboard()
-        reviewMoney(); tapVisible(app.buttons["loop.confirm"])
+        reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
         tapVisible(app.buttons["debt.activity.back"]); assertDebt("DOP -400.00")
         XCTAssertEqual(payments.count, 1)
@@ -133,6 +143,34 @@ extension FinancialLoopUITests {
         capture("debt-home-current-truth")
         app.buttons["debt.close"].tap()
         verifyDebtSearch(query, balance: nil)
+    }
+
+    private func reviewDebtPayment() {
+        tapVisible(app.buttons["loop.review"])
+        var answered = Set<String>()
+        // These synthetic balances precede the payments: answer the server's
+        // opening/check coverage controls explicitly, without confirming here.
+        for _ in 0..<16 {
+            if app.buttons["loop.confirm"].waitForExistence(timeout: 1) { break }
+            let choices = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'loop.coverage.no.'")).allElementsBoundByIndex
+            if let choice = choices.first(where: { !answered.contains($0.identifier) }) {
+                answered.insert(choice.identifier)
+                tapVisible(choice)
+            }
+        }
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 15))
+        capture("debt-canonical-money-preview")
+    }
+    private func assertReturnedMoneyDirection(from debt: String, to funding: String) {
+        let from = app.staticTexts["loop.destination.label"]
+        let to = app.staticTexts["loop.source.label"]
+        XCTAssertTrue(from.waitForExistence(timeout: 15))
+        XCTAssertTrue(to.waitForExistence(timeout: 15))
+        XCTAssertEqual(from.label, "From")
+        XCTAssertEqual(to.label, "To")
+        XCTAssertTrue(app.buttons["loop.destination"].label.contains(debt))
+        XCTAssertTrue(app.buttons["loop.source"].label.contains(funding))
+        XCTAssertLessThan(from.frame.minY, to.frame.minY)
     }
 
     private func debtSplit(total: String, principal: String, interest: String, fees: String) {

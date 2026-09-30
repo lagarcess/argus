@@ -92,7 +92,12 @@ struct FinancialActivityEditorView: View {
             } else {
                 Label(LocalizedStringKey("loop.kind." + model.kind.rawValue), systemImage: symbol(model.kind))
             }
-            if model.kind.isPaired {
+            if model.kind == .paymentReversal {
+                accountPicker("loop.activity.from", value: $model.destinationAccountId,
+                              choices: model.destinationChoices, identifier: "loop.destination", showLabel: true)
+                accountPicker("loop.activity.to", value: $model.sourceAccountId,
+                              choices: model.sourceChoices, identifier: "loop.source", showLabel: true)
+            } else if model.kind.isPaired {
                 accountPicker("loop.activity.from", value: $model.sourceAccountId,
                               choices: model.sourceChoices, identifier: "loop.source", showLabel: model.kind == .transfer)
                 accountPicker(model.kind == .cardPayment ? "loop.activity.card" : "loop.activity.to",
