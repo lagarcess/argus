@@ -103,7 +103,10 @@ API and data contracts change in the same implementation PR.
 
 `budget_financial_scout`, `budget_native_scout` and `budget_architecture_judge`
 completed read-only reports at the integration base and relinquished ownership.
-Implementation ownership is bound only after the policy gate. The captain owns
+The exclusive implementation checkout is
+`/Users/garces/.codex/worktrees/connected-budgets-core/private-alpha-next` on
+`codex/connected-budgets-implementation`. No writer is dispatched before the
+policy answer. The captain owns
 scope, financial contracts, integration, acceptance, publication and readiness.
 All agents have bounded outputs and are stopped after their handoffs.
 
@@ -140,7 +143,7 @@ These steps live here instead of a competing task board.
 | --- | --- | --- |
 | Preserve integration and existing demos | Fresh integration `9f51912198c2c77e239f670a2b3f78da2942afed`; prior demo guides below | New 590xx allocation and dedicated simulator created; no prior environment changed. |
 | Keep one financial owner | Existing Recording/Planning contracts and the three bounded scout reports | Snapshot architecture selected; policy answer pending. |
-| Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Native sign-in/relaunch acceptance is running, not yet verified. |
+| Verify inherited connected access early | Isolated API `/health` returns healthy; local Postgres seeded with two synthetic users | Inherited registered sign-in, relaunch, sign-out and signed-out relaunch passed on the dedicated simulator against real local Auth/API/Postgres. Result `ui-20260930T001256Z.xcresult` is ignored local diagnostics. Budget implementation has not started. |
 
 Completion requires the full assigned journey, durable visual/interaction evidence,
 runnable restart instructions, green applicable CI, clean independent scoped review
