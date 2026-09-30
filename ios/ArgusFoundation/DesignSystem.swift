@@ -7,6 +7,8 @@ enum ArgusStyle {
     static let surface = adaptive(light: 0xF4F4F4, dark: 0x24282C)
     static let ink = adaptive(light: 0x191C1F, dark: 0xF4F4F5)
     static let secondary = adaptive(light: 0x505A63, dark: 0xB4BBC2)
+    static let teal = Color(red: 0.357, green: 0.659, blue: 0.592)
+    static let negative = adaptive(light: 0xA83E49, dark: 0xE39BA2)
     static let line = adaptive(light: 0xE7E7E9, dark: 0x303438)
     static let pageInset: CGFloat = 24
     static let sectionGap: CGFloat = 32

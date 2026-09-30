@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from typing import Any
 
+from argus.domain.planning.budgets import all_progress
 from argus.domain.planning.model import expectation_response, occurrences
 from argus.domain.planning.schemas import CASH_TYPES
 from argus.domain.recording.currency import currency_exponent
@@ -187,10 +188,13 @@ def projection(
             "expected_bills_minor",
         ):
             group[key] = str(group[key])
+    budgets = all_progress(state, accounts)
     return {
+        "budgets": budgets,
         "home": home_response(
             accounts, time_zone=state["selection"]["time_zone"], now=now
-        ),
+        )
+        | {"budgets": [p for p in budgets if not p["budget"]["archived"]]},
         "selection": state["selection"],
         "accounts": [account_response(s).model_dump(mode="json") for s in accounts],
         "expectations": [

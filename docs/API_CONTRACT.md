@@ -6970,8 +6970,9 @@ correction and optional relink. Purchase account correction preserves identity/l
 `GET /financial-home?month=2026-09&time_zone=America/Santo_Domingo` adds
 `period:{month,time_zone,start_at,end_at_exclusive}`, `coverage:"recorded_only"`, and
 currency string integers gross_income_minor, gross_purchases_minor, refunds_minor,
-net_spending_minor. Default month uses clock in requested zone; default zone is Santo
-Domingo. Half-open monthly interval controls received-month refund attribution. Net
+net_spending_minor. Default month uses the clock in the requested zone. Omitted
+zone uses the saved Plan reporting zone, initially America/Santo_Domingo. The
+half-open monthly interval controls received-month refund attribution. Net
 may be negative. Transfers/payments contribute zero. Existing recorded_spending_minor
 remains lifetime gross purchases. Activity uses full transaction amounts; position
 retains personal shares. Archived accounts remain in summaries.
@@ -7127,3 +7128,50 @@ refetched before restoration. Sign-out clears the descriptor; owner/generation
 guards reject stale results. Existing financial detail/edit controls retain domain
 ownership. Accepted changes invalidate Search and return refreshes its loaded range
 while preserving the origin and surviving row anchor.
+
+## Connected personal spending budgets (September 29, 2026)
+
+Budgets use one calendar month (`YYYY-MM`) in the saved Plan reporting time zone,
+one currency, explicitly selected owned accounts and expense categories, and an
+explicit `include_uncategorized` choice. There is no rollover. Changing the Plan
+zone re-evaluates the month boundaries without changing activity timestamps.
+
+`POST /api/v1/financial-plan/budgets` accepts
+`{name,limit,currency,month,account_ids:[uuid],category_ids:[string],include_uncategorized}`.
+`limit` is a positive decimal string parsed with the canonical currency exponent.
+Accounts must support expenses in that currency, including credit cards. At least
+one account and one category or Uncategorized must be selected. Duplicate scope
+members fail. `PATCH /financial-plan/budgets/{id}` accepts `expected_version` and
+any definition fields above, or `archived`. Both commands require Idempotency-Key
+and return `{budget:BudgetDefinition,replayed}`. Exact active scope duplicates
+return `409 budget_scope_conflict`, including restoration conflicts. Removal is
+reversible archive, never deletion of activity. Missing and other-owner IDs share
+the existing financial-record 404. Replay precedes version checks. Archiving
+retains ownership checks but tolerates an account whose type/currency changed;
+restoring validates the current eligible scope before activation.
+
+`BudgetDefinition` is `{id,version,name,limit_minor,limit,currency,
+currency_fraction_digits,month,account_ids,category_ids,include_uncategorized,archived}`.
+`GET /financial-plan/budgets/{id}` returns `BudgetProgress`, including archived
+budgets. `BudgetProgress` is `{budget,period,gross_purchases_minor,refunds_minor,
+spent_minor,remaining_minor,over_budget_minor,contributors}`. Period uses the
+existing `{month,time_zone,start_at,end_at_exclusive}` shape. Aggregate minor-unit
+amounts are signed decimal strings. `remaining_minor` is limit minus spent;
+`over_budget_minor` is max(spent minus limit, zero). The UI shows overage when
+remaining is negative. Contributors are current `MoneyActivityResponse`
+rows; their matched collection owns both the totals and detail navigation.
+`GET /financial-plan` adds `budgets:[BudgetProgress]`; nested and standalone Home
+add the same active budget projections as `budgets`, from the same owner snapshot.
+
+Recording owns actual spending. Expenses add their full recorded amount. Refunds
+subtract it, and net spending may be negative. Transfers and card payments add
+zero. A linked refund uses the current original purchase's account and category
+for scope, even when deposited elsewhere or when the purchase was in a previous
+month. The refund counts in its received month. Unlinked refunds use their own
+recorded account and category. Corrections re-evaluate the current activity and
+scope. Budget limits never change balances, cash forecasts, or bill fulfillment.
+
+Financial Search adds `kind=budget` and `{kind:"budget",budget:BudgetDefinition}`
+hits with the existing owner/filter/snapshot cursor contract and live detail
+route. The iPhone reuses the owner-scoped exact-command write journal for budget
+commands and retains budget/contributor navigation within its originating tab.

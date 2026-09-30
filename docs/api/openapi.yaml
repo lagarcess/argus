@@ -2603,15 +2603,16 @@ paths:
         in: query
         required: false
         schema:
-          type: string
-          default: America/Santo_Domingo
+          anyOf:
+          - type: string
+          - type: 'null'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HomeResponse'
+                $ref: '#/components/schemas/BudgetHomeResponse'
         '422':
           description: Validation Error
           content:
@@ -2655,6 +2656,122 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlanResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/budgets:
+    post:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-plan/budgets/{budget_id}:
+    get:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: budget_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetProgress'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - financial-accounts
+      - financial-plan
+      parameters:
+      - name: budget_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetEdit'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetReceipt'
         '422':
           description: Validation Error
           content:
@@ -3007,6 +3124,7 @@ paths:
             - account
             - activity
             - expectation
+            - budget
             type: string
           - type: 'null'
       - name: currency
@@ -4558,6 +4676,223 @@ components:
       type: object
       required:
       - state
+    BudgetCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+        limit:
+          type: string
+          maxLength: 40
+        currency:
+          type: string
+          maxLength: 3
+        month:
+          type: string
+          maxLength: 7
+        account_ids:
+          items:
+            type: string
+            format: uuid
+          type: array
+          maxItems: 100
+          minItems: 1
+        category_ids:
+          items:
+            type: string
+          type: array
+          maxItems: 100
+        include_uncategorized:
+          type: boolean
+      additionalProperties: false
+      type: object
+      required:
+      - name
+      - limit
+      - currency
+      - month
+      - account_ids
+      - category_ids
+      - include_uncategorized
+    BudgetDefinition:
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+        name:
+          type: string
+        limit_minor:
+          type: integer
+        limit:
+          type: string
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        month:
+          type: string
+        account_ids:
+          items:
+            type: string
+          type: array
+        category_ids:
+          items:
+            type: string
+          type: array
+        include_uncategorized:
+          type: boolean
+        archived:
+          type: boolean
+      type: object
+      required:
+      - id
+      - version
+      - name
+      - limit_minor
+      - limit
+      - currency
+      - currency_fraction_digits
+      - month
+      - account_ids
+      - category_ids
+      - include_uncategorized
+      - archived
+    BudgetEdit:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        name:
+          anyOf:
+          - type: string
+            maxLength: 100
+            minLength: 1
+          - type: 'null'
+        limit:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+        currency:
+          anyOf:
+          - type: string
+            maxLength: 3
+          - type: 'null'
+        month:
+          anyOf:
+          - type: string
+            maxLength: 7
+          - type: 'null'
+        account_ids:
+          anyOf:
+          - items:
+              type: string
+              format: uuid
+            type: array
+            maxItems: 100
+            minItems: 1
+          - type: 'null'
+        category_ids:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 100
+          - type: 'null'
+        include_uncategorized:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        archived:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+    BudgetHit:
+      properties:
+        kind:
+          type: string
+          const: budget
+          default: budget
+        budget:
+          $ref: '#/components/schemas/BudgetDefinition'
+      type: object
+      required:
+      - budget
+    BudgetHomeResponse:
+      properties:
+        period:
+          $ref: '#/components/schemas/ReportingPeriod'
+        coverage:
+          type: string
+          const: recorded_only
+          default: recorded_only
+        currencies:
+          items:
+            $ref: '#/components/schemas/CurrencySummaryResponse'
+          type: array
+        recent_activity:
+          items:
+            $ref: '#/components/schemas/RecentActivityResponse'
+          type: array
+        recorded_at:
+          type: string
+          format: date-time
+        budgets:
+          items:
+            $ref: '#/components/schemas/BudgetProgress'
+          type: array
+      type: object
+      required:
+      - period
+      - currencies
+      - recent_activity
+      - recorded_at
+    BudgetProgress:
+      properties:
+        budget:
+          $ref: '#/components/schemas/BudgetDefinition'
+        period:
+          $ref: '#/components/schemas/ReportingPeriod'
+        gross_purchases_minor:
+          type: string
+        refunds_minor:
+          type: string
+        spent_minor:
+          type: string
+        remaining_minor:
+          type: string
+        over_budget_minor:
+          type: string
+        contributors:
+          items:
+            $ref: '#/components/schemas/MoneyActivityResponse'
+          type: array
+      type: object
+      required:
+      - budget
+      - period
+      - gross_purchases_minor
+      - refunds_minor
+      - spent_minor
+      - remaining_minor
+      - over_budget_minor
+      - contributors
+    BudgetReceipt:
+      properties:
+        budget:
+          $ref: '#/components/schemas/BudgetDefinition'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - budget
+      - replayed
     BulkConversationDeleteResponse:
       properties:
         success:
@@ -6515,31 +6850,6 @@ components:
       - created_at
       - conversation_id
       - expires_at
-    HomeResponse:
-      properties:
-        period:
-          $ref: '#/components/schemas/ReportingPeriod'
-        coverage:
-          type: string
-          const: recorded_only
-          default: recorded_only
-        currencies:
-          items:
-            $ref: '#/components/schemas/CurrencySummaryResponse'
-          type: array
-        recent_activity:
-          items:
-            $ref: '#/components/schemas/RecentActivityResponse'
-          type: array
-        recorded_at:
-          type: string
-          format: date-time
-      type: object
-      required:
-      - period
-      - currencies
-      - recent_activity
-      - recorded_at
     JsonValue: {}
     LinkReceipt:
       properties:
@@ -7900,7 +8210,11 @@ components:
     PlanResponse:
       properties:
         home:
-          $ref: '#/components/schemas/HomeResponse'
+          $ref: '#/components/schemas/BudgetHomeResponse'
+        budgets:
+          items:
+            $ref: '#/components/schemas/BudgetProgress'
+          type: array
         selection:
           $ref: '#/components/schemas/Selection'
         accounts:
@@ -7933,6 +8247,7 @@ components:
       type: object
       required:
       - home
+      - budgets
       - selection
       - accounts
       - expectations
@@ -9937,11 +10252,13 @@ components:
             - $ref: '#/components/schemas/AccountHit'
             - $ref: '#/components/schemas/ActivityHit'
             - $ref: '#/components/schemas/ExpectationHit'
+            - $ref: '#/components/schemas/BudgetHit'
             discriminator:
               propertyName: kind
               mapping:
                 account: '#/components/schemas/AccountHit'
                 activity: '#/components/schemas/ActivityHit'
+                budget: '#/components/schemas/BudgetHit'
                 expectation: '#/components/schemas/ExpectationHit'
           type: array
         next_cursor:

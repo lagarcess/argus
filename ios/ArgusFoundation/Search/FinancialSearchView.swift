@@ -203,10 +203,11 @@ struct FinancialSearchRow: View {
         case .account(let account): account.nickname.map { Text(verbatim: $0) } ?? Text(LocalizedStringKey("accounts.type." + account.type))
         case .activity(let activity, _): activity.note.map { Text(verbatim: $0) } ?? Text(LocalizedStringKey("loop.kind." + activity.kind.rawValue))
         case .expectation(let expectation): Text(verbatim: expectation.title)
+        case .budget(let budget): Text(verbatim: budget.name)
         }
     }
     private var symbol: String {
-        switch hit { case .account(let account): AccountPresentation.symbol(account.type); case .activity: "arrow.left.arrow.right"; case .expectation: "calendar" }
+        switch hit { case .account(let account): AccountPresentation.symbol(account.type); case .activity: "arrow.left.arrow.right"; case .expectation: "calendar"; case .budget: "chart.bar" }
     }
 }
 

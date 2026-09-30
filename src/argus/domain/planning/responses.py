@@ -5,8 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from argus.domain.planning.budget_schemas import BudgetHomeResponse, BudgetProgress
 from argus.domain.planning.schemas import Schedule
-from argus.domain.recording.loop_schemas import HomeResponse
 from argus.domain.recording.money_responses import (
     MoneyActivityResponse,
     MoneyPreviewResponse,
@@ -89,7 +89,8 @@ class ForecastCurrency(BaseModel):
 
 
 class PlanResponse(BaseModel):
-    home: HomeResponse
+    home: BudgetHomeResponse
+    budgets: list[BudgetProgress]
     selection: Selection
     accounts: list[FinancialAccountResponse]
     expectations: list[Expectation]

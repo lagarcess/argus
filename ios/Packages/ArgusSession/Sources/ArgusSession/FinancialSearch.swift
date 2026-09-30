@@ -1,38 +1,40 @@
 import Foundation
 
 public enum FinancialSearchKind: String, Codable, CaseIterable, Sendable {
-    case account, activity, expectation
+    case account, activity, expectation, budget
 }
 
 public enum FinancialSearchHit: Decodable, Sendable, Identifiable {
     case account(FinancialAccount)
     case activity(FinancialActivityDetail, archived: Bool)
     case expectation(FinancialExpectation)
+    case budget(FinancialBudget)
 
-    enum CodingKeys: String, CodingKey { case kind, account, activity, expectation, archived }
+    enum CodingKeys: String, CodingKey { case kind, account, activity, expectation, archived, budget }
     public init(from decoder: any Decoder) throws {
         let value = try decoder.container(keyedBy: CodingKeys.self)
         switch try value.decode(FinancialSearchKind.self, forKey: .kind) {
         case .account: self = .account(try value.decode(FinancialAccount.self, forKey: .account))
         case .activity: self = .activity(try value.decode(FinancialActivityDetail.self, forKey: .activity), archived: try value.decode(Bool.self, forKey: .archived))
+        case .budget: self = .budget(try value.decode(FinancialBudget.self, forKey: .budget))
         case .expectation: self = .expectation(try value.decode(FinancialExpectation.self, forKey: .expectation))
         }
     }
     public var kind: FinancialSearchKind {
-        switch self { case .account: .account; case .activity: .activity; case .expectation: .expectation }
+        switch self { case .account: .account; case .activity: .activity; case .expectation: .expectation; case .budget: .budget }
     }
     public var recordID: UUID {
-        switch self { case .account(let value): value.id; case .activity(let value, _): value.activityId; case .expectation(let value): value.id }
+        switch self { case .account(let value): value.id; case .activity(let value, _): value.activityId; case .expectation(let value): value.id; case .budget(let value): value.id }
     }
     public var id: String { kind.rawValue + "." + recordID.uuidString }
     public var currency: String {
-        switch self { case .account(let value): value.currency; case .activity(let value, _): value.currency; case .expectation(let value): value.currency }
+        switch self { case .account(let value): value.currency; case .activity(let value, _): value.currency; case .expectation(let value): value.currency; case .budget(let value): value.currency }
     }
     public var amount: String? {
-        switch self { case .account(let value): value.balance.amount; case .activity(let value, _): value.amount; case .expectation(let value): value.amount }
+        switch self { case .account(let value): value.balance.amount; case .activity(let value, _): value.amount; case .expectation(let value): value.amount; case .budget(let value): value.limit }
     }
     public var archived: Bool {
-        switch self { case .account(let value): value.archived; case .activity(_, let archived): archived; case .expectation(let value): value.archived }
+        switch self { case .account(let value): value.archived; case .activity(_, let archived): archived; case .expectation(let value): value.archived; case .budget(let value): value.archived }
     }
 }
 

@@ -2674,3 +2674,28 @@ before account locks. Recording from Plan composes the existing Money planner/pe
 inside that transaction. Read snapshots use repeatable read for planning and accounts.
 Schedule edits cut over only after every previously fulfilled date, including future
 prepayments. Amount/title edits retain occurrence identity and linked snapshots.
+
+### Connected personal spending budgets
+
+`financial_budgets` stores owner-scoped versioned definitions with stable IDs,
+name, positive limit in integer minor units, currency, calendar month, explicit
+account/category arrays, Uncategorized inclusion, and reversible archived state.
+The shared Plan selection owns the reporting time zone. Budget rows contain no
+actual totals. The account and category arrays are canonical sorted unique sets.
+A partial unique storage index rejects duplicate active owner/month/currency/
+account/category/Uncategorized scopes. Restoration observes the same constraint
+and current account eligibility. Archiving retains ownership checks even if an
+account no longer supports the definition's expense scope.
+
+Registered owners may SELECT their budget rows. Writes are service-only, and the
+existing financial_plan_receipts table retains exact accepted command results
+without client grants. Budget commands use the existing owner advisory lock,
+replay-before-version checks, account locks, and atomic transaction. Plan, Home,
+budget detail, and Search read the same repeatable-read owner snapshot.
+
+Recording's spending reducer derives full-amount purchases and received refunds
+from current logical activity. Linked refunds inherit scope from the current
+original purchase, while their received timestamp owns period membership.
+Unlinked refunds use their recorded scope. Negative net spending is valid.
+Archived accounts remain explicit scope members. Definition changes never write
+account records, cash forecasts, or bill-fulfillment links.

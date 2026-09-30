@@ -243,7 +243,14 @@ final class FinancialLoopUITests: XCTestCase {
         continueAfterFailure = false
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-appearancePreference", "dark"]
         app.launch()
+        if app.buttons["budget.close"].waitForExistence(timeout: 2) {
+            app.buttons["budget.close"].tap()
+            XCTAssertTrue(app.otherElements["budget.detail"].waitForNonExistence(timeout: 10))
+        }
         app.buttons["header.profile"].tap()
+        if !app.buttons["auth.signOut"].waitForExistence(timeout: 3), !app.textFields["auth.email"].exists {
+            app.buttons["header.profile"].tap()
+        }
         if fresh, app.buttons["auth.signOut"].waitForExistence(timeout: 2) { app.buttons["auth.signOut"].tap() }
         if !app.buttons["auth.signOut"].waitForExistence(timeout: 5) {
             let emailField = app.textFields["auth.email"]

@@ -148,6 +148,8 @@ def home_response(
     now: datetime | None = None,
 ) -> dict[str, Any]:
     from argus.domain.recording.money_home import period
+    from argus.domain.recording.money_reads import current_activities
+    from argus.domain.recording.spending import spending
 
     reporting = period(month, time_zone, now)
     groups = {}
@@ -207,13 +209,8 @@ def home_response(
             if not r.active or r.role == "destination":
                 continue
             if reporting["start_at"] <= r.occurred_at < reporting["end_at_exclusive"]:
-                summary_key = {
-                    "expense": "gross_purchases_minor",
-                    "income": "gross_income_minor",
-                    "refund": "refunds_minor",
-                }.get(r.kind)
-                if summary_key:
-                    group[summary_key] += r.amount_minor
+                if r.kind == "income":
+                    group["gross_income_minor"] += r.amount_minor
             recent.append(
                 {
                     **activity_response(stored, expense),
@@ -223,10 +220,17 @@ def home_response(
                     "currency_fraction_digits": currency_exponent(facts.currency),
                 }
             )
+    actual = current_activities(accounts)
     for group in groups.values():
-        group["net_spending_minor"] = (
-            group["gross_purchases_minor"] - group["refunds_minor"]
+        totals = spending(
+            actual,
+            currency=group["currency"],
+            start=reporting["start_at"],
+            end=reporting["end_at_exclusive"],
         )
+        group["gross_purchases_minor"] = totals.purchases
+        group["refunds_minor"] = totals.refunds
+        group["net_spending_minor"] = totals.net
         for key in list(group):
             if key.endswith("_minor"):
                 group[key] = str(group[key])

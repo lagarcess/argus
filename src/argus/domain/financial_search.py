@@ -9,6 +9,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 from argus.domain.planning import storage
+from argus.domain.planning.budget_schemas import BudgetDefinition
+from argus.domain.planning.budgets import definition
 from argus.domain.planning.model import expectation_response
 from argus.domain.planning.responses import Expectation
 from argus.domain.planning.service import PlanService
@@ -18,7 +20,7 @@ from argus.domain.recording.schemas import FinancialAccountResponse, account_res
 from argus.domain.recording.service import FinancialAccountService
 from argus.domain.search_text import normalize_search_text
 
-Kind = Literal["account", "activity", "expectation"]
+Kind = Literal["account", "activity", "expectation", "budget"]
 
 
 class AccountHit(BaseModel):
@@ -37,7 +39,14 @@ class ExpectationHit(BaseModel):
     expectation: Expectation
 
 
-Hit = Annotated[AccountHit | ActivityHit | ExpectationHit, Field(discriminator="kind")]
+class BudgetHit(BaseModel):
+    kind: Literal["budget"] = "budget"
+    budget: BudgetDefinition
+
+
+Hit = Annotated[
+    AccountHit | ActivityHit | ExpectationHit | BudgetHit, Field(discriminator="kind")
+]
 
 
 class SearchPage(BaseModel):
@@ -138,6 +147,9 @@ def search(
             expectation.id,
             expectation.currency,
         )
+    for item in state["budgets"].values():
+        budget = BudgetDefinition.model_validate(definition(item))
+        add(BudgetHit(budget=budget), budget.name, budget.id, budget.currency)
     rows.sort(key=lambda row: row[:3])
     items = [row[3] for row in rows]
     scope = digest([owner, query, kind, currency])

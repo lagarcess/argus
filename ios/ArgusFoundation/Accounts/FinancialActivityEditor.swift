@@ -286,6 +286,8 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         guard case SessionFailure.rejected(_, let code) = error else { return "loop.error.connection" }
         guard let code else { return "loop.error.validation" }
         switch code {
+        case "budget_scope_conflict": return "budget.error.duplicate"
+        case "budget_category_required", "budget_scope_duplicate", "budget_limit_required": return "budget.error.scope"
         case "plan_cutover_unsafe": return "plan.error.cutover"
         case "occurrence_already_linked", "activity_already_linked": return "plan.error.stale"
         case "fulfillment_mismatch": return "plan.error.account"

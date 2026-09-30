@@ -25,6 +25,7 @@ Action = Callable[
 def empty() -> dict[str, Any]:
     return {
         "expectations": {},
+        "budgets": {},
         "links": {},
         "selection": {
             "version": 0,
@@ -37,6 +38,11 @@ def empty() -> dict[str, Any]:
 
 def load(connection: Any, user_id: str) -> dict[str, Any]:
     state = empty()
+    for bid, body in connection.execute(
+        "select id,body from public.financial_budgets where user_id=%s order by id",
+        (user_id,),
+    ).fetchall():
+        state["budgets"][str(bid)] = body
     for eid, body in connection.execute(
         "select id,body from public.financial_expectations where user_id=%s order by id",
         (user_id,),
@@ -149,6 +155,11 @@ def write(
         result, money = action(state, load_owner(repository, connection, user_id))
         if money:
             persist(connection, user_id, money)
+        for bid, body in state["budgets"].items():
+            connection.execute(
+                "insert into public.financial_budgets(id,user_id,body) values(%s,%s,%s) on conflict(id) do update set body=excluded.body",
+                (bid, user_id, Jsonb(body)),
+            )
         for eid, body in state["expectations"].items():
             connection.execute(
                 "insert into public.financial_expectations(id,user_id,body) values(%s,%s,%s) on conflict(id) do update set body=excluded.body",
