@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** [connected personal savings goals](#pr-755-integration-landing) are landed through [PR #755](https://github.com/lagarcess/argus/pull/755), with the locally verified native journey and runnable demonstration preserved. The founder authorized this merge and its bounded integration landing. No next slice or deployment is authorized. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Execution state:** connected personal debt-payment plans are assigned through a merge-ready PR and a runnable native simulator journey. The founder approved the principal-based loan rule below. Savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. No merge or deployment is authorized for debt plans. Physical-iPhone testing belongs to its separate owner.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,75 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected personal debt-payment plans lane
+
+**Founder assignment and policy approval, September 30, 2026.** Deliver the
+complete personal debt-plan journey through a runnable native iPhone simulator
+against isolated real local Auth/API/Postgres, a short recording, durable
+screenshots, restart instructions, applicable green CI and a clean fresh
+independent review. Publication and existing isolated automatic PR previews are
+authorized. Stop at merge-ready. No merge, deployment, hosted settings,
+production data, paid providers, signing changes or phone installation.
+
+**Fresh integration base:** `7c29b2a9b3f4680f6804a2abc8378df45b05540c`,
+including savings #755/#756. **Recovery branch:** `codex/connected-debt-plans`.
+**Delivery checkout:**
+`/Users/garces/.codex/worktrees/connected-debt-plans/private-alpha-next`.
+**Current state:** policy recovery is complete and implementation is starting.
+The inherited provider-free baseline has 99 passes. Its 75 Postgres variants
+were skipped because this lane's isolated database was not yet configured.
+These results do not prove the new debt journey.
+
+### Approved money rule and shared owners
+
+Other-debt balances mean remaining principal. An actual loan payment uses the
+person's explicit principal, interest and fee breakdown. Cash falls by the total,
+debt falls by principal, and interest and fees count as spending once. Missing
+amounts are never guessed. Cards retain the landed card-payment contract.
+
+Recording owns actual activity, signed account movements, corrections and
+spending. Planning owns payment intentions, recurrence, fulfillment and
+conditional projections. Native clients render canonical results. Creating or
+editing a plan changes no recorded balance. Unknown debt remains unknown, and
+currencies never convert. Existing savings pools remain the allocation owner.
+Payoff assumptions stay visible and cannot establish an actual cleared balance.
+
+The release captain owns integration, the existing manifest, independent
+acceptance and publication. One implementation writer owns the coupled financial,
+API, persistence and native surfaces. Temporary architecture readers and the
+fresh reviewer do not write implementation. No competing board is introduced.
+
+| User outcome | Inherited capability | Remaining work and owner | Dependencies | Assembled proof |
+| --- | --- | --- | --- | --- |
+| Create and edit a debt plan | Debt accounts, native Plan controls, Schedule | Implementation owner: definition, funding and schedule | Canonical account and recurrence contracts | Create for card and loan; intentions change no balances |
+| Understand debt and payoff | Recording position, local TVM calculators | Same owner: recorded debt, conditional payoff and explicit missing terms | Known balance and stated supported terms for an estimate | Unknown stays unknown; assumptions and actual remain distinct |
+| Record or link a payment | Card payments, preview/confirm, atomic Plan receipts | Same owner: explicit loan split, eligible linking and occurrence progress | One Recording command and shared owner transaction | Cash, principal, costs and forecast update once |
+| Inspect, correct and recover | Original activity editor, revisions, balance checks | Same owner: split corrections, reversals, partial and extra payments | Current original revision and account versions | Independent totals; correction/reversal re-evaluates links |
+| Archive, restore and reopen | Plan lifecycle, native journals and origins | Same owner: debt lifecycle and durable context | Stable definition and occurrence identities | Relaunch, lost response, exact retry and stale edit |
+| Find and return through Search | Typed financial Search and existing detail navigation | Same owner: debt hit and owning detail | Canonical debt reads | Query, filters and scroll survive; edits refresh results |
+| See Accounts, Plan and Home agree | Shared forecast, budgets and savings support | Same owner: debt movements and concise summaries | Recording and one Plan snapshot | Partial, missed, extra, cleared/reopened debt; budget and goal regressions |
+
+### Delivery sequence and acceptance
+
+1. Compare two compact storage designs and select the smallest canonical shape.
+2. Implement payment truth and debt-plan lifecycle together with meaningful
+   domain, API and Postgres tests and updated API/data/OpenAPI contracts.
+3. Connect the native flow, Home and Search using existing components and
+   English/Spanish. Demonstrate the journey as it becomes runnable.
+4. Independently exercise payment linking, corrections, partial/extra/reversed
+   payments, explicit interest/fees, payoff/reopening, balance-check consistency,
+   currency/unknown behavior, identity isolation and budget/savings regressions.
+5. Preserve screenshots and a short recording. Verify interrupted writes,
+   duplicate retries, stale edits, Search/back and relaunch. Reconcile fresh
+   integration one way, run merged-tree modularity and required checks, obtain
+   one fresh scoped review, fix confirmed causes, then publish readiness.
+
+Keep the short payment flow and locked native design. No web, rebrand,
+navigation redesign, household, imports, notifications, voice or runtime work.
+Preserve every existing demo and synthetic record. Phone ports 58700–58749 and
+its checkout, services, simulator/device, certificates and signing are forbidden.
+Temporary helpers belong only to this lane and are cleaned up after verification.
 
 ## PR #755 integration landing
 
