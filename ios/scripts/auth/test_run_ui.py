@@ -46,15 +46,35 @@ def test_response_loss_is_explicit_runner_opt_in(tmp_path, monkeypatch, enabled)
             environment = plistlib.loads(runner.read_bytes())["UITests"][
                 "EnvironmentVariables"
             ]
-            observed.append(environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"])
+            observed.append(environment)
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr("subprocess.run", run)
     args = [str(script), "owned-simulator", "--accounts", "--port-base", "58500"]
     monkeypatch.setattr(
-        sys, "argv", args + (["--response-loss-proxy"] if enabled else [])
+        sys,
+        "argv",
+        args
+        + (
+            [
+                "--response-loss-proxy",
+                "--goal-supported",
+                "DOP 400.00",
+                "--search-query",
+                "Retained goal",
+            ]
+            if enabled
+            else []
+        ),
     )
     with pytest.raises(SystemExit) as exit:
         runpy.run_path(str(script), run_name="__main__")
     assert exit.value.code == 0
-    assert observed == [str(enabled).lower()]
+    assert len(observed) == 1
+    assert observed[0]["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == str(enabled).lower()
+    assert observed[0].get("ARGUS_TEST_GOAL_SUPPORTED") == (
+        "DOP 400.00" if enabled else None
+    )
+    assert observed[0].get("ARGUS_TEST_SEARCH_QUERY") == (
+        "Retained goal" if enabled else None
+    )

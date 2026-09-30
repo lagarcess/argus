@@ -25,6 +25,10 @@ parser.add_argument("--appearance", choices=["light", "dark", "system"], default
 parser.add_argument("--port-base", type=int, default=58400)
 parser.add_argument("--search-query", help="Reuse the isolated Search HTTP proof records")
 parser.add_argument(
+    "--goal-supported",
+    help="Expected formatted recorded amount for the retained goal UI proof",
+)
+parser.add_argument(
     "--response-loss-proxy",
     action="store_true",
     help="Opt in to local committed-response-loss acceptance; requires a build using the allocation's API fault-proxy port",
@@ -93,6 +97,8 @@ for target in targets:
     )
     if args.search_query is not None:
         target["EnvironmentVariables"]["ARGUS_TEST_SEARCH_QUERY"] = args.search_query
+    if args.goal_supported is not None:
+        target["EnvironmentVariables"]["ARGUS_TEST_GOAL_SUPPORTED"] = args.goal_supported
 # Keep beside original because __TESTROOT__ paths are relative to this file.
 runner = source.with_name(f"ios-auth-{stamp}.xctestrun")
 runner.write_bytes(plistlib.dumps(settings))

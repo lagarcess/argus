@@ -189,8 +189,10 @@ struct FinancialSearchRow: View {
                     Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
                         .font(ArgusStyle.body(11, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
                 }
-                Text(verbatim: hit.currency + " " + (hit.amount.map { AccountPresentation.amount($0, locale: locale) } ?? NSLocalizedString("accounts.unknown", comment: "")))
-                    .font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary).monospacedDigit()
+                HStack(spacing: 4) {
+                    if case .goal = hit { Text("goal.target") }
+                    Text(verbatim: hit.currency + " " + (hit.amount.map { AccountPresentation.amount($0, locale: locale) } ?? NSLocalizedString("accounts.unknown", comment: "")))
+                }.font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary).monospacedDigit()
             }
             Spacer(minLength: 0)
             Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(ArgusStyle.secondary)

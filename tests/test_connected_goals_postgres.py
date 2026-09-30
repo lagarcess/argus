@@ -225,16 +225,30 @@ def test_new_goal_rls_and_owner_qualified_claim_foreign_keys(scene, repository, 
                 (users["owner"],),
             )
         connection.execute("reset role")
-        with pytest.raises(ForeignKeyViolation), connection.transaction():
-            connection.execute(
-                "insert into public.financial_plan_links(user_id,claim_id,goal_id,activity_id,activity_revision,snapshot,attribution) values(%s,%s,%s,%s,1,%s,%s)",
-                (
-                    users["other"],
-                    str(uuid4()),
-                    g["id"],
-                    entry["activity_id"],
-                    Jsonb({}),
-                    Jsonb({"counting": True}),
-                ),
-            )
+        other_scene = (scene[0], users["other"], None)
+        _, other_dest, other_goal = setup_goal(other_scene)
+        other_source = account(other_scene, amount="1000")
+        other_entry = save(
+            other_scene,
+            kind="transfer",
+            source_account_id=other_source,
+            destination_account_id=other_dest,
+            amount="100",
+        )["activity"]
+        for goal_id, activity_id in [
+            (g["id"], other_entry["activity_id"]),
+            (other_goal["id"], entry["activity_id"]),
+        ]:
+            with pytest.raises(ForeignKeyViolation), connection.transaction():
+                connection.execute(
+                    "insert into public.financial_plan_links(user_id,claim_id,goal_id,activity_id,activity_revision,snapshot,attribution) values(%s,%s,%s,%s,1,%s,%s)",
+                    (
+                        users["other"],
+                        str(uuid4()),
+                        goal_id,
+                        activity_id,
+                        Jsonb({}),
+                        Jsonb({"counting": True}),
+                    ),
+                )
     assert linked["goal"]["supported_minor"] == "20000"

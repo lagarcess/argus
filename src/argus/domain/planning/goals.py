@@ -12,6 +12,7 @@ from argus.domain.planning.goal_schemas import (
     GoalCreate,
     GoalEdit,
 )
+from argus.domain.planning.schemas import CASH_TYPES
 from argus.domain.recording.money_plan import plan
 from argus.domain.recording.money_reads import activity, current_activities
 from argus.domain.recording.money_service import MoneyService
@@ -73,6 +74,12 @@ class GoalService:
         state, accounts = storage.read(self.planner.repository, owner)
         item = goal_model.get(state, gid)
         used = {link["activity_id"] for link in state["links"].values()}
+        eligible = {
+            stored.account.id
+            for stored in accounts
+            if stored.account.type in CASH_TYPES
+            and stored.account.currency == item["currency"]
+        }
         return {
             "items": [
                 a
@@ -80,6 +87,7 @@ class GoalService:
                 if a["activity_id"] not in used
                 and a["kind"] == "transfer"
                 and a["currency"] == item["currency"]
+                and all(leg["account_id"] in eligible for leg in a["legs"])
                 and any(
                     leg["role"] == "destination"
                     and leg["account_id"] == item["destination_account_id"]

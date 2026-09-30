@@ -247,6 +247,10 @@ final class FinancialLoopUITests: XCTestCase {
             app.buttons["budget.close"].tap()
             XCTAssertTrue(app.otherElements["budget.detail"].waitForNonExistence(timeout: 10))
         }
+        if app.buttons["goal.close"].waitForExistence(timeout: 2) {
+            app.buttons["goal.close"].tap()
+            XCTAssertTrue(app.otherElements["goal.detail"].waitForNonExistence(timeout: 10))
+        }
         app.buttons["header.profile"].tap()
         if !app.buttons["auth.signOut"].waitForExistence(timeout: 3), !app.textFields["auth.email"].exists {
             app.buttons["header.profile"].tap()
