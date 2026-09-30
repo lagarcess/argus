@@ -24,9 +24,9 @@ existing owners and deferrals.
 **Recovery branch:** `codex/connected-personal-assets`.
 **Delivery checkout:**
 `/Users/garces/.codex/worktrees/connected-personal-assets/private-alpha-next`.
-**Current state:** contracts and existing implementation inspected; bounded
-architecture recovery in progress. No financial product question has been
-identified inside the assigned rules. No implementation or new services yet.
+**Current state:** financial/native recovery and independent architecture
+comparison are complete. The accepted shape below is ready for the single writer.
+No unresolved financial product choice blocks the assigned journey.
 
 ### Locked behavior and contract gates
 
@@ -46,6 +46,46 @@ introduce another ledger, valuation service or editable derived total. Preserve
 history, legacy account readers and all budget/savings/debt behavior. Account
 archive remains organizational and retains money totals, with restoration of the
 same identity. This lane adds neither disposal accounting nor new sharing rights.
+
+### Accepted implementation shape and decision trail
+
+`assets_financial_design` and `assets_native_design` recovered the canonical
+Recording, account projection, native detail/journal and Search contracts.
+`assets_architecture_judge`, using a fresh gpt-6-luna context, compared their
+complete alternatives against current integration. The captain selected the
+native reader's smaller shape, scored 23/25 against 20/25 for the broader shape.
+All readers completed and relinquished ownership without repository/runtime edits.
+
+Keep one typed asset projection on the existing account ID. Whole value and
+date remain the canonical opening or value-update observation; optional basis
+binds to that exact revision. Current ownership remains the account fact. Add
+one optional owner-qualified reference to an existing liability account, with no
+stored amount, equity or financial allocation. Share and link edits retain their
+accepted history and replay identity atomically. This is non-money history,
+not another value ledger or generic event-sourcing system. Reuse the current
+owner/account locks and replay-before-CAS discipline.
+
+Graft the financial reader's correction safeguard. Correct the selected
+observation revision, preserve previous revisions and its observation order,
+and hydrate one current observation per identity. A correction recorded today
+must not promote an older estimate over a later observation. New dated estimates
+and correction of erroneous estimates remain distinct. Add durable pending
+account-create recovery using the existing owner-scoped write journal, rather
+than preserving create requests only in memory.
+
+Reject a separate Asset identity, multiple debt links, creation of a new debt
+from this flow, debt allocation, sale/disposal and generic audit machinery.
+Existing 1–10,000 basis-point shares remain supported. Initially unknown assets
+can later receive a value; explicit zero remains known. Omitted values never
+withdraw a previous known estimate. Withdrawing a known estimate is not an
+assigned disposal/withdrawal contract and must not be faked by zero or deletion.
+Keep the dated last estimate visible.
+
+Model the Domain selected revision-bound estimate provenance and the existing
+account identity. Separate Before Serializing Shared State selected one coupled
+implementation writer. Prove It Works requires the actual native/API/database
+journey before readiness. Ordinary endpoint, schema and receipt details belong
+to that writer and must be documented before their code is committed.
 
 ### Ownership, dependencies and acceptance
 
@@ -80,8 +120,8 @@ independent reviewer checks the finished diff and only affected fixes afterward.
 
 The poteto Feature checklist records the delivery sequence.
 
-- [ ] `how` over the affected subsystem.
-- [ ] `architect` for parallel design exploration.
+- [x] `how` over the affected subsystem.
+- [x] `architect` for parallel design exploration.
 - [x] Write the throughput checkpoint as four todo items.
 - [ ] Delegate code-writing to a subagent using the configured feature model.
 - [ ] Verify on the matching surface.
