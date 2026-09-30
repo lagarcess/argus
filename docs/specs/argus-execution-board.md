@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
-**Updated:** September 29, 2026.
-**Execution state:** [connected personal savings goals](#connected-personal-savings-goals-lane) are assigned through local acceptance and merge readiness. Recovery is complete; dependent implementation awaits one founder decision about what counts as saved. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
+**Updated:** September 30, 2026.
+**Execution state:** [connected personal savings goals](#connected-personal-savings-goals-lane) are assigned through local acceptance and merge readiness. The founder approved the allocation policy; implementation and local acceptance are active. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -25,38 +25,36 @@ including the budget implementation and landing (#753/#754).
 **Recovery branch:** `codex/connected-savings-goals`.
 **Delivery checkout:**
 `/Users/garces/.codex/worktrees/connected-savings-goals/private-alpha-next`.
-**Current state:** documentation preparation only. No application code, schema,
-local stack or simulator has changed. No implementation writer is dispatched.
+**Current state:** allocation policy approved September 30, 2026; bounded
+architecture selection and independent local acceptance preparation are active.
+Application implementation follows the selected contract with one writer.
 All existing demos, synthetic data and phone resources are preserved. Ports
 58700–58749 and the phone owner's checkout, services and signing are forbidden.
-A dedicated simulator and unused local ports will be assigned after the policy
-answer, without changing shared simulator defaults.
+A dedicated simulator and unused local ports are assigned below when created,
+without changing shared simulator defaults.
 
-### One pending savings policy
+### Founder-approved savings policy
 
-The [MVEE Plan rules][mvee-plan] distinguish actual and projected progress,
-require one canonical activity and no duplicate money claims, and explicitly
-leave production allocation contracts unresolved. The locked design's
-`plan-preview.js` and `plan-link-model.js` use a reported-total checkpoint plus
-linked transfers. Ordinary account withdrawals do not reduce that checkpoint.
-`JOURNEY-EXPANSION.md` explicitly leaves allocated funds unresolved. There is no
-landed goal or allocation service to inherit. This is a product gap, not an
-approved deferral or an environment/access blocker.
+**Approved September 30, 2026.** Goals use explicit allocations backed by known
+recorded account balances, kept separate by currency. Allocating money does not
+move it or change account balances. A shared pool prevents multiple goals from
+claiming the same money. Existing savings count when explicitly allocated;
+linking an already included contribution adds provenance without another credit.
+Planned contributions and projections remain separate from actual savings.
 
-**Required founder question, asked once; answer pending:** approve account-backed
-savings goals? Recommended policy: existing savings count only when explicitly
-allocated from known recorded money in owned, same-currency accounts. One shared
-pool prevents multiple goals from claiming the same funds. Linking an already
-counted contribution adds provenance without adding progress again. If a
-withdrawal or correction leaves allocations insufficiently backed, affected
-goals show Needs review until the person chooses how to reduce or reassign them.
-Argus does not silently choose which goal loses money. Unconfigured goals may
-exist; unknown balances cannot establish counted savings.
+Withdrawals, reversals and corrections re-evaluate backing and linked activity.
+If backing becomes insufficient, show the shortfall and **Needs review**. Do not
+silently redistribute money or present unsupported amounts as fully saved.
+Unknown balances cannot establish supported actual savings. The person chooses
+how to reduce or reassign allocations; Argus invents no priority among goals.
 
-Dependent contracts and implementation wait for this answer. The recommendation
-is not recorded as approved policy. No heavy environment preparation runs while
-this decision is pending. The approved answer will be recorded in the existing
-API/data contracts in the implementation PR, with the sketch difference explicit.
+This settles the product gap identified in the [MVEE Plan rules][mvee-plan] and
+locked design. The prototype's reported-total checkpoint, which ignored ordinary
+withdrawals, is superseded for production savings truth by this explicit founder
+decision. Its native visual standard and contribution/detail interactions remain
+the reference. Relevant API/data contracts record the approved policy and bounded
+allocation/link/lifecycle semantics alongside implementation. No new product
+approval is needed for routine technical choices within this policy.
 
 ### Ownership, dependency and acceptance map
 
@@ -71,8 +69,8 @@ and only affected fixes afterward. Codex availability is not a dependency.
 
 | User outcome | Inherited capability | Remaining delivery work | Actual dependency | Observable assembled proof |
 | --- | --- | --- | --- | --- |
-| Create, inspect and edit a named target, currency, optional date and account setup | Native Plan Goals destination, shared money inputs, versioned Plan commands | Goal definition and real detail/form; API/data contract | Pending savings policy for progress semantics | Native create/edit, stale-version rejection and API readback after reopen |
-| Assign existing savings; record or link contributions once across multiple goals | Canonical logical activity, paired transfers, Plan receipts and owner lock | One allocation/link owner and atomic record/link commands | Pending allocation policy; known same-currency backing | Independent expected amounts across two goals; unchanged balances on allocation; duplicate retry creates no second activity or claim |
+| Create, inspect and edit a named target, currency, optional date and account setup | Native Plan Goals destination, shared money inputs, versioned Plan commands | Goal definition and real detail/form; API/data contract | Goal definition/progress contract | Native create/edit, stale-version rejection and API readback after reopen |
+| Assign existing savings; record or link contributions once across multiple goals | Canonical logical activity, paired transfers, Plan receipts and owner lock | One allocation/link owner and atomic record/link commands | Shared allocation contract; known same-currency backing | Independent expected amounts across two goals; unchanged balances on allocation; duplicate retry creates no second activity or claim |
 | Separate actual, planned and projected progress in Plan/Home | Shared Plan/Home snapshot, recurrence and forecast, native summaries | Goal intentions and derived occurrences/progress; explicit exclusions | Accepted goal/link contract | Planned saving leaves balances and actual progress unchanged; internal transfer has zero combined-cash/spending effect; fulfilled movement disappears once |
 | Inspect/correct contributions and handle withdrawals/reversals | Original activity detail, append-only correction, account reconciliation | Goal link re-evaluation and explicit allocation recovery | Accepted backing and link rules | Original correction updates Accounts, goal and forecast; insufficient backing is visible; no invented goal-priority rule |
 | Archive and restore without copying money/history | Plan/Budget reversible lifecycle and CAS/idempotency | Goal lifecycle with retained identities and explicit allocation effect | Accepted lifecycle/allocation contract | Archive/restore/retry keeps IDs, history and consistent shared claims |
@@ -81,11 +79,30 @@ and only affected fixes afterward. Codex availability is not a dependency.
 
 ### Delivery workflow and throughput checkpoint
 
-1. **Blocking first steps:** answer the single saved-money question; settle the
-   resulting allocation/link/lifecycle contracts in their existing owners.
+- [x] Read the Principles section of poteto-mode; frame the falsifiable local
+  journey and preserve the scope/authority in this manifest.
+- [x] `how` over the affected subsystem. Financial/native scouts recovered the
+  canonical Recording, Plan snapshot/receipts, native detail/journal and Search
+  flow without rebuilding them.
+- [ ] `architect` for parallel design exploration. Two bounded, read-only
+  candidates compare current allocation intentions with allocation change events;
+  the captain chooses one after independent cross-judgment.
+- [ ] Write the throughput checkpoint as four todo items, below; update it at
+  ownership handoff.
+- [ ] Delegate code-writing to one exclusive implementation writer/worktree.
+- [ ] Verify on the matching surface: real local API/Postgres and native simulator.
+- [ ] Deliver small ordered commits, verifying each unit before the next.
+  Repository one-way integration merges override the playbook's rebase step.
+- [ ] If the design is contested, interrogate before shipping; skip if the
+  grounded selection resolves it without a contested invariant.
+- [ ] Run Opening a PR, exact-head applicable CI and the approved independent
+  review/fix loop, then record the terminal audit. No merge or deployment.
+
+
+1. **Blocking first steps:** the founder policy is settled. Select the bounded
+   allocation/link/lifecycle contract before writing dependent code.
 2. **Independent workstreams:** read-only financial/native recovery is complete.
-   No environment work or implementation is necessary to answer the question.
-   After approval, local acceptance preparation can run alongside the writer
+   Local acceptance preparation runs alongside the implementation writer
    without editing its checkout; independent review follows the finished diff.
 3. **Shared mutable state:** Planning snapshot, receipts, financial owner lock,
    activity links, Swift response types, Search union and localization each have
@@ -1445,8 +1462,8 @@ evidence are not an exhaustive scope or a substitute for the linked requirement.
 
 **Current phone evidence:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
-landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are landed through PR #753; its terminal audit and landing record retain the local evidence. Connected personal savings goals are assigned through merge readiness, with
-one saved-money policy question pending. Proposed owners must be bound to named
+landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are landed through PR #753; its terminal audit and landing record retain the local evidence. Connected personal savings goals are assigned through merge readiness, under
+the founder-approved account-backed allocation policy. Proposed owners must be bound to named
 workers at dispatch. D14 follows the linked runtime
 sequence rather than a separate deferral policy in this document.
 
@@ -1458,7 +1475,7 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; connected personal savings goals are assigned with one allocation-policy gate; debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; connected personal savings goals are assigned with approved account-backed allocations; debt-plan lifecycles, shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
 | [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
