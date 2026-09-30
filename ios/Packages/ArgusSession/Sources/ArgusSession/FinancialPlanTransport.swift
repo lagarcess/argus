@@ -19,6 +19,9 @@ extension SessionController {
     public func sendPlanConfirmation(_ write: PendingFinancialConfirmation, expectedIdentity: SessionSnapshot) async throws {
         let operation = try validatedPlanOperation(write, identity: expectedIdentity)
         switch operation {
+        case .createBudget, .editBudget:
+            let _: FinancialBudgetReceipt = try await planResponse(path: operation.path, method: operation.method,
+                body: write.body, key: write.key, identity: expectedIdentity)
         case .createExpectation, .editExpectation:
             let _: FinancialExpectationReceipt = try await planResponse(path: operation.path, method: operation.method,
                 body: write.body, key: write.key, identity: expectedIdentity)

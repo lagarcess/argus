@@ -118,8 +118,9 @@ public struct FinancialPlanProjection: Decodable, Sendable {
     public let endDate: String
     public let coverage: String
     public let hasExpectations: Bool
+    public let budgets: [FinancialBudgetProgress]
     enum CodingKeys: String, CodingKey {
-        case home, selection, accounts, expectations, occurrences, currencies, coverage
+        case home, selection, accounts, expectations, occurrences, currencies, coverage, budgets
         case startDate = "start_date", endDate = "end_date", hasExpectations = "has_expectations"
     }
 }
@@ -188,6 +189,8 @@ public struct FinancialPlanFulfillmentPreview: Decodable, Sendable {
 
 public enum FinancialPlanOperation: Codable, Equatable, Sendable {
     case createExpectation
+    case createBudget
+    case editBudget(id: UUID, version: Int)
     case editExpectation(id: UUID, version: Int)
     case selection(version: Int)
     case fulfill(occurrenceId: String, version: Int)
@@ -195,6 +198,8 @@ public enum FinancialPlanOperation: Codable, Equatable, Sendable {
 
     public var path: String {
         switch self {
+        case .createBudget: "/budgets"
+        case .editBudget(let id, _): "/budgets/" + id.uuidString
         case .createExpectation: "/expectations"
         case .editExpectation(let id, _): "/expectations/" + id.uuidString
         case .selection: "/selection"
@@ -203,7 +208,7 @@ public enum FinancialPlanOperation: Codable, Equatable, Sendable {
         }
     }
     public var method: String {
-        switch self { case .editExpectation: "PATCH"; case .selection: "PUT"; default: "POST" }
+        switch self { case .editExpectation, .editBudget: "PATCH"; case .selection: "PUT"; default: "POST" }
     }
 }
 

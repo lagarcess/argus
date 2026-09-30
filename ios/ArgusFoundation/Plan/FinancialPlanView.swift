@@ -24,7 +24,6 @@ struct FinancialPlanDestination: View {
 struct FinancialPlanView: View {
     @ObservedObject var model: FinancialPlanModel
     @ObservedObject var loop: FinancialLoopModel
-    @State private var section = PlanSection.overview
     @State private var selectingAccounts = false
     @State private var expanded = false
     @Environment(\.locale) private var locale
@@ -36,17 +35,17 @@ struct FinancialPlanView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 24) {
                         ForEach(PlanSection.allCases, id: \.self) { item in
-                            Button { section = item } label: {
+                            Button { model.section = item } label: {
                                 Text(item.title).font(ArgusStyle.body(14, relativeTo: .subheadline))
                                     .frame(minWidth: 44, minHeight: 48)
-                                    .foregroundStyle(section == item ? ArgusStyle.ink : ArgusStyle.secondary)
-                                    .overlay(alignment: .bottom) { Rectangle().fill(section == item ? ArgusStyle.ink : .clear).frame(height: 1) }
+                                    .foregroundStyle(model.section == item ? ArgusStyle.ink : ArgusStyle.secondary)
+                                    .overlay(alignment: .bottom) { Rectangle().fill(model.section == item ? ArgusStyle.ink : .clear).frame(height: 1) }
                             }.buttonStyle(.plain).accessibilityIdentifier("plan." + item.rawValue)
-                                .accessibilityAddTraits(section == item ? .isSelected : [])
+                                .accessibilityAddTraits(model.section == item ? .isSelected : [])
                         }
                     }
                 }
-                if section == .overview {
+                if model.section == .overview {
                     if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                     if let projection = model.projection { overview(projection) }
                     if model.loading { ProgressView("accounts.loading") }
@@ -54,8 +53,11 @@ struct FinancialPlanView: View {
                         Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                         Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
                     }
+                } else if model.section == .budgets {
+                    if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
+                    FinancialBudgetList(plan: model, model: loop.budgets, origin: .plan)
                 } else {
-                    Text(section.title).font(ArgusStyle.display())
+                    Text(model.section.title).font(ArgusStyle.display())
                     Text("plan.unavailable").foregroundStyle(ArgusStyle.secondary)
                 }
             }.padding(.horizontal, 24).padding(.top, 20).padding(.bottom, 24)

@@ -28,6 +28,7 @@ final class FinancialLoopModel: ObservableObject {
     private var generation = UUID()
     var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
+    lazy var budgets = FinancialBudgetModel(controller: controller, loop: self)
     lazy var plan = FinancialPlanModel(controller: controller, accounts: accounts, loop: self)
 
     init(controller: SessionController, accounts: AccountsModel, journal: FinancialWriteJournal) {
@@ -44,6 +45,7 @@ final class FinancialLoopModel: ObservableObject {
             catch { pendingConfirmation = nil; recoveryErrorKey = "auth.error.storage" }
         } else { pendingConfirmation = nil }
         plan.bind(snapshot)
+        budgets.bind(snapshot)
     }
 
     func refresh() async {
@@ -186,6 +188,7 @@ final class FinancialLoopModel: ObservableObject {
                     await accounts.load(); await refresh()
                     guard generation == ticket else { return }
                     plan.confirmed(operation)
+                    budgets.confirmed(operation)
                 }
             } else {
                 let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
@@ -239,6 +242,7 @@ final class FinancialLoopModel: ObservableObject {
     var pendingTitle: String {
         guard let operation = pendingConfirmation?.planOperation else { return "loop.pending.title" }
         switch operation {
+        case .createBudget, .editBudget: return "budget.pending"
         case .createExpectation, .editExpectation: return "plan.pending.expectation"
         case .selection: return "plan.pending.selection"
         case .link: return "plan.pending.link"

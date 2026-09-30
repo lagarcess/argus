@@ -3,6 +3,7 @@ import ArgusSession
 
 @MainActor
 final class FinancialPlanModel: ObservableObject {
+    @Published var section = PlanSection.overview
     @Published private(set) var projection: FinancialPlanProjection?
     @Published private(set) var loading = false
     @Published private(set) var saving = false
@@ -30,6 +31,7 @@ final class FinancialPlanModel: ObservableObject {
     func bind(_ snapshot: SessionSnapshot?) {
         generation = UUID(); request = UUID(); detailRequest = UUID()
         identity = snapshot?.phase == .authenticated ? snapshot : nil
+        section = .overview
         projection = nil; draft = nil; selectedOccurrence = nil; candidates = []; linkedActivity = nil
         endDate = nil; afterOccurrence = nil; loading = false; loadingDetails = false; saving = false; errorKey = nil
     }
@@ -45,6 +47,8 @@ final class FinancialPlanModel: ObservableObject {
             guard generation == ticket, request == query else { return }
             projection = next
             loop.acceptPlanHome(next.home)
+            await loop.budgets.refreshIfOpen()
+            guard generation == ticket, request == query else { return }
             if let selectedOccurrence { self.selectedOccurrence = next.occurrences.first { $0.id == selectedOccurrence.id } }
         } catch { if request == query { await failed(error, ticket: ticket) } }
     }

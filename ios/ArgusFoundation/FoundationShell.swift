@@ -41,9 +41,16 @@ struct FoundationShell: View {
                 }
             }
         }
+        .financialBudgetBackground(auth.financialLoop?.budgets)
+        .overlay {
+            if let loop = auth.financialLoop {
+                FinancialBudgetPresenter(model: loop.budgets, loop: loop, destination: $destination, search: auth.financialSearch)
+            }
+        }
         .background(ArgusStyle.background.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             FloatingNavigation(selection: $destination)
+                .financialBudgetBackground(auth.financialLoop?.budgets)
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 8)

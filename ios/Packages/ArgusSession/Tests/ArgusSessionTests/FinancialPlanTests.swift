@@ -19,7 +19,7 @@ final class FinancialPlanTests: XCTestCase {
         let identity = SessionSnapshot(phase: .authenticated, profile: .init(id: owner.uuidString,
             email: nil, displayName: nil, language: nil), revision: 1)
         let storage = MemoryStore()
-        let operations: [FinancialPlanOperation] = [.createExpectation, .editExpectation(id: UUID(), version: 7),
+        let operations: [FinancialPlanOperation] = [.createBudget, .editBudget(id: UUID(), version: 2), .createExpectation, .editExpectation(id: UUID(), version: 7),
             .selection(version: 4), .fulfill(occurrenceId: "opaque-occurrence", version: 3), .link(occurrenceId: "opaque-occurrence", version: 3)]
         for operation in operations {
             let journal = FinancialWriteJournal(storage: storage, prefix: "plan-test")

@@ -6970,8 +6970,9 @@ correction and optional relink. Purchase account correction preserves identity/l
 `GET /financial-home?month=2026-09&time_zone=America/Santo_Domingo` adds
 `period:{month,time_zone,start_at,end_at_exclusive}`, `coverage:"recorded_only"`, and
 currency string integers gross_income_minor, gross_purchases_minor, refunds_minor,
-net_spending_minor. Default month uses clock in requested zone; default zone is Santo
-Domingo. Half-open monthly interval controls received-month refund attribution. Net
+net_spending_minor. Default month uses the clock in the requested zone. Omitted
+zone uses the saved Plan reporting zone, initially America/Santo_Domingo. The
+half-open monthly interval controls received-month refund attribution. Net
 may be negative. Transfers/payments contribute zero. Existing recorded_spending_minor
 remains lifetime gross purchases. Activity uses full transaction amounts; position
 retains personal shares. Archived accounts remain in summaries.
