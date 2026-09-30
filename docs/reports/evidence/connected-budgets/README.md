@@ -112,8 +112,9 @@ all three new budget contract tests passed. All 23 generated OpenAPI compatibili
 checks pass. The connected native journey and actual committed-response-loss
 relaunch test pass. [Native proof](native-proof.json), [focused independent review](review-proof.json)
 and the PR terminal audit record exact source heads and evidence retention.
-The PR audit owns terminal CI and merge-readiness disposition. No merge, deployment
-or physical-device installation has occurred.
+The PR audit retains the accepted delivery evidence. [PR #753 is landed](../../../specs/argus-execution-board.md#pr-753-integration-landing)
+in integration; its landing comment records exact-head CI and final parity. No
+deployment or physical-device installation has occurred.
 
 ## Click through the retained journey
 
