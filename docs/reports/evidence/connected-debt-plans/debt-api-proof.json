@@ -78,6 +78,17 @@
       "goal_planned_minor": 0,
       "goal_supported_minor": 150000
     },
+    "interest_only_real": {
+      "bank_minor": 146000,
+      "cost_minor": 10000,
+      "loan_position_minor": -50000,
+      "principal_minor": 0
+    },
+    "interest_only_return": {
+      "bank_minor": 156000,
+      "loan_position_minor": -50000,
+      "net_cost_minor": 0
+    },
     "linked_partial": {
       "bank_minor": 165000,
       "budget_spent_minor": 5000,
@@ -161,8 +172,8 @@
     }
   },
   "observational": false,
-  "readback_at": "2026-09-30T20:05:11.740232+00:00",
-  "readback_commit": "74ad837580396a4ee99cf965bb02ec6ac047de04",
+  "readback_at": "2026-09-30T20:14:30.317434+00:00",
+  "readback_commit": "539852292e2bb10f7218b606f1447e892ea50142",
   "retained_state_verified": true,
   "stage": "api_complete",
   "suffix": "c801d065"

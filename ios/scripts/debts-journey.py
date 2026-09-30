@@ -992,6 +992,64 @@ def get_preview(client, path, body):
     return result
 
 
+def interest_only(journal, client):
+    accounts = ids(journal)
+    paid = money(
+        journal,
+        client,
+        "interest_only_real",
+        payment_body(
+            journal, accounts["bank"], accounts["loan"], "100", ("0", "90", "10")
+        ),
+    )["activity"]
+    if "interest_only_real" not in journal.state["checks"]:
+        check_accounts(client, accounts, {"bank": 146000, "loan": -50000})
+        budget = get(
+            client,
+            "/financial-plan/budgets/" + identity(journal, "cost_budget", "budget"),
+        )
+        require(
+            budget["spent_minor"] == "18500",
+            "Interest-only costs were lost or principal invented",
+        )
+        journal.state["checks"]["interest_only_real"] = {
+            "principal_minor": 0,
+            "cost_minor": 10000,
+            "bank_minor": 146000,
+            "loan_position_minor": -50000,
+        }
+        journal.save()
+    money(
+        journal,
+        client,
+        "interest_only_return",
+        payment_body(
+            journal,
+            accounts["bank"],
+            accounts["loan"],
+            "100",
+            ("0", "90", "10"),
+            original=paid["activity_id"],
+        ),
+    )
+    if "interest_only_return" not in journal.state["checks"]:
+        check_accounts(client, accounts, {"bank": 156000, "loan": -50000})
+        budget = get(
+            client,
+            "/financial-plan/budgets/" + identity(journal, "cost_budget", "budget"),
+        )
+        require(
+            budget["spent_minor"] == "8500",
+            "Interest-only return did not reverse exact costs",
+        )
+        journal.state["checks"]["interest_only_return"] = {
+            "net_cost_minor": 0,
+            "bank_minor": 156000,
+            "loan_position_minor": -50000,
+        }
+        journal.save()
+
+
 def dated_return(journal, client):
     now = datetime.fromisoformat(journal.state["now"])
     start = now.replace(day=1, hour=0, minute=30, second=0, microsecond=0)
@@ -1259,6 +1317,10 @@ def main():
             lifecycle(journal, client)
         if args.action == "run" and not journal.state.get("api_complete"):
             dated_return(journal, client)
+        if args.action == "run" and not journal.state["checks"].get(
+            "interest_only_return"
+        ):
+            interest_only(journal, client)
         result = observe(journal, client, observational=args.observe)
         PROOF.parent.mkdir(parents=True, exist_ok=True)
         target = PROOF.with_name("debt-api-observation.json") if args.observe else PROOF
