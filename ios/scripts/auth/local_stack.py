@@ -247,7 +247,26 @@ def seed() -> None:
     )
 
 
-def api(python: str, *, accounts_enabled: bool = False) -> None:
+def api(
+    python: str,
+    *,
+    accounts_enabled: bool = False,
+    api_port: int | None = None,
+    households_enabled: bool = False,
+) -> None:
+    port = ALLOCATION.port_base if api_port is None else api_port
+    if not 58400 <= port <= 59900 or 58700 <= port <= 58749:
+        raise SystemExit("Refusing API port outside the owned local test range")
+    if port in {
+        *ALLOCATION.ports.values(),
+        ALLOCATION.port_base + 5,
+        ALLOCATION.web_port,
+    }:
+        raise SystemExit("Refusing an API port reserved by this stack allocation")
+    if accounts_enabled and not ALLOCATION.accounts:
+        raise SystemExit("Financial accounts require --accounts isolation")
+    if households_enabled and not (ALLOCATION.accounts and accounts_enabled):
+        raise SystemExit("Households require --accounts and --accounts-enabled on")
     cfg = status()
     env = {
         key: value
@@ -279,6 +298,7 @@ def api(python: str, *, accounts_enabled: bool = False) -> None:
             "DATABASE_URL": cfg["DB_URL"],
             "ARGUS_PERSISTENCE_MODE": "supabase",
             "ARGUS_FINANCIAL_ACCOUNTS_ENABLED": str(accounts_enabled).lower(),
+            "ARGUS_HOUSEHOLDS_ENABLED": str(households_enabled).lower(),
             "ARGUS_MARKET_DATA_PROVIDER_MODE": "synthetic_unit_fixture",
             "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "false",
             "ARGUS_GUEST_ACCESS_ENABLED": "true",
@@ -317,7 +337,7 @@ def api(python: str, *, accounts_enabled: bool = False) -> None:
             "--host",
             "127.0.0.1",
             "--port",
-            str(ALLOCATION.port_base),
+            str(port),
             "--no-access-log",
         ],
         env,
@@ -344,8 +364,23 @@ if __name__ == "__main__":
         help="Explicit local API financial-record exposure (default off)",
     )
     parser.add_argument("--port-base", type=int, default=58400)
+    parser.add_argument(
+        "--api-port",
+        type=int,
+        help="Local API listen port; reuse the verified allocation Auth and database",
+    )
+    parser.add_argument(
+        "--households-enabled",
+        choices=["on", "off"],
+        default="off",
+        help="Explicit local API Household exposure (default off; requires accounts)",
+    )
     args = parser.parse_args()
     ALLOCATION = Allocation(args.accounts, args.port_base)
+    if args.action != "api" and (
+        args.api_port is not None or args.households_enabled == "on"
+    ):
+        raise SystemExit("--api-port and --households-enabled on apply only to api")
     if not args.accounts and args.accounts_enabled == "on":
         raise SystemExit("Financial accounts require --accounts isolation")
     ALLOCATION.work.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -366,7 +401,12 @@ if __name__ == "__main__":
     elif args.action == "api":
         if not args.python or not Path(args.python).is_absolute():
             raise SystemExit("--python must be an absolute interpreter path")
-        api(args.python, accounts_enabled=args.accounts_enabled == "on")
+        api(
+            args.python,
+            accounts_enabled=args.accounts_enabled == "on",
+            api_port=args.api_port,
+            households_enabled=args.households_enabled == "on",
+        )
     elif args.action == "web":
         if args.accounts:
             raise SystemExit("Web port is not allocated to the accounts lane")

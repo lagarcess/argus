@@ -18,6 +18,87 @@ metadata but no recovered capability; revoke and replace that invitation.
 Selection and authorization changes invalidate protected reads and editor state.
 Departure returns to Personal without deleting legitimate financial records.
 
+## Assigned local runtime
+
+Run from `/Users/garces/.codex/worktrees/connected-household-native/private-alpha-next`.
+Reuse the existing `ios-accounts-59500` allocation and its ignored client fixture;
+do not configure, start, seed or reset another stack. The runtime owner starts
+this API after releasing only its own existing 59520 process:
+
+```bash
+python3 ios/scripts/auth/local_stack.py api --accounts --port-base 59500 \
+  --api-port 59520 --accounts-enabled on --households-enabled on \
+  --python /Users/garces/.codex/worktrees/5a42/private-alpha-next/.venv/bin/python
+```
+
+The helper verifies Auth `http://127.0.0.1:59501` and PostgreSQL 59502 from the
+allocation before launching API 59520 on loopback. The optional API port changes
+neither stack identity nor Auth/database ports. Household exposure defaults off
+and requires the isolated accounts allocation plus accounts exposure. It rejects
+ports outside 58400–59900, the phone range 58700–58749, and this stack's reserved
+ports. Root `.env` refusal and provider credential sanitization remain enforced.
+
+Reuse the existing CAPTCHA bridge at
+`http://127.0.0.1:59505/captcha.html`. Its reproducible command, when the runtime
+owner needs to start that assigned bridge, is:
+
+```bash
+python3 ios/scripts/auth/bridge.py --accounts --port-base 59500
+```
+
+`ios/Config/Local.xcconfig` and the 0600 ignored
+`ios/.build/accounts-local-59500/client.json` must already point to API 59520 and
+Auth 59501. The CAPTCHA URL stays 59505. Config contains only public endpoints and
+public client configuration; the secure runner reads synthetic credentials from
+the ignored fixture. Preserve the frozen API 59500 installation.
+
+## Pinned native runner
+
+The assigned native profile is `argus-household-current`: simulator
+`C93072E7-D29A-4B0A-BE76-E6418E4E9F88`, bundle
+`local.argus.household-current-demo`, and cache
+`/private/tmp/argus-household-current-build`. This recipe uses the existing runner
+with two bounded in-memory overrides. It changes no tracked runner or project
+file, keeps the derived `.uitests` bundle distinct, and leaves credential
+injection/cleanup in the existing runner:
+
+```bash
+python3 - <<'PY_RUN'
+from pathlib import Path
+import sys
+
+script = Path("ios/scripts/auth/run-ui.py").resolve()
+sys.path.insert(0, str(script.parent))
+sys.argv = [
+    str(script), "C93072E7-D29A-4B0A-BE76-E6418E4E9F88",
+    "--accounts", "--port-base", "59500", "--api-port", "59520",
+    "--only", "ArgusFoundationUITests/FinancialLoopUITests/"
+    "testHouseholdTwoUsersConsentEditingRevocationAndSpanishRelaunch",
+]
+source = script.read_text()
+overrides = {
+    "DERIVED = DERIVED.with_name(DERIVED.name + allocation.suffix)":
+        'DERIVED = Path("/private/tmp/argus-household-current-build")',
+    '"CODE_SIGNING_REQUIRED=NO",':
+        '"CODE_SIGNING_REQUIRED=NO", '
+        '"ARGUS_LOCAL_BUNDLE_IDENTIFIER=local.argus.household-current-demo",',
+}
+for original, replacement in overrides.items():
+    assert source.count(original) == 1, "Runner changed; review the override"
+    source = source.replace(original, replacement)
+exec(compile(source, str(script), "exec"),
+     {"__name__": "__main__", "__file__": str(script)})
+PY_RUN
+```
+
+For the separately opted-in recovery case, the runtime owner temporarily sets
+only this bundle's API URL to 59532, runs the assigned 59532→59520 response-loss
+proxy, chooses the recovery test below, and adds `--response-loss-proxy` to
+`sys.argv`. Keep `--api-port 59520` so the runner derives the fault control URL
+59532 and validates the direct fixture. Restore this bundle's API URL 59520
+afterward. The runner deletes its temporary 0600 credential-bearing xctestrun
+file and CAPTCHA mode override in `finally`; ordinary results stay ignored.
+
 ## Verification entry points
 
 - `ios/FinancialModelTests/run_household.py`: actual presentation model with
