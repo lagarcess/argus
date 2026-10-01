@@ -61,7 +61,8 @@ merge-ready PR targeting `codex/private-alpha-next`.
 and this native-adapter assignment; no runtime, UI, migration or test overlap.
 **Active recovery branch:** `codex/connected-household-native`.
 **Review PR:** [#766](https://github.com/lagarcess/argus/pull/766). Assembled
-local acceptance is complete; final-head CI/terminal audit is recorded on the PR.
+local journey evidence is retained. Later default-off P1 class fixes are verified
+at sourcec38; consult the same PR terminal audit for renewed final-head CI and review readiness.
 No merge authority for this PR.
 **Active isolated checkout:**
 `/Users/garces/.codex/worktrees/connected-household-native/private-alpha-next`.
@@ -86,11 +87,27 @@ across an unrelated Household version, archived-money totals and deletion-safe
 grant FKs. All are fixed with clean affected reviews; helper and contrast deltas
 also reviewed clean. No unresolved independent findings.
 
+**Review follow-up:** the later P1 onfda found that a disabled Household route
+was misreported as access loss. Source `c38e4d107fd983cd95d5adf703513b913e443b0f`
+uses the existing typed server code to gate controls/routes/sheets, clear protected
+views and preserve original selection plus exact pending commands. Foreground
+restores availability without retrying writes automatically. Scoped removal
+stays meaningful; a429 keeps the pending journal, and a rejected H1 retry cannot
+clear valid current H2 selection. Fourteen actual model cases pass; scoped
+independent fix review is clean. Default-off native Home/Accounts/Search and
+English/Spanish reopen pass against real API59620/Auth/Postgres. Ten two-user
+API financial read checks and ten focused actual-Postgres regressions pass.
+Restoring API59520 rebuilds the original69447E demo with980 DOP/one20 DOP expense;
+new safe screenshots/short history recording are in the existing evidence packet.
+The PR remains non-draft. The captain finishes replies/reactions/resolution and
+final CI on this same PR before renewed READY. No hosted flag or infrastructure
+setting changes.
+
 Real Auth/API/Postgres acceptance covers named-current-member grants, view/edit
 separation, private-leg redaction, departure/rejoin/admin transfer/closure,
 retained owners' records, 50% asset attribution and unknown currency totals.
 Checks pass: 276 focused deterministic; 36 existing and six new actual-Postgres;
-seven production Household-model; session package64; local helper/secure runner37.
+fourteen production Household-model after the follow-up; session package64; local helper/secure runner37.
 The broad local suite cannot collect due to inherited SciPy `_spropack`; shared
 Python remains untouched. Full Linux CI passed at67e; final-head checks are the
 terminal PR gate, not inferred from that earlier head.
@@ -111,8 +128,8 @@ and [existing restart instructions](../../ios/HOUSEHOLD_SETUP.md) preserve the d
 remain unverified and unauthorized. Synthetic invitation links only; no delivery
 was sent. Shared Plan/budgets/goals/debt and Business/Custom remain outside this
 bounded assignment and retain their MVEE dependencies below. Existing #760
-shared navigation/Personal secondary colors on its white canvas under system-dark
-appearance need a later visual polish pass; this lane fixes only new Household
+shared navigation/Personal secondary colors on its white canvas and inherited
+Personal Search dark contrast need a later visual polish pass; this lane fixes only new Household
 inline contrast, preserves native sheet appearance and avoids design expansion.
 
 **Assigned resources:** simulator `C93072E7-D29A-4B0A-BE76-E6418E4E9F88`,

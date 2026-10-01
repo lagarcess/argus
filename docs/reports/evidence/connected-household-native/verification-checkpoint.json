@@ -17,7 +17,9 @@
     "passed": 6
   },
   "household_presentation_model": {
-    "passed": 7
+    "passed": 14,
+    "source": "c38e4d107fd983cd95d5adf703513b913e443b0f",
+    "verification": "writer ran actual production model suite; shared Session package64 passed,4 opted-in Auth skips"
   },
   "session_package": {
     "passed": 64,
@@ -65,5 +67,43 @@
     },
     "build_run": "PASS d108; direct API59520 restored after recovery; no credential-bearing xctestrun retained"
   },
-  "evidence_disposition": "Retain financial/API/PG/source8e and native continuation4fed after docs-only merge; source d108 changes only two subtree color environments, reviewed clean and native visuals/actual correction/recovery revalidated. Publication packet changes documentation/media only; terminal PR audit records final-head content equality and CI."
+  "evidence_disposition": "Retain financial/API/PG/source8e and native continuation4fed after docs-only merge; source d108 changes only two subtree color environments, reviewed clean and native visuals/actual correction/recovery revalidated. Publication packet changes documentation/media only; terminal PR audit records final-head content equality and CI.",
+  "feature_off_review_followup": {
+    "finding": "https://github.com/lagarcess/argus/pull/766#discussion_r4153356691",
+    "source": "c38e4d107fd983cd95d5adf703513b913e443b0f",
+    "independent_review": "CLEAN scoped deltas fda..c676, c676..b30 and b30..c38; static reviewer, captain owns actual execution",
+    "native_off": {
+      "result": "PASS",
+      "archive": "ui-20261001T141415Z.xcresult",
+      "simulator": "C93072E7-D29A-4B0A-BE76-E6418E4E9F88",
+      "api_port": 59620,
+      "journey": "existing registered user; Personal Home/Accounts/Search after English/Spanish relaunch; no Household controls, sheets or false access-ended message"
+    },
+    "native_on": {
+      "result": "PASS observed actual native restoration/detail/history/back",
+      "api_port": 59520,
+      "fixture": "69447E",
+      "balance_minor": 98000,
+      "activity_minor": 2000,
+      "selection": "original actor selection restored after disabled-server run",
+      "recording": "restored-household-demo.mp4",
+      "recording_seconds": 16.345,
+      "recording_audio_tracks": 0
+    },
+    "real_api_readback": {
+      "passed": 10,
+      "financial_writes": 0,
+      "normalization": "exclude only Home recorded_at read timestamp"
+    },
+    "focused_real_postgres": {
+      "passed": 10,
+      "skipped": 0
+    },
+    "recovery_cases": [
+      "disabled route preserves exact pending command and selection",
+      "429 preserves pending bytes and key",
+      "failed H1 command does not clear current authorized H2 selection"
+    ],
+    "disposition": "No backend/migration/financial calculation change; existing original journey evidence retained, changed native availability/recovery revalidated. Publication packet contains only documents/media; final-head build/CI and audit follow on PR."
+  }
 }

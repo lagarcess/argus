@@ -26,6 +26,45 @@ correction preview 975→980 and refreshed Home with one 20 DOP expense.
 Household white canvas readable and its native sheet dark. The white canvas
 was also inspected with system-light appearance.
 
+## Default-off and recovery review follow-up
+
+The later [P1 review](https://github.com/lagarcess/argus/pull/766#discussion_r4153356691)
+identified a real error: the native app treated the server's disabled feature as
+lost membership. Source `c38e4d107fd983cd95d5adf703513b913e443b0f` fixes that class
+through one server-derived availability state. Controls, routes and sheets stay
+hidden until discovery succeeds. Disabled responses clear protected views,
+retain actor-specific selection and exact pending bytes, and return to Personal.
+Foreground can restore the surface; writes still require explicit retry.
+Actual scoped membership loss remains distinct from generic errors. A transient
+429 preserves the journal, and denying a saved H1 command cannot clear a valid
+current H2 selection.
+
+[Scoped independent review](feature-off-review.md) is clean atc38; 14 actual
+production model tests pass, alongside64 Session cases with4 opt-in Auth skips.
+The real native default-off test atc38 is **PASS**, archive
+`ui-20261001T141415Z.xcresult`: ordinary registered authentication, English and
+Spanish relaunch, working Personal Home/Accounts/Search, and no Household
+selector/add/People/pending/editor or false access-ended state.
+[English Home](household-default-off-personal-home-en.png),
+[Spanish Home](household-default-off-personal-home-es-419.png),
+[English Search](household-default-off-personal-search-en.png) and
+[Spanish Search](household-default-off-personal-search-es-419.png) are safe test
+attachments. Existing Personal Search dark contrast remains recorded polish;
+these images prove routing/absence, not a redesign of that inherited screen.
+
+[Real two-user API readback](feature-off-api-proof.json) passes10 checks on
+API59520 versus disabled59620, sharing existing Auth59501/Postgres59502. Every
+Personal account/Home financial field is unchanged; only Home's fresh
+`recorded_at` timestamp is excluded from equality. No financial writes occurred.
+Ten focused Household/projection regressions also pass on actual Postgres.
+After restoring this bundle's direct API59520 and rebuilding, the original
+69447E selection,980 DOP balance and one20 DOP activity reappear.
+[Restored Home](restored-household-home.jpg) and the
+[short restored detail/history/back recording](restored-household-demo.mp4)
+show current source. Original financial/lifecycle evidence below is retained;
+unchanged backend/migrations/money calculations were not reopened. The final
+PR audit records publication-head equality, CI, review reply and resolution.
+
 ## Assembled acceptance and truthful disposition
 
 The full setup test at `ui-20261001T073216Z` reached household creation,
