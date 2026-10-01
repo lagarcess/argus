@@ -110,6 +110,7 @@ household_account_grants
 Default-off, registered-only (`ARGUS_INGESTION_ENABLED`):
 ```text
 financial_source_connections
+financial_shortcut_device_tokens
 ```
 
 Optional or later:
@@ -2851,3 +2852,11 @@ anything. Proven by `tests/test_ingestion_connections_postgres.py`.
 These rows are connection state, never financial records. Imported evidence
 and review state belong to reconciliation; canonical activity remains in the
 existing activity tables written only through `MoneyService`.
+
+`financial_shortcut_device_tokens` holds one row per Shortcuts connection:
+`connection_id` (primary key, cascades from `financial_source_connections`),
+`user_id`, `token_sha256` (32-byte SHA-256 digest of the device token; the
+token itself is never stored) and `created_at`. Disconnect deletes the row, and
+intake also requires the connection to be live. Row level security is enabled
+with no policies and every client grant revoked, so no client role can read or
+write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.

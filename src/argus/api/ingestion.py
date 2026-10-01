@@ -82,6 +82,9 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         configure_ingestion_hub(
             IngestionHub(connections, box=box, sink=None, clock=_clock)
         )
+        from argus.api.shortcuts import start_shortcuts
+
+        start_shortcuts(app, ingestion_hub())
     except Exception as exc:
         logger.warning(
             "Ingestion hub construction failed; surface stays off",
@@ -91,6 +94,9 @@ def start_ingestion(app) -> None:  # noqa: ANN001
 
 
 def stop_ingestion(app) -> None:  # noqa: ANN001
+    from argus.api.shortcuts import stop_shortcuts
+
+    stop_shortcuts()
     configure_ingestion_hub(None)
 
 

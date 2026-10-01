@@ -21,6 +21,9 @@ from argus.api.routers.financial_debts import router as debt_router
 from argus.api.routers.financial_loop import router as loop_router
 from argus.api.routers.financial_plan import router as plan_router
 from argus.api.routers.financial_search import router as search_router
+from argus.api.routers.ingestion_shortcuts import (
+    intake_router as shortcuts_intake_router,
+)
 from argus.domain import backtest_admission
 from argus.domain.recording.loop_schemas import LoopOpeningRequest
 from argus.domain.recording.schemas import (
@@ -159,3 +162,5 @@ router.include_router(debt_router)
 router.include_router(search_router)
 
 router.include_router(connections_router)
+
+router.include_router(shortcuts_intake_router)

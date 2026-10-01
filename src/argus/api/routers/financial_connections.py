@@ -92,3 +92,12 @@ def disconnect_financial_connection(
         provider_revocation=outcome.provider_revocation,
         unreviewed_removed=outcome.unreviewed_removed,
     )
+
+
+# Connector sub-routers import the response shapes above, so they are
+# included after those definitions.
+from argus.api.routers.ingestion_shortcuts import (  # noqa: E402
+    devices_router as shortcuts_devices_router,
+)
+
+router.include_router(shortcuts_devices_router)

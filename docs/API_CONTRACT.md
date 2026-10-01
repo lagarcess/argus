@@ -7491,3 +7491,56 @@ Connection shape:
   unreviewed drafts from that connection are removed; confirmed activity stays.
   Repeating the call returns the ended connection with `not_applicable` and `0`.
   Another person's or an unknown id answers 404 `financial_connection_not_found`.
+
+### Apple Shortcuts connector (default-off)
+
+Available whenever the connected-sources surface above is on; it stores no
+provider credential, so it does not need `ARGUS_INGESTION_SECRET_KEY`. While
+the surface is off both routes below, including intake, answer 404
+`financial_connections_unavailable`. Capabilities, setup and verification
+levels: [ingestion-shortcuts evidence](reports/evidence/ingestion-shortcuts/README.md).
+
+- POST `/api/v1/financial-connections/shortcuts/devices` `{device_name}`
+  (1-80 characters; registered-only like the routes above) creates a
+  `shortcuts` connection labeled with the device name and returns 201
+  `{connection, device_token, intake_url}`. `device_token`
+  (`sct1.<device id>.<secret>`, 256-bit secret) is returned only here; the
+  server keeps its SHA-256 digest and can never show it again. At most five
+  live devices per person; a sixth answers 409 `shortcuts_device_limit`.
+  Disconnecting the connection through the shared disconnect route deletes the
+  digest (`provider_revocation: revoked`) and the token stops working.
+- POST `/api/v1/ingestion/shortcuts/events` takes no user session: only
+  `Authorization: Bearer <device_token>`. A missing, malformed, unknown,
+  forged or disconnected token answers the same 401
+  `shortcuts_device_unauthorized` with `WWW-Authenticate: Bearer`. Body (at
+  most 4 KiB, unknown fields refused):
+  `{event_id?, kind, source_app, captured_at, amount?, currency?, merchant?,
+  card?, card_last4?, sender?, text?}`. `kind` is `transaction` (only with
+  `source_app: wallet`; no `sender`/`text`) or `message_capture` (with
+  `source_app: messages|notifications`; `text` required; no money fields).
+  `captured_at` carries a time zone and must be within 10 minutes ahead and
+  30 days behind the server clock (else 422 `shortcuts_event_out_of_window`).
+  Returns `{receipt_id, external_id, outcome}`; `outcome` is
+  `recorded|unchanged`. Re-sending the same `event_id` (or, without one, the
+  same content captured in the same second) returns the same `receipt_id` and
+  `external_id` with `unchanged`. A malformed body answers 422
+  `shortcuts_event_invalid` with `context.fields`; over the cap, 413
+  `shortcuts_event_too_large`. Per device: 20 requests a minute and 300 a day,
+  then 429 `too_many_requests` with `Retry-After`. Until the reconciliation
+  sink exists every valid request answers 503 `shortcuts_intake_unavailable`
+  (`context.retryable: true`, `Retry-After`) and nothing is saved.
+- POST `/api/v1/ingestion/shortcuts/events/batch` `{events: [...]}` (1-200
+  events, at most 128 KiB) sends captures saved while offline. Same
+  authentication, limits and receipts, returned as `{receipts}` in request
+  order, except that an event outside the time window gets outcome
+  `out_of_window` (nothing saved for it) instead of refusing the batch. One
+  malformed event refuses the whole batch with 422 before anything is saved.
+
+A Wallet `transaction` becomes `transaction` evidence with `status: unknown`
+and `direction: unknown`; `amount` is read from the formatted text only when a
+single value is possible, and `currency` only when the text names one
+(`RD$`, `US$`, `€`, an ISO code) or an explicit `currency` settles a bare `$`.
+Otherwise the field stays empty and is listed as uncertain. `card` becomes the
+account hint name and `card_last4` its mask; nothing else is inferred. A
+`message_capture` becomes inert text (`excerpt`, `sender` as description) with
+every money field unresolved and `kind` uncertain.
