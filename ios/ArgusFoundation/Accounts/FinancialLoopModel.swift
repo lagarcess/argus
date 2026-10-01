@@ -406,7 +406,9 @@ final class FinancialEditor: ObservableObject, Identifiable {
     var isCorrection: Bool { if case .expense(let value) = kind { return value != nil }; return false }
     var isCheck: Bool { if case .check = kind { return true }; return false }
     var busy: Bool { phase == .loading || phase == .saving }
-    var canEdit: Bool { phase == .editing || (phase == .review && expensePreview?.ready == false) }
+    /// Entry fields only while editing. Coverage review must not remount amount/date
+    /// controls — field didSet invalidate wiped coverage answers before confirm.
+    var canEdit: Bool { phase == .editing }
     var canConfirm: Bool { phase == .uncertain || (phase == .review && (checkPreview != nil || expensePreview?.ready == true)) }
     var readyToReview: Bool { !amount.isEmpty && (!isCorrection || !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
 

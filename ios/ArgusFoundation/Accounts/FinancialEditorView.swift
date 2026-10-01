@@ -52,6 +52,10 @@ struct FinancialEditorView: View {
                         } label: { Text("loop.review").frame(maxWidth: .infinity) }
                         .buttonStyle(PillButtonStyle()).disabled(!model.readyToReview || model.busy)
                         .accessibilityIdentifier("loop.review")
+                        if model.phase == .review, model.expensePreview?.ready == false {
+                            Button("loop.edit") { model.edit() }.frame(minHeight: 44)
+                                .accessibilityIdentifier("loop.edit")
+                        }
                     }
                     if model.busy { ProgressView("accounts.loading") }
                 }.padding(24)
