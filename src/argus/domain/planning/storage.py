@@ -8,6 +8,7 @@ from typing import Any
 from fastapi.encoders import jsonable_encoder
 from psycopg.types.json import Jsonb
 
+from argus.domain.planning import goal_allocations
 from argus.domain.recording.errors import IdempotencyConflict, RegisteredAccountRequired
 from argus.domain.recording.loop_storage import apply
 from argus.domain.recording.money_plan import MoneyPlan
@@ -50,6 +51,7 @@ def load(connection: Any, user_id: str) -> dict[str, Any]:
         (user_id,),
     ).fetchall():
         state["goals"][str(gid)] = body
+    goal_allocations.load(connection, user_id, state["goals"])
     for bid, body in connection.execute(
         "select id,body from public.financial_budgets where user_id=%s order by id",
         (user_id,),
@@ -187,11 +189,7 @@ def write(
                 "insert into public.financial_debt_plans(id,user_id,debt_account_id,body) values(%s,%s,%s,%s) on conflict(id) do update set body=excluded.body",
                 (did, user_id, body["debt_account_id"], Jsonb(body)),
             )
-        for gid, body in state["goals"].items():
-            connection.execute(
-                "insert into public.financial_goals(id,user_id,body) values(%s,%s,%s) on conflict(id) do update set body=excluded.body",
-                (gid, user_id, Jsonb(body)),
-            )
+        goal_allocations.persist(connection, user_id, state["goals"])
         for bid, body in state["budgets"].items():
             connection.execute(
                 "insert into public.financial_budgets(id,user_id,body) values(%s,%s,%s) on conflict(id) do update set body=excluded.body",
