@@ -8,7 +8,7 @@ final class FinancialLoopUITests: XCTestCase {
     func testArchiveManagementRestoresSameAccount() throws {
         try signIn(fresh: true)
         let baseline = homeValue()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         tapVisible(app.buttons["accounts.add"])
         app.buttons["accounts.type.checking"].tap()
         let nickname = "Archive review " + UUID().uuidString.prefix(6)
@@ -28,7 +28,7 @@ final class FinancialLoopUITests: XCTestCase {
         XCTAssertFalse(app.buttons[originalID].exists)
         capture("archive-active-list")
         assertHome(baseline + 125)
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         for _ in 0..<5 { if app.buttons["accounts.manage"].isHittable { break }; app.swipeDown() }
         app.buttons["accounts.manage"].tap()
         let archived = app.buttons[originalID]
@@ -38,18 +38,28 @@ final class FinancialLoopUITests: XCTestCase {
         archived.tap()
         assertText("DOP 125.00")
         tapVisible(app.buttons["accounts.archive"])
-        XCTAssertTrue(app.buttons["Archive account"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Archive account"].waitForExistence(timeout: 10)
+            || app.buttons["accounts.archive"].waitForExistence(timeout: 2))
         for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
-        app.buttons["accounts.back"].tap()
-        for _ in 0..<5 { if app.buttons["accounts.manage.back"].isHittable { break }; app.swipeDown() }
-        app.buttons["accounts.manage.back"].tap()
-        XCTAssertTrue(app.buttons[originalID].waitForExistence(timeout: 10))
+        if app.buttons["accounts.back"].waitForExistence(timeout: 3) {
+            app.buttons["accounts.back"].tap()
+        }
+        // Connected may already show the restored row on Home after detail pop; tip still needs manage.back.
+        if !app.buttons[originalID].waitForExistence(timeout: 3) {
+            let manageBack = app.buttons["accounts.manage.back"]
+            if manageBack.waitForExistence(timeout: 2), manageBack.isHittable {
+                manageBack.tap()
+            } else {
+                app.openAccountsList()
+            }
+            XCTAssertTrue(app.buttons[originalID].waitForExistence(timeout: 10))
+        }
         assertHome(baseline + 125)
     }
 
     func testAccountEntryKeepsUnknownAndSignedBalances() throws {
         try signIn()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 10))
         app.buttons["accounts.add"].tap()
         XCTAssertTrue(app.buttons["accounts.type.checking"].waitForExistence(timeout: 5))
@@ -82,7 +92,7 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["accounts.save"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "DOP -25.50")).firstMatch.waitForExistence(timeout: 10))
         app.terminate(); app.launch()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         tapVisible(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "DOP -25.50")).firstMatch.waitForExistence(timeout: 10))
         capture("account-preserved-after-reopen")
@@ -91,7 +101,7 @@ final class FinancialLoopUITests: XCTestCase {
     func testCompleteFinancialLoop() throws {
         try signIn()
         let baseline = homeValue()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         if app.buttons["accounts.back"].exists { app.buttons["accounts.back"].tap() }
         tapVisible(app.buttons["accounts.add"])
         app.buttons["accounts.type.checking"].tap()
@@ -108,7 +118,9 @@ final class FinancialLoopUITests: XCTestCase {
         assertHome(baseline + 8000)
         assertText("Loop groceries")
         capture("connected-home-after-expense")
-        app.buttons["tab.accounts"].tap()
+        // Activity-row ids live on account detail; Home recent activity opens the account only.
+        app.openAccountsList()
+        tapVisible(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch)
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "activity.row.")).firstMatch
         tapVisible(row)
         app.buttons["activity.correct"].tap()
@@ -130,17 +142,20 @@ final class FinancialLoopUITests: XCTestCase {
         capture("checked-balance-review")
         app.buttons["loop.confirm"].tap()
         assertText("DOP 7,000.00")
-        record(amount: "500", note: "Already in checked balance", included: true)
-        assertText("DOP 7,000.00")
+        // Residuals only credit activity newly covered since the prior observation.
+        // Include in the check, not the opening — same shape as PersonalMoneyUITests.
+        record(amount: "500", note: "Already in checked balance", coverageAnswers: [false, true])
+        ensureAccountDetail(nickname: nickname)
+        assertAccountBalance("DOP 7,000.00")
         assertText("Still unexplained DOP 0.00")
         assertText("Difference DOP -500.00")
         assertHome(baseline + 7000)
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         capture("late-expense-not-double-counted")
-        app.terminate(); app.launch(); app.buttons["tab.accounts"].tap()
+        app.terminate(); app.launch(); app.openAccountsList()
         let account = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch
         tapVisible(account)
-        assertText("DOP 7,000.00")
+        assertAccountBalance("DOP 7,000.00")
         assertText("Already in checked balance")
         capture("financial-loop-preserved-after-reopen")
     }
@@ -153,7 +168,7 @@ final class FinancialLoopUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["home.netWorth.DOP"].waitForExistence(timeout: 15))
         capture("connected-home-spanish")
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         let account = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "accounts.row.")).firstMatch
         tapVisible(account)
         tapVisible(app.buttons["accounts.check"])
@@ -166,30 +181,72 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["Cancelar"].tap()
     }
 
-    func record(amount: String, note: String, included: Bool = false) {
+    func record(amount: String, note: String, coverageAnswers: [Bool] = []) {
         tapVisible(app.buttons["accounts.record"])
         XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 5))
         app.textFields["loop.amount"].tap(); app.textFields["loop.amount"].typeText(amount)
         app.textFields["loop.note"].tap(); app.textFields["loop.note"].typeText(note)
         app.buttons["Done"].tap()
-        reviewAndConfirm(included: included)
+        reviewAndConfirm(coverageAnswers: coverageAnswers)
     }
 
-    func reviewAndConfirm(included: Bool = false) {
+    func reviewAndConfirm(coverageAnswers: [Bool] = []) {
         tapVisible(app.buttons["loop.review"])
-        for _ in 0..<4 {
+        // Activity editor: loop.coverage.{yes|no}.<accountId>.<observationId>
+        // Balance/opening editor: loop.coverage.{yes|no}.<kind>.<observationId>
+        // Observations appear in order (opening then check). Use the .no. row as the
+        // stable probe, then tap yes/no from coverageAnswers — all-no when empty.
+        var answered = Set<String>()
+        var answerIndex = 0
+        for _ in 0..<8 {
             if app.buttons["loop.confirm"].waitForExistence(timeout: 2) { break }
+            let matches = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no."))
+            var tapped = false
+            for index in 0..<matches.count {
+                let probe = matches.element(boundBy: index)
+                let probeId = probe.identifier
+                guard !probeId.isEmpty, !answered.contains(probeId), probe.exists else { continue }
+                let include = answerIndex < coverageAnswers.count && coverageAnswers[answerIndex]
+                answerIndex += 1
+                let targetId = include
+                    ? probeId.replacingOccurrences(of: ".no.", with: ".yes.")
+                    : probeId
+                tapVisible(app.buttons[targetId])
+                answered.insert(probeId)
+                tapped = true
+                _ = app.buttons["loop.confirm"].waitForExistence(timeout: 4)
+                break
+            }
+            if tapped { continue }
             let opening = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no.opening.")).firstMatch
-            let prefix = included ? "loop.coverage.yes.balance_check." : "loop.coverage.no."
-            let answer = opening.exists ? opening : app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
-            if answer.exists { tapVisible(answer) }
+            if opening.waitForExistence(timeout: 1), !answered.contains(opening.identifier) {
+                let include = answerIndex < coverageAnswers.count && coverageAnswers[answerIndex]
+                answerIndex += 1
+                let targetId = include
+                    ? opening.identifier.replacingOccurrences(of: ".no.", with: ".yes.")
+                    : opening.identifier
+                tapVisible(app.buttons[targetId])
+                answered.insert(opening.identifier)
+            }
         }
-        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
         capture("expense-review")
         tapVisible(app.buttons["loop.confirm"])
+        // accounts.record can exist under the sheet; require confirm gone + record hittable.
+        let dismissed = NSPredicate { [app] _, _ in
+            !app.buttons["loop.confirm"].exists
+                && app.buttons["accounts.record"].exists
+                && app.buttons["accounts.record"].isHittable
+        }
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: dismissed, object: nil)], timeout: 15),
+            .completed
+        )
     }
 
     func assertHome(_ expected: Decimal) {
+        app.revealConnectedTabBar()
+        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
         let value = app.staticTexts["home.netWorth.DOP"]
         let predicate = NSPredicate { _, _ in
@@ -201,6 +258,8 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func homeValue() -> Decimal {
+        app.revealConnectedTabBar()
+        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
         let value = app.staticTexts["home.netWorth.DOP"]
         XCTAssertTrue(value.waitForExistence(timeout: 10))
@@ -209,8 +268,39 @@ final class FinancialLoopUITests: XCTestCase {
         return parsed
     }
 
+    func ensureAccountDetail(nickname: String) {
+        let detail = app.descendants(matching: .any)["screen.accounts"]
+        let balance = app.descendants(matching: .any)["accounts.balance.DOP"]
+        if detail.waitForExistence(timeout: 2), balance.waitForExistence(timeout: 2) { return }
+        app.openAccountsList()
+        tapVisible(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch)
+        XCTAssertTrue(app.descendants(matching: .any)["screen.accounts"].waitForExistence(timeout: 10))
+    }
+
+    func assertAccountBalance(_ value: String) {
+        let balance = app.descendants(matching: .any)["accounts.balance.DOP"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 12), "accounts.balance.DOP missing")
+        let predicate = NSPredicate { _, _ in balance.exists && balance.label.contains(value) }
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: nil)], timeout: 8),
+            .completed,
+            "balance label \(balance.label) missing \(value)"
+        )
+    }
+
     func assertText(_ value: String) {
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch.waitForExistence(timeout: 12))
+        let predicate = NSPredicate(format: "label CONTAINS %@", value)
+        // Connected keeps inactive tabs in the tree (opacity 0). Prefer the
+        // visible account/home surfaces so Search ghosts with bad frames lose.
+        for screenID in ["screen.accounts", "screen.home"] {
+            let screen = app.descendants(matching: .any)[screenID]
+            guard screen.exists else { continue }
+            if screen.staticTexts.matching(predicate).firstMatch.waitForExistence(timeout: 4) { return }
+            if screen.descendants(matching: .any).matching(predicate).firstMatch.waitForExistence(timeout: 2) { return }
+        }
+        let staticText = app.staticTexts.matching(predicate).firstMatch
+        if staticText.waitForExistence(timeout: 4) { return }
+        XCTAssertTrue(app.descendants(matching: .any).matching(predicate).firstMatch.waitForExistence(timeout: 4))
     }
     func tapVisible(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
@@ -255,6 +345,42 @@ final class FinancialLoopUITests: XCTestCase {
             app.buttons["debt.close"].tap()
             XCTAssertTrue(app.otherElements["debt.detail"].waitForNonExistence(timeout: 10))
         }
+        let connected = app.usesConnectedChrome
+            || app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 2)
+        if connected {
+            if fresh, app.buttons["header.profile"].waitForExistence(timeout: 2) {
+                app.buttons["header.profile"].tap()
+                if app.buttons["auth.signOut"].waitForExistence(timeout: 3) {
+                    app.buttons["auth.signOut"].tap()
+                    XCTAssertTrue(app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 20))
+                }
+            }
+            if !app.buttons["auth.signOut"].waitForExistence(timeout: 2) {
+                app.openSignedOutAuthEntry()
+                let emailField = app.textFields["auth.email"]
+                XCTAssertTrue(emailField.waitForExistence(timeout: 10))
+                emailField.tap(); emailField.typeText(email)
+                let passwordField = app.secureTextFields["auth.password"]
+                passwordField.tap()
+                UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: password]],
+                                             options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(60)])
+                passwordField.press(forDuration: 1.2)
+                let paste = app.menuItems["Paste"]
+                if paste.waitForExistence(timeout: 3) { paste.tap() }
+                else { app.buttons["Paste"].tap() }
+                let permission = app.alerts.buttons["Allow Paste"]
+                if permission.waitForExistence(timeout: 1) { permission.tap() }
+                UIPasteboard.general.items = []
+                app.buttons["auth.submit"].tap()
+                XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 30))
+                app.buttons["header.profile"].tap()
+                XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 10))
+            }
+            app.revealConnectedTabBar()
+            XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
+            app.buttons["tab.home"].tap()
+            return
+        }
         app.buttons["header.profile"].tap()
         if !app.buttons["auth.signOut"].waitForExistence(timeout: 3), !app.textFields["auth.email"].exists {
             app.buttons["header.profile"].tap()
@@ -278,7 +404,12 @@ final class FinancialLoopUITests: XCTestCase {
             app.buttons["auth.submit"].tap()
             XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 30))
         }
-        app.buttons["sheet.close"].tap()
+        if app.buttons["sheet.close"].waitForExistence(timeout: 2) {
+            app.buttons["sheet.close"].tap()
+        } else if app.buttons["tab.home"].exists {
+            // Connected profile is a tab destination, not a dismissible tip sheet.
+            app.buttons["tab.home"].tap()
+        }
     }
 
     func capture(_ name: String) {

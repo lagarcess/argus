@@ -26,7 +26,7 @@ final class AuthJourneyUITests: XCTestCase {
         if app.buttons["auth.signOut"].exists {
             app.buttons["auth.signOut"].tap()
         }
-        XCTAssertTrue(app.textFields["auth.email"].waitForExistence(timeout: 10))
+        openEmailAuthAfterSignOut()
         capture("auth-entry")
         app.textFields["auth.email"].tap()
         app.textFields["auth.email"].typeText(email)
@@ -34,6 +34,12 @@ final class AuthJourneyUITests: XCTestCase {
         let submit = app.buttons["auth.submit"]
         if !submit.isHittable { app.swipeUp() }
         submit.tap()
+        // Connected lands on Home; tip left the profile sheet open after login.
+        if !app.buttons["auth.signOut"].waitForExistence(timeout: 5) {
+            XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 30)
+                || app.buttons["tab.home"].waitForExistence(timeout: 30))
+            app.openProfileSurface()
+        }
         XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 30))
         XCTAssertTrue(app.descendants(matching: .any)["auth.identity"].exists)
         capture("auth-verified")
@@ -45,14 +51,32 @@ final class AuthJourneyUITests: XCTestCase {
         XCTAssertFalse(app.textFields["auth.email"].exists)
         capture("auth-restored")
         app.buttons["auth.signOut"].tap()
-        XCTAssertTrue(app.textFields["auth.email"].waitForExistence(timeout: 20))
+        openEmailAuthAfterSignOut()
         XCTAssertFalse(app.buttons["auth.signOut"].exists)
         capture("auth-signed-out")
         app.terminate()
         app.launch()
         openProfile()
+        XCTAssertTrue(app.textFields["auth.email"].waitForExistence(timeout: 10)
+            || app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 10))
+        if !app.textFields["auth.email"].exists {
+            app.openSignedOutAuthEntry()
+        }
         XCTAssertTrue(app.textFields["auth.email"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["auth.signOut"].exists)
+    }
+
+    /// Connected sign-out returns to welcome; tip returns to the profile email sheet.
+    private func openEmailAuthAfterSignOut() {
+        if app.textFields["auth.email"].waitForExistence(timeout: 3) { return }
+        XCTAssertTrue(
+            app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 20)
+                || app.buttons["cuadrao.welcome.signup"].exists
+                || app.buttons["header.profile"].exists,
+            "Signed-out Connected must show welcome; tip must show profile entry."
+        )
+        app.openSignedOutAuthEntry()
+        XCTAssertTrue(app.textFields["auth.email"].waitForExistence(timeout: 10))
     }
 
     func testCaptchaCancellationKeepsEntry() throws {
@@ -79,9 +103,10 @@ final class AuthJourneyUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
-        openProfile()
-        app.buttons["auth.createAccount"].tap()
-        XCTAssertTrue(app.textFields["auth.name"].waitForExistence(timeout: 5))
+        app.openSignedOutAuthEntry(createAccount: true)
+        if app.textFields["auth.name"].waitForExistence(timeout: 2) {
+            // Tip ProfileAccountSection signup still collects an optional name.
+        }
         app.textFields["auth.email"].tap()
         app.textFields["auth.email"].typeText("native-signup-\(UUID().uuidString.lowercased())@example.test")
         pastePassword(UUID().uuidString)
@@ -113,8 +138,7 @@ final class AuthJourneyUITests: XCTestCase {
     }
 
     private func openProfile() {
-        XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 10))
-        app.buttons["header.profile"].tap()
+        app.openProfileSurface()
     }
 
     private func pastePassword(_ value: String) {

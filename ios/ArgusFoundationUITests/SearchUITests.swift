@@ -13,8 +13,12 @@ extension FinancialLoopUITests {
         chooseSearchCurrency("DOP")
         let bankRow = searchRow(bank.name)
         tapVisible(bankRow)
-        XCTAssertTrue(app.buttons["accounts.edit"].waitForExistence(timeout: 10))
-        tapVisible(app.buttons["accounts.edit"])
+        // Connected keeps Home account detail mounted; scope in-detail chrome to search.detail.
+        // AccountForm / expectation editors present as sheets outside that subtree.
+        let searchDetail = app.descendants(matching: .any)["search.detail"]
+        XCTAssertTrue(searchDetail.waitForExistence(timeout: 10))
+        XCTAssertTrue(searchDetail.buttons["accounts.edit"].waitForExistence(timeout: 10))
+        tapVisible(searchDetail.buttons["accounts.edit"])
         replaceMoneyField("accounts.nickname", with: "Revised bank " + stamp)
         dismissMoneyKeyboard(); tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 15))
@@ -26,7 +30,8 @@ extension FinancialLoopUITests {
 
         searchFor(note, kind: "activity")
         tapVisible(searchRow(note))
-        tapVisible(app.buttons["activity.correct"])
+        XCTAssertTrue(searchDetail.waitForExistence(timeout: 10))
+        tapVisible(searchDetail.buttons["activity.correct"])
         replaceMoneyField("loop.amount", with: "27")
         fillMoneyField("loop.reason", with: "Corrected income receipt")
         dismissMoneyKeyboard(); confirmPlanMoney()
@@ -146,7 +151,7 @@ extension FinancialLoopUITests {
         searchFor(first.name, kind: "account")
         tapVisible(searchRow(first.name))
         XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         assertText(second.name)
         XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
         XCTAssertFalse(activity(firstNote).exists)
@@ -164,7 +169,7 @@ extension FinancialLoopUITests {
         replaceMoneyField("accounts.nickname", with: first.name + " revised")
         dismissMoneyKeyboard(); tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 15))
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         assertText(second.name)
         XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
         app.buttons["tab.search"].tap()

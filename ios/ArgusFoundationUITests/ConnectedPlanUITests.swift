@@ -163,6 +163,8 @@ extension FinancialLoopUITests {
 
     func addPlanExpectation(_ title: String, kind: String, amount: String, account: MoneyAccount,
                             daysAhead: Int = 0, cadence: String = "Once", currency: String = "DOP") {
+        // Connected hides the tab bar on account detail; pop before Plan.
+        app.revealConnectedTabBar()
         app.buttons["tab.plan"].tap()
         tapVisible(app.buttons["plan.add"])
         tapVisible(app.buttons["plan.expectation.kind"])
@@ -191,6 +193,7 @@ extension FinancialLoopUITests {
     }
 
     func selectPlanAccounts(_ accounts: [MoneyAccount]) {
+        app.revealConnectedTabBar()
         app.buttons["tab.plan"].tap()
         tapVisible(app.buttons["plan.accounts"])
         let ids = Set(accounts.map { "plan.selection." + $0.id.uppercased() })
@@ -204,6 +207,7 @@ extension FinancialLoopUITests {
     }
 
     func openPlanOccurrence(_ title: String) {
+        app.revealConnectedTabBar()
         app.buttons["tab.plan"].tap()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.occurrence.' AND label CONTAINS %@", title)).firstMatch
         if !row.exists, app.buttons["Show more"].exists { tapVisible(app.buttons["Show more"]) }
@@ -211,6 +215,7 @@ extension FinancialLoopUITests {
     }
 
     func assertPlanProjected(_ value: String) {
+        app.revealConnectedTabBar()
         app.buttons["tab.plan"].tap()
         let amount = app.staticTexts["plan.projected.DOP"]
         XCTAssertTrue(amount.waitForExistence(timeout: 15))

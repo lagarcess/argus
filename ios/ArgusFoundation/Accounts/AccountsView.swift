@@ -106,7 +106,15 @@ struct AccountDetailView: View {
     @ObservedObject var model: AccountsModel
     @ObservedObject var loop: FinancialLoopModel
     @Environment(\.locale) private var locale
+
+    /// Navigation destinations capture the account at push time; always read the
+    /// model copy so post-confirm balance/version updates paint immediately.
+    private var current: FinancialAccount {
+        model.accounts.first(where: { $0.id == account.id }) ?? account
+    }
+
     var body: some View {
+        let account = current
         if account.isOptionalAsset { AssetDetailView(account: account, model: model, loop: loop) }
         else {
         AccountSummary(account: account, large: true)
@@ -160,8 +168,11 @@ struct AccountSummary: View {
             if let nickname = account.nickname { Text(verbatim: nickname).font(large ? ArgusStyle.display() : ArgusStyle.body()) }
             Text(LocalizedStringKey("accounts.type." + account.type)).foregroundStyle(ArgusStyle.secondary)
             if account.balance.state == .known, let amount = account.balance.amount {
+                // Keep balance as its own StaticText — children.combine hid "DOP …"
+                // from UITest label queries after activity confirm.
                 Text(verbatim: account.currency + " " + AccountPresentation.amount(amount, locale: locale))
                     .font(large ? ArgusStyle.display(30) : ArgusStyle.body()).monospacedDigit()
+                    .accessibilityIdentifier("accounts.balance." + account.currency)
             } else { Text("accounts.unknown") }
             if account.type == "credit_card", (account.balance.creditMinor ?? 0) > 0 {
                 Text("accounts.creditBalance").font(ArgusStyle.body(12, relativeTo: .caption))
@@ -169,7 +180,7 @@ struct AccountSummary: View {
                 Text("accounts.signedBalance").font(ArgusStyle.body(12, relativeTo: .caption))
             }
             if account.archived { Text("accounts.archived").font(ArgusStyle.body(12, relativeTo: .caption)) }
-        }.fixedSize(horizontal: false, vertical: true).accessibilityElement(children: .combine)
+        }.fixedSize(horizontal: false, vertical: true)
     }
 }
 
