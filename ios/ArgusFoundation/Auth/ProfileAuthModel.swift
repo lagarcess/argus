@@ -47,6 +47,11 @@ final class ProfileAuthModel: ObservableObject {
                     journal: FinancialWriteJournal(configuration: loadedConfiguration.session))
                 financialLoop?.financialChanged = { [weak self] in self?.financialSearch?.invalidate() }
                 financialLoop?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
+                household?.financialChanged = { [weak self] in
+                    await self?.accounts?.load()
+                    await self?.financialLoop?.refresh()
+                    self?.financialSearch?.invalidate()
+                }
             }
         }
     }

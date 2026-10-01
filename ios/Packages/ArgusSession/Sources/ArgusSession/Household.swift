@@ -142,7 +142,7 @@ public struct HouseholdSearchHit: Decodable, Identifiable, Sendable {
     public let id: UUID
     public let kind: String
     public let title: String
-    public let accountId: UUID
+    public let accountId: UUID?
     public let activityId: UUID?
     enum CodingKeys: String, CodingKey { case id, kind, title, accountId = "account_id", activityId = "activity_id" }
 }

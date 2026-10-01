@@ -15,9 +15,10 @@ public struct PendingFinancialConfirmation: Codable, Equatable, Sendable {
     public let planOperation: FinancialPlanOperation?
     public let householdMembershipId: UUID?
     public let householdAuthorizationVersion: Int?
+    public let householdOperation: HouseholdWriteOperation?
 
     public init(ownerId: UUID, originAccountId: UUID?, route: String, path: String,
-                method: String, body: Data, key: UUID, planOperation: FinancialPlanOperation? = nil, householdMembershipId: UUID? = nil, householdAuthorizationVersion: Int? = nil) {
+                method: String, body: Data, key: UUID, planOperation: FinancialPlanOperation? = nil, householdMembershipId: UUID? = nil, householdAuthorizationVersion: Int? = nil, householdOperation: HouseholdWriteOperation? = nil) {
         self.ownerId = ownerId
         self.originAccountId = originAccountId
         self.route = route
@@ -28,6 +29,29 @@ public struct PendingFinancialConfirmation: Codable, Equatable, Sendable {
         self.planOperation = planOperation
         self.householdMembershipId = householdMembershipId
         self.householdAuthorizationVersion = householdAuthorizationVersion
+        self.householdOperation = householdOperation
+    }
+    enum CodingKeys: String, CodingKey {
+        case ownerId, originAccountId, route, path, method, body, key, planOperation, householdMembershipId, householdAuthorizationVersion, householdOperation
+    }
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ownerId = try c.decode(UUID.self, forKey: .ownerId); originAccountId = try c.decodeIfPresent(UUID.self, forKey: .originAccountId)
+        route = try c.decode(String.self, forKey: .route); path = try c.decode(String.self, forKey: .path)
+        method = try c.decode(String.self, forKey: .method); body = try c.decode(Data.self, forKey: .body); key = try c.decode(UUID.self, forKey: .key)
+        planOperation = try c.decodeIfPresent(FinancialPlanOperation.self, forKey: .planOperation)
+        householdMembershipId = try c.decodeIfPresent(UUID.self, forKey: .householdMembershipId)
+        householdAuthorizationVersion = try c.decodeIfPresent(Int.self, forKey: .householdAuthorizationVersion)
+        if let stored = try c.decodeIfPresent(HouseholdWriteOperation.self, forKey: .householdOperation) { householdOperation = stored }
+        else if route == "households" {
+            let parts = path.split(separator: "/")
+            let exactPath = path == "/" + parts.joined(separator: "/")
+            if exactPath, parts.count == 2, parts[1] == "activities", let id = UUID(uuidString: String(parts[0])), method == "POST" {
+                householdOperation = .activity(householdId: id, activityId: nil)
+            } else if exactPath, parts.count == 3, parts[1] == "activities", let id = UUID(uuidString: String(parts[0])), let activity = UUID(uuidString: String(parts[2])), method == "PATCH" {
+                householdOperation = .activity(householdId: id, activityId: activity)
+            } else { householdOperation = .management }
+        } else { householdOperation = nil }
     }
 }
 
