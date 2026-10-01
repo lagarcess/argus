@@ -21,7 +21,7 @@ struct CuadraoChatHistory: View {
         return store.threads.filter {
             (scope == .deleted ? $0.deleted : !$0.deleted && $0.archived == (scope == .archived))
                 && (search.isEmpty || $0.title.localizedStandardContains(search))
-        }
+        }.sorted { ($0.lastMessageDate ?? .distantPast) > ($1.lastMessageDate ?? .distantPast) }
     }
     var body: some View {
         VStack(spacing: 12) {
@@ -70,47 +70,51 @@ struct CuadraoChatHistory: View {
     }
 
     private func row(_ thread: CanvasChatThread) -> some View {
-        HStack(spacing: 4) {
-            Button { open(thread) } label: {
-                HStack(spacing: 12) {
-                    Text(thread.title.isEmpty ? (es ? "Nuevo chat" : "New chat") : thread.title)
-                        .font(.body.weight(thread.unread ? .semibold : .regular)).lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    ZStack {
-                        if thread.unread { Circle().fill(WelcomePalette.pine).frame(width: 7, height: 7) }
-                        else if store.current.id == thread.id && !store.temporary {
-                            Image(systemName: "checkmark").font(.caption).foregroundStyle(WelcomePalette.pine)
-                        }
-                    }.frame(width: 16).accessibilityHidden(true)
-                }.frame(minHeight: 52).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityIdentifier("history-row-" + thread.id)
-                .accessibilityValue(thread.deleted ? (es ? "Restaurar y abrir" : "Restore and open")
-                    : thread.unread ? (es ? "No leído" : "Unread")
-                    : store.current.id == thread.id && !store.temporary ? (es ? "Actual" : "Current") : "")
-            Menu { actions(thread) } label: {
-                Image(systemName: "ellipsis").font(.body).foregroundStyle(.secondary).frame(width: 44, height: 44)
-            }.accessibilityLabel((es ? "Opciones de " : "Options for ") + thread.title)
-                .accessibilityIdentifier("history-menu-" + thread.id)
-        }.padding(.vertical, 4)
-            .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 12))
+        Button { open(thread) } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(thread.title.isEmpty ? (es ? "Nuevo chat" : "New chat") : thread.title)
+                    .font(.body.weight(thread.unread ? .semibold : .regular)).lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 6) {
+                    if thread.unread { Circle().fill(WelcomePalette.pine).frame(width: 6, height: 6) }
+                    else if store.current.id == thread.id && !store.temporary {
+                        Image(systemName: "checkmark").font(.caption2).foregroundStyle(WelcomePalette.pine)
+                    }
+                    if let date = thread.lastMessageDate { CuadraoChatDate(date: date, spanish: es) }
+                }.accessibilityHidden(true)
+            }.frame(minHeight: 52).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityIdentifier("history-row-" + thread.id)
+            .accessibilityLabel(thread.title.isEmpty ? (es ? "Nuevo chat" : "New chat") : thread.title)
+            .accessibilityValue(accessibilityValue(thread))
+            .accessibilityActions { actions(thread) }
+            .padding(.vertical, 4)
+            .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 24))
             .listRowBackground(WelcomePalette.background).foregroundStyle(WelcomePalette.ink)
             .contextMenu { actions(thread) }
             .swipeActions(edge: .leading, allowsFullSwipe: true) {
                 if scope == .recent {
                     Button { thread.pinned.toggle() } label: {
                         Label(thread.pinned ? (es ? "Desfijar" : "Unpin") : (es ? "Fijar" : "Pin"), systemImage: thread.pinned ? "pin.slash" : "pin")
-                    }.tint(WelcomePalette.pine)
+                    }.tint(Color(red: 0.62, green: 0.36, blue: 0.08))
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if scope == .recent {
                     Button { store.archive(thread) } label: { Label(es ? "Archivar" : "Archive", systemImage: "archivebox") }
-                        .tint(WelcomePalette.pine)
+                        .tint(Color(red: 0.34, green: 0.41, blue: 0.47))
                 } else {
                     Button { store.restore(thread) } label: { Label(es ? "Restaurar" : "Restore", systemImage: "arrow.uturn.backward") }
                         .tint(WelcomePalette.pine)
                 }
             }
+    }
+
+    private func accessibilityValue(_ thread: CanvasChatThread) -> String {
+        let state = thread.deleted ? (es ? "Restaurar y abrir" : "Restore and open")
+            : thread.unread ? (es ? "No leído" : "Unread")
+            : store.current.id == thread.id && !store.temporary ? (es ? "Actual" : "Current") : nil
+        return [state, thread.lastMessageDate.map { CanvasChatRecency.label($0, spanish: es) }]
+            .compactMap { $0 }.joined(separator: ", ")
     }
 
     @ViewBuilder private func actions(_ thread: CanvasChatThread) -> some View {

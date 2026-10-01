@@ -7,17 +7,20 @@ final class CuadraoHistoryDesignUITests: XCTestCase {
         app.buttons["cuadrao-tab-2"].tap()
         app.buttons["chat-history"].tap()
         let row = app.buttons["history-row-chat-cd"]
-        let menu = app.buttons["history-menu-chat-cd"]
+        XCTAssertFalse(app.buttons["history-menu-chat-cd"].exists)
         XCTAssertTrue(row.waitForExistence(timeout: 4))
         capture(app, "recents-spanish")
+        XCTAssertTrue((row.value as? String ?? "").contains("Hoy"))
+        XCTAssertTrue((app.buttons["history-row-chat-spending"].value as? String ?? "").contains("Ayer"))
         row.swipeRight()
+        capture(app, "recents-pin-gesture")
         app.buttons["Fijar"].tap()
         XCTAssertTrue(app.staticTexts["Fijados"].exists)
-        menu.tap()
+        row.press(forDuration: 0.8)
         capture(app, "recents-menu")
         app.buttons["Marcar como no leído"].tap()
-        XCTAssertEqual(row.value as? String, "No leído")
-        menu.tap(); app.buttons["Cambiar nombre"].tap()
+        XCTAssertTrue((row.value as? String ?? "").contains("No leído"))
+        row.press(forDuration: 0.8); app.buttons["Cambiar nombre"].tap()
         let field = app.alerts.textFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 2))
         field.tap()
@@ -36,10 +39,10 @@ final class CuadraoHistoryDesignUITests: XCTestCase {
         XCTAssertFalse(row.exists)
         app.segmentedControls.buttons["Archivados"].tap()
         XCTAssertTrue(row.waitForExistence(timeout: 2))
-        row.swipeLeft(); app.buttons["Restaurar"].tap()
+        row.swipeLeft(); capture(app, "recents-restore-gesture"); app.buttons["Restaurar"].tap()
         XCTAssertFalse(row.exists)
         app.segmentedControls.buttons["Recientes"].tap()
-        menu.tap(); app.buttons["Eliminar"].tap()
+        row.press(forDuration: 0.8); app.buttons["Eliminar"].tap()
         app.buttons["Eliminar chat"].tap()
         XCTAssertFalse(row.exists)
         app.segmentedControls.buttons["Eliminados"].tap()
@@ -49,7 +52,7 @@ final class CuadraoHistoryDesignUITests: XCTestCase {
         XCTAssertTrue(app.buttons["chat-history"].waitForExistence(timeout: 2))
         app.buttons["chat-history"].tap()
         XCTAssertTrue(row.waitForExistence(timeout: 2))
-        XCTAssertEqual(row.value as? String, "Actual")
+        XCTAssertTrue((row.value as? String ?? "").contains("Actual"))
     }
 
     func testScanAndEnglishParity() {
@@ -68,13 +71,35 @@ final class CuadraoHistoryDesignUITests: XCTestCase {
             app.buttons["chat-history"].tap()
             XCTAssertTrue(app.segmentedControls.buttons[english ? "Archived" : "Archivados"].exists)
             if english {
-                app.buttons["history-menu-chat-cd"].tap()
+                app.buttons["history-row-chat-cd"].press(forDuration: 0.8)
                 XCTAssertTrue(app.buttons["Mark as unread"].exists)
                 XCTAssertTrue(app.buttons["Rename"].exists)
                 capture(app, "recents-menu-english")
             }
             app.terminate()
         }
+    }
+
+    func testSharedDatesInSearchAndLargerText() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--home-populated", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryXXXL"]
+        app.launch()
+        app.buttons["cuadrao-tab-3"].tap()
+        let query = app.textFields["cuadrao.search.query"]
+        XCTAssertTrue(query.waitForExistence(timeout: 3))
+        query.tap(); query.typeText("certificados\n")
+        let result = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Entender los certificados")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 3))
+        XCTAssertTrue(result.label.contains("Hoy"))
+        capture(app, "search-shared-date-large")
+        result.tap()
+        app.buttons["chat-history"].tap()
+        let row = app.buttons["history-row-chat-cd"]
+        XCTAssertTrue(row.waitForExistence(timeout: 3))
+        XCTAssertTrue((row.value as? String ?? "").contains("Hoy"))
+        XCTAssertFalse(app.buttons["history-menu-chat-cd"].exists)
+        capture(app, "recents-dates-large")
     }
 
     private func capture(_ app: XCUIApplication, _ name: String) {

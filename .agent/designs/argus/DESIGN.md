@@ -730,11 +730,15 @@ attachment label in the native canvas.
   The current design preview still attaches clearly identified sample documents;
   camera permissions, real capture, upload and model processing remain unconnected.
 - Recents uses title-first rows, separate Pinned/Recent sections, unread/current
-  indicators, and one conversation object shared with Chat and Search. Do not add
-  fabricated dates or repeat a sample subtitle on every row.
-- Swipe right pins/unpins; swipe left archives or restores. A visible 44-point
-  ellipsis target and a touch-and-hold menu expose the same actions without requiring
-  gestures. Mark read/unread comes first, followed by pin, rename, archive and delete.
+  indicators, and one conversation object shared with Chat and Search. Do not repeat a sample subtitle on every row. Dates derive from the last
+  message timestamp, shared with Search; metadata changes do not update recency.
+  Render Hoy/Ayer or Today/Yesterday, then a localized short date (including the
+  year for older years). Unknown dates remain absent. Preview fixtures have explicit
+  sample message dates; these are not backend history.
+- Swipe right pins/unpins; swipe left archives or restores. Rows show quiet dates at the trailing edge, with no visible ellipsis.
+  Touch-and-hold and VoiceOver actions expose the same contextual commands.
+  Pin uses amber, archive uses slate, restore uses Cuadrao green; delete retains
+  its destructive red treatment in the menu, not a new swipe action. Mark read/unread comes first, followed by pin, rename, archive and delete.
   Delete requires confirmation and retains recovery in Deleted. Actions on a row
   never also open it. Opening temporary-chat destinations keeps the existing discard
   confirmation. Archiving/deleting the active regular chat opens a fresh chat.
@@ -746,3 +750,10 @@ References: [Apple document camera](https://developer.apple.com/documentation/vi
 [Messages contextual swipe controls](https://mobbin.com/screens/1ad68688-b638-4f85-b754-7ef96f6d45e5).
 The exact gesture mapping above is Cuadrao's adaptation, not a claim that these
 reference apps use the same mapping.
+
+
+October 1 refinement: the founder replaced the visible Recents ellipsis with
+last-message dates. Swipe colors adapt [Fiverr's amber star](https://mobbin.com/screens/d6624e4d-927d-46b3-a3f1-d763ef7dd04a)
+and [Telegram's gray archive](https://mobbin.com/screens/7b4ae82f-5122-4626-82c9-a6ef11bea8dc).
+The row's shared contextual actions are exposed through Apple's
+[accessibility actions](https://developer.apple.com/documentation/swiftui/accessible-controls).

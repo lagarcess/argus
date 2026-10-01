@@ -2,7 +2,27 @@ import Foundation
 
 @main struct TemporaryChatChecks {
     static func main() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        let midnight = calendar.date(from: DateComponents(year: 2026, month: 3, day: 9, hour: 0, minute: 5))!
+        let yesterday = calendar.date(from: DateComponents(year: 2026, month: 3, day: 8, hour: 0, minute: 1))!
         for spanish in [true, false] {
+            precondition(CanvasChatRecency.label(midnight, spanish: spanish, now: midnight, calendar: calendar) == (spanish ? "Hoy" : "Today"))
+            precondition(CanvasChatRecency.label(yesterday, spanish: spanish, now: midnight, calendar: calendar) == (spanish ? "Ayer" : "Yesterday"), "Calendar days must handle daylight saving time")
+            let old = calendar.date(from: DateComponents(year: 2025, month: 12, day: 31))!
+            precondition(CanvasChatRecency.label(old, spanish: spanish, now: midnight, calendar: calendar).contains("2025"))
+            let dateStore = CuadraoChatPreview(spanish: spanish)
+            precondition(dateStore.current.lastMessageDate == nil)
+            dateStore.current.draft = "A real local message"
+            dateStore.send(spanish: spanish, now: yesterday)
+            let datedThread = dateStore.current
+            datedThread.title = "Renamed"; datedThread.pinned = true; datedThread.unread = true
+            dateStore.archive(datedThread); dateStore.restore(datedThread)
+            precondition(datedThread.lastMessageDate == yesterday, "Metadata actions cannot change message recency")
+            dateStore.open(datedThread); datedThread.draft = "Follow up"
+            dateStore.send(spanish: spanish, now: midnight)
+            precondition(datedThread.lastMessageDate == midnight)
+
             let store = CuadraoChatPreview(spanish: spanish)
             let historyThread = store.threads[0]
             store.open(historyThread)

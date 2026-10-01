@@ -1,0 +1,5 @@
+Test Case '-[ArgusFoundationUITests.CuadraoHistoryDesignUITests testRecentsActionsAndRecovery]' passed (41.739 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoHistoryDesignUITests testScanAndEnglishParity]' passed (23.974 seconds).
+** TEST SUCCEEDED **
+Test Case '-[ArgusFoundationUITests.CuadraoHistoryDesignUITests testSharedDatesInSearchAndLargerText]' passed (13.521 seconds).
+** TEST SUCCEEDED **

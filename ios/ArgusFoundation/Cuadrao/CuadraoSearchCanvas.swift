@@ -89,7 +89,7 @@ struct CuadraoSearchCanvas: View {
                             ForEach(rows) { item in
                                 if item.kind == .chats, let thread = chat.threads.first(where: { $0.id == item.id }) {
                                     Button { focused = false; openChat(thread) } label: {
-                                        resultRow(item.title, detail: item.detail)
+                                        resultRow(item.title, detail: item.detail, date: thread.lastMessageDate)
                                     }.buttonStyle(.plain)
                                 } else {
                                     NavigationLink(value: Route.reference(item.id)) {
@@ -219,14 +219,15 @@ struct CuadraoSearchCanvas: View {
             Text(String(count)).font(.caption).foregroundStyle(.secondary)
         }.padding(.top, 20).padding(.bottom, 10).accessibilityAddTraits(.isHeader)
     }
-    private func resultRow(_ title: String, detail: String) -> some View {
+    private func resultRow(_ title: String, detail: String, date: Date? = nil) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).font(.body.weight(.medium))
                 Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
+            if let date { CuadraoChatDate(date: date, spanish: spanish) }
+            else { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true) }
         }.frame(minHeight: 62).padding(.vertical, 8).contentShape(Rectangle())
     }
     private func matches(_ text: String) -> Bool {

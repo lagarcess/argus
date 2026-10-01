@@ -12,6 +12,7 @@ import Observation
     var archived = false
     var deleted = false
     var unread = false
+    var lastMessageDate: Date? { turns.last?.createdAt }
     init(id: String = UUID().uuidString, title: String = "") { self.id = id; self.title = title }
 }
 
@@ -26,6 +27,7 @@ struct CanvasChatTurn: Identifiable {
     let question: String
     let attachments: [CanvasChatAttachment]
     let example: CanvasChatExample?
+    var createdAt: Date = .now
 }
 
 enum CanvasChatExample: String, CaseIterable, Identifiable {
@@ -65,10 +67,11 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
     private var suspended: CanvasChatThread?
 
     init(spanish: Bool) {
-        for item in CanvasSearchReference.examples(spanish).filter({ $0.kind == .chats }) {
+        for (index, item) in CanvasSearchReference.examples(spanish).filter({ $0.kind == .chats }).enumerated() {
             let thread = CanvasChatThread(id: item.id, title: item.title)
             thread.turns = [CanvasChatTurn(question: item.content, attachments: [],
-                example: item.id == "chat-cd" ? .certificate : nil)]
+                example: item.id == "chat-cd" ? .certificate : nil,
+                createdAt: Calendar.current.date(byAdding: .day, value: -index, to: .now)!)]
             threads.append(thread)
         }
     }
@@ -108,11 +111,11 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
             open(thread)
         }
     }
-    func send(example: CanvasChatExample? = nil, spanish: Bool) {
+    func send(example: CanvasChatExample? = nil, spanish: Bool, now: Date = .now) {
         let text = example?.question(spanish) ?? current.draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !current.attachments.isEmpty else { return }
         if current.title.isEmpty { current.title = String(text.prefix(80)) }
-        current.turns.append(CanvasChatTurn(question: text, attachments: current.attachments, example: example ?? (current.attachments.isEmpty ? nil : .document)))
+        current.turns.append(CanvasChatTurn(question: text, attachments: current.attachments, example: example ?? (current.attachments.isEmpty ? nil : .document), createdAt: now))
         current.draft = ""; current.attachments = []; responseState = .complete
         if !temporary && !threads.contains(where: { $0.id == current.id }) { threads.insert(current, at: 0) }
     }
@@ -123,5 +126,20 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
                     : (es ? "Conversación · Solo yo" : "Conversation · Only me"),
                 content: thread.turns.last?.question ?? "", source: es ? "Conversación de ejemplo" : "Example conversation")
         }
+    }
+}
+
+/// Both history and Search render the last message date, never a metadata edit time.
+enum CanvasChatRecency {
+    static func label(_ date: Date, spanish: Bool, now: Date = .now, calendar: Calendar = .current) -> String {
+        if calendar.isDate(date, inSameDayAs: now) { return spanish ? "Hoy" : "Today" }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) { return spanish ? "Ayer" : "Yesterday" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: spanish ? "es-419" : "en_US")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(calendar.component(.year, from: date) == calendar.component(.year, from: now) ? "dMMM" : "dMMMy")
+        return formatter.string(from: date)
     }
 }
