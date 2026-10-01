@@ -70,7 +70,7 @@ extension FinancialLoopUITests {
     }
 
     private func sharedPicker(_ id: String, label: String) {
-        tapVisible(app.buttons[id])
+        revealSharedControl(app.buttons[id]); tapVisible(app.buttons[id])
         let option = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", label, id)).firstMatch
         XCTAssertTrue(option.waitForExistence(timeout: 5), "Option " + label)
         option.tap()
@@ -78,11 +78,24 @@ extension FinancialLoopUITests {
 
     private func sharedToggle(_ id: String) {
         let control = app.switches[id]
+        revealSharedControl(control)
         tapVisible(control)
         if control.value as? String == "0" {
             control.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         }
         XCTAssertEqual(control.value as? String, "1")
+    }
+
+    private func revealSharedControl(_ control: XCUIElement) {
+        // Form creates rows lazily. Scroll the real form before asking its
+        // offscreen row to exist, then let the ordinary helper settle/tap it.
+        for direction in [true, false] {
+            for _ in 0..<15 {
+                if control.exists { return }
+                if direction { app.swipeUp() } else { app.swipeDown() }
+            }
+        }
+        XCTAssertTrue(control.exists, "Shared form control should be reachable")
     }
 
     private func createNativeSharedPlan(kind: String, name: String) throws -> String {
@@ -113,11 +126,14 @@ extension FinancialLoopUITests {
         sharedToggle("sharedPlan.member." + b)
         XCTAssertEqual(app.switches["sharedPlan.permission." + b].value as? String, "0", "View-only is the default")
         if kind == "bill" { sharedToggle("sharedPlan.permission." + b) }
+        revealSharedControl(app.textFields["sharedPlan.responsibility." + a])
         fillMoneyField("sharedPlan.responsibility." + a, with: kind == "bill" || kind == "debt" ? "35" : "70")
         dismissMoneyKeyboard()
+        revealSharedControl(app.textFields["sharedPlan.responsibility." + b])
         fillMoneyField("sharedPlan.responsibility." + b, with: kind == "bill" || kind == "debt" ? "15" : "30")
         dismissMoneyKeyboard()
         capture("shared-plan-create-" + kind)
+        revealSharedControl(app.buttons["sharedPlan.confirm"])
         tapVisible(app.buttons["sharedPlan.confirm"])
         XCTAssertTrue(app.buttons["sharedPlan.confirm"].waitForNonExistence(timeout: 20), "Shared definition should persist")
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "sharedPlan.row." + kind + ".", name)).firstMatch
@@ -129,6 +145,11 @@ extension FinancialLoopUITests {
     }
 
     private func recordNativeSharedContribution(kind: String, amount: String, privateNote: String, actor: String = "A") throws {
+        try prepareNativeSharedContribution(kind: kind, amount: amount, privateNote: privateNote, actor: actor)
+        confirmNativeSharedContribution()
+    }
+
+    private func prepareNativeSharedContribution(kind: String, amount: String, privateNote: String, actor: String = "A") throws {
         tapVisible(app.buttons["sharedPlan.record"])
         XCTAssertTrue(app.textFields["sharedPlan.contribution.amount"].waitForExistence(timeout: 15))
         if kind == "goal" || kind == "debt" {
@@ -146,10 +167,9 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
         fillMoneyField("sharedPlan.contribution.note", with: privateNote)
         dismissMoneyKeyboard()
-        confirmNativeSharedContribution()
     }
 
-    private func confirmNativeSharedContribution() {
+    private func reviewNativeSharedContribution() {
         tapVisible(app.buttons["sharedPlan.contribution.review"])
         for _ in 0..<12 {
             if app.buttons["sharedPlan.contribution.confirm"].waitForExistence(timeout: 1) { break }
@@ -157,9 +177,66 @@ extension FinancialLoopUITests {
             if answer.exists { tapVisible(answer) }
         }
         XCTAssertTrue(app.buttons["sharedPlan.contribution.confirm"].waitForExistence(timeout: 15))
+    }
+
+    private func confirmNativeSharedContribution() {
+        reviewNativeSharedContribution()
         tapVisible(app.buttons["sharedPlan.contribution.confirm"])
         XCTAssertTrue(app.buttons["sharedPlan.contribution.confirm"].waitForNonExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["sharedPlan.detail.name"].waitForExistence(timeout: 15))
+    }
+
+    private func sharedFaultStatus(arm: Bool) throws -> Int {
+        let url = try XCTUnwrap(ProcessInfo.processInfo.environment["ARGUS_TEST_FAULT_URL"].flatMap(URL.init(string:)))
+        guard url.host == "127.0.0.1", url.port == 59762, url.path == "/__fault" else {
+            throw XCTSkip("Requires the assigned loopback response-loss helper59762.")
+        }
+        var request = URLRequest(url: url); request.httpMethod = arm ? "POST" : "GET"
+        let done = DispatchSemaphore(value: 0)
+        var result: Result<Int, Error>?
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            defer { done.signal() }
+            do {
+                if let error { throw error }
+                let object = try JSONSerialization.jsonObject(with: XCTUnwrap(data)) as? [String: Any]
+                result = .success(try XCTUnwrap(object?["dropped"] as? Int))
+            } catch { result = .failure(error) }
+        }.resume()
+        XCTAssertEqual(done.wait(timeout: .now() + 10), .success)
+        return try XCTUnwrap(result).get()
+    }
+
+    func testSharedPlanningCommittedResponseLossKeepsOneContribution() throws {
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == "true" else {
+            throw XCTSkip("Requires the assigned response-loss proxy and isolated app configuration.")
+        }
+        try signIn(fresh: true, user: "A"); try selectSharedPlanSpace()
+        let name = "Native saved retry " + UUID().uuidString.prefix(6)
+        let row = try createNativeSharedPlan(kind: "budget", name: String(name))
+        try prepareNativeSharedContribution(kind: "budget", amount: "7", privateNote: "Private retry source")
+        reviewNativeSharedContribution()
+        let before = try sharedFaultStatus(arm: true)
+        tapVisible(app.buttons["sharedPlan.contribution.confirm"])
+        let responseLost = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            (try? self.sharedFaultStatus(arm: false)) == before + 1 && self.app.buttons["Cancel"].isEnabled
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [responseLost], timeout: 30), .completed)
+        app.buttons["Cancel"].tap()
+        let pending = app.buttons["household.pending.retry"]
+        XCTAssertTrue(pending.waitForExistence(timeout: 30))
+        XCTAssertEqual(try sharedFaultStatus(arm: false), before + 1, "Failure must occur after upstream commit")
+        app.terminate(); app.launch()
+        XCTAssertTrue(pending.waitForExistence(timeout: 20))
+        capture("shared-contribution-response-lost-journal-reopened")
+        tapVisible(pending)
+        XCTAssertTrue(pending.waitForNonExistence(timeout: 20))
+        XCTAssertEqual(try sharedFaultStatus(arm: false), before + 1)
+        tapVisible(app.buttons["tab.plan"]); tapVisible(app.buttons[row])
+        assertText("DOP 7.00")
+        let originals = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.original.'"))
+        revealSharedControl(originals.firstMatch)
+        XCTAssertEqual(originals.count, 1, "Retry must retain one canonical contribution")
+        capture("shared-contribution-exact-retry-one-result")
     }
 
     func testSharedPlanningFourKindsPrivateContributionsCorrectionsAndReopen() throws {
