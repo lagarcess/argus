@@ -21,12 +21,15 @@ struct CuadraoAppearancePicker: View {
                                 RoundedRectangle(cornerRadius: 15)
                                     .stroke(selection == option ? WelcomePalette.pine : Color.clear, lineWidth: 2)
                             }
-                        HStack(spacing: 4) {
-                            Text(title(option)).font(.subheadline)
-                            if selection == option {
-                                Image(systemName: "checkmark").font(.caption.weight(.semibold))
+                            .overlay(alignment: .topTrailing) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(WelcomePalette.pine, WelcomePalette.background)
+                                    .padding(7).opacity(selection == option ? 1 : 0)
+                                    .accessibilityHidden(true)
                             }
-                        }.foregroundStyle(selection == option ? WelcomePalette.pine : Color.secondary)
+                        Text(title(option)).font(.subheadline)
+                            .foregroundStyle(selection == option ? WelcomePalette.pine : Color.secondary)
                     }.frame(maxWidth: .infinity).contentShape(Rectangle())
                 }.buttonStyle(.plain)
                     .accessibilityLabel(title(option))

@@ -50,11 +50,8 @@ struct CuadraoDesignGallery: View {
                             CuadraoSectionAddButton(title: spanish ? "Añadir cuenta" : "Add account") { }
                         }
                         HStack {
-                            Menu {
-                                ForEach(PlanCurrency.supported, id: \.self) { code in
-                                    CuadraoChoiceOption(title: code, selected: code == currency) { currency = code }
-                                }
-                            } label: { CuadraoChoiceLabel(title: currency) }
+                            CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency", selection: $currency,
+                                values: PlanCurrency.supported, valueTitle: { $0 })
                             Spacer()
                             CuadraoChoiceLabel(title: currency, selectable: false, locked: true)
                         }

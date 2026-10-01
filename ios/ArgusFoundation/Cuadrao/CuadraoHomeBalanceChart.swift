@@ -113,13 +113,10 @@ struct CuadraoHomeBalanceChart: View {
     private var amountRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if currencies.count > 1 {
-                    Menu {
-                        ForEach(currencies, id: \.self) { code in
-                            CuadraoChoiceOption(title: code, selected: currency == code) { selectedDate = nil; chooseCurrency(code) }
-                        }
-                    } label: {
-                        CuadraoChoiceLabel(title: currency)
-                    }.accessibilityIdentifier("home-chart-currency")
+                    CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency",
+                        selection: Binding(get: { currency }, set: { selectedDate = nil; chooseCurrency($0) }),
+                        values: currencies, valueTitle: { $0 })
+                        .accessibilityIdentifier("home-chart-currency")
                 } else { Text(currency).foregroundStyle(.secondary) }
                 Text(shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—")
                     .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)

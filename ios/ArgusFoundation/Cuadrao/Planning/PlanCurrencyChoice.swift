@@ -13,11 +13,8 @@ struct PlanCurrencyChoice: View {
                 .accessibilityLabel(spanish ? "Moneda fija: \(currency)" : "Fixed currency: \(currency)")
                 .accessibilityIdentifier(showLock ? "plan-currency-fixed" : "plan-currency-inherited")
         } else {
-            Menu {
-                Picker(spanish ? "Moneda" : "Currency", selection: $currency) {
-                    ForEach(PlanCurrency.supported, id: \.self) { Text($0).tag($0) }
-                }
-            } label: { CuadraoChoiceLabel(title: currency) }
+            CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency", selection: $currency,
+                values: PlanCurrency.supported, valueTitle: { $0 })
                 .buttonStyle(.plain).foregroundStyle(WelcomePalette.pine)
                 .accessibilityLabel(spanish ? "Moneda, \(currency)" : "Currency, \(currency)")
                 .accessibilityIdentifier("plan-edit-currency")

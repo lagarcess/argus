@@ -105,13 +105,10 @@ struct CuadraoPlanCanvas: View {
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                 Spacer()
                 if forecastSpaces.count > 1 {
-                    Menu {
-                        ForEach(forecastSpaces) { space in
-                            CuadraoChoiceOption(title: space.title(spanish), selected: scope == space.id) {
-                                scope = space.id; selectedDay = nil
-                            }
-                        }
-                    } label: { CuadraoChoiceLabel(title: scopeName) }
+                    CuadraoChoiceMenu(title: spanish ? "Espacio del pronóstico" : "Forecast space",
+                        selection: Binding(get: { scope }, set: { scope = $0; selectedDay = nil }),
+                        values: forecastSpaces.map(\.id),
+                        valueTitle: { PlanFormat.space($0, accounts: accounts, spanish: spanish) })
                         .accessibilityLabel(spanish ? "Espacio del pronóstico, \(scopeName)" : "Forecast space, \(scopeName)")
                         .accessibilityIdentifier("plan-forecast-scope")
                 } else { CuadraoChoiceLabel(title: scopeName, selectable: false) }

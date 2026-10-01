@@ -26,7 +26,7 @@ value, make a row hard to scan or imply that a prediction is certain.
 | Currency precision, formatting and limits | [CanvasMoney.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoney.swift) | Derive preview limits and formatting here; currency selection/immutability retains its plan/group owner. |
 | Numeric preview bridge | [CanvasMoneyValueInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoneyValueInput.swift) | Adapts existing numeric preview models to decimal editing text; it is not a new financial store. |
 | Plan amount composition | [PlanAmountInput.swift](../../../ios/ArgusFoundation/Cuadrao/Planning/PlanAmountInput.swift) | Currency, rounded amount, focus underline and inline error. Accounts keeps its approved bordered, right-aligned composition around the same editor. |
-| Choice labels and add shortcuts | [CuadraoChoiceControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChoiceControls.swift) | Shared value/caret, selected menu option, fixed code and section plus. |
+| Choice labels and add shortcuts | [CuadraoChoiceControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChoiceControls.swift) | Shared value/caret, native single-selection menu, fixed code and section plus. |
 | Expanded chart controls | [CuadraoChartControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChartControls.swift) | Icon view choice and localized period choice, including selected accessibility state. |
 | Account management | [CuadraoAccountsCollection.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoAccountsCollection.swift) | Native ordering and archive recovery over the existing shared account model. |
 | Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift) | Uses real shared components. Access from a hold on Home's greeting → Guía visual / Visual guide, or launch with `--design-gallery`. Preview-only. |
@@ -273,3 +273,10 @@ References: [Wealthsimple history](https://mobbin.com/screens/667bf371-6e73-42f5
 Founder-supplied decomposition screenshots are retained with this decision's
 [reference evidence](../../../docs/reports/evidence/cuadrao-native-design/home-distribution-reference/README.md). They motivate the hierarchy and subtle depth; they are not
 Cuadrao implementation or acceptance evidence.
+
+## Selection alignment
+
+`CuadraoChoiceMenu` uses a native Picker with text-only options. The system owns
+the checkmark column; never switch a selected row to Label while unselected rows
+use Text. Keep captions centered independently of selection indicators. Appearance
+checks sit on the preview image; searchable currency checks sit after a Spacer.

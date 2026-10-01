@@ -17,15 +17,20 @@ struct CuadraoChoiceLabel: View {
     }
 }
 
-struct CuadraoChoiceOption: View {
+/// Native selection owns the checkmark gutter; row text never supplies its own icon.
+struct CuadraoChoiceMenu<Value: Hashable>: View {
     let title: String
-    let selected: Bool
-    let action: () -> Void
+    @Binding var selection: Value
+    let values: [Value]
+    let valueTitle: (Value) -> String
     var body: some View {
-        Button(action: action) {
-            if selected { Label(title, systemImage: "checkmark") }
-            else { Text(title) }
-        }
+        Menu {
+            Picker(title, selection: $selection) {
+                ForEach(values, id: \.self) { value in
+                    Text(valueTitle(value)).tag(value)
+                }
+            }
+        } label: { CuadraoChoiceLabel(title: valueTitle(selection)) }
     }
 }
 
