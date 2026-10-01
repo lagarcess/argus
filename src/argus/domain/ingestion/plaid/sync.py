@@ -140,7 +140,7 @@ class PlaidSync:
         except Exception:
             token = None
         if not token:
-            self._fail(current, CREDENTIAL_UNAVAILABLE, "error")
+            self._fail(current, holder, CREDENTIAL_UNAVAILABLE, "error")
             return SyncOutcome("failed", error_code=CREDENTIAL_UNAVAILABLE)
         start = current.cursor
         try:
@@ -156,11 +156,11 @@ class PlaidSync:
         except _LeaseLost:
             return SyncOutcome("superseded")
         except _Incomplete:
-            self._fail(current, INCOMPLETE, current.status)
+            self._fail(current, holder, INCOMPLETE, current.status)
             return SyncOutcome("failed", error_code=INCOMPLETE)
         except PlaidError as exc:
             failure = meaning(exc.error_code)
-            self._fail(current, failure.code, failure.status or current.status)
+            self._fail(current, holder, failure.code, failure.status or current.status)
             return SyncOutcome("failed", error_code=failure.code)
         try:
             result = sink.submit(
@@ -237,11 +237,19 @@ class PlaidSync:
         ):
             raise _LeaseLost()
 
-    def _fail(self, current: SourceConnection, code: str, status) -> None:  # noqa: ANN001
+    def _fail(  # noqa: ANN001
+        self, current: SourceConnection, holder: str, code: str, status
+    ) -> None:
         logger.warning("Plaid sync failed", failure_code=code, connection_status=status)
         try:
+            # Fenced by the lease: a sync that lost it cannot overwrite the
+            # state a newer sync or a webhook established.
             self.hub.connections.record_failure(
-                connection_id=current.id, code=code, status=status, now=self.hub.clock()
+                connection_id=current.id,
+                code=code,
+                status=status,
+                now=self.hub.clock(),
+                holder=holder,
             )
         except ConnectionNotFound:
             pass
