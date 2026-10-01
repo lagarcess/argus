@@ -36,85 +36,102 @@ struct CuadraoVoicePreference: View {
 struct CuadraoVoicePicker: View {
     let spanish: Bool
     @AppStorage(CuadraoVoiceOption.preferenceKey) private var selected = CuadraoVoiceOption.ara
-    @State private var candidate = CuadraoVoiceOption.ara
     @State private var sample = CuadraoVoiceSamplePlayer()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    Image(systemName: "waveform").font(.system(size: 36, weight: .light))
-                        .foregroundStyle(WelcomePalette.pine).frame(width: 88, height: 88)
-                        .background(WelcomePalette.sage.opacity(0.55), in: Circle())
-                        .accessibilityHidden(true).padding(.top, 12)
-                    Text(spanish ? "Una voz que vaya contigo." : "A voice that feels right.")
-                        .font(.system(.title2, design: .serif)).multilineTextAlignment(.center)
-                    choices
-                    Text(spanish ? "Muestras originales en inglés. Tu conversación puede seguir en español."
-                         : "Original English samples. Your conversation can use your preferred language.")
-                        .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                    if sample.failed {
-                        Text(spanish ? "No se pudo reproducir. Vuelve a tocar para intentarlo." : "Couldn't play this sample. Tap again to retry.")
-                            .font(.footnote).foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 12) {
+                header
+                TabView(selection: Binding(get: { selected }, set: choose)) {
+                    ForEach(CuadraoVoiceOption.allCases) { option in
+                        VStack(spacing: 8) {
+                            Text(option.name).font(.title2.weight(.semibold))
+                            Text(option.detail(spanish)).font(.subheadline)
+                                .foregroundStyle(.secondary).multilineTextAlignment(.center)
+                        }.padding(.horizontal, 16).tag(option)
                     }
-                }.padding(.horizontal, 24).padding(.bottom, 24)
-            }
-            .safeAreaInset(edge: .bottom) {
-                Button {
-                    selected = candidate; sample.stop(); dismiss()
-                } label: {
-                    Text((spanish ? "Usar " : "Use ") + candidate.name).font(.body.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .foregroundStyle(WelcomePalette.onAccent)
-                        .background(WelcomePalette.pine, in: Capsule())
-                }.padding(.horizontal, 24).padding(.vertical, 12)
-                    .background(WelcomePalette.background)
-            }
-            .background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink)
-            .navigationTitle(spanish ? "Elegir voz" : "Choose voice").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) {
-                Button(spanish ? "Cancelar" : "Cancel") { dismiss() }
-            } }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: typeSize.isAccessibilitySize ? 180 : 86)
+                .accessibilityIdentifier("voice-carousel")
+                pages
+                sampleControl
+                Text(spanish ? "Muestras en inglés. Puedes conversar en español."
+                     : "English samples. You can speak in your preferred language.")
+                    .font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+                if sample.failed {
+                    Text(spanish ? "No se pudo reproducir. Toca para volver a intentarlo."
+                         : "Couldn't play this sample. Tap to retry.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 24)
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink)
         .tint(WelcomePalette.pine)
-        .presentationDetents([.large]).presentationDragIndicator(.visible).presentationCornerRadius(32)
-        .onAppear { candidate = selected }
+        .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.height(360), .large])
+        .presentationDragIndicator(.visible).presentationCornerRadius(32)
         .onDisappear { sample.stop() }
         .onChange(of: scenePhase) { _, phase in if phase != .active { sample.stop() } }
     }
 
-    private var choices: some View {
-        VStack(spacing: 0) {
-            ForEach(CuadraoVoiceOption.allCases) { option in
-                HStack(spacing: 12) {
-                    Button { sample.stop(); candidate = option } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: candidate == option ? "checkmark.circle.fill" : "circle")
-                                .foregroundStyle(candidate == option ? WelcomePalette.pine : Color.secondary)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(option.name).font(.body.weight(.medium))
-                                Text(option.detail(spanish)).font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                        }.contentShape(Rectangle()).frame(minHeight: 72)
-                    }.buttonStyle(.plain)
-                        .accessibilityLabel(option.name + ", " + option.detail(spanish))
-                        .accessibilityIdentifier("voice-option-" + option.rawValue)
-                        .accessibilityAddTraits(candidate == option ? .isSelected : [])
-                    Button { sample.toggle(option) } label: {
-                        Image(systemName: sample.playing == option ? "stop.fill" : "play.fill")
-                            .font(.system(size: 15)).frame(width: 44, height: 44)
-                            .background(WelcomePalette.background, in: Circle())
-                    }.buttonStyle(.plain)
-                        .accessibilityLabel((sample.playing == option ? (spanish ? "Detener " : "Stop ") : (spanish ? "Escuchar " : "Preview ")) + option.name)
-                }.padding(.horizontal, 16)
-                if option != CuadraoVoiceOption.allCases.last { Divider().padding(.leading, 50) }
-            }
-        }.background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 24))
+    private var header: some View {
+        HStack {
+            Text(spanish ? "Elegir voz" : "Choose voice")
+                .font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+            Spacer()
+            Button { sample.stop(); dismiss() } label: {
+                Image(systemName: "checkmark").font(.body.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(WelcomePalette.surface, in: Circle())
+            }.accessibilityLabel(spanish ? "Listo" : "Done")
+                .accessibilityIdentifier("voice-picker-done")
+        }
     }
 
+    private var pages: some View {
+        HStack(spacing: 0) {
+            ForEach(CuadraoVoiceOption.allCases) { option in
+                Button { choose(option) } label: {
+                    Circle().fill(selected == option ? WelcomePalette.pine : Color.secondary.opacity(0.3))
+                        .frame(width: 7, height: 7).frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+                    .accessibilityLabel(option.name + ", " + option.detail(spanish))
+                    .accessibilityIdentifier("voice-option-" + option.rawValue)
+                    .accessibilityAddTraits(selected == option ? .isSelected : [])
+            }
+        }
+    }
+
+    private var sampleControl: some View {
+        Button { sample.toggle(selected) } label: {
+            HStack(spacing: 8) {
+                Image(systemName: sample.playing == selected ? "stop.fill" : "play.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(sample.playing == selected
+                     ? (spanish ? "Detener muestra" : "Stop preview")
+                     : (spanish ? "Escuchar muestra" : "Play preview"))
+                    .font(.subheadline.weight(.medium))
+            }.frame(minWidth: 180, minHeight: 44)
+                .background(WelcomePalette.surface, in: Capsule())
+        }.buttonStyle(.plain)
+            .accessibilityLabel((sample.playing == selected
+                ? (spanish ? "Detener " : "Stop ")
+                : (spanish ? "Escuchar " : "Preview ")) + selected.name)
+            .accessibilityIdentifier("voice-sample")
+    }
+
+    private func choose(_ option: CuadraoVoiceOption) {
+        guard selected != option else { return }
+        sample.stop()
+        selected = option
+        sample.toggle(option)
+    }
 }
 
 @MainActor @Observable final class CuadraoVoiceSamplePlayer: NSObject, AVAudioPlayerDelegate {

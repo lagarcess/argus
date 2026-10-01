@@ -31,12 +31,17 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         app.buttons["voice-expand"].tap()
         app.buttons["voice-choose"].tap()
         XCTAssertTrue(app.buttons["voice-option-sal"].waitForExistence(timeout: 3))
-        app.buttons["Escuchar Sal"].tap()
-        XCTAssertTrue(app.buttons["Detener Sal"].exists)
-        app.buttons["voice-option-sal"].tap()
-        XCTAssertTrue(app.buttons["Escuchar Sal"].exists)
-        capture(app, "voice-picker")
-        app.buttons["Usar Sal"].tap()
+        // Opening preferences stays quiet; paging both selects and previews a voice.
+        XCTAssertTrue(app.buttons["voice-sample"].label.hasPrefix("Escuchar"))
+        app.buttons["voice-option-ara"].tap()
+        swipeVoice(app.staticTexts["Ara"])
+        XCTAssertEqual(app.buttons["voice-sample"].label, "Detener Eve")
+        swipeVoice(app.staticTexts["Eve"])
+        XCTAssertEqual(app.buttons["voice-sample"].label, "Detener Sal")
+        app.buttons["voice-sample"].tap()
+        XCTAssertEqual(app.buttons["voice-sample"].label, "Escuchar Sal")
+        capture(app, "voice-carousel")
+        app.buttons["voice-picker-done"].tap()
         app.buttons["voice-minimize"].tap()
         app.buttons["cuadrao-tab-4"].tap()
         app.buttons["Preferencias"].tap()
@@ -61,6 +66,11 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         app.buttons["cuadrao-tab-4"].tap()
         app.buttons["Preferencias"].tap(); app.collectionViews.firstMatch.swipeUp(); app.buttons["Voz"].tap()
         XCTAssertEqual(app.buttons["voice-preference"].value as? String, "Sal")
+    }
+    private func swipeVoice(_ title: XCUIElement) {
+        let center = title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        center.withOffset(CGVector(dx: 120, dy: 0)).press(forDuration: 0.05,
+            thenDragTo: center.withOffset(CGVector(dx: -120, dy: 0)))
     }
     private func capture(_ app: XCUIApplication, _ name: String) {
         let item = XCTAttachment(screenshot: app.screenshot())
