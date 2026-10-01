@@ -89,3 +89,25 @@ Before provider delivery: permissions/consent, actual audio levels, connection a
 interruption recovery, background/privacy behavior, same runtime owner, editable
 financial proposals and confirmation, retention and provider handling. These
 remain with the voice/runtime delivery contract, not this view implementation.
+
+## Follow-up: escape typing and restore the selected share icon
+
+The founder found that focusing the composer hid navigation without a clear way
+back. Chat now exposes an accessible keyboard-down control in the header while
+typing. Dismissing it restores navigation and compacts the voice presentation
+without clearing the draft or ending the call. Minimizing/reopening the full
+voice surface also clears typing focus. The control lives in the header because
+a simulator autocorrect popup could cover a composer-adjacent button.
+
+The share control now uses the exact horizontal chain-link paths from
+`inheritedIcons.link`, reaffirmed by the founder's screenshot. The similarly
+named three-node `share` artwork was rejected and is not the final asset.
+
+Final simulator build passed. Reproduced and verified in Spanish on the reserved
+design simulator: open voice, choose typing, enter “Mi borrador,” dismiss typing
+from the header, visit Home, return to chat. Navigation, draft and active voice
+bar remain present. The final chain-link icon was visually inspected.
+[Typing escape](typing-dismiss-header.jpg) and
+[restored navigation and share icon](navigation-restored.jpg) capture this revision.
+English labels are provided; physical keyboard geometry/device checks remain
+subject to the earlier acceptance limits.

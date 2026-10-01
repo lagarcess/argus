@@ -32,7 +32,7 @@ struct CuadraoChatCanvas: View {
         .onDisappear { focused = false; editing = false }
         .onAppear { if store.voice.active && store.voice.presentation == .keyboard { focused = true } }
         .onChange(of: store.voice.presentation) { _, value in
-            if store.voice.active && value == .keyboard { focused = true }
+            focused = store.voice.active && value == .keyboard
         }
         .sheet(item: $sheet) { destination in
             CuadraoChatSheet(destination: destination, store: store, spanish: es)
@@ -60,9 +60,22 @@ struct CuadraoChatCanvas: View {
                     .accessibilityLabel(store.temporary ? (es ? "Nuevo chat normal" : "New regular chat") : (es ? "Nuevo chat" : "New chat"))
                     .accessibilityIdentifier("chat-new")
             } else { Color.clear.frame(width: 44, height: 44) }
+            if focused {
+                control("keyboard.chevron.compact.down", es ? "Ocultar teclado" : "Hide keyboard", id: "chat-dismiss-keyboard") {
+                    focused = false
+                    if store.voice.active && store.voice.presentation == .keyboard {
+                        store.voice.presentation = .compact
+                    }
+                }
+            }
             Spacer(minLength: 8)
             if active && !store.temporary {
-                control("square.and.arrow.up", es ? "Compartir chat" : "Share chat", id: "chat-share") { sheet = .share }
+                Button { sheet = .share } label: {
+                    Image("CuadraoShare").resizable().scaledToFit().frame(width: 20, height: 20)
+                        .frame(width: 44, height: 44)
+                }.buttonStyle(.plain)
+                    .accessibilityLabel(es ? "Compartir chat" : "Share chat")
+                    .accessibilityIdentifier("chat-share")
                 Menu {
                     Button(es ? "Cambiar nombre" : "Rename", systemImage: "pencil") { sheet = .rename }
                     Button(es ? (store.current.pinned ? "Desfijar" : "Fijar") : (store.current.pinned ? "Unpin" : "Pin"), systemImage: "pin") { store.current.pinned.toggle() }
