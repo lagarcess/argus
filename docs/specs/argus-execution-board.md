@@ -1753,13 +1753,23 @@ record the focused native checks, shared-behavior checks and phone handoff.
 This does not close remaining C10 connected-delivery/accessibility work.
 
 **Home chart UI, C05/C03:** the founder authorized the follow-up on October 1.
-The native preview now shows a compact last-30-days recorded-position chart with
+The native preview now shows a compact recorded-position chart (one month by default) with
 separate currencies, native tap/hold-and-drag inspection, Hoy/Today reset and
 Personal/Hogar scope. It shares the amount's debt/asset ownership calculation.
 Explicit example observations are labeled; missing history produces an empty
 state. No current activity is reverse-engineered into financial history.
 References: [Monzo selected balance](https://mobbin.com/screens/25125eda-5e62-4166-9a68-9b25bcc349b6)
 and [Apple chart selection](https://developer.apple.com/videos/play/wwdc2023/10037/).
+
+**Home exploration follow-up (UI only):** compact neutral greeting from the shared
+preview profile; Evolución / Distribución swap history and a flat asset breakdown
+in one block. Native range controls cover one month, three months, this year and
+all history; an expanded sheet isolates a recorded calendar month. Category rows
+reveal accounts on demand. Negative contributions/debts remain separate from the
+positive asset bar; currency conversion remains absent. Example history is extended
+for design review, never inferred from activity. The same contribution owner powers
+history, current net position and distribution. This is a review iteration, not a
+connected history implementation or a promotion of the paused Profile redesign.
 
 **Still future:** connect canonical recorded-balance observations with clear date,
 account-membership, currency, valuation and ownership semantics; distinguish

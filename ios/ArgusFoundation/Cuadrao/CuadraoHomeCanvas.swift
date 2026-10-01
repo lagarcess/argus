@@ -12,6 +12,7 @@ struct CuadraoHomeCanvas: View {
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
         reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
         empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
+    @State private var profile = CanvasProfileDraft()
     @State private var chatEditing = false
     @State private var voiceProposal: CanvasVoiceProposal?
     @State private var pendingTab: CuadraoTab?
@@ -165,7 +166,14 @@ struct CuadraoHomeCanvas: View {
 
     private var header: some View {
         HStack {
-            CuadraoBrand()
+            VStack(alignment: .leading, spacing: 5) {
+                Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)
+                    .locale(Locale(identifier: spanish ? "es_DO" : "en_US"))))
+                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                Text((spanish ? "Hola" : "Hello") + (profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    ? "" : ", " + profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines)))
+                    .font(.title2.weight(.semibold)).accessibilityIdentifier("home-greeting")
+            }
                 .contextMenu {
                     Button(spanish ? "Guía visual" : "Visual guide") { sheet = .gallery }
                         .accessibilityIdentifier("cuadrao-gallery-open")
@@ -303,7 +311,7 @@ struct CuadraoHomeCanvas: View {
         } else if tab == .assistant {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
         } else if tab == .profile {
-            CuadraoProfileCanvas(spanish: spanish, includeExamples: populated)
+            CuadraoProfileCanvas(spanish: spanish, includeExamples: populated, profile: $profile)
                 .safeAreaPadding(.bottom, chat.voice.active ? 144 : 80)
         } else if tab == .plan && voiceProposal == nil {
             CuadraoPlanCanvas(store: plans, accounts: data, spanish: spanish,

@@ -72,7 +72,7 @@ enum CanvasSettingsStyle {
 struct CuadraoProfileCanvas: View {
     let spanish: Bool
     let includeExamples: Bool
-    @State private var profile = CanvasProfileDraft()
+    @Binding var profile: CanvasProfileDraft
     @State private var signOut = false
     @State private var editor: CanvasProfileRoute?
 

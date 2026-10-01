@@ -26,13 +26,13 @@ value, make a row hard to scan or imply that a prediction is certain.
 | Currency precision, formatting and limits | [CanvasMoney.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoney.swift) | Derive preview limits and formatting here; currency selection/immutability retains its plan/group owner. |
 | Numeric preview bridge | [CanvasMoneyValueInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoneyValueInput.swift) | Adapts existing numeric preview models to decimal editing text; it is not a new financial store. |
 | Plan amount composition | [PlanAmountInput.swift](../../../ios/ArgusFoundation/Cuadrao/Planning/PlanAmountInput.swift) | Currency, rounded amount, focus underline and inline error. Accounts keeps its approved bordered, right-aligned composition around the same editor. |
-| Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift) | Uses real shared components. Access from a hold on Home's wordmark → Guía visual / Visual guide, or launch with `--design-gallery`. Preview-only. |
+| Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift) | Uses real shared components. Access from a hold on Home's greeting → Guía visual / Visual guide, or launch with `--design-gallery`. Preview-only. |
 
 ## Typography
 
 | Role | Treatment | Examples |
 | --- | --- | --- |
-| `screen` | Native large-title serif | Home overview, Plan heading, chat landing |
+| `screen` | Native large-title serif | Plan heading, chat landing |
 | `feature` | Native title serif | Important local headline |
 | `section` | Native title2 serif | Accounts, plans and content sections |
 | `body`, `supporting`, `caption` | Native readable system text | Instructions, metadata and controls |
@@ -110,3 +110,25 @@ currency/kind/share change cannot silently borrow old example observations.
 The Home link opens Plan as a separate surface; it does not imply its sample
 forecast is computed from Home's accounts. Connected history/forecast ownership
 and scope-preserving navigation remain in the main roadmap.
+
+### Home welcome and history perspectives
+
+Home uses a compact, static native-system greeting: Hola / Hello plus Profile's
+preferred name, or just the greeting if missing. The shared preview profile state
+lives in `CuadraoHomeCanvas`; Profile edits and Home read the same value. A localized
+date sits above it. Space switching changes the financial scope, not the welcome.
+The greeting's context menu retains the preview gallery/reset tools.
+
+Evolución / Distribución (History / Breakdown) replace each other in one overview.
+History offers 1 month, 3 months, year to date and all available observations, with
+an expanded history sheet for selecting a calendar month. These filters never
+invent boundary balances. A past month shows only its recorded dates, not today's
+balance. Preview observations span multiple months and stay explicitly illustrative.
+Distribution uses a flat positive-assets bar with category disclosure rows; debts
+and other negative contributions appear separately. All values derive from the
+same signed contribution function, with asset shares and currency separation.
+
+References: [Wealthsimple history](https://mobbin.com/screens/667bf371-6e73-42f5-b179-574e62d9b64b),
+[Public allocation](https://mobbin.com/screens/07c1ff8c-f0da-4bf0-919a-d21b2ac5ff43),
+and [Origin disclosure](https://mobbin.com/screens/7edb40e1-bbbe-4c1a-9916-f10f943d7685).
+This is a founder-reviewable UI iteration; connected history remains in the roadmap.

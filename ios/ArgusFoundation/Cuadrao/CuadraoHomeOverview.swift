@@ -6,16 +6,30 @@ struct CuadraoHomeOverview: View {
     let spanish: Bool
     var openPlan: () -> Void = {}
     @State private var chosenCurrency: String?
+    @State private var distribution = false
     private var currencies: [String] { Set(data.active.map(\.currency)).sorted() }
     private var currency: String { chosenCurrency.flatMap { currencies.contains($0) ? $0 : nil } ?? currencies.first ?? "DOP" }
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(title).font(CuadraoTypography.screen).fixedSize(horizontal: false, vertical: true)
+            Picker(spanish ? "Vista del balance" : "Balance view", selection: $distribution) {
+                Text(spanish ? "Evolución" : "History").tag(false)
+                Text(spanish ? "Distribución" : "Breakdown").tag(true)
+            }.pickerStyle(.segmented).accessibilityIdentifier("home-chart-view")
+            if distribution {
+                CuadraoHomeDistribution(accounts: data.active.filter { $0.currency == currency },
+                    currency: currency, spanish: spanish)
+                if currencies.count > 1 {
+                    Picker(spanish ? "Moneda" : "Currency", selection: Binding(get: { currency }, set: { chosenCurrency = $0 })) {
+                        ForEach(currencies, id: \.self) { Text($0).tag($0) }
+                    }.pickerStyle(.menu)
+                }
+            } else {
             CuadraoHomeBalanceChart(accounts: data.active.filter { $0.currency == currency },
                 observations: data.balanceObservations, currency: currency, currencies: currencies,
                 spanish: spanish, shared: data.selectedSpace.kind == .household,
                 chooseCurrency: { chosenCurrency = $0 })
                 .id(data.selectedSpaceID + currency)
+            }
             Button(action: openPlan) {
                 HStack {
                     Text(spanish ? "¿Y lo que viene?" : "What comes next?")
@@ -26,15 +40,9 @@ struct CuadraoHomeOverview: View {
                 .accessibilityIdentifier("home-chart-plan")
         }
     }
-    private var title: String {
-        if data.selectedSpace.kind == .household { return spanish ? "Lo de ustedes." : "Your shared picture." }
-        if data.selectedSpace.kind != .personal { return data.selectedSpace.title(spanish) }
-        return data.active.isEmpty ? (spanish ? "Un lugar para\ntus finanzas." : "A place for\nyour finances.")
-            : (spanish ? "Tu panorama." : "Your overview.")
-    }
 }
 
-private struct CuadraoHomeBalanceChart: View {
+struct CuadraoHomeBalanceChart: View {
     let accounts: [CanvasAccount]
     let observations: [CanvasBalanceObservation]
     let currency: String
@@ -42,8 +50,13 @@ private struct CuadraoHomeBalanceChart: View {
     let spanish: Bool
     let shared: Bool
     let chooseCurrency: (String) -> Void
+    var expanded = false
+    @State private var range: CanvasHistoryRange = .month
+    @State private var month: Date?
+    @State private var showHistory = false
     @State private var selectedDate: Date?
-    private var points: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now) }
+    private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now) }
+    private var points: [CanvasBalancePoint] { range.points(history, month: month) }
     private var selected: CanvasBalancePoint? {
         guard let selectedDate else { return nil }
         return points.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
@@ -70,22 +83,25 @@ private struct CuadraoHomeBalanceChart: View {
                     .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                     .accessibilityIdentifier("home-chart-amount")
             }.font(CuadraoTypography.supporting)
-            Text(selected.map { dateLabel($0.date) } ?? (partial
+            Text((selected ?? (month != nil ? shown : nil)).map { dateLabel($0.date) } ?? (partial
                  ? (spanish ? "Balance parcial · Faltan balances" : "Partial balance · Some balances missing")
                  : (shared ? (spanish ? "Balance de cuentas compartidas" : "Shared account balance")
-                    : (spanish ? "Balance registrado" : "Recorded balance"))))
+                    : (spanish ? "Balance neto registrado" : "Recorded net balance"))))
                 .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("home-chart-date")
+            if expanded { monthPicker }
             if points.count > 1 {
                 chart
                 HStack {
                     Text(dateLabel(points.first!.date))
                     Spacer()
-                    Button { selectedDate = nil } label: { Text(spanish ? "Hoy" : "Today").frame(minHeight: 44) }
-                        .buttonStyle(.plain).accessibilityIdentifier("home-chart-today")
+                    if month != nil {
+                        Text(dateLabel(points.last!.date)).frame(minHeight: 44)
+                    } else {
+                        Button { selectedDate = nil } label: { Text(spanish ? "Hoy" : "Today").frame(minHeight: 44) }
+                            .buttonStyle(.plain).accessibilityIdentifier("home-chart-today")
+                    }
                 }.font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                Text(spanish ? "Últimos 30 días · Datos de ejemplo" : "Last 30 days · Sample data")
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             } else {
                 HStack(spacing: 12) {
                     Image(systemName: "chart.xyaxis.line").foregroundStyle(WelcomePalette.pine)
@@ -93,11 +109,52 @@ private struct CuadraoHomeBalanceChart: View {
                         .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                 }.padding(.vertical, 16).accessibilityIdentifier("home-chart-empty")
             }
+            if month == nil {
+                HStack(spacing: 0) {
+                    ForEach(CanvasHistoryRange.allCases) { option in
+                        Button {
+                            range = option; selectedDate = nil
+                        } label: {
+                            Text(option.title(spanish)).font(CuadraoTypography.caption)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(range == option ? WelcomePalette.sage : .clear, in: Capsule())
+                        }.buttonStyle(.plain).accessibilityIdentifier("home-range-" + option.rawValue)
+                            .accessibilityAddTraits(range == option ? .isSelected : [])
+                    }
+                }
+            }
+            HStack {
+                Text(spanish ? "Datos de ejemplo" : "Sample data").font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                Spacer()
+                if !expanded {
+                    Button { showHistory = true } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right").frame(width: 44, height: 44)
+                    }.buttonStyle(.plain).accessibilityLabel(spanish ? "Explorar historial" : "Explore history")
+                        .accessibilityIdentifier("home-history-expand")
+                }
+            }
             if selected != nil && partial {
                 Text(spanish ? "Balance parcial · Faltan balances" : "Partial balance · Some balances missing")
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
         }.sensoryFeedback(.selection, trigger: selected?.date)
+            .sheet(isPresented: $showHistory) {
+                CuadraoHomeHistorySheet(accounts: accounts, observations: observations, currency: currency,
+                    spanish: spanish, shared: shared)
+            }
+    }
+    private var monthPicker: some View {
+        Menu {
+            Button(spanish ? "Hasta hoy" : "Through today") { month = nil; selectedDate = nil }
+            ForEach(Array(Set(history.map { Calendar.current.dateInterval(of: .month, for: $0.date)!.start })).sorted(by: >), id: \.self) { date in
+                Button(monthLabel(date)) { month = date; selectedDate = nil }
+            }
+        } label: {
+            HStack {
+                Text(month.map(monthLabel) ?? (spanish ? "Elegir un mes" : "Choose a month"))
+                Image(systemName: "chevron.down").font(.caption)
+            }.font(CuadraoTypography.supporting).frame(minHeight: 44)
+        }.accessibilityIdentifier("home-history-month")
     }
     private var chart: some View {
         Chart {
@@ -137,7 +194,10 @@ private struct CuadraoHomeBalanceChart: View {
                             if case .second(true, let drag?) = value { proxy.selectXValue(at: drag.location.x) }
                         })
             }
-            .frame(height: 125).accessibilityIdentifier("home-balance-chart")
+            .frame(height: expanded ? 270 : 125).accessibilityIdentifier("home-balance-chart")
+    }
+    private func monthLabel(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
     }
     private func dateLabel(_ date: Date) -> String {
         date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))

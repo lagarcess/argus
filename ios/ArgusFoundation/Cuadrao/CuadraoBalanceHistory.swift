@@ -29,12 +29,11 @@ enum CanvasBalanceHistory {
         let known = accounts.filter { $0.balance != nil }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: now)
-        let start = calendar.date(byAdding: .day, value: -29, to: today)!
         // Never invent earlier balances for a new account or reinterpret another currency/share.
         let matched = known.map { account in
             observations.filter {
                 $0.accountID == account.id && $0.currency == account.currency && $0.kind == account.kind
-                    && $0.share == account.share && $0.date >= start && $0.date < today
+                    && $0.share == account.share && $0.date < today
             }
         }
         let dates = Set(matched.flatMap { $0.map(\.date) }).sorted()
@@ -49,7 +48,7 @@ enum CanvasBalanceHistory {
         return result
     }
 
-    private static func contribution(_ balance: Decimal, account: CanvasAccount) -> Decimal {
+    static func contribution(_ balance: Decimal, account: CanvasAccount) -> Decimal {
         balance * (account.kind.isDebt ? -1 : 1) * Decimal(account.kind.isAsset ? account.share : 100) / 100
     }
 
@@ -67,10 +66,47 @@ enum CanvasBalanceHistory {
         let today = calendar.startOfDay(for: now)
         return accounts.enumerated().flatMap { index, account in
             guard let balance = account.balance, index < changes.count else { return [CanvasBalanceObservation]() }
-            return zip(days, changes[index]).map { day, change in
+            let older = (-9 ... -1).flatMap { month in
+                let anchor = calendar.date(byAdding: .month, value: month, to: today)!
+                let start = calendar.dateInterval(of: .month, for: anchor)!.start
+                return (0..<4).map { week in
+                    CanvasBalanceObservation(accountID: account.id, currency: account.currency, kind: account.kind,
+                        share: account.share, date: calendar.date(byAdding: .day, value: week * 7, to: start)!,
+                        balance: balance * Decimal(100 + month * 4 + week) / 100)
+                }
+            }
+            return older.filter { $0.date < calendar.date(byAdding: .day, value: -29, to: today)! } + zip(days, changes[index]).map { day, change in
                 CanvasBalanceObservation(accountID: account.id, currency: account.currency, kind: account.kind,
                     share: account.share, date: calendar.date(byAdding: .day, value: day, to: today)!, balance: balance + Decimal(change))
             }
         }
+    }
+}
+
+/// Calendar windows filter recorded observations; they never manufacture boundary balances.
+enum CanvasHistoryRange: String, CaseIterable, Identifiable {
+    case month, quarter, year, all
+    var id: String { rawValue }
+    func title(_ es: Bool) -> String {
+        switch self {
+        case .month: es ? "1 mes" : "1M"
+        case .quarter: es ? "3 meses" : "3M"
+        case .year: es ? "Este año" : "YTD"
+        case .all: es ? "Todo" : "All"
+        }
+    }
+    func points(_ points: [CanvasBalancePoint], now: Date = .now, month: Date? = nil) -> [CanvasBalancePoint] {
+        let calendar = Calendar.current
+        if let month, let interval = calendar.dateInterval(of: .month, for: month) {
+            return points.filter { $0.date >= interval.start && $0.date < interval.end }
+        }
+        let start: Date
+        switch self {
+        case .month: start = calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))!
+        case .quarter: start = calendar.date(byAdding: .month, value: -3, to: now)!
+        case .year: start = calendar.dateInterval(of: .year, for: now)!.start
+        case .all: return points
+        }
+        return points.filter { $0.date >= start && $0.date <= now }
     }
 }
