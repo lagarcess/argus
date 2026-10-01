@@ -96,7 +96,8 @@ struct ConnectedCuadraoHome: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button {
-                                accountPath = []
+                                // Clear selection first; selectedID onChange drops the path.
+                                accounts.back()
                             } label: {
                                 Label("accounts.back", systemImage: "chevron.left")
                             }
@@ -117,7 +118,18 @@ struct ConnectedCuadraoHome: View {
             }
         }
         .onChange(of: accountPath) { _, path in
-            if path.isEmpty, accounts.selectedID != nil { accounts.back() }
+            // Sheet dismiss can empty the stack under a still-selected account.
+            // Re-push instead of clearing selection (back button clears selection).
+            if path.isEmpty, let id = accounts.selectedID,
+               loop.activityEditor == nil, loop.editor == nil {
+                accountPath = [id]
+            }
+        }
+        .onChange(of: loop.activityEditor == nil) { _, closed in
+            if closed { restoreDetailPath() }
+        }
+        .onChange(of: loop.editor == nil) { _, closed in
+            if closed { restoreDetailPath() }
         }
         .refreshable { await accounts.load(); await loop.refresh() }
         .confirmationDialog("loop.chooseAccount", isPresented: $choosingAccount, titleVisibility: .visible) {
@@ -128,6 +140,12 @@ struct ConnectedCuadraoHome: View {
             }
         }
         .sheet(item: $sheet) { item in modal(item) }
+    }
+
+    private func restoreDetailPath() {
+        guard loop.activityEditor == nil, loop.editor == nil,
+              let id = accounts.selectedID, accountPath != [id] else { return }
+        accountPath = [id]
     }
 
     private var header: some View {

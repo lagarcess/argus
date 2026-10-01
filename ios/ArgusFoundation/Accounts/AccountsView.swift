@@ -106,7 +106,15 @@ struct AccountDetailView: View {
     @ObservedObject var model: AccountsModel
     @ObservedObject var loop: FinancialLoopModel
     @Environment(\.locale) private var locale
+
+    /// Navigation destinations capture the account at push time; always read the
+    /// model copy so post-confirm balance/version updates paint immediately.
+    private var current: FinancialAccount {
+        model.accounts.first(where: { $0.id == account.id }) ?? account
+    }
+
     var body: some View {
+        let account = current
         if account.isOptionalAsset { AssetDetailView(account: account, model: model, loop: loop) }
         else {
         AccountSummary(account: account, large: true)

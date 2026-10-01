@@ -143,9 +143,8 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["loop.confirm"].tap()
         assertText("DOP 7,000.00")
         record(amount: "500", note: "Already in checked balance", included: true)
-        XCTAssertTrue(app.descendants(matching: .any)["accounts.balance.DOP"].waitForExistence(timeout: 12)
-            || app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "DOP 7,000.00")).firstMatch.waitForExistence(timeout: 2))
-        assertText("DOP 7,000.00")
+        ensureAccountDetail(nickname: nickname)
+        assertAccountBalance("DOP 7,000.00")
         // Check history uses Text + Text; match the currency amount pieces.
         assertText("Still unexplained")
         assertText("DOP 0.00")
@@ -157,7 +156,7 @@ final class FinancialLoopUITests: XCTestCase {
         app.terminate(); app.launch(); app.openAccountsList()
         let account = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch
         tapVisible(account)
-        assertText("DOP 7,000.00")
+        assertAccountBalance("DOP 7,000.00")
         assertText("Already in checked balance")
         capture("financial-loop-preserved-after-reopen")
     }
@@ -264,12 +263,39 @@ final class FinancialLoopUITests: XCTestCase {
         return parsed
     }
 
+    func ensureAccountDetail(nickname: String) {
+        let detail = app.descendants(matching: .any)["screen.accounts"]
+        let balance = app.descendants(matching: .any)["accounts.balance.DOP"]
+        if detail.waitForExistence(timeout: 2), balance.waitForExistence(timeout: 2) { return }
+        app.openAccountsList()
+        tapVisible(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch)
+        XCTAssertTrue(app.descendants(matching: .any)["screen.accounts"].waitForExistence(timeout: 10))
+    }
+
+    func assertAccountBalance(_ value: String) {
+        let balance = app.descendants(matching: .any)["accounts.balance.DOP"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 12), "accounts.balance.DOP missing")
+        let predicate = NSPredicate { _, _ in balance.exists && balance.label.contains(value) }
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: nil)], timeout: 8),
+            .completed,
+            "balance label \(balance.label) missing \(value)"
+        )
+    }
+
     func assertText(_ value: String) {
         let predicate = NSPredicate(format: "label CONTAINS %@", value)
+        // Connected keeps inactive tabs in the tree (opacity 0). Prefer the
+        // visible account/home surfaces so Search ghosts with bad frames lose.
+        for screenID in ["screen.accounts", "screen.home"] {
+            let screen = app.descendants(matching: .any)[screenID]
+            guard screen.exists else { continue }
+            if screen.staticTexts.matching(predicate).firstMatch.waitForExistence(timeout: 4) { return }
+            if screen.descendants(matching: .any).matching(predicate).firstMatch.waitForExistence(timeout: 2) { return }
+        }
         let staticText = app.staticTexts.matching(predicate).firstMatch
-        if staticText.waitForExistence(timeout: 8) { return }
-        // AccountSummary combines children; balance may only appear on the combined element.
-        XCTAssertTrue(app.descendants(matching: .any).matching(predicate).firstMatch.waitForExistence(timeout: 8))
+        if staticText.waitForExistence(timeout: 4) { return }
+        XCTAssertTrue(app.descendants(matching: .any).matching(predicate).firstMatch.waitForExistence(timeout: 4))
     }
     func tapVisible(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
