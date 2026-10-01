@@ -169,6 +169,7 @@ final class HouseholdPlanModel: ObservableObject {
     static func message(_ error: Error) -> String {
         guard case SessionFailure.rejected(_, let code) = error else { return "household.loadError" }
         switch code {
+        case "budget_scope_conflict": return "budget.error.duplicate"
         case "shared_plan_scope_changed", "stale_version", "stale_activity", "shared_plan_stale": return "sharedPlan.changed"
         case "shared_plan_forbidden", "shared_plan_read_only", "shared_plan_owner_required": return "sharedPlan.permissionError"
         case "shared_plan_conflict", "activity_already_linked", "occurrence_already_linked": return "sharedPlan.linkedError"

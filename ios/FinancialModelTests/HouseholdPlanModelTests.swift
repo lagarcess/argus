@@ -5,6 +5,10 @@ import XCTest
 
 @MainActor
 final class HouseholdPlanModelTests: XCTestCase {
+    func testDuplicateBudgetScopeUsesExistingBudgetExplanation() {
+        XCTAssertEqual(HouseholdPlanModel.message(SessionFailure.rejected(status: 422, code: "budget_scope_conflict")), "budget.error.duplicate")
+        XCTAssertEqual(HouseholdPlanModel.message(SessionFailure.rejected(status: 422, code: "unrecognized_validation")), "household.reviewError")
+    }
     func testBackedSavingsUsesSupportedResidualShareAndCurrentnessFromServer() throws {
         let cases: [(String, String?, String?, String)] = [
             ("residual", "0", "4000", "active"),
