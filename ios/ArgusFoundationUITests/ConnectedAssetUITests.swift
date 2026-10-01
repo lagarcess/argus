@@ -14,7 +14,7 @@ extension FinancialLoopUITests {
         capture("asset-whole-estimate-and-half-share")
         tapVisible(app.buttons["assets.details"])
         tapVisible(app.buttons["assets.debt.picker"])
-        let option = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND NOT identifier BEGINSWITH 'assets.'", loan.name)).firstMatch
+        let option = app.buttons[loan.name + " · DOP"]
         tapVisible(option)
         tapVisible(app.buttons["assets.save"])
         XCTAssertTrue(app.buttons["assets.save"].waitForNonExistence(timeout: 15))
