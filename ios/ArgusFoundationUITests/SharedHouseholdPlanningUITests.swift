@@ -42,12 +42,12 @@ extension FinancialLoopUITests {
             } else {
                 XCTAssertTrue(app.buttons[selection].waitForExistence(timeout: 10))
                 app.buttons[selection].tap()
-                tapVisible(app.buttons["tab.plan"])
+                openSharedPlanTab()
                 XCTAssertTrue(app.buttons["sharedPlan.add"].waitForExistence(timeout: 15))
                 app.terminate()
                 app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "light"]
                 app.launch()
-                tapVisible(app.buttons["tab.plan"])
+                openSharedPlanTab()
                 XCTAssertTrue(app.buttons["sharedPlan.add"].waitForExistence(timeout: 15))
                 capture("shared-plan-scope-reopened-spanish-" + user)
             }
@@ -65,8 +65,21 @@ extension FinancialLoopUITests {
         app.openAccountsList()
         tapVisible(app.buttons["household.selector"])
         tapVisible(app.buttons["household.select." + (try sharedEnvironment("HOUSEHOLD"))])
-        tapVisible(app.buttons["tab.plan"])
+        capture("shared-plan-selected-space")
+        openSharedPlanTab()
+    }
+
+    private func openSharedPlanTab() {
+        openSharedTab("plan")
+        capture("shared-plan-opened-tab")
         XCTAssertTrue(app.buttons["sharedPlan.add"].waitForExistence(timeout: 20))
+    }
+
+    private func openSharedTab(_ name: String) {
+        app.revealConnectedTabBar()
+        let tab = app.buttons["tab." + name]
+        XCTAssertTrue(tab.waitForExistence(timeout: 10))
+        tab.tap()
     }
 
     private func sharedPicker(_ id: String, label: String) {
@@ -87,8 +100,6 @@ extension FinancialLoopUITests {
     }
 
     private func revealSharedControl(_ control: XCUIElement) {
-        // Form creates rows lazily. Scroll the real form before asking its
-        // offscreen row to exist, then let the ordinary helper settle/tap it.
         for direction in [true, false] {
             for _ in 0..<15 {
                 if control.exists { return }
@@ -231,7 +242,7 @@ extension FinancialLoopUITests {
         tapVisible(pending)
         XCTAssertTrue(pending.waitForNonExistence(timeout: 20))
         XCTAssertEqual(try sharedFaultStatus(arm: false), before + 1)
-        tapVisible(app.buttons["tab.plan"]); tapVisible(app.buttons[row])
+        openSharedPlanTab(); tapVisible(app.buttons[row])
         assertText("DOP 7.00")
         let originals = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.original.'"))
         revealSharedControl(originals.firstMatch)
@@ -269,11 +280,11 @@ extension FinancialLoopUITests {
             }
             tapVisible(app.buttons["sharedPlan.back"])
         }
-        tapVisible(app.buttons["tab.home"])
+        openSharedTab("home")
         XCTAssertTrue(app.buttons[try XCTUnwrap(rows["budget"])].waitForExistence(timeout: 20))
         capture("shared-plan-connected-home")
         app.terminate(); app.launch()
-        tapVisible(app.buttons["tab.plan"])
+        openSharedPlanTab()
         for row in rows.values { XCTAssertTrue(app.buttons[row].waitForExistence(timeout: 20)) }
         capture("shared-four-kinds-reopened")
 
@@ -309,7 +320,7 @@ extension FinancialLoopUITests {
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", try sharedEnvironment("ACCOUNT_A_NAME"))).firstMatch.exists)
         capture("shared-explicit-editor-safe-bill")
         tapVisible(app.buttons["sharedPlan.back"])
-        tapVisible(app.buttons["tab.search"])
+        openSharedTab("search")
         let query = app.textFields["household.search.query"]
         XCTAssertTrue(query.waitForExistence(timeout: 15))
         query.tap(); query.typeText(try XCTUnwrap(names["budget"]) + "\n")
@@ -322,7 +333,7 @@ extension FinancialLoopUITests {
         capture("shared-search-return-preserved")
         app.terminate()
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "light"]
-        app.launch(); tapVisible(app.buttons["tab.plan"])
+        app.launch(); openSharedPlanTab()
         tapVisible(app.buttons[try XCTUnwrap(rows["budget"])])
         assertText("DOP 40.00")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'sharedPlan.'")).firstMatch.exists)
