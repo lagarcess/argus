@@ -7562,8 +7562,10 @@ verification levels:
 (for example `plaid_item_login_required`); transient provider failures keep
 the connection's status. Plaid errors from Link routes answer 422
 `plaid_request_invalid` or 502 `plaid_unavailable` with
-`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`; an Item
-Plaid no longer knows counts as revoked.
+`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
+transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
+Item Plaid no longer knows counts as revoked.
+
 ### Gmail connector (default-off)
 
 Mounted under `/api/v1/financial-connections/gmail`. Available only while the
@@ -7650,7 +7652,14 @@ retries of 429/5xx and `gmail_oauth_client_invalid` (status `error`), or
 with that code or 502 `gmail_unavailable`. Disconnect posts the refresh token to
 Google's revocation endpoint (a token Google no longer knows counts as revoked);
 after the local disconnect the adapter's `forget` hook deletes the sender
-allowlist, whether or not revocation succeeded.
+allowlist, whether or not revocation succeeded. While the sealing key is set
+but the Google OAuth client is not, the routes answer 404 yet a revoke-only
+adapter still revokes and forgets on disconnect.
+
+Not end-to-end import: every Gmail draft is `unclassified` until the person
+fills it in, and drafts reach review only once reconciliation provides the
+candidate sink; without it sync answers `no_sink`.
+
 ### Apple Shortcuts connector (default-off)
 
 Available whenever the connected-sources surface above is on; it stores no
@@ -7714,7 +7723,11 @@ single value is possible, and `currency` only when the text names one
 Otherwise the field stays empty and is listed as uncertain. `card` becomes the
 account hint name and `card_last4` its mask; nothing else is inferred. A
 `message_capture` becomes `unclassified` evidence: inert text (`excerpt`,
-`sender` as description) with `kind` and every money field unresolved.
+`sender` as description) with `kind` and every money field unresolved. An
+explicit `currency` settles only a bare `$` or an unmarked amount; any other
+marker it cannot vouch for (`R$`, `€` with `DOP`, `¥`) leaves currency
+unresolved. A sign or parentheses on the amount adds `direction` to the
+uncertain fields, and more than 18 digits leaves the amount unresolved.
 
 ## Import review queue (default-off)
 

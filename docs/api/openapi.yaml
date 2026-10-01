@@ -16239,6 +16239,8 @@ components:
           type: integer
         candidates:
           type: integer
+        ignored:
+          type: integer
         skipped:
           additionalProperties:
             type: integer
@@ -16264,6 +16266,7 @@ components:
       - mode
       - messages
       - candidates
+      - ignored
       - skipped
       - attachments
       - attachments_skipped
@@ -16299,8 +16302,6 @@ components:
           type: integer
         removed:
           type: integer
-        more_pending:
-          type: boolean
         error_code:
           anyOf:
           - type: string
@@ -16312,7 +16313,6 @@ components:
       - added
       - modified
       - removed
-      - more_pending
       - error_code
     argus__domain__financial_search__SearchPage:
       properties:
