@@ -160,6 +160,8 @@ struct AccountSummary: View {
             if let nickname = account.nickname { Text(verbatim: nickname).font(large ? ArgusStyle.display() : ArgusStyle.body()) }
             Text(LocalizedStringKey("accounts.type." + account.type)).foregroundStyle(ArgusStyle.secondary)
             if account.balance.state == .known, let amount = account.balance.amount {
+                // Keep balance as its own StaticText — children.combine hid "DOP …"
+                // from UITest label queries after activity confirm.
                 Text(verbatim: account.currency + " " + AccountPresentation.amount(amount, locale: locale))
                     .font(large ? ArgusStyle.display(30) : ArgusStyle.body()).monospacedDigit()
                     .accessibilityIdentifier("accounts.balance." + account.currency)
@@ -170,7 +172,7 @@ struct AccountSummary: View {
                 Text("accounts.signedBalance").font(ArgusStyle.body(12, relativeTo: .caption))
             }
             if account.archived { Text("accounts.archived").font(ArgusStyle.body(12, relativeTo: .caption)) }
-        }.fixedSize(horizontal: false, vertical: true).accessibilityElement(children: .combine)
+        }.fixedSize(horizontal: false, vertical: true)
     }
 }
 

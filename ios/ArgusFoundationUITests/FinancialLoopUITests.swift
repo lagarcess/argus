@@ -143,9 +143,14 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["loop.confirm"].tap()
         assertText("DOP 7,000.00")
         record(amount: "500", note: "Already in checked balance", included: true)
+        XCTAssertTrue(app.descendants(matching: .any)["accounts.balance.DOP"].waitForExistence(timeout: 12)
+            || app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "DOP 7,000.00")).firstMatch.waitForExistence(timeout: 2))
         assertText("DOP 7,000.00")
-        assertText("Still unexplained DOP 0.00")
-        assertText("Difference DOP -500.00")
+        // Check history uses Text + Text; match the currency amount pieces.
+        assertText("Still unexplained")
+        assertText("DOP 0.00")
+        assertText("Difference")
+        assertText("DOP -500.00")
         assertHome(baseline + 7000)
         app.openAccountsList()
         capture("late-expense-not-double-counted")
@@ -223,8 +228,16 @@ final class FinancialLoopUITests: XCTestCase {
         XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
         capture("expense-review")
         tapVisible(app.buttons["loop.confirm"])
-        // Wait for the editor sheet to dismiss before balance assertions.
-        XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 12))
+        // accounts.record can exist under the sheet; require confirm gone + record hittable.
+        let dismissed = NSPredicate { _, _ in
+            !app.buttons["loop.confirm"].exists
+                && app.buttons["accounts.record"].exists
+                && app.buttons["accounts.record"].isHittable
+        }
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: dismissed, object: nil)], timeout: 15),
+            .completed
+        )
     }
 
     func assertHome(_ expected: Decimal) {
