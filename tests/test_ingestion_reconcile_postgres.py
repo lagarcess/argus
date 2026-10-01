@@ -13,6 +13,7 @@ import pytest
 from tests import test_financial_accounts_postgres as shared
 from tests.ingestion.reconcile_cases import *  # noqa: F403
 from tests.ingestion.reconcile_cases import plaid, submit
+from tests.ingestion.reconcile_review_cases import *  # noqa: F403
 from tests.ingestion.reconcile_world import build
 
 pytestmark = pytest.mark.skipif(

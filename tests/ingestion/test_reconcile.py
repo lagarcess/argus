@@ -3,6 +3,7 @@
 import pytest
 
 from tests.ingestion.reconcile_cases import *  # noqa: F403
+from tests.ingestion.reconcile_review_cases import *  # noqa: F403
 from tests.ingestion.reconcile_world import memory_pair
 
 
