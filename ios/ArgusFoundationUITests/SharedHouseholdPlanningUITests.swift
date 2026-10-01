@@ -157,7 +157,7 @@ extension FinancialLoopUITests {
 
     private func recordNativeSharedContribution(kind: String, amount: String, privateNote: String, actor: String = "A") throws {
         try prepareNativeSharedContribution(kind: kind, amount: amount, privateNote: privateNote, actor: actor)
-        confirmNativeSharedContribution()
+        try confirmNativeSharedContribution()
     }
 
     private func prepareNativeSharedContribution(kind: String, amount: String, privateNote: String, actor: String = "A") throws {
@@ -180,18 +180,28 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
     }
 
-    private func reviewNativeSharedContribution() {
+    private func reviewNativeSharedContribution() throws {
         tapVisible(app.buttons["sharedPlan.contribution.review"])
-        for _ in 0..<12 {
-            if app.buttons["sharedPlan.contribution.confirm"].waitForExistence(timeout: 1) { break }
-            let answer = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.coverage.no.'")).firstMatch
-            if answer.exists { tapVisible(answer) }
+        var answered = Set<String>()
+        let confirm = app.buttons["sharedPlan.contribution.confirm"]
+        for _ in 0..<24 {
+            if confirm.waitForExistence(timeout: 1) { break }
+            let answers = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.coverage.no.'"))
+            let pending = (0..<answers.count).map { answers.element(boundBy: $0) }
+                .first { !answered.contains($0.identifier) }
+            if let pending {
+                let identifier = pending.identifier
+                tapVisible(pending)
+                answered.insert(identifier)
+            } else { app.swipeUp() }
         }
-        XCTAssertTrue(app.buttons["sharedPlan.contribution.confirm"].waitForExistence(timeout: 15))
+        capture("shared-contribution-reviewed")
+        _ = try XCTUnwrap(confirm.waitForExistence(timeout: 15) ? confirm : nil,
+                          "Reviewed contribution must have all required coverage answers")
     }
 
-    private func confirmNativeSharedContribution() {
-        reviewNativeSharedContribution()
+    private func confirmNativeSharedContribution() throws {
+        try reviewNativeSharedContribution()
         tapVisible(app.buttons["sharedPlan.contribution.confirm"])
         XCTAssertTrue(app.buttons["sharedPlan.contribution.confirm"].waitForNonExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["sharedPlan.detail.name"].waitForExistence(timeout: 15))
@@ -225,7 +235,7 @@ extension FinancialLoopUITests {
         let name = "Native saved retry " + UUID().uuidString.prefix(6)
         let row = try createNativeSharedPlan(kind: "budget", name: String(name))
         try prepareNativeSharedContribution(kind: "budget", amount: "7", privateNote: "Private retry source")
-        reviewNativeSharedContribution()
+        try reviewNativeSharedContribution()
         let before = try sharedFaultStatus(arm: true)
         tapVisible(app.buttons["sharedPlan.contribution.confirm"])
         let responseLost = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
@@ -270,7 +280,7 @@ extension FinancialLoopUITests {
                 tapVisible(correct)
                 replaceMoneyField("sharedPlan.contribution.amount", with: "25")
                 fillMoneyField("sharedPlan.contribution.reason", with: "Receipt checked")
-                dismissMoneyKeyboard(); confirmNativeSharedContribution()
+                dismissMoneyKeyboard(); try confirmNativeSharedContribution()
                 assertText("DOP 25.00")
                 tapVisible(app.buttons["sharedPlan.archive"])
                 XCTAssertTrue(app.buttons["sharedPlan.restore"].waitForExistence(timeout: 20))
@@ -306,7 +316,7 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["sharedPlan.original.correct"])
         replaceMoneyField("sharedPlan.contribution.amount", with: "15")
         fillMoneyField("sharedPlan.contribution.reason", with: "My receipt correction")
-        dismissMoneyKeyboard(); confirmNativeSharedContribution()
+        dismissMoneyKeyboard(); try confirmNativeSharedContribution()
         assertText("DOP 40.00")
         capture("shared-view-only-own-correction")
         tapVisible(app.buttons["sharedPlan.back"])
