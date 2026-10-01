@@ -30,6 +30,7 @@ enum CuadraoTab: Int, CaseIterable, Identifiable {
         switch self {
         case .home: Image(selected ? "CuadraoHomeSelected" : "CuadraoHomeOutline")
         case .plan: Image("CuadraoPlan")
+        case .profile: Image("CuadraoProfile")
         default: Image(systemName: symbol)
         }
     }

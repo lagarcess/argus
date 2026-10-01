@@ -11,3 +11,9 @@ on September 30, 2026 (clipboard image 6ad6b5a4-1caa-434e-b8c9-b42a0de11cb9).
 It preserves the rounded calendar, binding strokes, header rule and single lower
 dash; it is not claimed to be the original vendor SVG. Template rendering follows
 the existing selected/unselected navigation color.
+
+`CuadraoProfile` and `CuadraoNotifications` are vector redraws of the founder's
+September 30 reference screenshots (6a08c79f-7ece-4dcb-b26a-6fff301bb702 and
+1dcbf13e-b888-4d3c-b17b-f656524e2a25). Rounded outline strokes preserve the
+reference shapes; background and gray pixels are not part of the template assets.
+These redraws are not claimed to be original vendor SVGs.

@@ -117,7 +117,7 @@ struct CuadraoHomeCanvas: View {
                 }
             Spacer()
             Button { sheet = .updates } label: {
-                Image(systemName: "bell").font(.title3).frame(width: 44, height: 44)
+                Image("CuadraoNotifications").frame(width: 44, height: 44)
             }
             .accessibilityLabel(spanish ? "Novedades" : "Updates")
         }

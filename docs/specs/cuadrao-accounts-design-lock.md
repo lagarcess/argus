@@ -189,3 +189,9 @@ existing invitation and acceptance behavior stays within the local design mock.
 Founder replaced the target icon with the supplied rounded calendar outline.
 The native tab uses a scalable vector redraw; other navigation icons and the
 icon-only layout remain unchanged. [Visual check](../reports/evidence/cuadrao-native-design/plan-calendar/README.md).
+
+## Profile and notifications icons — September 30, 2026
+
+Founder-supplied rounded outline references replace the default person and bell
+artwork in navigation. Template vector redraws preserve the current placement,
+colors and interactions. [Visual check](../reports/evidence/cuadrao-native-design/navigation-icons/README.md).
