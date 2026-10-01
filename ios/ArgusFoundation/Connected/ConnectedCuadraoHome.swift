@@ -12,6 +12,8 @@ struct ConnectedCuadraoHome: View {
     let showUpdates: () -> Void
 
     @AppStorage("cuadrao.design.home-section-order") private var homeOrder = CuadraoHomeSection.defaultOrder
+    @EnvironmentObject private var auth: ProfileAuthModel
+    @State private var householdDestination: AppDestination = .home
     @Environment(\.locale) private var locale
     @State private var sheet: HomeSheet?
     @State private var choosingAccount = false
@@ -48,9 +50,9 @@ struct ConnectedCuadraoHome: View {
                 VStack(alignment: .leading, spacing: 36) {
                     VStack(alignment: .leading, spacing: 18) {
                         header
-                        Text(spanish ? "Personal" : "Personal")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary)
+                        if tab == .home, let household = auth.household {
+                            HouseholdControls(model: household, destination: $householdDestination)
+                        }
                     }
                     if loop.pendingConfirmation != nil {
                         pendingBanner

@@ -92,8 +92,10 @@ public struct FinancialActivityCommand: Codable, Equatable, Sendable {
     }
 }
 
-public struct FinancialActivityOptions: Decodable, Sendable {
-    public let accounts: [FinancialAccount]
+public typealias FinancialActivityOptions = FinancialActivityOptionsValue<UUID>
+
+public struct FinancialActivityOptionsValue<Author: Codable & Equatable & Sendable>: Decodable, Sendable {
+    public let accounts: [FinancialAccountValue<Author>]
     public let eligibility: [String: [String]]
     public let destinationEligibility: [String: [String]]
     public let categories: [String]
