@@ -7477,10 +7477,12 @@ and the review queue are documented with their packages. Imports are drafts
 until the person confirms them; no route here writes financial activity.
 
 Connection shape:
-`{id,source,status,label,last_success_at,last_attempt_at,last_error_code,created_at,disconnected_at}`.
+`{id,source,status,label,last_success_at,last_attempt_at,last_error_code,attention_code,attention_at,created_at,disconnected_at}`.
 `source` is `plaid|gmail|shortcuts|statement`; `status` is
 `active|needs_reauth|error|disconnected`. A failed refresh keeps the previous
-`last_success_at`. Credentials, cursors and sync leases are never returned.
+`last_success_at`. `attention_code` is a warning that outlives successful
+refreshes (for example consent expiring soon) and clears only on
+re-authorization or disconnect. Credentials, cursors and sync leases are never returned.
 
 - GET `/api/v1/financial-connections` returns `{items}` for the caller only,
   oldest first.

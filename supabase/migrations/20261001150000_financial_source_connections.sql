@@ -22,6 +22,12 @@ create table if not exists public.financial_source_connections (
     last_error_code text check (
         last_error_code is null or last_error_code ~ '^[a-z0-9_]{1,64}$'
     ),
+    -- A warning that survives successful syncs (consent expiring); cleared
+    -- only by re-authorization or disconnect.
+    attention_code text check (
+        attention_code is null or attention_code ~ '^[a-z0-9_]{1,64}$'
+    ),
+    attention_at timestamptz,
     lease_holder text check (lease_holder is null or char_length(lease_holder) <= 64),
     lease_until timestamptz,
     created_at timestamptz not null default now(),
@@ -32,7 +38,8 @@ create table if not exists public.financial_source_connections (
     constraint financial_source_connections_disconnected_is_empty check (
         status <> 'disconnected'
         or (secret_ciphertext is null and sync_cursor is null
-            and lease_holder is null and disconnected_at is not null)
+            and attention_code is null and lease_holder is null
+            and disconnected_at is not null)
     )
 );
 
@@ -61,6 +68,6 @@ revoke all on public.financial_source_connections from public, anon, authenticat
 -- Column grant: the credential envelope and lease are never client-readable.
 grant select (
     id, user_id, source, status, label, last_success_at, last_attempt_at,
-    last_error_code, created_at, updated_at, disconnected_at, version
+    last_error_code, attention_code, attention_at, created_at, updated_at, disconnected_at, version
 ) on public.financial_source_connections to authenticated;
 grant all on public.financial_source_connections to service_role;
