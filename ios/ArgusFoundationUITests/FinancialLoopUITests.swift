@@ -142,14 +142,13 @@ final class FinancialLoopUITests: XCTestCase {
         capture("checked-balance-review")
         app.buttons["loop.confirm"].tap()
         assertText("DOP 7,000.00")
-        record(amount: "500", note: "Already in checked balance", included: true)
+        // Residuals only credit activity newly covered since the prior observation.
+        // Include in the check, not the opening — same shape as PersonalMoneyUITests.
+        record(amount: "500", note: "Already in checked balance", coverageAnswers: [false, true])
         ensureAccountDetail(nickname: nickname)
         assertAccountBalance("DOP 7,000.00")
-        // Check history uses Text + Text; match the currency amount pieces.
-        assertText("Still unexplained")
-        assertText("DOP 0.00")
-        assertText("Difference")
-        assertText("DOP -500.00")
+        assertText("Still unexplained DOP 0.00")
+        assertText("Difference DOP -500.00")
         assertHome(baseline + 7000)
         app.openAccountsList()
         capture("late-expense-not-double-counted")
@@ -182,46 +181,52 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["Cancelar"].tap()
     }
 
-    func record(amount: String, note: String, included: Bool = false) {
+    func record(amount: String, note: String, coverageAnswers: [Bool] = []) {
         tapVisible(app.buttons["accounts.record"])
         XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 5))
         app.textFields["loop.amount"].tap(); app.textFields["loop.amount"].typeText(amount)
         app.textFields["loop.note"].tap(); app.textFields["loop.note"].typeText(note)
         app.buttons["Done"].tap()
-        reviewAndConfirm(included: included)
+        reviewAndConfirm(coverageAnswers: coverageAnswers)
     }
 
-    func reviewAndConfirm(included: Bool = false) {
+    func reviewAndConfirm(coverageAnswers: [Bool] = []) {
         tapVisible(app.buttons["loop.review"])
         // Activity editor: loop.coverage.{yes|no}.<accountId>.<observationId>
         // Balance/opening editor: loop.coverage.{yes|no}.<kind>.<observationId>
-        // After a checked balance, one expense can ask about opening AND check —
-        // answer each distinct id once; re-tapping firstMatch never reaches the rest.
-        let prefix = included ? "loop.coverage.yes." : "loop.coverage.no."
+        // Observations appear in order (opening then check). Use the .no. row as the
+        // stable probe, then tap yes/no from coverageAnswers — all-no when empty.
         var answered = Set<String>()
+        var answerIndex = 0
         for _ in 0..<8 {
             if app.buttons["loop.confirm"].waitForExistence(timeout: 2) { break }
-            let matches = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+            let matches = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no."))
             var tapped = false
             for index in 0..<matches.count {
-                let answer = matches.element(boundBy: index)
-                let id = answer.identifier
-                guard !id.isEmpty, !answered.contains(id), answer.exists else { continue }
-                tapVisible(answer)
-                answered.insert(id)
+                let probe = matches.element(boundBy: index)
+                let probeId = probe.identifier
+                guard !probeId.isEmpty, !answered.contains(probeId), probe.exists else { continue }
+                let include = answerIndex < coverageAnswers.count && coverageAnswers[answerIndex]
+                answerIndex += 1
+                let targetId = include
+                    ? probeId.replacingOccurrences(of: ".no.", with: ".yes.")
+                    : probeId
+                tapVisible(app.buttons[targetId])
+                answered.insert(probeId)
                 tapped = true
-                // Let the review round-trip finish before the next observation.
                 _ = app.buttons["loop.confirm"].waitForExistence(timeout: 4)
                 break
             }
             if tapped { continue }
-            if !included {
-                let opening = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no.opening.")).firstMatch
-                if opening.waitForExistence(timeout: 1), !answered.contains(opening.identifier) {
-                    tapVisible(opening)
-                    answered.insert(opening.identifier)
-                    continue
-                }
+            let opening = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no.opening.")).firstMatch
+            if opening.waitForExistence(timeout: 1), !answered.contains(opening.identifier) {
+                let include = answerIndex < coverageAnswers.count && coverageAnswers[answerIndex]
+                answerIndex += 1
+                let targetId = include
+                    ? opening.identifier.replacingOccurrences(of: ".no.", with: ".yes.")
+                    : opening.identifier
+                tapVisible(app.buttons[targetId])
+                answered.insert(opening.identifier)
             }
         }
         XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
