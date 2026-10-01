@@ -1,0 +1,73 @@
+{
+  "sourceCommit": "91ba76c496444c07b28075303bdfcb47d8bc10fc",
+  "scope": "UI-only shared amount treatment for personal plans, group estimates, shared expenses and repayments. Fixed currency ownership unchanged.",
+  "nativeTests": {
+    "passed": 2,
+    "failed": 0,
+    "resultBundle": "test_sim_2026-10-01T16-18-32-579Z_pid473_80c2bce4.xcresult",
+    "coverage": [
+      "English personal EUR plan with 1,250,000.50 target and 750.25 monthly contribution; save and reopen preserve both amounts",
+      "Spanish USD group creation, equal expense split, partial repayment and locked currency editing"
+    ]
+  },
+  "visualReview": "Inspected native screenshots. Fixed long-amount clipping using adaptive text sizing and bounded field width. Shared currency chip, baseline, focus underline and amount hierarchy.",
+  "warning": "Preexisting unlocated invalid-frame warning remains when opening native keyboards.",
+  "physicalDevice": {
+    "signedBuild": "passed",
+    "installation": "passed",
+    "installationSequence": 3348,
+    "launch": "passed"
+  },
+  "designReferences": [
+    {
+      "app": "Wise",
+      "url": "https://mobbin.com/screens/61682665-54d7-4518-8af2-d3eeb4a152b8",
+      "lesson": "Primary numeric amount with secondary currency choice"
+    },
+    {
+      "app": "Splitwise",
+      "url": "https://mobbin.com/screens/81d7df66-32f4-4cb9-abd5-9f3628f80371",
+      "lesson": "Clear editable amount within expense context"
+    }
+  ],
+  "appleBillSplitFollowup": {
+    "reference": "https://support.apple.com/en-us/127565",
+    "checked": "2026-10-01",
+    "currentGap": "Receipt attachment only; item extraction, editable receipt lines, shared-item selection and tax/tip allocation are not implemented. Apple Cash payment execution is outside this UI-only preview.",
+    "adaptation": "Spanish-first scan or photo, review items, split equally or by item, preview shares, retain drafts and external repayment tracking in one fixed currency."
+  },
+  "captures": [
+    {
+      "file": "currency-personal-fixed-en.png",
+      "sha256": "ed954ad73c049c9846c8568a7fbf1444ea949b6195ceeacb0b306bde8328dd53"
+    },
+    {
+      "file": "currency-personal-choice-en.png",
+      "sha256": "250f859072c69e35c51f1f7ef472fe96d8797e770cedfbc034e2837f1d4b2349"
+    },
+    {
+      "file": "amount-personal-focused-en.png",
+      "sha256": "21025783261bdfa4936b65f5de28d9f25aba5b47fa9b15344e138b1cb878528c"
+    },
+    {
+      "file": "currency-group-fixed-es.png",
+      "sha256": "77dc5aabe7edfcce52f1c8363eba56889d7ff2aacf5f21ded4bc5c9c99cecb1f"
+    },
+    {
+      "file": "currency-dollar-balance-es.png",
+      "sha256": "8bcbbbc500a6f7a75309394017df83a97a57620a06c938c685a7ee326d24a3f2"
+    },
+    {
+      "file": "amount-repayment-es.png",
+      "sha256": "de219bb239152e7ed731f1b96964744af0c9d87169aa57f822a9eb61d904b2ab"
+    },
+    {
+      "file": "currency-dollar-split-es.png",
+      "sha256": "329032a441dc6a4d7c46cbb990b64a530cf40125e5ce545ef4e37e3e2fa72635"
+    },
+    {
+      "file": "currency-group-choice-es.png",
+      "sha256": "1705f14980c4796990f8ea3cb87db0ee6f5a0135d4935d074055758eca7bdccf"
+    }
+  ]
+}
