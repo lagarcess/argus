@@ -60,8 +60,9 @@ merge-ready PR targeting `codex/private-alpha-next`.
 #764 adds #763 landing documentation only. Reconciliation preserves that register
 and this native-adapter assignment; no runtime, UI, migration or test overlap.
 **Active recovery branch:** `codex/connected-household-native`.
-**Review PR:** [#766](https://github.com/lagarcess/argus/pull/766), draft while
-assembled acceptance and terminal checks run. No merge authority for this PR.
+**Review PR:** [#766](https://github.com/lagarcess/argus/pull/766). Assembled
+local acceptance is complete; final-head CI/terminal audit is recorded on the PR.
+No merge authority for this PR.
 **Active isolated checkout:**
 `/Users/garces/.codex/worktrees/connected-household-native/private-alpha-next`.
 **Current status:** connect the complete native household journey to landed
@@ -78,17 +79,41 @@ The earlier local implementation remains frozen at
 checkpoint, not evidence that the new canonical adapter already works.
 Recapture assembled acceptance against the active branch before a READY claim.
 
-**Verification checkpoint:** canonical adapters and connected native controls are
-committed through `8e43fab960bde6542d82c21d197cd840ea68275e`. Fresh independent
-review found three confirmed issues (committed retry after an unrelated Household
-version change, archived-money totals and deletion-safe grant FKs). All three
-are fixed; the affected-fix review is clean at that source. Local regressions
-pass (276 deterministic checks; 36 existing and six new real-Postgres Household
-checks). Native assembled and response-loss acceptance, durable recording,
-publication and terminal CI remain in progress. This is not a READY claim.
-The broad local suite cannot collect because the inherited shared SciPy binary
-fails to load `_spropack`; the shared environment remains unchanged. Full
-Linux CI is still required.
+**Local delivery result:** canonical source `8e43fab960bde6542d82c21d197cd840ea68275e`,
+helper `095473a7`, reconciliation `4fed9efb` and native contrast `d1084805`.
+Fresh independent review identified three real issues: exact committed retry
+across an unrelated Household version, archived-money totals and deletion-safe
+grant FKs. All are fixed with clean affected reviews; helper and contrast deltas
+also reviewed clean. No unresolved independent findings.
+
+Real Auth/API/Postgres acceptance covers named-current-member grants, view/edit
+separation, private-leg redaction, departure/rejoin/admin transfer/closure,
+retained owners' records, 50% asset attribution and unknown currency totals.
+Checks pass: 276 focused deterministic; 36 existing and six new actual-Postgres;
+seven production Household-model; session package64; local helper/secure runner37.
+The broad local suite cannot collect due to inherited SciPy `_spropack`; shared
+Python remains untouched. Full Linux CI passed at67e; final-head checks are the
+terminal PR gate, not inferred from that earlier head.
+
+Native setup reached acceptance and consent before the unchanged local login
+rate limit interrupted its ninth sign-in; that entire test is **not** reported
+passing. Same-fixture AAE272 continuation passed (224.032s), including expense25,
+original correction20, balance980, Search/back, Spanish relaunch and withdrawal.
+Confirmed response-loss creation/acceptance passed separately (228.443s) atd108,
+with two committed responses dropped and exact journal outcomes recovered.
+Finald108 native interaction retained fixture69447E, recording25 then correcting
+that original entry20 (1000→975→980), with readable Household colors under light
+and dark appearance. Current signed-in recipient can click through that fixture.
+[Durable packet and recording](../reports/evidence/connected-household-native/README.md)
+and [existing restart instructions](../../ios/HOUSEHOLD_SETUP.md) preserve the demo.
+
+**Remaining limits/polish:** physical iPhone/internet delivery and hosted migration
+remain unverified and unauthorized. Synthetic invitation links only; no delivery
+was sent. Shared Plan/budgets/goals/debt and Business/Custom remain outside this
+bounded assignment and retain their MVEE dependencies below. Existing #760
+shared navigation/Personal secondary colors on its white canvas under system-dark
+appearance need a later visual polish pass; this lane fixes only new Household
+inline contrast, preserves native sheet appearance and avoids design expansion.
 
 **Assigned resources:** simulator `C93072E7-D29A-4B0A-BE76-E6418E4E9F88`,
 new bundle `local.argus.household-current-demo`, cache

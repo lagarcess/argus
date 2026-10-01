@@ -1,0 +1,69 @@
+{
+  "financial_native_source": "8e43fab960bde6542d82c21d197cd840ea68275e",
+  "runtime_helper_source": "095473a78c11a6d368927c8132f5ecf4bb1a4e81",
+  "reconciliation_merge": "4fed9efbe17ad3ac1c722deddc390082a46094d3",
+  "original_assignment_base": "9b5e8643f0493145bd672c2af6e7508371d4cfa0",
+  "adapter_base": "631d405142435d059ab6ef419f8235bf0ad52947",
+  "integration": "09ce4e0af3b6df7a41e2d21c52c67b4fe7c82c0a",
+  "overlap": "landing documents only; no runtime, API/data contract, UI state, migration, environment variable or affected-test change",
+  "deterministic_connected": {
+    "passed": 276,
+    "skipped": 160
+  },
+  "household_existing_postgres_and_projection": {
+    "passed": 36
+  },
+  "new_real_postgres_review_regressions": {
+    "passed": 6
+  },
+  "household_presentation_model": {
+    "passed": 7
+  },
+  "session_package": {
+    "passed": 64,
+    "opt_in_live_auth_skipped": 4
+  },
+  "local_helper_and_secure_runner": {
+    "passed": 37
+  },
+  "ruff": "pass",
+  "modularity_after_reconciliation": "pass",
+  "broad_local_backend": "collection blocked by inherited shared SciPy _spropack dlopen error; shared environment unchanged; Linux CI required",
+  "remaining": [
+    "exact final-head CI and terminal audit on PR766"
+  ],
+  "native_visual_source": "d1084805fa1da72dba8faf6c78971c73c1e97882",
+  "native": {
+    "setup": {
+      "result": "partial; accepted setup stages only",
+      "fixture": "AAE272",
+      "archive": "ui-20261001T073216Z.xcresult",
+      "failure": "ninth login encountered unchanged eight-logins-per-ten-minutes limit; full test is not reported as PASS"
+    },
+    "same_fixture_continuation": {
+      "result": "PASS",
+      "seconds": 224.032,
+      "archive": "ui-20261001T074502Z.xcresult",
+      "journey": "expense25, correction20, balance980, Search/detail/back, Spanish relaunch, owner withdrawal and recipient absence"
+    },
+    "committed_response_loss": {
+      "result": "PASS",
+      "seconds": 228.443,
+      "archive": "ui-20261001T075255Z.xcresult",
+      "source": "d1084805fa1da72dba8faf6c78971c73c1e97882",
+      "fault": {
+        "armed": false,
+        "dropped": 2
+      },
+      "journey": "one original household and membership after response loss, relaunch and exact-journal retries"
+    },
+    "current_visual_and_money_revalidation": {
+      "source": "d1084805fa1da72dba8faf6c78971c73c1e97882",
+      "fixture": "69447E",
+      "result": "PASS observed native real API interaction",
+      "journey": "system light/dark legibility; dark native sheet; explicit not-included balance attribution; expense25 then same activity correction20; Home1000 to975 to980"
+    },
+    "build_run": "PASS d108; direct API59520 restored after recovery; no credential-bearing xctestrun retained"
+  },
+  "evidence_disposition": "Retain financial/API/PG/source8e and native continuation4fed after docs-only merge; source d108 changes only two subtree color environments, reviewed clean and native visuals/actual correction/recovery revalidated. Publication packet changes documentation/media only; terminal PR audit records final-head content equality and CI."
+}
