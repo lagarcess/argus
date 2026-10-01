@@ -3,8 +3,9 @@ import XCTest
 extension FinancialLoopUITests {
     func testConnectedAssetEstimateShareDebtHistorySearchAndRelaunch() throws {
         try signIn()
-        let baseline = homeValue()
         let stamp = String(UUID().uuidString.prefix(5))
+        _ = createMoneyAccount("Asset baseline cash " + stamp, type: "checking", amount: "1000")
+        let baseline = homeValue()
         let loan = createMoneyAccount("Asset loan " + stamp, type: "other_debt", amount: "1000000")
         let house = createAsset("Home " + stamp, type: "property", amount: "8000000", half: true)
         assertAssetContribution("DOP 4,000,000.00")
