@@ -23,8 +23,40 @@ def credit(entry, accepted, purpose, actual, accounts):
     return entry["amount_minor"] if purpose == "bill_payment" else 0
 
 
+def supported_credit(state, link, actual, records, canonical):
+    amount = credit(
+        actual.get(link["activity_id"]),
+        link["attribution"],
+        link["purpose"],
+        actual,
+        records,
+    )
+    if amount is None or link["purpose"] != "goal_saving" or amount == 0:
+        return amount
+    owner = link["attribution"]["destination_owner_id"]
+    pool_state = (
+        state
+        if owner == state.get("_owner_id")
+        else state.get("_claim_pool_states", {}).get(owner)
+    )
+    if pool_state is None:
+        return None
+    from argus.domain.recording.canonical_groups import VisibleAccounts
+
+    owned = [record for record in records if record.account.user_id == owner]
+    positions = VisibleAccounts(owned, canonical) if canonical is not None else owned
+    pool_state = pool_state | {
+        "_canonical_records": records,
+        "_canonical_activities": actual,
+    }
+    amounts, _, __ = goal_projection.pool_assignments(pool_state, positions)
+    pools = goal_projection.pool_facts(pool_state, positions, amounts)
+    destination = link["attribution"]["destination_account_id"]
+    return amount if pools.get(destination, {}).get("state") == "backed" else None
+
+
 def for_occurrence(state, identifier, accounts=None):
-    canonical = getattr(accounts, "canonical", None)
+    canonical = getattr(accounts, "canonical", None) or state.get("_canonical_groups")
     actual = state.get("_canonical_activities", {})
     records = state.get("_canonical_records", accounts or [])
     if canonical is not None:
@@ -45,13 +77,7 @@ def for_occurrence(state, identifier, accounts=None):
     values = [
         0
         if link["released"]
-        else credit(
-            actual.get(link["activity_id"]),
-            link["attribution"],
-            link["purpose"],
-            actual,
-            records,
-        )
+        else supported_credit(state, link, actual, records, canonical)
         for link in links
     ]
     return dict(amount=sum(values) if all(v is not None for v in values) else None)

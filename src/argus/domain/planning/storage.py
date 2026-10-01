@@ -9,7 +9,11 @@ from fastapi.encoders import jsonable_encoder
 from psycopg.types.json import Jsonb
 
 from argus.domain.planning import goal_allocations
-from argus.domain.recording.errors import IdempotencyConflict, RegisteredAccountRequired
+from argus.domain.recording.errors import (
+    IdempotencyConflict,
+    RegisteredAccountRequired,
+    StaleVersion,
+)
 from argus.domain.recording.loop_storage import apply
 from argus.domain.recording.money_plan import MoneyPlan
 from argus.domain.recording.money_postgres import load_owner, owner_lock, persist
@@ -39,8 +43,38 @@ def empty() -> dict[str, Any]:
     }
 
 
+def shared_links(connection: Any, user_id: str) -> list[dict[str, Any]]:
+    """Current canonical consent supplies internal claim dependencies only."""
+    return [
+        dict(
+            claim_id=str(cid),
+            activity_owner_id=str(activity_owner),
+            occurrence_id=str(oid) if oid else None,
+            activity_id=str(aid),
+            expectation_id=str(eid) if eid else None,
+            goal_id=str(gid) if gid else None,
+            debt_plan_id=str(did) if did else None,
+            snapshot=snapshot,
+            attribution=attribution,
+            purpose=purpose,
+            released=released is not None,
+        )
+        for cid, oid, activity_owner, aid, eid, gid, did, snapshot, attribution, purpose, released in connection.execute(
+            "select l.claim_id,l.occurrence_id,l.activity_owner_id,l.activity_id,l.expectation_id,l.goal_id,l.debt_plan_id,l.snapshot,l.attribution,l.purpose,l.released_at "
+            "from public.financial_plan_links l join public.household_plan_bindings b on b.id=l.binding_id "
+            "where l.user_id=%s and b.departed_at is null and b.revoked_at is null",
+            (user_id,),
+        ).fetchall()
+    ]
+
+
+def claim_owners(user_id: str, links: list[dict[str, Any]]) -> set[str]:
+    return {user_id, *(link["activity_owner_id"] for link in links)}
+
+
 def load(connection: Any, user_id: str, repository: Any = None) -> dict[str, Any]:
     state = empty()
+    state["_owner_id"] = user_id
     for did, body in connection.execute(
         "select id,body from public.financial_debt_plans where user_id=%s order by id",
         (user_id,),
@@ -91,58 +125,53 @@ def load(connection: Any, user_id: str, repository: Any = None) -> dict[str, Any
     ).fetchone()
     if row:
         state["selection"] = row[0]
+    state["_pool_external"] = []
+    for gid, aid, amount in connection.execute(
+        "select goal_id,account_id,unlinked_minor from public.financial_goal_allocations "
+        "where account_owner_id=%s and goal_owner_id<>%s",
+        (user_id, user_id),
+    ).fetchall():
+        state["_pool_external"].append(
+            dict(goal_id=str(gid), account_id=str(aid), amount=amount)
+        )
+    for gid, activity_id, attribution in connection.execute(
+        "select goal_id,activity_id,attribution from public.financial_plan_links "
+        "where goal_id is not null and purpose='goal_saving' and binding_id is not null and released_at is null "
+        "and attribution->>'destination_owner_id'=%s",
+        (user_id,),
+    ).fetchall():
+        state["_pool_external"].append(
+            dict(
+                goal_id=str(gid),
+                activity_id=str(activity_id),
+                attribution=attribution,
+            )
+        )
     if repository is not None:
         from argus.domain.recording import canonical_groups
         from argus.domain.recording.money_reads import render_activity
 
-        canonical = canonical_groups.load(repository, connection, {user_id})
+        state["_shared_links"] = shared_links(connection, user_id)
+        canonical = canonical_groups.load(
+            repository, connection, claim_owners(user_id, state["_shared_links"])
+        )
+        state["_canonical_groups"] = canonical
         state["_canonical_records"] = canonical.records
         state["_canonical_activities"] = {
             aid: render_activity(aid, canonical.history[aid], revision)
             for aid, revision in canonical.current.items()
         }
-        state["_pool_external"] = []
-        state["_shared_links"] = [
-            dict(
-                claim_id=str(cid),
-                occurrence_id=str(oid) if oid else None,
-                activity_id=str(aid),
-                expectation_id=str(eid) if eid else None,
-                goal_id=str(gid) if gid else None,
-                debt_plan_id=str(did) if did else None,
-                snapshot=snapshot,
-                attribution=attribution,
-                purpose=purpose,
-                released=released is not None,
-            )
-            for cid, oid, aid, eid, gid, did, snapshot, attribution, purpose, released in connection.execute(
-                "select l.claim_id,l.occurrence_id,l.activity_id,l.expectation_id,l.goal_id,l.debt_plan_id,l.snapshot,l.attribution,l.purpose,l.released_at "
-                "from public.financial_plan_links l join public.household_plan_bindings b on b.id=l.binding_id "
-                "where l.user_id=%s and b.departed_at is null and b.revoked_at is null",
-                (user_id,),
-            ).fetchall()
-        ]
-        for gid, aid, amount in connection.execute(
-            "select goal_id,account_id,unlinked_minor from public.financial_goal_allocations "
-            "where account_owner_id=%s and goal_owner_id<>%s",
-            (user_id, user_id),
-        ).fetchall():
-            state["_pool_external"].append(
-                dict(goal_id=str(gid), account_id=str(aid), amount=amount)
-            )
-        for gid, activity_id, attribution in connection.execute(
-            "select goal_id,activity_id,attribution from public.financial_plan_links "
-            "where goal_id is not null and purpose='goal_saving' and binding_id is not null and released_at is null "
-            "and attribution->>'destination_owner_id'=%s",
-            (user_id,),
-        ).fetchall():
-            state["_pool_external"].append(
-                dict(
-                    goal_id=str(gid),
-                    activity_id=str(activity_id),
-                    attribution=attribution,
-                )
-            )
+        # Foreign pool state stays internal. The existing single pool reducer uses
+        # current full groups, while public account positions remain owner-only.
+        state["_claim_pool_states"] = {
+            owner: load(connection, owner)
+            for owner in {
+                link["attribution"]["destination_owner_id"]
+                for link in state["_shared_links"]
+                if link["purpose"] == "goal_saving" and not link["released"]
+            }
+            if owner != user_id
+        }
     return state
 
 
@@ -158,11 +187,11 @@ def read(repository: Any, user_id: str) -> tuple[dict[str, Any], list[StoredAcco
     with repository._pool.connection() as connection, connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
         from argus.domain.recording.canonical_groups import VisibleAccounts
-        from argus.domain.recording.canonical_groups import load as load_groups
 
-        return load(connection, user_id, repository), VisibleAccounts(
+        state = load(connection, user_id, repository)
+        return state, VisibleAccounts(
             load_owner(repository, connection, user_id),
-            load_groups(repository, connection, {user_id}),
+            state["_canonical_groups"],
         )
 
 
@@ -231,9 +260,11 @@ def write(
             return deepcopy(result)
     with repository._pool.connection() as connection, connection.transaction():
         from argus.domain.recording.canonical_groups import VisibleAccounts, owner_closure
-        from argus.domain.recording.canonical_groups import load as load_groups
 
-        for owner in owner_closure(connection, {user_id}):
+        owners = owner_closure(
+            connection, claim_owners(user_id, shared_links(connection, user_id))
+        )
+        for owner in owners:
             owner_lock(connection, owner)
         if not connection.execute(
             "select 1 from auth.users where id=%s and coalesce(is_anonymous,false)=false",
@@ -248,15 +279,23 @@ def write(
             if receipt[0] != identity:
                 raise IdempotencyConflict()
             return receipt[1] | {"replayed": True}
+        # Claims may change while waiting for locks. Retry rather than acquiring a
+        # newly discovered owner out of order or reducing an incomplete original.
+        if not set(
+            owner_closure(
+                connection, claim_owners(user_id, shared_links(connection, user_id))
+            )
+        ) <= set(owners):
+            raise StaleVersion()
         connection.execute(
-            "select id from public.financial_accounts where user_id=%s order by id for update",
-            (user_id,),
+            "select id from public.financial_accounts where user_id=any(%s::uuid[]) order by id for update",
+            (owners,),
         ).fetchall()
         state = load(connection, user_id, repository)
         original_claims = set(state["links"])
         accounts = VisibleAccounts(
             load_owner(repository, connection, user_id),
-            load_groups(repository, connection, {user_id}),
+            state["_canonical_groups"],
         )
         result, money = action(state, accounts)
         if money:

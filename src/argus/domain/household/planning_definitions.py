@@ -66,7 +66,13 @@ def edit(kind, item, patch, accounts, state, today):
     elif kind == "goal":
         if "amount" in fields:
             fields["target"] = fields.pop("amount")
-        if "schedule" in fields or "planned_contribution_amount" in fields:
+        contribution_amount = fields.pop("planned_contribution_amount", None)
+        if (
+            "planned_contribution_amount" in patch.model_fields_set
+            and contribution_amount is None
+        ):
+            model.fail("amount_invalid", "Enter a planned contribution amount.")
+        if "schedule" in fields:
             planned = goal_model.current_plan(item)
             if planned is None:
                 model.fail(
@@ -75,10 +81,18 @@ def edit(kind, item, patch, accounts, state, today):
                 )
             fields["contribution_plan"] = planned | {
                 "schedule": fields.pop("schedule", planned["schedule"]),
-                "amount": fields.pop("planned_contribution_amount", planned["amount"]),
+                "amount": contribution_amount
+                if contribution_amount is not None
+                else planned["amount"],
             }
+            contribution_amount = None
         goal_model.edit(
-            item, GoalEdit(expected_version=version, **fields), accounts, state, today
+            item,
+            GoalEdit(expected_version=version, **fields),
+            accounts,
+            state,
+            today,
+            contribution_amount=contribution_amount,
         )
     else:
         debt_model.edit(
