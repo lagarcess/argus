@@ -221,3 +221,38 @@ def test_time_limited_grant_is_flagged_without_blocking_and_cleared_on_reconnect
     assert row.attention_at == connector.hub.clock()
     again = connect(connector, fake, ALICE, senders=None).connection
     assert again.id == row.id and again.attention_code is None
+
+
+def _senders_unavailable(connector, monkeypatch):  # noqa: ANN001, ANN202
+    def unavailable(**_kwargs):  # noqa: ANN003, ANN202
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(connector.senders, "replace", unavailable)
+
+
+def test_a_new_connection_whose_setup_fails_is_ended_and_its_grant_released(
+    monkeypatch,
+):
+    fake = FakeGoogle()
+    connector = make_connector(fake)
+    _senders_unavailable(connector, monkeypatch)
+    with pytest.raises(RuntimeError):
+        connect(connector, fake, ALICE)
+    (row,) = connector.hub.connections.list(user_id=ALICE)
+    assert row.status == "disconnected" and row.secret is None
+    assert fake.count("/revoke") == 1 and fake.revoked
+    assert connector.senders.list(connection_id=row.id) == []
+
+
+def test_a_reconnect_whose_setup_fails_asks_for_authorization_again(monkeypatch):
+    fake = FakeGoogle()
+    connector = make_connector(fake)
+    first = connect(connector, fake, ALICE).connection
+    _senders_unavailable(connector, monkeypatch)
+    with pytest.raises(RuntimeError):
+        connect(connector, fake, ALICE, senders=("other-bank.test",))
+    row = connector.hub.connections.get(user_id=ALICE, connection_id=first.id)
+    assert (row.status, row.last_error_code) == ("needs_reauth", "gmail_token_revoked")
+    assert fake.count("/revoke") == 1
+    # The allowlist chosen at first connect is untouched.
+    assert len(connector.senders.list(connection_id=first.id)) == 2

@@ -36,6 +36,7 @@ from argus.domain.ingestion.gmail.config import (
     mailbox_ref,
     masked_label,
 )
+from argus.domain.ingestion.gmail.failures import TOKEN_REVOKED
 from argus.domain.ingestion.gmail.senders import SenderRepository, SenderRule
 from argus.domain.ingestion.gmail.state import OAuthStates
 from argus.domain.ingestion.hub import IngestionHub
@@ -140,8 +141,24 @@ class GmailOAuth:
             # the connection then asks for authorization again.
             self._discard(grant.refresh_token)
             raise
+        try:
+            return self._configure(row, created, grant.refresh_expires_in, senders)
+        except Exception:
+            # The grant is stored but the connection is not fully set up (a
+            # time-limited grant without its warning, senders not saved).
+            # Undo rather than leave a partly applied connection.
+            self._undo(user_id, row, created, grant.refresh_token)
+            raise
+
+    def _configure(
+        self,
+        row: SourceConnection,
+        created: bool,
+        refresh_expires_in: int | None,
+        senders: tuple[str, ...] | None,
+    ) -> ConnectResult:
         now = self.hub.clock()
-        if grant.refresh_expires_in is not None:
+        if refresh_expires_in is not None:
             # Not blocking: syncs work until Google ends the grant, then the
             # connection moves to needs_reauth. The person is told ahead.
             row = self.hub.connections.flag_attention(
@@ -149,11 +166,40 @@ class GmailOAuth:
             )
         if senders is not None:
             rules = self.senders.replace(
-                user_id=user_id, connection_id=row.id, senders=senders, now=now
+                user_id=row.user_id, connection_id=row.id, senders=senders, now=now
             )
         else:
             rules = self.senders.list(connection_id=row.id)
         return ConnectResult(row, created, rules)
+
+    def _undo(
+        self, user_id: str, row: SourceConnection, created: bool, refresh_token: str
+    ) -> None:
+        """Release the grant. A new connection is ended and its senders
+        forgotten; a reconnected one asks for authorization again, as when the
+        store itself fails (Google revokes the whole grant)."""
+
+        self._discard(refresh_token)
+        try:
+            if created:
+                self.hub.connections.disconnect(
+                    user_id=user_id, connection_id=row.id, now=self.hub.clock()
+                )
+                self.senders.delete(connection_id=row.id)
+            else:
+                self.hub.connections.record_failure(
+                    connection_id=row.id,
+                    code=TOKEN_REVOKED,
+                    status="needs_reauth",
+                    now=self.hub.clock(),
+                )
+        except Exception as exc:
+            # The grant is revoked either way; the next sync finds that and
+            # asks for authorization again.
+            logger.warning(
+                "Failed Gmail connection could not be rolled back",
+                failure_mode=type(exc).__name__,
+            )
 
     def _store(
         self, user_id: str, access_token: str, refresh_token: str

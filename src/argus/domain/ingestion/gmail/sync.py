@@ -20,8 +20,9 @@ cursor truthful:
    authentication before any body is fetched).
 6. Hand the candidates to the sink, and only then advance the cursor with
    ``record_success`` (compare-and-set on the starting cursor, under the
-   lease). A sink failure or a lost race leaves the cursor alone; the same
-   messages come back next time and the sink absorbs them by message id.
+   lease). A sink failure, ignored candidates or a lost race leave the cursor
+   alone; the same messages come back next time and the sink absorbs them by
+   message id.
 
 Gmail push (``users.watch`` with Pub/Sub) is a production follow-up; it needs
 a hosted Pub/Sub topic.
@@ -178,6 +179,14 @@ class GmailSync:
                 logger.warning(
                     "Gmail sync could not hand candidates to the sink; cursor kept",
                     failure_mode=type(exc).__name__,
+                )
+                return SyncOutcome("sink_failed", **counts)
+            if result.ignored:
+                # Not recorded: moving the cursor or marking senders scanned
+                # would skip these messages for good.
+                logger.warning(
+                    "Gmail sync candidates were not recorded; cursor kept",
+                    ignored=result.ignored,
                 )
                 return SyncOutcome("sink_failed", **counts)
         now = self.hub.clock()
