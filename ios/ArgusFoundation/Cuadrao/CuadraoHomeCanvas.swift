@@ -1,0 +1,286 @@
+import SwiftUI
+
+/// Independent native design canvas. Sample values never reach financial services.
+struct CuadraoHomeCanvas: View {
+    @AppStorage("cuadrao.design.home-section-order") private var homeOrder = CuadraoHomeSection.defaultOrder
+    @State private var populated = ProcessInfo.processInfo.arguments.contains("--home-populated")
+    @State private var selectedTab: CuadraoTab = .home
+    @State private var navigationScroll = CuadraoNavigationScroll()
+    @State private var sheet: HomeSheet?
+    @State private var data = CuadraoAccountsPreview(
+        populated: ProcessInfo.processInfo.arguments.contains("--home-populated"),
+        spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
+    @State private var accountPath: [UUID] = []
+    @State private var ordering = false
+    @State private var archivedID: UUID?
+    @ScaledMetric private var reorderRowHeight = 84
+    private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
+
+    private enum HomeSheet: Identifiable {
+        case add, options, archived, updates, spaces, customize, household
+        case actions(UUID), rename(UUID), record(UUID)
+        var id: String { "home-modal" }
+    }
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            NavigationStack(path: $accountPath) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 36) {
+                        VStack(alignment: .leading, spacing: 18) {
+                            header
+                            CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
+                        }
+                        ForEach(CuadraoHomeSection.decode(homeOrder)) { section in
+                            homeSection(section)
+                        }
+                        if !data.active.isEmpty {
+                            Button { ordering = false; sheet = .customize } label: {
+                                Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
+                                    .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
+                            }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
+                        }
+                    }
+                    .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
+                }
+                .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
+                    enabled: selectedTab == .home && sheet == nil && accountPath.isEmpty))
+                .safeAreaPadding(.bottom, 80)
+                .background(Color.white)
+                .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .navigationBar)
+                .navigationDestination(for: UUID.self) { id in
+                    CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
+                        actions: { sheet = .actions($0) }, record: { sheet = .record($0) })
+                }
+            }
+            .toolbar(.hidden, for: .tabBar)
+            .tag(CuadraoTab.home)
+            ForEach(CuadraoTab.allCases.filter { $0 != .home }) { tab in
+                destination(tab).tag(tab)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if accountPath.isEmpty || selectedTab != .home {
+            CuadraoNavigationBar(selection: $selectedTab,
+                compact: selectedTab == .home && navigationScroll.compact, spanish: spanish)
+                .padding(.horizontal, 20)
+                .frame(height: 64, alignment: .bottom)
+                .padding(.bottom, 8)
+            }
+        }
+        .tint(WelcomePalette.pine).foregroundStyle(Color(white: 0.08))
+        .sheet(item: $sheet) { item in modal(item) }
+        .onChange(of: data.selectedSpaceID) { _, _ in
+            ordering = false; archivedID = nil; accountPath = []; navigationScroll = CuadraoNavigationScroll()
+        }
+        .overlay(alignment: .bottom) {
+            if let archivedID {
+                HStack {
+                    Text(spanish ? "Cuenta archivada" : "Account archived")
+                    Spacer()
+                    Button(spanish ? "Deshacer" : "Undo") {
+                        data.archive(archivedID, false); self.archivedID = nil
+                    }
+                    Button { self.archivedID = nil } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                        .accessibilityLabel(spanish ? "Cerrar" : "Close")
+                }.font(.subheadline).padding(.leading, 20).padding(.trailing, 6)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                    .padding(.horizontal, 20).padding(.bottom, 90)
+            }
+        }
+    }
+
+    @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
+        switch section {
+        case .overview: if !data.active.isEmpty { CuadraoHomeOverview(data: data, spanish: spanish) }
+        case .accounts: accounts
+        case .activity: if !data.visibleActivity.isEmpty { activity }
+        case .upcoming: if populated && data.selectedSpace.kind == .personal { upcoming }
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            CuadraoBrand()
+                .contextMenu {
+                    Button(spanish ? "Vista previa: primer uso" : "Preview: first use") {
+                        populated = false; data.reset(populated: false, spanish: spanish); ordering = false
+                    }
+                    Button(spanish ? "Vista previa: Hogar sin cuentas compartidas" : "Preview: household with no shared accounts") {
+                        populated = false; data.reset(populated: false, spanish: spanish)
+                        data.openHousehold(); data.household = .joined("Alex")
+                    }
+                    Button(spanish ? "Vista previa: con actividad" : "Preview: with activity") {
+                        populated = true; data.reset(populated: true, spanish: spanish); ordering = false
+                    }
+                }
+            Spacer()
+            Button { sheet = .updates } label: {
+                Image("CuadraoNotifications").frame(width: 44, height: 44)
+            }
+            .accessibilityLabel(spanish ? "Novedades" : "Updates")
+        }
+    }
+
+    private var accounts: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if data.selectedSpace.kind == .household && !data.active.isEmpty {
+                Button { sheet = .household } label: {
+                    Label(spanish ? "Personas" : "People", systemImage: "person.2")
+                        .font(.subheadline).frame(minHeight: 44)
+                }
+            }
+            if !data.active.isEmpty || !data.archived.isEmpty {
+                HStack(spacing: 0) {
+                    sectionTitle(spanish ? "Cuentas" : "Accounts")
+                    Spacer()
+                    if ordering {
+                        Button(spanish ? "Listo" : "Done") { ordering = false }
+                            .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+                    } else {
+                        Button { sheet = .add } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
+                            .accessibilityLabel(spanish ? "Añadir cuenta" : "Add account")
+                        Button { sheet = .options } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                            .accessibilityLabel(spanish ? "Opciones de cuentas" : "Account options")
+                    }
+                }
+            }
+            if ordering {
+                List {
+                    ForEach(data.active) { account in
+                        CanvasAccountRow(account: account, spanish: spanish)
+                            .padding(.trailing, 20)
+                            .listRowInsets(EdgeInsets()).listRowBackground(Color.white)
+                            .frame(height: reorderRowHeight)
+                    }.onMove { from, to in data.move(from: from, to: to) }
+                }.listStyle(.plain).scrollDisabled(true)
+                    .environment(\.editMode, .constant(.active))
+                    .frame(height: reorderRowHeight * CGFloat(data.active.count))
+            } else {
+                ForEach(data.active) { account in
+                    CanvasAccountRow(account: account, spanish: spanish)
+                        .gesture(LongPressGesture(minimumDuration: 0.45).exclusively(before: TapGesture()).onEnded { gesture in
+                            switch gesture {
+                            case .first: sheet = .actions(account.id)
+                            case .second: accountPath.append(account.id)
+                            }
+                        })
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { accountPath.append(account.id) }
+                        .accessibilityAction(named: Text(spanish ? "Opciones de cuenta" : "Account actions")) { sheet = .actions(account.id) }
+                        .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
+                }
+            }
+            if data.active.isEmpty { firstAccount }
+        }
+    }
+
+    private var firstAccount: some View {
+        CuadraoHomeEmptyState(data: data, spanish: spanish,
+            addAccount: { sheet = .add }, household: { sheet = .household })
+    }
+
+    private var activity: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                sectionTitle(spanish ? "Movimientos" : "Activity")
+                Spacer()
+                Button { if let account = data.active.first { sheet = .record(account.id) } } label: {
+                    Image(systemName: "plus").frame(width: 44, height: 44)
+                }.accessibilityLabel(spanish ? "Añadir movimiento" : "Add activity")
+            }
+            Text(spanish ? "Hoy" : "Today").font(.footnote).foregroundStyle(.secondary)
+            ForEach(data.visibleActivity.prefix(3)) { entry in
+                if let account = data.account(entry.accountID) {
+                    feedRow(entry.title, detail: account.displayName(spanish),
+                        amount: (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
+                        icon: entry.income ? "arrow.down.left" : "arrow.up.right")
+                }
+            }
+        }
+    }
+
+    private var upcoming: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                sectionTitle(spanish ? "Próximamente" : "Coming up")
+                Spacer()
+                Button(spanish ? "Ver plan" : "View plan") { selectedTab = .plan }
+                    .font(.subheadline).frame(minHeight: 44)
+            }
+            feedRow("Internet", detail: spanish ? "Mañana · Previsto" : "Tomorrow · Planned", amount: "1,500.00", icon: "wifi")
+        }
+    }
+
+    private func feedRow(_ title: String, detail: String, amount: String, icon: String) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: icon).font(.body).frame(width: 28).foregroundStyle(.secondary).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title).font(.body)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(amount).font(.subheadline).monospacedDigit()
+        }.padding(.vertical, 6)
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title).font(.system(.title2, design: .serif)).accessibilityAddTraits(.isHeader)
+    }
+
+    private func destination(_ tab: CuadraoTab) -> some View {
+        NavigationStack {
+            ContentUnavailableView(tab.title(spanish: spanish), systemImage: tab.symbol,
+                description: Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home."))
+                .background(Color.white)
+        }
+        .toolbar(.hidden, for: .tabBar)
+    }
+
+    @ViewBuilder private func modal(_ item: HomeSheet) -> some View {
+        switch item {
+        case .household: CuadraoHouseholdSheet(data: data, spanish: spanish)
+        case .customize: CuadraoHomeLayoutSheet(savedOrder: $homeOrder, spanish: spanish)
+        case .spaces: CuadraoSpacesSheet(data: data, spanish: spanish)
+        case .add: CuadraoFirstAccountSheet(data: data, spanish: spanish)
+        case .archived: CuadraoArchivedAccounts(data: data, spanish: spanish)
+        case .options:
+            VStack(alignment: .leading, spacing: 8) {
+                Text(spanish ? "Cuentas" : "Accounts").font(.title3.weight(.medium)).padding(.bottom, 12)
+                CanvasActionRow(title: spanish ? "Ordenar cuentas" : "Reorder accounts", symbol: "line.3.horizontal") {
+                    sheet = nil; ordering = true
+                }.disabled(data.active.count < 2)
+                Divider()
+                CanvasActionRow(title: spanish ? "Cuentas archivadas" : "Archived accounts", symbol: "archivebox") { sheet = .archived }
+            }.padding(28).presentationDetents([.height(250)]).presentationDragIndicator(.visible)
+        case .actions(let id):
+            if let account = data.account(id) {
+                CuadraoAccountActions(account: account, spanish: spanish,
+                    rename: { sheet = .rename(id) }, record: { sheet = .record(id) }, archive: {
+                        data.archive(id, true); sheet = nil; accountPath = []; archivedID = id
+                    })
+            }
+        case .rename(let id):
+            if let account = data.account(id) { CuadraoRenameAccount(data: data, account: account, spanish: spanish) }
+        case .record(let id):
+            if let account = data.account(id) { CuadraoTransactionCanvas(data: data, account: account, spanish: spanish) }
+        case .updates:
+            NavigationStack {
+                ContentUnavailableView {
+                    Label {
+                        Text(spanish ? "Novedades" : "Updates")
+                    } icon: {
+                        Image("CuadraoNotifications").resizable().scaledToFit().frame(width: 40, height: 40)
+                    }
+                } description: {
+                    Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home.")
+                }
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { sheet = nil } } }
+            }
+        }
+    }
+}
+
+#Preview("Home · First use") { CuadraoHomeCanvas().preferredColorScheme(.light) }
