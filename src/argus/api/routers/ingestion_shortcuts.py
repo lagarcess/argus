@@ -8,7 +8,6 @@ enrollment response is the one place the token appears, once.
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Request
@@ -23,13 +22,17 @@ from argus.api.routers.financial_connections import (
 from argus.api.shortcuts import (
     DeviceContext,
     ShortcutsContext,
+    device_unauthorized_problem,
+    events_not_saved_problem,
     intake_unavailable_problem,
     require_shortcuts_context,
     require_shortcuts_device,
+    spend_event_budget,
 )
 from argus.domain.ingestion.shortcuts.connector import (
+    ConnectionEnded,
     DeviceLimitReached,
-    EventOutOfWindow,
+    EventsNotSaved,
     IntakeUnavailable,
     Receipt,
 )
@@ -100,7 +103,9 @@ class EventReceipt(BaseModel):
 
     receipt_id: str
     external_id: str
-    outcome: Literal["recorded", "unchanged", "out_of_window"]
+    # Only recorded and unchanged mean the capture is held. out_of_window and
+    # rejected can never be saved; not_saved may be sent again.
+    outcome: Literal["recorded", "unchanged", "out_of_window", "rejected", "not_saved"]
 
 
 class BatchReceipt(BaseModel):
@@ -139,11 +144,33 @@ async def receive_shortcuts_event(
     request: Request,
     device: DeviceContext = Depends(require_shortcuts_device),  # noqa: B008
 ) -> EventReceipt:
-    """Device-token only. Re-sending the same event returns the same receipt."""
+    """Device-token only. Re-sending the same event returns the same receipt.
+
+    A receipt is returned only for a held capture; anything else is an error,
+    so a recipe that checks for ``receipt_id`` never mistakes it for saved.
+    """
 
     event = await _json_body(request, MAX_EVENT_BYTES, ShortcutEvent)
-    receipts = await _intake(request, device, [event])
-    return receipts[0]
+    [receipt] = await _intake(request, device, [event])
+    if receipt.outcome == "out_of_window":
+        raise problem(
+            request,
+            status_code=422,
+            code="shortcuts_event_out_of_window",
+            title="Unprocessable Content",
+            detail="The capture time is in the future or more than 30 days old.",
+        )
+    if receipt.outcome == "rejected":
+        raise problem(
+            request,
+            status_code=422,
+            code="shortcuts_event_invalid",
+            title="Unprocessable Content",
+            detail="The capture could not be accepted.",
+        )
+    if receipt.outcome == "not_saved":
+        raise events_not_saved_problem(request)
+    return receipt
 
 
 @intake_router.post(
@@ -156,8 +183,7 @@ async def receive_shortcuts_event_batch(
     """Pending captures saved while offline; idempotent per event."""
 
     batch = await _json_body(request, MAX_BATCH_BYTES, ShortcutEventBatch)
-    receipts = await _intake(request, device, batch.events, skip_out_of_window=True)
-    return BatchReceipt(receipts=receipts)
+    return BatchReceipt(receipts=await _intake(request, device, batch.events))
 
 
 async def _json_body(request: Request, cap: int, model: type[BaseModel]):  # noqa: ANN202
@@ -190,31 +216,21 @@ def _field(error: dict) -> str:
 
 
 async def _intake(
-    request: Request,
-    device: DeviceContext,
-    events: list[ShortcutEvent],
-    *,
-    skip_out_of_window: bool = False,
+    request: Request, device: DeviceContext, events: list[ShortcutEvent]
 ) -> list[EventReceipt]:
+    if device.connector.hub.sink is None:
+        raise intake_unavailable_problem(request)
+    spend_event_budget(request, device, len(events))
     try:
         receipts: list[Receipt] = await run_in_threadpool(
-            partial(
-                device.connector.intake,
-                device.connection,
-                events,
-                skip_out_of_window=skip_out_of_window,
-            )
+            device.connector.intake, device.connection, events
         )
     except IntakeUnavailable:
         raise intake_unavailable_problem(request) from None
-    except EventOutOfWindow:
-        raise problem(
-            request,
-            status_code=422,
-            code="shortcuts_event_out_of_window",
-            title="Unprocessable Content",
-            detail="The capture time is in the future or more than 30 days old.",
-        ) from None
+    except EventsNotSaved:
+        raise events_not_saved_problem(request) from None
+    except ConnectionEnded:
+        raise device_unauthorized_problem(request) from None
     return [
         EventReceipt(
             receipt_id=r.receipt_id, external_id=r.external_id, outcome=r.outcome

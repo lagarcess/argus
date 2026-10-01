@@ -114,3 +114,43 @@ def test_clients_have_no_access_and_digests_follow_their_connection(connector, u
                 (connection_id,),
             )
             assert cursor.fetchone()[0] == 0
+
+
+def test_concurrent_enrollment_holds_the_device_limit(connector, users):
+    import threading
+
+    from argus.domain.ingestion.shortcuts.connector import (
+        MAX_LIVE_DEVICES,
+        DeviceLimitReached,
+    )
+
+    outcomes: list[str] = []
+    gate = threading.Barrier(10)
+
+    def attempt(index: int) -> None:
+        gate.wait()
+        try:
+            connector.enroll(user_id=users["owner"], device_name=f"phone {index}")
+            outcomes.append("ok")
+        except DeviceLimitReached:
+            outcomes.append("limit")
+
+    threads = [threading.Thread(target=attempt, args=(i,)) for i in range(10)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert outcomes.count("ok") == MAX_LIVE_DEVICES
+    assert outcomes.count("limit") == 10 - MAX_LIVE_DEVICES
+    live = [
+        row
+        for row in connector.hub.list(user_id=users["owner"])
+        if row.status != "disconnected"
+    ]
+    assert len(live) == MAX_LIVE_DEVICES
+    with psycopg.connect(shared.DSN) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "select count(*) from public.financial_shortcut_device_tokens where user_id = %s",
+            (users["owner"],),
+        )
+        assert cursor.fetchone()[0] == MAX_LIVE_DEVICES

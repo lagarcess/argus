@@ -2860,6 +2860,8 @@ existing activity tables written only through `MoneyService`.
 `connection_id` (primary key, cascades from `financial_source_connections`),
 `user_id`, `token_sha256` (32-byte SHA-256 digest of the device token; the
 token itself is never stored) and `created_at`. Disconnect deletes the row, and
-intake also requires the connection to be live. Row level security is enabled
+intake also requires the connection to be live. Enrollment counts a person's
+live device digests and inserts the new one in a single transaction under a
+per-person advisory lock, so the five-device limit holds under concurrency. Row level security is enabled
 with no policies and every client grant revoked, so no client role can read or
 write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.

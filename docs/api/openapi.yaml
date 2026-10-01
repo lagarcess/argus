@@ -5030,7 +5030,12 @@ paths:
       tags:
       - financial-accounts
       - financial-connections
-      description: Device-token only. Re-sending the same event returns the same receipt.
+      description: 'Device-token only. Re-sending the same event returns the same receipt.
+
+
+        A receipt is returned only for a held capture; anything else is an error,
+
+        so a recipe that checks for ``receipt_id`` never mistakes it for saved.'
       requestBody:
         content:
           application/json:
@@ -9105,6 +9110,8 @@ components:
           - recorded
           - unchanged
           - out_of_window
+          - rejected
+          - not_saved
       additionalProperties: false
       type: object
       required:

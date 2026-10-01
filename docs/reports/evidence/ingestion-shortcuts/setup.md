@@ -119,27 +119,55 @@ Cambios al atajo del paso 2 / Changes to the step 2 shortcut:
    `receipt_id` has a value: **Get File** → **Replace Text** (the exact Text,
    regular expression off, replace with nothing) → **Save File** (overwrite).
 
-Atajo manual "Enviar pendientes" / Manual "Send pending captures" shortcut:
+Atajo manual "Enviar pendientes" / Manual "Send pending captures" shortcut.
+ES: envía en tandas de **25 líneas** (cada tanda queda muy por debajo del
+límite de 256 KiB aunque las capturas sean mensajes largos) y repite hasta 8
+tandas, es decir hasta 200 capturas por ejecución. EN: it sends **25 lines** per
+batch (well under the 256 KiB cap even for long message captures) and repeats
+up to 8 batches, i.e. up to 200 captures per run.
 
-1. **Obtener archivo / Get File** `pendientes.txt` (si está vacío, detener /
-   stop if empty).
-2. **Dividir texto / Split Text** por nuevas líneas / by New Lines.
-3. **Combinar texto / Combine Text** con / with `,`.
-4. **Texto / Text**: `{"events":[` `[Texto combinado / Combined Text]` `]}`.
-5. **Obtener contenido de URL / Get Contents of URL**:
-   `https://<api>/api/v1/ingestion/shortcuts/events/batch`, POST, encabezados /
-   headers `Authorization: Bearer [Código]` y / and
-   `Content-Type: application/json`, cuerpo **Archivo** / body **File** = the
-   Text above.
-6. ES: Si `receipts` tiene valor, guarda un archivo vacío sobre
-   `pendientes.txt`; si no, muestra "No se enviaron". EN: If `receipts` has a
-   value, save an empty file over `pending.txt`; otherwise show "Not sent".
+1. **Repetir / Repeat** 8 veces / times:
+   1. **Obtener archivo / Get File** `pendientes.txt` / `pending.txt`
+      ("Error si no se encuentra" desactivado / "Error If Not Found" off).
+   2. **Ajustar espacios / Trim Whitespace** *(sin verificar / unverified)* y
+      luego / then **Dividir texto / Split Text** por nuevas líneas / by New
+      Lines → variable "Lista" / "Lines".
+   3. **Si / If** **Contar / Count** de "Lista" es 0: **Mostrar notificación /
+      Show Notification** "Nada pendiente / Nothing pending" y **Detener este
+      atajo / Stop This Shortcut**.
+   4. **Obtener elementos de la lista / Get Items from List**: rango / range
+      1-25 → **Combinar texto / Combine Text** con / with `,` →
+      **Texto / Text** `{"events":[` `[Texto combinado / Combined Text]` `]}`.
+   5. **Obtener contenido de URL / Get Contents of URL**:
+      `https://<api>/api/v1/ingestion/shortcuts/events/batch`, POST,
+      encabezados / headers `Authorization: Bearer [Código]` y / and
+      `Content-Type: application/json`, cuerpo **Archivo** / body **File** = the
+      Text above.
+   6. ES: **Si** la respuesta **no** tiene `receipts`, **o** su texto contiene
+      `not_saved`: muestra "No se enviaron; intenta más tarde" y **Detener este
+      atajo** (el archivo queda igual; reenviar es seguro). EN: **If** the
+      response has **no** `receipts`, **or** its text contains `not_saved`:
+      show "Not sent; try later" and **Stop This Shortcut** (the file is kept;
+      re-sending is safe).
+   7. ES: Si no, quita esas 25 líneas: si "Lista" tiene más de 25, **Obtener
+      elementos de la lista** 26 a "Contar", **Combinar texto** con nueva
+      línea y **Guardar archivo** sobre `pendientes.txt` (sobrescribir); si
+      no, guarda un archivo vacío. EN: Otherwise drop those 25 lines: if
+      "Lines" has more than 25, **Get Items from List** 26 to Count, **Combine
+      Text** with New Lines and **Save File** over `pending.txt` (overwrite);
+      otherwise save an empty file.
+2. ES: Si aún quedan pendientes después de 8 tandas, ejecútalo otra vez.
+   EN: If captures remain after 8 batches, run it again.
 
 ES: Reenviar es seguro: cada captura tiene su `event_id` y Cuadrao no la
-duplica. Hasta 200 capturas por envío; las de más de 30 días se rechazan
-(`out_of_window`). EN: Re-sending is safe: each capture has its `event_id` and
-is never duplicated. Up to 200 captures per send; captures older than 30 days
-are refused (`out_of_window`).
+duplica. Cada recibo dice qué pasó: `recorded`/`unchanged` (guardada),
+`not_saved` (reenvíala), `out_of_window` (más de 30 días: no se puede guardar)
+o `rejected` (no válida). Por eso el paso 6 conserva el archivo si hay algún
+`not_saved`. EN: Re-sending is safe: each capture has its `event_id` and is
+never duplicated. Each receipt says what happened: `recorded`/`unchanged`
+(held), `not_saved` (send again), `out_of_window` (older than 30 days: cannot
+be saved) or `rejected` (invalid). That is why step 6 keeps the file when any
+receipt is `not_saved`.
 
 ## 4. Mensajes del banco (opcional) / Bank SMS (optional)
 

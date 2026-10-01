@@ -119,7 +119,6 @@ def test_message_capture_is_inert_text_with_money_unresolved():
         {"currency": "US$"},
         {"card_last4": "12345"},
         {"amount": "9" * 65},
-        {"event_id": ""},
         {"kind": "balance"},
     ],
 )
@@ -142,3 +141,15 @@ def test_message_capture_refuses_money_fields_and_needs_text(extra):
     body.update(extra)
     with pytest.raises(ValidationError):
         ShortcutEvent.model_validate({k: v for k, v in body.items() if v is not None})
+
+
+def test_empty_optional_strings_are_missing():
+    event = tap(event_id="", currency=" ", card_last4="", merchant="", card="")
+    assert event.event_id is None and event.currency is None
+    assert event.card_last4 is None and event.merchant is None and event.card is None
+    assert external_id(event).startswith("wallet:d:")
+
+
+def test_huge_amount_becomes_unresolved_evidence_not_an_error():
+    candidate = to_candidate(tap(amount="RD$" + "9" * 30), connection_id="c1")
+    assert candidate.amount is None and "amount" in candidate.uncertain

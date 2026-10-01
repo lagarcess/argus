@@ -36,7 +36,7 @@ EventKind = Literal["transaction", "message_capture"]
 SourceApp = Literal["wallet", "messages", "notifications"]
 MAX_EVENT_BYTES = 4 * 1024
 MAX_BATCH_EVENTS = 200
-MAX_BATCH_BYTES = 128 * 1024
+MAX_BATCH_BYTES = 256 * 1024
 
 _PREFIX = {"wallet": "wallet", "messages": "message", "notifications": "notification"}
 _MONEY_FIELDS = ("amount", "currency", "merchant", "card", "card_last4")
@@ -59,6 +59,23 @@ class ShortcutEvent(BaseModel):
     card_last4: str | None = Field(default=None, pattern=r"^[0-9]{4}$")
     sender: str | None = Field(default=None, max_length=120)
     text: str | None = Field(default=None, max_length=1000)
+
+    @field_validator(
+        "event_id",
+        "amount",
+        "currency",
+        "merchant",
+        "card",
+        "card_last4",
+        "sender",
+        mode="before",
+    )
+    @classmethod
+    def _blank_is_missing(cls, value: object) -> object:
+        # Shortcuts sends "" for a variable that had no value.
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("captured_at")
     @classmethod

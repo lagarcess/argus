@@ -4,6 +4,11 @@ Enrollment creates an inert ``shortcuts`` connection (``external_ref`` is a
 random device id, ``label`` the person's device name) and returns its token
 once. Intake turns verified events into candidates through the hub's sink and
 nothing else; with no sink it refuses before anything is recorded.
+
+Every event gets its own outcome, and only ``recorded`` or ``unchanged`` mean
+the evidence is held: ``out_of_window`` and ``rejected`` can never be saved,
+``not_saved`` can be sent again. A capture is never reported saved unless the
+sink said so.
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from loguru import logger
+from pydantic import ValidationError
 
 from argus.domain.ingestion.connections import LIVE, SourceConnection
 from argus.domain.ingestion.contract import inert_text
@@ -21,6 +27,7 @@ from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.shortcuts import tokens
 from argus.domain.ingestion.shortcuts.events import (
     ShortcutEvent,
+    external_id,
     receipt_id,
     to_candidate,
 )
@@ -39,8 +46,12 @@ class IntakeUnavailable(RuntimeError):
     """No candidate sink yet: nothing can be recorded, so nothing is."""
 
 
-class EventOutOfWindow(ValueError):
-    pass
+class EventsNotSaved(RuntimeError):
+    """The sink failed part-way; earlier events may be held. Retry is safe."""
+
+
+class ConnectionEnded(RuntimeError):
+    """The device was disconnected while its events were in flight."""
 
 
 @dataclass(frozen=True)
@@ -56,7 +67,12 @@ class Enrollment:
 class Receipt:
     receipt_id: str
     external_id: str
-    outcome: str  # "recorded" | "unchanged" | "out_of_window"
+    # recorded | unchanged | out_of_window | rejected | not_saved
+    outcome: str
+
+    @property
+    def held(self) -> bool:
+        return self.outcome in ("recorded", "unchanged")
 
 
 class ShortcutsAdapter:
@@ -83,7 +99,7 @@ class ShortcutsConnector:
             for row in self.hub.list(user_id=user_id)
             if row.source == "shortcuts" and row.status in LIVE
         ]
-        if len(live) >= MAX_LIVE_DEVICES:
+        if len(live) >= MAX_LIVE_DEVICES:  # cheap early answer; the store decides
             raise DeviceLimitReached()
         minted = tokens.mint()
         now = self.hub.clock()
@@ -95,15 +111,23 @@ class ShortcutsConnector:
             now=now,
         )
         try:
-            self.store.put(
-                connection_id=row.id, user_id=user_id, digest=minted.digest, now=now
+            stored = self.store.put_within_limit(
+                connection_id=row.id,
+                user_id=user_id,
+                digest=minted.digest,
+                now=now,
+                limit=MAX_LIVE_DEVICES,
             )
         except Exception:
+            stored = None
+        if not stored:
             # No usable token: do not leave a live device that can never send.
             self.hub.connections.disconnect(
                 user_id=user_id, connection_id=row.id, now=self.hub.clock()
             )
-            raise
+            if stored is None:
+                raise RuntimeError("device token could not be stored")
+            raise DeviceLimitReached()
         logger.info("Shortcuts device enrolled", connection_id=row.id)
         return Enrollment(connection=row, token=minted.token)
 
@@ -128,69 +152,65 @@ class ShortcutsConnector:
         return row
 
     def intake(
-        self,
-        connection: SourceConnection,
-        events: Sequence[ShortcutEvent],
-        *,
-        skip_out_of_window: bool = False,
+        self, connection: SourceConnection, events: Sequence[ShortcutEvent]
     ) -> list[Receipt]:
-        """Submit each event; a single event outside the window is refused.
-
-        A pending batch instead reports such events as ``out_of_window`` and
-        saves the rest, so one capture left offline for weeks cannot block
-        the others.
-        """
-
         sink = self.hub.sink
         if sink is None:
             raise IntakeUnavailable()
         now = self.hub.clock()
-        in_window = [
-            now - MAX_EVENT_AGE <= event.captured_at <= now + MAX_CLOCK_SKEW
-            for event in events
-        ]
-        if not skip_out_of_window and not all(in_window):
-            raise EventOutOfWindow("captured_at is outside the accepted window")
         receipts: list[Receipt] = []
-        for event, accepted in zip(events, in_window, strict=True):
-            candidate = to_candidate(event, connection_id=connection.id)
-            outcome = "out_of_window"
-            if accepted:
-                # One event per submit so each receipt says what happened to it.
-                try:
-                    result = sink.submit(
-                        user_id=connection.user_id,
-                        connection_id=connection.id,
-                        candidates=[candidate],
-                    )
-                except Exception as exc:
-                    # Earlier events of a batch are kept; a retry is harmless
-                    # because each one is idempotent by its external id.
-                    logger.warning(
-                        "Shortcuts sink refused an event",
-                        connection_id=connection.id,
-                        failure_mode=type(exc).__name__,
-                    )
-                    raise IntakeUnavailable() from None
-                outcome = "recorded" if result.recorded else "unchanged"
-            receipts.append(
-                Receipt(
-                    receipt_id=receipt_id(
-                        connection_id=connection.id,
-                        external_id=candidate.source.external_id,
-                    ),
-                    external_id=candidate.source.external_id,
-                    outcome=outcome,
-                )
-            )
-        self._mark_fresh(connection)
+        for event in events:
+            receipts.append(self._one(sink, connection, event, now))
+        if any(receipt.held for receipt in receipts):
+            self._mark_fresh(connection)
         logger.info(
             "Shortcuts events received",
             connection_id=connection.id,
             events=len(receipts),
             recorded=sum(r.outcome == "recorded" for r in receipts),
+            held=sum(r.held for r in receipts),
         )
         return receipts
+
+    def _one(self, sink, connection, event, now) -> Receipt:  # noqa: ANN001
+        external = external_id(event)
+        receipt = receipt_id(connection_id=connection.id, external_id=external)
+        if not now - MAX_EVENT_AGE <= event.captured_at <= now + MAX_CLOCK_SKEW:
+            return Receipt(receipt, external, "out_of_window")
+        try:
+            candidate = to_candidate(event, connection_id=connection.id)
+        except ValidationError:
+            # The contract refused this event's content; the rest proceed.
+            logger.warning(
+                "Shortcuts event refused by contract", connection_id=connection.id
+            )
+            return Receipt(receipt, external, "rejected")
+        try:
+            result = sink.submit(
+                user_id=connection.user_id,
+                connection_id=connection.id,
+                candidates=[candidate],
+            )
+        except Exception as exc:
+            # Earlier events of a batch are kept; a retry is harmless because
+            # each one is idempotent by its external id.
+            logger.warning(
+                "Shortcuts sink refused an event",
+                connection_id=connection.id,
+                failure_mode=type(exc).__name__,
+            )
+            raise EventsNotSaved() from None
+        if result.recorded:
+            return Receipt(receipt, external, "recorded")
+        if result.unchanged:
+            return Receipt(receipt, external, "unchanged")
+        # Ignored, or not accounted for: never report it as saved.
+        current = self.hub.connections.get(
+            user_id=connection.user_id, connection_id=connection.id
+        )
+        if current.status not in LIVE:
+            raise ConnectionEnded()
+        return Receipt(receipt, external, "not_saved")
 
     def _mark_fresh(self, connection: SourceConnection) -> None:
         """Last successful capture for the connections list; best effort."""
