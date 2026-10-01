@@ -10,6 +10,7 @@ import pytest
 ROUTERS = [
     "argus.api.routers.financial_connections_plaid",
     "argus.api.routers.financial_connections_gmail",
+    "argus.api.routers.ingestion_shortcuts",
     "argus.api.routers.financial_connections",
     "argus.api.routers.financial_connections_schemas",
 ]

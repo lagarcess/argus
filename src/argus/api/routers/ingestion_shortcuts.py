@@ -15,7 +15,7 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from argus.api.dependencies import problem
-from argus.api.routers.financial_connections import (
+from argus.api.routers.financial_connections_schemas import (
     FinancialConnectionResponse,
     connection_response,
 )
