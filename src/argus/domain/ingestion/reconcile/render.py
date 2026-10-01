@@ -35,6 +35,14 @@ def proposed_kind(facts: Facts) -> str | None:
     return {"outflow": "expense", "inflow": "income"}.get(facts.direction or "")
 
 
+def counterpart(direction: str | None) -> str:
+    """For a two-account kind, the leg the person must choose. The observed
+    account is the destination when money arrived in it (a card payment seen
+    on the card, a transfer seen on the receiving account), else the source."""
+
+    return "source_account_id" if direction == "inflow" else "destination_account_id"
+
+
 def unresolved(
     event: ImportEvent, observations: list[Observation], facts: Facts
 ) -> list[str]:
@@ -54,10 +62,10 @@ def unresolved(
     if event.evidence == "unclassified" and not event.resolution.get("kind"):
         missing.add("kind")
     kind = event.resolution.get("kind") or proposed_kind(facts)
-    if kind in DESTINATION_ELIGIBILITY and not event.resolution.get(
-        "destination_account_id"
-    ):
-        missing.add("destination_account_id")
+    if kind in DESTINATION_ELIGIBILITY:
+        other = counterpart(facts.direction)
+        if not event.resolution.get(other):
+            missing.add(other)
     first = primary(observations)
     if first is not None:
         for field in first.candidate.get("uncertain") or ():

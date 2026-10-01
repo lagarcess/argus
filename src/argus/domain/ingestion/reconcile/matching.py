@@ -159,6 +159,19 @@ def recorded_facts(recorded: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def match_key(facts: Facts) -> tuple[Any, ...]:
+    """The facts duplicate matching depends on."""
+
+    return (
+        facts.amount,
+        facts.currency,
+        facts.occurred_on,
+        facts.account_id,
+        facts.direction,
+        facts.mask,
+    )
+
+
 def compare(new: Facts, existing: Facts) -> Strength | None:
     """How well ``new`` could be the same event as ``existing``; None if not.
 

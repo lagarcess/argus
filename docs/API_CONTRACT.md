@@ -7756,8 +7756,12 @@ created_at,updated_at}`.
   proposal from the source's hint or direction; the person confirms it in
   preview. Amounts are positive decimal strings; currency is never guessed.
 - `unresolved`: fields that must be supplied before preview
-  (`amount|currency|occurred_on|account_id|kind`, `destination_account_id`
-  for two-account kinds, and anything the source marked uncertain).
+  (`amount|currency|occurred_on|account_id|kind`, the other leg of a
+  two-account kind, and anything the source marked uncertain). For a
+  two-account kind the observed account is the destination when the money
+  arrived in it (`direction=inflow`, such as a card payment seen on the
+  card), so `source_account_id` is asked for; otherwise it is the source and
+  `destination_account_id` is asked for.
 - `attention`: `source_changed` (a source revised an accepted event's
   amount, currency or date beyond the window, and not back to what was
   recorded; a person's correction at review never counts; detail carries
@@ -7784,8 +7788,9 @@ Routes under `/api/v1/financial-imports`:
   which includes `accepting`).
 - GET `/{id}` returns one event.
 - PATCH `/{id}` `{version,changes}` sets the person's resolution. Allowed keys:
-  `kind,account_id,destination_account_id,amount,currency,occurred_on,
-  direction,category_id,source_id,purchase_activity_id,note,time_zone`; `null`
+  `kind,account_id,source_account_id,destination_account_id,amount,currency,
+  occurred_on,direction,category_id,source_id,purchase_activity_id,note,
+  time_zone`; `null`
   clears one. Setting `account_id` remembers the mapping for that source's
   account hint, so later imports from it resolve automatically. Re-checks
   possible duplicates only when a matching fact changes (amount, currency,
@@ -7835,7 +7840,11 @@ conflicts above; 422 validation codes (`activity_invalid`, `kind_invalid`,
 `category_unknown`, `source_unknown`, `time_zone_unknown`, `*_id_invalid`);
 recording errors use the existing financial-accounts problems. Evidence a
 connector submits after its connection ended is ignored (`SubmitResult.ignored`),
-so an in-flight sync cannot recreate drafts a disconnect removed.
+so an in-flight sync cannot recreate drafts a disconnect removed. A source
+revision that changes an open event's matching facts re-checks its possible
+duplicates on both sides, as a new observation would. A disconnect that
+removes one source from an event other sources still back gives that event a
+new version (an earlier `version` is stale) and re-checks its duplicates.
 `context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
 transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
 Item Plaid no longer knows counts as revoked.

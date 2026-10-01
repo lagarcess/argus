@@ -25,6 +25,7 @@ from argus.domain.ingestion.reconcile.model import (
     ReconcileError,
     StaleEvent,
 )
+from argus.domain.ingestion.reconcile.render import counterpart
 from argus.domain.recording.errors import (
     AccountNotFound,
     IdempotencyConflict,
@@ -335,8 +336,14 @@ class Recording:
             "note": resolution.get("note") or _merchant(detail),
         }
         if kind in DESTINATION_ELIGIBILITY:
-            draft["source_account_id"] = account_id
-            draft["destination_account_id"] = resolution.get("destination_account_id")
+            other = counterpart(facts["direction"])
+            observed = (
+                "destination_account_id"
+                if other == "source_account_id"
+                else "source_account_id"
+            )
+            draft[observed] = account_id
+            draft[other] = resolution.get(other)
         else:
             draft["account_id"] = account_id
         for field in ("category_id", "source_id", "purchase_activity_id"):

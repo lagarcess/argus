@@ -24,8 +24,8 @@ from argus.domain.ingestion.reconcile.matching import (
     ACTIVITY_EVIDENCE,
     account_key,
     activity_matches,
-    compare,
     event_facts,
+    match_key,
     primary,
 )
 from argus.domain.ingestion.reconcile.model import (
@@ -112,7 +112,7 @@ class ReconciliationService(Recording):
             raise ReconcileError("field_not_resolvable", ", ".join(sorted(unknown)))
         cleaned = _clean_resolution(changes)
         owned = {s.account.id for s in self.money.accounts.list_accounts(user_id=user_id)}
-        for field in ("account_id", "destination_account_id"):
+        for field in ("account_id", "source_account_id", "destination_account_id"):
             if cleaned.get(field) and cleaned[field] not in owned:
                 raise ReconcileError(
                     "financial_account_not_found", "Choose your own account."
@@ -121,7 +121,7 @@ class ReconciliationService(Recording):
         with self.store.transaction(user_id) as tx:
             event = self._editable(tx, event_id, version)
             links = tx.links()
-            matched_before = _match_key(
+            matched_before = match_key(
                 event_facts(event, tx.observations(event.id), links)
             )
             resolution = {**event.resolution, **cleaned}
@@ -131,13 +131,13 @@ class ReconciliationService(Recording):
                 self._remember_account(tx, event, cleaned["account_id"], now)
             event = intake.reanchor(tx, event)
             facts = event_facts(event, tx.observations(event.id), tx.links())
-            if _match_key(facts) == matched_before:
+            if match_key(facts) == matched_before:
                 # A note or category edit: keep the person's earlier answer
                 # about duplicates instead of raising the question again.
                 tx.put_event(_bump(event, now))
             else:
                 previous = event.possible_duplicates
-                event = _bump(self._recheck_duplicates(tx, event), now)
+                event = _bump(intake.recheck(tx, event), now)
                 tx.put_event(event)
                 duplicates.mirror(tx, event, previous, now)
         return self.detail(user_id=user_id, event_id=event_id)
@@ -330,27 +330,6 @@ class ReconciliationService(Recording):
             )
         )
 
-    def _recheck_duplicates(self, tx: ImportTx, event: ImportEvent) -> ImportEvent:
-        """After a person supplies facts (an unclassified email), point at
-        events that may be the same purchase; never merge on their behalf."""
-
-        observations = tx.observations(event.id)
-        facts = event_facts(event, observations, tx.links())
-        sources = {o.source for o in observations if o.live}
-        found = []
-        for other, others, other_facts in intake.nearby_facts(tx, facts):
-            if other.id == event.id or other.state == "dismissed":
-                continue
-            if sources & {o.source for o in others if o.live}:
-                continue
-            if compare(facts, other_facts) is not None:
-                found.append(other.id)
-        return duplicates.flag(
-            event,
-            found,
-            ambiguous=event.attention == "ambiguous_match" and len(found) > 1,
-        )
-
 
 def _clean_resolution(changes: dict[str, Any]) -> dict[str, Any]:
     cleaned = dict(changes)
@@ -394,26 +373,18 @@ def _clean_resolution(changes: dict[str, Any]) -> dict[str, Any]:
             raise ReconcileError(
                 "time_zone_unknown", "Choose a valid time zone."
             ) from None
-    for field in ("account_id", "destination_account_id", "purchase_activity_id"):
+    for field in (
+        "account_id",
+        "source_account_id",
+        "destination_account_id",
+        "purchase_activity_id",
+    ):
         if cleaned.get(field) is not None:
             try:
                 cleaned[field] = str(UUID(str(cleaned[field])))
             except ValueError:
                 raise ReconcileError(f"{field}_invalid", "Use a valid id.") from None
     return cleaned
-
-
-def _match_key(facts: Any) -> tuple[Any, ...]:
-    """The facts duplicate matching depends on."""
-
-    return (
-        facts.amount,
-        facts.currency,
-        facts.occurred_on,
-        facts.account_id,
-        facts.direction,
-        facts.mask,
-    )
 
 
 @dataclass(frozen=True)

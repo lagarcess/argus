@@ -19,6 +19,7 @@ RESOLVABLE = frozenset(
     {
         "kind",
         "account_id",
+        "source_account_id",
         "destination_account_id",
         "amount",
         "currency",

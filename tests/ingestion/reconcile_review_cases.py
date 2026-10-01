@@ -193,7 +193,9 @@ def test_batch_returns_money_refusals_per_item(world):
         plaid(bank, "ok", amount="40"),
     )
     payment = next(e for e in _open(world) if e["facts"]["kind"] == "card_payment")
-    assert "destination_account_id" in payment["unresolved"]
+    # Seen on the card (inflow): the card is the destination; the person
+    # still has to say which account paid it.
+    assert "source_account_id" in payment["unresolved"]
     items = [(e["id"], e["version"]) for e in _open(world)]
     results = world.recon.accept_batch(
         user_id=world.user, items=items, idempotency_key="b1"
@@ -561,3 +563,93 @@ def test_store_refuses_two_imports_for_one_activity(world):
                 dc_replace(tx.event(second["id"]), state="accepted", activity_id=activity)
             )
     assert len(_open(world)) == 2
+
+
+# --- Third review regressions (#772 Codex review of f740158) ---------------
+
+
+@pytest.mark.parametrize("seen_on", ["card", "checking"])
+def test_a_card_payment_puts_the_observed_account_on_its_own_leg(world, seen_on):
+    card = new_account(world)
+    checking = new_account(world, kind="checking")
+    observed, other = (card, checking) if seen_on == "card" else (checking, card)
+    bank = world.connect("plaid")
+    link_accounts(world, observed, (bank, plaid(bank, "seed", amount="1")))
+    direction = "inflow" if seen_on == "card" else "outflow"
+    submit(
+        world,
+        bank,
+        plaid(bank, "pay", amount="40", kind_hint="card_payment", direction=direction),
+    )
+    event = only(world)
+    other_leg = "source_account_id" if seen_on == "card" else "destination_account_id"
+    assert event["unresolved"] == [other_leg]
+    world.recon.resolve(
+        user_id=world.user,
+        event_id=event["id"],
+        version=event["version"],
+        changes={other_leg: other},
+    )
+    accept(world, world.recon.detail(user_id=world.user, event_id=event["id"]))
+    (activity,) = [a for a in activities(world) if a["kind"] == "card_payment"]
+    legs = {leg["account_id"]: leg for leg in activity["legs"]}
+    assert set(legs) == {card, checking}
+
+
+def test_disconnecting_one_source_versions_the_event_others_still_back(world):
+    card = new_account(world)
+    wallet, bank = world.connect("shortcuts"), world.connect("plaid")
+    link_accounts(
+        world,
+        card,
+        (bank, plaid(bank, "seed", amount="1")),
+        (wallet, tap(wallet, "seed-tap", amount="1")),
+    )
+    submit(world, wallet, tap(wallet))
+    submit(world, bank, plaid(bank, "t1", status="posted"))
+    event = only(world)
+    assert {o["source"] for o in event["observations"]} == {"shortcuts", "plaid"}
+    world.recon.forget_connection(user_id=world.user, connection_id=bank)
+    after = only(world)
+    assert after["id"] == event["id"]
+    assert [o["source"] for o in after["observations"]] == ["shortcuts"]
+    # A review based on the removed evidence is refused as stale.
+    assert after["version"] > event["version"]
+    with pytest.raises(StaleEvent):
+        world.recon.resolve(
+            user_id=world.user,
+            event_id=event["id"],
+            version=event["version"],
+            changes={"note": "lunch"},
+        )
+
+
+def test_a_source_revision_that_now_matches_flags_both_events(world):
+    card = new_account(world)
+    gmail, bank = world.connect("gmail"), world.connect("plaid")
+    link_accounts(world, card, (bank, plaid(bank, "seed", amount="1")))
+    email = cand(
+        gmail,
+        "m1",
+        source="gmail",
+        amount="12.50",
+        currency="USD",
+        occurred_on=DAY,
+        account={"mask": "4321"},
+    )
+    submit(world, gmail, email)
+    submit(world, bank, plaid(bank, "t1", amount="99", status="posted"))
+    [first] = _open(world, "gmail")
+    [second] = _open(world, "plaid", "t1")
+    assert first["possible_duplicates"] == second["possible_duplicates"] == []
+    # The bank corrects the amount: now it may be the emailed purchase.
+    submit(world, bank, plaid(bank, "t1", amount="12.50", status="posted"))
+    first = world.recon.detail(user_id=world.user, event_id=first["id"])
+    second = world.recon.detail(user_id=world.user, event_id=second["id"])
+    assert second["possible_duplicates"] == [first["id"]]
+    assert first["possible_duplicates"] == [second["id"]]
+    assert first["attention"] == second["attention"] == "possible_duplicate"
+    # And a revision that moves away again clears both sides.
+    submit(world, bank, plaid(bank, "t1", amount="70", status="posted"))
+    first = world.recon.detail(user_id=world.user, event_id=first["id"])
+    assert first["possible_duplicates"] == [] and first["attention"] is None

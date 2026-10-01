@@ -26,7 +26,9 @@ from argus.domain.ingestion.reconcile.matching import (
     ACTIVITY_EVIDENCE,
     MATCH_WINDOW_DAYS,
     Facts,
+    compare,
     event_facts,
+    match_key,
     observation_facts,
     place,
     recorded_facts,
@@ -89,6 +91,11 @@ def forget(store: ImportStore, now: datetime, *, user_id: str, connection_id: st
             if not tx.observations(event.id):
                 duplicates.forget(tx, event, now)
                 tx.delete_event(event.id)
+            else:
+                # Other sources still back this event, but its facts may have
+                # changed: a new version, so a review based on the removed
+                # evidence is refused as stale.
+                _settle(tx, event, now)
         tx.delete_links(connection_id)
     return removed
 
@@ -99,6 +106,28 @@ def reanchor(tx: ImportTx, event: ImportEvent) -> ImportEvent:
 
     facts = event_facts(event, tx.observations(event.id), tx.links())
     return replace(event, anchor_on=facts.occurred_on or event.anchor_on)
+
+
+def recheck(tx: ImportTx, event: ImportEvent) -> ImportEvent:
+    """Point at events that may be the same purchase as ``event`` given its
+    current facts; never merge on the person's behalf."""
+
+    observations = tx.observations(event.id)
+    facts = event_facts(event, observations, tx.links())
+    sources = {o.source for o in observations if o.live}
+    found = []
+    for other, others, other_facts in nearby_facts(tx, facts):
+        if other.id == event.id or other.state == "dismissed":
+            continue
+        if sources & {o.source for o in others if o.live}:
+            continue
+        if compare(facts, other_facts) is not None:
+            found.append(other.id)
+    return duplicates.flag(
+        event,
+        found,
+        ambiguous=event.attention == "ambiguous_match" and len(found) > 1,
+    )
 
 
 def nearby_facts(
@@ -132,6 +161,7 @@ def _record(
             return
         removed = candidate.status == "removed"
         before = _facts(tx, existing.event_id)
+        matched = _match(tx, existing.event_id)
         tx.put_observation(
             replace(
                 existing,
@@ -144,7 +174,7 @@ def _record(
                 updated_at=now,
             )
         )
-        _after_change(tx, existing.event_id, before, now)
+        _after_change(tx, existing.event_id, before, now, matched)
         if removed:
             tally.withdrawn += 1
         else:
@@ -175,9 +205,10 @@ def _record(
     )
     if prior is not None:
         before = _facts(tx, prior.event_id)
+        matched = _match(tx, prior.event_id)
         tx.put_observation(replace(prior, live=False, updated_at=now))
         tx.put_observation(replace(observation, event_id=prior.event_id))
-        _after_change(tx, prior.event_id, before, now)
+        _after_change(tx, prior.event_id, before, now, matched)
         return
     facts = observation_facts(observation, tx.links())
     event_id, found, ambiguous = None, (), False
@@ -227,7 +258,18 @@ def _facts(tx: ImportTx, event_id: str) -> Facts:
     return _evidence(tx, tx.event(event_id))
 
 
-def _after_change(tx: ImportTx, event_id: str, before: Facts, now: datetime) -> None:
+def _match(tx: ImportTx, event_id: str) -> tuple[Any, ...]:
+    event = tx.event(event_id)
+    return match_key(event_facts(event, tx.observations(event_id), tx.links()))
+
+
+def _after_change(
+    tx: ImportTx,
+    event_id: str,
+    before: Facts,
+    now: datetime,
+    matched: tuple[Any, ...],
+) -> None:
     event = tx.event(event_id)
     observations = tx.observations(event_id)
     after = _evidence(tx, event)
@@ -273,7 +315,25 @@ def _after_change(tx: ImportTx, event_id: str, before: Facts, now: datetime) -> 
         # Withdrawn by the source, then replaced (pending removed, posted
         # later): the purchase is real again and back in review.
         event = replace(event, state="open", attention_detail=None)
-    tx.put_event(_bump(reanchor(tx, event), now))
+        matched = ()
+    if event.state == "open" and _match(tx, event.id) == matched:
+        tx.put_event(_bump(reanchor(tx, event), now))
+        return
+    _settle(tx, event, now)
+
+
+def _settle(tx: ImportTx, event: ImportEvent, now: datetime) -> None:
+    """Store ``event`` with a new version and, while it is open, its
+    possible duplicates recomputed from its current facts (both sides)."""
+
+    event = reanchor(tx, event)
+    if event.state != "open":
+        tx.put_event(_bump(event, now))
+        return
+    previous = event.possible_duplicates
+    event = _bump(recheck(tx, event), now)
+    tx.put_event(event)
+    duplicates.mirror(tx, event, previous, now)
 
 
 def _as_facts(recorded: dict[str, Any]) -> Facts | None:
