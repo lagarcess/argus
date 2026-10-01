@@ -5,3 +5,9 @@ The nine `CuadraoAccount-*` assets preserve the path data from the founder-revie
 retrieved September 30, 2026. Only SVG wrapping/template rendering is adapted for
 Xcode. Order: Cash, Checking, Savings, Investment, Credit card, Loan, Property,
 Vehicle, Other asset. These are not substituted SF Symbols.
+
+`CuadraoPlan` is a vector redraw of the calendar outline supplied by the founder
+on September 30, 2026 (clipboard image 6ad6b5a4-1caa-434e-b8c9-b42a0de11cb9).
+It preserves the rounded calendar, binding strokes, header rule and single lower
+dash; it is not claimed to be the original vendor SVG. Template rendering follows
+the existing selected/unselected navigation color.

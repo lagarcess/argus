@@ -19,7 +19,7 @@ enum CuadraoTab: Int, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .home: "house"
-        case .plan: "target"
+        case .plan: "calendar"
         case .assistant: "sparkle"
         case .search: "magnifyingglass"
         case .profile: "person"
@@ -27,9 +27,11 @@ enum CuadraoTab: Int, CaseIterable, Identifiable {
     }
 
     func image(selected: Bool) -> Image {
-        self == .home
-            ? Image(selected ? "CuadraoHomeSelected" : "CuadraoHomeOutline")
-            : Image(systemName: symbol)
+        switch self {
+        case .home: Image(selected ? "CuadraoHomeSelected" : "CuadraoHomeOutline")
+        case .plan: Image("CuadraoPlan")
+        default: Image(systemName: symbol)
+        }
     }
 }
 

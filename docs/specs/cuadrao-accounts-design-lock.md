@@ -183,3 +183,9 @@ badges or delivery tracking are introduced.
 [Native visual check](../reports/evidence/cuadrao-native-design/household-people/README.md).
 This supersedes the invitation-status card in earlier first-use screenshots;
 existing invitation and acceptance behavior stays within the local design mock.
+
+## Plan navigation icon — September 30, 2026
+
+Founder replaced the target icon with the supplied rounded calendar outline.
+The native tab uses a scalable vector redraw; other navigation icons and the
+icon-only layout remain unchanged. [Visual check](../reports/evidence/cuadrao-native-design/plan-calendar/README.md).
