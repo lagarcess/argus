@@ -23,7 +23,7 @@ Locked means preserve the reviewed baseline, not final polish or connected deliv
 | Accounts | Add/type/name/optional balance, currency entry, details, actions, reorder, archive/restore | Present the existing connected transaction inspection/correction, transfer/refund and reconciliation capabilities coherently; richer account/asset details; loading/failure/recovery presentation |
 | Household | Empty Home, create/open Hogar, native share-link preview, recipient accept/defer, Personas owns invitation/member status | Auth/install handoff, invitation expiry/revocation recovery, explicit sharing and visibility/editing explanations, leave/remove consequences under approved production contracts |
 | Plan | Calendar navigation icon | Cuadrao overview and detail presentation for budgets, savings goals, debt plans and commitments, using the delivery lane's existing capabilities |
-| Search | Navigation entry | Cuadrao search/results/detail presentation and empty/error states |
+| Search | Quiet field, categories, grouped results, scope/currency filters; accounts/activity share Home state; Plans/Chats/Files/Memory presentation examples | Connect all record owners, full destination experiences and loading/error/retry; advanced activity filters and device keyboard/localization acceptance |
 | Assistant, Profile and Novedades | Placement; profile and bell artwork | Actual Cuadrao destination screens, minimum account/settings controls, assistant entry and result presentation, meaningful updates |
 | Shared visual system | Native SwiftUI, Spanish-first review, reusable components and vector assets, light mode | Final logo/brand decisions, consolidated typography/spacing, accessibility, language coverage and device verification; dark mode remains deferred |
 
@@ -55,7 +55,8 @@ Two separate milestones prevent misleading completion claims:
 
 - **Next local step:** physical-phone design preview and the focused reuse map
   below. Use the current simulator/build cache for local checks; no new demo farm.
-- **Next design surface:** Plan as a complete overview-to-detail experience,
+- **Updated founder priority:** carry the locked Search/Discover design into Cuadrao, including Chats, Files and Memory, before Plan.
+- **Following design surface:** Plan as a complete overview-to-detail experience,
   informed by the approved account controls and existing financial contracts.
   Apply the established Mobbin/Apple reference exercise before design changes.
 - **Connection priority:** the personal account loop above, then Plan and Search.
@@ -275,3 +276,23 @@ icon-only layout remain unchanged. [Visual check](../reports/evidence/cuadrao-na
 Founder-supplied rounded outline references replace the default person and bell
 artwork in navigation. Template vector redraws preserve the current placement,
 colors and interactions. [Visual check](../reports/evidence/cuadrao-native-design/navigation-icons/README.md).
+
+## Search and physical-phone continuation — September 30, 2026
+
+Founder selected Search/Discover before Plan and explicitly retained Chats, Files
+and Memory. The native preview now includes Todo, Cuentas, Movimientos, Planes,
+Chats, Archivos and Memoria. Existing preview accounts/activity are the only owner
+of their data. Other categories use separate labelled presentation examples until
+their actual owners are connected; they do not create saved chats, PDFs, plans or
+memories. Memory examples include source-conversation navigation. Private chats,
+source files and memory are excluded from the Household filter. Currency affects
+financial results only. Do not interpret these preview filters as authorization.
+
+The separate Cuadrao Preview was signed, installed and launched on the paired
+iPhone 15 without launch arguments. Its bundle opts into the design canvas, opens
+Home with samples and leaves the existing Argus identity/session untouched. The
+normal build defaults remain the connected app. Sample financial data resets on
+relaunch; this is phone design review, not connected internet delivery.
+
+[Search evidence and remaining checks](../reports/evidence/cuadrao-native-design/search/README.md).
+[VM handoff prompt](../reports/cuadrao-vm-handoff-prompt.md).

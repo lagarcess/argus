@@ -8,12 +8,16 @@ enum WelcomePalette {
 
 /// The native visual canvas. Add only the UI elements selected during design review.
 struct CuadraoCanvas: View {
+    static var standalonePreview: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "CUADRAO_DESIGN_PREVIEW") as? String == "true"
+    }
+
     private let language = "es"
 
     private var spanish: Bool { language == "es" }
 
     var body: some View {
-        if ProcessInfo.processInfo.arguments.contains("--cuadrao-home") {
+        if Self.standalonePreview || ProcessInfo.processInfo.arguments.contains("--cuadrao-home") {
             CuadraoHomeCanvas()
         } else {
         NavigationStack {

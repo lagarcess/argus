@@ -1,5 +1,7 @@
 // Simulator-only placeholder. Production identity and signing remain unapproved.
 ARGUS_LOCAL_BUNDLE_IDENTIFIER = local.argus.foundation
+ARGUS_DISPLAY_NAME = Argus Sample
+CUADRAO_DESIGN_PREVIEW = false
 // Local ad-hoc simulator signature supplies Keychain identity; no account/team.
 CODE_SIGNING_ALLOWED = YES
 CODE_SIGN_IDENTITY = -

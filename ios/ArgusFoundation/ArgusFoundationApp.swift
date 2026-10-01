@@ -24,7 +24,7 @@ struct ArgusFoundationApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--cuadrao-design") {
+            if CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--cuadrao-design") {
                 CuadraoCanvas()
                     .preferredColorScheme(.light)
             } else {

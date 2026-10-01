@@ -3,12 +3,12 @@ import SwiftUI
 /// Independent native design canvas. Sample values never reach financial services.
 struct CuadraoHomeCanvas: View {
     @AppStorage("cuadrao.design.home-section-order") private var homeOrder = CuadraoHomeSection.defaultOrder
-    @State private var populated = ProcessInfo.processInfo.arguments.contains("--home-populated")
+    @State private var populated = (CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
     @State private var selectedTab: CuadraoTab = .home
     @State private var navigationScroll = CuadraoNavigationScroll()
     @State private var sheet: HomeSheet?
     @State private var data = CuadraoAccountsPreview(
-        populated: ProcessInfo.processInfo.arguments.contains("--home-populated"),
+        populated: (CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated")),
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
     @State private var accountPath: [UUID] = []
     @State private var ordering = false
@@ -230,13 +230,18 @@ struct CuadraoHomeCanvas: View {
         Text(title).font(.system(.title2, design: .serif)).accessibilityAddTraits(.isHeader)
     }
 
-    private func destination(_ tab: CuadraoTab) -> some View {
+    @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
+        if tab == .search {
+            CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
+                actions: { sheet = .actions($0) }, record: { sheet = .record($0) })
+        } else {
         NavigationStack {
             ContentUnavailableView(tab.title(spanish: spanish), systemImage: tab.symbol,
                 description: Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home."))
                 .background(Color.white)
         }
         .toolbar(.hidden, for: .tabBar)
+        }
     }
 
     @ViewBuilder private func modal(_ item: HomeSheet) -> some View {
