@@ -100,6 +100,8 @@ extension FinancialLoopUITests {
     }
 
     private func revealSharedControl(_ control: XCUIElement) {
+        let appeared = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in self.sharedControlIsVisible(control) }, object: nil)
+        if XCTWaiter.wait(for: [appeared], timeout: 2) == .completed { return }
         for direction in [true, false] {
             for _ in 0..<15 {
                 if sharedControlIsVisible(control) { return }
