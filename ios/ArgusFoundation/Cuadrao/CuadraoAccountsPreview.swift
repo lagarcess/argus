@@ -51,6 +51,7 @@ struct CanvasActivity: Identifiable {
     var accounts: [CanvasAccount] = []
     var activity: [CanvasActivity] = []
     var spaces: [CanvasSpace] = []
+    var household: CanvasHouseholdState = .alone
     var selectedSpaceID = CanvasSpace.personalID
     init(populated: Bool, spanish: Bool) { reset(populated: populated, spanish: spanish) }
     var active: [CanvasAccount] { scopedAccounts.filter { !$0.archived } }
@@ -72,6 +73,7 @@ struct CanvasActivity: Identifiable {
         accounts = accounts.map { ids.contains($0.id) ? iterator.next()! : $0 }
     }
     func reset(populated: Bool, spanish: Bool) {
+        household = populated ? .joined("Alex") : .alone
         selectedSpaceID = CanvasSpace.personalID
         spaces = [CanvasSpace(id: CanvasSpace.personalID, kind: .personal, name: "")]
         if populated { spaces.append(CanvasSpace(id: CanvasSpace.householdID, kind: .household, name: "")) }

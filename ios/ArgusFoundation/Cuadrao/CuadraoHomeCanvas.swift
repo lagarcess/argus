@@ -17,7 +17,7 @@ struct CuadraoHomeCanvas: View {
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
-        case add, options, archived, updates, spaces, customize
+        case add, options, archived, updates, spaces, customize, household
         case actions(UUID), rename(UUID), record(UUID)
         var id: String { "home-modal" }
     }
@@ -34,10 +34,12 @@ struct CuadraoHomeCanvas: View {
                         ForEach(CuadraoHomeSection.decode(homeOrder)) { section in
                             homeSection(section)
                         }
-                        Button { ordering = false; sheet = .customize } label: {
-                            Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
-                                .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
-                        }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
+                        if !data.active.isEmpty {
+                            Button { ordering = false; sheet = .customize } label: {
+                                Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
+                                    .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
+                            }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
+                        }
                     }
                     .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
                 }
@@ -91,7 +93,7 @@ struct CuadraoHomeCanvas: View {
 
     @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
         switch section {
-        case .overview: CuadraoHomeOverview(data: data, spanish: spanish)
+        case .overview: if !data.active.isEmpty { CuadraoHomeOverview(data: data, spanish: spanish) }
         case .accounts: accounts
         case .activity: if !data.visibleActivity.isEmpty { activity }
         case .upcoming: if populated && data.selectedSpace.kind == .personal { upcoming }
@@ -104,6 +106,10 @@ struct CuadraoHomeCanvas: View {
                 .contextMenu {
                     Button(spanish ? "Vista previa: primer uso" : "Preview: first use") {
                         populated = false; data.reset(populated: false, spanish: spanish); ordering = false
+                    }
+                    Button(spanish ? "Vista previa: Hogar sin cuentas compartidas" : "Preview: household with no shared accounts") {
+                        populated = false; data.reset(populated: false, spanish: spanish)
+                        data.openHousehold(); data.household = .joined("Alex")
                     }
                     Button(spanish ? "Vista previa: con actividad" : "Preview: with activity") {
                         populated = true; data.reset(populated: true, spanish: spanish); ordering = false
@@ -119,17 +125,25 @@ struct CuadraoHomeCanvas: View {
 
     private var accounts: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 0) {
-                sectionTitle(spanish ? "Cuentas" : "Accounts")
-                Spacer()
-                if ordering {
-                    Button(spanish ? "Listo" : "Done") { ordering = false }
-                        .font(.subheadline.weight(.medium)).frame(minHeight: 44)
-                } else {
-                    Button { sheet = .add } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
-                        .accessibilityLabel(spanish ? "Añadir cuenta" : "Add account")
-                    Button { sheet = .options } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                        .accessibilityLabel(spanish ? "Opciones de cuentas" : "Account options")
+            if data.selectedSpace.kind == .household && !data.active.isEmpty {
+                Button { sheet = .household } label: {
+                    Label(spanish ? "Personas e invitaciones" : "People and invitations", systemImage: "person.2")
+                        .font(.subheadline).frame(minHeight: 44)
+                }
+            }
+            if !data.active.isEmpty || !data.archived.isEmpty {
+                HStack(spacing: 0) {
+                    sectionTitle(spanish ? "Cuentas" : "Accounts")
+                    Spacer()
+                    if ordering {
+                        Button(spanish ? "Listo" : "Done") { ordering = false }
+                            .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+                    } else {
+                        Button { sheet = .add } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
+                            .accessibilityLabel(spanish ? "Añadir cuenta" : "Add account")
+                        Button { sheet = .options } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                            .accessibilityLabel(spanish ? "Opciones de cuentas" : "Account options")
+                    }
                 }
             }
             if ordering {
@@ -164,24 +178,8 @@ struct CuadraoHomeCanvas: View {
     }
 
     private var firstAccount: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Image(systemName: "wallet.bifold")
-                .font(.system(size: 30, weight: .light)).foregroundStyle(WelcomePalette.pine)
-                .frame(width: 62, height: 62)
-                .background(.white.opacity(0.75), in: RoundedRectangle(cornerRadius: 18))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 10) {
-                Text(spanish ? "Empieza con una cuenta." : "Start with one account.")
-                    .font(.system(.title2, design: .serif))
-                Text(spanish ? "Tu banco, tu efectivo o tus ahorros. Tú eliges por dónde empezar."
-                     : "Your bank, cash or savings. Choose where to begin.")
-                    .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
-            RegistrationButton(title: spanish ? "Añadir cuenta" : "Add account") { sheet = .add }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 24))
+        CuadraoHomeEmptyState(data: data, spanish: spanish,
+            addAccount: { sheet = .add }, household: { sheet = .household })
     }
 
     private var activity: some View {
@@ -243,6 +241,7 @@ struct CuadraoHomeCanvas: View {
 
     @ViewBuilder private func modal(_ item: HomeSheet) -> some View {
         switch item {
+        case .household: CuadraoHouseholdSheet(data: data, spanish: spanish)
         case .customize: CuadraoHomeLayoutSheet(savedOrder: $homeOrder, spanish: spanish)
         case .spaces: CuadraoSpacesSheet(data: data, spanish: spanish)
         case .add: CuadraoFirstAccountSheet(data: data, spanish: spanish)

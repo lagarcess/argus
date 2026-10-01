@@ -7,8 +7,8 @@ struct CuadraoSpacesSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    data.openHousehold(); dismiss()
+                NavigationLink {
+                    CuadraoHouseholdIntroduction(data: data, spanish: spanish, finished: { dismiss() })
                 } label: {
                     spaceChoice(.household, subtitle: spanish ? "Lo que comparten en casa" : "What you share at home")
                 }.buttonStyle(.plain)

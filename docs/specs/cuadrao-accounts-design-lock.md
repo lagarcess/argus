@@ -140,3 +140,18 @@ boundaries: joining alone does not share private records or create a joint
 account. This checkpoint does not approve a new permission model, invitation
 integration, financial rule or backend implementation. Household flow proposals
 still require the usual design-reference and founder review exercise.
+
+## First-use design proposal — September 30, 2026
+
+Implemented for founder review in the native sample canvas after the Mobbin pass:
+Personal with no accounts; Household creation introduction; Household alone;
+invitation pending; joined with nothing shared. Empty Personal has one add-account
+entry point; empty charts, summary totals and reordering are deferred until content
+exists. The existing section order and populated account interactions are retained.
+Household pending/joined states do not create or share private account records.
+
+[First-use evidence and preview instructions](../reports/evidence/cuadrao-native-design/cold-start/README.md)
+record the native journey and its limits. This advances the earlier checkpoint's
+first-use/empty-household rows; it does not close the complete invitation, sharing
+or member-management design. The recipient acceptance screen and production
+invitation mechanism remain open. Preview-only simulation is labelled explicitly.
