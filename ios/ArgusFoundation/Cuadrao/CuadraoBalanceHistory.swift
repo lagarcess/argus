@@ -83,30 +83,64 @@ enum CanvasBalanceHistory {
     }
 }
 
-/// Calendar windows filter recorded observations; they never manufacture boundary balances.
+/// Calendar periods own filtering, paging bounds and the balance comparison.
 enum CanvasHistoryRange: String, CaseIterable, Identifiable {
-    case month, quarter, year, all
+    case week, month, year
     var id: String { rawValue }
+    var component: Calendar.Component {
+        switch self { case .week: .weekOfYear; case .month: .month; case .year: .year }
+    }
     func title(_ es: Bool) -> String {
         switch self {
-        case .month: es ? "1 mes" : "1M"
-        case .quarter: es ? "3 meses" : "3M"
-        case .year: es ? "Este año" : "YTD"
-        case .all: es ? "Todo" : "All"
+        case .week: es ? "Semana" : "Week"
+        case .month: es ? "Mes" : "Month"
+        case .year: es ? "Año" : "Year"
         }
     }
-    func points(_ points: [CanvasBalancePoint], now: Date = .now, month: Date? = nil) -> [CanvasBalancePoint] {
+    func interval(now: Date = .now, offset: Int = 0) -> DateInterval {
         let calendar = Calendar.current
-        if let month, let interval = calendar.dateInterval(of: .month, for: month) {
-            return points.filter { $0.date >= interval.start && $0.date < interval.end }
-        }
-        let start: Date
+        let current = calendar.dateInterval(of: component, for: now)!.start
+        return calendar.dateInterval(of: component, for: calendar.date(byAdding: component, value: min(offset, 0), to: current)!)!
+    }
+    func points(_ points: [CanvasBalancePoint], now: Date = .now, offset: Int = 0) -> [CanvasBalancePoint] {
+        let window = interval(now: now, offset: offset)
+        return points.filter { $0.date >= window.start && $0.date < window.end && $0.date <= now }
+    }
+    func oldestOffset(_ points: [CanvasBalancePoint], now: Date = .now) -> Int {
+        guard let first = points.first else { return 0 }
+        let start = Calendar.current.dateInterval(of: component, for: first.date)!.start
+        return min(0, Calendar.current.dateComponents([component], from: interval(now: now).start, to: start).value(for: component) ?? 0)
+    }
+    func baseline(_ history: [CanvasBalancePoint], now: Date = .now, offset: Int = 0) -> CanvasBalancePoint? {
+        let start = interval(now: now, offset: offset).start
+        return history.last { $0.date < start } ?? points(history, now: now, offset: offset).first
+    }
+}
+
+/// Quiet Home offers only windows covered by recorded history.
+enum CanvasHomeRange: String, CaseIterable, Identifiable {
+    case month, twoMonths, quarter, halfYear, year, all
+    var id: String { rawValue }
+    var months: Int? {
         switch self {
-        case .month: start = calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))!
-        case .quarter: start = calendar.date(byAdding: .month, value: -3, to: now)!
-        case .year: start = calendar.dateInterval(of: .year, for: now)!.start
-        case .all: return points
+        case .month: 1; case .twoMonths: 2; case .quarter: 3
+        case .halfYear: 6; case .year: 12; case .all: nil
         }
+    }
+    func title(_ es: Bool) -> String {
+        guard let months else { return es ? "Todo" : "All" }
+        if months == 12 { return es ? "1 año" : "1Y" }
+        return es ? "\(months) \(months == 1 ? "mes" : "meses")" : "\(months)M"
+    }
+    func start(now: Date) -> Date? {
+        months.map { Calendar.current.date(byAdding: .month, value: -$0, to: Calendar.current.startOfDay(for: now))! }
+    }
+    static func available(_ points: [CanvasBalancePoint], now: Date = .now) -> [Self] {
+        guard let first = points.first, points.count > 1 else { return [.all] }
+        return allCases.filter { option in option.start(now: now).map { first.date <= $0 } ?? true }
+    }
+    func points(_ points: [CanvasBalancePoint], now: Date = .now) -> [CanvasBalancePoint] {
+        guard let start = start(now: now) else { return points }
         return points.filter { $0.date >= start && $0.date <= now }
     }
 }
