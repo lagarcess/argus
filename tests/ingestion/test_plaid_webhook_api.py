@@ -225,3 +225,38 @@ def test_unknown_items_and_other_environments_are_acknowledged_and_ignored(
     assert deliver(client, production_error)[0].status_code == 200
     assert signed.paths().count("/transactions/sync") == syncs
     assert stored(client, identities, connection_id).status == "active"
+
+
+def test_a_delivery_whose_handling_failed_is_processed_when_retried(
+    client, signed, identities, monkeypatch
+):  # noqa: ANN001
+    from argus.api.plaid import plaid_connector
+
+    connection_id = connect(client).json()["connection"]["id"]
+    signed.sync["c1"] = [page(added=[txn("t2", 7)], next_cursor="c2")]
+    webhooks = plaid_connector().webhooks
+    planned = webhooks.plan
+
+    def unavailable(payload):  # noqa: ANN001, ANN202
+        raise RuntimeError("database unavailable")
+
+    body = json.dumps(sync_event()).encode()
+    token = jwt.encode(
+        {
+            "iat": int(time.time()),
+            "request_body_sha256": hashlib.sha256(body).hexdigest(),
+        },
+        PRIVATE,
+        algorithm="ES256",
+        headers={"kid": KID},
+    )
+    headers = {"Plaid-Verification": token, "Content-Type": "application/json"}
+    monkeypatch.setattr(webhooks, "plan", unavailable)
+    failed = client.post(f"{URL}/webhook", content=body, headers=headers)
+    assert failed.status_code == 500
+    assert stored(client, identities, connection_id).cursor == "c1"
+    # Plaid retries the same signed delivery: it is handled, not skipped.
+    monkeypatch.setattr(webhooks, "plan", planned)
+    retried = client.post(f"{URL}/webhook", content=body, headers=headers)
+    assert retried.status_code == 200
+    assert stored(client, identities, connection_id).cursor == "c2"

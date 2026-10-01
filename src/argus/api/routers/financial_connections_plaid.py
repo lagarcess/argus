@@ -236,7 +236,12 @@ async def receive_plaid_webhook(
         ) from None
     if verified.duplicate:
         return WebhookReceipt(received=True)
-    plan = await run_in_threadpool(connector.webhooks.plan, verified.payload)
+    try:
+        plan = await run_in_threadpool(connector.webhooks.plan, verified.payload)
+    except Exception:
+        # Not handled: Plaid's retry of this delivery must be processed.
+        connector.verifier.release(token or "")
+        raise
     if plan.effect in ("sync", "repair"):
         background.add_task(connector.run, plan)
     return WebhookReceipt(received=True)
