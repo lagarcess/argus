@@ -6,54 +6,56 @@ struct CuadraoLiveVoiceCanvas: View {
     let keyboard: () -> Void
     let showProposal: () -> Void
     @State private var choosingVoice = false
+    @State private var previewDetails = false
     private var es: Bool { spanish }
     private var voice: CuadraoVoicePreview { chat.voice }
 
     var body: some View {
-        ZStack {
-            WelcomePalette.background.ignoresSafeArea()
-            CuadraoVoiceSea(voice: voice).ignoresSafeArea()
-            VStack(spacing: 0) {
-                header
+        GeometryReader { geometry in
+            ZStack {
+                WelcomePalette.background.ignoresSafeArea()
+                CuadraoVoiceSea(voice: voice).ignoresSafeArea()
                 ScrollView {
-                    VStack(spacing: 24) {
-                        Spacer(minLength: 65)
-                        CuadraoBrand().scaleEffect(0.9)
-                        Text(voice.status(es)).font(.system(.largeTitle, design: .serif))
-                            .multilineTextAlignment(.center).contentTransition(.opacity)
-                            .accessibilityIdentifier("voice-status")
-                        Text(voice.phase == .speaking
-                            ? (es ? "Claro. ¿Qué quieres revisar primero?" : "Of course. What would you like to look at first?")
-                            : voice.muted
-                                ? (es ? "Activa el micrófono cuando quieras seguir." : "Unmute whenever you want to continue.")
-                                : (es ? "Podemos seguir hablando mientras usas Cuadrao." : "We can keep talking while you use Cuadrao."))
-                            .font(.body).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                            .frame(maxWidth: 310)
-                        if voice.phase == .speaking {
-                            Button(es ? "Interrumpir" : "Interrupt") { voice.interrupt() }
-                                .font(.body.weight(.medium)).frame(minHeight: 44)
-                                .accessibilityIdentifier("voice-interrupt")
-                        }
-                        if chat.temporary {
-                            Label { Text(es ? "Chat temporal" : "Temporary chat") } icon: {
-                                Image("CuadraoTemporaryChat").resizable().scaledToFit().frame(width: 16, height: 16)
-                            }.font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }.frame(maxWidth: .infinity).padding(.horizontal, 28).padding(.bottom, 24)
-                }
-                VStack(spacing: 28) {
-                    CuadraoVoiceWave(voice: voice)
-                    HStack(alignment: .top, spacing: 32) {
-                        control(voice.muted ? "mic.slash" : "mic", voice.muted ? (es ? "Activar" : "Unmute") : (es ? "Silenciar" : "Mute"), id: "voice-mute", selected: voice.muted) { voice.muted.toggle() }
-                        control("keyboard", es ? "Escribir" : "Type", id: "voice-keyboard", action: keyboard)
-                        control("xmark", es ? "Terminar" : "End", id: "voice-end", destructive: true) { voice.end() }
-                    }
-                    Text(es ? "Vista previa · El micrófono está apagado" : "Preview · The microphone is off")
-                        .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                }.padding(.horizontal, 24).padding(.bottom, 28)
+                    VStack(spacing: 0) {
+                        header
+                        Spacer(minLength: 64)
+                        status
+                        Spacer(minLength: 64)
+                        CuadraoVoiceWave(voice: voice).padding(.bottom, 36)
+                        controls
+                        previewNotice.padding(.top, 16).padding(.bottom, 16)
+                    }.frame(minHeight: geometry.size.height)
+                }.scrollBounceBehavior(.basedOnSize)
             }
         }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
             .sheet(isPresented: $choosingVoice) { CuadraoVoicePicker(spanish: es) }
+            .confirmationDialog(es ? "Vista previa de diseño" : "Design preview",
+                                isPresented: $previewDetails, titleVisibility: .visible) {
+                Button(es ? "Ver propuesta de ejemplo" : "Show example proposal", action: showProposal)
+                Button(es ? "Probar escucha" : "Preview listening") { voice.phase = .listening }
+                Button(es ? "Probar respuesta" : "Preview speaking") { voice.phase = .speaking }
+            } message: {
+                Text(es ? "El micrófono está apagado. Estas opciones permiten revisar el diseño; no ejecutan acciones reales."
+                     : "The microphone is off. These options let you review the design; they do not perform real actions.")
+            }
+    }
+
+    private var status: some View {
+        VStack(spacing: 16) {
+            Text(voice.status(es)).font(.title2.weight(.medium))
+                .multilineTextAlignment(.center).contentTransition(.opacity)
+                .accessibilityIdentifier("voice-status")
+            if voice.phase == .speaking {
+                Button(es ? "Interrumpir" : "Interrupt") { voice.interrupt() }
+                    .font(.subheadline).frame(minHeight: 44)
+                    .accessibilityIdentifier("voice-interrupt")
+            }
+            if chat.temporary {
+                Label { Text(es ? "Chat temporal" : "Temporary chat") } icon: {
+                    Image("CuadraoTemporaryChat").resizable().scaledToFit().frame(width: 16, height: 16)
+                }.font(.footnote).foregroundStyle(.secondary)
+            }
+        }.frame(maxWidth: .infinity).padding(.horizontal, 28)
     }
 
     private var header: some View {
@@ -61,34 +63,45 @@ struct CuadraoLiveVoiceCanvas: View {
             Button { voice.presentation = .compact } label: {
                 Image(systemName: "chevron.down").font(.system(size: 18, weight: .medium))
                     .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
             }.accessibilityLabel(es ? "Minimizar conversación de voz" : "Minimize voice conversation")
                 .accessibilityIdentifier("voice-minimize")
             Spacer()
-            Button { choosingVoice = true } label: {
-                Label(es ? "Elegir voz" : "Choose voice", systemImage: "slider.horizontal.3")
-                    .font(.subheadline.weight(.medium)).frame(minHeight: 44)
-            }.accessibilityIdentifier("voice-choose")
+            Text("Cuadrao").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
             Spacer()
-            Menu {
-                Button(es ? "Ver propuesta de ejemplo" : "Show example proposal", systemImage: "rectangle.on.rectangle", action: showProposal)
-                Button(es ? "Probar escucha" : "Preview listening", systemImage: "waveform") { voice.phase = .listening }
-                Button(es ? "Probar respuesta" : "Preview speaking", systemImage: "speaker.wave.2") { voice.phase = .speaking }
-            } label: {
-                Image(systemName: "ellipsis").frame(width: 48, height: 48)
-            }.accessibilityLabel(es ? "Estados de la vista previa" : "Preview states")
-        }.padding(.horizontal, 16).padding(.top, 8)
+            Button { choosingVoice = true } label: {
+                Image(systemName: "slider.horizontal.3").font(.system(size: 20))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+            }.accessibilityLabel(es ? "Elegir voz" : "Choose voice")
+                .accessibilityIdentifier("voice-choose")
+        }.buttonStyle(.plain).padding(.horizontal, 24).padding(.top, 12)
     }
 
-    private func control(_ symbol: String, _ title: String, id: String, selected: Bool = false,
-                         destructive: Bool = false, action: @escaping () -> Void) -> some View {
+    private var controls: some View {
+        HStack(spacing: 16) {
+            control(voice.muted ? "mic.slash" : "mic",
+                    voice.muted ? (es ? "Activar micrófono" : "Unmute microphone") : (es ? "Silenciar micrófono" : "Mute microphone"),
+                    id: "voice-mute", selected: voice.muted) { voice.muted.toggle() }
+            control("keyboard", es ? "Escribir" : "Type", id: "voice-keyboard", action: keyboard)
+            control("xmark", es ? "Terminar conversación de voz" : "End voice conversation", id: "voice-end") { voice.end() }
+        }.padding(8).background(.regularMaterial, in: Capsule())
+            .overlay { Capsule().stroke(WelcomePalette.separator.opacity(0.5), lineWidth: 0.5) }
+    }
+
+    private var previewNotice: some View {
+        Button { previewDetails = true } label: {
+            Label(es ? "Vista previa · Sin conexión" : "Preview · Not connected", systemImage: "info.circle")
+                .font(.caption).foregroundStyle(.secondary).frame(minHeight: 44)
+        }.buttonStyle(.plain).accessibilityIdentifier("voice-preview-info")
+    }
+
+    private func control(_ symbol: String, _ title: String, id: String,
+                         selected: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 9) {
-                Image(systemName: symbol).font(.system(size: 22, weight: .medium))
-                    .frame(width: 60, height: 60)
-                    .foregroundStyle(destructive ? Color.white : WelcomePalette.ink)
-                    .background(destructive ? Color(red: 0.78, green: 0.19, blue: 0.22) : (selected ? WelcomePalette.sage : WelcomePalette.background.opacity(0.78)), in: Circle())
-                Text(title).font(.caption)
-            }
+            Image(systemName: symbol).font(.system(size: 22, weight: .regular))
+                .frame(width: 52, height: 52)
+                .background(selected ? WelcomePalette.sage : Color.clear, in: Circle())
         }.buttonStyle(.plain).accessibilityIdentifier(id)
             .accessibilityLabel(title).accessibilityValue(selected ? (es ? "Activado" : "On") : "")
     }

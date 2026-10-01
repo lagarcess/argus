@@ -3,14 +3,12 @@ import SwiftUI
 struct CuadraoVoiceBar: View {
     let voice: CuadraoVoicePreview
     let spanish: Bool
-    @State private var choosingVoice = false
 
     var body: some View {
         HStack(spacing: 0) {
             Button { voice.presentation = .expanded } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: voice.resting ? "waveform.slash" : "waveform")
-                        .font(.system(size: 19)).foregroundStyle(WelcomePalette.pine)
+                    CuadraoVoiceWave(voice: voice, compact: true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(voice.resting ? (spanish ? "Silenciado" : "Muted") : voice.status(spanish)).font(.subheadline.weight(.medium)).lineLimit(1)
                         Text(spanish ? "Vista previa" : "Preview").font(.caption).foregroundStyle(.secondary)
@@ -19,12 +17,9 @@ struct CuadraoVoiceBar: View {
                 }.padding(.leading, 16).frame(minHeight: 54).contentShape(Rectangle())
             }.accessibilityLabel(spanish ? "Ampliar voz" : "Expand voice")
                 .accessibilityIdentifier("voice-expand")
-            Button { choosingVoice = true } label: {
-                Image(systemName: "slider.horizontal.3").frame(width: 44, height: 48)
-            }.accessibilityLabel(spanish ? "Elegir voz" : "Choose voice")
             Button { voice.muted.toggle() } label: {
                 Image(systemName: voice.muted ? "mic.slash" : "mic").frame(width: 44, height: 48)
-            }.accessibilityLabel(voice.muted ? (spanish ? "Activar micrófono" : "Unmute microphone") : (spanish ? "Silenciar micrófono" : "Mute microphone"))
+            }.accessibilityIdentifier("voice-mute-compact").accessibilityLabel(voice.muted ? (spanish ? "Activar micrófono" : "Unmute microphone") : (spanish ? "Silenciar micrófono" : "Mute microphone"))
             Button { voice.end() } label: {
                 Image(systemName: "xmark").frame(width: 44, height: 48)
             }.accessibilityLabel(spanish ? "Terminar conversación de voz" : "End voice conversation")
@@ -33,6 +28,5 @@ struct CuadraoVoiceBar: View {
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
             .overlay { RoundedRectangle(cornerRadius: 24).stroke(WelcomePalette.separator, lineWidth: 0.5) }
             .padding(.horizontal, 20).padding(.bottom, 8)
-            .sheet(isPresented: $choosingVoice) { CuadraoVoicePicker(spanish: spanish) }
     }
 }
