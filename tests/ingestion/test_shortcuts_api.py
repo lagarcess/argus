@@ -181,6 +181,7 @@ def test_message_capture_is_accepted_as_inert_text(client, sink):
     assert response.status_code == 200
     [candidate] = sink.evidence.values()
     assert candidate.amount is None and candidate.excerpt == "Consumo aprobado RD$500.00"
+    assert candidate.evidence == "unclassified" and "kind" in candidate.unresolved()
 
 
 def test_without_a_sink_nothing_is_saved_and_the_answer_is_retryable(client, identities):

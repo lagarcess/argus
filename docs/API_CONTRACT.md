@@ -7544,5 +7544,5 @@ single value is possible, and `currency` only when the text names one
 (`RD$`, `US$`, `€`, an ISO code) or an explicit `currency` settles a bare `$`.
 Otherwise the field stays empty and is listed as uncertain. `card` becomes the
 account hint name and `card_last4` its mask; nothing else is inferred. A
-`message_capture` becomes inert text (`excerpt`, `sender` as description) with
-every money field unresolved and `kind` uncertain.
+`message_capture` becomes `unclassified` evidence: inert text (`excerpt`,
+`sender` as description) with `kind` and every money field unresolved.

@@ -31,7 +31,7 @@ parity), [device test protocol](device-test-protocol.md).
 | A tap becomes `transaction` evidence, `status=unknown`, `direction=unknown`, card name as account hint, no invented mask | Hermetic | `test_wallet_tap_is_unsettled_transaction_evidence`, `test_mask_only_when_the_shortcut_states_it` |
 | Re-delivery returns the same receipt with `unchanged`; distinct event ids with identical content stay distinct | Hermetic API + real Postgres | `test_repeated_delivery_returns_the_same_receipt`, `test_identical_purchases_with_distinct_event_ids_stay_distinct`, `test_pending_batch_is_idempotent_per_event` |
 | Formatted amounts read deterministically or left unresolved: `RD$1,250.00`, `US$ 12.50`, `1.250,00 €` parse; bare `$` keeps currency empty and uncertain unless an ISO code is sent; `1,250` stays unresolved | Hermetic | `test_shortcuts_amounts.py` (29 tests), `test_ambiguous_dollar_and_explicit_code` |
-| Message captures are inert text with every money field unresolved | Hermetic | `test_message_capture_is_inert_text_with_money_unresolved`, `test_message_capture_is_accepted_as_inert_text` |
+| Message captures are `unclassified` inert text with every money field unresolved | Hermetic | `test_message_capture_is_inert_text_with_money_unresolved`, `test_message_capture_is_accepted_as_inert_text` |
 | No sink: 503 `shortcuts_intake_unavailable`, retryable, nothing saved, freshness unchanged | Hermetic API | `test_without_a_sink_nothing_is_saved_and_the_answer_is_retryable` |
 | A sink failure mid-batch answers 503; the retry records only what is missing | Hermetic API | `test_sink_failure_is_retryable_and_retry_is_harmless` |
 | Body caps, strict schema (unknown fields refused), time window, batch limits | Hermetic API | `test_body_cap_extra_fields_and_bad_json`, `test_events_outside_the_time_window_are_refused`, `test_batch_limits_refuse_before_saving`, `test_stale_capture_in_a_batch_does_not_block_the_rest` |
@@ -53,7 +53,7 @@ $PY -m pytest tests/ingestion/test_shortcuts_*.py -q --no-cov
 ARGUS_DISPOSABLE_DATABASE_URL=postgresql://postgres@127.0.0.1:56811/argus_shortcuts \
   $PY -m pytest tests/test_ingestion_shortcuts_postgres.py \
   tests/test_ingestion_connections_postgres.py -q --no-cov
-# 12 passed (shortcuts 2, connections 10)
+# 13 passed (shortcuts 2, connections 11)
 
 # Lane gate
 $PY -m pytest tests/ingestion tests/financial_accounts tests/household \
@@ -97,10 +97,13 @@ $PY -m pytest tests/ingestion tests/financial_accounts tests/household \
 - Token rotation without re-enrollment (disconnect and enroll again instead).
 - Native presentation of enrollment and review.
 
-## Proposed change for the contract owner
+## Contract follow-up (adopted)
 
-`EvidenceKind` has no value for an unclassified capture. Message captures are
-emitted as `evidence="transaction"` with `uncertain={"kind"}` and every money
-field empty, which reconciliation must not read as a transaction claim.
-Proposed: add `"unclassified"` to `EvidenceKind` (no money fields required,
-`unresolved()` always includes `"kind"`), and have this connector emit it.
+The amended wave-0 contract (`claude/ingestion-contract` @ `3bed4ac1`) added
+`unclassified` to `EvidenceKind` at this connector's request. Message and
+notification captures are emitted as `evidence="unclassified"`; `unresolved()`
+always lists `kind` and every money field. The amended contract also counts a
+card or account name alone as resolving `account`, so a tap with a card name
+leaves only `direction` (and any uncertain amount or currency) for review.
+Tap direction stays `unknown`; whether a Wallet tap may be taken as an
+outflow is an open founder question.

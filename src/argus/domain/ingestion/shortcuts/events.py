@@ -7,8 +7,8 @@ Two kinds of event:
   ``status=unknown`` (a tap is not settlement) and ``direction=unknown`` (the
   trigger also fires for declined taps and does not say refund or purchase).
 - ``message_capture`` from the Messages trigger or the iOS 27 notification
-  trigger: inert text for review. No money field is read from it; it is
-  marked ``kind`` uncertain because nothing has classified it.
+  trigger: inert text for review, emitted as ``unclassified`` evidence. No
+  money field is read from it; the person says what it is.
 
 The shortcut sends the capture time, not a transaction time (Wallet does not
 provide one), so a tap's ``occurred_on`` is the capture day in the phone's own
@@ -127,11 +127,10 @@ def to_candidate(event: ShortcutEvent, *, connection_id: str) -> ImportCandidate
     if event.kind == "message_capture":
         return ImportCandidate(
             source=source,
-            evidence="transaction",
+            evidence="unclassified",
             status="unknown",
             description=event.sender,
             excerpt=event.text,
-            uncertain=frozenset({"kind"}),
         )
     parsed = parse_amount(event.amount, currency_code=event.currency)
     return ImportCandidate(

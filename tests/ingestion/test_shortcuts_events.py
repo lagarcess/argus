@@ -41,7 +41,9 @@ def test_wallet_tap_is_unsettled_transaction_evidence():
     assert candidate.occurred_at is None
     assert candidate.excerpt == "RD$1,250.00"
     assert candidate.source.source == "shortcuts"
-    assert {"direction", "account"} <= candidate.unresolved()
+    # The card name is the account hint; direction stays for the person.
+    assert "direction" in candidate.unresolved()
+    assert "account" not in candidate.unresolved()
 
 
 def test_mask_only_when_the_shortcut_states_it():
@@ -95,7 +97,8 @@ def test_message_capture_is_inert_text_with_money_unresolved():
     assert candidate.source.external_id.startswith("message:e:")
     assert candidate.amount is None and candidate.currency is None
     assert candidate.merchant is None and candidate.occurred_on is None
-    assert candidate.uncertain == frozenset({"kind"})
+    assert candidate.evidence == "unclassified"
+    assert candidate.uncertain == frozenset()
     assert "‮" not in candidate.excerpt
     assert {
         "amount",
