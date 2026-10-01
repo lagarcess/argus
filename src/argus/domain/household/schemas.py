@@ -53,8 +53,8 @@ class HouseholdRecord(BaseModel):
     id: str
     name: str | None
     status: HouseholdStatus
-    admin_user_id: str
-    created_by: str
+    admin_user_id: str | None
+    created_by: str | None
     created_at: datetime
     closed_at: datetime | None
     members: list[MemberRecord]

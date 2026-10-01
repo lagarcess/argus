@@ -117,10 +117,12 @@ class PostgresHouseholdRepository:
     ) -> None:
         with self._pool.connection() as connection:
             with connection.transaction():
+                # Household first (via admin check), then invitation — same order
+                # as accept_invitation.
                 self._require_admin(connection, user_id=user_id, household_id=household_id)
                 row = connection.execute(
                     "select accepted_at, revoked_at from public.household_invitations"
-                    " where id = %s and household_id = %s",
+                    " where id = %s and household_id = %s for update",
                     (invitation_id, household_id),
                 ).fetchone()
                 if row is None:
@@ -138,16 +140,32 @@ class PostgresHouseholdRepository:
         token_hash = hash_token(token)
         with self._pool.connection() as connection:
             with connection.transaction():
-                invite = connection.execute(
-                    "select id, household_id, expires_at, revoked_at, accepted_by"
-                    " from public.household_invitations where token_hash = %s"
-                    " for update",
+                # Locate first without locks, then always lock household before
+                # invitation so revoke/close cannot deadlock this path.
+                located = connection.execute(
+                    "select id, household_id from public.household_invitations"
+                    " where token_hash = %s",
                     (token_hash,),
                 ).fetchone()
-                if invite is None:
+                if located is None:
                     raise InvitationNotFound()
-                invite_id, household_id, expires_at, revoked_at, accepted_by = invite
-                household_id = str(household_id)
+                invite_id = str(located[0])
+                household_id = str(located[1])
+                status = connection.execute(
+                    "select status from public.households where id = %s for update",
+                    (household_id,),
+                ).fetchone()
+                if status is None or status[0] != "active":
+                    raise HouseholdClosed()
+                invite = connection.execute(
+                    "select id, household_id, expires_at, revoked_at, accepted_by,"
+                    " token_hash from public.household_invitations"
+                    " where id = %s for update",
+                    (invite_id,),
+                ).fetchone()
+                if invite is None or invite[5] != token_hash:
+                    raise InvitationNotFound()
+                _id, _hid, expires_at, revoked_at, accepted_by, _hash = invite
                 now = self._clock()
                 if revoked_at is not None:
                     raise InvitationRevoked()
@@ -155,12 +173,6 @@ class PostgresHouseholdRepository:
                     raise InvitationExpired()
                 if accepted_by is not None and str(accepted_by) != user_id:
                     raise InvitationConsumed()
-                status = connection.execute(
-                    "select status from public.households where id = %s for update",
-                    (household_id,),
-                ).fetchone()
-                if status is None or status[0] != "active":
-                    raise HouseholdClosed()
                 active = connection.execute(
                     "select 1 from public.household_members"
                     " where household_id = %s and user_id = %s and left_at is null",
@@ -272,8 +284,8 @@ class PostgresHouseholdRepository:
                     id=str(row[0]),
                     name=row[1],
                     status=row[2],
-                    admin_user_id=str(row[3]),
-                    created_by=str(row[4]),
+                    admin_user_id=str(row[3]) if row[3] is not None else None,
+                    created_by=str(row[4]) if row[4] is not None else None,
                     created_at=row[5],
                     closed_at=row[6],
                     members=[],
@@ -497,8 +509,8 @@ class PostgresHouseholdRepository:
             "id": str(row[0]),
             "name": row[1],
             "status": row[2],
-            "admin_user_id": str(row[3]),
-            "created_by": str(row[4]),
+            "admin_user_id": str(row[3]) if row[3] is not None else None,
+            "created_by": str(row[4]) if row[4] is not None else None,
             "created_at": row[5],
             "closed_at": row[6],
         }

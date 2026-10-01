@@ -9270,9 +9270,13 @@ components:
           - active
           - closed
         admin_user_id:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
         created_by:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
         created_at:
           type: string
           format: date-time

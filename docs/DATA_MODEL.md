@@ -1943,22 +1943,30 @@ Migration `20261001090000_household_membership.sql`. Account ownership remains
 | `id` | uuid, server-assigned |
 | `name` | null or 1–80 characters |
 | `status` | `active` or `closed` |
-| `created_by` | creator `auth.users(id)` |
-| `admin_user_id` | current administrator; on delete restrict while household is active |
+| `created_by` | creator; `auth.users` on delete set null (historical identity) |
+| `admin_user_id` | current administrator; on delete set null; CHECK requires non-null while `status = active` so an active admin must transfer or close before account deletion |
 | `created_at`, `closed_at` | timestamps; `closed_at` set only when status becomes `closed` |
+
+Deletion-safe historical identity: attribution FKs use `ON DELETE SET NULL` so
+household history never blocks account deletion after closure/transfer. Active
+membership rows cascade with the member; financial accounts stay with owners.
 
 ### household_members
 
 Active membership is one row with `left_at` null. `(household_id, user_id)`
 unique among active rows via partial unique index. Leaving or removal sets
 `left_at` and does not delete financial history. A person may rejoin only through
-a fresh invitation; prior grants do not revive.
+a fresh invitation; prior grants do not revive. Client SELECT RLS uses
+`is_active_household_member` (security definer) so membership self-reads do not
+recurse.
 
 ### household_invitations
 
 Token material is hashed (`token_hash`); plaintext is returned once at create.
 `expires_at` is create time plus seven days. `revoked_at` and `accepted_by` /
 `accepted_at` enforce revocation and single-use. Same acceptor retry is safe.
+`accepted_by` may become null after the acceptor is deleted while `accepted_at`
+remains; CHECK requires `accepted_at` whenever `accepted_by` is set.
 
 ### household_account_grants
 
