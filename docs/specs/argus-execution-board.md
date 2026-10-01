@@ -100,8 +100,9 @@ projections, global claim uniqueness, one normalized savings allocation owner,
 and ordered cross-owner locks. Raw owner-readable claims and cascade deletion
 must not expose or erase another person's private financial records. These
 requirements remain implementation and database verification work, not proof
-of delivery. No new simulator, service or database was created while the
-interaction and custody answers remain pending. Bounded read-only scouts and
+of delivery. Initial contract preparation created no runtime resources. The
+isolated local database assigned for the subsequent read checks is recorded
+below; no simulator or connected API is running. Bounded read-only scouts and
 contract preparation are complete. Independent complete-group reads are
 implemented at `2499e3c5a602c4b50b03bc9be8d7fb631feeae3f` in
 `canonical_groups.py` and Household `financial.py`/`projection.py`. The writer
@@ -125,7 +126,11 @@ assembled work. Its configuration and state live only in this worker's ignored
 `ios/.build/accounts-local-59700`. Other allocations remain untouched.
 [CI at this head](https://github.com/lagarcess/argus/actions/runs/36901975308) is
 SUCCESS, including backend, frontend and required guest database/Auth gates.
-These checks do not prove shared planning or native acceptance.
+Durable [Postgres proof](../reports/evidence/shared-household-planning/canonical-read-postgres-check.json)
+records the exact source and 110 executed tests. These checks do not prove shared
+planning or native acceptance. A fresh fetch still reports integration
+`15e57931584b21dd7f9e453dbeb9127fc4b8cff3`; no reconciliation is needed at this
+component checkpoint. The open PR inventory has no other backend delivery lane.
 
 The sole writer's next independent prerequisite owns
 `src/argus/domain/planning/goal_allocations.py`, bounded `planning/storage.py`,
@@ -134,7 +139,18 @@ owner-readable goal-body residuals with one canonical owner-qualified allocation
 relation, retaining Personal API shape and the existing pool reducer. No shared
 rows, foreign-authority writers, plan permissions, custody or native UI are
 activated by this step. Plan rights, custody, contributions and dependent UI
-still await the two founder answers.
+still await the two founder answers. Automatic approval review rejected the
+combined storage/migration patch and then the strictly source-only proposal.
+Its stated reason was missing direct founder authorization for the allocation
+backfill, JSON-field removal and storage/RLS change. No source patch or database
+migration was applied. One narrow approval request now names the exact change
+and limits rehearsal to synthetic local Postgres 59702. Production migrations
+and hosted changes remain prohibited. The test-first
+[draft](../reports/evidence/shared-household-planning/goal-allocation-tests-pending.py.txt)
+is preserved outside test discovery: its initial case failed on the intended
+existing JSON authority, and the expanded cases have not been executed against
+the nonexistent new schema. That red test is not passing acceptance evidence. A schema/code cutover would need coordination; reverting the
+adapter alone after a future durable cutover is unsafe.
 
 The checkpoint's temporary groups, splitting and guest proposals do not define
 Household permissions. Guest finance remains registered-only. A narrow proposed
@@ -157,8 +173,9 @@ verify one connected shared journey at a time across all four plan types;
 integration reconciliation, merged-tree modularity and exact-head CI; (7) PR and
 restart handoff. Component checks do not establish assembled or phone delivery.
 
-Local resource assignment and native checks remain pending; no existing
-simulator/database/port is reassigned. No merge, deployment, hosted changes,
+The lane-owned Auth/Postgres allocation is assigned above. Native simulator
+assignment and assembled checks remain pending; no existing simulator, database
+or port is reassigned. No merge, deployment, hosted changes,
 production data, paid providers or physical-phone internet readiness is granted.
 The entire assigned shared-planning outcome remains required while its missing
 interaction is resolved; it is not newly deferred.
