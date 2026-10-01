@@ -1,0 +1,18 @@
+{
+  "sourceCommit": "73ae78ec6fa6d577a83d54431172a759c94a321d",
+  "balanceChecks": 21,
+  "nativeSuite": {
+    "passed": 3,
+    "failed": 0,
+    "result": "test_sim_2026-10-01T18-47-46-291Z_pid473_45567865.xcresult"
+  },
+  "finalDelta": {
+    "passed": 1,
+    "failed": 0,
+    "result": "test_sim_2026-10-01T18-49-48-970Z_pid473_447daaa0.xcresult"
+  },
+  "retainedEvidence": "The final delta changes only the past-month endpoint from Today to the last observed date. Current-month, scope, and dark/large-text evidence is unchanged and retained.",
+  "simulator": "8AFB6084-8918-416E-9164-E21061306BEC",
+  "deviceBuild": "passed",
+  "scope": "UI preview only; no provider or connected financial writes"
+}

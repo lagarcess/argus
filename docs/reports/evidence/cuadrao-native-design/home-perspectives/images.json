@@ -1,0 +1,68 @@
+[
+  {
+    "file": "home-chart-dark-large-scroll-en.png",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "timestamp": 1790880482.545,
+    "sourceRun": "home-perspectives-final"
+  },
+  {
+    "file": "home-chart-dark-large-en.png",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "timestamp": 1790880482.373,
+    "sourceRun": "home-perspectives-final"
+  },
+  {
+    "file": "home-chart-household-return-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790880513.221,
+    "sourceRun": "home-perspectives-final"
+  },
+  {
+    "file": "home-chart-household-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790880509.667,
+    "sourceRun": "home-perspectives-final"
+  },
+  {
+    "file": "home-chart-scrub-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790880508.838,
+    "sourceRun": "home-perspectives-final"
+  },
+  {
+    "file": "home-chart-inspect-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790880507.546,
+    "sourceRun": "home-perspectives-final"
+  },
+  {
+    "file": "home-chart-personal-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790880505.895,
+    "sourceRun": "home-perspectives-final"
+  },
+  {
+    "file": "home-history-january-es.png",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790880615.885,
+    "sourceRun": "home-perspectives-delta"
+  },
+  {
+    "file": "home-distribution-accounts-es.png",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790880608.499,
+    "sourceRun": "home-perspectives-delta"
+  },
+  {
+    "file": "home-distribution-es.png",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790880608.046,
+    "sourceRun": "home-perspectives-delta"
+  },
+  {
+    "file": "home-history-all-es.png",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790880605.925,
+    "sourceRun": "home-perspectives-delta"
+  }
+]

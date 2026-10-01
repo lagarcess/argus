@@ -1770,6 +1770,8 @@ positive asset bar; currency conversion remains absent. Example history is exten
 for design review, never inferred from activity. The same contribution owner powers
 history, current net position and distribution. This is a review iteration, not a
 connected history implementation or a promotion of the paused Profile redesign.
+Source checkpoint: `73ae78ec`; [screenshots and verification](../reports/evidence/cuadrao-native-design/home-perspectives/README.md).
+Physical iPhone installation and launch succeeded; founder visual acceptance remains open.
 
 **Still future:** connect canonical recorded-balance observations with clear date,
 account-membership, currency, valuation and ownership semantics; distinguish
