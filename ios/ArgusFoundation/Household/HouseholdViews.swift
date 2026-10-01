@@ -5,29 +5,36 @@ struct HouseholdControls: View {
     @ObservedObject var model: HouseholdModel
     @Binding var destination: AppDestination
     @EnvironmentObject private var auth: ProfileAuthModel
-    @Environment(\.scenePhase) private var phase
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 22) {
-                Button("household.personal") { Task { await model.select(nil) } }
-                    .fontWeight(model.active ? .regular : .semibold).foregroundStyle(model.active ? Color.secondary : WelcomePalette.pine)
-                    .accessibilityIdentifier("household.personal").frame(minHeight: 44)
-                Menu {
-                    ForEach(model.households) { item in
-                        Button(item.name ?? NSLocalizedString("household.title", comment: "")) { Task { await model.select(item.id) } }.accessibilityIdentifier("household.select." + item.id.uuidString)
+            if model.isAvailable {
+                HStack(spacing: 22) {
+                    Button("household.personal") { Task { await model.select(nil) } }
+                        .fontWeight(model.active ? .regular : .semibold).foregroundStyle(model.active ? Color.secondary : WelcomePalette.pine)
+                        .accessibilityIdentifier("household.personal").frame(minHeight: 44)
+                    Menu {
+                        ForEach(model.households) { item in
+                            Button(item.name ?? NSLocalizedString("household.title", comment: "")) { Task { await model.select(item.id) } }.accessibilityIdentifier("household.select." + item.id.uuidString)
+                        }
+                        Button("household.manage") { model.showManagement = true }
+                    } label: { Text("household.title").fontWeight(model.active ? .semibold : .regular).foregroundStyle(model.active ? WelcomePalette.pine : Color.secondary).frame(minHeight: 44) }
+                    .accessibilityIdentifier("household.selector")
+                    Button { Task { await model.select(nil); if model.isAvailable { model.showManagement = true } } } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
+                        .accessibilityLabel("household.manage").accessibilityIdentifier("household.add")
+                    Spacer(minLength: 0)
+                }
+                if model.errorKey == "household.accessEnded" { Text("household.accessEnded").font(.system(size: 13)).accessibilityIdentifier("household.accessEnded") }
+                if model.pending != nil {
+                    HStack {
+                        Text("household.uncertain").font(.system(size: 13))
+                        Button("accounts.retry") { Task { await model.retry() } }.accessibilityIdentifier("household.pending.retry").frame(minHeight: 44)
                     }
-                    Button("household.manage") { model.showManagement = true }
-                } label: { Text("household.title").fontWeight(model.active ? .semibold : .regular).foregroundStyle(model.active ? WelcomePalette.pine : Color.secondary).frame(minHeight: 44) }
-                .accessibilityIdentifier("household.selector")
-                Button { Task { await model.select(nil); model.showManagement = true } } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
-                    .accessibilityLabel("household.manage").accessibilityIdentifier("household.add")
-                Spacer(minLength: 0)
-            }
-            if model.errorKey == "household.accessEnded" { Text("household.accessEnded").font(.system(size: 13)).accessibilityIdentifier("household.accessEnded") }
-            if model.pending != nil {
+                }
+            } else if model.availability == .unavailable {
                 HStack {
-                    Text("household.uncertain").font(.system(size: 13))
-                    Button("accounts.retry") { Task { await model.retry() } }.accessibilityIdentifier("household.pending.retry").frame(minHeight: 44)
+                    Text("household.loadError").font(.system(size: 13))
+                    Button("accounts.retry") { Task { await model.refresh() } }
+                        .accessibilityIdentifier("household.availability.retry").frame(minHeight: 44)
                 }
             }
         }
@@ -37,8 +44,6 @@ struct HouseholdControls: View {
             model.navigateToAccounts = { destination = .accounts }
             model.addAccount = { Task { await model.select(nil); destination = .accounts; auth.accounts?.create() } }
         }
-        .task(id: model.identity?.revision) { await model.refresh() }
-        .onChange(of: phase) { _, phase in if phase == .active { Task { await model.foreground() } } }
 
     }
 }
@@ -205,9 +210,12 @@ struct HouseholdConnectedDestination: View {
 struct HouseholdPresenter: View {
     @ObservedObject var model: HouseholdModel
     @EnvironmentObject private var auth: ProfileAuthModel
+    @Environment(\.scenePhase) private var phase
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
-            .sheet(isPresented: $model.showManagement) { HouseholdManagement(model: model, accounts: auth.accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
-            .sheet(item: $model.editor) { HouseholdActivityEditorView(model: $0).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
+            .task(id: model.identity?.revision) { await model.refresh() }
+            .onChange(of: phase) { _, phase in if phase == .active { Task { await model.foreground() } } }
+            .sheet(isPresented: Binding(get: { model.isAvailable && model.showManagement }, set: { model.showManagement = $0 })) { HouseholdManagement(model: model, accounts: auth.accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
+            .sheet(item: Binding(get: { model.isAvailable ? model.editor : nil }, set: { model.editor = $0 })) { HouseholdActivityEditorView(model: $0).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
     }
 }

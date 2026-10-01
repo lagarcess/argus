@@ -45,16 +45,16 @@ final class HouseholdActivityEditor: ObservableObject, Identifiable {
             coverage = value.legs.flatMap { leg in leg.coverage.map { FinancialAccountCoverage(accountId: leg.accountId, observationId: $0.observationId, included: $0.included) } }
         }
     }
-    var current: Bool { model?.selectedId == household.id && model?.household?.membershipId == household.membershipId && model?.identity?.revision == identity.revision && model?.editor?.id == id }
+    var current: Bool { model?.isAvailable == true && model?.selectedId == household.id && model?.household?.membershipId == household.membershipId && model?.identity?.revision == identity.revision && model?.editor?.id == id }
     var choices: [HouseholdFinancialAccount] { options?.accounts ?? [] }
     var kinds: [FinancialActivityKind] { FinancialActivityKind.allCases.filter { options?.eligibility[$0.rawValue]?.contains(origin.account.type) == true && $0 != .paymentReversal } }
     func load() async {
-        guard let model else { return }
+        guard let model, current else { return }
         do {
             let value = try await model.controller.householdResponse(HouseholdActivityOptions.self, path: model.path(household.id, "/activity-options"), expectedIdentity: identity)
             guard current else { return }; options = value
             if correcting == nil, !kinds.contains(kind), let first = kinds.first { kind = first }
-        } catch { if current { errorKey = "household.loadError" } }
+        } catch { if current, !model.handleAccessFailure(error) { errorKey = "household.loadError" } }
     }
     func answer(_ accountId: UUID, _ observationId: UUID, _ included: Bool) {
         coverage.removeAll { $0.accountId == accountId && $0.observationId == observationId }
@@ -68,8 +68,8 @@ final class HouseholdActivityEditor: ObservableObject, Identifiable {
             let value = try await model.controller.householdResponse(FinancialActivityPreview.self, path: model.path(household.id, "/activities" + (correcting.map { "/" + $0.id.uuidString } ?? "") + "/preview"), method: "POST", body: JSONEncoder().encode(HouseholdFinancialCommand(membershipId: household.membershipId, expectedVersion: household.version, activity: command)), expectedIdentity: identity)
             guard current else { return }; preview = value
         } catch {
-            guard current else { return }; errorKey = "household.reviewError"
-            if case SessionFailure.rejected(let status, _) = error, status == 404 { model.clear(); await model.refresh() }
+            guard current else { return }
+            if !model.handleAccessFailure(error) { errorKey = "household.reviewError" }
         }
     }
     func confirm() async {

@@ -4,6 +4,12 @@ The Connected Cuadrao shell mounts Household Home, account details and Search
 beside Personal. `ARGUS_HOUSEHOLDS_ENABLED` stays server-default-off. The native
 client uses the canonical `/api/v1/households` and `/household-invitations` API;
 it has no membership store or money calculation. Accounts remain on Home.
+Household controls appear only after server discovery succeeds. The typed
+`households_unavailable` response hides the surface and dismisses its sheets,
+while preserving actor-scoped selection and exact pending recovery bytes.
+Foreground/authentication re-probes can restore the surface; writes resume only
+through explicit Retry. Network discovery failures expose a scoped retry on
+Personal; genuine membership loss clears selection.
 
 Create/open and recipient preview/defer/accept are separate from People and
 explicit account consent. Acceptance grants membership only. Owners choose
@@ -104,6 +110,10 @@ file and CAPTCHA mode override in `finally`; ordinary results stay ignored.
 - `ios/FinancialModelTests/run_household.py`: actual presentation model with
   controlled transport delay, scope change, sign-out, asset decoding and retry.
   Set `ARGUS_HOUSEHOLD_MODEL_SCRATCH_PATH` to the assigned isolated cache.
+- `FinancialLoopUITests/testHouseholdDefaultOffKeepsPersonalHomeAccountsAndSearchAfterReopen`:
+  opt-in normal sign-in and English/Spanish reopen against the runtime owner's
+  verified off API. Assert Personal Home/accounts/Search remain reachable and
+  Household selector/add/People/editors/access-ended notice remain absent.
 - `FinancialLoopUITests/testHouseholdTwoUsersConsentEditingRevocationAndSpanishRelaunch`:
   create, defer/accept, explicit view access, relaunch, edit permission, expense
   25 then correction20 (1000→975→980), actual Search hit/back context, Spanish
@@ -145,3 +155,13 @@ and clean only their own UUID users. They cover canonical consent incarnation,
 receipt races/rejoin, hidden legs/history/refund dependencies, account attribution,
 unknown currency totals and original-owner RLS. The migration disposition and
 exact wire are in `docs/DATA_MODEL.md` and `docs/API_CONTRACT.md`.
+
+For default-off UI acceptance, the runtime owner uses the same allocation with
+an additional API at 59620 and `--households-enabled off`, and verifies
+`GET /api/v1/households` returns the typed 404. Temporarily point only the current
+bundle's API URL at 59620. Select the off test above and inject
+`ARGUS_TEST_HOUSEHOLD_SURFACE_OFF=true` through the secure runner's in-memory
+xctestrun environment; the runner's in-memory fixture API URL may be overridden
+to 59620 without changing the credential fixture. Keep Auth59501, PG59502,
+CAPTCHA59505 and the assigned simulator/bundle/cache. Restore API59520 afterward.
+This test performs no financial writes and requires no client capability flag.

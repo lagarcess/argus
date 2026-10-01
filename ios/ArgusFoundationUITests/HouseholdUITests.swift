@@ -1,6 +1,30 @@
 import XCTest
 
 extension FinancialLoopUITests {
+    func testHouseholdDefaultOffKeepsPersonalHomeAccountsAndSearchAfterReopen() throws {
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_HOUSEHOLD_SURFACE_OFF"] == "true" else {
+            throw XCTSkip("Requires the runtime owner's verified default-off local API and normal synthetic sign-in.")
+        }
+        try signIn(fresh: true)
+        for language in ["en", "es-419"] {
+            app.terminate()
+            app.launchArguments = ["-AppleLanguages", "(" + language + ")", "-AppleLocale", language == "en" ? "en_US" : "es_DO", "-appearancePreference", "dark"]
+            app.launch()
+            app.openAccountsList()
+            XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 15))
+            for identifier in ["household.selector", "household.add", "household.people", "household.pending.retry", "household.availability.retry", "household.management.done", "household.activity.review"] {
+                XCTAssertFalse(app.buttons[identifier].exists, identifier)
+            }
+            XCTAssertFalse(app.staticTexts["household.accessEnded"].exists)
+            capture("household-default-off-personal-home-" + language)
+            tapVisible(app.buttons["tab.search"])
+            XCTAssertTrue(app.textFields["search.query"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.textFields["household.search.query"].exists)
+            XCTAssertFalse(app.staticTexts["household.accessEnded"].exists)
+            capture("household-default-off-personal-search-" + language)
+        }
+    }
+
     private func openHouseholdPeople() {
         openAccountsTab()
         tapVisible(app.scrollViews["screen.home"].buttons["household.people"])

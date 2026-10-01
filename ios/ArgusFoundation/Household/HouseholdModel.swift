@@ -3,6 +3,8 @@ import ArgusSession
 
 @MainActor
 final class HouseholdModel: ObservableObject {
+    enum Availability { case discovering, available, disabled, unavailable }
+    @Published private(set) var availability = Availability.discovering
     @Published private(set) var households: [Household] = []
     @Published private(set) var selectedId: UUID?
     @Published private(set) var household: Household?
@@ -40,7 +42,8 @@ final class HouseholdModel: ObservableObject {
         self.controller = controller; storagePrefix = configuration.storagePrefix + ".household.selection."
         self.journal = journal ?? FinancialWriteJournal(configuration: configuration, namespace: ".household")
     }
-    var active: Bool { selectedId != nil }
+    var isAvailable: Bool { availability == .available }
+    var active: Bool { isAvailable && selectedId != nil }
     private var storageKey: String? { identity?.profile.map { storagePrefix + $0.id } }
 
     func bind(_ next: SessionSnapshot?) {
@@ -48,13 +51,15 @@ final class HouseholdModel: ObservableObject {
         identity = next?.phase == .authenticated ? next : nil
         clear(); households = []; household = nil; preparedInvitation = nil; invitationPreview = nil; pending = nil; busy = false; writeAttempt = nil
         selectedId = storageKey.flatMap { UserDefaults.standard.string(forKey: $0) }.flatMap(UUID.init(uuidString:))
-        lastSearchQuery = nil
+        lastSearchQuery = nil; availability = .discovering; showManagement = false; errorKey = nil
+        reviewedInvitationToken = nil; pendingInvitationToken = ""
         if let identity { pending = try? journal.pending(for: identity) }
     }
     func clear() {
         generation = UUID(); searchGeneration = UUID(); snapshot = nil; detail = nil; history = []; search = []; nextCursor = nil; editor = nil; highlightActivityId = nil; searchState = .idle
     }
     func select(_ id: UUID?) async {
+        guard isAvailable else { return }
         clear(); selectedId = id; household = nil; preparedInvitation = nil; errorKey = nil
         if let storageKey { UserDefaults.standard.set(id?.uuidString, forKey: storageKey) }
         await refresh()
@@ -66,22 +71,22 @@ final class HouseholdModel: ObservableObject {
             let result = try await controller.householdResponse(HouseholdList.self, expectedIdentity: identity)
             guard current(ticket, identity) else { return }
             households = result.households
-            guard let selectedId else { return }
+            guard let selectedId else { availability = .available; errorKey = nil; return }
             guard let h = households.first(where: { $0.id == selectedId }) else {
                 accessEnded(); return
             }
             let values = try await controller.householdResponse(HouseholdSnapshot.self, path: path(selectedId, "/snapshot"), expectedIdentity: identity)
             guard current(ticket, identity) else { return }
-            guard h.membershipId == values.membershipId, h.version == values.authorizationVersion else { clear(); household = nil; errorKey = "household.changed"; return }
+            guard h.membershipId == values.membershipId, h.version == values.authorizationVersion else { suspend(.unavailable); errorKey = "household.changed"; return }
             if snapshot?.authorizationVersion != values.authorizationVersion || snapshot?.membershipId != values.membershipId {
                 clear()
             }
-            household = h; snapshot = values; errorKey = nil
-        } catch { await failed(error, ticket, identity) }
+            household = h; snapshot = values; availability = .available; errorKey = nil
+        } catch { await failed(error, ticket, identity, discovery: true) }
     }
     func foreground() async { clear(); await refresh() }
     func open(_ id: UUID) async {
-        guard let identity, let selectedId else { return }
+        guard isAvailable, let identity, let selectedId else { return }
         let ticket = generation
         detail = nil; history = []
         do {
@@ -95,14 +100,14 @@ final class HouseholdModel: ObservableObject {
         if detail?.account.account.id == hit.accountId { highlightActivityId = hit.activityId }
     }
     func loadHistory(_ id: UUID) async {
-        guard let identity, let selectedId else { return }; let ticket = generation
+        guard isAvailable, let identity, let selectedId else { return }; let ticket = generation
         do {
             let value = try await controller.householdResponse(HouseholdHistory.self, path: path(selectedId, "/activities/" + id.uuidString + "/history"), expectedIdentity: identity)
             guard current(ticket, identity) else { return }; history = value.items
         } catch { await failed(error, ticket, identity) }
     }
     func find(_ query: String, more: Bool = false) async {
-        guard let identity, let selectedId else { return }
+        guard isAvailable, let identity, let selectedId else { return }
         let ticket = generation; let searchTicket = UUID(); searchGeneration = searchTicket
         lastSearchQuery = query; searchState = .loading
         var items = [URLQueryItem(name: "q", value: query)]
@@ -116,11 +121,11 @@ final class HouseholdModel: ObservableObject {
         } catch {
             guard current(ticket, identity), searchGeneration == searchTicket else { return }
             searchState = .unavailable
-            if case SessionFailure.rejected(let status, _) = error, status == 403 || status == 404 { await failed(error, ticket, identity) }
+            handleAccessFailure(error)
         }
     }
     func previewInvitation(_ token: String) async {
-        guard let identity else { return }; let ticket = generation; invitationPreview = nil
+        guard isAvailable, let identity else { return }; let ticket = generation; invitationPreview = nil
         do {
             let body = try JSONEncoder().encode(HouseholdCommand(token: Self.token(token)))
             let value = try await controller.householdResponse(HouseholdInvitationPreview.self, path: "/invitations/preview", method: "POST", body: body, expectedIdentity: identity)
@@ -133,7 +138,7 @@ final class HouseholdModel: ObservableObject {
         return URLComponents(string: trimmed)?.fragment ?? trimmed
     }
     func command(_ command: HouseholdCommand, path: String, method: String = "POST") async {
-        guard let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), !busy, pending == nil else { return }
+        guard isAvailable, let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), !busy, pending == nil else { return }
         if path == "/invitations/accept", command.token != reviewedInvitationToken { errorKey = "household.changed"; return }
         do {
             let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: nil, route: "households", path: path, method: method, body: try JSONEncoder().encode(command), key: UUID(), householdMembershipId: household?.membershipId, householdAuthorizationVersion: household?.version)
@@ -142,7 +147,7 @@ final class HouseholdModel: ObservableObject {
         } catch { errorKey = "household.storageError" }
     }
     func retry() async {
-        guard let identity, let write = pending, !busy else { return }
+        guard isAvailable, let identity, let write = pending, !busy else { return }
         let ticket = generation; let attempt = UUID()
         writeAttempt = attempt; busy = true; errorKey = nil
         defer { if writeAttempt == attempt { busy = false; writeAttempt = nil } }
@@ -168,9 +173,13 @@ final class HouseholdModel: ObservableObject {
             if write.path.contains("/activities"), let query = lastSearchQuery { await find(query) }
         } catch {
             guard current(ticket, identity) else { return }
-            if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 {
-                try? journal.clear(write, for: identity); pending = nil; clear(); errorKey = status == 404 ? "household.accessEnded" : "household.changed"; busy = false
-            } else { errorKey = "household.uncertain" }
+            let accessFailure = handleAccessFailure(error)
+            if availability != .disabled {
+                if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 {
+                    try? journal.clear(write, for: identity); pending = nil
+                    if !accessFailure { clear(); errorKey = "household.changed" }
+                } else { errorKey = "household.uncertain" }
+            }
             let latest = await controller.snapshot()
             if latest.revision != identity.revision || latest.phase != .authenticated { bind(latest); sessionChanged?(latest) }
         }
@@ -187,11 +196,11 @@ final class HouseholdModel: ObservableObject {
         await command(HouseholdCommand(expectedVersion: household.version, userId: member, recipients: recipients), path: path(household.id, suffix), method: method)
     }
     func beginActivity(_ account: HouseholdAccount, correction: HouseholdActivity? = nil) {
-        guard account.permission == "edit", let identity, let household, let snapshot, pending == nil else { return }
+        guard isAvailable, account.permission == "edit", let identity, let household, let snapshot, pending == nil else { return }
         editor = HouseholdActivityEditor(model: self, identity: identity, household: household, snapshot: snapshot, account: account, correction: correction)
     }
     func confirmActivity(_ body: FinancialActivityCommand, activityId: UUID?, membership: UUID, version: Int) async {
-        guard let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), let household, household.membershipId == membership, household.version == version, pending == nil else { return }
+        guard isAvailable, let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), let household, household.membershipId == membership, household.version == version, pending == nil else { return }
         do {
             let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: body.accountId ?? body.sourceAccountId, route: "households", path: path(household.id, "/activities" + (activityId.map { "/" + $0.uuidString } ?? "")), method: activityId == nil ? "POST" : "PATCH", body: try JSONEncoder().encode(HouseholdFinancialCommand(membershipId: membership, expectedVersion: version, activity: body)), key: UUID(), householdMembershipId: membership, householdAuthorizationVersion: version)
             try journal.begin(write, for: identity); pending = write; await retry()
@@ -200,14 +209,35 @@ final class HouseholdModel: ObservableObject {
     func path(_ id: UUID, _ suffix: String = "") -> String { "/" + id.uuidString + suffix }
     func current(_ ticket: UUID, _ session: SessionSnapshot) -> Bool { ticket == generation && identity?.revision == session.revision && identity?.profile?.id == session.profile?.id }
     func accessEnded() {
+        availability = .available
         clear(); household = nil; selectedId = nil; preparedInvitation = nil
+        showManagement = false; cancelInvitationReview(); pendingInvitationToken = ""
         if let storageKey { UserDefaults.standard.removeObject(forKey: storageKey) }
         errorKey = "household.accessEnded"
     }
-    private func failed(_ error: Error, _ ticket: UUID, _ session: SessionSnapshot) async {
+    // Surface availability is server-owned; a disabled route says nothing about membership.
+    @discardableResult
+    func handleAccessFailure(_ error: Error) -> Bool {
+        guard case SessionFailure.rejected(_, let code) = error else { return false }
+        switch code {
+        case "households_unavailable": suspend(.disabled)
+        case "household_not_found", "not_a_member", "household_closed", "household_access_unavailable": accessEnded()
+        default: return false
+        }
+        return true
+    }
+    private func suspend(_ state: Availability) {
+        clear(); lastSearchQuery = nil; availability = state; households = []; household = nil; preparedInvitation = nil
+        showManagement = false; cancelInvitationReview(); pendingInvitationToken = ""
+        errorKey = state == .unavailable ? "household.loadError" : nil
+        // Keep actor-partitioned selection and exact pending bytes for explicit recovery.
+    }
+    private func failed(_ error: Error, _ ticket: UUID, _ session: SessionSnapshot, discovery: Bool = false) async {
         guard current(ticket, session) else { return }
-        clear(); household = nil; errorKey = "household.loadError"
-        if case SessionFailure.rejected(let status, _) = error, status == 403 || status == 404 { accessEnded() }
+        if !handleAccessFailure(error) {
+            if discovery { suspend(.unavailable) }
+            else { errorKey = "household.loadError" }
+        }
         let latest = await controller.snapshot()
         if latest.revision != session.revision || latest.phase != .authenticated { bind(latest); sessionChanged?(latest) }
     }

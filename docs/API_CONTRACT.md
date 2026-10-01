@@ -7335,6 +7335,18 @@ return `404 households_unavailable` before authentication. Responses are
 `Cache-Control: no-store`. The [permission policy](specs/lanes/household-permission-policy.md)
 owns member powers; local links are synthetic and never deliver messages.
 
+Native availability derives from the server response, without a client feature
+flag. Discovery must succeed before Household controls or destinations appear.
+The typed `households_unavailable` problem hides Household controls, returns to
+Personal, dismisses management/editors and clears protected in-memory reads. It
+preserves the actor's saved selection and exact pending command journal; it is
+not membership loss. Foreground and authenticated identity changes re-probe the
+surface. Re-enabling restores accessible selection and exposes explicit retry;
+it never automatically submits a pending command. Failed network discovery
+shows a scoped retry on Personal without claiming access ended. Actual scoped
+membership/access failures clear the saved selection; an invalid invitation or
+an unrelated 403/404 does not imply departure.
+
 ## Lifecycle commands and recovery
 
 All lifecycle mutations require `Idempotency-Key` (1–128 visible ASCII
