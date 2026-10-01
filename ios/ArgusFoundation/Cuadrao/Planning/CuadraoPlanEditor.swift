@@ -48,10 +48,11 @@ struct CuadraoPlanEditor: View {
                     }.background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 20))
                     HStack {
                         Menu {
-                            ForEach(accounts.visibleSpaces) { space in Button(space.title(spanish)) { draft.spaceID = space.id } }
+                            ForEach(accounts.visibleSpaces) { space in
+                                CuadraoChoiceOption(title: space.title(spanish), selected: draft.spaceID == space.id) { draft.spaceID = space.id }
+                            }
                         } label: {
-                            Label(PlanFormat.space(draft.spaceID, accounts: accounts, spanish: spanish), systemImage: draft.spaceID == "household" ? "person.2" : "person")
-                                .font(.subheadline).frame(minHeight: 44)
+                            CuadraoChoiceLabel(title: PlanFormat.space(draft.spaceID, accounts: accounts, spanish: spanish))
                         }.accessibilityIdentifier("plan-edit-space")
                         Spacer()
                     }

@@ -13,13 +13,15 @@ struct CuadraoAmountField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Button { choosingCurrency = true } label: {
-                    HStack(spacing: 7) {
-                        Text(currency).font(.title3)
-                        if currencySelectable { Image(systemName: "chevron.down").font(.caption) }
-                    }.foregroundStyle(.secondary).frame(minHeight: 56)
-                }.disabled(!currencySelectable)
-                    .accessibilityLabel(spanish ? "Moneda, \(currency)" : "Currency, \(currency)")
+                if currencySelectable {
+                    Button { choosingCurrency = true } label: { CuadraoChoiceLabel(title: currency) }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(spanish ? "Moneda, \(currency)" : "Currency, \(currency)")
+                        .accessibilityIdentifier("account-edit-currency")
+                } else {
+                    CuadraoChoiceLabel(title: currency, selectable: false)
+                        .accessibilityLabel(spanish ? "Moneda fija: \(currency)" : "Fixed currency: \(currency)")
+                }
                 CanvasDecimalInput(raw: $raw, error: $error, currency: currency,
                     spanish: spanish, allowNegative: allowNegative)
                     .frame(minHeight: 60)

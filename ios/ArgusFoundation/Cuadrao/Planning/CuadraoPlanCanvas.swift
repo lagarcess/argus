@@ -98,25 +98,30 @@ struct CuadraoPlanCanvas: View {
         }
     }
 
+    private var forecastSpaces: [CanvasSpace] { accounts.visibleSpaces.filter { $0.kind == .personal || $0.kind == .household } }
+
     private var newPlan: CanvasPlan {
-        CanvasPlan(name: "", spaceID: filter ?? (accounts.visibleSpaces.contains { $0.id == scope } ? scope : "personal"))
+        CanvasPlan(name: "", spaceID: filter ?? CanvasSpace.personalID)
     }
 
     private var forecastOverview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Menu {
-                ForEach(accounts.visibleSpaces.filter { $0.kind == .personal || $0.kind == .household }) { space in
-                    Button { scope = space.id; selectedDay = nil } label: {
-                        if scope == space.id { Label(space.title(spanish), systemImage: "checkmark") }
-                        else { Text(space.title(spanish)) }
-                    }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(spanish ? "Octubre · \(scopeName)" : "October · \(scopeName)")
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-                }.font(.subheadline).frame(minHeight: 36)
-            }.accessibilityIdentifier("plan-forecast-scope")
+            HStack(spacing: 8) {
+                Text(spanish ? "Octubre" : "October")
+                    .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+                Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
+                if forecastSpaces.count > 1 {
+                    Menu {
+                        ForEach(forecastSpaces) { space in
+                            CuadraoChoiceOption(title: space.title(spanish), selected: scope == space.id) {
+                                scope = space.id; selectedDay = nil
+                            }
+                        }
+                    } label: { CuadraoChoiceLabel(title: scopeName) }
+                        .accessibilityLabel(spanish ? "Espacio del pronóstico, \(scopeName)" : "Forecast space, \(scopeName)")
+                        .accessibilityIdentifier("plan-forecast-scope")
+                } else { CuadraoChoiceLabel(title: scopeName, selectable: false) }
+            }
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(selectedPoint.map { "\($0.day) oct. · \($0.day > CanvasForecast.today ? (spanish ? "estimado" : "estimated") : (spanish ? "registrado" : "recorded"))" } ?? (store.dailyAssumptions[scope] == nil ? (spanish ? "Balance estimado al cierre" : "Estimated closing balance") : (spanish ? "Con tu plan, cerrarías con" : "With your plan, you'd end with")))
@@ -131,10 +136,10 @@ struct CuadraoPlanCanvas: View {
                 CuadraoForecastPlayground(store: store, scope: scope, scopeName: scopeName, spanish: spanish, bottomSpace: bottomSpace)
             } label: {
                 HStack {
-                    Text(spanish ? "¿Y si cambias el ritmo?" : "What if you changed the pace?")
-                    Spacer(); Image(systemName: "arrow.up.right")
-                }.font(.subheadline.weight(.medium)).frame(minHeight: 44)
-            }.accessibilityIdentifier("plan-explore")
+                    Text(spanish ? "Explorar escenarios" : "Explore scenarios")
+                    Image(systemName: "chevron.right").font(.caption2).accessibilityHidden(true)
+                }.font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44)
+            }.buttonStyle(.plain).accessibilityIdentifier("plan-explore")
         }
     }
 
@@ -157,14 +162,15 @@ struct CuadraoPlanCanvas: View {
                 Text(spanish ? "Tus planes" : "Your plans").font(CuadraoTypography.section)
                 Spacer()
                 Menu {
-                    Button(spanish ? "Todos los espacios" : "All spaces") { filter = nil }
-                    ForEach(accounts.visibleSpaces) { space in Button(space.title(spanish)) { filter = space.id } }
+                    CuadraoChoiceOption(title: spanish ? "Todos los espacios" : "All spaces", selected: filter == nil) { filter = nil }
+                    ForEach(accounts.visibleSpaces) { space in
+                        CuadraoChoiceOption(title: space.title(spanish), selected: filter == space.id) { filter = space.id }
+                    }
                 } label: {
-                    HStack(spacing: 5) {
-                        Text(filter.map { PlanFormat.space($0, accounts: accounts, spanish: spanish) } ?? (spanish ? "Todos" : "All"))
-                        Image(systemName: "line.3.horizontal.decrease")
-                    }.font(.caption).frame(minHeight: 44)
-                }.accessibilityIdentifier("plan-space-filter")
+                    CuadraoChoiceLabel(title: filter.map { PlanFormat.space($0, accounts: accounts, spanish: spanish) } ?? (spanish ? "Todos" : "All"))
+                }.accessibilityLabel(spanish ? "Filtrar planes por espacio" : "Filter plans by space")
+                    .accessibilityValue(filter.map { PlanFormat.space($0, accounts: accounts, spanish: spanish) } ?? (spanish ? "Todos los espacios" : "All spaces"))
+                    .accessibilityIdentifier("plan-space-filter")
             }
             ForEach(active) { plan in
                 NavigationLink(value: plan.id) {

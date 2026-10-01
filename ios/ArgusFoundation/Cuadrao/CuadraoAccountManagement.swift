@@ -7,6 +7,7 @@ struct CuadraoAccountActions: View {
     let rename: () -> Void
     let record: () -> Void
     let archive: () -> Void
+    var reorder: (() -> Void)? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
@@ -18,7 +19,12 @@ struct CuadraoAccountActions: View {
             CanvasActionRow(title: spanish ? "Añadir movimiento" : "Add transaction", symbol: "plus", action: record)
             Divider()
             CanvasActionRow(title: spanish ? "Archivar" : "Archive", symbol: "archivebox", action: archive)
-        }.padding(28).presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.height(320)]).presentationDragIndicator(.visible)
+            if let reorder {
+                Divider()
+                CanvasActionRow(title: spanish ? "Ordenar cuentas" : "Reorder accounts", symbol: "line.3.horizontal", action: reorder)
+                    .accessibilityIdentifier("account-reorder")
+            }
+        }.padding(28).presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.height(reorder == nil ? 320 : 390)]).presentationDragIndicator(.visible)
     }
 }
 

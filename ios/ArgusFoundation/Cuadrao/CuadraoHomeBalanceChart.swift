@@ -11,10 +11,21 @@ struct CuadraoHomeBalanceChart: View {
     let chooseCurrency: (String) -> Void
     var expanded = false
     var expand: () -> Void = {}
+    var viewChoice: CuadraoChartViewChoice?
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var compactRange: CanvasHomeRange = .month
-    @State private var range: CanvasHistoryRange = .month
-    @State private var periodOffset = 0
+    @Binding var range: CanvasHistoryRange
+    @Binding var periodOffset: Int
     @State private var selectedDate: Date?
+    init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], currency: String,
+         currencies: [String], spanish: Bool, shared: Bool, chooseCurrency: @escaping (String) -> Void,
+         expanded: Bool = false, expand: @escaping () -> Void = {}, viewChoice: CuadraoChartViewChoice? = nil,
+         range: Binding<CanvasHistoryRange> = .constant(.month), periodOffset: Binding<Int> = .constant(0)) {
+        self.accounts = accounts; self.observations = observations; self.currency = currency
+        self.currencies = currencies; self.spanish = spanish; self.shared = shared; self.chooseCurrency = chooseCurrency
+        self.expanded = expanded; self.expand = expand; self.viewChoice = viewChoice
+        _range = range; _periodOffset = periodOffset
+    }
     private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now) }
     private var availableRanges: [CanvasHomeRange] { CanvasHomeRange.available(history) }
     private var effectiveRange: CanvasHomeRange { availableRanges.contains(compactRange) ? compactRange : .all }
@@ -43,46 +54,28 @@ struct CuadraoHomeBalanceChart: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if expanded {
-            Picker(spanish ? "Período" : "Period", selection: $range) {
-                ForEach(CanvasHistoryRange.allCases) { option in
-                    Text(option.title(spanish)).tag(option)
-                }
-            }.pickerStyle(.segmented).accessibilityIdentifier("home-history-range")
-                .onChange(of: range) { _, _ in periodOffset = 0; selectedDate = nil }
-            periodHeading
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                if currencies.count > 1 {
-                    Menu {
-                        ForEach(currencies, id: \.self) { code in Button(code) { selectedDate = nil; chooseCurrency(code) } }
-                    } label: {
-                        HStack(spacing: 4) { Text(currency); Image(systemName: "chevron.down").font(.caption2) }.frame(minHeight: 44)
-                    }.accessibilityIdentifier("home-chart-currency")
-                } else { Text(currency).foregroundStyle(.secondary) }
-                Text(shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—")
-                    .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
-                    .accessibilityIdentifier("home-chart-amount")
-                if !expanded {
-                    Spacer(minLength: 0)
-                    Button(action: expand) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.body)
-                            .frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityLabel(spanish ? "Explorar balance" : "Explore balance")
-                        .accessibilityIdentifier("home-history-expand")
-                }
-            }.font(CuadraoTypography.supporting)
-            Text(selected.map { dateLabel($0.date) } ?? (partial
+            amountRow
+            if expanded && typeSize.isAccessibilitySize, let viewChoice { viewChoice }
+            Text((expanded ? nil : selected.map { dateLabel($0.date) }) ?? (partial
                 ? (spanish ? "Balance parcial" : "Partial balance")
                 : (spanish ? "Balance neto" : "Net balance")))
                 .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("home-chart-date")
             if expanded, let point = shown {
+                if selected != nil {
+                    Text(dateLabel(point.date)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                }
                 Text(takeaway(point)).font(CuadraoTypography.supporting)
                     .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("home-chart-takeaway")
             }
+            if expanded {
+                CuadraoHistoryPeriodChoice(range: $range, spanish: spanish)
+                    .padding(.top, 8)
+                    .onChange(of: range) { _, _ in periodOffset = 0; selectedDate = nil }
+                periodHeading
+            }
             if !points.isEmpty {
-                chart
+                periodCanvas
                 HStack {
                     Text(dateLabel(expanded ? xDomain.lowerBound : points.first!.date))
                     Spacer()
@@ -113,8 +106,53 @@ struct CuadraoHomeBalanceChart: View {
                     }
                 }
             }
-        }.sensoryFeedback(.selection, trigger: selected?.date)
+        }.onAppear { periodOffset = max(range.oldestOffset(history), min(0, periodOffset)) }
+            .sensoryFeedback(.selection, trigger: selected?.date)
             .sensoryFeedback(.selection, trigger: periodOffset)
+    }
+    private var amountRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                if currencies.count > 1 {
+                    Menu {
+                        ForEach(currencies, id: \.self) { code in
+                            CuadraoChoiceOption(title: code, selected: currency == code) { selectedDate = nil; chooseCurrency(code) }
+                        }
+                    } label: {
+                        CuadraoChoiceLabel(title: currency)
+                    }.accessibilityIdentifier("home-chart-currency")
+                } else { Text(currency).foregroundStyle(.secondary) }
+                Text(shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—")
+                    .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
+                    .accessibilityIdentifier("home-chart-amount")
+                if expanded && !typeSize.isAccessibilitySize, let viewChoice {
+                    Spacer(minLength: 8); viewChoice
+                }
+                if !expanded {
+                    Spacer(minLength: 0)
+                    Button(action: expand) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.body)
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel(spanish ? "Explorar balance" : "Explore balance")
+                        .accessibilityIdentifier("home-history-expand")
+                }
+            }.font(CuadraoTypography.supporting)
+    }
+    private var periodCanvas: some View {
+        chart.padding(expanded ? 14 : 0)
+            .background {
+                if expanded { RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface.opacity(0.5)) }
+            }
+            .overlay(alignment: .leading) {
+                if expanded && periodOffset > range.oldestOffset(history) { pageEdge.offset(x: -192) }
+            }
+            .overlay(alignment: .trailing) {
+                if expanded && periodOffset < 0 { pageEdge.offset(x: 192) }
+            }
+    }
+    private var pageEdge: some View {
+        RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface)
+            .overlay { RoundedRectangle(cornerRadius: 22).stroke(WelcomePalette.border, lineWidth: 0.5) }
+            .frame(width: 180, height: 258).allowsHitTesting(false).accessibilityHidden(true)
     }
     private var periodTitle: String {
         let interval = range.interval(offset: periodOffset)
@@ -128,17 +166,30 @@ struct CuadraoHomeBalanceChart: View {
         }
     }
     private var periodHeading: some View {
-        HStack(spacing: 4) {
-            Text(periodTitle).font(.headline).frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityIdentifier("home-history-period")
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                Text(periodTitle).font(CuadraoTypography.supporting).fontWeight(.medium)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("home-history-period")
+                periodButton(-1)
+                periodButton(1)
+            }
             if periodOffset < 0 || selectedDate != nil {
-                Button(spanish ? "Hoy" : "Today") { periodOffset = 0; selectedDate = nil }
+                Button(spanish ? "Volver a hoy" : "Back to today") { periodOffset = 0; selectedDate = nil }
                     .font(CuadraoTypography.caption).frame(minHeight: 44).accessibilityIdentifier("home-chart-today")
             }
-
         }.frame(minHeight: 44).contentShape(Rectangle()).gesture(periodSwipe)
             .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
             .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
+    }
+    private func periodButton(_ direction: Int) -> some View {
+        Button { movePeriod(direction) } label: {
+            Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
+                .font(.subheadline.weight(.medium)).frame(width: 44, height: 44)
+        }.buttonStyle(.plain)
+            .disabled(direction < 0 ? periodOffset <= range.oldestOffset(history) : periodOffset >= 0)
+            .accessibilityLabel(direction < 0 ? (spanish ? "Período anterior" : "Previous period") : (spanish ? "Período siguiente" : "Next period"))
+            .accessibilityIdentifier(direction < 0 ? "home-period-previous" : "home-period-next")
     }
     private var periodSwipe: some Gesture {
         DragGesture(minimumDistance: 25).onEnded { value in

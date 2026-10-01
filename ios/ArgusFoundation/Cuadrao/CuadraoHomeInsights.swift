@@ -7,23 +7,22 @@ struct CuadraoHomeInsights: View {
     let spanish: Bool
     let space: String
     let shared: Bool
+    @State private var range: CanvasHistoryRange = .month
+    @State private var periodOffset = 0
     @State private var distribution = false
     @State private var accountPath: [UUID] = []
     @State private var accountSheet: CanvasAccountSheet?
     @Environment(\.dismiss) private var dismiss
+    private var viewChoice: CuadraoChartViewChoice { CuadraoChartViewChoice(distribution: $distribution, spanish: spanish) }
     var body: some View {
         NavigationStack(path: $accountPath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    Picker(spanish ? "Vista" : "View", selection: $distribution) {
-                        Text(spanish ? "Evolución" : "History").tag(false)
-                        Text(spanish ? "Distribución" : "Breakdown").tag(true)
-                    }.pickerStyle(.segmented).accessibilityIdentifier("home-chart-view")
                     if distribution {
-                        CuadraoHomeDistribution(accounts: accounts, currency: currency, spanish: spanish)
+                        CuadraoHomeDistribution(accounts: accounts, currency: currency, spanish: spanish, viewChoice: viewChoice)
                     } else {
                         CuadraoHomeBalanceChart(accounts: accounts, observations: data.balanceObservations, currency: currency,
-                            currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true)
+                            currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true, viewChoice: viewChoice, range: $range, periodOffset: $periodOffset)
                     }
                 }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 32)
             }.accessibilityIdentifier("home-insights-content").background(WelcomePalette.background)

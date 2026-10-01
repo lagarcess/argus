@@ -5,6 +5,8 @@ struct CuadraoHomeDistribution: View {
     let accounts: [CanvasAccount]
     let currency: String
     let spanish: Bool
+    var viewChoice: CuadraoChartViewChoice?
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedKind: CanvasAccountKind?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var known: [CanvasAccount] { accounts.filter { $0.balance != nil } }
@@ -31,13 +33,16 @@ struct CuadraoHomeDistribution: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(spanish ? "Así se reparte lo que tienes" : "How your money is spread")
+                Text(spanish ? "Activos · Hoy" : "Assets · Today")
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                     Text(known.isEmpty ? "—" : CanvasMoney.format(total, currency: currency))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
-                }.accessibilityIdentifier("home-distribution-total")
+                        .accessibilityIdentifier("home-distribution-total")
+                    if !typeSize.isAccessibilitySize, let viewChoice { Spacer(minLength: 8); viewChoice }
+                }
+                if typeSize.isAccessibilitySize, let viewChoice { viewChoice }
                 if accounts.count != known.count {
                     Text(spanish ? "Faltan balances por registrar" : "Some balances are missing")
                         .font(CuadraoTypography.caption).foregroundStyle(.secondary)

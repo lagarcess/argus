@@ -26,6 +26,9 @@ value, make a row hard to scan or imply that a prediction is certain.
 | Currency precision, formatting and limits | [CanvasMoney.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoney.swift) | Derive preview limits and formatting here; currency selection/immutability retains its plan/group owner. |
 | Numeric preview bridge | [CanvasMoneyValueInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoneyValueInput.swift) | Adapts existing numeric preview models to decimal editing text; it is not a new financial store. |
 | Plan amount composition | [PlanAmountInput.swift](../../../ios/ArgusFoundation/Cuadrao/Planning/PlanAmountInput.swift) | Currency, rounded amount, focus underline and inline error. Accounts keeps its approved bordered, right-aligned composition around the same editor. |
+| Choice labels and add shortcuts | [CuadraoChoiceControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChoiceControls.swift) | Shared value/caret, selected menu option, fixed code and section plus. |
+| Expanded chart controls | [CuadraoChartControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChartControls.swift) | Icon view choice and localized period choice, including selected accessibility state. |
+| Account management | [CuadraoAccountsCollection.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoAccountsCollection.swift) | Native ordering and archive recovery over the existing shared account model. |
 | Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift) | Uses real shared components. Access from a hold on Home's greeting → Guía visual / Visual guide, or launch with `--design-gallery`. Preview-only. |
 
 ## Typography
@@ -84,10 +87,24 @@ The money editor retains its short grouping fade and respects Reduce Motion.
 Scroll-edge materials belong behind persistent chrome, never across interactive
 content. Surface-specific gestures retain their existing meanings.
 
+### Locked selector language — October 1, 2026
+
+Single-choice selectors show the current value and a downward chevron, with a
+checkmark on the selected option. Apply this grammar to space and currency choices,
+including Tus planes. Reserve the sliders/filter icon for controls that open
+multiple filter dimensions. Align typography, caret weight and accessible touch
+targets across equivalent controls while retaining each surface's composition.
+Short choice lists can use native menus; long currency catalogs use a searchable
+sheet. Fixed currency is a static code without a chevron, with a lock where useful.
+Home's currency choice filters a view; plan/group creation chooses a currency that
+stays fixed afterward. Shared presentation does not introduce conversion or change
+those ownership rules. Delivery status remains in the main roadmap.
+
 ## Review and evolution
 
 The gallery offers Spanish/English, light/dark and large-text controls. It contains
-headings, amounts, a row, a disabled action and working Account/Plan input fields.
+headings, amounts, a row, a disabled action, working Account/Plan input fields,
+and the real shared choice, add and chart controls.
 Use it to compare states, then verify the actual surfaces: isolated components do
 not prove keyboard, scroll or navigation behavior. The gallery does not post data.
 
@@ -97,6 +114,37 @@ and migrate equivalent usages together. Update the component owner rather than
 copying a style or parser. Preserve each surface's useful personality. Tests should
 exercise meaningful behavior and navigation, not freeze every styling literal.
 Future chart, receipt, provider and connected-delivery work stays in the roadmap.
+
+## Locked Plan hierarchy — October 1, 2026
+
+Share Home's interaction language while preserving Plan's hierarchy. Home's space
+selector scopes its financial snapshot; Plan's main distinction is Para ti / En
+grupo. Keep month and forecast space within the forecast rather than implying that
+one top-level selector scopes forecasts, personal goals and group plans together.
+In the forecast context, the month is quiet text and the space is the selectable
+control. Reuse Home's space names, selection feedback, menu styling and accessible
+touch targets. Hide the forecast-space menu when only one compatible space exists.
+Forecast scope never sets a new plan's space: creation uses the explicitly selected
+plan-list space, or Personal when the list shows all spaces, with an editable choice.
+
+Same action, same behavior; different purpose, different composition. Shared
+money behavior, typography, icons, selectors, gestures and return paths provide
+consistency. Plan retains its illustration, exploration and personal language. The forecast
+playground entry is a quiet “Explorar escenarios / Explore scenarios” link beneath
+the forecast, rather than an attention-seeking headline or primary action.
+Implementation status and future work live in the
+[main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-consistency-pass-and-home-chart-follow-up).
+
+## Home account and activity shortcuts
+
+Cuentas / Accounts and Movimientos / Activity share the same trailing plain plus.
+Home keeps quick creation and row gestures; no accounts-header ellipsis or redundant
+configuration cluster. Hold an account to reach its actions, including reorder when
+there are multiple active accounts. Preserve the equivalent accessibility action.
+Tapping the Accounts heading opens its management surface, where visible reorder
+and archived-account recovery remain discoverable. The entry remains available
+when all accounts are archived. Account detail retains visible owner actions;
+Home's shortcut does not become the only way to manage a record.
 
 ## Home balance chart
 
@@ -147,6 +195,23 @@ periods; a balance change must not be described as earnings, spending or investm
 return. Inspection and period paging must coexist with vertical scrolling and
 accessible alternatives. The metric remains recorded net position unless separately
 changed; Apple spending visuals do not redefine that metric.
+
+**Locked control refinement:** place the compact line-chart / stacked-bar icon
+switch beside the hero amount, with clear selected state and localized accessible
+names. Above the history chart, size Semana / Mes / Año to localized labels instead
+of stretching the selector across the screen. Preserve 44-point touch targets and
+allow layout to adapt for larger text rather than truncating labels or money.
+Show a subtle neighboring-period edge only when that period exists, with explicit
+previous/next controls beside the period title as an accessible alternative. Stop
+at the oldest available period and the present; do not tease unavailable pages.
+Keep chart inspection distinct from paging and preserve vertical scrolling.
+
+Period selection and historical paging apply only to Evolución. Distribución shows
+current positive assets, labeled Activos · Hoy / Assets · Today: remove period controls and date paging there and make its current
+scope clear. Switching views preserves Evolución's chosen period for the return,
+but never applies that past date to today's distribution or leaves a stale date
+label attached to it. Do not imply historical allocation support. These controls
+belong only in expanded insights; the compact Home entry remains quiet.
 
 **Distribución: decomposable bar, category rows, account detail.** The bar shows the
 whole positive asset distribution. Selecting a category emphasizes its segment;

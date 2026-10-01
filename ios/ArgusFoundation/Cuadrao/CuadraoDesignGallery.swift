@@ -12,6 +12,8 @@ struct CuadraoDesignGallery: View {
     @State private var amount = 0.0
     @State private var planError = ""
     @State private var currency = "DOP"
+    @State private var distribution = false
+    @State private var period: CanvasHistoryRange = .month
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -40,6 +42,24 @@ struct CuadraoDesignGallery: View {
                         }
                         PlanPrimaryButton(title: spanish ? "Continuar" : "Continue") { }
                             .disabled(true).accessibilityIdentifier("gallery-action")
+                    }
+                    sample(spanish ? "Controles compartidos" : "Shared controls") {
+                        HStack {
+                            Text(spanish ? "Cuentas" : "Accounts").font(CuadraoTypography.section)
+                            Spacer()
+                            CuadraoSectionAddButton(title: spanish ? "Añadir cuenta" : "Add account") { }
+                        }
+                        HStack {
+                            Menu {
+                                ForEach(PlanCurrency.supported, id: \.self) { code in
+                                    CuadraoChoiceOption(title: code, selected: code == currency) { currency = code }
+                                }
+                            } label: { CuadraoChoiceLabel(title: currency) }
+                            Spacer()
+                            CuadraoChoiceLabel(title: currency, selectable: false, locked: true)
+                        }
+                        CuadraoChartViewChoice(distribution: $distribution, spanish: spanish)
+                        CuadraoHistoryPeriodChoice(range: $period, spanish: spanish)
                     }
                     sample(spanish ? "Monto en Cuentas" : "Account amount") {
                         CuadraoAmountField(raw: $raw, currency: $currency, error: $accountError, spanish: spanish)

@@ -22,13 +22,11 @@ struct CuadraoHomeCanvas: View {
         populated: (CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated")),
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
     @State private var accountPath: [UUID] = []
-    @State private var ordering = false
     @State private var archivedID: UUID?
-    @ScaledMetric private var reorderRowHeight = 84
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
-        case add, options, archived, updates, spaces, customize, household, gallery
+        case add, updates, spaces, customize, household, gallery
         case account(CanvasAccountSheet)
         var id: String { "home-modal" }
     }
@@ -46,7 +44,7 @@ struct CuadraoHomeCanvas: View {
                             homeSection(section)
                         }
                         if !data.active.isEmpty {
-                            Button { ordering = false; sheet = .customize } label: {
+                            Button { sheet = .customize } label: {
                                 Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
                                     .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
                             }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
@@ -126,7 +124,7 @@ struct CuadraoHomeCanvas: View {
         .sheet(item: $sheet) { item in modal(item) }
         .onChange(of: chat.current.id) { _, _ in voiceProposal = nil }
         .onChange(of: data.selectedSpaceID) { _, _ in
-            ordering = false; archivedID = nil; accountPath = []; navigationScroll = CuadraoNavigationScroll()
+            archivedID = nil; accountPath = []; navigationScroll = CuadraoNavigationScroll()
         }
         .overlay(alignment: .bottom) {
             if let archivedID {
@@ -178,14 +176,14 @@ struct CuadraoHomeCanvas: View {
                     Button(spanish ? "Guía visual" : "Visual guide") { sheet = .gallery }
                         .accessibilityIdentifier("cuadrao-gallery-open")
                     Button(spanish ? "Vista previa: primer uso" : "Preview: first use") {
-                        populated = false; data.reset(populated: false, spanish: spanish); ordering = false
+                        populated = false; data.reset(populated: false, spanish: spanish)
                     }
                     Button(spanish ? "Vista previa: Hogar sin cuentas compartidas" : "Preview: household with no shared accounts") {
                         populated = false; data.reset(populated: false, spanish: spanish)
                         data.openHousehold(); data.household = .joined("Alex")
                     }
                     Button(spanish ? "Vista previa: con actividad" : "Preview: with activity") {
-                        populated = true; data.reset(populated: true, spanish: spanish); ordering = false
+                        populated = true; data.reset(populated: true, spanish: spanish)
                     }
                 }
             Spacer()
@@ -206,45 +204,30 @@ struct CuadraoHomeCanvas: View {
             }
             if !data.active.isEmpty || !data.archived.isEmpty {
                 HStack(spacing: 0) {
-                    sectionTitle(spanish ? "Cuentas" : "Accounts")
+                    Button { sheet = .account(.manageAccounts(editing: false)) } label: {
+                        HStack(spacing: 8) {
+                            sectionTitle(spanish ? "Cuentas" : "Accounts")
+                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+                        }.frame(minHeight: 44)
+                    }.buttonStyle(.plain).accessibilityIdentifier("home-accounts-open")
                     Spacer()
-                    if ordering {
-                        Button(spanish ? "Listo" : "Done") { ordering = false }
-                            .font(.subheadline.weight(.medium)).frame(minHeight: 44)
-                    } else {
-                        Button { sheet = .add } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
-                            .accessibilityLabel(spanish ? "Añadir cuenta" : "Add account")
-                        Button { sheet = .options } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                            .accessibilityLabel(spanish ? "Opciones de cuentas" : "Account options")
-                    }
+                    CuadraoSectionAddButton(title: spanish ? "Añadir cuenta" : "Add account") { sheet = .add }
+                        .accessibilityIdentifier("home-account-add")
                 }
             }
-            if ordering {
-                List {
-                    ForEach(data.active) { account in
-                        CanvasAccountRow(account: account, spanish: spanish)
-                            .padding(.trailing, 20)
-                            .listRowInsets(EdgeInsets()).listRowBackground(WelcomePalette.background)
-                            .frame(height: reorderRowHeight)
-                    }.onMove { from, to in data.move(from: from, to: to) }
-                }.listStyle(.plain).scrollDisabled(true)
-                    .environment(\.editMode, .constant(.active))
-                    .frame(height: reorderRowHeight * CGFloat(data.active.count))
-            } else {
-                ForEach(data.active) { account in
-                    CanvasAccountRow(account: account, spanish: spanish)
-                        .gesture(LongPressGesture(minimumDuration: 0.45).exclusively(before: TapGesture()).onEnded { gesture in
-                            switch gesture {
-                            case .first: sheet = .account(.actions(account.id))
-                            case .second: accountPath.append(account.id)
-                            }
-                        })
-                        .accessibilityElement(children: .combine)
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAction { accountPath.append(account.id) }
-                        .accessibilityAction(named: Text(spanish ? "Opciones de cuenta" : "Account actions")) { sheet = .account(.actions(account.id)) }
-                        .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
-                }
+            ForEach(data.active) { account in
+                CanvasAccountRow(account: account, spanish: spanish)
+                    .gesture(LongPressGesture(minimumDuration: 0.45).exclusively(before: TapGesture()).onEnded { gesture in
+                        switch gesture {
+                        case .first: sheet = .account(.actions(account.id))
+                        case .second: accountPath.append(account.id)
+                        }
+                    })
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { accountPath.append(account.id) }
+                    .accessibilityAction(named: Text(spanish ? "Opciones de cuenta" : "Account actions")) { sheet = .account(.actions(account.id)) }
+                    .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
             }
             if data.active.isEmpty { firstAccount }
         }
@@ -260,9 +243,9 @@ struct CuadraoHomeCanvas: View {
             HStack {
                 sectionTitle(spanish ? "Movimientos" : "Activity")
                 Spacer()
-                Button { if let account = data.active.first { sheet = .account(.record(account.id)) } } label: {
-                    Image(systemName: "plus").frame(width: 44, height: 44)
-                }.accessibilityLabel(spanish ? "Añadir movimiento" : "Add activity")
+                CuadraoSectionAddButton(title: spanish ? "Añadir movimiento" : "Add activity") {
+                    if let account = data.active.first { sheet = .account(.record(account.id)) }
+                }.accessibilityIdentifier("home-activity-add")
             }
             Text(spanish ? "Hoy" : "Today").font(.footnote).foregroundStyle(.secondary)
             ForEach(data.visibleActivity.prefix(3)) { entry in
@@ -335,16 +318,6 @@ struct CuadraoHomeCanvas: View {
         case .customize: CuadraoHomeLayoutSheet(savedOrder: $homeOrder, spanish: spanish)
         case .spaces: CuadraoSpacesSheet(data: data, spanish: spanish)
         case .add: CuadraoFirstAccountSheet(data: data, spanish: spanish)
-        case .archived: CuadraoArchivedAccounts(data: data, spanish: spanish)
-        case .options:
-            VStack(alignment: .leading, spacing: 8) {
-                Text(spanish ? "Cuentas" : "Accounts").font(.title3.weight(.medium)).padding(.bottom, 12)
-                CanvasActionRow(title: spanish ? "Ordenar cuentas" : "Reorder accounts", symbol: "line.3.horizontal") {
-                    sheet = nil; ordering = true
-                }.disabled(data.active.count < 2)
-                Divider()
-                CanvasActionRow(title: spanish ? "Cuentas archivadas" : "Archived accounts", symbol: "archivebox") { sheet = .archived }
-            }.padding(28).presentationDetents([.height(250)]).presentationDragIndicator(.visible)
         case .account(let selection):
             CuadraoAccountModal(data: data, selection: selection, spanish: spanish,
                 show: { sheet = .account($0) }, archived: {
