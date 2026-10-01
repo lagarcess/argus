@@ -175,7 +175,7 @@ final class HouseholdModel: ObservableObject {
             guard current(ticket, identity) else { return }
             let accessFailure = handleAccessFailure(error)
             if availability != .disabled {
-                if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 {
+                if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 && status != 429 {
                     try? journal.clear(write, for: identity); pending = nil
                     if !accessFailure { clear(); errorKey = "household.changed" }
                 } else { errorKey = "household.uncertain" }

@@ -90,6 +90,31 @@ final class HouseholdModelTests: XCTestCase {
             XCTAssertEqual(reopened.selectedId, ended ? nil : HouseholdServer.household, code)
         }
     }
+    func testRateLimitedPendingRetryKeepsExactCommandUntilExplicitRetry() async throws {
+        let fixture = try HouseholdFixture()
+        let identity = try await fixture.login()
+        await fixture.server.failCreateOnce()
+        await fixture.model.command(HouseholdCommand(name: "Committed once", displayName: "Alice"), path: "")
+        let pending = try XCTUnwrap(fixture.model.pending)
+        await fixture.server.failNext(429, code: "too_many_requests")
+        await fixture.model.retry()
+        XCTAssertEqual(fixture.model.pending, pending)
+        XCTAssertEqual(try fixture.journal.pending(for: identity), pending)
+        XCTAssertEqual(fixture.model.errorKey, "household.uncertain")
+        XCTAssertTrue(fixture.model.isAvailable)
+        XCTAssertFalse(fixture.model.busy)
+        let beforeExplicitRetry = await fixture.server.creates
+        XCTAssertEqual(beforeExplicitRetry.count, 1)
+        await fixture.model.retry()
+        let requests = await fixture.server.creates
+        XCTAssertEqual(requests.count, 2)
+        if requests.count == 2 {
+            XCTAssertEqual(requests[0].httpBody, requests[1].httpBody)
+            XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Idempotency-Key"), requests[1].value(forHTTPHeaderField: "Idempotency-Key"))
+        }
+        XCTAssertNil(fixture.model.pending)
+        XCTAssertNil(try fixture.journal.pending(for: identity))
+    }
     func testCommittedPendingRetryWhileOffPreservesExactJournalThroughRelaunch() async throws {
         let fixture = try HouseholdFixture()
         let identity = try await fixture.login()
