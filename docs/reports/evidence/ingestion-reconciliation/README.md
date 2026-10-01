@@ -12,7 +12,7 @@ distinct, holds the review queue and records canonical activity only through
 `src/argus/domain/ingestion/reconcile/` (model, matching, intake, render,
 service, recording, store, store_postgres), routes in
 `src/argus/api/routers/financial_imports.py`, migration
-`supabase/migrations/20261001190000_financial_import_reconciliation.sql`.
+`supabase/migrations/20261002120300_financial_import_reconciliation.sql`.
 
 ## What is proven, and how
 
