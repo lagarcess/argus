@@ -1,0 +1,7 @@
+Test Case '-[ArgusFoundationUITests.CuadraoHistoryDesignUITests testRecentsActionsAndRecovery]' passed (40.834 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoHistoryDesignUITests testScanAndEnglishParity]' passed (24.242 seconds).
+	 Executed 2 tests, with 0 failures (0 unexpected) in 65.075 (65.078) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 65.075 (65.079) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 65.075 (65.080) seconds
+** TEST SUCCEEDED **
+Device build: BUILD SUCCEEDED (Debug-iphoneos, design preview, auth disabled)

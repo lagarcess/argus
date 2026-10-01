@@ -117,7 +117,7 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         app.buttons["cuadrao-tab-2"].tap()
         app.buttons["chat-attach"].tap()
         XCTAssertFalse(app.buttons["chat-voice-message"].exists)
-        for label in ["Recibo", "Foto", "Archivo"] { XCTAssertTrue(app.buttons[label].exists) }
+        for label in ["Escanear", "Foto", "Archivo"] { XCTAssertTrue(app.buttons[label].exists) }
         capture(app, "attachments-only")
         app.buttons["chat-attach"].tap()
         for target in ["chat-composer-entry", "chat-voice-entry"] {

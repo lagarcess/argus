@@ -712,3 +712,37 @@ owns the native design iteration's Accounts-in-Home, management, entry and
 navigation decisions. For that canvas it supersedes this document's older
 three-row Home preview and separate Accounts-tab assumptions. Existing connected
 financial contracts and reconciliation behavior remain unchanged.
+
+
+### Cuadrao native capture and Recents decisions · October 1, 2026
+
+Founder-approved design checkpoint; this supersedes the receipt-specific
+attachment label in the native canvas.
+
+- The attachment action is **Escanear** in Spanish and **Scan** in English,
+  with a document-scanner symbol. Photos and files remain independent entry points.
+- Future iOS document capture uses Apple's native VisionKit
+  `VNDocumentCameraViewController`. Its scanned page images feed the same approved
+  document interpretation and user-review flow as other uploads. PDF conversion
+  is optional, not a prerequisite for vision-model input. Capture does not itself
+  classify, confirm, or save a financial record.
+- This is a future implementation decision, not scanner or provider activation.
+  The current design preview still attaches clearly identified sample documents;
+  camera permissions, real capture, upload and model processing remain unconnected.
+- Recents uses title-first rows, separate Pinned/Recent sections, unread/current
+  indicators, and one conversation object shared with Chat and Search. Do not add
+  fabricated dates or repeat a sample subtitle on every row.
+- Swipe right pins/unpins; swipe left archives or restores. A visible 44-point
+  ellipsis target and a touch-and-hold menu expose the same actions without requiring
+  gestures. Mark read/unread comes first, followed by pin, rename, archive and delete.
+  Delete requires confirmation and retains recovery in Deleted. Actions on a row
+  never also open it. Opening temporary-chat destinations keeps the existing discard
+  confirmation. Archiving/deleting the active regular chat opens a fresh chat.
+
+References: [Apple document camera](https://developer.apple.com/documentation/visionkit/vndocumentcameraviewcontroller),
+[scan output](https://developer.apple.com/documentation/visionkit/vndocumentcamerascan),
+[Apple gestures](https://developer.apple.com/design/human-interface-guidelines/gestures),
+[Claude title-first history](https://mobbin.com/screens/9059f305-c9bb-44b9-b0fe-efe19e50a428),
+[Messages contextual swipe controls](https://mobbin.com/screens/1ad68688-b638-4f85-b754-7ef96f6d45e5).
+The exact gesture mapping above is Cuadrao's adaptation, not a claim that these
+reference apps use the same mapping.

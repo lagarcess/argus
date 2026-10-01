@@ -1,0 +1,9 @@
+{
+  "ios/ArgusFoundation/Cuadrao/CuadraoChatCanvas.swift": "34189d92c4ad56c449460395d6c05074fea035c2f4578b44e3c6806b85e24c08",
+  "ios/ArgusFoundation/Cuadrao/CuadraoChatHistory.swift": "ea05808406c234c1df076aa937f7e34477f87260bd56f17cab44a4bd8cf18198",
+  "ios/ArgusFoundation/Cuadrao/CuadraoChatPreview.swift": "5e4e450f74ba5abde126b4bc85001cf66d6bd9e125d2a386b829ae4068476d82",
+  "ios/ArgusFoundation/Cuadrao/CuadraoChatSheet.swift": "8c789205b06c50199129a68beb517abc75116fe5a70cb5d5244c38e29dbee384",
+  "ios/ArgusFoundationUITests/CuadraoHistoryDesignUITests.swift": "7407a6784b959abbe4fcc1a623ebf852de37d2dd6ae9ab8a24e0b3b4f2bf6a7d",
+  "ios/ArgusFoundationUITests/CuadraoVoiceDesignUITests.swift": "287617c9fbab59404c0a9912fc95e215b46b8b243cab447a2e9dc75fb62ed484",
+  "ios/DesignPreviewTests/TemporaryChatChecks.swift": "895916372b264ec383a86fc7f847be0204c4f51550e61688f9240b9660d9903b"
+}

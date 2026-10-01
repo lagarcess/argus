@@ -4,6 +4,19 @@ import Foundation
     static func main() {
         for spanish in [true, false] {
             let store = CuadraoChatPreview(spanish: spanish)
+            let historyThread = store.threads[0]
+            store.open(historyThread)
+            historyThread.draft = "Preserve on archive"
+            store.voice.start()
+            store.archive(historyThread)
+            precondition(historyThread.archived && store.current !== historyThread && !store.voice.active)
+            precondition(historyThread.draft == "Preserve on archive")
+            store.restore(historyThread)
+            store.open(historyThread)
+            store.delete(historyThread)
+            precondition(historyThread.deleted && store.current !== historyThread)
+            store.restore(historyThread)
+            precondition(!historyThread.deleted && !historyThread.archived)
             let previous = store.current
             let originalDraft = spanish ? "Mi borrador" : "My draft"
             previous.draft = originalDraft

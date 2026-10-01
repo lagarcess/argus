@@ -87,6 +87,15 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
         current = suspended ?? CanvasChatThread(); suspended = nil; temporary = false; contextEnabled = false
         responseState = .complete
     }
+    func archive(_ thread: CanvasChatThread) {
+        thread.archived = true
+        if current.id == thread.id { newChat() }
+    }
+    func delete(_ thread: CanvasChatThread) {
+        thread.deleted = true
+        if current.id == thread.id { newChat() }
+    }
+    func restore(_ thread: CanvasChatThread) { thread.deleted = false; thread.archived = false }
     enum Exit { case returnToRegular, newRegular, open(CanvasChatThread) }
     // Call only after the presentation has confirmed any temporary content loss.
     func leaveTemporary(for destination: Exit) {
@@ -95,7 +104,7 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
         case .returnToRegular: break
         case .newRegular: newChat()
         case .open(let thread):
-            if thread.deleted { thread.deleted = false; thread.archived = false }
+            if thread.deleted { restore(thread) }
             open(thread)
         }
     }

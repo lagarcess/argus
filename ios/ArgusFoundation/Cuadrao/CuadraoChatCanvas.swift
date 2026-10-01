@@ -94,8 +94,8 @@ struct CuadraoChatCanvas: View {
                     Button(es ? "Cambiar nombre" : "Rename", systemImage: "pencil") { sheet = .rename }
                     Button(es ? (store.current.pinned ? "Desfijar" : "Fijar") : (store.current.pinned ? "Unpin" : "Pin"), systemImage: "pin") { store.current.pinned.toggle() }
                     Button(es ? "Marcar como no leído" : "Mark unread", systemImage: "envelope.badge") { store.current.unread = true }
-                    Button(es ? "Archivar" : "Archive", systemImage: "archivebox") { store.current.archived = true; store.newChat() }
-                    Button(es ? "Eliminar" : "Delete", systemImage: "trash", role: .destructive) { store.current.deleted = true; store.newChat() }
+                    Button(es ? "Archivar" : "Archive", systemImage: "archivebox") { store.archive(store.current) }
+                    Button(es ? "Eliminar" : "Delete", systemImage: "trash", role: .destructive) { store.delete(store.current) }
                     Divider()
                     Button(es ? "Estados de vista previa" : "Preview states", systemImage: "slider.horizontal.3") { sheet = .states }
                 } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
@@ -276,7 +276,7 @@ struct CuadraoChatCanvas: View {
                 if tray && voiceMessage.state != .recording {
                     Divider()
                     HStack(spacing: 8) {
-                        attachmentButton("camera", es ? "Recibo" : "Receipt")
+                        attachmentButton("doc.viewfinder", es ? "Escanear" : "Scan")
                         attachmentButton("photo", es ? "Foto" : "Photo")
                         attachmentButton("doc", es ? "Archivo" : "File")
                     }.padding(.bottom, 4)

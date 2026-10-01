@@ -11,9 +11,7 @@ struct CuadraoChatSheet: View {
     let store: CuadraoChatPreview
     let spanish: Bool
     @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
     @State private var title = ""
-    @State private var historyScope = 0
     @State private var endTemporary = false
     @State private var pendingExit = CuadraoChatPreview.Exit.returnToRegular
     private var es: Bool { spanish }
@@ -32,7 +30,9 @@ struct CuadraoChatSheet: View {
     var body: some View {
         NavigationStack {
             Group {
-                if case .history = destination { history }
+                if case .history = destination {
+                    CuadraoChatHistory(store: store, spanish: es, open: { requestExit(.open($0)) }, newChat: { requestExit(.newRegular) })
+                }
                 else { ScrollView { content.padding(24).frame(maxWidth: .infinity, alignment: .leading) } }
             }
             .background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink)
@@ -99,51 +99,6 @@ struct CuadraoChatSheet: View {
         }
     }
 
-    private var history: some View {
-        let rows = store.threads.filter {
-            (historyScope == 2 ? $0.deleted : !$0.deleted && $0.archived == (historyScope == 1))
-                && (query.isEmpty || $0.title.localizedStandardContains(query))
-        }.sorted { $0.pinned && !$1.pinned }
-        return VStack(spacing: 12) {
-            Picker(es ? "Ver chats" : "Show chats", selection: $historyScope) {
-                Text(es ? "Recientes" : "Recent").tag(0)
-                Text(es ? "Archivados" : "Archived").tag(1)
-                Text(es ? "Eliminados" : "Deleted").tag(2)
-            }.pickerStyle(.segmented).padding(.horizontal, 24)
-            List {
-                if rows.isEmpty {
-                    ContentUnavailableView(es ? "Sin chats" : "No chats", systemImage: "bubble.left.and.bubble.right",
-                        description: Text(es ? "Prueba otra búsqueda o empieza un chat." : "Try another search or start a chat."))
-                }
-                ForEach(rows) { thread in
-                    Button {
-                        requestExit(.open(thread))
-                    } label: {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(thread.title).font(.body).lineLimit(2)
-                                Text(thread.deleted ? (es ? "Toca para restaurar" : "Tap to restore") : (es ? "Conversación de ejemplo" : "Example conversation"))
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if thread.pinned { Image(systemName: "pin").font(.caption).foregroundStyle(.secondary) }
-                            if thread.unread { Circle().fill(WelcomePalette.pine).frame(width: 7, height: 7) }
-                        }.padding(.vertical, 8)
-                    }.listRowBackground(WelcomePalette.background).foregroundStyle(WelcomePalette.ink)
-                        .swipeActions { if thread.archived { Button(es ? "Restaurar" : "Restore") { thread.archived = false } } }
-                }
-            }.listStyle(.plain).searchable(text: $query, prompt: es ? "Buscar chats" : "Search chats")
-            Button {
-                requestExit(.newRegular)
-            } label: {
-                Label { Text(es ? "Nuevo chat" : "New chat") } icon: {
-                    Image("CuadraoNewChat").resizable().scaledToFit().frame(width: 20, height: 20)
-                }.frame(minHeight: 44)
-            }
-            Text(es ? "Vista previa · Conversaciones locales de ejemplo" : "Preview · Local example conversations")
-                .font(.caption).foregroundStyle(.secondary).padding(.bottom, 16)
-        }
-    }
     private func requestExit(_ destination: CuadraoChatPreview.Exit) {
         pendingExit = destination
         if store.hasTemporaryContent { endTemporary = true } else { finishExit() }
