@@ -2714,6 +2714,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections:
+    get:
+      tags:
+      - financial-accounts
+      - financial-connections
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialConnectionListResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/{connection_id}/disconnect:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: 'Idempotent: disconnecting an ended connection returns it unchanged.'
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisconnectResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-home:
     get:
       tags:
@@ -8647,6 +8700,24 @@ components:
       required:
       - markets
       description: What a person's own records show interest in.
+    DisconnectResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        provider_revocation:
+          type: string
+          enum:
+          - revoked
+          - failed
+          - not_applicable
+        unreviewed_removed:
+          type: integer
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - provider_revocation
+      - unreviewed_removed
     DiscoveryItem:
       properties:
         id:
@@ -9071,6 +9142,72 @@ components:
       - expected_version
       - membership_id
       - activity
+    FinancialConnectionListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/FinancialConnectionResponse'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - items
+    FinancialConnectionResponse:
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+          enum:
+          - plaid
+          - gmail
+          - shortcuts
+          - statement
+        status:
+          type: string
+          enum:
+          - active
+          - needs_reauth
+          - error
+          - disconnected
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+        last_success_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        last_attempt_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        last_error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+        disconnected_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - source
+      - status
+      - label
+      - last_success_at
+      - last_attempt_at
+      - last_error_code
+      - created_at
+      - disconnected_at
     ForecastCurrency:
       properties:
         currency:
