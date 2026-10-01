@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** connected personal assets and net worth are authorized for implementation, local verification and publication through a merge-ready PR. Debt plans (#757/#758), savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) remain landed. Preserve their demonstrations and the separate phone-testing and Cuadrao environments. No merge, deployment, hosted configuration change, paid provider or next slice is authorized.
+**Execution state:** connected personal assets and net worth landed through PR #759 at `0cd8d1658c8a58d0a8e29e3307f948aed11ecbc3`, preserving the locally verified native journey. The founder authorized the verified-head merge and complete bounded integration landing only. Debt plans (#757/#758), savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) remain landed with their demonstrations preserved. No deployment, hosted configuration change, paid provider or next slice is authorized. Physical-phone testing and Cuadrao belong to their separate owners.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -10,37 +10,83 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
+## PR #759 integration landing
+
+The founder authorized merging the verified head and completing integration
+landing. This grant does not authorize deployment, hosted configuration changes,
+paid providers, phone-environment actions or another delivery lane.
+
+- [PR #759](https://github.com/lagarcess/argus/pull/759) squash-merged at
+  **September 30, 2026, 8:44:43 p.m. America/Chicago** as
+  `0cd8d1658c8a58d0a8e29e3307f948aed11ecbc3`, from verified head
+  `12a48f598da40fdad16c96caf80a92324f2eb1a4` onto unchanged integration
+  `9d6ed94491be9d904da881901a6d7a2dc8cf635b` (also the original base).
+  No intervening semantic overlap or reconciliation merge exists. Approved-head
+  and squash-merge trees are identical; canonical integration fast-forwarded
+  cleanly. The accepted lane evidence is preserved across that identical tree.
+- The [terminal readiness audit](https://github.com/lagarcess/argus/pull/759#issuecomment-5922943880)
+  records green applicable PR/push CI and smoke, clean fresh independent review
+  through the exact final head, a clean scoped Codex follow-up and zero unresolved
+  findings. Both assembled native journeys and real API readback revalidated the
+  retained evidence at that head. 394 financial/API/OpenAPI/Postgres/recovery
+  checks passed without skips; native package tests had 64 passes and four
+  inherited opt-in live-auth skips. Real local authentication was exercised by
+  the assembled journeys. Ten screenshots and the 60-second recording remain
+  durable. Landing does not repeat the accepted journey.
+- Exact merge [integration CI](https://github.com/lagarcess/argus/actions/runs/36802549319)
+  and [local smoke](https://github.com/lagarcess/argus/actions/runs/36802549379),
+  checked landing housekeeping and final clean local/remote parity are recorded
+  in the merged PR's final landing comment after terminal checks.
+- No linked closing issues or obsolete documents need closure or archiving.
+  Only this manifest and the existing integration ledger need landing updates;
+  API/data/OpenAPI contracts already landed with the feature.
+- No new production environment variable or tracked-template update is needed.
+  Existing financial exposure remains default-off. Synthetic native test/proxy
+  inputs are local-only. The additive
+  `20260930230000_connected_personal_assets.sql` migration was locally and
+  ordinary-preview verified; landing applies no hosted migration or activation.
+- The [asset demo, evidence and restart guide](../reports/evidence/connected-personal-assets/README.md)
+  remain preserved. The runnable demo checkout is detached at the approved head,
+  with the same application tree as the feature merge, using the retained
+  financial simulator, direct API59300, Auth59201/Postgres59202 and CAPTCHA59305.
+  The owned response-loss helper is stopped. Older demos, synthetic records,
+  Cuadrao and the physical-phone environment (58700–58749) remain untouched.
+  Personal manual assets are locally delivered; physical-iPhone internet proof,
+  shared variants and the remaining MVEE outcomes are not completed or assigned
+  by this landing.
+
 ## Connected personal assets and net worth lane
 
-**Founder assignment, September 30, 2026.** Add a property, vehicle or other
+**Original implementation assignment, September 30, 2026 (historical authority; subsequent merge grant above).** Add a property, vehicle or other
 asset, record its estimated whole value and personal ownership share, optionally
 link an existing debt, inspect Accounts/Home, correct the estimate, archive and
 restore, find it through Search and reopen with preserved state. This is the
 only active delivery lane. The full MVEE coverage below remains assigned to its
 existing owners and deferrals.
 
-**Original and freshly fetched integration:**
+**Original and freshly fetched pre-merge integration:**
 `9d6ed94491be9d904da881901a6d7a2dc8cf635b`, including #757/#758.
 **Recovery branch:** `codex/connected-personal-assets`.
 **Delivery checkout:**
 `/Users/garces/.codex/worktrees/connected-personal-assets/private-alpha-next`.
 **Current state:** the complete assigned journey is locally verified in the native
-simulator against real Auth/API/Postgres and published in [PR #759](https://github.com/lagarcess/argus/pull/759).
+simulator against real Auth/API/Postgres and landed through [PR #759](https://github.com/lagarcess/argus/pull/759); the integration landing above owns the subsequent merge grant.
 Two assembled native cases pass, including partial ownership, linked original
 debt, old-estimate correction, archive/restore, Search return, English/Spanish,
 reopening and recovery of a lost accepted create response with exactly one asset.
 The financial/API/OpenAPI/Postgres and recovery gate passes 394 checks; native
 package tests have 64 passes and four inherited opt-in live-auth skips.
 The fresh independent reviewer is clean through
-`0aabfb1605336d695fa59b636061e53995b65282`. The confirmed GitHub type-history
+`12a48f598da40fdad16c96caf80a92324f2eb1a4`. The confirmed GitHub type-history
 finding is fixed at the shared guard and verified in memory and Postgres.
 The [durable evidence and restart guide](../reports/evidence/connected-personal-assets/README.md)
 record exact source/review SHAs, ten screenshots and the 60-second recording.
-Original and freshly fetched integration remain `9d6ed94491be9d904da881901a6d7a2dc8cf635b`;
-no reconciliation or intervening semantic overlap exists. Evidence is retained
-across the last test-selector and documentation/evidence deltas; the PR terminal
-audit records final-head revalidation, applicable CI, scoped follow-up review and
-unresolved-thread count after they finish. Stop at merge-ready; no merge is authorized.
+Original and pre-merge integration were `9d6ed94491be9d904da881901a6d7a2dc8cf635b`;
+no reconciliation or intervening semantic overlap exists. Evidence was retained
+across the last test-selector and documentation/evidence deltas and revalidated
+at the final head. The [terminal audit](https://github.com/lagarcess/argus/pull/759#issuecomment-5922943880)
+records green applicable CI, clean scoped follow-up review and zero unresolved
+findings. The integration landing above records the subsequent authorized merge.
 The direct API59300 demo remains runnable; the disposable response-loss helper is
 stopped. Other demonstrations, Cuadrao and the physical-phone environment remain
 preserved. This closes local personal-asset delivery, not physical-phone internet
@@ -113,6 +159,9 @@ and native design readers return bounded alternatives. One exclusive writer
 then owns the coupled Recording, API, additive persistence, native and tests.
 The writer relinquishes its checkout before captain verification. One fresh
 independent reviewer checks the finished diff and only affected fixes afterward.
+
+The following is the original delivery mapping; its personal local outcomes
+are verified and landed as recorded above. Physical-phone proof remains pending.
 
 | User outcome | Existing capability | Remaining work | Owner | Dependency | Assembled acceptance |
 | --- | --- | --- | --- | --- | --- |
@@ -2006,7 +2055,7 @@ sequence rather than a separate deferral policy in this document.
 | --- | --- | --- | --- | --- | --- |
 | [Access][mvee-access], D01 | Argus auth/recovery; Swift session/Keychain | Finish native/hosted auth adapter and guest conversion | Native continuity + Device/release | Identity API; signing/hosted access for phone proof | Physical-device auth recordings and session/identity test results |
 | [iPhone experience][mvee-platforms], D15 | Native shell; localization; design archive | Replace sample destinations with connected modules | Native continuity | Domain reads per destination | Device navigation/accessibility recordings against [native quality][mvee-quality] |
-| [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 account/opening lifecycle; PR #759 locally verifies personal assets, estimates, ownership shares, existing-debt links and net worth | Deliver existing space/shared ownership scope through its assigned owner; verify the assembled account/asset lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
+| [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 account/opening lifecycle; PR #759 landed locally verified personal assets, estimates, ownership shares, existing-debt links and net worth | Deliver existing space/shared ownership scope through its assigned owner; verify the assembled account/asset lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
