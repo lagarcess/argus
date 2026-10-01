@@ -1,0 +1,117 @@
+[
+  {
+    "file": "plan-new-debt-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+  },
+  {
+    "file": "plan-create-debt-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+  },
+  {
+    "file": "plan-new-budget-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+  },
+  {
+    "file": "plan-create-budget-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+  },
+  {
+    "file": "plan-restored-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+  },
+  {
+    "file": "plan-archived-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+  },
+  {
+    "file": "plan-created-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+  },
+  {
+    "file": "plan-create-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+  },
+  {
+    "file": "plan-with-voice-dark-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testExactAmountsDarkModeAndVoiceContinuity()"
+  },
+  {
+    "file": "plan-exact-dark-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testExactAmountsDarkModeAndVoiceContinuity()"
+  },
+  {
+    "file": "plan-overview-dark-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testExactAmountsDarkModeAndVoiceContinuity()"
+  },
+  {
+    "file": "plan-goal-experiment.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+  },
+  {
+    "file": "plan-goal-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+  },
+  {
+    "file": "plan-forecast-experiment.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+  },
+  {
+    "file": "plan-forecast-shortfall.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+  },
+  {
+    "file": "plan-forecast-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+  },
+  {
+    "file": "plan-overview-es.png",
+    "source_commit": "7fd1e4a40e4062001bee9f9d20bb3d92ec1bdbc0",
+    "test": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+  },
+  {
+    "file": "plan-cold-start-large-es.png",
+    "source_commit": "7e129c46eaeddb414d24a003f8e1503412262f7d",
+    "test": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+  },
+  {
+    "file": "plan-debt-en.png",
+    "source_commit": "7e129c46eaeddb414d24a003f8e1503412262f7d",
+    "test": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+  },
+  {
+    "file": "plan-budget-en.png",
+    "source_commit": "7e129c46eaeddb414d24a003f8e1503412262f7d",
+    "test": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+  },
+  {
+    "file": "plan-household-detail-en.png",
+    "source_commit": "7e129c46eaeddb414d24a003f8e1503412262f7d",
+    "test": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+  },
+  {
+    "file": "plan-household-en.png",
+    "source_commit": "7e129c46eaeddb414d24a003f8e1503412262f7d",
+    "test": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+  },
+  {
+    "file": "plan-overview-en.png",
+    "source_commit": "7e129c46eaeddb414d24a003f8e1503412262f7d",
+    "test": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+  }
+]
