@@ -40,6 +40,11 @@ value, make a row hard to scan or imply that a prediction is certain.
 | `rowAmount` | Compact rounded numerals, stable digit widths | Financial rows |
 | `action` | Native body medium | Primary action labels |
 
+Expandable financial rows are controls, not content-section headings. Use
+`supporting` system text for distribution category and account names, `caption`
+for account counts, and `rowAmount` for both money and percentages. Keep serif
+`section` for actual content sections such as Cuentas or Próximamente.
+
 Type scales with Dynamic Type. Long amounts may reduce to fit their bounded field;
 large-text content must otherwise wrap or scroll. Native navigation titles,
 profile identity, avatars, icons and the Cuadrao wordmark are intentional distinct

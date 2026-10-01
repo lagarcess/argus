@@ -117,7 +117,7 @@ struct CuadraoHomeDistribution: View {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 6) {
-                                Text(kind.title(spanish)).font(CuadraoTypography.section)
+                                Text(kind.title(spanish)).font(CuadraoTypography.supporting)
                                 Image(systemName: selectedKind == kind ? "chevron.up" : "chevron.down").font(.caption2).foregroundStyle(.secondary)
                             }
                             Text(spanish ? "\(rows(kind).count) \(rows(kind).count == 1 ? "cuenta" : "cuentas")" : "\(rows(kind).count) \(rows(kind).count == 1 ? "account" : "accounts")")
@@ -126,7 +126,7 @@ struct CuadraoHomeDistribution: View {
                         Spacer(minLength: 8)
                         VStack(alignment: .trailing, spacing: 6) {
                             Text(percent(amount(rows(kind)))).font(CuadraoTypography.rowAmount)
-                            Text(CanvasMoney.format(amount(rows(kind)), currency: currency)).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+                            Text(CanvasMoney.format(amount(rows(kind)), currency: currency)).font(CuadraoTypography.rowAmount).foregroundStyle(.secondary)
                         }
                     }
                     GeometryReader { proxy in
@@ -147,7 +147,7 @@ struct CuadraoHomeDistribution: View {
             Spacer(minLength: 12)
             VStack(alignment: .trailing, spacing: 5) {
                 if showPercent { Text(percent(value(account))).font(CuadraoTypography.rowAmount) }
-                Text(CanvasMoney.format(value(account), currency: currency)).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+                Text(CanvasMoney.format(value(account), currency: currency)).font(CuadraoTypography.rowAmount).foregroundStyle(.secondary)
             }
         }.padding(.vertical, 15).padding(.leading, 12).accessibilityElement(children: .combine)
     }
