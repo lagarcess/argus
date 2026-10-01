@@ -52,8 +52,8 @@ def disconnect_financial_connection(
     )
 
 
-# Connector sub-routers import the response shapes above, so they are
-# included after those definitions.
+# Connector sub-routers are included after this router's own routes; they
+# take their response shapes from financial_connections_schemas.
 from argus.api.routers.ingestion_shortcuts import (  # noqa: E402
     devices_router as shortcuts_devices_router,
 )

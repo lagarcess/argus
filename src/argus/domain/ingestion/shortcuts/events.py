@@ -68,6 +68,7 @@ class ShortcutEvent(BaseModel):
         "card",
         "card_last4",
         "sender",
+        "text",
         mode="before",
     )
     @classmethod

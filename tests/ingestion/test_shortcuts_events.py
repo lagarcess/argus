@@ -129,7 +129,13 @@ def test_schema_refuses_anything_outside_the_shape(overrides):
 
 @pytest.mark.parametrize(
     "extra",
-    [{"amount": "RD$5"}, {"merchant": "X"}, {"card": "Visa"}, {"text": None}],
+    [
+        {"amount": "RD$5"},
+        {"merchant": "X"},
+        {"card": "Visa"},
+        {"text": None},
+        {"text": "  "},
+    ],
 )
 def test_message_capture_refuses_money_fields_and_needs_text(extra):
     body = {
@@ -144,8 +150,8 @@ def test_message_capture_refuses_money_fields_and_needs_text(extra):
 
 
 def test_empty_optional_strings_are_missing():
-    event = tap(event_id="", currency=" ", card_last4="", merchant="", card="")
-    assert event.event_id is None and event.currency is None
+    event = tap(event_id="", currency=" ", card_last4="", merchant="", card="", text="")
+    assert event.event_id is None and event.currency is None and event.text is None
     assert event.card_last4 is None and event.merchant is None and event.card is None
     assert external_id(event).startswith("wallet:d:")
 
