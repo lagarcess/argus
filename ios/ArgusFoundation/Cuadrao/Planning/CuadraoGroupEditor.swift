@@ -26,10 +26,10 @@ struct CuadraoGroupEditor: View {
                     }.pickerStyle(.segmented).disabled(initial?.expenses.isEmpty == false)
                     VStack(alignment: .leading, spacing: 10) {
                         Text(kind == .trip ? (spanish ? "Creemos que costará" : "We expect it to cost") : (spanish ? "Queremos reunir" : "We want to save")).foregroundStyle(.secondary)
-                        HStack {
-                            PlanCurrencyChoice(currency: $currency, locked: initial != nil, spanish: spanish)
-                            TextField("0", value: $amount, format: .number).keyboardType(.decimalPad).font(.title2).accessibilityIdentifier("group-estimate")
-                        }
+                        PlanAmountInput(value: $amount, currency: $currency,
+                                        title: spanish ? "Monto estimado" : "Estimated amount",
+                                        identifier: "group-estimate", spanish: spanish,
+                                        currencySelectable: initial == nil, showCurrencyLock: initial != nil)
                         Stepper(spanish ? "\(people) personas previstas" : "\(people) expected people", value: $people, in: 1...50)
                         Text(spanish ? "\(PlanFormat.amount(amount / Double(people), currency: currency)) por persona, si se divide igual." : "\(PlanFormat.amount(amount / Double(people), currency: currency)) each, if split equally.")
                             .font(.subheadline).foregroundStyle(look.color)

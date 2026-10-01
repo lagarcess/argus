@@ -8,6 +8,11 @@ final class CuadraoPlanCurrencyUITests: XCTestCase {
         app.textFields["plan-name"].tap(); app.textFields["plan-name"].typeText("Summer in euros\n")
         reveal(app, app.buttons["plan-edit-currency"])
         app.buttons["plan-edit-currency"].tap(); app.buttons["EUR"].tap()
+        replace(app.textFields["plan-target"], "1250000.50")
+        capture(app, "amount-personal-focused-en")
+        app.toolbars.buttons["Done"].tap()
+        replace(app.textFields["plan-monthly"], "750.25")
+        app.toolbars.buttons["Done"].tap()
         capture(app, "currency-personal-choice-en")
         app.buttons["plan-save"].tap()
         XCTAssertTrue(app.buttons["plan-detail-options"].waitForExistence(timeout: 3))
@@ -17,6 +22,8 @@ final class CuadraoPlanCurrencyUITests: XCTestCase {
         reveal(app, fixed)
         XCTAssertFalse(app.buttons["plan-edit-currency"].exists)
         XCTAssertTrue(fixed.label.contains("EUR"))
+        XCTAssertEqual(number(app.textFields["plan-target"]), 1250000.50)
+        XCTAssertEqual(number(app.textFields["plan-monthly"]), 750.25)
         capture(app, "currency-personal-fixed-en")
         app.buttons["plan-save"].tap()
         XCTAssertTrue(app.buttons["plan-detail-options"].waitForExistence(timeout: 3))
@@ -41,15 +48,17 @@ final class CuadraoPlanCurrencyUITests: XCTestCase {
         app.textFields["group-expense-name"].tap(); app.textFields["group-expense-name"].typeText("Cena\n")
         replace(app.textFields["group-expense-amount"], "100")
         if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }
-        XCTAssertTrue(app.staticTexts["USD"].exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "plan-currency-inherited").firstMatch.label.contains("USD"))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "USD 50")).count == 2)
         capture(app, "currency-dollar-split-es")
         reveal(app, app.buttons["group-expense-save"]); app.buttons["group-expense-save"].tap()
         app.segmentedControls["group-sections"].buttons["El plan"].tap()
         XCTAssertEqual(app.staticTexts["group-own-share"].label, "USD 50")
         reveal(app, app.buttons["group-settle"]); app.buttons["group-settle"].tap()
-        XCTAssertTrue(app.staticTexts["USD"].exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "plan-currency-inherited").firstMatch.label.contains("USD"))
         replace(app.textFields["group-repayment-amount"], "20")
+        if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }
+        capture(app, "amount-repayment-es")
         app.buttons["group-repayment-save"].tap()
         capture(app, "currency-dollar-balance-es")
         app.buttons["group-options"].tap(); app.buttons["Editar grupo"].tap()
@@ -63,6 +72,9 @@ final class CuadraoPlanCurrencyUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", "light"] + (english ? ["--design-english"] : [])
         app.launch(); app.buttons["cuadrao-tab-1"].tap(); return app
+    }
+    private func number(_ field: XCUIElement) -> Double? {
+        Double((field.value as? String ?? "").replacingOccurrences(of: ",", with: ""))
     }
     private func replace(_ field: XCUIElement, _ text: String) {
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()

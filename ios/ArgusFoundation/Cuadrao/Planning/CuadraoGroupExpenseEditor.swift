@@ -37,11 +37,8 @@ struct CuadraoGroupExpenseEditor: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         TextField(group.kind == .saving ? (spanish ? "¿Para qué aportas?" : "What are you saving for?") : (spanish ? "¿Qué pagaron?" : "What was it for?"), text: $title).font(.system(.title2, design: .serif)).accessibilityIdentifier("group-expense-name")
-                        HStack {
-                            Text(group.currency).foregroundStyle(.secondary)
-                            TextField("0", value: $amount, format: .number.precision(.fractionLength(0...2)))
-                                .keyboardType(.decimalPad).font(.system(size: 36, design: .rounded)).accessibilityIdentifier("group-expense-amount")
-                        }
+                        PlanAmountInput(value: $amount, currency: .constant(group.currency),
+                                        title: spanish ? "Monto" : "Amount", identifier: "group-expense-amount", spanish: spanish)
                         Picker(group.kind == .saving ? (spanish ? "Aportó" : "Contributed by") : (spanish ? "Pagó" : "Paid by"), selection: $payer) {
                             ForEach(group.members) { member in Text(member.name).tag(Optional(member.id)) }
                         }.pickerStyle(.menu)
@@ -151,7 +148,8 @@ struct CuadraoGroupSettlement: View {
                     Section {
                         Picker(spanish ? "Envió" : "Sent by", selection: $from) { ForEach(group.members.filter { group.balance($0.id) < 0 }) { Text($0.name).tag(Optional($0.id)) } }
                         Picker(spanish ? "Recibió" : "Received by", selection: $to) { ForEach(group.members.filter { group.balance($0.id) > 0 }) { Text($0.name).tag(Optional($0.id)) } }
-                        HStack { Text(group.currency); TextField("0", value: $amount, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad).accessibilityIdentifier("group-repayment-amount") }
+                        PlanAmountInput(value: $amount, currency: .constant(group.currency),
+                                        title: spanish ? "Monto devuelto" : "Amount repaid", identifier: "group-repayment-amount", spanish: spanish)
                     } footer: { Text(spanish ? "Registra dinero que ya se devolvió por fuera de Cuadrao. Puedes registrar una parte." : "Record money already returned outside Cuadrao. Partial repayments are welcome.") }
                     Section {
                         Button(spanish ? "Registrar reembolso" : "Record repayment") {
@@ -161,7 +159,10 @@ struct CuadraoGroupSettlement: View {
                         }.disabled(!amount.isFinite || amount < 0.01 || amount * 100 > Double(maximum)).accessibilityIdentifier("group-repayment-save")
                     }
                 }.navigationTitle(spanish ? "Vamos cuadrando" : "Settling up").navigationBarTitleDisplayMode(.inline)
-                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cerrar" : "Close") { dismiss() } } }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cerrar" : "Close") { dismiss() } }
+                        ToolbarItemGroup(placement: .keyboard) { Spacer(); Button(spanish ? "Listo" : "Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
+                    }
                     .onAppear { from = group.members.first { group.balance($0.id) < 0 }?.id; to = group.members.first { group.balance($0.id) > 0 }?.id; amount = Double(maximum) / 100 }
                     .onChange(of: from) { _, _ in amount = Double(maximum) / 100 }
                     .onChange(of: to) { _, _ in amount = Double(maximum) / 100 }

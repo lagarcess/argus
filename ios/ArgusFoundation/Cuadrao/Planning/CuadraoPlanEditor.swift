@@ -39,7 +39,7 @@ struct CuadraoPlanEditor: View {
                         }
                     }
                     VStack(spacing: 0) {
-                        amountRow(draft.kind.amountTitle(spanish), value: $draft.target, id: "plan-target")
+                        amountRow(draft.kind.amountTitle(spanish), value: $draft.target, id: "plan-target", primary: true)
                         if draft.kind != .budget {
                             Divider().padding(.horizontal, 18)
                             amountRow(spanish ? "Cada mes" : "Each month", value: $draft.monthly, id: "plan-monthly")
@@ -53,7 +53,6 @@ struct CuadraoPlanEditor: View {
                                 .font(.subheadline).frame(minHeight: 44)
                         }.accessibilityIdentifier("plan-edit-space")
                         Spacer()
-                        PlanCurrencyChoice(currency: $draft.currency, locked: editing, spanish: spanish)
                     }
                     if !editing {
                         Text(spanish ? "La moneda queda fija al crear el plan." : "Currency is fixed once you create the plan.").font(.caption).foregroundStyle(.secondary)
@@ -142,15 +141,12 @@ struct CuadraoPlanEditor: View {
             }.accessibilityIdentifier("plan-kind-\(kind.rawValue)").accessibilityAddTraits(draft.kind == kind ? .isSelected : [])
         }
     }
-    private func amountRow(_ title: String, value: Binding<Double>, id: String) -> some View {
+    private func amountRow(_ title: String, value: Binding<Double>, id: String, primary: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Text(draft.currency).foregroundStyle(.secondary)
-                TextField("0", value: value, format: .number.precision(.fractionLength(0...2)))
-                    .keyboardType(.decimalPad).font(.title2).monospacedDigit().multilineTextAlignment(.trailing)
-                    .accessibilityLabel(title).accessibilityIdentifier(id)
-            }
+            PlanAmountInput(value: value, currency: $draft.currency, title: title,
+                            identifier: id, spanish: spanish, currencySelectable: primary && !editing,
+                            showCurrencyLock: primary && editing, prominent: primary)
         }.padding(18)
     }
 }
