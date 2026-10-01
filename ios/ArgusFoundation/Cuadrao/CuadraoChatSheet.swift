@@ -16,6 +16,7 @@ struct CuadraoChatSheet: View {
     @State private var historyScope = 0
     @State private var transcript = ""
     @State private var endTemporary = false
+    @State private var pendingExit = CuadraoChatPreview.Exit.returnToRegular
     private var es: Bool { spanish }
     private var heading: String {
         switch destination {
@@ -46,13 +47,9 @@ struct CuadraoChatSheet: View {
         .presentationDragIndicator(.visible)
         .onAppear { title = store.current.title; transcript = es ? "Quiero organizar mis gastos del mes." : "I want to organize my monthly spending." }
         .confirmationDialog(es ? "¿Terminar el chat temporal?" : "End temporary chat?", isPresented: $endTemporary, titleVisibility: .visible) {
-            Button(es ? "Terminar y abrir chat" : "End and open chat", role: .destructive) {
-                store.endTemporary()
-                if let selected = store.threads.first(where: { $0.id == title }) { store.open(selected) }
-                else { store.newChat() }
-                dismiss()
-            }
-        } message: { Text(es ? "Se descartará el contenido temporal." : "Temporary content will be discarded.") }
+            Button(es ? "Terminar chat" : "End chat", role: .destructive) { finishExit() }
+            Button(es ? "Seguir aquí" : "Stay here", role: .cancel) {}
+        } message: { Text(es ? "Se descartarán los mensajes y adjuntos de este chat temporal. Tu chat anterior quedará intacto." : "This temporary chat’s messages and attachments will be discarded. Your previous chat stays intact.") }
     }
 
     @ViewBuilder private var content: some View {
@@ -65,11 +62,7 @@ struct CuadraoChatSheet: View {
                 action(es ? "Guardar" : "Save") { store.current.title = String(title.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80)); dismiss() }
                     .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             case .temporary:
-                Text(es ? "Este chat no aparece en Chats ni en Buscar, y no añade memorias." : "This chat does not appear in Chats or Search and adds no memories.")
-                Toggle(es ? "Usar mi contexto" : "Use my context", isOn: $store.useContext).disabled(!store.current.turns.isEmpty)
-                Text(es ? "Memorias, preferencias y registros a los que tienes acceso. La elección queda fija al enviar el primer mensaje." : "Memories, preferences and records you can access. The choice is fixed after the first message.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                previewNote
+                CuadraoTemporaryChatSettings(store: store, spanish: es) { requestExit(.returnToRegular) }
             case .calculation:
                 Text("DOP " + CanvasChatCalculation.amount(CanvasChatCalculation.total)).font(.system(.largeTitle, design: .rounded))
                 detail(es ? "Aporte mensual" : "Monthly contribution", "DOP " + CanvasChatCalculation.amount(CanvasChatCalculation.monthly))
@@ -139,9 +132,7 @@ struct CuadraoChatSheet: View {
                 }
                 ForEach(rows) { thread in
                     Button {
-                        if thread.deleted { thread.deleted = false; thread.archived = false }
-                        if store.hasTemporaryContent { title = thread.id; endTemporary = true }
-                        else { if store.temporary { store.endTemporary() }; store.open(thread); dismiss() }
+                        requestExit(.open(thread))
                     } label: {
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 6) {
@@ -158,13 +149,17 @@ struct CuadraoChatSheet: View {
                 }
             }.listStyle(.plain).searchable(text: $query, prompt: es ? "Buscar chats" : "Search chats")
             Button {
-                if store.hasTemporaryContent { title = ""; endTemporary = true }
-                else { if store.temporary { store.endTemporary() }; store.newChat(); dismiss() }
+                requestExit(.newRegular)
             } label: { Label(es ? "Nuevo chat" : "New chat", systemImage: "square.and.pencil").frame(minHeight: 44) }
             Text(es ? "Vista previa · Conversaciones locales de ejemplo" : "Preview · Local example conversations")
                 .font(.caption).foregroundStyle(.secondary).padding(.bottom, 16)
         }
     }
+    private func requestExit(_ destination: CuadraoChatPreview.Exit) {
+        pendingExit = destination
+        if store.hasTemporaryContent { endTemporary = true } else { finishExit() }
+    }
+    private func finishExit() { store.leaveTemporary(for: pendingExit); dismiss() }
     private var previewNote: some View {
         Text(es ? "Vista previa de diseño. No se crea un enlace, se guarda información ni se conecta a un servicio." : "Design preview. No link is created, information saved or service connected.")
             .font(.footnote).foregroundStyle(.secondary)

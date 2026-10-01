@@ -75,9 +75,10 @@ struct CuadraoHomeCanvas: View {
         .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
             isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {
             Button(spanish ? "Terminar y salir" : "End and leave", role: .destructive) {
-                let destination = pendingTab; chat.endTemporary(); pendingTab = nil
+                let destination = pendingTab; chat.leaveTemporary(for: .returnToRegular); pendingTab = nil
                 if let destination { selectedTab = destination }
             }
+            Button(spanish ? "Seguir aquí" : "Stay here", role: .cancel) { pendingTab = nil }
         } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
         .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
@@ -105,7 +106,7 @@ struct CuadraoHomeCanvas: View {
         Binding(get: { selectedTab }, set: { next in
             if selectedTab == .assistant && next != .assistant && chat.hasTemporaryContent { pendingTab = next }
             else {
-                if selectedTab == .assistant && next != .assistant && chat.temporary { chat.endTemporary() }
+                if selectedTab == .assistant && next != .assistant && chat.temporary { chat.leaveTemporary(for: .returnToRegular) }
                 selectedTab = next
             }
         })

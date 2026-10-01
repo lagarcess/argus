@@ -17,3 +17,7 @@ September 30 reference screenshots (6a08c79f-7ece-4dcb-b26a-6fff301bb702 and
 1dcbf13e-b888-4d3c-b17b-f656524e2a25). Rounded outline strokes preserve the
 reference shapes; background and gray pixels are not part of the template assets.
 These redraws are not claimed to be original vendor SVGs.
+
+CuadraoTemporaryChat: exact dashed conversation SVG path from the founder-approved
+HTML chat-mode.js, reaffirmed September 30, 2026. Stroke 1.7, round caps/joins,
+24-point viewBox. Shared by the temporary entry, hero and active status.

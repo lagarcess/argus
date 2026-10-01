@@ -53,7 +53,12 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
     var threads: [CanvasChatThread] = []
     var current = CanvasChatThread()
     var temporary = false
-    var useContext = false
+    private var contextEnabled = false
+    var contextLocked: Bool { temporary && !current.turns.isEmpty }
+    var useContext: Bool {
+        get { contextEnabled }
+        set { if temporary && !contextLocked { contextEnabled = newValue } }
+    }
     var responseState = CanvasChatResponseState.complete
     private var suspended: CanvasChatThread?
 
@@ -66,16 +71,30 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
         }
     }
     var hasTemporaryContent: Bool {
-        temporary && (!current.turns.isEmpty || !current.draft.isEmpty || !current.attachments.isEmpty)
+        temporary && (!current.turns.isEmpty || !current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !current.attachments.isEmpty)
     }
     func newChat() { current = CanvasChatThread(); responseState = .complete }
     func open(_ thread: CanvasChatThread) { current = thread; thread.unread = false; responseState = .complete }
     func startTemporary() {
-        suspended = current; temporary = true; useContext = false; newChat()
+        guard !temporary else { return }
+        suspended = current; temporary = true; contextEnabled = false; newChat()
     }
     func endTemporary() {
-        current = suspended ?? CanvasChatThread(); suspended = nil; temporary = false; useContext = false
+        guard temporary else { return }
+        current = suspended ?? CanvasChatThread(); suspended = nil; temporary = false; contextEnabled = false
         responseState = .complete
+    }
+    enum Exit { case returnToRegular, newRegular, open(CanvasChatThread) }
+    // Call only after the presentation has confirmed any temporary content loss.
+    func leaveTemporary(for destination: Exit) {
+        endTemporary()
+        switch destination {
+        case .returnToRegular: break
+        case .newRegular: newChat()
+        case .open(let thread):
+            if thread.deleted { thread.deleted = false; thread.archived = false }
+            open(thread)
+        }
     }
     func send(example: CanvasChatExample? = nil, spanish: Bool) {
         let text = example?.question(spanish) ?? current.draft.trimmingCharacters(in: .whitespacesAndNewlines)

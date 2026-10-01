@@ -48,3 +48,55 @@ real sources, memory controls, file opening/capture, voice connection, share-lin
 review and broader message actions still need their existing contracts connected.
 The source explanation explicitly says no external research occurred; no fake
 financial citations are supplied. Recovery and share presentation are previews.
+
+## Founder icon correction
+
+The temporary-chat entry now uses the exact vector path from HTML chat-mode.js,
+not an SF bubble with a dotted circle. The same asset renders its hero/status.
+The existing time-aware/typed greeting logic remains required for connection;
+the native greeting is currently static and does not replace that behavior.
+
+
+## Temporary chat adaptation, September 30
+
+Reviewed the actual HTML `chat-mode.js`, `chat-shell.js`, composer behavior and
+MVEE temporary-chat contract. Mobbin references visually inspected:
+[ChatGPT: Switching to Temporary Chat](https://mobbin.com/flows/160a1a14-bf8b-4f51-b34c-b1b567131bcc)
+and [Claude: Switching to incognito chat](https://mobbin.com/flows/ded64e16-69be-4cf6-ba85-b06cd13d7c68).
+Borrowed short icon-led explanations and quiet mode presentation. Kept Cuadrao's
+one-tap entry, naming, explicit optional context, exit guard and regular-draft
+restoration. Did not import other products' retention or model-training promises.
+
+| Interaction | Native adaptation |
+| --- | --- |
+| Enter temporary | One tap; context off; previous thread, draft and attachments suspended. |
+| Context choice | Editable before first send; model owns the lock thereafter. Active status shows the chosen context. |
+| Return to regular | Restores the suspended thread and draft. |
+| New regular chat | Ends temporary mode and opens a blank regular chat. |
+| Open history | Ends temporary mode and opens the selected thread; deleted restoration occurs only after confirmation. |
+| Leave for another tab | Uses the same content check and end operation. |
+| Discard guard | Sent messages, nonblank draft or attachment require confirmation; whitespace alone does not. Cancel keeps the current state. |
+| Background app switch | No background-discard handler is added. |
+| Details | Expandable explanation covers leaving, previous drafts and preview/retention limits. |
+
+Founder explicitly kept the attachment chooser **below** the composer controls.
+Tradeoff: closer to the + button and thumb, but uses lower-screen space and moves
+the composer upward when expanded. Opening it dismisses the keyboard; focusing
+the draft closes it. Selected attachment chips stay above the text for review.
+This is an intentional native variation from HTML's upper tray.
+
+Verification: final simulator and iPhone builds passed; the final iPhone build
+is installed under the separate `Cuadrao Preview` identity. `python3 ios/DesignPreviewTests/run_temporary_chat.py`
+passes against the actual native model and actual reference fixtures in Spanish
+and English: whitespace, attachment-only content, context lock, history exclusion,
+regular draft/attachment restoration, new regular chat and opening history.
+Uses the existing build cache and cleans its temporary test executable.
+
+The iPhone 18 Pro simulator was concurrently running #760's FinancialLoopUITests
+and repeatedly returned to that app. Founder confirmed simulator
+`8AFB6084-8918-416E-9164-E21061306BEC` remains assigned to this design lane;
+#760's verification is being moved elsewhere. Do not interact with or relaunch
+this simulator until it is released. Final visual/keyboard/discard-dialog
+acceptance is pending and must be repeated after release. Prior screenshots do
+not certify this change. No new simulator, backend behavior, retention policy
+or Profile changes.

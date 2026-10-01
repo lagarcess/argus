@@ -32,7 +32,8 @@ struct CuadraoChatCanvas: View {
                 .tint(WelcomePalette.pine)
         }
         .confirmationDialog(es ? "¿Terminar el chat temporal?" : "End temporary chat?", isPresented: $ending, titleVisibility: .visible) {
-            Button(es ? "Terminar chat" : "End chat", role: .destructive) { store.endTemporary() }
+            Button(es ? "Terminar y crear chat" : "End and create chat", role: .destructive) { store.leaveTemporary(for: .newRegular) }
+            Button(es ? "Seguir aquí" : "Stay here", role: .cancel) {}
         } message: {
             Text(es ? "Se descartará esta conversación. Tu chat anterior quedará intacto." : "This conversation will be discarded. Your previous chat stays intact.")
         }
@@ -42,10 +43,9 @@ struct CuadraoChatCanvas: View {
         HStack(spacing: 0) {
             control("clock.arrow.circlepath", es ? "Chats recientes" : "Recent chats", id: "chat-history") { sheet = .history }
             if active || store.temporary {
-                control("square.and.pencil", es ? "Nuevo chat" : "New chat", id: "chat-new") {
+                control("square.and.pencil", store.temporary ? (es ? "Nuevo chat normal" : "New regular chat") : (es ? "Nuevo chat" : "New chat"), id: "chat-new") {
                     if store.hasTemporaryContent { ending = true }
-                    else if store.temporary { store.endTemporary() }
-                    else { store.newChat() }
+                    else { store.leaveTemporary(for: .newRegular) }
                 }
             } else { Color.clear.frame(width: 44, height: 44) }
             Spacer(minLength: 8)
@@ -63,12 +63,17 @@ struct CuadraoChatCanvas: View {
                     .accessibilityLabel(es ? "Opciones del chat" : "Chat options")
             } else {
                 Button {
-                    if store.temporary { sheet = .temporary } else { store.startTemporary() }
+                    if store.temporary { sheet = .temporary } else {
+                        focused = false; tray = false
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { store.startTemporary() }
+                    }
                 } label: {
-                    Image(systemName: "bubble.left").font(.system(size: 19))
-                        .overlay { Circle().stroke(style: StrokeStyle(lineWidth: 1, dash: [2, 3])).frame(width: 29, height: 29) }
+                    Image("CuadraoTemporaryChat").resizable().scaledToFit().frame(width: 24, height: 24)
                         .frame(width: 44, height: 44)
-                }.accessibilityLabel(es ? "Chat temporal" : "Temporary chat").accessibilityIdentifier("chat-temporary")
+                        .background(store.temporary ? WelcomePalette.surface : .clear, in: Circle())
+                }.accessibilityLabel(store.temporary ? (es ? "Opciones del chat temporal" : "Temporary chat settings") : (es ? "Iniciar chat temporal" : "Start temporary chat"))
+                    .accessibilityValue(store.temporary ? (es ? "Activo" : "Active") : "")
+                    .accessibilityIdentifier("chat-temporary")
             }
         }.foregroundStyle(WelcomePalette.ink).padding(.horizontal, 18).padding(.top, 6)
     }
@@ -79,7 +84,7 @@ struct CuadraoChatCanvas: View {
                 VStack(spacing: 18) {
                     Spacer(minLength: 24)
                     if store.temporary {
-                        Image(systemName: "bubble.left").font(.system(size: 35, weight: .ultraLight)).foregroundStyle(.secondary)
+                        Image("CuadraoTemporaryChat").resizable().scaledToFit().frame(width: 36, height: 36).foregroundStyle(.secondary)
                         Text(es ? "Chat temporal" : "Temporary chat").font(.system(.title, design: .serif))
                         Text(es ? "Fuera de tu historial.\nSin nuevas memorias." : "Outside your history.\nNo new memories.")
                             .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -106,9 +111,11 @@ struct CuadraoChatCanvas: View {
                 LazyVStack(alignment: .leading, spacing: 32) {
                     if store.temporary {
                         Button { sheet = .temporary } label: {
-                            Label(es ? "Temporal" : "Temporary", systemImage: "bubble.left")
+                            Label { Text((es ? "Temporal · " : "Temporary · ") + (store.useContext ? (es ? "Con mi contexto" : "Using my context") : (es ? "Sin mi contexto" : "Without my context"))) } icon: {
+                                Image("CuadraoTemporaryChat").resizable().scaledToFit().frame(width: 16, height: 16)
+                            }
                                 .font(.caption).foregroundStyle(.secondary)
-                        }.frame(maxWidth: .infinity)
+                        }.frame(maxWidth: .infinity, minHeight: 44)
                     }
                     ForEach(store.current.turns) { turn in
                         VStack(alignment: .leading, spacing: 24) {
@@ -185,7 +192,7 @@ struct CuadraoChatCanvas: View {
                     .padding(.horizontal, 6).padding(.top, 4)
                     .accessibilityIdentifier("chat-composer")
                 HStack {
-                    control(tray ? "xmark" : "plus", es ? "Adjuntar" : "Attach", id: "chat-attach") {
+                    control(tray ? "xmark" : "plus", tray ? (es ? "Cerrar adjuntos" : "Close attachments") : (es ? "Adjuntar" : "Attach"), id: "chat-attach") {
                         focused = false
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { tray.toggle() }
                     }
