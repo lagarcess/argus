@@ -33,7 +33,7 @@ ROOTS = (
 SCENE = (
     (0, "checking", "checking", "DOP", "1000", 100000),
     (0, "savings", "savings", "DOP", "0", 0),
-    (0, "card", "credit_card", "DOP", "200", 20000),
+    (0, "card", "credit_card", "DOP", "200", -20000),
     (0, "unknown", "savings", "DOP", None, None),
     (0, "usd", "checking", "USD", "100", 10000),
     (1, "checking", "checking", "DOP", "500", 50000),
