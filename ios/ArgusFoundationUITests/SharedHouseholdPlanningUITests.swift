@@ -102,16 +102,38 @@ extension FinancialLoopUITests {
     private func revealSharedControl(_ control: XCUIElement) {
         for direction in [true, false] {
             for _ in 0..<15 {
-                if control.exists { return }
-                if direction { app.swipeUp() } else { app.swipeDown() }
+                if sharedControlIsVisible(control) { return }
+                let up = control.exists ? control.frame.midY >= sharedViewport.minY : direction
+                swipeSharedContent(up: up)
             }
         }
-        XCTAssertTrue(control.exists, "Shared form control should be reachable")
+        XCTAssertTrue(sharedControlIsVisible(control), "Shared control should be visible in the active content")
     }
 
     private func tapSharedControl(_ control: XCUIElement) {
         revealSharedControl(control)
-        tapVisible(control)
+        control.tap()
+    }
+
+    private func sharedControlIsVisible(_ control: XCUIElement) -> Bool {
+        control.exists && control.isHittable && sharedViewport.contains(CGPoint(x: control.frame.midX, y: control.frame.midY))
+    }
+
+    private var sharedScrollTarget: XCUIElement {
+        ["sharedPlan.detail", "screen.plan", "screen.home", "screen.search"]
+            .map { app.scrollViews[$0] }.first { $0.exists && $0.isHittable } ?? app
+    }
+
+    private var sharedViewport: CGRect {
+        let frame = sharedScrollTarget.frame
+        let top = max(frame.minY, 115)
+        let bottom = min(frame.maxY, app.frame.height - 130)
+        return CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
+    }
+
+    private func swipeSharedContent(up: Bool) {
+        let target = sharedScrollTarget
+        if up { target.swipeUp() } else { target.swipeDown() }
     }
 
     private func createNativeSharedPlan(kind: String, name: String, budgetCategory: String? = nil) throws -> String {
@@ -200,7 +222,7 @@ extension FinancialLoopUITests {
                 let identifier = pending.identifier
                 tapSharedControl(pending)
                 answered.insert(identifier)
-            } else { app.swipeUp() }
+            } else { swipeSharedContent(up: true) }
         }
         capture("shared-contribution-reviewed")
         _ = try XCTUnwrap(confirm.waitForExistence(timeout: 15) ? confirm : nil,

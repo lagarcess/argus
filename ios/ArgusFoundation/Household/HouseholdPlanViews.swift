@@ -175,7 +175,7 @@ struct HouseholdPlanDetailView: View {
                     if item.canRelease { Button("sharedPlan.release") { Task { await model.release(item, plan: plan) } }.accessibilityIdentifier("sharedPlan.release." + item.id.uuidString).frame(minHeight: 44) }
                 }.disabled(model.pending || model.busy)
             }
-        }.padding(.vertical, 8).accessibilityIdentifier("sharedPlan.contribution." + item.id.uuidString)
+        }.padding(.vertical, 8)
     }
 }
 
