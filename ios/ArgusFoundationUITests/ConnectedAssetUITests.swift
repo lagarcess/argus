@@ -15,7 +15,8 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["assets.details"])
         tapVisible(app.buttons["assets.debt.picker"])
         let option = app.buttons[loan.name + " · DOP"]
-        tapVisible(option)
+        XCTAssertTrue(option.waitForExistence(timeout: 10))
+        option.tap()
         tapVisible(app.buttons["assets.save"])
         XCTAssertTrue(app.buttons["assets.save"].waitForNonExistence(timeout: 15))
         verifyAssetLinkedDebt(in: app.scrollViews["screen.accounts"])
