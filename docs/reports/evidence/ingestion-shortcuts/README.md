@@ -11,7 +11,7 @@ per run; the server turns it into `ImportCandidate` evidence for the hub's
 `src/argus/domain/ingestion/shortcuts/` (`tokens`, `store`, `amounts`,
 `events`, `connector`), routes in `src/argus/api/routers/ingestion_shortcuts.py`,
 wiring in `src/argus/api/shortcuts.py`, table in
-`supabase/migrations/20261001170000_financial_shortcut_device_tokens.sql`.
+`supabase/migrations/20261002120200_financial_shortcut_device_tokens.sql`.
 No native iOS code changed; native adoption (an App Intent with a
 Keychain-held token) is for the iPhone delivery owner.
 
