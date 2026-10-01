@@ -15,7 +15,8 @@ stale or mismatched token costs no Plaid call; they run again on the verified
 claims. Every refusal raises the same ``WebhookRejected`` so a caller cannot
 tell why; the reason is logged as a short code. A token seen before inside its
 validity window is reported as a duplicate so the caller can skip repeated
-work.
+work; a caller whose handling then fails calls ``release`` so a retried
+delivery of that token is processed instead of skipped.
 """
 
 from __future__ import annotations
@@ -131,8 +132,14 @@ class WebhookVerifier:
             raise reject("body_hash")
         return issued
 
+    def release(self, token: str) -> None:
+        """Forget a token whose handling failed, so its retry is not a duplicate."""
+
+        with self._lock:
+            self._seen.pop(_digest(token), None)
+
     def _remember(self, token: str, until: datetime, now: datetime) -> bool:
-        digest = hashlib.sha256(token.encode()).hexdigest()
+        digest = _digest(token)
         with self._lock:
             for seen, expiry in list(self._seen.items()):
                 if expiry <= now:
@@ -143,3 +150,7 @@ class WebhookVerifier:
                 self._seen.pop(next(iter(self._seen)))
             self._seen[digest] = until
             return False
+
+
+def _digest(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
