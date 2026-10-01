@@ -18,10 +18,7 @@ extension FinancialLoopUITests {
         tapVisible(option)
         tapVisible(app.buttons["assets.save"])
         XCTAssertTrue(app.buttons["assets.save"].waitForNonExistence(timeout: 15))
-        tapVisible(app.buttons["assets.debt.open"])
-        XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 10))
-        assertText("DOP -1,000,000.00")
-        tapVisible(app.buttons["assets.debt.back"])
+        verifyAssetLinkedDebt(in: app.scrollViews["screen.accounts"])
         assertAssetContribution("DOP 4,000,000.00")
         tapVisible(app.buttons["assets.update"])
         fillMoneyField("assets.amount", with: "9000000")
@@ -72,33 +69,30 @@ extension FinancialLoopUITests {
         let query = app.textFields["search.query"]
         tapVisible(query); query.typeText("Updated home " + stamp + "\n")
         tapVisible(app.buttons["search.filter.account"])
-        let hit = app.buttons["search.row.account:" + house.id.lowercased()]
-        let fallback = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.' AND label CONTAINS %@", "Updated home " + stamp)).firstMatch
-        tapVisible(hit.exists ? hit : fallback)
-        assertAssetContribution("DOP 2,250,000.00")
-        tapVisible(app.buttons["assets.debt.open"])
-        XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 10))
-        tapVisible(app.buttons["assets.debt.back"])
-        assertAssetContribution("DOP 2,250,000.00")
-        scrollMoneyTop(); tapVisible(app.buttons["search.back"])
+        let houseID = try XCTUnwrap(UUID(uuidString: house.id)).uuidString
+        let hit = app.buttons["search.row.account." + houseID]
+        XCTAssertTrue(hit.waitForExistence(timeout: 15))
+        tapVisible(hit)
+        let detail = app.scrollViews["search.detail"]
+        assertAssetContribution("DOP 2,250,000.00", in: detail)
+        verifyAssetLinkedDebt(in: detail)
+        assertAssetContribution("DOP 2,250,000.00", in: detail)
+        scrollMoneyTop(); tapVisible(detail.buttons["search.back"])
         XCTAssertEqual(query.value as? String, "Updated home " + stamp)
         capture("asset-search-origin-preserved")
         app.terminate()
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO"]
         app.launch()
         app.buttons["tab.search"].tap()
-        XCTAssertTrue(fallback.waitForExistence(timeout: 15))
-        tapVisible(fallback); assertAssetContribution("DOP 2,250,000.00")
-        XCTAssertEqual(app.buttons["assets.update"].label, "Actualizar estimado")
-        XCTAssertTrue(app.staticTexts["Valor estimado del bien completo"].exists)
-        XCTAssertTrue(app.buttons["Archivar cuenta"].exists)
-        XCTAssertEqual(app.staticTexts["assets.basis.value"].label, "Recent manual estimate")
-        tapVisible(app.buttons["assets.debt.open"])
-        XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 10))
-        assertText("DOP -1,000,000.00")
-        tapVisible(app.buttons["assets.debt.back"])
-        scrollMoneyTop(); tapVisible(app.buttons["search.back"])
-        XCTAssertTrue(hit.exists)
+        XCTAssertTrue(hit.waitForExistence(timeout: 15))
+        tapVisible(hit); assertAssetContribution("DOP 2,250,000.00", in: detail)
+        XCTAssertEqual(detail.buttons["assets.update"].label, "Actualizar estimado")
+        XCTAssertTrue(detail.staticTexts["Valor estimado del bien completo"].exists)
+        XCTAssertTrue(detail.buttons["Archivar cuenta"].exists)
+        XCTAssertEqual(detail.staticTexts["assets.basis.value"].label, "Recent manual estimate")
+        verifyAssetLinkedDebt(in: detail)
+        scrollMoneyTop(); tapVisible(detail.buttons["search.back"])
+        XCTAssertTrue(hit.waitForExistence(timeout: 15))
         XCTAssertEqual(query.value as? String, "Updated home " + stamp)
         capture("asset-restored-spanish-relaunch")
     }
@@ -154,8 +148,16 @@ extension FinancialLoopUITests {
         return result
     }
 
-    func assertAssetContribution(_ value: String) {
-        let label = app.staticTexts["assets.personal.value"]
+    func verifyAssetLinkedDebt(in detail: XCUIElement) {
+        tapVisible(detail.buttons["assets.debt.open"])
+        let debt = app.scrollViews.containing(.button, identifier: "accounts.record").firstMatch
+        XCTAssertTrue(debt.buttons["accounts.record"].waitForExistence(timeout: 10))
+        XCTAssertTrue(debt.staticTexts["DOP -1,000,000.00"].exists)
+        tapVisible(app.buttons["assets.debt.back"])
+    }
+
+    func assertAssetContribution(_ value: String, in detail: XCUIElement? = nil) {
+        let label = (detail ?? app.scrollViews["screen.accounts"]).staticTexts["assets.personal.value"]
         XCTAssertTrue(label.waitForExistence(timeout: 15))
         XCTAssertEqual(label.label, value)
     }
