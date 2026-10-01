@@ -60,9 +60,9 @@ paid providers, phone-environment actions or another delivery lane.
 **Original implementation assignment, September 30, 2026 (historical authority; subsequent merge grant above).** Add a property, vehicle or other
 asset, record its estimated whole value and personal ownership share, optionally
 link an existing debt, inspect Accounts/Home, correct the estimate, archive and
-restore, find it through Search and reopen with preserved state. This is the
-only active delivery lane. The full MVEE coverage below remains assigned to its
-existing owners and deferrals.
+restore, find it through Search and reopen with preserved state. This lane is
+closed and retained only as delivery history. The full MVEE coverage below keeps
+its existing owners and deferrals; this landing assigns no further implementation.
 
 **Original and freshly fetched pre-merge integration:**
 `9d6ed94491be9d904da881901a6d7a2dc8cf635b`, including #757/#758.
