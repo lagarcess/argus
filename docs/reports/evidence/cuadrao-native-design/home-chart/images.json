@@ -1,0 +1,32 @@
+[
+  {
+    "file": "home-chart-household-return-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790878443.296
+  },
+  {
+    "file": "home-chart-scrub-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790878438.864
+  },
+  {
+    "file": "home-chart-inspect-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790878437.587
+  },
+  {
+    "file": "home-chart-personal-es.png",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790878435.917
+  },
+  {
+    "file": "home-chart-dark-large-scroll-en.png",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "timestamp": 1790878185.97
+  },
+  {
+    "file": "home-chart-dark-large-en.png",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "timestamp": 1790878185.782
+  }
+]

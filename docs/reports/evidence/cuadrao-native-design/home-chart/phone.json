@@ -1,0 +1,32 @@
+{
+  "source": "5c0b6b6aa3d92d2e04030f91f9287aecea881696",
+  "build": "passed",
+  "install": "success",
+  "bundle": "local.cuadrao.design.47R3855RTJ",
+  "installation_sequence": 3364,
+  "launch": "failed",
+  "launch_error": {
+    "code": 4000,
+    "domain": "com.apple.dt.CoreDeviceError",
+    "userInfo": {
+      "NSLocalizedDescription": {
+        "string": "A connection to a remote process could not be established."
+      },
+      "NSUnderlyingError": {
+        "error": {
+          "code": 1,
+          "domain": "CoreDevice.ActionError",
+          "userInfo": {
+            "NSDebugDescription": {
+              "string": "A required XPC connection to remoteService was unavailable."
+            },
+            "target": {
+              "string": "remoteService"
+            }
+          }
+        }
+      }
+    }
+  },
+  "physical_touch_test": "not claimed"
+}

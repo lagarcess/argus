@@ -26,6 +26,8 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertTrue(app.buttons["plan-explore"].waitForExistence(timeout: 3))
         app.buttons["cuadrao-tab-0"].tap()
         XCTAssertEqual(app.staticTexts["home-chart-amount"].label, "43,500.00")
+        XCTAssertLessThanOrEqual(app.staticTexts["home-chart-amount"].frame.maxX, app.frame.maxX)
+        shot(app,"home-chart-household-return-es")
     }
     func testDarkAndLargeEnglish() {
         continueAfterFailure = false
