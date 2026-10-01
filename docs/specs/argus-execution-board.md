@@ -24,8 +24,14 @@ existing owners and deferrals.
 **Recovery branch:** `codex/connected-personal-assets`.
 **Delivery checkout:**
 `/Users/garces/.codex/worktrees/connected-personal-assets/private-alpha-next`.
-**Current state:** financial/native recovery and independent architecture
-comparison are complete. The accepted shape below is ready for the single writer.
+**Current state:** the financial/API/database and native implementation are committed.
+The real local API journey passes independent currency/net-worth totals, selected
+older-estimate correction, debt-link updates, Search, owner isolation and unchanged
+cash/budgets/savings/forecast checks. Native package and recovery tests pass; the
+assembled simulator journey is under verification. The first fresh review of
+`158664979513048e64abe30a4f3972518e078c28` and its affected delta through
+`173c62200a88870f0300a5ae06528ac0fe4f8278` found no confirmed defects. This is
+component/API progress, not accepted phone delivery or a merge-ready claim.
 No unresolved financial product choice blocks the assigned journey.
 
 ### Locked behavior and contract gates
@@ -123,7 +129,7 @@ The poteto Feature checklist records the delivery sequence.
 - [x] `how` over the affected subsystem.
 - [x] `architect` for parallel design exploration.
 - [x] Write the throughput checkpoint as four todo items.
-- [ ] Delegate code-writing to a subagent using the configured feature model.
+- [x] Delegate code-writing to a subagent using the configured feature model.
 - [ ] Verify on the matching surface.
 - [ ] Rebase into small, ordered commits. Stack follow-ups.
   Skip rebasing after evidence/publication under the repository one-way rules.
