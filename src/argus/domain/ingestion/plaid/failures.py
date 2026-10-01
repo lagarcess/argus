@@ -1,9 +1,13 @@
 """What a Plaid failure means for the connection the person sees.
 
-Three outcomes, chosen from Plaid's structured ``error_type``/``error_code``:
+Outcomes, chosen from Plaid's structured ``error_type``/``error_code``:
 
 - ``needs_reauth``: the person can fix it through Link update mode
-  (``ITEM_LOGIN_REQUIRED``, consent expiring or about to disconnect).
+  (``ITEM_LOGIN_REQUIRED`` and other login conditions).
+- attention: the Item still works but consent is expiring or the Item is
+  about to be disconnected (``PENDING_EXPIRATION``, ``PENDING_DISCONNECT``).
+  The connection stays ``active`` and carries ``attention_code``, which
+  successful syncs keep; update mode (``set_secret``) or disconnect clears it.
 - ``error``: the Item is gone or its permission was revoked; the person must
   disconnect and connect again.
 - transient: Plaid, the institution or our own configuration is unavailable;
@@ -22,8 +26,6 @@ from argus.domain.ingestion.connections import ConnectionStatus
 REAUTH_CODES = frozenset(
     {
         "ITEM_LOGIN_REQUIRED",
-        "PENDING_EXPIRATION",
-        "PENDING_DISCONNECT",
         "ITEM_LOCKED",
         "USER_SETUP_REQUIRED",
         "INVALID_CREDENTIALS",
@@ -40,6 +42,7 @@ ENDED_CODES = frozenset(
         "ITEM_NO_LONGER_AVAILABLE",
     }
 )
+ATTENTION_CODES = frozenset({"PENDING_EXPIRATION", "PENDING_DISCONNECT"})
 MUTATION_DURING_PAGINATION = "TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION"
 
 
@@ -48,10 +51,14 @@ class FailureMeaning:
     code: str
     # None keeps the connection's current status (transient failure).
     status: ConnectionStatus | None
+    # A warning on a working Item: flag attention, record no failure.
+    attention: bool = False
 
 
 def meaning(error_code: str) -> FailureMeaning:
     code = failure_code(error_code)
+    if error_code in ATTENTION_CODES:
+        return FailureMeaning(code, None, attention=True)
     if error_code in REAUTH_CODES:
         return FailureMeaning(code, "needs_reauth")
     if error_code in ENDED_CODES:

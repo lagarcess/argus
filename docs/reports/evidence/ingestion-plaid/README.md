@@ -30,6 +30,7 @@ adapter, connector), routes in
 | Webhook key endpoint reachable, unknown kid refused | Sandbox | `webhook_key_unknown_kid=INVALID_WEBHOOK_VERIFICATION_KEY_ID` |
 | Webhook JWT verification (ES256, kid key, iat, body hash) | Mocked provider (local ES256 key) | `test_plaid_verification.py`, `test_plaid_webhook_api.py` |
 | Webhook-triggered sync, Item status webhooks, `LOGIN_REPAIRED` | Mocked provider | `test_plaid_webhook_api.py` |
+| `PENDING_EXPIRATION`/`PENDING_DISCONNECT` flag `attention_code` on an `active` connection; a successful sync keeps it; update mode (`set_secret` with the existing envelope) clears it | Mocked provider; real Postgres | `test_expiring_consent_flags_attention_that_syncs_keep_and_update_mode_clears`, `test_exchange_sync_and_resync_on_postgres` |
 | Mutation during pagination restarts from the starting cursor | Mocked provider; also observed live once | tests below; a first lifecycle run at 19:30Z recorded `initial_sync.restarts=1` while Plaid was still writing the historical pull (that run's JSON was superseded by the committed run) |
 | Lease and cursor CAS under concurrency | Mocked provider on real Postgres | `tests/test_ingestion_plaid_postgres.py` |
 | Real-institution coverage | Not claimed | `institution-coverage.json` is directory metadata only |
@@ -92,10 +93,6 @@ for foreign (non-Dominican) accounts only, as the lane spec says.
 - Live webhook delivery to a public URL (`PLAID_WEBHOOK_URL` is empty here).
 - Production access, pricing, `/transactions/refresh` add-on billing and real
   institution behavior.
-- `PENDING_EXPIRATION`/`PENDING_DISCONNECT` set `needs_reauth`, but a later
-  successful sync's `record_success` returns the connection to `active` and
-  clears the code even though consent is still expiring (wave-0 state has no
-  separate warning field).
 - Accounts without transactions in a sync page get their hint from
   `/accounts/get` (one extra call per sync at most); investment accounts are
   not synced (`/transactions/sync` does not cover them).

@@ -73,6 +73,11 @@ class PlaidWebhooks:
         failure = meaning(error_code)
         for row in live:
             try:
+                if failure.attention:
+                    self.hub.connections.flag_attention(
+                        connection_id=row.id, code=failure.code, now=self.hub.clock()
+                    )
+                    continue
                 self.hub.connections.record_failure(
                     connection_id=row.id,
                     code=failure.code,

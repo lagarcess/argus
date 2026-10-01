@@ -72,6 +72,23 @@ def test_exchange_sync_and_resync_on_postgres(repo, users):  # noqa: ANN001
     fake.item_error = None
     restored = connector.link.reconnected(user_id=owner, connection_id=row.id)
     assert restored.status == "active" and restored.cursor == "c2"
+    # Consent expiring: attention survives a successful sync, update mode clears it.
+    connector.webhooks.plan(
+        {
+            "webhook_type": "ITEM",
+            "webhook_code": "PENDING_EXPIRATION",
+            "item_id": restored.external_ref,
+            "environment": "sandbox",
+        }
+    )
+    assert connector.sync(restored).status == "synced"
+    warned = repo.get(user_id=owner, connection_id=row.id)
+    assert (warned.status, warned.attention_code) == (
+        "active",
+        "plaid_pending_expiration",
+    )
+    cleared = connector.link.reconnected(user_id=owner, connection_id=row.id)
+    assert cleared.attention_code is None and cleared.attention_at is None
     outcome = connector.hub.disconnect(user_id=owner, connection_id=row.id)
     assert outcome.provider_revocation == "revoked"
     assert repo.get(user_id=owner, connection_id=row.id).secret is None

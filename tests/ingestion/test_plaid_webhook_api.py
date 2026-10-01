@@ -140,8 +140,6 @@ def test_unverified_webhooks_are_rejected_without_detail(client, signed, case): 
             "needs_reauth",
             "plaid_item_login_required",
         ),
-        (item_event("PENDING_EXPIRATION"), "needs_reauth", "plaid_pending_expiration"),
-        (item_event("PENDING_DISCONNECT"), "needs_reauth", "plaid_pending_disconnect"),
         (
             item_event("USER_PERMISSION_REVOKED", "USER_PERMISSION_REVOKED"),
             "error",
@@ -159,16 +157,52 @@ def test_item_webhooks_record_actionable_status_and_keep_freshness(
     row = stored(client, identities, connection_id)
     assert (row.status, row.last_error_code) == (status, code)
     assert row.last_success_at == fresh and row.cursor == "c1"
+    assert row.attention_code is None
     listed = client.get("/api/v1/financial-connections", headers=bearer(ALICE)).json()
     assert listed["items"][0]["last_error_code"] == code
+
+
+@pytest.mark.parametrize(
+    ("webhook_code", "attention"),
+    [
+        ("PENDING_EXPIRATION", "plaid_pending_expiration"),
+        ("PENDING_DISCONNECT", "plaid_pending_disconnect"),
+    ],
+)
+def test_expiring_consent_flags_attention_that_syncs_keep_and_update_mode_clears(
+    client, signed, identities, webhook_code, attention
+):  # noqa: ANN001
+    connection_id = connect(client).json()["connection"]["id"]
+    assert deliver(client, item_event(webhook_code))[0].status_code == 200
+    row = stored(client, identities, connection_id)
+    assert (row.status, row.last_error_code) == ("active", None)
+    assert row.attention_code == attention and row.attention_at is not None
+    # A successful sync does not hide the warning.
+    synced = client.post(f"{URL}/{connection_id}/sync", headers=bearer(ALICE)).json()
+    assert synced["sync"]["status"] == "synced"
+    assert synced["connection"]["status"] == "active"
+    assert synced["connection"]["attention_code"] == attention
+    # Update mode is offered for it, and finishing it clears the warning.
+    update = client.post(f"{URL}/{connection_id}/link-token", headers=bearer(ALICE))
+    assert update.status_code == 200
+    restored = client.post(
+        f"{URL}/{connection_id}/reconnected", headers=bearer(ALICE)
+    ).json()
+    assert restored["status"] == "active"
+    assert restored["attention_code"] is None and restored["attention_at"] is None
+    assert stored(client, identities, connection_id).cursor == "c1"
 
 
 def test_login_repaired_restores_after_a_health_check(client, signed, identities):  # noqa: ANN001
     connection_id = connect(client).json()["connection"]["id"]
     deliver(client, item_event("ERROR", "ITEM_LOGIN_REQUIRED"))
     assert stored(client, identities, connection_id).status == "needs_reauth"
+    deliver(client, item_event("PENDING_EXPIRATION"))
     deliver(client, item_event("LOGIN_REPAIRED"))
-    assert stored(client, identities, connection_id).status == "active"
+    repaired = stored(client, identities, connection_id)
+    assert repaired.status == "active" and repaired.last_error_code is None
+    # Re-sealing the existing envelope (set_secret) also clears attention.
+    assert repaired.attention_code is None
     assert "/item/get" in signed.paths()
 
 

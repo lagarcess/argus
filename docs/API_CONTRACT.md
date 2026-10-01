@@ -7523,22 +7523,27 @@ verification levels:
   recorded and the cursor did not move. A disconnected connection answers 409
   `financial_connection_disconnected`.
 - POST `/plaid/{id}/link-token` creates a Link update-mode token for a
-  connection in `needs_reauth` or `error` (the Item is named server-side);
-  otherwise 409 `financial_connection_not_reauthorizable`.
+  connection in `needs_reauth` or `error`, or one carrying an
+  `attention_code` (the Item is named server-side); otherwise 409
+  `financial_connection_not_reauthorizable`.
 - POST `/plaid/{id}/reconnected` re-checks the Item after update mode. A
   healthy Item returns the connection `active` with its cursor and
-  `last_success_at` kept and resumes syncing; a still-broken Item keeps its
-  status and actionable `last_error_code`.
+  `last_success_at` kept, clears `attention_code`/`attention_at` and resumes
+  syncing; a still-broken Item keeps its status and actionable
+  `last_error_code`.
 - POST `/plaid/webhook` takes no user session. It accepts only a valid
   `Plaid-Verification` JWT (ES256, key from `/webhook_verification_key/get`,
   `iat` within 5 minutes, `request_body_sha256` equal to the raw body hash) and
   returns 200 `{received: true}`; anything else answers 400
   `plaid_webhook_rejected` with no reason, and an unreachable key endpoint
   answers 503 `plaid_webhook_unverifiable`. Transactions updates sync the
-  Item's live connections after the response; Item errors and
-  `PENDING_EXPIRATION`/`PENDING_DISCONNECT` set `needs_reauth`,
-  `USER_PERMISSION_REVOKED` sets `error`, `LOGIN_REPAIRED` re-checks and
-  resumes. Unknown Items and other environments are acknowledged and ignored.
+  Item's live connections after the response; Item errors such as
+  `ITEM_LOGIN_REQUIRED` set `needs_reauth`, `USER_PERMISSION_REVOKED` sets
+  `error`, and `LOGIN_REPAIRED` re-checks and resumes. `PENDING_EXPIRATION`
+  and `PENDING_DISCONNECT` keep the connection `active` and set
+  `attention_code` (`plaid_pending_expiration`, `plaid_pending_disconnect`),
+  which successful syncs keep and only update mode or disconnect clears.
+  Unknown Items and other environments are acknowledged and ignored.
 
 `last_error_code` for Plaid failures is `plaid_<lowercased Plaid error code>`
 (for example `plaid_item_login_required`); transient provider failures keep

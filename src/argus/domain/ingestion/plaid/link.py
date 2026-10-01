@@ -120,7 +120,7 @@ class PlaidLink:
         self, *, user_id: str, connection_id: str, language: LinkLanguage
     ) -> LinkToken:
         row = self._plaid_connection(user_id, connection_id)
-        if row.status not in ("needs_reauth", "error"):
+        if row.status not in ("needs_reauth", "error") and not row.attention_code:
             raise ConnectionNotReauthorizable()
         token = self._credential(row)
         payload = self.client.link_token_create(
@@ -133,8 +133,10 @@ class PlaidLink:
     def reconnected(self, *, user_id: str, connection_id: str) -> SourceConnection:
         """After Link update mode: re-check the Item and restore the connection.
 
-        The cursor and ``last_success_at`` are kept; a still-broken Item keeps
-        (or updates) its actionable failure instead of claiming health.
+        The cursor and ``last_success_at`` are kept. Re-sealing the same
+        envelope through ``set_secret`` also clears any attention warning
+        (consent renewed). A still-broken Item keeps (or updates) its
+        actionable failure instead of claiming health.
         """
 
         row = self._plaid_connection(user_id, connection_id)
