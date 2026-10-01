@@ -16,14 +16,19 @@ struct CuadraoChatCanvas: View {
 
     var body: some View {
         @Bindable var thread = store.current
-        VStack(spacing: 0) {
-            header
+        Group {
             if active { conversation } else { welcome }
-            if store.voice.active && store.voice.presentation != .expanded {
-                CuadraoVoiceBar(voice: store.voice, spanish: es)
-            }
-            composer(thread: $thread.draft)
         }
+        .cuadraoScrollBar(edge: .top) { header }
+        .cuadraoScrollBar(edge: .bottom) {
+            VStack(spacing: 0) {
+                if store.voice.active && store.voice.presentation != .expanded {
+                    CuadraoVoiceBar(voice: store.voice, spanish: es)
+                }
+                composer(thread: $thread.draft)
+            }
+        }
+        .cuadraoSoftScrollEdges()
         .safeAreaPadding(.bottom, focused ? 0 : 80)
         .background(WelcomePalette.background)
         .foregroundStyle(WelcomePalette.ink)

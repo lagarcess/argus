@@ -50,85 +50,88 @@ struct CuadraoSearchCanvas: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                searchField
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 24) {
-                        ForEach(Kind.allCases, id: \.self) { value in
-                            Button { kind = value; focused = false } label: {
-                                Text(title(value)).font(.subheadline)
-                                    .foregroundStyle(kind == value ? Color.primary : .secondary)
-                                    .frame(minHeight: 44)
-                                    .overlay(alignment: .bottom) {
-                                        Rectangle().fill(kind == value ? WelcomePalette.pine : .clear).frame(height: 2)
-                                    }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if count == 0 {
+                        ContentUnavailableView {
+                            Label(spanish ? (query.isEmpty && filterCount == 0 ? "Todo empieza con una cuenta" : "Sin resultados")
+                                  : (query.isEmpty && filterCount == 0 ? "Start with an account" : "No results"), systemImage: "magnifyingglass")
+                        } description: {
+                            Text(spanish ? (data.accounts.isEmpty ? "Las cuentas y movimientos que añadas aparecerán aquí." : "Prueba otro nombre o cambia los filtros.")
+                                 : (data.accounts.isEmpty ? "Accounts and activity you add will appear here." : "Try another name or change the filters."))
+                        }.padding(.top, 36)
+                    }
+                    if (kind == .all || kind == .accounts) && !accounts.isEmpty {
+                        heading(title(.accounts), count: accounts.count)
+                        ForEach(accounts) { account in
+                            NavigationLink(value: Route.account(account.id)) {
+                                resultRow(account.displayName(spanish), detail: subtitle(account))
                             }.buttonStyle(.plain)
-                                .accessibilityAddTraits(kind == value ? .isSelected : [])
+                            Divider().foregroundStyle(WelcomePalette.separator)
                         }
                     }
-                }
-                if filterCount > 0 {
-                    HStack {
-                        Text([scope == .all ? nil : scopeTitle(scope), currency.isEmpty ? nil : currency].compactMap { $0 }.joined(separator: " · "))
-                        Spacer()
-                        Button(spanish ? "Quitar filtros" : "Clear filters") { scope = .all; currency = "" }
-                            .frame(minHeight: 44)
-                    }.font(.caption).foregroundStyle(.secondary)
-                }
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        if count == 0 {
-                            ContentUnavailableView {
-                                Label(spanish ? (query.isEmpty && filterCount == 0 ? "Todo empieza con una cuenta" : "Sin resultados")
-                                      : (query.isEmpty && filterCount == 0 ? "Start with an account" : "No results"), systemImage: "magnifyingglass")
-                            } description: {
-                                Text(spanish ? (data.accounts.isEmpty ? "Las cuentas y movimientos que añadas aparecerán aquí." : "Prueba otro nombre o cambia los filtros.")
-                                     : (data.accounts.isEmpty ? "Accounts and activity you add will appear here." : "Try another name or change the filters."))
-                            }.padding(.top, 36)
-                        }
-                        if (kind == .all || kind == .accounts) && !accounts.isEmpty {
-                            heading(title(.accounts), count: accounts.count)
-                            ForEach(accounts) { account in
-                                NavigationLink(value: Route.account(account.id)) {
-                                    resultRow(account.displayName(spanish), detail: subtitle(account))
+                    if (kind == .all || kind == .activity) && !activity.isEmpty {
+                        heading(title(.activity), count: activity.count)
+                        ForEach(activity) { entry in
+                            if let account = data.account(entry.accountID) {
+                                NavigationLink(value: Route.activity(entry.id)) {
+                                    resultRow(entry.title, detail: account.displayName(spanish) + " · " + account.currency + " "
+                                        + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
                                 }.buttonStyle(.plain)
                                 Divider().foregroundStyle(WelcomePalette.separator)
                             }
                         }
-                        if (kind == .all || kind == .activity) && !activity.isEmpty {
-                            heading(title(.activity), count: activity.count)
-                            ForEach(activity) { entry in
-                                if let account = data.account(entry.accountID) {
-                                    NavigationLink(value: Route.activity(entry.id)) {
-                                        resultRow(entry.title, detail: account.displayName(spanish) + " · " + account.currency + " "
-                                            + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
+                    }
+                    ForEach([Kind.plans, .chats, .files, .memory], id: \.self) { section in
+                        let rows = references.filter { $0.kind == section }
+                        if (kind == .all || kind == section) && !rows.isEmpty {
+                            heading(title(section), count: rows.count)
+                            ForEach(rows) { item in
+                                if item.kind == .chats, let thread = chat.threads.first(where: { $0.id == item.id }) {
+                                    Button { focused = false; openChat(thread) } label: {
+                                        resultRow(item.title, detail: item.detail)
                                     }.buttonStyle(.plain)
-                                    Divider().foregroundStyle(WelcomePalette.separator)
+                                } else {
+                                    NavigationLink(value: Route.reference(item.id)) {
+                                        resultRow(item.title, detail: item.detail)
+                                    }.buttonStyle(.plain)
                                 }
+                                Divider()
                             }
                         }
-                        ForEach([Kind.plans, .chats, .files, .memory], id: \.self) { section in
-                            let rows = references.filter { $0.kind == section }
-                            if (kind == .all || kind == section) && !rows.isEmpty {
-                                heading(title(section), count: rows.count)
-                                ForEach(rows) { item in
-                                    if item.kind == .chats, let thread = chat.threads.first(where: { $0.id == item.id }) {
-                                        Button { focused = false; openChat(thread) } label: {
-                                            resultRow(item.title, detail: item.detail)
-                                        }.buttonStyle(.plain)
-                                    } else {
-                                        NavigationLink(value: Route.reference(item.id)) {
-                                            resultRow(item.title, detail: item.detail)
-                                        }.buttonStyle(.plain)
-                                    }
-                                    Divider()
-                                }
+                    }
+                }.padding(.horizontal, 24).padding(.bottom, 24)
+            }.scrollDismissesKeyboard(.interactively)
+            .cuadraoScrollBar(edge: .top) {
+                VStack(alignment: .leading, spacing: 18) {
+                    searchField
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 24) {
+                            ForEach(Kind.allCases, id: \.self) { value in
+                                Button { kind = value; focused = false } label: {
+                                    Text(title(value)).font(.subheadline)
+                                        .foregroundStyle(kind == value ? Color.primary : .secondary)
+                                        .frame(minHeight: 44)
+                                        .overlay(alignment: .bottom) {
+                                            Rectangle().fill(kind == value ? WelcomePalette.pine : .clear).frame(height: 2)
+                                        }
+                                }.buttonStyle(.plain)
+                                    .accessibilityAddTraits(kind == value ? .isSelected : [])
                             }
                         }
-                    }.padding(.bottom, 24)
-                }.scrollDismissesKeyboard(.interactively)
+                    }
+                    if filterCount > 0 {
+                        HStack {
+                            Text([scope == .all ? nil : scopeTitle(scope), currency.isEmpty ? nil : currency].compactMap { $0 }.joined(separator: " · "))
+                            Spacer()
+                            Button(spanish ? "Quitar filtros" : "Clear filters") { scope = .all; currency = "" }
+                                .frame(minHeight: 44)
+                        }.font(.caption).foregroundStyle(.secondary)
+                    }
+                }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 18)
+                    .background(WelcomePalette.background.opacity(0.92))
             }
-            .padding(.horizontal, 24).padding(.top, 24)
+            .cuadraoSoftScrollEdges()
             .background(WelcomePalette.background)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in

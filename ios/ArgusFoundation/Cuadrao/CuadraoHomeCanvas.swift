@@ -63,7 +63,7 @@ struct CuadraoHomeCanvas: View {
                 destination(tab).tag(tab)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .cuadraoScrollBar(edge: .bottom) {
             VStack(spacing: 0) {
             if selectedTab != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
                 CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
@@ -77,6 +77,7 @@ struct CuadraoHomeCanvas: View {
             }
             }
         }
+        .cuadraoSoftScrollEdges()
         .fullScreenCover(isPresented: Binding(
             get: { chat.voice.active && chat.voice.presentation == .expanded },
             set: { if !$0 && chat.voice.active && chat.voice.presentation == .expanded { chat.voice.presentation = .compact } })) {
