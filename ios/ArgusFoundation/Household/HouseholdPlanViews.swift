@@ -95,6 +95,10 @@ struct HouseholdPlanDetailView: View {
                     Text(plan.archiveReason == "owner_departed" ? "sharedPlan.ownerDeparted" : "sharedPlan.archivedNotice")
                         .font(.footnote).accessibilityIdentifier("sharedPlan.archiveNotice")
                 }
+                if plan.progress.common.state == .needsReview {
+                    Text("sharedPlan.state.needs_review").font(.footnote)
+                        .accessibilityIdentifier("sharedPlan.reviewNotice")
+                }
                 HouseholdPlanSummary(plan: plan)
                 if !plan.archived, let schedule = plan.definition.schedule {
                     Text(LocalizedStringKey("plan.repeat." + schedule.cadence.rawValue)) + Text(" · " + schedule.startDate)
