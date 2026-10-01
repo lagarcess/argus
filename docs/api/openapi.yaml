@@ -14659,6 +14659,8 @@ components:
           type: integer
         candidates:
           type: integer
+        ignored:
+          type: integer
         skipped:
           additionalProperties:
             type: integer
@@ -14684,6 +14686,7 @@ components:
       - mode
       - messages
       - candidates
+      - ignored
       - skipped
       - attachments
       - attachments_skipped

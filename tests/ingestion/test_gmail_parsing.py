@@ -66,10 +66,18 @@ def test_hostile_html_keeps_only_visible_text_and_fetches_nothing():
         "<template><p>secret</p></template>shown",
         "<script>var a = '</div>secret';</script>shown",
         "<div style='display:none'><div><br>secret</div></div>shown",
+        # A stray end tag of another element cannot end the hidden region.
+        "<div hidden></p></span>secret</div>shown",
+        "<div hidden><div></div>secret</div>shown",
+        "<section hidden><div>secret</section>shown",
     ],
 )
 def test_hidden_markup_is_dropped(markup):
     assert html_to_text(markup) == "shown"
+
+
+def test_an_unclosed_hidden_element_hides_everything_after_it():
+    assert html_to_text("<p>visible</p><div hidden>secret<p>more secret") == "visible"
 
 
 def test_unknown_or_bytes_codecs_fall_back_to_utf8():
@@ -179,6 +187,12 @@ def test_from_header_parsing_refuses_ambiguous_senders():
         from_address('"Banco, Ejemplo" <A@Banco-Ejemplo.test>') == "a@banco-ejemplo.test"
     )
     assert from_address("a@x.test, b@y.test") is None
+    # Defects or parser disagreement: no sender rather than a guess.
+    assert from_address("Bank <a@bank.test") is None
+    assert from_address("alerts@bank.test <evil@x.test>") is None
+    assert from_address("a@bank.test@evil.test") is None
+    assert from_address("Bank <a@bank.test>, ") is None
+    assert from_address('"a@bank.test" <evil@x.test>') == "evil@x.test"
     assert from_address("no address here") is None
     assert from_address(None) is None
 

@@ -68,6 +68,9 @@ class SyncOutcome:
     mode: SyncMode | None = None
     messages: int = 0
     candidates: int = 0
+    # Candidates the sink refused without recording (connection ended while
+    # the batch was in flight); never reported as saved.
+    ignored: int = 0
     skipped: dict[str, int] = field(default_factory=dict)
     attachments: int = 0
     attachments_skipped: dict[str, int] = field(default_factory=dict)
@@ -163,11 +166,12 @@ class GmailSync:
         }
         if tally.candidates:
             try:
-                sink.submit(
+                result = sink.submit(
                     user_id=current.user_id,
                     connection_id=current.id,
                     candidates=tally.candidates,
                 )
+                counts["ignored"] = result.ignored
             except Exception as exc:
                 logger.warning(
                     "Gmail sync could not hand candidates to the sink; cursor kept",

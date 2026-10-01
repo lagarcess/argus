@@ -10,7 +10,9 @@ associated data names the same person. So:
   the victim's account);
 - the PKCE verifier is unreadable to the browser and to Google, and is never
   stored in a database;
-- an expired state is refused, and a ledger refuses a nonce seen twice.
+- an expired state is refused, and a ledger refuses a nonce seen twice. The
+  ledger caps unexpired entries per person and refuses only that person when
+  over it, so one account cannot lock everyone out.
 
 The in-memory ledger is per process. Behind several API instances a replayed
 state could reach a fresh instance; it still needs Google's single-use
@@ -36,9 +38,12 @@ from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 STATE_TTL = timedelta(minutes=10)
 MAX_STATE_CHARS = 1024
 _AAD_SOURCE = "gmail_oauth_state"
-_LEDGER_CAP = 10_000
+# Unexpired redeemed states one person may hold in the ledger. Only that
+# person is refused past it, so nobody can fill the ledger for everyone.
+MAX_REDEEMED_PER_USER = 20
 
-StateFailure = Literal["invalid", "expired", "replayed"]
+StateFailure = Literal["invalid", "expired", "replayed", "rate_limited"]
+Consumed = Literal["ok", "replayed", "rate_limited"]
 
 
 class StateRejected(RuntimeError):
@@ -48,27 +53,37 @@ class StateRejected(RuntimeError):
 
 
 class StateLedger(Protocol):
-    def consume(self, nonce: str, *, expires_at: datetime, now: datetime) -> bool:
-        """True the first time a nonce is presented before it expires."""
+    def consume(
+        self, nonce: str, *, user_id: str, expires_at: datetime, now: datetime
+    ) -> Consumed:
+        """``ok`` the first time a person presents an unexpired nonce."""
         ...
 
 
 class InMemoryStateLedger:
-    def __init__(self) -> None:
-        self._seen: dict[str, datetime] = {}
+    def __init__(self, per_user: int = MAX_REDEEMED_PER_USER) -> None:
+        self._seen: dict[str, dict[str, datetime]] = {}
+        self._per_user = per_user
         self._lock = threading.Lock()
 
-    def consume(self, nonce: str, *, expires_at: datetime, now: datetime) -> bool:
+    def consume(
+        self, nonce: str, *, user_id: str, expires_at: datetime, now: datetime
+    ) -> Consumed:
         with self._lock:
-            for key in [k for k, until in self._seen.items() if until <= now]:
-                del self._seen[key]
-            if nonce in self._seen:
-                return False
-            if len(self._seen) >= _LEDGER_CAP:
-                # Refuse rather than forget: a full ledger must not reopen replay.
-                return False
-            self._seen[nonce] = expires_at
-            return True
+            for owner in list(self._seen):
+                live = {k: t for k, t in self._seen[owner].items() if t > now}
+                if live:
+                    self._seen[owner] = live
+                else:
+                    del self._seen[owner]
+            mine = self._seen.setdefault(user_id, {})
+            if nonce in mine:
+                return "replayed"
+            if len(mine) >= self._per_user:
+                # Refuse rather than forget: forgetting would reopen replay.
+                return "rate_limited"
+            mine[nonce] = expires_at
+            return "ok"
 
 
 @dataclass(frozen=True)
@@ -132,8 +147,11 @@ class OAuthStates:
         expires_at = datetime.fromtimestamp(expiry, tz=now.tzinfo)
         if expires_at <= now:
             raise StateRejected("expired")
-        if not self.ledger.consume(nonce, expires_at=expires_at, now=now):
-            raise StateRejected("replayed")
+        consumed = self.ledger.consume(
+            nonce, user_id=user_id, expires_at=expires_at, now=now
+        )
+        if consumed != "ok":
+            raise StateRejected(consumed)
         return verifier
 
 

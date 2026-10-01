@@ -17,6 +17,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, replace
 from datetime import datetime
+from email import policy
 from email.utils import getaddresses
 from typing import Literal, Protocol
 
@@ -83,16 +84,29 @@ def _check_domain(domain: str) -> None:
 
 
 def from_address(header: str | None) -> str | None:
-    """The single mailbox in a ``From`` header, lowercased; None if ambiguous."""
+    """The single mailbox in a ``From`` header, lowercased; None if ambiguous.
+
+    Two independent parsers must agree: ``policy.default``'s header registry
+    (refused when it reports any defect) and ``email.utils.getaddresses`` on
+    the raw value. Parser differentials are a known way to show one address
+    to a filter and another to a reader, so any disagreement is no sender.
+    """
 
     if not header:
         return None
-    pairs = [addr for _, addr in getaddresses([header]) if addr]
-    if len(pairs) != 1:
+    try:
+        parsed = policy.default.header_factory("From", header)
+        addresses = parsed.addresses
+    except Exception:  # noqa: BLE001 - unparseable headers have no sender
         return None
-    address = pairs[0].strip().lower()
+    if parsed.defects or len(addresses) != 1:
+        return None
+    address = addresses[0].addr_spec.strip().lower()
+    strict = [addr for _, addr in getaddresses([header]) if addr]
+    if len(strict) != 1 or strict[0].strip().lower() != address:
+        return None
     local, at, domain = address.rpartition("@")
-    if not at or not local or not domain:
+    if not at or not local or not domain or "@" in local:
         return None
     return address
 

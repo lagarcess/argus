@@ -117,6 +117,8 @@ class FakeGoogle:
     fail: dict[str, list[tuple[int, dict]]] = field(default_factory=dict)
     calls: list[tuple[str, str, dict[str, list[str]]]] = field(default_factory=list)
     unexpected: list[str] = field(default_factory=list)
+    # Per-item replies: (message id, "metadata"|"full"|"attachment") -> response.
+    item_replies: dict[tuple[str, str], httpx.Response] = field(default_factory=dict)
     _serial: Any = field(default_factory=lambda: itertools.count(1))
 
     # Scripting ---------------------------------------------------------------
@@ -208,6 +210,8 @@ class FakeGoogle:
             return _json(*google_error(404, "notFound", "NOT_FOUND"))
         if len(parts) == 2:
             return self._message(mail, query)
+        if (mail.id, "attachment") in self.item_replies:
+            return self.item_replies[(mail.id, "attachment")]
         part = mail.attachment_ids().get(parts[3])
         if part is None:
             return _json(*google_error(404, "notFound", "NOT_FOUND"))
@@ -308,6 +312,9 @@ class FakeGoogle:
         return _json(200, body)
 
     def _message(self, mail: Mail, query: dict[str, list[str]]) -> httpx.Response:
+        fmt = query.get("format", ["full"])[0]
+        if (mail.id, fmt) in self.item_replies:
+            return self.item_replies[(mail.id, fmt)]
         full = mail.full(self.history_id)
         if query.get("format", ["full"])[0] == "metadata":
             wanted = {h.lower() for h in query.get("metadataHeaders", [])}

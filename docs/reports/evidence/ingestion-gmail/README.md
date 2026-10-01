@@ -5,12 +5,28 @@
 **API:** [Gmail connector routes](../../../API_CONTRACT.md#gmail-connector-default-off).
 **Data:** [Gmail sender allowlist](../../../DATA_MODEL.md#gmail-sender-allowlist).
 
-**Verification level: mocked provider only.** No Google Cloud OAuth client or
-test inbox exists yet, so no request in this lane reached Google. Every Google
-response used in the tests comes from an in-process fake
+## Read this first (founder decision)
+
+**(a) Verified against a mocked Google only.** OAuth (consent URL, code
+exchange, scopes, refresh, revocation) and Gmail API behavior (profile, search,
+messages, attachments, history) were proven only against an in-process fake
 (`tests/ingestion/gmail_fakes.py`) with synthetic, clearly labeled mailboxes
 (`tests/ingestion/gmail_mailbox.py`: fictional banks on `.test` domains, no real
-people or email content).
+people or email content). No Google Cloud OAuth client or test inbox exists
+yet, so no request in this lane reached Google. Real Google behavior, quotas
+and consent screens are unverified.
+
+**(b) Gmail is NOT end-to-end automatic import.** Financial extraction (amount,
+currency, date, account) is missing in this wave. Every relevant email becomes
+an `unclassified` draft that the person must classify and fill in during
+review. Reading those fields from email content needs a separately authorized,
+measured step (a paid model and a committed scorecard, AGENTS.md
+Never-Violate 12).
+
+**(c) Nothing reaches review from this branch alone.** Candidates go to the
+hub's `CandidateSink`, which reconciliation (#772) provides. On this branch the
+sink is absent, so sync answers `no_sink` and fetches nothing; drafts appear
+only once reconciliation is wired.
 
 The connector observes only. It turns allowlisted, sender-authenticated Gmail
 messages into `ImportCandidate` drafts handed to the hub's `CandidateSink`; it
@@ -149,7 +165,7 @@ Never-Violate 12).
 | Reconnect updates the same connection; insert race resolves; other person's mailbox refused | Mocked provider; Postgres | `test_reconnect_*`, `test_concurrent_callback_race_*`, `test_mailbox_connected_by_someone_else_*`, `tests/test_ingestion_gmail_postgres.py` |
 | Allowlist only; query built from it; strict local match (lookalike domain rejected) | Mocked provider | `test_initial_sync_imports_allowlisted_authenticated_messages_only`, `test_matching_*`, `test_senders_that_could_inject_query_operators_are_refused` (12) |
 | Forged `From` skipped using Gmail's topmost `Authentication-Results` | Mocked provider (synthetic headers) | `test_gmail_authentication_results_decide_sender_authenticity`, spoofed fixture |
-| MIME limits, charset handling, HTML to inert text, nothing fetched | Mocked provider | `test_hostile_html_*`, `test_hidden_markup_is_dropped` (6), `test_part_tree_is_bounded`, `fake.unexpected == []` |
+| MIME limits, charset handling, HTML to inert text, nothing fetched | Mocked provider | `test_hostile_html_*`, `test_hidden_markup_is_dropped` (9), `test_part_tree_is_bounded`, `fake.unexpected == []` |
 | Attachment media types, size cap (30 MiB part never downloaded), signatures | Mocked provider | `test_attachment_policy_*`, `test_candidates_claim_only_machine_certain_facts` |
 | Pagination (search and history), bounded with resume | Mocked provider | `test_scan_paginates_and_reports_truncation`, `test_history_pagination_is_bounded_and_resumes` |
 | Incremental history, spam rescue, duplicates are one observation | Mocked provider | `test_incremental_*`, `test_message_rescued_from_spam_*`, `test_same_message_from_scan_and_history_*`, `test_a_retried_sync_*` |
@@ -157,7 +173,12 @@ Never-Violate 12).
 | History 404 recovery, window bounded | Mocked provider | `test_history_too_old_*`, `test_recovery_window_never_exceeds_the_lookback` |
 | Revoked grant, 401, 403 scope, 403 other: `needs_reauth`, freshness kept | Mocked provider; Postgres | `test_revoked_refresh_token_*`, `test_refused_access_needs_reauth` (3) |
 | 429/5xx bounded backoff then `gmail_unavailable`, cursor kept | Mocked provider | `test_outages_*` (3), `test_a_transient_outage_*` |
-| Disconnect revokes; failure still deletes credential; `forget` deletes the allowlist | Mocked provider; Postgres | `test_connect_choose_senders_sync_and_disconnect`, `test_failed_revocation_still_deletes_credential` |
+| A message or attachment Gmail refuses on its own (oversized, malformed, per-item 4xx) is a counted skip and the cursor moves past it; auth, 429 and 5xx still fail the sync | Mocked provider | `test_one_bad_message_is_skipped_*` (3), `test_malformed_metadata_*`, `test_a_refused_attachment_*`, `test_auth_refusals_on_a_message_*` |
+| OAuth state ledger is capped per person and never locks out others | Hermetic unit; mocked provider for the 429 | `test_state_ledger_*` (2), `test_a_person_over_the_state_limit_gets_429` |
+| A failure after the code exchange (profile 403/5xx, database) revokes the new grant; owned-elsewhere never revokes | Mocked provider | `test_profile_failure_after_the_exchange_*` (2), `test_database_failure_*` |
+| Two people completing the callback concurrently cannot both hold the mailbox | Mocked provider; Postgres (global live-reference index) | `test_two_people_completing_the_callback_concurrently_*`, `test_two_people_cannot_both_hold_a_live_mailbox` |
+| `From` with parse defects or parser disagreement has no sender; hidden HTML regions end only at their own tag | Hermetic unit | `test_from_header_parsing_*`, `test_hidden_markup_is_dropped` (9), `test_an_unclosed_hidden_element_*` |
+| Disconnect revokes; failure still deletes credential; `forget` deletes the allowlist; a revoke-only adapter does both while the OAuth client is unconfigured | Mocked provider | `test_connect_choose_senders_sync_and_disconnect`, `test_failed_revocation_still_deletes_credential`, `test_forget_runs_even_when_google_revocation_fails`, `test_unconfigured_oauth_still_registers_a_revoke_only_adapter` | Mocked provider; Postgres | `test_connect_choose_senders_sync_and_disconnect`, `test_failed_revocation_still_deletes_credential` |
 | Flag/config off is 404; other person's connection is 404; no token in responses or logs | Mocked provider | `test_flag_off_*`, `test_missing_configuration_*` (4), `test_another_persons_connection_looks_absent`, loguru capture in the round-trip test |
 | Allowlist table RLS, owner-only writes through a live connection | Real Postgres 16 (Supabase shim) | `test_clients_read_their_own_senders_and_never_write`, `test_senders_attach_only_*` |
 | Real Google OAuth, consent screen, Gmail API behavior and quotas | **Not verified** | Needs the founder's OAuth client and test inbox |
@@ -167,17 +188,23 @@ Never-Violate 12).
 ```bash
 # Hermetic (no network)
 python -m pytest tests/ingestion/test_gmail_*.py -q --no-cov
-# 95 passed (oauth 17, parsing 34, sync 12, sync failures 13, api 19)
+# 117 passed (oauth 17, parsing 38, sync 12, sync failures 13, api 20,
+#             hardening 17)
 
 # Real Postgres (wave-0 and Gmail senders migrations)
 ARGUS_DISPOSABLE_DATABASE_URL=postgresql://postgres@127.0.0.1:56811/argus_gmail \
   python -m pytest tests/test_ingestion_gmail_postgres.py \
   tests/test_ingestion_connections_postgres.py -q --no-cov
-# 15 passed (gmail 4, connections 11)
+# 17 passed (gmail 5, connections 12)
 ```
 
 ## Unsupported or unknown
 
+- Forged `Authentication-Results` on messages Gmail did not deliver: mail
+  placed in the mailbox by IMAP `APPEND`, Gmail import or migration tools
+  carries whatever headers its author wrote, including a topmost
+  `mx.google.com` "pass". Sender authentication cannot tell those apart from
+  delivered mail, so such a message from an allowlisted sender becomes a draft.
 - Gmail push (`users.watch` with Pub/Sub) needs a hosted Pub/Sub topic;
   syncs are manual (`POST .../gmail/{id}/sync`) or a future scheduler.
 - Messages whose sender domain Gmail did not authenticate (no DMARC pass and
@@ -193,7 +220,12 @@ ARGUS_DISPOSABLE_DATABASE_URL=postgresql://postgres@127.0.0.1:56811/argus_gmail 
   not change).
 - The OAuth state replay ledger is per process; behind several API instances
   replay protection rests on Google's single-use code and PKCE (see
-  `state.py`).
+  `state.py`). It holds at most 20 unexpired redeemed states per person and
+  answers 429 to that person only.
+- A reconnect that fails after Google issued the new grant revokes it, and
+  Google revokes the whole grant, so that mailbox's existing connection then
+  needs authorization again. A grant without a refresh token is not revoked
+  (it may back the person's live connection).
 - Google Workspace accounts whose admin blocks third-party Gmail access fail
   with `gmail_access_denied`; not exercised against Google.
 - In memory persistence mode the sender allowlist is in memory too.

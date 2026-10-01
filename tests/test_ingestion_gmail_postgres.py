@@ -87,6 +87,21 @@ def test_connect_sync_increment_reconnect_and_disconnect(pool, users):  # noqa: 
         )
 
 
+def test_two_people_cannot_both_hold_a_live_mailbox(pool, users, monkeypatch):  # noqa: ANN001
+    from argus.domain.ingestion.gmail.oauth import MailboxOwnedElsewhere
+
+    fake = FakeGoogle()
+    connector = postgres_connector(pool, fake, RecordingSink())
+    owner = connect(connector, fake, users["owner"]).connection
+    # The other person's callback read no live row before the owner's insert
+    # committed; the database's global live-reference index decides.
+    monkeypatch.setattr(connector.hub.connections, "find_live", lambda **_: [])
+    with pytest.raises(MailboxOwnedElsewhere):
+        connect(connector, fake, users["other"])
+    assert connector.hub.connections.list(user_id=users["other"]) == []
+    assert connector.hub.credential(owner) not in fake.revoked
+
+
 def test_senders_attach_only_to_the_owners_live_gmail_connection(pool, users):  # noqa: ANN001
     fake = FakeGoogle()
     connector = postgres_connector(pool, fake, RecordingSink())
