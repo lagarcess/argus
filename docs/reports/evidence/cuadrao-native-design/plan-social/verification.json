@@ -1,0 +1,242 @@
+{
+  "sourceCommit": "2f3b91dfe2e8cc5d5a247de5083a28373fd1ad46",
+  "scope": "Native UI-only Plan design preview; Spanish first, English parity",
+  "checkpointParent": "b32b0705359f02aab9c3091ab59d7067ab7ddf46",
+  "verification": {
+    "nativeJourneys": 8,
+    "regressionPass": "2026-10-01T15:31:15Z: 8/8 passed",
+    "finalGroupPass": "2026-10-01T15:36:06Z: savings/dark and personal/large-text passed at 9643911d; Spanish split assertion exposed test cursor placement",
+    "finalCorrectionPass": "2026-10-01T15:39:46Z: Spanish full journey including unequal edits and repayment passed at sourceCommit",
+    "retainedEvidence": "Final delta from 9643911d changes only excess-split copy and test cursor positioning. Other 7 journeys retained; receipt draft and covers were covered by the preceding group run. Earlier personal regression code unchanged except whitespace.",
+    "deterministicPlanChecks": 44,
+    "deterministicGroupChecks": 30,
+    "chatVoiceStateRegressions": "passed in Spanish and English",
+    "modularity": "passed",
+    "diffCheck": "passed",
+    "runtimeWarnings": "XCTest reports an unlocated invalid-frame warning when keyboards open, including existing personal editors. Inspected screenshots show no clipping attributable to it; origin not established."
+  },
+  "boundaries": [
+    "No financial APIs, money movement, live invitations, contacts discovery or OCR",
+    "PhotosPicker stores a resized local cover or receipt; automated journeys do not select a personal photo",
+    "QR encodes a sample design string, not a live invitation",
+    "Shared savings tracks fictional recorded contributions; rotating savings is not implemented",
+    "No deployment or integration merge"
+  ],
+  "captures": [
+    {
+      "file": "plan-new-debt-es.png",
+      "sha256": "946c210bab21bbb168151a722cab39b5c3a95887ee36a8e1acaa556ef2094f39",
+      "journey": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+    },
+    {
+      "file": "plan-create-debt-es.png",
+      "sha256": "57d899425670630a8f5a0a75807e8fc9ba44d04e6c1ff66682bf664157608780",
+      "journey": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+    },
+    {
+      "file": "plan-new-budget-es.png",
+      "sha256": "35ade091b4abf7ea8ae527b1c7b3c4f6f4042ddd108fd386c5645550a9260453",
+      "journey": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+    },
+    {
+      "file": "plan-create-budget-es.png",
+      "sha256": "0380c20586292d603a074766d38a3afd4bd3bed635587da1a926756f3896bec6",
+      "journey": "CuadraoPlanDesignUITests/testCreateMonthlyAndDebtPlans()"
+    },
+    {
+      "file": "plan-restored-es.png",
+      "sha256": "d9cd3756677bf181cd46bcafd685135378a8856408b7df17a78495206d193d9e",
+      "journey": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+    },
+    {
+      "file": "plan-archived-es.png",
+      "sha256": "d0cc6ba1e9774aa5e057882129eba6886412cfc51da169d3e70119f8ae65a313",
+      "journey": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+    },
+    {
+      "file": "plan-created-es.png",
+      "sha256": "a2a6d792e58cd571c709d8d28348d3537eb9a5c73da85357f771e4743cd8fa23",
+      "journey": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+    },
+    {
+      "file": "plan-create-es.png",
+      "sha256": "e48802d71d7416ae06d0178594f7a40987949511449d73962dfebf5498f145d2",
+      "journey": "CuadraoPlanDesignUITests/testCreationEditingArchiveAndRecovery()"
+    },
+    {
+      "file": "plan-with-voice-dark-es.png",
+      "sha256": "ea06f80a3f707d293cdf3cba9b721ad10ed4a46d43c0d884d25a92c55befaf35",
+      "journey": "CuadraoPlanDesignUITests/testExactAmountsDarkModeAndVoiceContinuity()"
+    },
+    {
+      "file": "plan-exact-dark-es.png",
+      "sha256": "03049d5aaad8007e16ce4e26f353b47bcce61c98812b150a7d037cb386b2f1d1",
+      "journey": "CuadraoPlanDesignUITests/testExactAmountsDarkModeAndVoiceContinuity()"
+    },
+    {
+      "file": "plan-overview-dark-es.png",
+      "sha256": "ddbc917770273e14a1ffdbecd8b99650c1564e148508e3a7b8ca02561c3abf13",
+      "journey": "CuadraoPlanDesignUITests/testExactAmountsDarkModeAndVoiceContinuity()"
+    },
+    {
+      "file": "plan-goal-experiment.png",
+      "sha256": "ddae9dd875cbe8833ac3b6415257ac3af3bf6613da2709324b15ccd7368a5b70",
+      "journey": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+    },
+    {
+      "file": "plan-goal-es.png",
+      "sha256": "b687215ffd276933f9d6c7ca0e634c86da032b86579c5b433fa905e4f1c29fad",
+      "journey": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+    },
+    {
+      "file": "plan-forecast-experiment.png",
+      "sha256": "f444fdb9ad8b93c93de75560405b6441268ef86ef79a7e762e35780739ce0f34",
+      "journey": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+    },
+    {
+      "file": "plan-forecast-shortfall.png",
+      "sha256": "bfe5ca481a81487197f2797641790a1965a74e28c57133914a77ac1c8eac0a27",
+      "journey": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+    },
+    {
+      "file": "plan-forecast-es.png",
+      "sha256": "ec738d2141b785b9dcafc317b398e8928e9a06beb35d800fab9674aebd7aabd4",
+      "journey": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+    },
+    {
+      "file": "plan-overview-es.png",
+      "sha256": "850c771aed7873461438f09f1113e921b2e9f9e117bc3907b044d53e2999a258",
+      "journey": "CuadraoPlanDesignUITests/testForecastAndGoalPlaygrounds()"
+    },
+    {
+      "file": "plan-cold-start-large-es.png",
+      "sha256": "e9f5fb4d2d499d2f06cc101f1d1608eb264f6440e0f43284fbf4d842873ba448",
+      "journey": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+    },
+    {
+      "file": "plan-debt-en.png",
+      "sha256": "496039e5e07c18a43ee747821433bcd9c610dc800a70b7f02ccfb9f87110429e",
+      "journey": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+    },
+    {
+      "file": "plan-budget-en.png",
+      "sha256": "70f9962cfaa78a73f5ba06e450cbd9e4080abf68fcacb5eecd9e19be2c05df70",
+      "journey": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+    },
+    {
+      "file": "plan-household-detail-en.png",
+      "sha256": "649b04c8bcb3547539c36cd6ae03627584414afbd0912ef581de1c27f460e81c",
+      "journey": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+    },
+    {
+      "file": "plan-household-en.png",
+      "sha256": "48fb117d17611d7449619b90edb966c9e4a5aeed96c5720e04c3c698f3a7308e",
+      "journey": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+    },
+    {
+      "file": "plan-overview-en.png",
+      "sha256": "c16a84001fd2db0c233cd07e9de4321d581fc6f843b171b613b8e56c78ed0322",
+      "journey": "CuadraoPlanDesignUITests/testSharedBudgetDebtEnglishAndColdStart()"
+    },
+    {
+      "file": "plan-shared-goal-dark-en.png",
+      "sha256": "01babc78885b0f5e51515897a4dd17940a39eca24e3293b87ae5039a45f16cf4",
+      "journey": "CuadraoGroupDesignUITests/testGroupCreationSavingsEnglishDark()"
+    },
+    {
+      "file": "plan-group-create-en.png",
+      "sha256": "5025bbbc3a8de608dee162e4f2d696644b9c9c1d961480f93f7d45ad3e0182c7",
+      "journey": "CuadraoGroupDesignUITests/testGroupCreationSavingsEnglishDark()"
+    },
+    {
+      "file": "plan-together-dark-en.png",
+      "sha256": "55c7813476b9b1dde732d09cb91225a773fd82943221505454be8071f0009280",
+      "journey": "CuadraoGroupDesignUITests/testGroupCreationSavingsEnglishDark()"
+    },
+    {
+      "file": "plan-group-large-en.png",
+      "sha256": "bd2c80487ff252aef48bbb1b38cb2ec1c86d0038c87c437e23a62d712e5a0a7b",
+      "journey": "CuadraoGroupDesignUITests/testPersonalPolishAndLargeText()"
+    },
+    {
+      "file": "plan-together-large-en.png",
+      "sha256": "3bc8c8e12a106d32d2d948f735e644d633d98302e4f7d7e139753ccd6df2002b",
+      "journey": "CuadraoGroupDesignUITests/testPersonalPolishAndLargeText()"
+    },
+    {
+      "file": "plan-refined-creation-es.png",
+      "sha256": "62cd7db1d88a733f32063f7f102907a96ccfbd0109cd7278c1af5b8692e1400d",
+      "journey": "CuadraoGroupDesignUITests/testPersonalPolishAndLargeText()"
+    },
+    {
+      "file": "plan-refined-goal-change-es.png",
+      "sha256": "79e04591b982a4966e7f1e673d0282795214124705b5e609e8caeb0f1ba86e1b",
+      "journey": "CuadraoGroupDesignUITests/testPersonalPolishAndLargeText()"
+    },
+    {
+      "file": "plan-refined-goal-es.png",
+      "sha256": "eecf4232ca4d6f75e95b258c9d08cf06bfe6555ba0cc5fe89226f4fb424f2db7",
+      "journey": "CuadraoGroupDesignUITests/testPersonalPolishAndLargeText()"
+    },
+    {
+      "file": "plan-refined-overview-es.png",
+      "sha256": "45605a670f6d858db3ed7157e6933db06e885bdfed3931d64ef7eeba0ebb7247",
+      "journey": "CuadraoGroupDesignUITests/testPersonalPolishAndLargeText()"
+    },
+    {
+      "file": "plan-partial-repayment-es.png",
+      "sha256": "02bdfd56268abfdccbeb15c064e418c8cd6d032c9ea1d55c7c3c6638339465ec",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-unequal-split-es.png",
+      "sha256": "09c77b93e1f1d54b2feda9619619abe4e1dcac6829919322ccbfe1b9f2ad7cba",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-receipt-draft-es.png",
+      "sha256": "5d14f92ba0f5e7c2ce0901bb7307eee864c61716194f4ec9327a10730dfc9875",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-split-editor-es.png",
+      "sha256": "4035351986eb099af0147728ac9f7db32ca254f8b305fad2c7aaa90fb051e0c7",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-invitation-guest-es.png",
+      "sha256": "942b746211782738c88ec0eb6593df4a40268c2ee02ddc4ee5ef7b78657a1e19",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-invitation-qr-es.png",
+      "sha256": "4a99bbc6e7a9ce58ece68f0611727de94ed414c5b89c9ef317bb83bee0c26e8e",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-invitation-es.png",
+      "sha256": "f408f5abfcdc0216a8137b798d5b04e91a423bd18914b5cf944f67cef8e7401c",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-group-detail-es.png",
+      "sha256": "e54f0e5c3b9f40520eb1bd03d9c365040185c75a2745f2e17323bd38ef030e0d",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    },
+    {
+      "file": "plan-together-es.png",
+      "sha256": "5f8d951d254f1edf01bfa2432dccd9e83ac759a173f2a25559a29dc35b2be010",
+      "journey": "CuadraoGroupDesignUITests/testSharedJourneySpanish()"
+    }
+  ],
+  "physicalDevice": {
+    "model": "iPhone 15",
+    "bundleID": "local.cuadrao.design.47R3855RTJ",
+    "displayName": "Cuadrao Preview",
+    "signedBuild": "succeeded",
+    "installation": "succeeded",
+    "installationSequence": 3332,
+    "launch": "succeeded",
+    "interactionAcceptance": "Simulator journeys verified; physical interaction awaits founder review"
+  }
+}
