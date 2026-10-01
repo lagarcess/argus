@@ -8,12 +8,12 @@ from uuid import uuid4
 import pytest
 from argus.domain.household.errors import InvitationExpired, InvitationRevoked
 from argus.domain.household.repository import InMemoryHouseholdRepository
-from argus.domain.household.schemas import OwnedAccountRef
-from argus.domain.household.service import HouseholdService
 from argus.domain.household.schemas import (
     CreateAccountGrantRequest,
     CreateHouseholdRequest,
+    OwnedAccountRef,
 )
+from argus.domain.household.service import HouseholdService
 
 
 class DictAccounts:
