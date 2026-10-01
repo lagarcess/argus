@@ -8,6 +8,7 @@ import sys
 import pytest
 
 ROUTERS = [
+    "argus.api.routers.financial_connections_plaid",
     "argus.api.routers.financial_connections",
     "argus.api.routers.financial_connections_schemas",
 ]

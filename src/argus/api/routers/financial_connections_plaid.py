@@ -21,7 +21,7 @@ from argus.api.plaid import (
     require_plaid_context,
     require_plaid_webhook_surface,
 )
-from argus.api.routers.financial_connections import (
+from argus.api.routers.financial_connections_schemas import (
     FinancialConnectionResponse,
     connection_response,
 )
