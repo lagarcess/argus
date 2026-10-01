@@ -92,3 +92,21 @@ and migrate equivalent usages together. Update the component owner rather than
 copying a style or parser. Preserve each surface's useful personality. Tests should
 exercise meaningful behavior and navigation, not freeze every styling literal.
 Future chart, receipt, provider and connected-delivery work stays in the roadmap.
+
+## Home balance chart
+
+Home keeps a compact recorded-position chart, with the same debt signs and asset
+ownership shares as its amount. `CanvasBalanceHistory` owns that projection;
+`CuadraoHomeOverview` owns presentation. Select currencies separately, never add
+or convert them. Personal/Hogar retain the existing account-scope owner.
+
+Tap to retain one observed date/value, hold and drag to inspect, and use Hoy/Today
+to return to the current balance. The native chart leaves regular vertical
+scrolling available. Keep the pine line, subtle fill, readable range labels and
+sample-history label in the preview. Missing history gets an empty state; no flat
+line, inferred pre-account balances or forecast is invented. A new account or
+currency/kind/share change cannot silently borrow old example observations.
+
+The Home link opens Plan as a separate surface; it does not imply its sample
+forecast is computed from Home's accounts. Connected history/forecast ownership
+and scope-preserving navigation remain in the main roadmap.

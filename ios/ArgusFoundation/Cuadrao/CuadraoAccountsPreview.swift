@@ -50,6 +50,7 @@ struct CanvasActivity: Identifiable {
 @Observable final class CuadraoAccountsPreview {
     var accounts: [CanvasAccount] = []
     var activity: [CanvasActivity] = []
+    var balanceObservations: [CanvasBalanceObservation] = []
     var spaces: [CanvasSpace] = []
     var household: CanvasHouseholdState = .alone
     var selectedSpaceID = CanvasSpace.personalID
@@ -88,6 +89,7 @@ struct CanvasActivity: Identifiable {
             accounts.append(CanvasAccount(name: spanish ? "Fondo de la casa" : "Household fund",
                 kind: .savings, balance: 25000, spaceID: CanvasSpace.householdID, sharedWithHousehold: true))
         }
+        balanceObservations = CanvasBalanceHistory.examples(accounts: accounts, now: .now)
         activity = []
         if let first = accounts.first, let cash = accounts.last(where: { $0.kind == .cash }) {
             activity = [

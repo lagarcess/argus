@@ -156,7 +156,7 @@ struct CuadraoHomeCanvas: View {
 
     @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
         switch section {
-        case .overview: if !data.active.isEmpty { CuadraoHomeOverview(data: data, spanish: spanish) }
+        case .overview: if !data.active.isEmpty { CuadraoHomeOverview(data: data, spanish: spanish, openPlan: { selectedTab = .plan }) }
         case .accounts: accounts
         case .activity: if !data.visibleActivity.isEmpty { activity }
         case .upcoming: if populated && data.selectedSpace.kind == .personal { upcoming }

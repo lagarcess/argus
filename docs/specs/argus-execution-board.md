@@ -1752,19 +1752,23 @@ The four pieces are implemented at `53285d59`; [verification and screenshots](..
 record the focused native checks, shared-behavior checks and phone handoff.
 This does not close remaining C10 connected-delivery/accessibility work.
 
-**Home chart proposal, separately tracked under C05/C03:** a compact month view
-with one labeled amount/currency, solid recorded history, a Today marker and a
-clearly labeled dashed forecast only when its owner can supply one. Scrubbing
-shows date/value; further exploration belongs in Plan. References inspected on
-October 1: [Monzo balance](https://mobbin.com/screens/8e2b7c06-14e9-41cd-8114-2a5670c66485)
-and [bunq prediction](https://mobbin.com/screens/f5ca0ce0-971b-4d41-a5e3-d957be27fbec).
-These are captured visual references, not measured animation specifications.
-The recommendation is to implement the chart in a follow-up, not expand this
-four-point consistency pass. The founder has not yet approved a final chart.
-Home's current recorded position includes assets/debt; it must not silently become
-a projected spendable-cash series. Settle the metric, scope, period, missing-history
-state and the shared Plan data owner first. No second forecast calculation or
-fabricated Home history is authorized by this proposal.
+**Home chart UI, C05/C03:** the founder authorized the follow-up on October 1.
+The native preview now shows a compact last-30-days recorded-position chart with
+separate currencies, native tap/hold-and-drag inspection, Hoy/Today reset and
+Personal/Hogar scope. It shares the amount's debt/asset ownership calculation.
+Explicit example observations are labeled; missing history produces an empty
+state. No current activity is reverse-engineered into financial history.
+References: [Monzo selected balance](https://mobbin.com/screens/25125eda-5e62-4166-9a68-9b25bcc349b6)
+and [Apple chart selection](https://developer.apple.com/videos/play/wwdc2023/10037/).
+
+**Still future:** connect canonical recorded-balance observations with clear date,
+account-membership, currency, valuation and ownership semantics; distinguish
+recorded position from spendable cash. Home's Plan link opens the existing Plan
+surface, not a forecast derived from Home or a currency/scope-matched deep link.
+A future shared forecast owner must supply forecast values before Home can draw
+a dashed projection. Preview UI approval does not authorize a new financial store,
+backfill, calculation engine or provider integration. Verification and phone
+handoff: [chart evidence](../reports/evidence/cuadrao-native-design/home-chart/README.md).
 
 ### Handoff and upkeep
 
