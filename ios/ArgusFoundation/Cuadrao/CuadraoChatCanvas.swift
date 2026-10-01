@@ -19,6 +19,9 @@ struct CuadraoChatCanvas: View {
         VStack(spacing: 0) {
             header
             if active { conversation } else { welcome }
+            if store.voice.active && store.voice.presentation != .expanded {
+                CuadraoVoiceBar(voice: store.voice, spanish: es)
+            }
             composer(thread: $thread.draft)
         }
         .safeAreaPadding(.bottom, focused ? 0 : 80)
@@ -27,6 +30,10 @@ struct CuadraoChatCanvas: View {
         .toolbar(.hidden, for: .tabBar)
         .onChange(of: focused) { _, value in editing = value; if value { tray = false } }
         .onDisappear { focused = false; editing = false }
+        .onAppear { if store.voice.active && store.voice.presentation == .keyboard { focused = true } }
+        .onChange(of: store.voice.presentation) { _, value in
+            if store.voice.active && value == .keyboard { focused = true }
+        }
         .sheet(item: $sheet) { destination in
             CuadraoChatSheet(destination: destination, store: store, spanish: es)
                 .tint(WelcomePalette.pine)
@@ -202,16 +209,15 @@ struct CuadraoChatCanvas: View {
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { tray.toggle() }
                     }
                     Spacer()
-                    control("mic", es ? "Dictar mensaje" : "Dictate message", id: "chat-dictate") { focused = false; sheet = .dictation }
                     Button {
                         focused = false; tray = false
-                        if ready { store.send(spanish: es) } else { sheet = .voice }
+                        if ready { store.send(spanish: es) } else { store.voice.start() }
                     } label: {
                         Image(systemName: ready ? "arrow.up" : "waveform")
                             .font(.system(size: 19, weight: .semibold))
                             .foregroundStyle(WelcomePalette.onAccent).frame(width: 44, height: 44)
                             .background(WelcomePalette.pine, in: Circle())
-                    }.accessibilityLabel(ready ? (es ? "Enviar" : "Send") : (es ? "Conversación por voz" : "Voice conversation"))
+                    }.accessibilityLabel(ready ? (es ? "Enviar" : "Send") : (es ? "Hablar con Cuadrao" : "Talk to Cuadrao"))
                         .accessibilityIdentifier("chat-send")
                 }
                 if tray {

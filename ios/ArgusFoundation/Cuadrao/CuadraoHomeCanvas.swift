@@ -64,12 +64,25 @@ struct CuadraoHomeCanvas: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+            if selectedTab != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
+                CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
+            }
             if (accountPath.isEmpty || selectedTab != .home) && !(selectedTab == .assistant && chatEditing) {
             CuadraoNavigationBar(selection: tabSelection,
                 compact: selectedTab == .home && navigationScroll.compact, spanish: spanish)
                 .padding(.horizontal, 20)
                 .frame(height: 64, alignment: .bottom)
                 .padding(.bottom, 8)
+            }
+            }
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { chat.voice.active && chat.voice.presentation == .expanded },
+            set: { if !$0 && chat.voice.active && chat.voice.presentation == .expanded { chat.voice.presentation = .compact } })) {
+            CuadraoLiveVoiceCanvas(chat: chat, spanish: spanish) {
+                selectedTab = .assistant
+                chat.voice.presentation = .keyboard
             }
         }
         .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",

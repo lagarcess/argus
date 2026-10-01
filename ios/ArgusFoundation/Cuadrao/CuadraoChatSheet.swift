@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum CanvasChatSheet: Identifiable {
-    case history, rename, temporary, sources, calculation, share, states, dictation, voice
+    case history, rename, temporary, sources, calculation, share, states
     case attachment(String)
     var id: String { String(describing: self) }
 }
@@ -14,7 +14,6 @@ struct CuadraoChatSheet: View {
     @State private var query = ""
     @State private var title = ""
     @State private var historyScope = 0
-    @State private var transcript = ""
     @State private var endTemporary = false
     @State private var pendingExit = CuadraoChatPreview.Exit.returnToRegular
     private var es: Bool { spanish }
@@ -27,8 +26,6 @@ struct CuadraoChatSheet: View {
         case .calculation: es ? "El cálculo" : "The calculation"
         case .share: es ? "Compartir chat" : "Share chat"
         case .states: es ? "Vista previa" : "Preview"
-        case .dictation: es ? "Revisar dictado" : "Review dictation"
-        case .voice: es ? "Conversación por voz" : "Voice conversation"
         case .attachment: es ? "Añadir al mensaje" : "Add to message"
         }
     }
@@ -45,7 +42,7 @@ struct CuadraoChatSheet: View {
             } }
         }
         .presentationDragIndicator(.visible)
-        .onAppear { title = store.current.title; transcript = es ? "Quiero organizar mis gastos del mes." : "I want to organize my monthly spending." }
+        .onAppear { title = store.current.title }
         .confirmationDialog(es ? "¿Terminar el chat temporal?" : "End temporary chat?", isPresented: $endTemporary, titleVisibility: .visible) {
             Button(es ? "Terminar chat" : "End chat", role: .destructive) { finishExit() }
             Button(es ? "Seguir aquí" : "Stay here", role: .cancel) {}
@@ -88,18 +85,6 @@ struct CuadraoChatSheet: View {
                         }.frame(minHeight: 44)
                     }
                 }
-            case .dictation:
-                Text(es ? "Transcripción de ejemplo" : "Example transcript").font(.footnote).foregroundStyle(.secondary)
-                TextField(es ? "Revisa el texto" : "Review the text", text: $transcript, axis: .vertical)
-                    .lineLimit(3...8).padding(16).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 16))
-                action(es ? "Usar texto" : "Use text") {
-                    store.current.draft = [store.current.draft, transcript].filter { !$0.isEmpty }.joined(separator: " "); dismiss()
-                }.disabled(transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                Text(es ? "El micrófono permanece apagado en esta vista previa." : "The microphone stays off in this preview.").font(.footnote).foregroundStyle(.secondary)
-            case .voice:
-                Image(systemName: "waveform").font(.system(size: 40)).foregroundStyle(WelcomePalette.pine)
-                Text(es ? "Hablar y escuchar, sin escribir." : "Talk and listen, without typing.").font(.title2)
-                previewNote
             case .attachment(let symbol):
                 Image(systemName: symbol).font(.system(size: 36)).foregroundStyle(WelcomePalette.pine)
                 let name = symbol == "doc" ? (es ? "Documento de ejemplo.pdf" : "Example document.pdf") : (es ? "Recibo de ejemplo" : "Example receipt")

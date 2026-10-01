@@ -46,6 +46,43 @@ import Foundation
             precondition(restored.deleted)
             store.leaveTemporary(for: .open(restored))
             precondition(store.current === restored && !restored.deleted && !restored.archived)
+            let regularID = store.current.id
+            let priorTurns = store.current.turns.count
+            let draftBeforeCall = "Keep this draft"
+            store.current.draft = draftBeforeCall
+            store.current.attachments = [attachment]
+            store.voice.start()
+            precondition(store.voice.active && store.voice.presentation == .expanded)
+            store.voice.muted = true
+            store.voice.phase = .speaking
+            precondition(!store.voice.resting, "Muting input must not suppress the speaking state")
+            store.voice.interrupt()
+            precondition(store.voice.resting && store.voice.active)
+            store.voice.presentation = .keyboard
+            precondition(store.voice.active && store.current.id == regularID)
+            precondition(store.current.draft == draftBeforeCall && store.current.attachments.first?.id == attachment.id)
+            store.voice.presentation = .compact
+            store.voice.start()
+            precondition(store.voice.presentation == .expanded && store.voice.muted)
+            store.voice.end()
+            precondition(!store.voice.active && store.current.id == regularID)
+            precondition(store.current.turns.count == priorTurns && store.current.draft == draftBeforeCall)
+            store.voice.start()
+            store.startTemporary()
+            precondition(!store.voice.active && store.temporary)
+            store.voice.start()
+            store.voice.end()
+            precondition(store.temporary, "Ending voice must not silently end the temporary chat")
+            store.voice.start()
+            store.leaveTemporary(for: .returnToRegular)
+            precondition(!store.voice.active && store.current.id == regularID)
+            store.voice.start()
+            store.open(store.threads[1])
+            precondition(!store.voice.active)
+            store.voice.start()
+            store.newChat()
+            precondition(!store.voice.active && store.current.id != regularID)
+            print("PASS: live voice start, mute/speaking, interruption, keyboard handoff, minimization, end and conversation boundaries (\(spanish ? "es" : "en"))")
             print("PASS: temporary entry, whitespace, attachments, context lock, history isolation, draft restoration, new chat and history opening (\(spanish ? "es" : "en"))")
         }
     }

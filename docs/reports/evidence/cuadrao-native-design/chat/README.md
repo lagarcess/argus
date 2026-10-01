@@ -107,3 +107,11 @@ Founder selected the original HTML bubble-plus icon over square-and-pencil.
 The exact vector now serves both the header (including “Nuevo chat normal” from
 temporary mode) and the history sheet. Existing exit confirmation and new-chat
 behavior are unchanged. Simulator visual checks remain pending its release.
+
+## Live voice direction supersedes separate dictation preview
+
+The founder approved removing the redundant composer microphone and focusing on
+one live-session entry; keyboard dictation remains native. See the
+[live voice checkpoint](../live-voice/README.md) for controls, research and pending
+visual acceptance. Earlier dictation-sheet evidence is historical, not the current
+composer design.

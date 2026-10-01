@@ -50,6 +50,7 @@ enum CanvasChatExample: String, CaseIterable, Identifiable {
 enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, failed }
 
 @Observable final class CuadraoChatPreview {
+    let voice = CuadraoVoicePreview()
     var threads: [CanvasChatThread] = []
     var current = CanvasChatThread()
     var temporary = false
@@ -73,14 +74,15 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
     var hasTemporaryContent: Bool {
         temporary && (!current.turns.isEmpty || !current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !current.attachments.isEmpty)
     }
-    func newChat() { current = CanvasChatThread(); responseState = .complete }
-    func open(_ thread: CanvasChatThread) { current = thread; thread.unread = false; responseState = .complete }
+    func newChat() { voice.end(); current = CanvasChatThread(); responseState = .complete }
+    func open(_ thread: CanvasChatThread) { if current.id != thread.id { voice.end() }; current = thread; thread.unread = false; responseState = .complete }
     func startTemporary() {
         guard !temporary else { return }
         suspended = current; temporary = true; contextEnabled = false; newChat()
     }
     func endTemporary() {
         guard temporary else { return }
+        voice.end()
         current = suspended ?? CanvasChatThread(); suspended = nil; temporary = false; contextEnabled = false
         responseState = .complete
     }
