@@ -27,3 +27,9 @@ Reuse ios/ArgusFoundation.xcodeproj, ArgusFoundation scheme and /private/tmp/cua
 Device build overrides: SUPPORTED_PLATFORMS=iphoneos, CODE_SIGN_STYLE=Automatic, CODE_SIGNING_ALLOWED=YES, CODE_SIGNING_REQUIRED=YES, CODE_SIGN_IDENTITY=Apple Development, empty CODE_SIGN_ENTITLEMENTS, existing approved DEVELOPMENT_TEAM, distinct ARGUS_LOCAL_BUNDLE_IDENTIFIER, ARGUS_DISPLAY_NAME=Cuadrao Preview, CUADRAO_DESIGN_PREVIEW=true, ARGUS_AUTH_ENABLED=false. Use the paired device destination. These overrides are opt-in; do not rewrite the connected app configuration.
 
 One build cache was reused; no simulator was created. No backend, hosted setting, real invitation, financial record or model call changed.
+
+## Search header refinement
+
+Removed the duplicate screen heading and shortened the placeholder to Buscar/Search.
+Simulator and device builds passed. The Spanish simulator screenshot search-header.jpg
+shows the resulting layout; existing query/categories/filter behavior is unchanged.

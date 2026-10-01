@@ -296,3 +296,7 @@ relaunch; this is phone design review, not connected internet delivery.
 
 [Search evidence and remaining checks](../reports/evidence/cuadrao-native-design/search/README.md).
 [VM handoff prompt](../reports/cuadrao-vm-handoff-prompt.md).
+
+Search copy refinement: remove the separate Buscar/Search heading. The field
+placeholder is simply Buscar/Search; the selected tab, magnifier and categories
+provide context without repeating the app name.

@@ -48,8 +48,6 @@ struct CuadraoSearchCanvas: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 18) {
-                Text(spanish ? "Buscar" : "Search")
-                    .font(.system(.title2, design: .serif)).accessibilityAddTraits(.isHeader)
                 searchField
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 24) {
@@ -144,7 +142,7 @@ struct CuadraoSearchCanvas: View {
     private var searchField: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-            TextField(spanish ? "Buscar en Cuadrao" : "Search Cuadrao", text: $query)
+            TextField(spanish ? "Buscar" : "Search", text: $query)
                 .focused($focused).autocorrectionDisabled().textInputAutocapitalization(.never)
                 .submitLabel(.search).onSubmit { focused = false }
                 .accessibilityIdentifier("cuadrao.search.query")
