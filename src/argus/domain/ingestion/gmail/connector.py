@@ -49,7 +49,6 @@ class GmailConnector:
         config: GmailConfig,
         *,
         senders: SenderRepository,
-        ref_key: bytes,
         ledger: StateLedger | None = None,
         extractor: EmailExtractor | None = None,
         transport: httpx.BaseTransport | None = None,
@@ -68,7 +67,6 @@ class GmailConnector:
             config,
             OAuthStates(hub.box, ledger or InMemoryStateLedger(), hub.clock),
             senders,
-            ref_key=ref_key,
         )
         self.syncer = GmailSync(
             hub,

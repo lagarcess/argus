@@ -7557,8 +7557,12 @@ Each relevant message becomes one draft candidate with `source=gmail`,
 references with SHA-256 and size), `observed_at` = Gmail's `internalDate`,
 `account.institution` = the sender domain and a capped inert `excerpt` (subject
 and visible text). Amount, currency, dates, direction and account are left for
-the person to resolve; `evidence` is `transaction` with `kind` in `uncertain`
-because no content is interpreted in this wave.
+the person to resolve, and `evidence` is `unclassified` (the person says what
+it is) because no content is interpreted in this wave.
+
+When Google issues a time-limited grant (`refresh_token_expires_in` in the
+token response), the connection stays `active` and carries
+`attention_code=gmail_access_time_limited` until the person authorizes again.
 
 `last_error_code` for Gmail is `gmail_token_revoked` (revoked or expired grant,
 or a refused access token) and `gmail_scope_missing` or `gmail_access_denied`
@@ -7566,5 +7570,6 @@ or a refused access token) and `gmail_scope_missing` or `gmail_access_denied`
 retries of 429/5xx and `gmail_oauth_client_invalid` (status `error`), or
 `gmail_credential_unavailable`. Other routes map the same Google failures to 409
 with that code or 502 `gmail_unavailable`. Disconnect posts the refresh token to
-Google's revocation endpoint (a token Google no longer knows counts as revoked)
-and deletes the sender allowlist.
+Google's revocation endpoint (a token Google no longer knows counts as revoked);
+after the local disconnect the adapter's `forget` hook deletes the sender
+allowlist, whether or not revocation succeeded.

@@ -150,6 +150,8 @@ def test_failed_revocation_still_deletes_credential(client, google, identities):
         user_id=identities[ALICE]["id"], connection_id=connection_id
     )
     assert stored.secret is None and stored.status == "disconnected"
+    # The forget hook still deletes the sender allowlist.
+    assert gmail_connector().senders.list(connection_id=connection_id) == []
 
 
 def test_reconnect_returns_200_with_the_same_connection(client, google):  # noqa: ANN001, F811

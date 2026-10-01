@@ -41,6 +41,10 @@ from argus.domain.ingestion.gmail.state import OAuthStates
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.secrets import SecretBoxUnavailable
 
+# Google issued a time-limited grant (refresh_token_expires_in); re-authorizing
+# clears it.
+ACCESS_TIME_LIMITED = "gmail_access_time_limited"
+
 
 class ScopeNotGranted(RuntimeError):
     """The person did not allow reading Gmail; nothing was stored."""
@@ -75,15 +79,12 @@ class GmailOAuth:
         config: GmailConfig,
         states: OAuthStates,
         senders: SenderRepository,
-        *,
-        ref_key: bytes,
     ) -> None:
         self.hub = hub
         self.client = client
         self.config = config
         self.states = states
         self.senders = senders
-        self._ref_key = ref_key
 
     def authorize(self, *, user_id: str) -> AuthorizationRequest:
         pending = self.states.issue(user_id=user_id)
@@ -127,7 +128,7 @@ class GmailOAuth:
             # The unused access token expires on its own within the hour.
             raise RefreshTokenMissing()
         profile = self.client.profile(grant.access_token)
-        ref = mailbox_ref(profile.email, self._ref_key)
+        ref = mailbox_ref(profile.email, box)
         live = self.hub.connections.find_live(source="gmail", external_ref=ref)
         mine = [row for row in live if row.user_id == user_id]
         if live and not mine:
@@ -158,6 +159,12 @@ class GmailOAuth:
                 )
                 row = self._reseal(existing, grant.refresh_token)
                 created = False
+        if grant.refresh_expires_in is not None:
+            # Not blocking: syncs work until Google ends the grant, then the
+            # connection moves to needs_reauth. The person is told ahead.
+            row = self.hub.connections.flag_attention(
+                connection_id=row.id, code=ACCESS_TIME_LIMITED, now=now
+            )
         if senders is not None:
             rules = self.senders.replace(
                 user_id=user_id, connection_id=row.id, senders=senders, now=now

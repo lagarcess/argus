@@ -26,10 +26,7 @@ from argus.api.ingestion import (
 )
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.gmail.client import GmailError
-from argus.domain.ingestion.gmail.config import (
-    gmail_config_from_env,
-    mailbox_ref_key_from_env,
-)
+from argus.domain.ingestion.gmail.config import gmail_config_from_env
 from argus.domain.ingestion.gmail.connector import (
     ConnectionDisconnected,
     GmailConnector,
@@ -70,8 +67,7 @@ def start_gmail(hub: IngestionHub | None, pool: object | None) -> None:
         )
         configure_gmail_connector(None)
         return
-    ref_key = mailbox_ref_key_from_env()
-    if not config.configured or ref_key is None:
+    if not config.configured:
         configure_gmail_connector(None)
         return
     if api_state.PERSISTENCE_MODE == "supabase":
@@ -86,7 +82,7 @@ def start_gmail(hub: IngestionHub | None, pool: object | None) -> None:
     else:
         senders = InMemorySenderRepository()
     try:
-        connector = GmailConnector(hub, config, senders=senders, ref_key=ref_key)
+        connector = GmailConnector(hub, config, senders=senders)
     except Exception as exc:
         # Gmail failing to start must not take the shared hub down with it.
         logger.warning(

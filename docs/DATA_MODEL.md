@@ -2864,8 +2864,8 @@ was last searched; null means the next sync searches it). `sender` is a
 lowercased address or domain name with no whitespace, quotes, parentheses,
 commas or angle brackets, so it can never inject Gmail search operators. The
 connector reads only messages whose authenticated `From` matches an entry.
-Rows cascade with their connection and their user, and the Gmail adapter
-deletes them on disconnect. The server writes rows only through the owner's
+Rows cascade with their connection and their user, and the Gmail adapter's
+`forget` hook deletes them on disconnect. The server writes rows only through the owner's
 live Gmail connection (checked in the same transaction). Registered owners may
 `SELECT` their rows; no client role can write. Rows never hold message content.
 Proven by `tests/test_ingestion_gmail_postgres.py`.

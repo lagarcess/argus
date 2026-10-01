@@ -51,6 +51,9 @@ class TokenGrant:
     access_token: str = field(repr=False)
     refresh_token: str | None = field(repr=False)
     scopes: frozenset[str]
+    # Set by Google only for time-limited grants; the refresh token then
+    # stops working after this many seconds.
+    refresh_expires_in: int | None = None
 
 
 @dataclass(frozen=True)
@@ -97,10 +100,14 @@ class GmailClient:
         access = _text(payload, "access_token")
         refresh = payload.get("refresh_token")
         scopes = payload.get("scope")
+        lifetime = payload.get("refresh_token_expires_in")
         return TokenGrant(
             access_token=access,
             refresh_token=refresh if isinstance(refresh, str) and refresh else None,
             scopes=frozenset(scopes.split()) if isinstance(scopes, str) else frozenset(),
+            refresh_expires_in=lifetime
+            if isinstance(lifetime, int) and not isinstance(lifetime, bool)
+            else None,
         )
 
     def refresh(self, refresh_token: str) -> str:

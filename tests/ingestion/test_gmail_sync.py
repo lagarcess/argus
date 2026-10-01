@@ -6,7 +6,6 @@ from threading import Barrier
 
 import pytest
 from argus.domain.ingestion.gmail import sync as sync_module
-from argus.domain.ingestion.gmail.extract import UNREVIEWED_UNCERTAIN
 
 from tests.ingestion.gmail_fakes import (
     FakeGoogle,
@@ -80,13 +79,15 @@ def test_candidates_claim_only_machine_certain_facts():
     alert = by_id["a0001es"]
     assert alert.source.source == "gmail" and alert.source.connection_id == row.id
     assert int(alert.source.observed_at.timestamp() * 1000) == fake.mails[0].internal_ms
-    assert alert.evidence == "transaction" and alert.uncertain == UNREVIEWED_UNCERTAIN
+    assert alert.evidence == "unclassified" and alert.uncertain == frozenset()
+    assert alert.kind_hint == "unknown" and alert.status == "unknown"
     assert (alert.amount, alert.currency, alert.occurred_on, alert.direction) == (
         None, None, None, "unknown",
     )  # fmt: skip
     assert alert.account.institution == BANK and alert.account.mask is None
-    assert alert.unresolved() >= {"amount", "currency", "occurred_on", "direction",
+    assert alert.unresolved() == {"amount", "currency", "occurred_on", "direction",
                                   "account", "kind"}  # fmt: skip
+    assert all(c.evidence == "unclassified" for c in by_id.values())
     assert alert.excerpt.startswith("Alerta de consumo: tarjeta terminada en 1234 · ")
     statement = by_id["s0003pdf"]
     assert [(a.external_id, a.media_type) for a in statement.attachments] == [

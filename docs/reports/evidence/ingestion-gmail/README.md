@@ -119,7 +119,7 @@ Until verification passes, Gmail stays limited to manually added test users.
 | --- | --- |
 | Refresh token | Sealed (AES-256-GCM, bound to `gmail:<connection id>`) in `financial_source_connections`; deleted on disconnect |
 | Access token | Memory only, minted per sync or suggestion request, never stored or logged |
-| Mailbox address | Not stored: a keyed HMAC digest (`external_ref`) and a masked label only |
+| Mailbox address | Not stored: a keyed, purpose-separated digest (`SecretBox.digest`, `external_ref`) and a masked label only |
 | Sender allowlist | `financial_source_gmail_senders`; deleted on disconnect |
 | Message body, HTML, headers | Not stored; parsed in memory during a sync |
 | Excerpt | Subject and visible text, inert and capped at 280 characters, inside the candidate (reconciliation decides its retention) |
@@ -145,7 +145,7 @@ Never-Violate 12).
 | Consent URL: `gmail.readonly` only, offline, `prompt=consent`, incremental, PKCE S256 | Mocked provider | `test_authorize_url_asks_only_for_gmail_readonly_with_pkce_and_offline_access` |
 | State bound to the person, single-use, expiring, tamper-proof; PKCE verifier checked by the token endpoint | Mocked provider | `test_state_is_*`, `test_forged_or_altered_state_is_refused` (4), `test_a_code_issued_for_another_pkce_challenge_is_refused_by_google`, RFC 7636 vector |
 | Partial consent refused and released; missing refresh token stores nothing | Mocked provider | `test_partial_consent_*`, `test_missing_refresh_token_*`, API 422 |
-| Connection: digest ref, masked label, sealed refresh token | Mocked provider | `test_callback_creates_a_connection_*` |
+| Connection: digest ref, masked label, sealed refresh token; time-limited grant flagged for attention | Mocked provider | `test_callback_creates_a_connection_*`, `test_time_limited_grant_is_flagged_*` |
 | Reconnect updates the same connection; insert race resolves; other person's mailbox refused | Mocked provider; Postgres | `test_reconnect_*`, `test_concurrent_callback_race_*`, `test_mailbox_connected_by_someone_else_*`, `tests/test_ingestion_gmail_postgres.py` |
 | Allowlist only; query built from it; strict local match (lookalike domain rejected) | Mocked provider | `test_initial_sync_imports_allowlisted_authenticated_messages_only`, `test_matching_*`, `test_senders_that_could_inject_query_operators_are_refused` (12) |
 | Forged `From` skipped using Gmail's topmost `Authentication-Results` | Mocked provider (synthetic headers) | `test_gmail_authentication_results_decide_sender_authenticity`, spoofed fixture |
@@ -157,7 +157,7 @@ Never-Violate 12).
 | History 404 recovery, window bounded | Mocked provider | `test_history_too_old_*`, `test_recovery_window_never_exceeds_the_lookback` |
 | Revoked grant, 401, 403 scope, 403 other: `needs_reauth`, freshness kept | Mocked provider; Postgres | `test_revoked_refresh_token_*`, `test_refused_access_needs_reauth` (3) |
 | 429/5xx bounded backoff then `gmail_unavailable`, cursor kept | Mocked provider | `test_outages_*` (3), `test_a_transient_outage_*` |
-| Disconnect revokes; failure still deletes credential; allowlist deleted | Mocked provider; Postgres | `test_connect_choose_senders_sync_and_disconnect`, `test_failed_revocation_still_deletes_credential` |
+| Disconnect revokes; failure still deletes credential; `forget` deletes the allowlist | Mocked provider; Postgres | `test_connect_choose_senders_sync_and_disconnect`, `test_failed_revocation_still_deletes_credential` |
 | Flag/config off is 404; other person's connection is 404; no token in responses or logs | Mocked provider | `test_flag_off_*`, `test_missing_configuration_*` (4), `test_another_persons_connection_looks_absent`, loguru capture in the round-trip test |
 | Allowlist table RLS, owner-only writes through a live connection | Real Postgres 16 (Supabase shim) | `test_clients_read_their_own_senders_and_never_write`, `test_senders_attach_only_*` |
 | Real Google OAuth, consent screen, Gmail API behavior and quotas | **Not verified** | Needs the founder's OAuth client and test inbox |
@@ -167,13 +167,13 @@ Never-Violate 12).
 ```bash
 # Hermetic (no network)
 python -m pytest tests/ingestion/test_gmail_*.py -q --no-cov
-# 94 passed (oauth 16, parsing 34, sync 12, sync failures 13, api 19)
+# 95 passed (oauth 17, parsing 34, sync 12, sync failures 13, api 19)
 
 # Real Postgres (wave-0 and Gmail senders migrations)
 ARGUS_DISPOSABLE_DATABASE_URL=postgresql://postgres@127.0.0.1:56811/argus_gmail \
   python -m pytest tests/test_ingestion_gmail_postgres.py \
   tests/test_ingestion_connections_postgres.py -q --no-cov
-# 14 passed (gmail 4, connections 10)
+# 15 passed (gmail 4, connections 11)
 ```
 
 ## Unsupported or unknown
@@ -198,20 +198,25 @@ ARGUS_DISPOSABLE_DATABASE_URL=postgresql://postgres@127.0.0.1:56811/argus_gmail 
   with `gmail_access_denied`; not exercised against Google.
 - In memory persistence mode the sender allowlist is in memory too.
 
-## Proposed wave-0 changes (not made here)
+## Wave-0 changes adopted
 
-1. `contract.py`: no way to say "evidence kind unknown". Proposed: add
-   `"unknown"` to `EvidenceKind` (and require resolution in `unresolved()`), or
-   add `"evidence"` to `UncertainField`. Until then Gmail emits
-   `evidence="transaction"` with `kind` uncertain, the most demanding value.
-2. `secrets.py`: connectors need a keyed digest (Gmail's mailbox
-   `external_ref`). `gmail/config.py` re-decodes `ARGUS_INGESTION_SECRET_KEY`
-   and derives an HKDF subkey itself. Proposed: `SecretBox.digest(value, *,
-   purpose)` so the key is parsed in one place.
-3. `hub.py`: connector-local state to delete on disconnect (the sender
-   allowlist) is removed inside `SourceAdapter.revoke`, which is about the
-   provider. Proposed: an optional `forget(connection)` adapter hook the hub
-   calls after the local disconnect.
+The amended contract (`claude/ingestion-contract` at `3bed4ac1`) took the
+three changes this lane proposed, and Gmail now uses them:
+
+1. `evidence="unclassified"`: every Gmail candidate says "a person must say
+   what this is"; `unresolved()` then demands `kind` and every money field.
+   The earlier `transaction` plus uncertain-`kind` workaround is gone.
+2. `SecretBox.digest(address, purpose="gmail_mailbox")` makes the mailbox
+   `external_ref`; Gmail no longer reads `ARGUS_INGESTION_SECRET_KEY` itself.
+3. The adapter's `forget(connection)` hook deletes the sender allowlist after
+   the local disconnect; `revoke` only talks to Google.
+
+It also uses `flag_attention`: a grant Google marks time-limited
+(`refresh_token_expires_in`) sets `attention_code=gmail_access_time_limited`
+without blocking syncs; re-authorizing clears it. Google documents that field
+for time-based access grants; whether Testing-mode grants (7-day refresh
+tokens) report it was not verified, so the 7-day expiry may still surface only
+as `needs_reauth` with `gmail_token_revoked`.
 
 [gmail-scopes]: https://developers.google.com/workspace/gmail/api/auth/scopes
 [restricted]: https://support.google.com/cloud/answer/13464325?hl=en

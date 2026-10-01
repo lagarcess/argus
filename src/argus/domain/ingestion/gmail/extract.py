@@ -6,15 +6,13 @@ unsure of. It cannot touch source identity, observation time, the excerpt or
 attachments; ``build_candidate`` owns those from the message itself, so no
 extractor can relabel where evidence came from.
 
-The shipped ``UnreviewedEmailExtractor`` interprets nothing. Amount, currency,
-dates, direction and account stay unresolved for the person to supply in
-review. The kind of evidence cannot be known without reading the message, and
-the contract has no "unknown" evidence kind, so it uses the most demanding
-value, ``transaction`` (every money field must be resolved before acceptance),
-and lists ``kind`` as uncertain. Reading content (amounts, due dates,
-statement periods) is a separate, measured step that needs founder
-authorization: a paid model and a committed scorecard (AGENTS.md
-Never-Violate 12).
+The shipped ``UnreviewedEmailExtractor`` interprets nothing. The kind of
+evidence cannot be known without reading the message, so it emits
+``unclassified``: the contract then requires the person to say what it is and
+to supply amount, currency, date, direction and account before anything can
+become activity. Reading content (amounts, due dates, statement periods) is a
+separate, measured step that needs founder authorization: a paid model and a
+committed scorecard (AGENTS.md Never-Violate 12).
 """
 
 from __future__ import annotations
@@ -38,14 +36,11 @@ from argus.domain.ingestion.contract import (
 from argus.domain.ingestion.gmail.mime import ParsedEmail
 
 EXCERPT_SOURCE_CHARS = 1000
-UNREVIEWED_UNCERTAIN: frozenset[UncertainField] = frozenset(
-    {"kind", "amount", "currency", "occurred_on", "direction", "account"}
-)
 
 
 @dataclass(frozen=True)
 class EmailFacts:
-    evidence: EvidenceKind = "transaction"
+    evidence: EvidenceKind = "unclassified"
     status: ObservedStatus = "unknown"
     account: AccountHint = AccountHint()
     occurred_on: date | None = None
@@ -78,8 +73,8 @@ class UnreviewedEmailExtractor:
 
     def extract(self, email: ParsedEmail) -> EmailFacts:
         return EmailFacts(
+            evidence="unclassified",
             account=AccountHint(institution=email.sender_domain),
-            uncertain=UNREVIEWED_UNCERTAIN,
         )
 
 

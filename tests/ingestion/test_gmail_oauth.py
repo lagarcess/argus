@@ -1,8 +1,6 @@
 """Gmail OAuth: consent URL, sealed single-use state, PKCE, scope checks,
 connection creation, reconnect without duplicates and mailbox ownership."""
 
-import hashlib
-import hmac
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -57,10 +55,10 @@ def test_callback_creates_a_connection_with_digest_ref_masked_label_and_sealed_t
     row = result.connection
     assert result.created and row.source == "gmail" and row.status == "active"
     assert row.label == "j***@example.test" == masked_label(MAILBOX)
-    expected = hmac.new(
-        b"k" * 32, b"gmail-mailbox:" + MAILBOX.encode(), hashlib.sha256
-    ).hexdigest()
-    assert row.external_ref == "gm_" + expected == mailbox_ref(MAILBOX.upper(), b"k" * 32)
+    box = connector.hub.box
+    expected = "gm_" + box.digest(MAILBOX, purpose="gmail_mailbox")
+    assert row.external_ref == expected == mailbox_ref(MAILBOX.upper(), box)
+    assert row.attention_code is None
     assert MAILBOX not in row.external_ref
     refresh = connector.hub.credential(row)
     assert refresh in fake.refresh_tokens
@@ -212,3 +210,14 @@ def test_pkce_challenge_is_s256_of_the_verifier():
     assert challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk") == (
         "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
     )  # RFC 7636 appendix B
+
+
+def test_time_limited_grant_is_flagged_without_blocking_and_cleared_on_reconnect():
+    fake = FakeGoogle()
+    connector = make_connector(fake)
+    row = connect(connector, fake, ALICE, refresh_lifetime=604799).connection
+    assert row.status == "active"
+    assert row.attention_code == "gmail_access_time_limited"
+    assert row.attention_at == connector.hub.clock()
+    again = connect(connector, fake, ALICE, senders=None).connection
+    assert again.id == row.id and again.attention_code is None

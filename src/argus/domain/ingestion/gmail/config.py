@@ -12,18 +12,11 @@ route, so the exchange always happens under the person's own session.
 
 from __future__ import annotations
 
-import base64
-import binascii
-import hashlib
-import hmac
 import os
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-
-from argus.domain.ingestion.secrets import KEY_ENV
+from argus.domain.ingestion.secrets import SecretBox
 
 # The narrowest Gmail scope that can read message bodies and attachments.
 # No ``openid email``: users.getProfile returns the address under this scope.
@@ -66,42 +59,15 @@ def gmail_config_from_env() -> GmailConfig:
     )
 
 
-def mailbox_ref_key_from_env() -> bytes | None:
-    """A digest key derived from the ingestion secret key (HKDF-SHA256).
-
-    Rotating ``ARGUS_INGESTION_SECRET_KEY`` already invalidates stored
-    connections, so tying the mailbox digest to it adds no new rotation duty.
-    """
-
-    raw = os.getenv(KEY_ENV, "").strip()
-    if not raw:
-        return None
-    try:
-        key = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
-    except (binascii.Error, ValueError):
-        return None
-    if len(key) != 32:
-        return None
-    return HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=b"argus-ingestion:gmail:mailbox-ref",
-    ).derive(key)
-
-
 def normalize_address(address: str) -> str:
     return address.strip().lower()
 
 
-def mailbox_ref(address: str, key: bytes) -> str:
+def mailbox_ref(address: str, box: SecretBox) -> str:
     """Keyed digest of the mailbox: stable, comparable, not reversible by
     guessing addresses without the server key."""
 
-    digest = hmac.new(
-        key, b"gmail-mailbox:" + normalize_address(address).encode(), hashlib.sha256
-    )
-    return "gm_" + digest.hexdigest()
+    return "gm_" + box.digest(normalize_address(address), purpose="gmail_mailbox")
 
 
 def masked_label(address: str) -> str:

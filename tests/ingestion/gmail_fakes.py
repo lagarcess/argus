@@ -128,6 +128,7 @@ class FakeGoogle:
         scopes: Sequence[str] = (SCOPE,),
         refresh: bool = True,
         email: str | None = None,
+        refresh_lifetime: int | None = None,
     ) -> tuple[str, str]:
         """What Google does after consent: a code tied to the PKCE challenge.
         Returns ``(code, state)`` as the browser would receive them."""
@@ -138,6 +139,7 @@ class FakeGoogle:
             "challenge": query["code_challenge"][0],
             "scopes": list(scopes),
             "refresh": refresh,
+            "lifetime": refresh_lifetime,
             "email": email or self.email,
             "redirect_uri": query["redirect_uri"][0],
         }
@@ -242,6 +244,8 @@ class FakeGoogle:
                 refresh = f"1//synthetic-refresh-{next(self._serial)}"
                 self.refresh_tokens[refresh] = issued["email"]
                 body["refresh_token"] = refresh
+                if issued["lifetime"] is not None:
+                    body["refresh_token_expires_in"] = issued["lifetime"]
             return _json(200, body)
         if get("grant_type") == "refresh_token":
             refresh = get("refresh_token")
@@ -360,7 +364,6 @@ def make_connector(
         hub,
         config,
         senders=senders or InMemorySenderRepository(),
-        ref_key=b"k" * 32,
         transport=httpx.MockTransport(fake),
         sleep=recorded.append,
     )

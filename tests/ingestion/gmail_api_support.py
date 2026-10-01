@@ -44,7 +44,6 @@ def google(client):  # noqa: ANN001
         hub,
         started.config,
         senders=InMemorySenderRepository(),
-        ref_key=b"r" * 32,
         transport=httpx.MockTransport(fake),
         sleep=lambda _seconds: None,
     )
