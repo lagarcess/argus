@@ -107,6 +107,11 @@ household_invitations
 household_account_grants
 ```
 
+Default-off, registered-only (`ARGUS_INGESTION_ENABLED`):
+```text
+financial_source_connections
+```
+
 Optional or later:
 ```
 - assets
@@ -2822,3 +2827,28 @@ changes replay their accepted version before stale-version validation. Account
 metadata/link type validation is serialized with details writes. Existing
 owner-scoped native financial journals persist pending account creation and
 asset commands until an accepted response or explicit failure resolution.
+
+## Connected financial sources
+
+Default-off with `ARGUS_INGESTION_ENABLED`. Lane spec:
+[financial-ingestion-connectors](specs/lanes/financial-ingestion-connectors.md).
+
+`financial_source_connections` holds one row per person-authorized connection
+(Plaid Item, Gmail mailbox, Shortcuts device). It owns status, last successful
+and last attempted refresh, the last actionable error code, an attention warning
+(`attention_code`, `attention_at`) that successful syncs do not clear, the provider sync
+cursor, a short sync lease (`lease_holder`, `lease_until`) and the sealed
+provider credential (`secret_ciphertext`, AES-256-GCM bound to
+`source:id`, key `ARGUS_INGESTION_SECRET_KEY`). One live row per
+`(user_id, source, external_ref)`; webhooks resolve by `(source, external_ref)`.
+Cursor advances are compare-and-set under the lease; failures never clear
+`last_success_at` or the cursor. A check constraint keeps disconnected rows free
+of credential, cursor and lease.
+
+Registered owners may `SELECT` only the non-secret columns (column grant); no
+client role can read `secret_ciphertext`, `sync_cursor` or the lease, or write
+anything. Proven by `tests/test_ingestion_connections_postgres.py`.
+
+These rows are connection state, never financial records. Imported evidence
+and review state belong to reconciliation; canonical activity remains in the
+existing activity tables written only through `MoneyService`.

@@ -63,6 +63,10 @@ services:
         value: "false"
       - key: ARGUS_HOUSEHOLDS_ENABLED
         value: "false"
+      - key: ARGUS_INGESTION_ENABLED
+        value: "false"
+      - key: ARGUS_INGESTION_SECRET_KEY
+        sync: false
       - key: ARGUS_IN_PLACE_CARD_EDITS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
