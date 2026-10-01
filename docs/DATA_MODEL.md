@@ -99,6 +99,14 @@ financial_record_revisions
 financial_account_idempotency
 ```
 
+Default-off, registered-only (`ARGUS_HOUSEHOLDS_ENABLED`):
+```text
+households
+household_members
+household_invitations
+household_account_grants
+```
+
 Optional or later:
 ```
 - assets
@@ -1833,7 +1841,7 @@ indexed RLS, and composite foreign keys `(account_id, user_id)` and
 | --- | --- |
 | `id` | uuid, server-assigned, stable across nickname, archive and edits |
 | `user_id` | owner, `auth.users(id)` on delete cascade |
-| `space_id` | text, default `personal`; created for the later spaces slice, read and written by no route today |
+| `space_id` | text, default `personal`; household sharing uses explicit grants and does not rewrite this field |
 | `type` | one of the nine account types; nature derives from it in code and is never stored |
 | `currency` | ISO 4217 code, `^[A-Z]{3}$`; accepted set is the CLDR tender set in code |
 | `nickname` | null or 1–60 characters, trimmed by the domain |
@@ -1920,6 +1928,50 @@ positions, activity totals and residuals are checked within Int64 before commit.
 Unknown positions remain absent from known subtotals and explicitly counted.
 Archived accounts retain their money in this projection.
 
+
+## 12.1.5 Households (membership, invitations, grants)
+
+Registered-only, behind `ARGUS_HOUSEHOLDS_ENABLED`. Spec:
+[`docs/specs/lanes/household-permission-policy.md`](specs/lanes/household-permission-policy.md).
+Migration `20261001090000_household_membership.sql`. Account ownership remains
+`financial_accounts.user_id`; grants never rewrite ownership or `space_id`.
+
+### households
+
+| Field | Rule |
+| --- | --- |
+| `id` | uuid, server-assigned |
+| `name` | null or 1–80 characters |
+| `status` | `active` or `closed` |
+| `created_by` | creator `auth.users(id)` |
+| `admin_user_id` | current administrator; on delete restrict while household is active |
+| `created_at`, `closed_at` | timestamps; `closed_at` set only when status becomes `closed` |
+
+### household_members
+
+Active membership is one row with `left_at` null. `(household_id, user_id)`
+unique among active rows via partial unique index. Leaving or removal sets
+`left_at` and does not delete financial history. A person may rejoin only through
+a fresh invitation; prior grants do not revive.
+
+### household_invitations
+
+Token material is hashed (`token_hash`); plaintext is returned once at create.
+`expires_at` is create time plus seven days. `revoked_at` and `accepted_by` /
+`accepted_at` enforce revocation and single-use. Same acceptor retry is safe.
+
+### household_account_grants
+
+One active grant per `(household_id, account_id)`. `owner_user_id` must match
+`financial_accounts.user_id`. `permission` is `view` (default) or `edit`. Edit
+never implies ownership, admin, or resharing. Revocation sets `revoked_at`.
+Leave/removal of the owner revokes their outbound grants. Closure revokes all
+grants for the household.
+
+Writes are service-owned (security-definer helpers or server pool with
+application authorization). Client RLS allows registered owners/members to read
+only rows they are entitled to; clients hold no insert/update grant for
+membership or invitation mutation.
 
 ## 12.2 backtest_jobs
 

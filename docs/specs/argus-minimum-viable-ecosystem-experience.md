@@ -930,7 +930,7 @@ The personal view contains the person's own financial picture and any joint acco
 - Support individual accounts kept private, individual accounts explicitly shared with the household, and joint accounts shared by the partners.
 - A person can contribute an agreed amount to a household plan without exposing the source account's entire balance or history. Mark whether that contribution is planned or received.
 - Account ownership, visibility, and permission to edit are distinct. Label them clearly; joining a household does not transfer ownership or confer banking authority.
-- Sharing can be reviewed and revoked. Leaving/removal must stop future unauthorized access, explain effects on shared plans, and avoid silently deleting another person's records. Exact retention and ownership mechanics remain implementation decisions.
+- Sharing can be reviewed and revoked. Leaving/removal must stop future unauthorized access, explain effects on shared plans, and avoid silently deleting another person's records. Member powers, view-versus-edit grants, and departure/custody for membership and account grants are locked by the [2026-10-01 permission policy](lanes/household-permission-policy.md); further joint-plan export/retention product choices beyond that package remain open.
 
 ### Shared financial picture
 

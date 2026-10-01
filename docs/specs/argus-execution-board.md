@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
-**Updated:** September 30, 2026.
-**Execution state:** connected Spaces and Household is the newly authorized bounded lane, currently recovering contracts and awaiting one founder decision on member powers, account editing and departure/custody. No dependent implementation has begun. Its freshly fetched base is `9b5e8643f0493145bd672c2af6e7508371d4cfa0`, including #759/#761. All landed personal financial journeys and their demonstrations remain preserved. #760 owns connected Cuadrao presentation and its Compact simulator; the active design checkout, design simulator and physical-phone environment remain separate. This assignment authorizes implementation, isolated local verification and reviewed PR publication, not merge, deployment, hosted changes, paid providers or phone changes.
+**Updated:** October 1, 2026.
+**Execution state:** connected Spaces and Household is the authorized bounded lane. **Founder approved the permission policy on 2026-10-01** (Project orchestrator recorded); implementation proceeds on that locked package. Freshly fetched integration base at lane start: `9b5e8643f0493145bd672c2af6e7508371d4cfa0` (#759/#761). All landed personal financial journeys and their demonstrations remain preserved. #760 owns connected Cuadrao presentation and its Compact simulator; the active design checkout, design simulator and physical-phone environment remain separate. This assignment authorizes implementation, isolated local verification and reviewed PR publication, not merge, deployment, hosted changes, paid providers or phone changes.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -23,12 +23,13 @@ merge-ready PR targeting `codex/private-alpha-next`.
 **Recovery branch:** `codex/connected-spaces-household`.
 **Isolated checkout:**
 `/Users/garces/.codex/worktrees/connected-spaces-household/private-alpha-next`.
-**Current status:** source/contract recovery and read-only authorization impact
-mapping complete; one permission-policy question pending. No product code,
-migration, local test stack, installation or hosted action has started. Existing
-runtime services and demonstrations have not been stopped or modified.
+**Current status:** permission policy founder-approved 2026-10-01. Bounded
+API/data implementation is in progress on this branch (API/Postgres-first;
+native adapters may follow without claiming #760 or design-sim exclusivity).
+No merge, deploy, hosted change, paid provider or phone change is authorized
+by the policy approval alone.
 
-### Recovered decisions and pending policy
+### Recovered decisions and approved permission policy
 
 [MVEE household][mvee-household] owns consent and financial meaning. Creation,
 invitation acceptance and account sharing are three separate operations.
@@ -45,19 +46,25 @@ household controls. Home retains the quiet Personal / Household / + selector;
 People owns invitations and member status. Sharing uses the native share sheet;
 dismissing it never asserts delivery or acceptance. The recipient can accept or
 choose Not now. Do not wait for the design PR to merge or import its unfinished
-Profile/chat proposals or wholesale runtime ancestry.
+Profile/chat proposals or wholesale runtime ancestry. This lane stays
+API/Postgres-first unless a **third** simulator UUID is pinned; do not use
+Compact `1A90F684…` or design `8AFB6084…` without orchestrator coordination.
 
-**Founder decision requested, not yet approved:** creator administers invitations
-and membership; members see the member list and can leave; creator transfers
-administration or closes the household before departure. Accounts start view-only
-unless their owner explicitly grants activity editing; owners retain ownership,
-sharing and account-removal powers. Leaving/removal revokes membership and that
-person's sharing immediately, retains original owners' records, and requires fresh
-sharing approval on rejoin. The question is material because the MVEE and design
-lock explicitly leave member powers and departure/custody contracts open.
-Proposed invitation mechanics are revocable, single-use, seven-day links with safe
-same-recipient acceptance retries. Do not implement the dependent permission
-policy or label it founder-approved while the answer is pending.
+**Founder approved permission policy, 2026-10-01 (locked — implement this):**
+
+- Creator administers invitations and membership; can transfer administration
+  or close the household before departure.
+- Members see the member list and can leave.
+- Shared accounts start **view-only**; editing only with an **explicit** grant.
+- Editing does **not** grant ownership, membership administration, or resharing
+  rights. Owners retain ownership, sharing and account-removal powers.
+- Leave/removal revokes membership and that member's account grants; original
+  owners retain records/history (departure/closure preserves financial history).
+  Fresh sharing approval is required on rejoin.
+- Invitations: revocable, single-use, seven-day links; safe same-recipient
+  acceptance retries. Local invitations are synthetic (no email/WhatsApp/
+  external delivery in this lane).
+- Create household ≠ invite ≠ share account. Acceptance = membership only.
 
 ### Ownership, reuse and overlap
 
@@ -112,8 +119,7 @@ Compact `1A90F684-345F-465C-AA50-6A5298F34156`; Cuadrao exclusively owns
 `/private/tmp/cuadrao-native-design-build`. Neither is assigned to this lane.
 Assign an available simulator only after checking ownership/active use, with a
 separate bundle and disposable build cache. Preserve all demos and synthetic data;
-ports 58700–58749 and the physical-phone setup remain untouched. No lane runtime
-has been provisioned while the product policy is pending.
+ports 58700–58749 and the physical-phone setup remain untouched.
 
 Keep local invitations synthetic. No email, WhatsApp, external delivery,
 shortener deployment or provider call is authorized here. The selected future
@@ -2185,7 +2191,7 @@ sequence rather than a separate deferral policy in this document.
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
 | [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762 | Assigned Household context adapter in the active lane above; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof for this lane; later private lifecycle/move evidence remains required |
-| [Household][mvee-household], D07 | Existing identities/accounts/history and fixed #762 create/invite/accept/People flow | Active bounded lane: membership, invitations, explicit account grants and Home/Accounts/Search; awaiting one policy decision. Shared plans, private contributions, other consumers and live delivery retain their dependencies | Household captain; one membership/authorization writer | Identities; approved member/edit/departure policy; existing financial adapters | Two synthetic users on real local Auth/API/Postgres and native simulator, revocation/isolation/recovery/en-es; physical-phone and other shared journeys remain required |
+| [Household][mvee-household], D07 | Existing identities/accounts/history and fixed #762 create/invite/accept/People flow | Active bounded lane: membership, invitations, explicit account grants; **permission policy founder-approved 2026-10-01**. Shared plans, private contributions, other consumers and live delivery retain their dependencies | Household captain; one membership/authorization writer | Identities; locked member/edit/departure policy; existing financial adapters | Two synthetic users on Auth/API/Postgres (native simulator optional with a third UUID); revocation/isolation; physical-phone and other shared journeys remain required |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |
@@ -2440,7 +2446,7 @@ only when a product choice, access grant or spending authority is necessary.
 | Apple account/team, physical phone access, stable app identity, supported device/OS and private updates | Device/release; installation and phone acceptance | Inspect existing entitlement/team/device access and choose the shortest supported signed route with a stable identity and repeatable update path. Public App Store release is unnecessary. Device specifics remain unverified; backend and native implementation continue |
 | Existing Render/Supabase access, deployed revisions/migrations/capacity and production-compatible rollout | Device/release; hosted proof | Reuse existing project/current plan and compatible Render capacity. Prepare exact migration/settings/candidate, production-web regression evidence, backup/restore and rollback before the hosted grant. No new project or spending by default |
 | Financial/private-space recovery window, purge/export behavior and production limits | Financial core + Native continuity; lifecycle controls | Propose the unresolved limits under [account recovery][mvee-activity] and [space lifecycle][mvee-spaces] before release. Ordinary posting can progress |
-| Household editing, departure, joint-record custody and recovery | Household; shared writes and revocation | Recommend view-only sharing unless edit rights are explicitly granted; revoke future access promptly without silently deleting another person's records. Present joint custody/export/retention choices for approval. Private journeys and invitation mechanics can progress |
+| Household editing, departure, joint-record custody and recovery | Household; shared writes and revocation | **Founder-approved 2026-10-01:** view-only by default; explicit edit grants; leave/removal revokes membership and that member's grants; owners retain records/history. Further joint custody/export/retention product choices beyond that package remain open. Private journeys progress under MVEE consent boundaries |
 | File formats/institutions, OCR, upload/page limits, encrypted files and retention | Intake; extraction/storage | Cover declared PDFs, structured exports and images/photos; select concrete supported samples. Recommend local type/readability checks, private source access and explicit sharing; do not accept unreviewed OCR as fact. Determine limits/provider from bounded synthetic evaluation, then seek any paid/data-handling grant. Do not drop photo/PDF intake because selection is unfinished |
 | Notifications, schedule defaults, time zones and monitored external conditions | Planning/Home; delivery and scheduled updates | Recommend a persistent inbox and opt-in private push previews; no financial details outside the authenticated app. Founder selects external channels/defaults. Use existing jobs and sourced conditions; trigger/inbox implementation can progress independently |
 | Audio and Temporary chat context/provider retention | Conversation/voice; Temporary behavior and live audio | Recommend no retained raw audio by default; verify provider feasibility and seek approval for unresolved retention under [voice][mvee-voice] and [Temporary chat][mvee-continuity]. Regular native chat can progress |
