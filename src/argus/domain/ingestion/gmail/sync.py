@@ -144,7 +144,9 @@ class GmailSync:
             refresh = None
         if not refresh:
             return self._fail(
-                current, failures.FailureMeaning(failures.CREDENTIAL_UNAVAILABLE, "error")
+                current,
+                holder,
+                failures.FailureMeaning(failures.CREDENTIAL_UNAVAILABLE, "error"),
             )
         try:
             access = self.client.refresh(refresh)
@@ -153,7 +155,7 @@ class GmailSync:
                 access, plan.ids, rules=rules, connection_id=current.id
             )
         except GmailError as exc:
-            return self._fail(current, failures.meaning(exc))
+            return self._fail(current, holder, failures.meaning(exc))
         counts = {
             "mode": plan.mode,
             "messages": len(dict.fromkeys(plan.ids)),
@@ -273,7 +275,10 @@ class GmailSync:
         return ids, str(latest or start), True
 
     def _fail(
-        self, current: SourceConnection, failure: failures.FailureMeaning
+        self,
+        current: SourceConnection,
+        holder: str,
+        failure: failures.FailureMeaning,
     ) -> SyncOutcome:
         logger.warning(
             "Gmail sync failed",
@@ -286,6 +291,9 @@ class GmailSync:
                 code=failure.code,
                 status=failure.status,
                 now=self.hub.clock(),
+                # Fenced by the lease: a sync that lost it cannot overwrite
+                # the state a newer sync established.
+                holder=holder,
             )
         except ConnectionNotFound:
             pass

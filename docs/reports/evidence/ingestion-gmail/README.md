@@ -36,7 +36,7 @@ attachments, authenticity, extract, messages, failures, sync, suggestions,
 adapter, connector), routes in
 `src/argus/api/routers/financial_connections_gmail.py`, wiring in
 `src/argus/api/gmail.py`, table in
-`supabase/migrations/20261001160000_financial_source_gmail_senders.sql`.
+`supabase/migrations/20261002120100_financial_source_gmail_senders.sql`.
 Forwarding mail to Cuadrao is not offered as a substitute for this connection.
 
 ## Scope and why
