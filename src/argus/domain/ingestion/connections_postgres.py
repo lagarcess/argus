@@ -62,7 +62,9 @@ class PostgresConnectionRepository:
                 where user_id = %s and source = %s and external_ref = %s and {_LIVE}""",
                 (user_id, source, external_ref),
             )
-            raise DuplicateConnection(existing["id"] if existing else "") from None
+            if existing is None:
+                raise DuplicateConnection("", elsewhere=True) from None
+            raise DuplicateConnection(existing["id"]) from None
         assert row is not None
         return _row(row)
 

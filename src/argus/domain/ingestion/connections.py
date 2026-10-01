@@ -30,9 +30,17 @@ class ConnectionNotFound(LookupError):
 
 
 class DuplicateConnection(RuntimeError):
-    def __init__(self, existing_id: str) -> None:
+    """A live connection already holds this provider reference.
+
+    ``elsewhere`` means it belongs to another person: one provider grant (a
+    Plaid Item, a mailbox) never backs two people's connections, because
+    revoking it for one would silently break the other.
+    """
+
+    def __init__(self, existing_id: str, *, elsewhere: bool = False) -> None:
         super().__init__("a live connection for this source reference exists")
         self.existing_id = existing_id
+        self.elsewhere = elsewhere
 
 
 @dataclass(frozen=True)
@@ -150,11 +158,12 @@ class InMemoryConnectionRepository:
         with self._lock:
             for row in self._rows.values():
                 if (
-                    row.user_id == user_id
-                    and row.source == source
+                    row.source == source
                     and row.external_ref == external_ref
                     and row.status in LIVE
                 ):
+                    if row.user_id != user_id:
+                        raise DuplicateConnection("", elsewhere=True)
                     raise DuplicateConnection(row.id)
             row = SourceConnection(
                 id=connection_id or str(uuid.uuid4()),

@@ -32,8 +32,10 @@ def test_one_live_connection_per_reference_and_reconnect_after_disconnect(repo, 
     with pytest.raises(DuplicateConnection) as caught:
         make(repo, users["owner"])
     assert caught.value.existing_id == first.id
-    # Another person may connect the same provider reference independently.
-    make(repo, users["other"])
+    # Nobody else can hold the same provider grant while it is live.
+    with pytest.raises(DuplicateConnection) as elsewhere:
+        make(repo, users["other"])
+    assert elsewhere.value.elsewhere and elsewhere.value.existing_id == ""
     repo.disconnect(user_id=users["owner"], connection_id=first.id, now=NOW)
     again = make(repo, users["owner"])
     assert again.id != first.id and again.status == "active"
