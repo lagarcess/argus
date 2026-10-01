@@ -17,8 +17,8 @@ permissions were not enabled.
   historical entries through member removal, block unsettled removal, and persist
   viewer order/removal. Existing fixed-currency and cent-conservation checks pass.
 - Xcode 27 / iOS 27 simulator: `8AFB6084-8918-416E-9164-E21061306BEC`.
-- Final signed phone build 3404: iPhone 15, iOS 27.0.1. Installation and launch
-  recorded separately in the main roadmap. Physical touch/VoiceOver were not
+- Final signed phone build 3404: iPhone 15, iOS 27.0.1. Installed successfully (sequence 2088); final launch was blocked by the locked
+  phone. Build 3403 launched before the final icon-only correction. Physical touch/VoiceOver were not
   observed by automation. Deployment minimum stays iOS 17.
 
 ## Evidence lineage

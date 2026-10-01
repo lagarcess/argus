@@ -1852,7 +1852,9 @@ The preview's role switch is not an authorization implementation.
 **Verification checkpoint:** native UI tests for the ten focused journeys passed,
 plus 50 group and 58 Plan state checks. See the [durable collection evidence](../reports/evidence/cuadrao-native-design/collection-gestures/README.md).
 Final UI source is `0cba90ba` (implementation `a136c0af`); phone build 3404 was
-installed and launched on Sr.Garces i15, iOS 27.0.1 (installation sequence 2088). The icon-only native swipe controls preserve localized
+installed on Sr.Garces i15, iOS 27.0.1 (installation sequence 2088). Final launch
+was blocked by the locked phone; build 3403 had launched before the final icon-only
+correction. Open Cuadrao Preview after unlocking to inspect build 3404. The icon-only native swipe controls preserve localized
 accessibility labels and avoid truncated captions. Physical gesture/VoiceOver
 acceptance remains distinct from simulator automation and installation proof.
 
