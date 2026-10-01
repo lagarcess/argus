@@ -8,6 +8,10 @@ struct CuadraoHomeCanvas: View {
     @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var plans = CuadraoPlanPreview(
+        spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
+        reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
+        empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
     @State private var chatEditing = false
     @State private var voiceProposal: CanvasVoiceProposal?
     @State private var pendingTab: CuadraoTab?
@@ -299,6 +303,9 @@ struct CuadraoHomeCanvas: View {
         } else if tab == .profile {
             CuadraoProfileCanvas(spanish: spanish, includeExamples: populated)
                 .safeAreaPadding(.bottom, chat.voice.active ? 144 : 80)
+        } else if tab == .plan && voiceProposal == nil {
+            CuadraoPlanCanvas(store: plans, accounts: data, spanish: spanish,
+                bottomSpace: chat.voice.active ? 160 : 90)
         } else if voiceProposal != nil {
             CuadraoVoiceProposalCanvas(state: $voiceProposal, spanish: spanish)
         } else {
