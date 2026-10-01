@@ -26,7 +26,7 @@ extension FinancialLoopUITests {
             XCTAssertTrue(identity.waitForExistence(timeout: 10))
             XCTAssertTrue(identity.label.contains(email), "Native identity must match its separate registered user")
             app.openAccountsList()
-            tapVisible(app.buttons["household.personal"])
+            tapSharedControl(app.buttons["household.personal"])
             XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 15))
             XCTAssertFalse(app.buttons["accounts.row." + hidden].exists)
             if !own.isEmpty {
@@ -34,7 +34,7 @@ extension FinancialLoopUITests {
             } else {
                 XCTAssertFalse(app.buttons["accounts.row." + recipientAccount].exists)
             }
-            tapVisible(app.buttons["household.selector"])
+            tapSharedControl(app.buttons["household.selector"])
             if user == "C" {
                 XCTAssertFalse(app.buttons[selection].exists)
                 XCUIDevice.shared.press(.home)
@@ -63,8 +63,8 @@ extension FinancialLoopUITests {
 
     private func selectSharedPlanSpace() throws {
         app.openAccountsList()
-        tapVisible(app.buttons["household.selector"])
-        tapVisible(app.buttons["household.select." + (try sharedEnvironment("HOUSEHOLD"))])
+        tapSharedControl(app.buttons["household.selector"])
+        tapSharedControl(app.buttons["household.select." + (try sharedEnvironment("HOUSEHOLD"))])
         capture("shared-plan-selected-space")
         openSharedPlanTab()
     }
@@ -83,7 +83,7 @@ extension FinancialLoopUITests {
     }
 
     private func sharedPicker(_ id: String, label: String) {
-        revealSharedControl(app.buttons[id]); tapVisible(app.buttons[id])
+        revealSharedControl(app.buttons[id]); tapSharedControl(app.buttons[id])
         let option = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", label, id)).firstMatch
         XCTAssertTrue(option.waitForExistence(timeout: 5), "Option " + label)
         option.tap()
@@ -92,7 +92,7 @@ extension FinancialLoopUITests {
     private func sharedToggle(_ id: String) {
         let control = app.switches[id]
         revealSharedControl(control)
-        tapVisible(control)
+        tapSharedControl(control)
         if control.value as? String == "0" {
             control.coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         }
@@ -109,9 +109,14 @@ extension FinancialLoopUITests {
         XCTAssertTrue(control.exists, "Shared form control should be reachable")
     }
 
-    private func createNativeSharedPlan(kind: String, name: String) throws -> String {
-        tapVisible(app.buttons["sharedPlan.add"])
-        tapVisible(app.buttons["sharedPlan.create"])
+    private func tapSharedControl(_ control: XCUIElement) {
+        revealSharedControl(control)
+        tapVisible(control)
+    }
+
+    private func createNativeSharedPlan(kind: String, name: String, budgetCategory: String? = nil) throws -> String {
+        tapSharedControl(app.buttons["sharedPlan.add"])
+        tapSharedControl(app.buttons["sharedPlan.create"])
         XCTAssertTrue(app.textFields["sharedPlan.name"].waitForExistence(timeout: 15))
         if kind != "budget" { sharedPicker("sharedPlan.kind", label: kind.capitalized) }
         fillMoneyField("sharedPlan.name", with: name)
@@ -120,6 +125,7 @@ extension FinancialLoopUITests {
         sharedPicker("sharedPlan.currency", label: "DOP")
         if kind == "budget" {
             sharedToggle("sharedPlan.account." + (try sharedEnvironment("ACCOUNT_A")))
+            if let budgetCategory { sharedToggle("sharedPlan.category." + budgetCategory) }
         } else {
             if kind == "goal" {
                 sharedToggle("sharedPlan.hasContribution")
@@ -145,12 +151,13 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
         capture("shared-plan-create-" + kind)
         revealSharedControl(app.buttons["sharedPlan.confirm"])
-        tapVisible(app.buttons["sharedPlan.confirm"])
+        tapSharedControl(app.buttons["sharedPlan.confirm"])
         XCTAssertTrue(app.buttons["sharedPlan.confirm"].waitForNonExistence(timeout: 20), "Shared definition should persist")
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "sharedPlan.row." + kind + ".", name)).firstMatch
+        revealSharedControl(row)
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         let id = row.identifier
-        tapVisible(row)
+        tapSharedControl(row)
         XCTAssertEqual(app.staticTexts["sharedPlan.detail.name"].label, name)
         return id
     }
@@ -161,7 +168,7 @@ extension FinancialLoopUITests {
     }
 
     private func prepareNativeSharedContribution(kind: String, amount: String, privateNote: String, actor: String = "A") throws {
-        tapVisible(app.buttons["sharedPlan.record"])
+        tapSharedControl(app.buttons["sharedPlan.record"])
         XCTAssertTrue(app.textFields["sharedPlan.contribution.amount"].waitForExistence(timeout: 15))
         if kind == "goal" || kind == "debt" {
             sharedPicker("sharedPlan.contribution.kind", label: kind == "goal" ? "Transfer" : "Card payment")
@@ -181,7 +188,7 @@ extension FinancialLoopUITests {
     }
 
     private func reviewNativeSharedContribution() throws {
-        tapVisible(app.buttons["sharedPlan.contribution.review"])
+        tapSharedControl(app.buttons["sharedPlan.contribution.review"])
         var answered = Set<String>()
         let confirm = app.buttons["sharedPlan.contribution.confirm"]
         for _ in 0..<24 {
@@ -191,7 +198,7 @@ extension FinancialLoopUITests {
                 .first { !answered.contains($0.identifier) }
             if let pending {
                 let identifier = pending.identifier
-                tapVisible(pending)
+                tapSharedControl(pending)
                 answered.insert(identifier)
             } else { app.swipeUp() }
         }
@@ -202,7 +209,7 @@ extension FinancialLoopUITests {
 
     private func confirmNativeSharedContribution() throws {
         try reviewNativeSharedContribution()
-        tapVisible(app.buttons["sharedPlan.contribution.confirm"])
+        tapSharedControl(app.buttons["sharedPlan.contribution.confirm"])
         XCTAssertTrue(app.buttons["sharedPlan.contribution.confirm"].waitForNonExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["sharedPlan.detail.name"].waitForExistence(timeout: 15))
     }
@@ -233,11 +240,11 @@ extension FinancialLoopUITests {
         }
         try signIn(fresh: true, user: "A"); try selectSharedPlanSpace()
         let name = "Native saved retry " + UUID().uuidString.prefix(6)
-        let row = try createNativeSharedPlan(kind: "budget", name: String(name))
+        let row = try createNativeSharedPlan(kind: "budget", name: String(name), budgetCategory: "groceries")
         try prepareNativeSharedContribution(kind: "budget", amount: "7", privateNote: "Private retry source")
         try reviewNativeSharedContribution()
         let before = try sharedFaultStatus(arm: true)
-        tapVisible(app.buttons["sharedPlan.contribution.confirm"])
+        tapSharedControl(app.buttons["sharedPlan.contribution.confirm"])
         let responseLost = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             (try? self.sharedFaultStatus(arm: false)) == before + 1 && self.app.buttons["Cancel"].isEnabled
         }, object: nil)
@@ -249,10 +256,10 @@ extension FinancialLoopUITests {
         app.terminate(); app.launch()
         XCTAssertTrue(pending.waitForExistence(timeout: 20))
         capture("shared-contribution-response-lost-journal-reopened")
-        tapVisible(pending)
+        tapSharedControl(pending)
         XCTAssertTrue(pending.waitForNonExistence(timeout: 20))
         XCTAssertEqual(try sharedFaultStatus(arm: false), before + 1)
-        openSharedPlanTab(); tapVisible(app.buttons[row])
+        openSharedPlanTab(); tapSharedControl(app.buttons[row])
         assertText("DOP 7.00")
         let originals = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.original.'"))
         revealSharedControl(originals.firstMatch)
@@ -277,30 +284,34 @@ extension FinancialLoopUITests {
             capture("shared-plan-recorded-" + kind)
             if kind == "budget" {
                 let correct = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.correct.'")).firstMatch
-                tapVisible(correct)
+                tapSharedControl(correct)
                 replaceMoneyField("sharedPlan.contribution.amount", with: "25")
                 fillMoneyField("sharedPlan.contribution.reason", with: "Receipt checked")
                 dismissMoneyKeyboard(); try confirmNativeSharedContribution()
                 assertText("DOP 25.00")
-                tapVisible(app.buttons["sharedPlan.archive"])
+                tapSharedControl(app.buttons["sharedPlan.archive"])
                 XCTAssertTrue(app.buttons["sharedPlan.restore"].waitForExistence(timeout: 20))
                 capture("shared-budget-archived")
-                tapVisible(app.buttons["sharedPlan.restore"])
+                tapSharedControl(app.buttons["sharedPlan.restore"])
                 XCTAssertTrue(app.buttons["sharedPlan.record"].waitForExistence(timeout: 20))
             }
-            tapVisible(app.buttons["sharedPlan.back"])
+            tapSharedControl(app.buttons["sharedPlan.back"])
         }
         openSharedTab("home")
+        revealSharedControl(app.buttons[try XCTUnwrap(rows["budget"])])
         XCTAssertTrue(app.buttons[try XCTUnwrap(rows["budget"])].waitForExistence(timeout: 20))
         capture("shared-plan-connected-home")
         app.terminate(); app.launch()
         openSharedPlanTab()
-        for row in rows.values { XCTAssertTrue(app.buttons[row].waitForExistence(timeout: 20)) }
+        for row in rows.values {
+            revealSharedControl(app.buttons[row])
+            XCTAssertTrue(app.buttons[row].waitForExistence(timeout: 20))
+        }
         capture("shared-four-kinds-reopened")
 
         try signIn(fresh: true, user: "B")
         try selectSharedPlanSpace()
-        tapVisible(app.buttons[try XCTUnwrap(rows["budget"])])
+        tapSharedControl(app.buttons[try XCTUnwrap(rows["budget"])])
         XCTAssertFalse(app.buttons["sharedPlan.edit"].exists)
         XCTAssertFalse(app.buttons["sharedPlan.archive"].exists)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.correct.'")).firstMatch.exists)
@@ -309,42 +320,42 @@ extension FinancialLoopUITests {
         try recordNativeSharedContribution(kind: "budget", amount: "10", privateNote: "Private source B " + stamp, actor: "B")
         assertText("DOP 35.00")
         let original = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'sharedPlan.original.'")).firstMatch
-        tapVisible(original)
+        tapSharedControl(original)
         XCTAssertTrue(app.buttons["sharedPlan.original.correct"].waitForExistence(timeout: 15))
         assertText("Private source B " + stamp)
         capture("shared-own-original-inspection")
-        tapVisible(app.buttons["sharedPlan.original.correct"])
+        tapSharedControl(app.buttons["sharedPlan.original.correct"])
         replaceMoneyField("sharedPlan.contribution.amount", with: "15")
         fillMoneyField("sharedPlan.contribution.reason", with: "My receipt correction")
         dismissMoneyKeyboard(); try confirmNativeSharedContribution()
         assertText("DOP 40.00")
         capture("shared-view-only-own-correction")
-        tapVisible(app.buttons["sharedPlan.back"])
-        tapVisible(app.buttons[try XCTUnwrap(rows["bill"])])
+        tapSharedControl(app.buttons["sharedPlan.back"])
+        tapSharedControl(app.buttons[try XCTUnwrap(rows["bill"])])
         XCTAssertTrue(app.buttons["sharedPlan.edit"].waitForExistence(timeout: 15), "Explicit plan editing does not grant private source access")
-        tapVisible(app.buttons["sharedPlan.edit"])
+        tapSharedControl(app.buttons["sharedPlan.edit"])
         replaceMoneyField("sharedPlan.amount", with: "60")
-        dismissMoneyKeyboard(); tapVisible(app.buttons["sharedPlan.confirm"])
+        dismissMoneyKeyboard(); tapSharedControl(app.buttons["sharedPlan.confirm"])
         XCTAssertTrue(app.buttons["sharedPlan.confirm"].waitForNonExistence(timeout: 20))
         assertText("DOP 60.00")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", try sharedEnvironment("ACCOUNT_A_NAME"))).firstMatch.exists)
         capture("shared-explicit-editor-safe-bill")
-        tapVisible(app.buttons["sharedPlan.back"])
+        tapSharedControl(app.buttons["sharedPlan.back"])
         openSharedTab("search")
         let query = app.textFields["household.search.query"]
         XCTAssertTrue(query.waitForExistence(timeout: 15))
         query.tap(); query.typeText(try XCTUnwrap(names["budget"]) + "\n")
         let result = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'household.search.' AND label CONTAINS %@", try XCTUnwrap(names["budget"])) ).firstMatch
-        tapVisible(result)
+        tapSharedControl(result)
         XCTAssertTrue(app.staticTexts["sharedPlan.detail.name"].waitForExistence(timeout: 15))
         assertText("DOP 40.00")
-        tapVisible(app.buttons["sharedPlan.back"])
+        tapSharedControl(app.buttons["sharedPlan.back"])
         XCTAssertEqual(app.textFields["household.search.query"].value as? String, try XCTUnwrap(names["budget"]))
         capture("shared-search-return-preserved")
         app.terminate()
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "light"]
         app.launch(); openSharedPlanTab()
-        tapVisible(app.buttons[try XCTUnwrap(rows["budget"])])
+        tapSharedControl(app.buttons[try XCTUnwrap(rows["budget"])])
         assertText("DOP 40.00")
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'sharedPlan.'")).firstMatch.exists)
         capture("shared-progress-spanish-reopened")
