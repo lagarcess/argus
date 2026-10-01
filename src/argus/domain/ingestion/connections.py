@@ -30,9 +30,17 @@ class ConnectionNotFound(LookupError):
 
 
 class DuplicateConnection(RuntimeError):
-    def __init__(self, existing_id: str) -> None:
+    """A live connection already holds this provider reference.
+
+    ``elsewhere`` means it belongs to another person: one provider grant (a
+    Plaid Item, a mailbox) never backs two people's connections, because
+    revoking it for one would silently break the other.
+    """
+
+    def __init__(self, existing_id: str, *, elsewhere: bool = False) -> None:
         super().__init__("a live connection for this source reference exists")
         self.existing_id = existing_id
+        self.elsewhere = elsewhere
 
 
 @dataclass(frozen=True)
@@ -101,6 +109,18 @@ class ConnectionRepository(Protocol):
         ttl: timedelta = DEFAULT_LEASE,
     ) -> bool: ...
 
+    def renew(
+        self,
+        *,
+        connection_id: str,
+        holder: str,
+        now: datetime,
+        ttl: timedelta = DEFAULT_LEASE,
+    ) -> bool:
+        """Extend a lease only while ``holder`` still holds it; never re-take
+        a lease a failure released or another sync acquired."""
+        ...
+
     def release(self, *, connection_id: str, holder: str) -> None: ...
 
     def record_success(
@@ -150,11 +170,12 @@ class InMemoryConnectionRepository:
         with self._lock:
             for row in self._rows.values():
                 if (
-                    row.user_id == user_id
-                    and row.source == source
+                    row.source == source
                     and row.external_ref == external_ref
                     and row.status in LIVE
                 ):
+                    if row.user_id != user_id:
+                        raise DuplicateConnection("", elsewhere=True)
                     raise DuplicateConnection(row.id)
             row = SourceConnection(
                 id=connection_id or str(uuid.uuid4()),
@@ -239,6 +260,27 @@ class InMemoryConnectionRepository:
             self._rows[connection_id] = replace(
                 row, lease_holder=holder, lease_until=now + ttl, last_attempt_at=now
             )
+            return True
+
+    def renew(
+        self,
+        *,
+        connection_id: str,
+        holder: str,
+        now: datetime,
+        ttl: timedelta = DEFAULT_LEASE,
+    ) -> bool:
+        with self._lock:
+            row = self._rows.get(connection_id)
+            if (
+                row is None
+                or row.status not in LIVE
+                or row.lease_holder != holder
+                or row.lease_until is None
+                or row.lease_until <= now
+            ):
+                return False
+            self._rows[connection_id] = replace(row, lease_until=now + ttl)
             return True
 
     def release(self, *, connection_id: str, holder: str) -> None:

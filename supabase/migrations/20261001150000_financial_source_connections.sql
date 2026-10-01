@@ -43,12 +43,10 @@ create table if not exists public.financial_source_connections (
     )
 );
 
+-- One live connection per provider reference across everyone: a Plaid Item or
+-- a mailbox grant never backs two people's connections. Webhooks also resolve
+-- by this pair, since they name the provider handle, not the person.
 create unique index if not exists financial_source_connections_live_ref_idx
-    on public.financial_source_connections (user_id, source, external_ref)
-    where status <> 'disconnected';
-
--- Webhooks name the provider handle, not the person.
-create index if not exists financial_source_connections_ref_idx
     on public.financial_source_connections (source, external_ref)
     where status <> 'disconnected';
 

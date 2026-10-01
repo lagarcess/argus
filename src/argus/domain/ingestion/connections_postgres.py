@@ -62,7 +62,9 @@ class PostgresConnectionRepository:
                 where user_id = %s and source = %s and external_ref = %s and {_LIVE}""",
                 (user_id, source, external_ref),
             )
-            raise DuplicateConnection(existing["id"] if existing else "") from None
+            if existing is None:
+                raise DuplicateConnection("", elsewhere=True) from None
+            raise DuplicateConnection(existing["id"]) from None
         assert row is not None
         return _row(row)
 
@@ -134,6 +136,23 @@ class PostgresConnectionRepository:
               and (lease_until is null or lease_until <= %s or lease_holder = %s)
             returning id""",
             (holder, now + ttl, now, _uuid(connection_id), now, holder),
+        )
+        return row is not None
+
+    def renew(
+        self,
+        *,
+        connection_id: str,
+        holder: str,
+        now: datetime,
+        ttl: timedelta = DEFAULT_LEASE,
+    ) -> bool:
+        row = self._one(
+            f"""update public.financial_source_connections
+            set lease_until = %s
+            where id = %s::uuid and {_LIVE} and lease_holder = %s and lease_until > %s
+            returning id""",
+            (now + ttl, _uuid(connection_id), holder, now),
         )
         return row is not None
 

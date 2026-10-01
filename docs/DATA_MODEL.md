@@ -2845,7 +2845,8 @@ and last attempted refresh, the last actionable error code, an attention warning
 cursor, a short sync lease (`lease_holder`, `lease_until`) and the sealed
 provider credential (`secret_ciphertext`, AES-256-GCM bound to
 `source:id`, key `ARGUS_INGESTION_SECRET_KEY`). One live row per
-`(user_id, source, external_ref)`; webhooks resolve by `(source, external_ref)`.
+`(source, external_ref)` across all people, so a Plaid Item or mailbox grant
+never backs two people's connections; webhooks resolve by the same pair.
 Cursor advances are compare-and-set under the lease; failures never clear
 `last_success_at` or the cursor, and recording a failure releases the lease so
 a sync already in flight cannot report success over it. A check constraint keeps disconnected rows free

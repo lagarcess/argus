@@ -32,8 +32,10 @@ def test_one_live_connection_per_reference_and_reconnect_after_disconnect(repo, 
     with pytest.raises(DuplicateConnection) as caught:
         make(repo, users["owner"])
     assert caught.value.existing_id == first.id
-    # Another person may connect the same provider reference independently.
-    make(repo, users["other"])
+    # Nobody else can hold the same provider grant while it is live.
+    with pytest.raises(DuplicateConnection) as elsewhere:
+        make(repo, users["other"])
+    assert elsewhere.value.elsewhere and elsewhere.value.existing_id == ""
     repo.disconnect(user_id=users["owner"], connection_id=first.id, now=NOW)
     again = make(repo, users["owner"])
     assert again.id != first.id and again.status == "active"
@@ -186,3 +188,16 @@ def test_failure_reported_during_a_sync_wins_over_that_sync_finishing(repo, user
     current = repo.get(user_id=users["owner"], connection_id=row.id)
     assert current.status == "needs_reauth" and current.cursor is None
     assert current.last_error_code == "plaid_item_login_required"
+
+
+def test_renew_extends_only_a_lease_still_held(repo, users):
+    row = make(repo, users["owner"])
+    assert not repo.renew(connection_id=row.id, holder="sync", now=NOW)
+    assert repo.lease(connection_id=row.id, holder="sync", now=NOW)
+    assert repo.renew(connection_id=row.id, holder="sync", now=NOW + timedelta(minutes=4))
+    # A failure releases the lease; renewing must not take it back.
+    repo.record_failure(connection_id=row.id, code="x", status="needs_reauth", now=NOW)
+    assert not repo.renew(connection_id=row.id, holder="sync", now=NOW)
+    assert repo.get(user_id=users["owner"], connection_id=row.id).lease_holder is None
+    assert repo.lease(connection_id=row.id, holder="other", now=NOW)
+    assert not repo.renew(connection_id=row.id, holder="sync", now=NOW)
