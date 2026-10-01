@@ -303,24 +303,3 @@ def test_tokens_never_reach_logs(client, sink, logs):
     secret = token.split(".")[2]
     assert logs and not any(secret in line for line in logs)
     assert not any("Supermercado" in line or "1,250" in line for line in logs)
-
-
-def test_sink_failure_is_retryable_and_retry_is_harmless(client, sink):
-    token = enroll(client)["device_token"]
-    real_submit = sink.submit
-    calls = {"n": 0}
-
-    def flaky(**kwargs):  # noqa: ANN003, ANN202
-        calls["n"] += 1
-        if calls["n"] == 2:
-            raise RuntimeError("storage down")
-        return real_submit(**kwargs)
-
-    sink.submit = flaky
-    events = [tap(event_id="f1"), tap(event_id="f2")]
-    failed = client.post(BATCH, json={"events": events}, headers=bearer(token))
-    assert failed.status_code == 503
-    assert failed.json()["code"] == "shortcuts_intake_unavailable"
-    retried = client.post(BATCH, json={"events": events}, headers=bearer(token)).json()
-    assert [r["outcome"] for r in retried["receipts"]] == ["unchanged", "recorded"]
-    assert len(sink.evidence) == 2

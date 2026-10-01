@@ -36,10 +36,19 @@ def test_ambiguous_symbol_keeps_currency_open_and_uncertain(text):
     assert parsed.uncertain == frozenset({"currency"})
 
 
-def test_explicit_iso_code_settles_an_ambiguous_symbol():
+def test_explicit_iso_code_settles_only_a_bare_dollar_or_no_marker():
     assert parse_amount("$12.50", currency_code="usd").currency == "USD"
     assert parse_amount("$12.50", currency_code="DOP").currency == "DOP"
     assert parse_amount("12.50", currency_code="DOP").uncertain == frozenset()
+
+
+@pytest.mark.parametrize(
+    ("text", "code"),
+    [("R$ 5,00", "DOP"), ("€5.00", "DOP"), ("¥1.000,5", "JPY"), ("C$4.00", "USD")],
+)
+def test_explicit_code_never_settles_another_marker(text, code):
+    parsed = parse_amount(text, currency_code=code)
+    assert parsed.currency is None and "currency" in parsed.uncertain
 
 
 def test_explicit_code_never_overrides_a_marker_that_disagrees():
@@ -71,9 +80,27 @@ def test_unlisted_three_letter_word_is_not_a_currency():
     assert parsed.currency is None and parsed.uncertain == frozenset({"currency"})
 
 
-def test_sign_is_dropped_from_the_magnitude():
-    # Direction is never inferred from a sign; the raw text stays as excerpt.
-    assert parse_amount("-$4.00").amount == "4.00"
+@pytest.mark.parametrize("text", ["-$4.00", "($4.00)", "+US$4.00", "US$ 4.00-"])
+def test_a_sign_is_doubt_about_direction_not_a_direction(text):
+    parsed = parse_amount(text)
+    assert parsed.amount == "4.00"
+    assert "direction" in parsed.uncertain
+
+
+def test_unsigned_amount_adds_no_direction_doubt():
+    assert "direction" not in parse_amount("US$4.00").uncertain
+
+
+@pytest.mark.parametrize(
+    "text", ["1" * 19, "RD$1234567890123456.789", "9,999,999,999,999,999,999.00"]
+)
+def test_more_than_eighteen_digits_stays_unresolved(text):
+    parsed = parse_amount(text)
+    assert parsed.amount is None and "amount" in parsed.uncertain
+
+
+def test_eighteen_digits_still_parse():
+    assert parse_amount("1234567890123456.78").amount == "1234567890123456.78"
 
 
 def test_missing_and_oversized_amounts():

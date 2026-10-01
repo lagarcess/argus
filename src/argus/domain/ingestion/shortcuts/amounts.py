@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 
 MAX_AMOUNT_TEXT = 64
+# The contract refuses amounts with more digits; past it the text is not a
+# purchase anyone made, so it stays unresolved instead of failing the request.
+MAX_AMOUNT_DIGITS = 18
 
 # Markers that name exactly one ISO 4217 currency. Bare "$" and "¥" name
 # several, so they are deliberately absent and read as ambiguous.
@@ -34,7 +37,8 @@ _ISO_MARKERS = frozenset(
     {"DOP", "USD", "EUR", "GBP", "CAD", "MXN", "COP", "BRL", "CHF", "JPY", "CNY"}
 )
 _GROUPING_SPACES = {" ", " ", " ", " ", "'", "’"}
-_MINUS = {"-", "−"}
+_MINUS = {"-", "\u2212"}
+_SIGNS = _MINUS | {"+", "(", ")"}
 
 
 @dataclass(frozen=True)
@@ -48,8 +52,10 @@ def parse_amount(text: str | None, *, currency_code: str | None = None) -> Parse
     """Magnitude and currency from a formatted amount; doubt is listed.
 
     ``currency_code`` is an explicit ISO code the shortcut sent alongside the
-    text. It settles an ambiguous marker; it never overrides a marker that
-    names a different currency (that conflict stays unresolved).
+    text. It settles only a bare "$" or an amount with no marker; any other
+    marker it disagrees with or cannot vouch for ("R$", "€", "¥") leaves the
+    currency unresolved. A sign or parentheses is doubt about direction: a
+    refund, a reversal or just a display style, never decided here.
     """
 
     uncertain: set[str] = set()
@@ -58,10 +64,12 @@ def parse_amount(text: str | None, *, currency_code: str | None = None) -> Parse
         return ParsedAmount(None, _iso(currency_code), frozenset())
     if len(raw) > MAX_AMOUNT_TEXT:
         return ParsedAmount(None, None, frozenset({"amount", "currency"}))
-    marker, number = _split(raw)
+    marker, number, signed = _split(raw)
     amount = _magnitude(number) if number is not None else None
     if amount is None:
         uncertain.add("amount")
+    if signed:
+        uncertain.add("direction")
     currency, currency_doubt = _currency(marker, _iso(currency_code))
     if currency_doubt:
         uncertain.add("currency")
@@ -77,8 +85,8 @@ def _iso(code: str | None) -> str | None:
     return None
 
 
-def _split(raw: str) -> tuple[str, str | None]:
-    """Leading/trailing marker text and the numeric core between them."""
+def _split(raw: str) -> tuple[str, str | None, bool]:
+    """Marker text, the numeric core between it, and whether a sign showed."""
 
     start = 0
     while start < len(raw) and not raw[start].isdigit():
@@ -87,17 +95,19 @@ def _split(raw: str) -> tuple[str, str | None]:
     while end > start and not raw[end - 1].isdigit():
         end -= 1
     edges = raw[:start] + raw[end:]
-    marker = "".join(c for c in edges if c not in _MINUS and c not in "()+")
-    marker = " ".join(marker.split())
+    signed = any(c in _SIGNS for c in edges)
+    marker = " ".join("".join(c for c in edges if c not in _SIGNS).split())
     if start >= end or any(c in ".," for c in edges):
         # No digits, or a separator outside them (".99", "12."): unreadable.
-        return marker, None
+        return marker, None, signed
     core = raw[start:end]
     if any(not (c.isdigit() or c in ".," or c in _GROUPING_SPACES) for c in core):
-        return marker, None
+        return marker, None, signed
     if any(c.isdigit() and not c.isascii() for c in core):
-        return marker, None
-    return marker, core
+        return marker, None, signed
+    if sum(c.isdigit() for c in core) > MAX_AMOUNT_DIGITS:
+        return marker, None, signed
+    return marker, core, signed
 
 
 def _currency(marker: str, explicit: str | None) -> tuple[str | None, bool]:
@@ -112,8 +122,9 @@ def _currency(marker: str, explicit: str | None) -> tuple[str | None, bool]:
         if explicit is not None and explicit != named:
             return None, True
         return named, False
-    # Ambiguous or unknown symbol: only an explicit ISO code settles it.
-    if explicit is not None:
+    # A bare "$" is pesos or dollars: only an explicit ISO code settles it.
+    # Any other unlisted marker ("R$", "C$", "¥") stays open even then.
+    if compact == "$" and explicit is not None:
         return explicit, False
     return None, True
 
