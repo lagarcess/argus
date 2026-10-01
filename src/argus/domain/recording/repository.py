@@ -198,6 +198,12 @@ class InMemoryFinancialAccountRepository:
             return None
         return stored
 
+    def get_any_account(self, *, account_id: str) -> StoredAccount | None:
+        """Server-side lookup after household authorization already passed."""
+
+        with self._lock:
+            return self._accounts.get(account_id)
+
     def update_account(
         self,
         *,
