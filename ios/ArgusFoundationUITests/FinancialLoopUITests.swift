@@ -118,7 +118,9 @@ final class FinancialLoopUITests: XCTestCase {
         assertHome(baseline + 8000)
         assertText("Loop groceries")
         capture("connected-home-after-expense")
+        // Activity-row ids live on account detail; Home recent activity opens the account only.
         app.openAccountsList()
+        tapVisible(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch)
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "activity.row.")).firstMatch
         tapVisible(row)
         app.buttons["activity.correct"].tap()
