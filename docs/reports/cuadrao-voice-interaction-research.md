@@ -67,3 +67,9 @@ Founder approved replacing the upward cancel gesture with WhatsApp-style up-to-l
 The chat store owns the single recording state read by gestures, overlay and navigation. Pending review survives switching ordinary app surfaces; changing conversation clears it. Temporary-chat exit includes pending voice review in its existing discard confirmation. Backgrounding or interrupted gestures cancel an active recording.
 
 This remains a visual interaction preview: elapsed time and waveform illustrate state, the microphone is off, and no recording, transcription, provider session, playback or send occurs. [Hands-free evidence](evidence/cuadrao-native-design/voice-lock/README.md).
+
+## Reduced recording chrome, 2026-10-01
+
+Following `78a0fec12`, the founder approved removing the large locked-state pill and explanatory paragraph. Locked recording now shows a small lock/timer, waveform, Cancelar and Detener. Gesture instructions appear only while the finger is held, including the brief “Puedes soltar” acknowledgment. The preview-only microphone notice is shorter. This follows Apple's [Writing guidance](https://developer.apple.com/design/human-interface-guidelines/writing), which favors concise wording; the removed paragraph was a design choice, not an Apple requirement.
+
+The lock hint had shifted because conditional rows and different line counts changed the bottom-aligned stack height. Status alternatives now occupy one stable measured slot; gesture guidance and recording actions occupy another. The longest hold hint owns the reserved text height. Cancellation changes color/opacity and locking changes content, without moving the shared anchors. No drag offset is applied to the hint. Invisible alternatives are removed from accessibility and cannot receive taps. The timer is one accessible status with its label and elapsed-time value.

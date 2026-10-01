@@ -125,7 +125,8 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
             XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 3))
             XCTAssertFalse(app.buttons["cuadrao-tab-0"].exists)
             XCTAssertFalse(app.buttons["voice-minimize"].exists)
-            XCTAssertEqual(app.staticTexts["voice-recording-instruction"].frame.midX, app.frame.midX, accuracy: 1)
+            // SF Symbol accessibility bounds can differ slightly from the layout box.
+            XCTAssertEqual(app.descendants(matching: .any)["voice-recording-timer"].firstMatch.frame.midX, app.frame.midX, accuracy: 2)
             capture(app, "locked-" + target)
             app.buttons["voice-message-stop"].tap()
             XCTAssertEqual(app.staticTexts["voice-message-status"].label, "Revisar mensaje · Vista previa")
@@ -157,7 +158,7 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         lockRecording(app.buttons["chat-voice-entry"])
         XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 3))
         XCTAssertEqual(app.buttons["voice-message-stop"].label, "Stop")
-        XCTAssertEqual(app.staticTexts["voice-recording-instruction"].frame.midX, app.frame.midX, accuracy: 1)
+        XCTAssertEqual(app.descendants(matching: .any)["voice-recording-timer"].firstMatch.frame.midX, app.frame.midX, accuracy: 2)
         capture(app, "locked-english")
         app.buttons["voice-message-stop"].tap()
         app.buttons["Discard"].tap()

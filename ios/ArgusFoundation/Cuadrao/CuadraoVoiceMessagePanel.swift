@@ -38,7 +38,6 @@ struct CuadraoVoiceRecordingOverlay: View {
     let spanish: Bool
     @State private var illustration = CuadraoVoicePreview()
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var es: Bool { spanish }
 
     var body: some View {
@@ -67,63 +66,72 @@ struct CuadraoVoiceRecordingOverlay: View {
 
     private var recordingContent: some View {
         VStack(spacing: 22) {
-                lockHint
+            // Both alternatives keep their measured space throughout the gesture.
+            ZStack {
+                lockHint.opacity(message.locked ? 0 : 1)
+                    .accessibilityHidden(message.locked)
+                TimelineView(.periodic(from: .now, by: 1)) { _ in
+                    Label(Duration.seconds(message.elapsed()).formatted(.time(pattern: .minuteSecond)), systemImage: "lock.fill")
+                        .font(.subheadline.monospacedDigit()).foregroundStyle(WelcomePalette.pine)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(es ? "Grabación sin mantener" : "Hands-free recording")
+                        .accessibilityValue(Duration.seconds(message.elapsed()).formatted(.time(pattern: .minuteSecond)))
+                        .accessibilityIdentifier("voice-recording-timer")
+                }.opacity(message.locked ? 1 : 0).accessibilityHidden(!message.locked)
+            }.frame(maxWidth: .infinity)
+            CuadraoVoiceWave(voice: illustration, cancelling: message.cancelArmed)
+            ZStack {
                 Text(instruction).font(.subheadline.weight(.medium)).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .foregroundStyle(message.cancelArmed ? Color.red : WelcomePalette.ink)
+                    .opacity(message.held ? 1 : 0).accessibilityHidden(!message.held)
                     .accessibilityIdentifier("voice-recording-instruction")
-                if message.locked {
-                    TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        Text(Duration.seconds(message.elapsed()).formatted(.time(pattern: .minuteSecond)))
-                            .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                }
-                CuadraoVoiceWave(voice: illustration, cancelling: message.cancelArmed)
-                if message.locked {
-                    let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 16)) : AnyLayout(HStackLayout(spacing: 24))
-                    layout {
-                        Button(es ? "Cancelar" : "Cancel", role: .destructive) { message.cancel() }
-                            .frame(minWidth: 80, minHeight: 48).fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("voice-message-cancel")
-                        Button { message.stop() } label: {
-                            Label(es ? "Detener" : "Stop", systemImage: "stop.fill")
-                                .font(.body.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-                                .padding(.horizontal, 22).padding(.vertical, 10).frame(minHeight: 48)
-                                .foregroundStyle(WelcomePalette.onAccent)
-                                .background(WelcomePalette.pine, in: Capsule())
-                        }.accessibilityIdentifier("voice-message-stop")
-                    }.buttonStyle(.plain)
-                }
-                Text(es ? "Vista previa · El micrófono está apagado" : "Preview · The microphone is off")
-                    .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            }.padding(.horizontal, 28).padding(.top, 24).padding(.bottom, 48)
+                // Measure the longest hint even when the current hint is shorter.
+                Text(holdInstruction)
+                    .font(.subheadline.weight(.medium)).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true).hidden().accessibilityHidden(true)
+                recordingActions.opacity(message.held ? 0 : 1)
+                    .allowsHitTesting(!message.held).accessibilityHidden(message.held)
+            }.frame(maxWidth: .infinity)
+            Text(es ? "Vista previa · Micrófono apagado" : "Preview · Microphone off")
+                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }.padding(.horizontal, 28).padding(.top, 24).padding(.bottom, 48)
+    }
+
+    private var recordingActions: some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 16)) : AnyLayout(HStackLayout(spacing: 24))
+        return layout {
+            Button(es ? "Cancelar" : "Cancel", role: .destructive) { message.cancel() }
+                .frame(minWidth: 80, minHeight: 48).fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("voice-message-cancel")
+            Button { message.stop() } label: {
+                Label(es ? "Detener" : "Stop", systemImage: "stop.fill")
+                    .font(.body.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 22).padding(.vertical, 10).frame(minHeight: 48)
+                    .foregroundStyle(WelcomePalette.onAccent)
+                    .background(WelcomePalette.pine, in: Capsule())
+            }.accessibilityIdentifier("voice-message-stop")
+        }.buttonStyle(.plain)
     }
 
     private var lockHint: some View {
-        HStack(spacing: 12) {
-            Image(systemName: message.locked ? "lock.fill" : "lock.open")
-                .font(.system(size: 20, weight: .medium))
-                .offset(y: reduceMotion ? 0 : -6 * message.lockProgress)
-                .frame(width: 36, height: 44)
-                .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
-            Text(message.locked
-                 ? (es ? "Sin mantener" : "Hands-free")
-                 : (es ? "↑ Desliza arriba para fijar" : "↑ Slide up to lock"))
-                .font(.footnote.weight(.medium)).fixedSize(horizontal: false, vertical: true)
-        }.padding(.horizontal, 16).padding(.vertical, 4)
+        Label(es ? "↑ Desliza para fijar" : "↑ Slide to lock", systemImage: "lock.open")
+            .font(.footnote.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 16).frame(minHeight: 48)
             .background(.regularMaterial, in: Capsule())
             .foregroundStyle(WelcomePalette.pine)
             .opacity(message.cancelArmed ? 0.35 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: message.lockProgress)
-            .accessibilityLabel(message.locked ? (es ? "Grabación fijada" : "Recording locked")
-                                : (es ? "Desliza arriba para grabar sin mantener" : "Slide up to record hands-free"))
+            .accessibilityIdentifier("voice-lock-hint")
+            .accessibilityLabel(es ? "Desliza arriba para grabar sin mantener" : "Slide up to record hands-free")
     }
 
     private var instruction: String {
         if message.cancelArmed { return es ? "Suelta para cancelar" : "Release to cancel" }
-        if message.locked {
-            return message.held ? (es ? "Puedes soltar" : "You can let go")
-                : (es ? "Graba tu mensaje. Cuadrao responderá por escrito." : "Record your message. Cuadrao will reply in text.")
-        }
-        return es ? "Suelta para enviar\nDesliza a la izquierda para cancelar"
-            : "Release to send\nSlide left to cancel"
+        if message.locked { return es ? "Puedes soltar" : "You can let go" }
+        return holdInstruction
+    }
+
+    private var holdInstruction: String {
+        es ? "Suelta para enviar\n← Desliza para cancelar" : "Release to send\n← Slide to cancel"
     }
 }

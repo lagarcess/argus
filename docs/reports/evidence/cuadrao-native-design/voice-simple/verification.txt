@@ -1,0 +1,8 @@
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testEnglishVoiceAndLargeText]' started.
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testEnglishVoiceAndLargeText]' passed (25.884 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testLockedRecordingAndCleanAttachments]' started.
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testLockedRecordingAndCleanAttachments]' passed (25.050 seconds).
+	 Executed 2 tests, with 0 failures (0 unexpected) in 50.934 (50.939) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 50.934 (50.939) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 50.934 (50.940) seconds
+** TEST SUCCEEDED **
