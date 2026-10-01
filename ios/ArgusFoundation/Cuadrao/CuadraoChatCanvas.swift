@@ -195,7 +195,7 @@ struct CuadraoChatCanvas: View {
 
     private func composer(thread: Binding<String>) -> some View {
         VStack(spacing: 10) {
-            if !active && !store.temporary && !focused && !tray {
+            if !active && !store.temporary && !focused && !tray && !store.voice.active {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(CanvasChatExample.allCases) { sample in

@@ -45,10 +45,11 @@ struct CuadraoProfilePage: View {
             empty(spanish ? "Sin movimientos eliminados" : "No removed activity", detail: spanish ? "Aquí podrás revisar los movimientos disponibles para restaurar." : "Review activity available to restore here.")
         case .voice:
             Section {
-                LabeledContent(spanish ? "Entrada" : "Input", value: spanish ? "Dictado del teclado" : "Keyboard dictation")
-                previewAction(spanish ? "Respuestas habladas" : "Spoken responses")
+                CuadraoVoicePreference(spanish: spanish)
+                LabeledContent(spanish ? "Idioma" : "Language", value: spanish ? "El de la conversación" : "Matches the conversation")
             } footer: {
-                Text(spanish ? "El dictado usa el teclado de iOS. Las respuestas habladas todavía no están conectadas." : "Dictation uses the iOS keyboard. Spoken responses are not connected yet.")
+                Text(spanish ? "La voz cambia cómo suena Cuadrao. El tono y la extensión se eligen en Personalización. Esta vista previa no activa el micrófono."
+                     : "Voice changes how Cuadrao sounds. Choose response tone and length in Personalization. This preview does not activate the microphone.")
             }
         case .advanced:
             Section {

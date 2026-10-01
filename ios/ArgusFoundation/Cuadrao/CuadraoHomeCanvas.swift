@@ -7,6 +7,7 @@ struct CuadraoHomeCanvas: View {
     @State private var selectedTab: CuadraoTab = .home
     @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
     @State private var chatEditing = false
+    @State private var voiceProposal: CanvasVoiceProposal?
     @State private var pendingTab: CuadraoTab?
     @State private var navigationScroll = CuadraoNavigationScroll()
     @State private var sheet: HomeSheet?
@@ -78,13 +79,20 @@ struct CuadraoHomeCanvas: View {
             }
         }
         .cuadraoSoftScrollEdges()
-        .fullScreenCover(isPresented: Binding(
+        .sheet(isPresented: Binding(
             get: { chat.voice.active && chat.voice.presentation == .expanded },
             set: { if !$0 && chat.voice.active && chat.voice.presentation == .expanded { chat.voice.presentation = .compact } })) {
-            CuadraoLiveVoiceCanvas(chat: chat, spanish: spanish) {
+            CuadraoLiveVoiceCanvas(chat: chat, spanish: spanish, keyboard: {
                 selectedTab = .assistant
                 chat.voice.presentation = .keyboard
-            }
+            }, showProposal: {
+                voiceProposal = .proposed
+                selectedTab = .plan
+                chat.voice.presentation = .compact
+            })
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(32)
         }
         .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
             isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {
@@ -96,6 +104,7 @@ struct CuadraoHomeCanvas: View {
         } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
         .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
+        .onChange(of: chat.current.id) { _, _ in voiceProposal = nil }
         .onChange(of: data.selectedSpaceID) { _, _ in
             ordering = false; archivedID = nil; accountPath = []; navigationScroll = CuadraoNavigationScroll()
         }
@@ -274,6 +283,9 @@ struct CuadraoHomeCanvas: View {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
         } else if tab == .profile {
             CuadraoProfileCanvas(spanish: spanish, includeExamples: populated)
+                .safeAreaPadding(.bottom, chat.voice.active ? 144 : 80)
+        } else if voiceProposal != nil {
+            CuadraoVoiceProposalCanvas(state: $voiceProposal, spanish: spanish)
         } else {
         NavigationStack {
             ContentUnavailableView(tab.title(spanish: spanish), systemImage: tab.symbol,

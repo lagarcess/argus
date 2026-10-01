@@ -52,7 +52,7 @@ import Foundation
             store.current.draft = draftBeforeCall
             store.current.attachments = [attachment]
             store.voice.start()
-            precondition(store.voice.active && store.voice.presentation == .expanded)
+            precondition(store.voice.active && store.voice.presentation == .compact)
             store.voice.muted = true
             store.voice.phase = .speaking
             precondition(!store.voice.resting, "Muting input must not suppress the speaking state")

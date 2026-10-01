@@ -1,0 +1,5 @@
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testVoiceStaysAvailableAcrossSheetsAndSurfaces]' passed (15.774 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testVoiceChoiceAndProposalHandoff]' passed (32.975 seconds).
+Final device build: BUILD SUCCEEDED
+Device install: local.cuadrao.design.47R3855RTJ, sequence 3160
+Device launch: succeeded

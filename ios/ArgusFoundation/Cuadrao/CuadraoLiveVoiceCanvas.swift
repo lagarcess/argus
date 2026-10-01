@@ -4,6 +4,8 @@ struct CuadraoLiveVoiceCanvas: View {
     let chat: CuadraoChatPreview
     let spanish: Bool
     let keyboard: () -> Void
+    let showProposal: () -> Void
+    @State private var choosingVoice = false
     private var es: Bool { spanish }
     private var voice: CuadraoVoicePreview { chat.voice }
 
@@ -44,14 +46,14 @@ struct CuadraoLiveVoiceCanvas: View {
                     HStack(alignment: .top, spacing: 32) {
                         control(voice.muted ? "mic.slash" : "mic", voice.muted ? (es ? "Activar" : "Unmute") : (es ? "Silenciar" : "Mute"), id: "voice-mute", selected: voice.muted) { voice.muted.toggle() }
                         control("keyboard", es ? "Escribir" : "Type", id: "voice-keyboard", action: keyboard)
-                        control("phone.down.fill", es ? "Terminar" : "End", id: "voice-end", destructive: true) { voice.end() }
+                        control("xmark", es ? "Terminar" : "End", id: "voice-end", destructive: true) { voice.end() }
                     }
                     Text(es ? "Vista previa · El micrófono está apagado" : "Preview · The microphone is off")
                         .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }.padding(.horizontal, 24).padding(.bottom, 28)
             }
         }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
-            .interactiveDismissDisabled()
+            .sheet(isPresented: $choosingVoice) { CuadraoVoicePicker(spanish: es) }
     }
 
     private var header: some View {
@@ -62,9 +64,13 @@ struct CuadraoLiveVoiceCanvas: View {
             }.accessibilityLabel(es ? "Minimizar conversación de voz" : "Minimize voice conversation")
                 .accessibilityIdentifier("voice-minimize")
             Spacer()
-            Text(es ? "Voz" : "Voice").font(.subheadline.weight(.medium))
+            Button { choosingVoice = true } label: {
+                Label(es ? "Elegir voz" : "Choose voice", systemImage: "slider.horizontal.3")
+                    .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+            }.accessibilityIdentifier("voice-choose")
             Spacer()
             Menu {
+                Button(es ? "Ver propuesta de ejemplo" : "Show example proposal", systemImage: "rectangle.on.rectangle", action: showProposal)
                 Button(es ? "Probar escucha" : "Preview listening", systemImage: "waveform") { voice.phase = .listening }
                 Button(es ? "Probar respuesta" : "Preview speaking", systemImage: "speaker.wave.2") { voice.phase = .speaking }
             } label: {
@@ -85,33 +91,5 @@ struct CuadraoLiveVoiceCanvas: View {
             }
         }.buttonStyle(.plain).accessibilityIdentifier(id)
             .accessibilityLabel(title).accessibilityValue(selected ? (es ? "Activado" : "On") : "")
-    }
-}
-
-struct CuadraoVoiceBar: View {
-    let voice: CuadraoVoicePreview
-    let spanish: Bool
-    var body: some View {
-        HStack(spacing: 4) {
-            Button { voice.presentation = .expanded } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "waveform").foregroundStyle(WelcomePalette.pine)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(spanish ? "Voz con Cuadrao" : "Voice with Cuadrao").font(.subheadline.weight(.medium))
-                        Text(spanish ? "Vista previa" : "Preview").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                }.padding(.leading, 16).frame(minHeight: 52)
-            }.accessibilityLabel(spanish ? "Volver a la conversación de voz" : "Return to voice conversation")
-            Button { voice.muted.toggle() } label: {
-                Image(systemName: voice.muted ? "mic.slash" : "mic").frame(width: 44, height: 48)
-            }.accessibilityLabel(voice.muted ? (spanish ? "Activar micrófono" : "Unmute microphone") : (spanish ? "Silenciar micrófono" : "Mute microphone"))
-            Button { voice.end() } label: {
-                Image(systemName: "phone.down.fill").foregroundStyle(.red).frame(width: 44, height: 48)
-            }.accessibilityLabel(spanish ? "Terminar conversación de voz" : "End voice conversation")
-        }.buttonStyle(.plain).foregroundStyle(WelcomePalette.ink)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
-            .overlay { RoundedRectangle(cornerRadius: 22).stroke(WelcomePalette.separator, lineWidth: 0.5) }
-            .padding(.horizontal, 20).padding(.bottom, 8)
     }
 }
