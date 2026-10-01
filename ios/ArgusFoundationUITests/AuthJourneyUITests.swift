@@ -26,6 +26,10 @@ final class AuthJourneyUITests: XCTestCase {
         if app.buttons["auth.signOut"].exists {
             app.buttons["auth.signOut"].tap()
         }
+        // Connected returns to welcome (no email field) until the email chooser opens.
+        if !app.textFields["auth.email"].waitForExistence(timeout: 3) {
+            app.openSignedOutAuthEntry()
+        }
         XCTAssertTrue(app.textFields["auth.email"].waitForExistence(timeout: 10))
         capture("auth-entry")
         app.textFields["auth.email"].tap()

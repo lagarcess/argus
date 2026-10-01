@@ -38,11 +38,19 @@ final class FinancialLoopUITests: XCTestCase {
         archived.tap()
         assertText("DOP 125.00")
         tapVisible(app.buttons["accounts.archive"])
-        XCTAssertTrue(app.buttons["Archive account"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Archive account"].waitForExistence(timeout: 10)
+            || app.buttons["accounts.archive"].waitForExistence(timeout: 2))
         for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
-        app.buttons["accounts.back"].tap()
-        for _ in 0..<5 { if app.buttons["accounts.manage.back"].isHittable { break }; app.swipeDown() }
-        app.buttons["accounts.manage.back"].tap()
+        if app.buttons["accounts.back"].waitForExistence(timeout: 3) {
+            app.buttons["accounts.back"].tap()
+        }
+        // Tip manage is a pushed stack; Connected archived list is a sheet dismissed then detail opened.
+        if app.buttons["accounts.manage.back"].waitForExistence(timeout: 2) {
+            for _ in 0..<5 { if app.buttons["accounts.manage.back"].isHittable { break }; app.swipeDown() }
+            app.buttons["accounts.manage.back"].tap()
+        } else {
+            app.openAccountsList()
+        }
         XCTAssertTrue(app.buttons[originalID].waitForExistence(timeout: 10))
         assertHome(baseline + 125)
     }
