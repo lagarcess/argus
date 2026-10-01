@@ -33,6 +33,8 @@ class FinancialConnectionResponse(BaseModel):
     last_success_at: datetime | None
     last_attempt_at: datetime | None
     last_error_code: str | None
+    attention_code: str | None
+    attention_at: datetime | None
     created_at: datetime
     disconnected_at: datetime | None
 
@@ -60,6 +62,8 @@ def connection_response(row: SourceConnection) -> FinancialConnectionResponse:
         last_success_at=row.last_success_at,
         last_attempt_at=row.last_attempt_at,
         last_error_code=row.last_error_code,
+        attention_code=row.attention_code,
+        attention_at=row.attention_at,
         created_at=row.created_at,
         disconnected_at=row.disconnected_at,
     )

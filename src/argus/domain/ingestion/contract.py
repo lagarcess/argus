@@ -39,8 +39,16 @@ SOURCE_KINDS: tuple[SourceKind, ...] = ("plaid", "gmail", "shortcuts", "statemen
 # statement_period: a statement exists for a period (optionally its closing).
 # due_notice: a payment is due; it is not proof that anything was paid.
 # payment_notice: the institution says a payment was received or sent.
+# unclassified: something financial arrived (an email, a message capture) but
+# what it is needs a person or a measured extractor; it is never activity
+# until the person says what it is.
 EvidenceKind = Literal[
-    "transaction", "balance", "statement_period", "due_notice", "payment_notice"
+    "transaction",
+    "balance",
+    "statement_period",
+    "due_notice",
+    "payment_notice",
+    "unclassified",
 ]
 ObservedStatus = Literal["pending", "posted", "unknown", "removed"]
 Direction = Literal["outflow", "inflow", "unknown"]
@@ -270,7 +278,9 @@ class ImportCandidate(_Frozen):
         canonical activity: missing ones plus the ones marked uncertain."""
 
         missing: set[str] = set(self.uncertain)
-        if self.evidence in ("transaction", "payment_notice"):
+        if self.evidence == "unclassified":
+            missing.add("kind")
+        if self.evidence in ("transaction", "payment_notice", "unclassified"):
             if self.amount is None:
                 missing.add("amount")
             if self.currency is None:
@@ -279,7 +289,9 @@ class ImportCandidate(_Frozen):
                 missing.add("occurred_on")
             if self.direction == "unknown":
                 missing.add("direction")
-            if self.account.external_account_id is None and self.account.mask is None:
+            if not (
+                self.account.external_account_id or self.account.mask or self.account.name
+            ):
                 missing.add("account")
         return frozenset(missing)
 

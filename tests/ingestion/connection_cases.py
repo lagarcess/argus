@@ -144,3 +144,25 @@ def test_disconnect_clears_credential_cursor_and_lease_and_is_idempotent(repo, u
         repo.set_secret(connection_id=row.id, secret=b"x", status="active", now=NOW)
     with pytest.raises(ConnectionNotFound):
         repo.record_failure(connection_id=row.id, code="x", status="error", now=NOW)
+
+
+def test_attention_survives_successful_syncs_until_reauthorization(repo, users):
+    row = make(repo, users["owner"])
+    flagged = repo.flag_attention(
+        connection_id=row.id, code="plaid_pending_expiration", now=NOW
+    )
+    assert flagged.attention_code == "plaid_pending_expiration"
+    assert repo.lease(connection_id=row.id, holder="a", now=NOW)
+    assert repo.record_success(
+        connection_id=row.id, holder="a", expected_cursor=None, cursor="c1", now=NOW
+    )
+    synced = repo.get(user_id=users["owner"], connection_id=row.id)
+    assert synced.status == "active"
+    assert synced.attention_code == "plaid_pending_expiration"
+    renewed = repo.set_secret(connection_id=row.id, secret=b"n", status="active", now=NOW)
+    assert renewed.attention_code is None and renewed.attention_at is None
+    repo.flag_attention(connection_id=row.id, code="plaid_pending_expiration", now=NOW)
+    ended = repo.disconnect(user_id=users["owner"], connection_id=row.id, now=NOW)
+    assert ended.attention_code is None
+    with pytest.raises(ConnectionNotFound):
+        repo.flag_attention(connection_id=row.id, code="x", now=NOW)

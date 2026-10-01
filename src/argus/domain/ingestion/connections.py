@@ -50,6 +50,10 @@ class SourceConnection:
     last_success_at: datetime | None
     last_attempt_at: datetime | None
     last_error_code: str | None
+    # A warning that outlives successful syncs (Plaid consent expiring soon).
+    # Only re-authorization or disconnect clears it; sync status does not.
+    attention_code: str | None
+    attention_at: datetime | None
     lease_holder: str | None
     lease_until: datetime | None
     created_at: datetime
@@ -113,6 +117,10 @@ class ConnectionRepository(Protocol):
         self, *, connection_id: str, code: str, status: ConnectionStatus, now: datetime
     ) -> SourceConnection: ...
 
+    def flag_attention(
+        self, *, connection_id: str, code: str, now: datetime
+    ) -> SourceConnection: ...
+
     def disconnect(
         self, *, user_id: str, connection_id: str, now: datetime
     ) -> SourceConnection: ...
@@ -157,6 +165,8 @@ class InMemoryConnectionRepository:
                 last_success_at=None,
                 last_attempt_at=None,
                 last_error_code=None,
+                attention_code=None,
+                attention_at=None,
                 lease_holder=None,
                 lease_until=None,
                 created_at=now,
@@ -197,7 +207,15 @@ class InMemoryConnectionRepository:
         with self._lock:
             row = self._live(connection_id)
             return self._put(
-                replace(row, secret=secret, status=status, last_error_code=None), now
+                replace(
+                    row,
+                    secret=secret,
+                    status=status,
+                    last_error_code=None,
+                    attention_code=None,
+                    attention_at=None,
+                ),
+                now,
             )
 
     def lease(
@@ -271,6 +289,13 @@ class InMemoryConnectionRepository:
                 now,
             )
 
+    def flag_attention(
+        self, *, connection_id: str, code: str, now: datetime
+    ) -> SourceConnection:
+        with self._lock:
+            row = self._live(connection_id)
+            return self._put(replace(row, attention_code=code, attention_at=now), now)
+
     def disconnect(
         self, *, user_id: str, connection_id: str, now: datetime
     ) -> SourceConnection:
@@ -284,6 +309,8 @@ class InMemoryConnectionRepository:
                     status="disconnected",
                     secret=None,
                     cursor=None,
+                    attention_code=None,
+                    attention_at=None,
                     lease_holder=None,
                     lease_until=None,
                     disconnected_at=now,
