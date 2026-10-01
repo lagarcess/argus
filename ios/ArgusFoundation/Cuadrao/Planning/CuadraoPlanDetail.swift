@@ -34,7 +34,7 @@ struct CuadraoPlanDetail: View {
                                 Text(spanish ? "Tu ritmo aparecerá con tus primeros movimientos." : "Your pace will appear with your first transactions.")
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }
-                        } else { PlanDetailChart(plan: plan, amount: amount(plan), spanish: spanish) }
+                        } else { PlanDetailChart(plan: plan, amount: amount(plan), spanish: spanish, scenarioCeiling: sliderCeiling) }
                         if plan.remaining > 0 || plan.kind == .budget { playground(plan) }
                         facts(plan)
                         if plan.spaceID == "household" { household(plan) }
@@ -193,13 +193,14 @@ private struct PlanDetailChart: View {
     let plan: CanvasPlan
     let amount: Double
     let spanish: Bool
+    var scenarioCeiling: Double = 0
     private var horizon: Int { plan.kind == .budget ? 31 : min(24, max(6, plan.months(at: plan.monthly) ?? 12)) }
     private func value(_ month: Int, monthly: Double) -> Double {
         plan.projectedValue(at: month, monthly: monthly)
     }
     private var upperBound: Double {
         if plan.kind == .debt { return max(plan.target, plan.remaining * pow(1 + plan.annualRate / 1200, Double(horizon))) * 1.15 }
-        if plan.kind == .budget { return max(plan.target, amount, value(horizon, monthly: amount)) * 1.15 }
+        if plan.kind == .budget { return max(plan.target * 3, scenarioCeiling, value(horizon, monthly: amount)) * 1.15 }
         return plan.target * 1.15
     }
     var body: some View {
