@@ -56,7 +56,7 @@ struct AssetDetailView: View {
                 if debtError { Text("search.destination.unavailable") }
             }
             if let estimates = account.asset?.estimates, !estimates.isEmpty {
-                DisclosureGroup("assets.history") {
+                DisclosureGroup {
                     ForEach(estimates.reversed()) { estimate in
                         VStack(alignment: .leading, spacing: 10) {
                             Text(verbatim: account.currency + " " + AccountPresentation.amount(estimate.amount, locale: locale)).monospacedDigit()
@@ -77,7 +77,9 @@ struct AssetDetailView: View {
                             }
                         }.padding(.vertical, 12)
                     }
-                }.accessibilityIdentifier("assets.history")
+                } label: {
+                    Text("assets.history").accessibilityIdentifier("assets.history")
+                }
             }
             if let changes = account.asset?.changes, !changes.isEmpty {
                 DisclosureGroup("assets.details.history") {

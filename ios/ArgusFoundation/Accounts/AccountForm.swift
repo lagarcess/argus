@@ -167,9 +167,11 @@ struct AccountForm: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                     ForEach(primaryTypes, id: \.self) { type in typeButton(type) }
                 }
-                DisclosureGroup("accounts.otherAssets", isExpanded: $otherAssets) {
+                DisclosureGroup(isExpanded: $otherAssets) {
                     ForEach(["property", "vehicle", "other_asset"], id: \.self) { type in typeButton(type) }
-                }.font(ArgusStyle.body(13, relativeTo: .caption)).padding(.top, 4).accessibilityIdentifier("accounts.otherAssets")
+                } label: {
+                    Text("accounts.otherAssets").accessibilityIdentifier("accounts.otherAssets")
+                }.font(ArgusStyle.body(13, relativeTo: .caption)).padding(.top, 4)
             }.disabled(locked)
         } else if draft.mode == .create {
             HStack(spacing: 12) {
