@@ -27,6 +27,7 @@
         "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": "false",
         "ARGUS_FINANCIAL_ACCOUNTS_ENABLED": "false",
         "ARGUS_HOUSEHOLDS_ENABLED": "false",
+        "ARGUS_INGESTION_ENABLED": "false",
         "ARGUS_IN_PLACE_CARD_EDITS_ENABLED": "true",
         "ARGUS_MEMORY_EMBEDDING_MODEL": "pplx-embed-v1-0.6b",
         "ARGUS_MEMORY_EMBEDDING_DIMENSIONS": "1024",
@@ -82,7 +83,9 @@
         "ALPACA_API_KEY",
         "ALPACA_SECRET_KEY"
       ],
-      "optional": []
+      "optional": [
+        "ARGUS_INGESTION_SECRET_KEY"
+      ]
     },
     "web": {
       "name": "argus-app",
