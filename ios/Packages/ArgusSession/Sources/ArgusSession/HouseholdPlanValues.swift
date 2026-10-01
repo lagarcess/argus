@@ -48,7 +48,7 @@ public struct HouseholdPlanCommonProgress: Decodable, Sendable {
     }
 }
 public enum HouseholdPlanProgress: Sendable {
-    case budget(HouseholdPlanCommonProgress, gross: String, refunds: String, spent: String, overBudget: Bool)
+    case budget(HouseholdPlanCommonProgress, gross: String?, refunds: String?, spent: String?, overBudget: Bool?)
     case goal(HouseholdPlanCommonProgress, planned: String?, projected: String?)
     case bill(HouseholdPlanCommonProgress)
     case debt(HouseholdPlanCommonProgress)
@@ -60,7 +60,7 @@ public enum HouseholdPlanProgress: Sendable {
         let common = try HouseholdPlanCommonProgress(from: decoder)
         let c = try decoder.container(keyedBy: Keys.self)
         switch kind {
-        case .budget: self = .budget(common, gross: try c.decode(String.self, forKey: .gross), refunds: try c.decode(String.self, forKey: .refunds), spent: try c.decode(String.self, forKey: .spent), overBudget: try c.decode(Bool.self, forKey: .overBudget))
+        case .budget: self = .budget(common, gross: try c.decode(String?.self, forKey: .gross), refunds: try c.decode(String?.self, forKey: .refunds), spent: try c.decode(String?.self, forKey: .spent), overBudget: try c.decode(Bool?.self, forKey: .overBudget))
         case .goal: self = .goal(common, planned: try c.decodeIfPresent(String.self, forKey: .planned), projected: try c.decodeIfPresent(String.self, forKey: .projected))
         case .bill: self = .bill(common)
         case .debt: self = .debt(common)

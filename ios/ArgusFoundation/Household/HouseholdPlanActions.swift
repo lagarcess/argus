@@ -37,7 +37,7 @@ struct HouseholdPlanActionSheet: View {
                             }.accessibilityIdentifier("sharedPlan.contribution.occurrence")
                             Picker("sharedPlan.activity", selection: $activityId) {
                                 Text("household.choose").tag(UUID?.none)
-                                ForEach(candidates) { item in Text(item.currency + " " + item.amount + " · " + String(item.occurredAt.prefix(10)) + " · " + (item.note ?? NSLocalizedString("loop.kind." + item.kind.rawValue, comment: ""))).tag(Optional(item.id)) }
+                                ForEach(candidates) { item in Text(item.currency + " " + AccountPresentation.amount(item.amount, locale: locale) + " · " + String(item.occurredAt.prefix(10)) + " · " + (item.note ?? NSLocalizedString("loop.kind." + item.kind.rawValue, comment: ""))).tag(Optional(item.id)) }
                             }.accessibilityIdentifier("sharedPlan.link.activity")
                             if candidates.isEmpty { Text("sharedPlan.noCandidates").accessibilityIdentifier("sharedPlan.link.empty") }
                             if plan.ref.kind == .goal {
@@ -91,7 +91,7 @@ struct HouseholdPlanPresenter: View {
     @ObservedObject var model: HouseholdPlanModel
     var body: some View {
         Color.clear.sheet(item: $model.sheet) { sheet in
-            switch sheet {
+            Group { switch sheet {
             case .create: HouseholdPlanDefinitionEditor(model: model)
             case .share: HouseholdPlanDefinitionEditor(model: model, sharing: true)
             case .edit(let plan): HouseholdPlanDefinitionEditor(model: model, editing: plan)
@@ -100,7 +100,7 @@ struct HouseholdPlanPresenter: View {
             case .link(let plan): HouseholdPlanActionSheet(model: model, plan: plan)
             case .allocation(let plan): HouseholdPlanActionSheet(model: model, plan: plan, allocating: true)
             case .original(let plan, let contribution): HouseholdPlanOriginalView(model: model, plan: plan, contribution: contribution)
-            }
+            } }.preferredColorScheme(.light).tint(WelcomePalette.pine).foregroundStyle(ArgusStyle.ink)
         }
     }
 }
@@ -119,7 +119,7 @@ private struct HouseholdPlanOriginalView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     if let activity {
                         Text(LocalizedStringKey("loop.kind." + activity.kind.rawValue)).font(ArgusStyle.display(25))
-                        Text(activity.currency + " " + activity.amount).font(ArgusStyle.display(28))
+                        Text(activity.currency + " " + AccountPresentation.amount(activity.amount, locale: .current)).font(ArgusStyle.display(28))
                         Text(activity.occurredAt)
                         if let note = activity.note { Text(note) }
                     } else if let account {
@@ -130,7 +130,7 @@ private struct HouseholdPlanOriginalView: View {
                         }
                     } else if error == nil { ProgressView("accounts.loading") }
                     if let error { Text(LocalizedStringKey(error)); Button("accounts.retry") { Task { await load() } } }
-                    if contribution.canCorrect, plan.canContribute, activity != nil || account != nil {
+                    if contribution.canCorrect, plan.canContribute, activity?.originalAmountAvailable == true || account != nil {
                         Button("household.correct") { model.sheet = .record(plan, contribution) }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("sharedPlan.original.correct")
                     }
                 }.padding(24)

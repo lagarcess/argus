@@ -68,8 +68,9 @@ final class HouseholdContributionEditor: ObservableObject {
                     fill(kind: a.kind, amount: a.amount!, note: a.note, category: a.categoryId, source: a.sourceId, occurredAt: a.occurredAt, digits: a.currencyFractionDigits, principal: a.principalMinor, interest: a.interestMinor, fees: a.feesMinor, legs: a.legs)
                 } else {
                     let activity = try await controller.financialActivityDetail(ref.activityId, expectedIdentity: identity)
-                    guard current else { return }; original = activity
-                    fill(kind: activity.kind, amount: activity.amount, note: activity.note, category: activity.categoryId, source: activity.sourceId, occurredAt: activity.occurredAt, digits: activity.currencyFractionDigits, principal: activity.principalMinor, interest: activity.interestMinor, fees: activity.feesMinor, legs: activity.legs)
+                    guard current else { return }
+                    guard activity.originalAmountAvailable, let amount = activity.amount else { throw SessionFailure.unauthorized }; original = activity
+                    fill(kind: activity.kind, amount: amount, note: activity.note, category: activity.categoryId, source: activity.sourceId, occurredAt: activity.occurredAt, digits: activity.currencyFractionDigits, principal: activity.principalMinor, interest: activity.interestMinor, fees: activity.feesMinor, legs: activity.legs)
                 }
             } else {
                 if let first = purposes.first { purpose = first }

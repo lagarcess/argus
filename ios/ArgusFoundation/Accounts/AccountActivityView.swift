@@ -119,12 +119,14 @@ struct FinancialActivityDetailView: View {
                         }
                     }
                 }
-                if detail.kind == .cardPayment || detail.kind == .debtPayment {
-                    Button("debt.return") { if let returnPayment { returnPayment(detail) } else { loop.returnPayment(detail) } }.buttonStyle(PillButtonStyle(primary: false)).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("activity.return")
+                if detail.originalAmountAvailable {
+                    if detail.kind == .cardPayment || detail.kind == .debtPayment {
+                        Button("debt.return") { if let returnPayment { returnPayment(detail) } else { loop.returnPayment(detail) } }.buttonStyle(PillButtonStyle(primary: false)).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("activity.return")
+                    }
+                    Button("loop.correction.title") { correct(detail) }
+                        .buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil)
+                        .accessibilityIdentifier("activity.correct")
                 }
-                Button("loop.correction.title") { correct(detail) }
-                    .buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil)
-                    .accessibilityIdentifier("activity.correct")
             } else if errorKey == nil { ProgressView("accounts.loading") }
             if let errorKey {
                 Text(LocalizedStringKey(errorKey)).accessibilityIdentifier("activity.detail.error")

@@ -57,7 +57,7 @@ struct HouseholdPlanSummary: View {
             case .budget(let c, let gross, let refunds, let spent, let over):
                 value("sharedPlan.spent", spent)
                 if !compact { value("sharedPlan.limit", plan.definition.amountMinor); value("sharedPlan.gross", gross); value("sharedPlan.refunds", refunds); value("sharedPlan.remaining", c.remainingMinor) }
-                if over { Text("sharedPlan.overBudget").foregroundStyle(ArgusStyle.negative) }
+                if over == true { Text("sharedPlan.overBudget").foregroundStyle(ArgusStyle.negative) }
             case .goal(let c, let planned, let projected):
                 value("sharedPlan.actual", c.actualMinor)
                 if !compact { value("sharedPlan.target", plan.definition.amountMinor); value("sharedPlan.planned", planned); value("sharedPlan.projected", projected); value("sharedPlan.remaining", c.remainingMinor); Text("sharedPlan.plannedNotice").font(.footnote).foregroundStyle(ArgusStyle.secondary) }

@@ -19,7 +19,7 @@ final class HouseholdPlanTests: XCTestCase {
             if case .goal(let c, let planned, let projected) = plan.progress {
                 XCTAssertNil(c.actualMinor); XCTAssertEqual(planned, "12000"); XCTAssertNil(projected)
             }
-            if case .budget(_, _, _, let spent, let over) = plan.progress { XCTAssertEqual(spent, "1700"); XCTAssertFalse(over) }
+            if case .budget(_, _, _, let spent, let over) = plan.progress { XCTAssertEqual(spent, "1700"); XCTAssertEqual(over, false) }
         }
     }
     func testUnknownKindAndMissingKindSpecificValuesFailClosed() throws {
@@ -29,6 +29,16 @@ final class HouseholdPlanTests: XCTestCase {
         wire = SharedPlanTestData.plan(.budget)
         wire["progress"] = ["actual_minor": NSNull(), "applied_minor": NSNull(), "remaining_minor": NSNull(), "state": "unknown"]
         XCTAssertThrowsError(try JSONDecoder().decode(HouseholdPlan.self, from: JSONSerialization.data(withJSONObject: wire)))
+    }
+    func testBudgetNeedsReviewCarriesUnknownTotalsWithoutInventedZeroOrOverBudget() throws {
+        var wire = SharedPlanTestData.plan(.budget)
+        var progress = try XCTUnwrap(wire["progress"] as? [String: Any])
+        for key in ["actual_minor", "applied_minor", "remaining_minor", "gross_minor", "refunds_minor", "spent_minor", "over_budget"] { progress[key] = NSNull() }
+        progress["state"] = "needs_review"; wire["progress"] = progress
+        let plan = try JSONDecoder().decode(HouseholdPlan.self, from: JSONSerialization.data(withJSONObject: wire))
+        guard case .budget(let common, let gross, let refunds, let spent, let over) = plan.progress else { return XCTFail("Budget progress required") }
+        XCTAssertEqual(common.state, .needsReview); XCTAssertNil(common.actualMinor); XCTAssertNil(common.appliedMinor)
+        XCTAssertNil(gross); XCTAssertNil(refunds); XCTAssertNil(spent); XCTAssertNil(over)
     }
     func testDepartureHistoryHasNoEditContributionOrRestoreCapability() throws {
         var wire = SharedPlanTestData.plan(.goal)
