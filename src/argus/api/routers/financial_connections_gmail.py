@@ -98,6 +98,7 @@ class SyncSummary(BaseModel):
     mode: SyncMode | None
     messages: int
     candidates: int
+    ignored: int
     skipped: dict[str, int]
     attachments: int
     attachments_skipped: dict[str, int]
@@ -256,6 +257,7 @@ def sync_gmail_connection(
             mode=outcome.mode,
             messages=outcome.messages,
             candidates=outcome.candidates,
+            ignored=outcome.ignored,
             skipped=outcome.skipped,
             attachments=outcome.attachments,
             attachments_skipped=outcome.attachments_skipped,

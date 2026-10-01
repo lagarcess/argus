@@ -5,14 +5,18 @@ accounts on), credentials can be sealed (``ARGUS_INGESTION_SECRET_KEY``) and
 the Google OAuth client is configured (``GOOGLE_OAUTH_CLIENT_ID``,
 ``GOOGLE_OAUTH_CLIENT_SECRET``, ``GOOGLE_OAUTH_REDIRECT_URI``). Otherwise every
 Gmail route answers 404 like the rest of the financial-connections surface.
-Its ``revoke`` is registered with the hub at startup so disconnect reaches
-Google's revocation endpoint.
+Its adapter is registered with the hub at startup so disconnect reaches
+Google's revocation endpoint and forgets the sender allowlist. When only the
+OAuth client is missing (the sealing key exists), a revoke-only adapter is
+still registered: Gmail connections made earlier can be disconnected
+truthfully while the routes are off.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+import httpx
 from fastapi import Depends, HTTPException, Request
 from loguru import logger
 
@@ -25,8 +29,9 @@ from argus.api.ingestion import (
     unavailable_problem,
 )
 from argus.domain.ingestion.connections import ConnectionNotFound
-from argus.domain.ingestion.gmail.client import GmailError
-from argus.domain.ingestion.gmail.config import gmail_config_from_env
+from argus.domain.ingestion.gmail.adapter import GmailAdapter
+from argus.domain.ingestion.gmail.client import GmailClient, GmailError
+from argus.domain.ingestion.gmail.config import GmailConfig, gmail_config_from_env
 from argus.domain.ingestion.gmail.connector import (
     ConnectionDisconnected,
     GmailConnector,
@@ -37,11 +42,16 @@ from argus.domain.ingestion.gmail.oauth import (
     RefreshTokenMissing,
     ScopeNotGranted,
 )
-from argus.domain.ingestion.gmail.senders import InMemorySenderRepository, InvalidSender
+from argus.domain.ingestion.gmail.senders import (
+    InMemorySenderRepository,
+    InvalidSender,
+    SenderRepository,
+)
 from argus.domain.ingestion.gmail.state import StateRejected
 from argus.domain.ingestion.hub import IngestionHub
 
 _connector: GmailConnector | None = None
+_revoke_only: GmailAdapter | None = None
 
 
 def gmail_connector() -> GmailConnector | None:
@@ -55,48 +65,70 @@ def configure_gmail_connector(connector: GmailConnector | None) -> None:
     _connector = connector
 
 
-def start_gmail(hub: IngestionHub | None, pool: object | None) -> None:
+def revoke_only_adapter() -> GmailAdapter | None:
+    return _revoke_only
+
+
+def _set_revoke_only(adapter: GmailAdapter | None) -> None:
+    global _revoke_only
+    if _revoke_only is not None and _revoke_only is not adapter:
+        _revoke_only.client.close()
+    _revoke_only = adapter
+
+
+def start_gmail(
+    hub: IngestionHub | None,
+    pool: object | None,
+    *,
+    transport: httpx.BaseTransport | None = None,
+) -> None:
+    configure_gmail_connector(None)
+    _set_revoke_only(None)
     if hub is None or hub.box is None:
-        configure_gmail_connector(None)
+        return
+    senders = _sender_repository(pool)
+    if senders is None:
         return
     try:
-        config = gmail_config_from_env()
+        config: GmailConfig | None = gmail_config_from_env()
     except ValueError as exc:
         logger.warning(
             "Gmail configuration is invalid; connector stays off", reason=str(exc)
         )
-        configure_gmail_connector(None)
-        return
-    if not config.configured:
-        configure_gmail_connector(None)
-        return
-    if api_state.PERSISTENCE_MODE == "supabase":
-        if pool is None:
-            configure_gmail_connector(None)
+        config = None
+    if config is not None and config.configured:
+        try:
+            connector = GmailConnector(hub, config, senders=senders, transport=transport)
+        except Exception as exc:
+            # Gmail failing to start must not take the shared hub down with it.
+            logger.warning(
+                "Gmail connector construction failed; connector stays off",
+                failure_mode=type(exc).__name__,
+            )
+        else:
+            hub.register(connector.adapter)
+            configure_gmail_connector(connector)
             return
-        from argus.domain.ingestion.gmail.senders_postgres import (
-            PostgresSenderRepository,
-        )
+    # Routes stay off, but stored Gmail grants can still be revoked at Google
+    # (revocation needs no client credentials) and sender rows forgotten.
+    adapter = GmailAdapter(GmailClient(GmailConfig(), transport=transport), senders)
+    hub.register(adapter)
+    _set_revoke_only(adapter)
 
-        senders = PostgresSenderRepository(pool)  # type: ignore[arg-type]
-    else:
-        senders = InMemorySenderRepository()
-    try:
-        connector = GmailConnector(hub, config, senders=senders)
-    except Exception as exc:
-        # Gmail failing to start must not take the shared hub down with it.
-        logger.warning(
-            "Gmail connector construction failed; connector stays off",
-            failure_mode=type(exc).__name__,
-        )
-        configure_gmail_connector(None)
-        return
-    hub.register(connector.adapter)
-    configure_gmail_connector(connector)
+
+def _sender_repository(pool: object | None) -> SenderRepository | None:
+    if api_state.PERSISTENCE_MODE != "supabase":
+        return InMemorySenderRepository()
+    if pool is None:
+        return None
+    from argus.domain.ingestion.gmail.senders_postgres import PostgresSenderRepository
+
+    return PostgresSenderRepository(pool)  # type: ignore[arg-type]
 
 
 def stop_gmail() -> None:
     configure_gmail_connector(None)
+    _set_revoke_only(None)
 
 
 @dataclass(frozen=True)
@@ -150,6 +182,15 @@ def gmail_problem(
             return problem(
                 request, status_code=status, code=code, title=title, detail=detail
             )
+    if isinstance(error, StateRejected) and error.reason == "rate_limited":
+        return problem(
+            request,
+            status_code=429,
+            code="gmail_oauth_rate_limited",
+            title="Too Many Requests",
+            detail="Too many Gmail authorizations in a short time. Wait a few "
+            "minutes and start again.",
+        )
     if isinstance(error, StateRejected):
         return problem(
             request,

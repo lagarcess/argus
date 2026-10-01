@@ -4,10 +4,11 @@ from unittest.mock import patch
 
 import pytest
 from argus.api import state as api_state
-from argus.api.gmail import gmail_connector
+from argus.api.gmail import gmail_connector, revoke_only_adapter
 from argus.api.ingestion import ingestion_hub
 from argus.api.main import app
 from argus.domain.ingestion.gmail.config import SCOPE
+from argus.domain.ingestion.gmail.state import InMemoryStateLedger
 from fastapi.testclient import TestClient
 
 from tests.ingestion.conftest import ALICE, BOB, GUEST, bearer
@@ -75,7 +76,12 @@ def test_missing_configuration_keeps_gmail_off_but_the_surface_on(
         TestClient(app) as client,
     ):
         assert gmail_connector() is None and ingestion_hub() is not None
-        assert ingestion_hub().adapter("gmail") is None
+        adapter = ingestion_hub().adapter("gmail")
+        if unset == "ARGUS_INGESTION_SECRET_KEY":
+            assert adapter is None
+        else:
+            # Disconnect can still revoke at Google and forget sender rows.
+            assert adapter is revoke_only_adapter() and adapter is not None
         response = client.post(f"{URL}/authorize", headers=bearer(ALICE))
         assert response.status_code == 404
         assert client.get(ROOT, headers=bearer(ALICE)).status_code == 200
@@ -237,3 +243,13 @@ def test_sync_without_a_sink_reports_no_sink(client, google):  # noqa: ANN001, F
     response = client.post(f"{URL}/{connection_id}/sync", headers=bearer(ALICE))
     assert response.json()["sync"]["status"] == "no_sink"
     assert response.json()["connection"]["last_success_at"] is None
+
+
+def test_a_person_over_the_state_limit_gets_429(client, google):  # noqa: ANN001, F811
+    gmail_connector().oauth.states.ledger = InMemoryStateLedger(per_user=0)
+    code, state = google.issue_code(authorize(client))
+    response = client.post(
+        f"{URL}/callback", json={"code": code, "state": state}, headers=bearer(ALICE)
+    )
+    assert response.status_code == 429
+    assert response.json()["code"] == "gmail_oauth_rate_limited"

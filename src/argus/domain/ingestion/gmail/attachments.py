@@ -22,7 +22,9 @@ from argus.domain.ingestion.gmail.mime import AttachmentPart
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 MAX_ATTACHMENTS = 10
 
-SkipReason = Literal["media_type", "too_large", "empty", "signature", "limit"]
+SkipReason = Literal[
+    "media_type", "too_large", "empty", "signature", "limit", "unreadable"
+]
 
 
 def _pdf(data: bytes) -> bool:

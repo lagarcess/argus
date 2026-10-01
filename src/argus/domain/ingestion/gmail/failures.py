@@ -14,6 +14,7 @@ codes are fixed ``gmail_*`` strings, never provider text.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from argus.domain.ingestion.connections import ConnectionStatus
 from argus.domain.ingestion.gmail.client import GmailError
@@ -53,3 +54,27 @@ def meaning(error: GmailError) -> FailureMeaning:
             return FailureMeaning(UNAVAILABLE, "error")
         return FailureMeaning(ACCESS_DENIED, "needs_reauth")
     return FailureMeaning(UNAVAILABLE, "error")
+
+
+MessageSkip = Literal["gone", "too_large", "unreadable"]
+
+
+def message_skip(error: GmailError) -> MessageSkip | None:
+    """A refusal that concerns one message or attachment, not the mailbox.
+
+    Deleted, oversized or malformed items (and other per-item 4xx answers) are
+    skipped and counted so they can never stall the cursor. Auth refusals
+    (401/403), rate limits (429), 5xx and transport failures return None: they
+    concern the whole sync and fail it without moving the cursor.
+    """
+
+    if error.status == 404:
+        return "gone"
+    if error.reason == "response_too_large":
+        return "too_large"
+    if error.reason.startswith("malformed"):
+        return "unreadable"
+    if error.status is not None and 400 <= error.status < 500:
+        if error.status not in (401, 403, 429):
+            return "unreadable"
+    return None

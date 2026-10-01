@@ -7592,12 +7592,16 @@ client and an authorized test inbox exist:
   connection, now `active` with the new credential and its cursor and
   `last_success_at` kept. `senders` (optional, at most 20) sets the allowlist;
   omitted keeps it. Problems: 400 `gmail_oauth_state_invalid`
-  (`context.reason` `invalid|expired|replayed`), 400
-  `gmail_authorization_code_invalid`, 422 `gmail_scope_not_granted` (partial
-  consent; the grant is revoked and nothing is stored), 422
-  `gmail_sender_invalid` (the state stays usable), 409
-  `gmail_mailbox_unavailable` (another person connected this mailbox), 502
-  `gmail_refresh_token_missing` or `gmail_unavailable`.
+  (`context.reason` `invalid|expired|replayed`), 429
+  `gmail_oauth_rate_limited` (this person redeemed more than 20 states in ten
+  minutes; others are unaffected), 400 `gmail_authorization_code_invalid`, 422
+  `gmail_scope_not_granted` (partial consent; the grant is revoked and nothing
+  is stored), 422 `gmail_sender_invalid` (the state stays usable), 409
+  `gmail_mailbox_unavailable` (another person holds this mailbox, including
+  when both callbacks race; never revoked), 502 `gmail_refresh_token_missing`
+  or `gmail_unavailable`. Any other failure after Google issued the grant
+  (profile refused, Google or database unavailable) revokes that grant before
+  answering.
 - GET `/gmail/{id}/senders` and PUT `/gmail/{id}/senders` `{senders}` return
   `{senders: [{sender, kind: address|domain, created_at, backfilled_at}]}`.
   Entries are lowercased email addresses or domain names (a domain covers its
@@ -7611,13 +7615,17 @@ client and an authorized test inbox exist:
   `Authentication-Results`), excluding senders already allowed. It does not
   decide which senders are banks.
 - POST `/gmail/{id}/sync` runs one bounded sync and returns `{connection, sync:
-  {status, mode, messages, candidates, skipped, attachments,
+  {status, mode, messages, candidates, ignored, skipped, attachments,
   attachments_skipped, more_pending, scan_truncated, error_code}}`. `status` is
   `synced|busy|no_sink|no_senders|failed|sink_failed|superseded`; `mode` is
   `initial|incremental|recovery`. `skipped` counts `not_allowlisted`,
   `unverified_sender` (Gmail did not authenticate the `From` domain),
-  `hidden_label`, `gone` and `unreadable`; `attachments_skipped` counts
-  `media_type`, `too_large`, `empty`, `signature` and `limit`. Nothing is
+  `hidden_label`, `gone`, `too_large` and `unreadable`; `attachments_skipped`
+  counts `media_type`, `too_large`, `empty`, `signature`, `limit` and
+  `unreadable`. A message or attachment Gmail refuses on its own (oversized,
+  malformed, another per-item 4xx) is skipped and the cursor moves past it;
+  401/403, 429 and 5xx fail the sync. `ignored` counts candidates the sink
+  refused without recording. Nothing is
   recorded and the cursor does not move for `no_sink`, `no_senders`, `failed`
   or `sink_failed`. A disconnected connection answers 409
   `financial_connection_disconnected`.
@@ -7794,3 +7802,10 @@ so an in-flight sync cannot recreate drafts a disconnect removed.
 `context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
 transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
 Item Plaid no longer knows counts as revoked.
+allowlist, whether or not revocation succeeded. While the sealing key is set
+but the Google OAuth client is not, the routes answer 404 yet a revoke-only
+adapter still revokes and forgets on disconnect.
+
+Not end-to-end import: every Gmail draft is `unclassified` until the person
+fills it in, and drafts reach review only once reconciliation provides the
+candidate sink; without it sync answers `no_sink`.

@@ -127,38 +127,20 @@ class GmailOAuth:
             # Not revoked: the grant may back this person's live connection.
             # The unused access token expires on its own within the hour.
             raise RefreshTokenMissing()
-        profile = self.client.profile(grant.access_token)
-        ref = mailbox_ref(profile.email, box)
-        live = self.hub.connections.find_live(source="gmail", external_ref=ref)
-        mine = [row for row in live if row.user_id == user_id]
-        if live and not mine:
-            raise MailboxOwnedElsewhere()
+        try:
+            row, created = self._store(user_id, grant.access_token, grant.refresh_token)
+        except MailboxOwnedElsewhere:
+            # Never revoke: the grant is the other person's too.
+            raise
+        except Exception:
+            # Nothing stored the new grant (profile refused, Google down, a
+            # database failure): release it rather than leave access the
+            # person cannot see. Google revokes the whole grant, so a failed
+            # reconnect also ends the previous credential of that mailbox;
+            # the connection then asks for authorization again.
+            self._discard(grant.refresh_token)
+            raise
         now = self.hub.clock()
-        if mine:
-            row = self._reseal(mine[0], grant.refresh_token)
-            created = False
-        else:
-            connection_id = str(uuid.uuid4())
-            try:
-                row = self.hub.connections.create(
-                    user_id=user_id,
-                    source="gmail",
-                    external_ref=ref,
-                    label=masked_label(profile.email),
-                    now=now,
-                    secret=box.seal(
-                        grant.refresh_token, source="gmail", connection_id=connection_id
-                    ),
-                    connection_id=connection_id,
-                )
-                created = True
-            except DuplicateConnection as duplicate:
-                # A concurrent callback for the same mailbox won the insert.
-                existing = self.hub.connections.get(
-                    user_id=user_id, connection_id=duplicate.existing_id
-                )
-                row = self._reseal(existing, grant.refresh_token)
-                created = False
         if grant.refresh_expires_in is not None:
             # Not blocking: syncs work until Google ends the grant, then the
             # connection moves to needs_reauth. The person is told ahead.
@@ -172,6 +154,44 @@ class GmailOAuth:
         else:
             rules = self.senders.list(connection_id=row.id)
         return ConnectResult(row, created, rules)
+
+    def _store(
+        self, user_id: str, access_token: str, refresh_token: str
+    ) -> tuple[SourceConnection, bool]:
+        box = self.hub.box
+        assert box is not None
+        profile = self.client.profile(access_token)
+        ref = mailbox_ref(profile.email, box)
+        live = self.hub.connections.find_live(source="gmail", external_ref=ref)
+        mine = [row for row in live if row.user_id == user_id]
+        if live and not mine:
+            raise MailboxOwnedElsewhere()
+        if mine:
+            return self._reseal(mine[0], refresh_token), False
+        connection_id = str(uuid.uuid4())
+        try:
+            row = self.hub.connections.create(
+                user_id=user_id,
+                source="gmail",
+                external_ref=ref,
+                label=masked_label(profile.email),
+                now=self.hub.clock(),
+                secret=box.seal(
+                    refresh_token, source="gmail", connection_id=connection_id
+                ),
+                connection_id=connection_id,
+            )
+        except DuplicateConnection as duplicate:
+            if duplicate.elsewhere:
+                # Another person's callback for this mailbox won the insert;
+                # the live reference is unique across people.
+                raise MailboxOwnedElsewhere() from None
+            # This person's concurrent callback won the insert.
+            existing = self.hub.connections.get(
+                user_id=user_id, connection_id=duplicate.existing_id
+            )
+            return self._reseal(existing, refresh_token), False
+        return row, True
 
     def _reseal(self, row: SourceConnection, refresh_token: str) -> SourceConnection:
         """Reconnect: the newest grant replaces the stored one. The old token is
