@@ -7462,3 +7462,32 @@ household and membership incarnation. Native changes of identity, membership,
 permission generation or scope discard protected reads; denied reads return to
 Personal, preserving uncertain command recovery. Household Plan/Argus remain
 explicitly unsupported in this bounded native lane.
+
+## Connected financial sources (default-off)
+
+Registered-only, behind `ARGUS_INGESTION_ENABLED` nested inside
+`ARGUS_FINANCIAL_ACCOUNTS_ENABLED`. The flag is checked before authentication:
+while either is off every route answers 404 `financial_connections_unavailable`.
+Guests receive 403 `account_conversion_required`. Lane spec and the shared
+import-candidate contract:
+[financial-ingestion-connectors](specs/lanes/financial-ingestion-connectors.md).
+
+Connector-specific routes (Plaid Link, Gmail OAuth, Shortcuts device setup)
+and the review queue are documented with their packages. Imports are drafts
+until the person confirms them; no route here writes financial activity.
+
+Connection shape:
+`{id,source,status,label,last_success_at,last_attempt_at,last_error_code,created_at,disconnected_at}`.
+`source` is `plaid|gmail|shortcuts|statement`; `status` is
+`active|needs_reauth|error|disconnected`. A failed refresh keeps the previous
+`last_success_at`. Credentials, cursors and sync leases are never returned.
+
+- GET `/api/v1/financial-connections` returns `{items}` for the caller only,
+  oldest first.
+- POST `/api/v1/financial-connections/{id}/disconnect` returns
+  `{connection,provider_revocation,unreviewed_removed}`.
+  `provider_revocation` is `revoked|failed|not_applicable`. The stored
+  credential and cursor are deleted even when provider revocation fails, and
+  unreviewed drafts from that connection are removed; confirmed activity stays.
+  Repeating the call returns the ended connection with `not_applicable` and `0`.
+  Another person's or an unknown id answers 404 `financial_connection_not_found`.
