@@ -92,3 +92,12 @@ def disconnect_financial_connection(
         provider_revocation=outcome.provider_revocation,
         unreviewed_removed=outcome.unreviewed_removed,
     )
+
+
+# Connector sub-routers import the response shapes above, so they are
+# included after those definitions.
+from argus.api.routers.financial_connections_gmail import (  # noqa: E402
+    router as gmail_router,
+)
+
+router.include_router(gmail_router)

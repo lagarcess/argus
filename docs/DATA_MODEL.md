@@ -110,6 +110,7 @@ household_account_grants
 Default-off, registered-only (`ARGUS_INGESTION_ENABLED`):
 ```text
 financial_source_connections
+financial_source_gmail_senders
 ```
 
 Optional or later:
@@ -2851,3 +2852,23 @@ anything. Proven by `tests/test_ingestion_connections_postgres.py`.
 These rows are connection state, never financial records. Imported evidence
 and review state belong to reconciliation; canonical activity remains in the
 existing activity tables written only through `MoneyService`.
+
+### Gmail sender allowlist
+
+`financial_source_gmail_senders` (migration
+`20261001160000_financial_source_gmail_senders.sql`) holds the senders a person
+chose for one Gmail connection: `(connection_id, sender)` primary key,
+`user_id`, `created_at` and `backfilled_at` (when that sender's lookback window
+was last searched; null means the next sync searches it). `sender` is a
+lowercased address or domain name with no whitespace, quotes, parentheses,
+commas or angle brackets, so it can never inject Gmail search operators. The
+connector reads only messages whose authenticated `From` matches an entry.
+Rows cascade with their connection and their user, and the Gmail adapter
+deletes them on disconnect. The server writes rows only through the owner's
+live Gmail connection (checked in the same transaction). Registered owners may
+`SELECT` their rows; no client role can write. Rows never hold message content.
+Proven by `tests/test_ingestion_gmail_postgres.py`.
+
+The cursor for a Gmail connection is the mailbox `historyId` in
+`financial_source_connections.sync_cursor`; the sealed credential is the
+Google refresh token. Access tokens are never stored.

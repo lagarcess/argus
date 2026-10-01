@@ -82,6 +82,9 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         configure_ingestion_hub(
             IngestionHub(connections, box=box, sink=None, clock=_clock)
         )
+        from argus.api.gmail import start_gmail
+
+        start_gmail(ingestion_hub(), pool)
     except Exception as exc:
         logger.warning(
             "Ingestion hub construction failed; surface stays off",
@@ -91,6 +94,9 @@ def start_ingestion(app) -> None:  # noqa: ANN001
 
 
 def stop_ingestion(app) -> None:  # noqa: ANN001
+    from argus.api.gmail import stop_gmail
+
+    stop_gmail()
     configure_ingestion_hub(None)
 
 
