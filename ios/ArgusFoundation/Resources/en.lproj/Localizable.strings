@@ -597,3 +597,31 @@
 "plan.exclusion.plan_archived" = "Plan archived";
 
 "debt.funding.assigned" = "Assigned to savings goals";
+
+"assets.whole" = "Whole-asset estimate";
+"assets.personal %@" = "Your contribution at %@%% ownership";
+"assets.share.allSummary" = "You own all of it";
+"assets.share.summary %@" = "You own %@%%";
+"assets.share.all" = "All of it";
+"assets.share.half" = "Half";
+"assets.share.other" = "Another share";
+"assets.share.changed %@ %@" = "Ownership changed from %@%% to %@%%";
+"assets.debt" = "Related debt";
+"assets.debt.none" = "No related debt";
+"assets.debt.help" = "Choose an existing debt. Linking keeps its balance and payments unchanged.";
+"assets.debt.removed %@" = "Removed link to %@";
+"assets.debt.added %@" = "Linked to %@";
+"assets.update" = "Update estimate";
+"assets.correct" = "Correct this estimate";
+"assets.details" = "Ownership and related debt";
+"assets.date" = "Estimate date";
+"assets.basis" = "Basis for the estimate";
+"assets.basis.unspecified" = "Basis not recorded";
+"assets.noncash" = "A recorded estimate of a noncash asset. It is not money available to spend.";
+"assets.history" = "Estimate history";
+"assets.details.history" = "Ownership and debt-link history";
+"assets.revision %lld" = "Revision %lld";
+"assets.pending" = "Account confirmation pending";
+"assets.back" = "Back to asset";
+"assets.error.dateOrder" = "Keep the date between the estimates before and after it.";
+"assets.error.debt" = "Choose an existing debt account.";
