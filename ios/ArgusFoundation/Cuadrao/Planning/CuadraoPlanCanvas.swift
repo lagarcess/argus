@@ -6,6 +6,12 @@ struct CuadraoPlanCanvas: View {
     let spanish: Bool
     var bottomSpace: CGFloat = 90
     @State private var path: [UUID] = []
+    @State private var together = false
+    @State private var groups = CuadraoGroupPreview(
+        spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
+        reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
+        empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
+    @State private var newGroup = false
     @State private var scope = "personal"
     @State private var filter: String?
     @State private var selectedDay: Int?
@@ -24,10 +30,18 @@ struct CuadraoPlanCanvas: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 30) {
+                VStack(alignment: .leading, spacing: 24) {
                     header
-                    if store.hasForecast { forecastOverview } else { forecastColdStart }
-                    plans
+                    Picker(spanish ? "Tus planes" : "Your plans", selection: $together) {
+                        Text(spanish ? "Para ti" : "For you").tag(false)
+                        Text(spanish ? "En grupo" : "Together").tag(true)
+                    }.pickerStyle(.segmented).accessibilityIdentifier("plan-audience")
+                    if together {
+                        CuadraoGroupCollection(store: groups, spanish: spanish, bottomSpace: bottomSpace, create: { newGroup = true })
+                    } else {
+                        if store.hasForecast { forecastOverview } else { forecastColdStart }
+                        plans
+                    }
                     PlanPreviewFootnote(spanish: spanish)
                 }.padding(.horizontal, 24).padding(.top, 20).padding(.bottom, bottomSpace)
             }
@@ -36,16 +50,23 @@ struct CuadraoPlanCanvas: View {
             .toolbar(.hidden, for: .navigationBar).toolbar(.hidden, for: .tabBar)
             .cuadraoSoftScrollEdges()
             .navigationDestination(for: UUID.self) { id in
-                CuadraoPlanDetail(store: store, accounts: accounts, planID: id, spanish: spanish, bottomSpace: bottomSpace)
+                if store.plan(id) != nil {
+                    CuadraoPlanDetail(store: store, accounts: accounts, planID: id, spanish: spanish, bottomSpace: bottomSpace)
+                } else {
+                    CuadraoGroupDetail(store: groups, groupID: id, spanish: spanish, bottomSpace: bottomSpace)
+                }
             }
             .sheet(item: $creation) { route in
                 CuadraoPlanEditor(store: store, accounts: accounts, initial: route.plan, spanish: spanish) { id in
                     if store.plan(route.plan.id) != nil { path.append(id) }
                 }
             }
+            .sheet(isPresented: $newGroup) {
+                CuadraoGroupEditor(store: groups, spanish: spanish, onSave: { path.append($0) })
+            }
             .confirmationDialog(spanish ? "¿Cambiar el escenario de vista previa?" : "Change preview scenario?", isPresented: $resetConfirmation, titleVisibility: .visible) {
                 Button(spanish ? "Cambiar escenario" : "Change scenario", role: .destructive) {
-                    store.resetExamples(spanish: spanish, empty: showEmpty); filter = nil
+                    store.resetExamples(spanish: spanish, empty: showEmpty); groups.resetExamples(spanish: spanish, empty: showEmpty); filter = nil
                 }
             } message: {
                 Text(spanish ? "Se reemplazarán solo los planes de esta vista previa." : "Only this preview's plans will be replaced.")
@@ -57,7 +78,7 @@ struct CuadraoPlanCanvas: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Plan").font(.system(.largeTitle, design: .serif))
-                Text(spanish ? "Dale forma a lo que viene." : "Make room for what's next.")
+                Text(spanish ? "Lo que viene, lo hacemos." : "Make what's next happen.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
@@ -70,7 +91,7 @@ struct CuadraoPlanCanvas: View {
             } label: {
                 Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Circle())
             }.accessibilityLabel(spanish ? "Opciones de Plan" : "Plan options").accessibilityIdentifier("plan-options")
-            Button { creation = PlanEditorRoute(plan: newPlan) } label: {
+            Button { if together { newGroup = true } else { creation = PlanEditorRoute(plan: newPlan) } } label: {
                 Image(systemName: "plus").font(.system(size: 20, weight: .medium))
                     .frame(width: 44, height: 44).background(WelcomePalette.sage, in: Circle())
             }.accessibilityLabel(spanish ? "Crear plan" : "Create plan").accessibilityIdentifier("plan-create")
@@ -82,7 +103,7 @@ struct CuadraoPlanCanvas: View {
     }
 
     private var forecastOverview: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 8) {
             Menu {
                 ForEach(accounts.visibleSpaces.filter { $0.kind == .personal || $0.kind == .household }) { space in
                     Button { scope = space.id; selectedDay = nil } label: {
@@ -96,16 +117,16 @@ struct CuadraoPlanCanvas: View {
                     Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
                 }.font(.subheadline).frame(minHeight: 36)
             }.accessibilityIdentifier("plan-forecast-scope")
-            Text(spanish ? "MES DE EJEMPLO · 2026" : "EXAMPLE MONTH · 2026").font(.system(size: 10, weight: .medium)).tracking(1.2).foregroundStyle(.secondary)
+
             VStack(alignment: .leading, spacing: 5) {
-                Text(selectedPoint.map { "\($0.day) oct. · \($0.day > CanvasForecast.today ? (spanish ? "estimado" : "estimated") : (spanish ? "registrado" : "recorded"))" } ?? (store.dailyAssumptions[scope] == nil ? (spanish ? "A este ritmo, cerrarías con" : "At this pace, you'd end with") : (spanish ? "Con tu plan, cerrarías con" : "With your plan, you'd end with")))
+                Text(selectedPoint.map { "\($0.day) oct. · \($0.day > CanvasForecast.today ? (spanish ? "estimado" : "estimated") : (spanish ? "registrado" : "recorded"))" } ?? (store.dailyAssumptions[scope] == nil ? (spanish ? "Balance estimado al cierre" : "Estimated closing balance") : (spanish ? "Con tu plan, cerrarías con" : "With your plan, you'd end with")))
                     .font(.subheadline).foregroundStyle(.secondary)
                 Text(PlanFormat.amount(selectedPoint?.balance ?? forecast.ending(daily: store.daily(for: scope))))
-                    .font(.system(size: 36, weight: .regular, design: .rounded)).monospacedDigit()
+                    .font(.system(size: 30, weight: .regular, design: .rounded)).monospacedDigit()
                     .contentTransition(.numericText()).minimumScaleFactor(0.65).lineLimit(1)
                     .accessibilityIdentifier("plan-month-ending")
             }
-            PlanForecastChart(forecast: forecast, daily: store.daily(for: scope), spanish: spanish, selectedDay: $selectedDay)
+            PlanForecastChart(forecast: forecast, daily: store.daily(for: scope), spanish: spanish, selectedDay: $selectedDay, compact: true)
             NavigationLink {
                 CuadraoForecastPlayground(store: store, scope: scope, scopeName: scopeName, spanish: spanish, bottomSpace: bottomSpace)
             } label: {

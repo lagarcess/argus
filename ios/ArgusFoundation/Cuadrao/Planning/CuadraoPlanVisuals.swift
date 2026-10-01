@@ -127,6 +127,7 @@ struct PlanForecastChart: View {
     var comparison: Double? = nil
     @Binding var selectedDay: Int?
     var detailed = false
+    var compact = false
     var selected: CanvasForecastPoint? {
         guard let selectedDay else { return nil }
         return (forecast.actual + forecast.projection(daily: daily).dropFirst()).first { $0.day == selectedDay }
@@ -175,7 +176,7 @@ struct PlanForecastChart: View {
         }
         .chartXSelection(value: $selectedDay)
         .accessibilityIdentifier("plan-forecast-chart")
-        .frame(height: detailed ? 170 : 150)
+        .frame(height: compact ? 95 : detailed ? 170 : 150)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spanish ? "Balance de octubre. Línea continua: registrado. Línea punteada: estimación." : "October balance. Solid line: recorded. Dashed line: estimate.")
         .accessibilityValue(PlanFormat.amount(forecast.ending(daily: daily)))

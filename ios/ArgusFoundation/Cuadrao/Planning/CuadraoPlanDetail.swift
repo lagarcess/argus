@@ -14,6 +14,7 @@ struct CuadraoPlanDetail: View {
     @State private var archive = false
     @State private var people = false
     @State private var saved = false
+    @State private var progressEntry = false
     @Environment(\.dismiss) private var dismiss
     private var plan: CanvasPlan? { store.plan(planID) }
     private func baseline(_ plan: CanvasPlan) -> Double { plan.kind == .budget ? plan.target : plan.monthly }
@@ -24,7 +25,7 @@ struct CuadraoPlanDetail: View {
         Group {
             if let plan {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 20) {
                         heading(plan)
                         if plan.remaining == 0 && plan.kind != .budget {
                             PlanLandscape(look: plan.look).frame(height: 135)
@@ -34,8 +35,11 @@ struct CuadraoPlanDetail: View {
                                 Text(spanish ? "Tu ritmo aparecerá con tus primeros movimientos." : "Your pace will appear with your first transactions.")
                                     .font(.subheadline).foregroundStyle(.secondary)
                             }
-                        } else { PlanDetailChart(plan: plan, amount: amount(plan), spanish: spanish, scenarioCeiling: sliderCeiling) }
+                        }
                         if plan.remaining > 0 || plan.kind == .budget { playground(plan) }
+                        Button { progressEntry = true } label: {
+                            Label(spanish ? "Actualizar progreso" : "Update progress", systemImage: "plus.circle").frame(minHeight: 44)
+                        }.accessibilityIdentifier("plan-record-progress")
                         facts(plan)
                         if plan.spaceID == "household" { household(plan) }
                         PlanPreviewFootnote(spanish: spanish)
@@ -55,6 +59,11 @@ struct CuadraoPlanDetail: View {
                     PlanExactAmount(amount: Binding(get: { amount(plan) }, set: { draftAmount = $0; sliderCeiling = max(sliderCeiling, $0); saved = false }), maximum: 9999999, minimum: 1,
                         title: plan.kind == .budget ? (spanish ? "Mi margen mensual" : "My monthly allowance") : (spanish ? "Cada mes" : "Each month"), currency: plan.currency, spanish: spanish)
                 }
+                .sheet(isPresented: $progressEntry) {
+                    PlanExactAmount(amount: Binding(get: { plan.recorded }, set: { value in
+                        var updated = plan; updated.recorded = value; store.save(updated)
+                    }), maximum: plan.kind == .debt ? plan.target : 9999999, title: plan.kind.recordedTitle(spanish), currency: plan.currency, spanish: spanish)
+                }
                 .confirmationDialog(spanish ? "¿Dejamos este plan en pausa?" : "Put this plan aside?", isPresented: $archive, titleVisibility: .visible) {
                     Button(spanish ? "Archivar plan" : "Archive plan") { store.archive(plan.id, true); dismiss() }
                 } message: { Text(spanish ? "Podrás retomarlo desde Archivados. Su progreso se conserva." : "You can restore it from Archived. Its progress stays with it.") }
@@ -72,49 +81,47 @@ struct CuadraoPlanDetail: View {
     }
 
     private func heading(_ plan: CanvasPlan) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Text(PlanFormat.space(plan.spaceID, accounts: accounts, spanish: spanish)).font(.subheadline).foregroundStyle(.secondary)
-                Spacer()
-                Image(systemName: plan.look.symbol).foregroundStyle(plan.look.color).font(.title2)
-            }
-            Text(plan.name).font(.system(.largeTitle, design: .serif)).fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(PlanFormat.amount(plan.kind == .debt ? plan.remaining : plan.recorded, currency: plan.currency))
-                    .font(.system(size: 34, weight: .regular, design: .rounded)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(PlanFormat.space(plan.spaceID, accounts: accounts, spanish: spanish)).font(.caption).foregroundStyle(.secondary)
+            HStack(alignment: .center, spacing: 16) {
+                Text(plan.name).font(.system(.title, design: .serif)).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
+                PlanLandscape(look: plan.look).frame(width: 70, height: 76)
             }
-            Text(plan.kind == .debt ? (spanish ? "por pagar" : "left to pay") : plan.kind.recordedTitle(spanish))
-                .font(.subheadline).foregroundStyle(.secondary).padding(.top, -12)
+            HStack {
+                Text(PlanFormat.amount(plan.kind == .debt ? plan.remaining : plan.recorded, currency: plan.currency)).font(.headline).monospacedDigit()
+                Text(plan.kind == .debt ? (spanish ? "por pagar" : "left to pay") : plan.kind.recordedTitle(spanish)).font(.caption).foregroundStyle(.secondary)
+            }
             if plan.remaining == 0 && plan.kind != .budget {
-                Label(spanish ? "Lo hiciste. Un plan menos, más posibilidades." : "You did it. One plan down, more possibilities ahead.", systemImage: "checkmark.seal")
-                    .font(.subheadline).foregroundStyle(plan.look.color)
+                Label(spanish ? "Lo hiciste. Un plan menos, más posibilidades." : "You did it. One plan down, more possibilities ahead.", systemImage: "checkmark.seal").font(.subheadline).foregroundStyle(plan.look.color)
             }
         }
     }
 
     private func playground(_ plan: CanvasPlan) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(plan.kind == .budget ? (spanish ? "Dale aire a tu mes." : "Give your month some room.") : (spanish ? "Encuentra tu ritmo." : "Find your rhythm."))
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(plan.kind == .budget ? (spanish ? "Dale aire a tu mes." : "Give your month some room.") : plan.kind == .debt ? (spanish ? "Más cerca de soltarla." : "Closer to letting it go.") : (spanish ? "A tu ritmo, llegarías en" : "At your pace, you would arrive in"))
                     .font(.system(.title2, design: .serif))
                 if plan.kind == .budget && plan.recorded > 0 {
                     let estimate = plan.projectedValue(at: CanvasForecast.lastDay, monthly: amount(plan))
-                    Text(spanish ? "A tu ritmo actual, gastarías \(PlanFormat.amount(estimate, currency: plan.currency)). Cambiar el margen no cambia ese ritmo." : "At your current pace, you'd spend \(PlanFormat.amount(estimate, currency: plan.currency)). Changing the allowance doesn't change that pace.")
+                    Text(spanish ? "A este ritmo: \(PlanFormat.amount(estimate, currency: plan.currency)) al cierre. El margen no cambia el gasto previsto." : "At this pace: \(PlanFormat.amount(estimate, currency: plan.currency)) at month end. The allowance doesn't change projected spending.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 } else if plan.kind != .budget {
                     Text(plan.months(at: amount(plan)).map { PlanFormat.month(after: $0, spanish: spanish) }
                         ?? (spanish ? "Este aporte no alcanza para llegar." : "This amount won't get you there."))
-                        .font(.title3.weight(.medium)).foregroundStyle(plan.look.color).accessibilityIdentifier("plan-estimated-date")
+                        .font(.system(.title, design: .rounded)).foregroundStyle(plan.look.color).contentTransition(.numericText()).accessibilityIdentifier("plan-estimated-date")
                     if changed(plan), let original = plan.months(at: plan.monthly), let proposed = plan.months(at: amount(plan)), original != proposed {
                         Text(spanish ? "\(abs(original - proposed)) meses \(proposed < original ? "antes" : "después")" : "\(abs(original - proposed)) months \(proposed < original ? "earlier" : "later")")
                             .font(.subheadline.weight(.medium)).foregroundStyle(plan.look.color)
                     }
-                    Text(spanish ? "Fecha estimada, manteniendo este aporte." : "Estimated date if you keep this contribution.")
-                        .font(.caption).foregroundStyle(.secondary)
+
                 }
             }
-            VStack(spacing: 10) {
+            if plan.kind != .budget || plan.recorded > 0 {
+                PlanDetailChart(plan: plan, amount: amount(plan), spanish: spanish, scenarioCeiling: sliderCeiling)
+            }
+            VStack(spacing: 6) {
                 HStack {
                     Text(plan.kind == .budget ? (spanish ? "Mi margen" : "My allowance") : (spanish ? "Cada mes" : "Each month")).font(.subheadline)
                     Spacer()
@@ -127,7 +134,7 @@ struct CuadraoPlanDetail: View {
                     in: 1...max(1000, baseline(plan) * 3, sliderCeiling), step: 1)
                     .tint(plan.look.color).accessibilityLabel(spanish ? "Probar otro monto" : "Try another amount")
                     .accessibilityIdentifier("plan-detail-slider")
-            }.padding(20).background(plan.look.color.opacity(0.065), in: RoundedRectangle(cornerRadius: 24))
+            }.padding(16).background(plan.look.color.opacity(0.065), in: RoundedRectangle(cornerRadius: 24))
             if plan.kind != .budget {
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
@@ -216,7 +223,7 @@ private struct PlanDetailChart: View {
                 }
             }
             .chartYScale(domain: 0...upperBound)
-            .chartYAxis(.hidden).chartXAxis(.hidden).frame(height: 145)
+            .chartYAxis(.hidden).chartXAxis(.hidden).frame(height: 110)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(spanish ? "Proyección ilustrativa del plan. Línea punteada: lo previsto, no progreso registrado." : "Illustrative plan projection. Dashed line: planned, not recorded progress.")
             HStack {
@@ -224,7 +231,7 @@ private struct PlanDetailChart: View {
                 Spacer()
                 Text(plan.kind == .budget ? (spanish ? "31 oct." : "Oct 31") : (spanish ? "\(horizon) meses" : "\(horizon) months"))
             }.font(.caption2).foregroundStyle(.secondary)
-            Text(spanish ? "Línea punteada · proyección" : "Dashed line · projection").font(.caption2).foregroundStyle(.secondary)
+            Text(spanish ? "Punteado: estimado · gris: plan guardado" : "Dashed: estimate · gray: saved plan").font(.caption2).foregroundStyle(.secondary)
         }
     }
 }

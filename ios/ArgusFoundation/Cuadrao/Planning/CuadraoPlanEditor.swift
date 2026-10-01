@@ -27,25 +27,15 @@ struct CuadraoPlanEditor: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 18) {
                     if !editing { kindPicker }
                     HStack(spacing: 18) {
-                        PlanLandscape(look: draft.look).frame(width: 80, height: 90)
+                        PlanLandscape(look: draft.look).frame(width: 64, height: 70)
                         VStack(alignment: .leading, spacing: 8) {
                             Text(spanish ? "Dale un nombre." : "Make it yours.").font(.system(.title2, design: .serif))
                             TextField(spanish ? "Por ejemplo, mi próximo viaje" : "For example, my next trip", text: $draft.name)
                                 .font(.body).focused($nameFocused).submitLabel(.done).onSubmit { nameFocused = false }
                                 .accessibilityIdentifier("plan-name")
-                        }
-                    }
-                    HStack(spacing: 14) {
-                        ForEach(CanvasPlanLook.allCases) { look in
-                            Button { draft.look = look } label: {
-                                Image(systemName: look.symbol).font(.title3).foregroundStyle(look.color)
-                                    .frame(maxWidth: .infinity, minHeight: 48)
-                                    .background(look.color.opacity(draft.look == look ? 0.17 : 0.04), in: RoundedRectangle(cornerRadius: 16))
-                                    .overlay { if draft.look == look { RoundedRectangle(cornerRadius: 16).stroke(look.color.opacity(0.65), lineWidth: 1.5) } }
-                            }.accessibilityLabel(look.title(spanish)).accessibilityAddTraits(draft.look == look ? .isSelected : [])
                         }
                     }
                     VStack(spacing: 0) {
@@ -71,6 +61,9 @@ struct CuadraoPlanEditor: View {
                         Text(spanish ? "Este plan pertenece a Hogar. Sus miembros podrán verlo; tus cuentas personales siguen siendo privadas." : "This plan belongs to Household. Its members will see it; your personal accounts stay private.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
+                    DisclosureGroup(spanish ? "Darle mi estilo" : "Make it mine") {
+                        PlanLookPicker(look: $draft.look, spanish: spanish).padding(.top, 12)
+                    }.font(.subheadline)
                     DisclosureGroup(isExpanded: $showDetails) {
                         VStack(spacing: 12) {
                             amountRow(draft.kind.recordedTitle(spanish), value: $draft.recorded, id: "plan-recorded")
@@ -99,17 +92,19 @@ struct CuadraoPlanEditor: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    PlanPrimaryButton(title: editing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Crear plan" : "Create plan")) {
-                        draft.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if draft.kind == .budget { draft.monthly = draft.target }
-                        store.save(draft); dismiss(); onSave?(draft.id)
-                    }.disabled(!valid).opacity(valid ? 1 : 0.45).accessibilityIdentifier("plan-save")
                     if !valid {
                         Text(spanish ? "Añade un nombre y revisa los montos." : "Add a name and check the amounts.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     PlanPreviewFootnote(spanish: spanish)
                 }.padding(24)
+            }.safeAreaInset(edge: .bottom) {
+                PlanPrimaryButton(title: editing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Crear plan" : "Create plan")) {
+                        draft.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if draft.kind == .budget { draft.monthly = draft.target }
+                        store.save(draft); dismiss(); onSave?(draft.id)
+                    }.disabled(!valid).opacity(valid ? 1 : 0.45).accessibilityIdentifier("plan-save")
+                    .padding(.horizontal, 24).padding(.vertical, 12).background(.regularMaterial)
             }.scrollDismissesKeyboard(.interactively).background(WelcomePalette.background)
                 .navigationTitle(editing ? (spanish ? "Editar plan" : "Edit plan") : (spanish ? "Un nuevo plan" : "A new plan"))
                 .navigationBarTitleDisplayMode(.inline)

@@ -149,7 +149,12 @@ final class CuadraoPlanDesignUITests: XCTestCase {
         app.launch(); app.buttons["cuadrao-tab-1"].tap(); return app
     }
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
-        for _ in 0..<6 { if element.isHittable { return }; app.swipeUp() }
+        for _ in 0..<7 {
+            let navigation = app.buttons["cuadrao-tab-0"]
+            let bottom = navigation.exists ? navigation.frame.minY - 12 : app.frame.maxY
+            if element.isHittable && element.frame.midY < bottom { return }
+            app.swipeUp()
+        }
         XCTAssertTrue(element.isHittable)
     }
     private func capture(_ app: XCUIApplication, _ name: String) {
