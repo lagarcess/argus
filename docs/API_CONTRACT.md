@@ -7467,6 +7467,11 @@ explicitly unsupported in this bounded native lane.
 
 **Status:** Proposed technical extension for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Not implemented or enabled. The current unsupported state above remains accurate until implementation and acceptance. The People & permissions interaction and plan custody after owner departure await founder approval.
 
+The independent read prerequisite now resolves authoritative transaction
+revisions before Household visibility filtering. It preserves current write
+permissions and cross-owner rejection. All shared planning commands and native
+flows below remain proposed. See the lane manifest for its limited evidence.
+
 ### Canonical definitions and consent
 
 A shared plan references one existing owner-qualified budget, bill expectation,

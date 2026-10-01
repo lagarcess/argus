@@ -2798,7 +2798,9 @@ Debt-plan archive preserves canonical payments and claimed occurrence snapshots.
 
 ## Shared Household planning storage sketch
 
-**Status:** Proposed additive contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. No migration or runtime implementation is claimed. The [API sketch](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the proposed public wire and unresolved permission/custody decisions.
+**Status:** Proposed additive contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. No shared-planning migration or writer is implemented. The independent
+Household read prerequisite now uses exact current group membership; it does not
+enable cross-owner posting or shared plans. The [API sketch](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the proposed public wire and unresolved permission/custody decisions.
 
 The selected candidate adds consent and responsibility references to existing
 owner-qualified definitions. The alternative adds Household scope directly to

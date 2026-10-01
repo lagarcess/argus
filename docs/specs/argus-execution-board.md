@@ -102,11 +102,20 @@ must not expose or erase another person's private financial records. These
 requirements remain implementation and database verification work, not proof
 of delivery. No new simulator, service or database was created while the
 interaction and custody answers remain pending. Bounded read-only scouts and
-contract preparation are complete. The sole writer may now implement the
-independent complete-group read prerequisite in `canonical_groups.py` and
-Household `financial.py`/`projection.py`, with focused boundary tests. This
-step retains current write permissions and cross-owner rejection. Plan rights,
-custody, contributions and dependent UI remain blocked on the two answers.
+contract preparation are complete. Independent complete-group reads are
+implemented at `2499e3c5a602c4b50b03bc9be8d7fb631feeae3f` in
+`canonical_groups.py` and Household `financial.py`/`projection.py`. The writer
+reported **45 passed / 65 skipped** focused regressions and clean scoped Ruff.
+The captain verified the affected subset at that exact commit: **10 passed /
+30 skipped**, zero failures. Missing exact references and incomplete paired
+groups fail closed; current revision controls visibility before existing
+redaction. Account positions load separately.
+[Commands and evidence](../reports/evidence/shared-household-planning/canonical-read-check.json)
+explicitly mark SQL-backed load/snapshot/history unverified without the local
+DSN. This step retains current write permissions and cross-owner rejection.
+No shared plan, contribution or native delivery is claimed. All bounded agents
+have stopped; no lane-owned service runs. Plan rights, custody, contributions
+and dependent UI remain blocked on the two answers.
 
 The checkpoint's temporary groups, splitting and guest proposals do not define
 Household permissions. Guest finance remains registered-only. A narrow proposed
