@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from argus.domain.recording.assets import AssetDetailsResult
     from argus.domain.recording.loop_storage import OperationResult, Planner
 
 import threading
@@ -20,6 +21,8 @@ from typing import Protocol
 from uuid import uuid4
 
 from argus.domain.recording.accounts import AccountFacts
+from argus.domain.recording.asset_model import AssetChange
+from argus.domain.recording.asset_schemas import AssetDetailsRequest
 from argus.domain.recording.errors import (
     AccountNotFound,
     IdempotencyConflict,
@@ -46,6 +49,8 @@ class StoredAccount:
     expenses: tuple[ExpenseRecord, ...] = ()
     checks: tuple[CheckRecord, ...] = ()
     coverage: tuple[Coverage, ...] = ()
+    related_debt_account_id: str | None = None
+    asset_changes: tuple[AssetChange, ...] = ()
 
     @property
     def has_records(self) -> bool:
@@ -63,6 +68,16 @@ class CreateResult:
 
 
 class FinancialAccountRepository(Protocol):
+    def write_asset_details(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        request: AssetDetailsRequest,
+        idempotency_key: str,
+        identity_hash: str,
+    ) -> AssetDetailsResult: ...
+
     def mutate(
         self,
         *,
@@ -195,6 +210,12 @@ class InMemoryFinancialAccountRepository:
             stored = self._owned(user_id, account_id)
             if stored.account.version != expected_version:
                 raise StaleVersion()
+            from argus.domain.recording.asset_storage import validate_type_change
+
+            linked = stored.related_debt_account_id is not None or any(
+                a.related_debt_account_id == account_id for a in self._accounts.values()
+            )
+            validate_type_change(stored, changes, linked)
             facts = replace(
                 stored.account,
                 **changes,
@@ -270,6 +291,26 @@ class InMemoryFinancialAccountRepository:
             self._operations[key] = (identity_hash, record.id, revision, mutation.kind)
             return OperationResult(updated, record.id, revision, mutation.kind, False)
 
+    def write_asset_details(
+        self,
+        *,
+        user_id: str,
+        account_id: str,
+        request: AssetDetailsRequest,
+        idempotency_key: str,
+        identity_hash: str,
+    ) -> AssetDetailsResult:
+        from argus.domain.recording.asset_storage import memory_write
+
+        return memory_write(
+            self,
+            user_id=user_id,
+            account_id=account_id,
+            request=request,
+            idempotency_key=idempotency_key,
+            identity_hash=identity_hash,
+        )
+
     def _owned(self, user_id: str, account_id: str) -> StoredAccount:
         stored = self._accounts.get(account_id)
         if stored is None or stored.account.user_id != user_id:
@@ -288,4 +329,5 @@ def _revision(
         reason=write.reason,
         recorded_by=user_id,
         recorded_at=now,
+        estimate_basis=write.estimate_basis,
     )

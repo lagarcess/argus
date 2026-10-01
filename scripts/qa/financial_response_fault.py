@@ -54,6 +54,8 @@ class Fault:
                 path == "/api/v1/financial-activities"
                 or path.startswith("/api/v1/financial-activities/")
                 or path.startswith("/api/v1/financial-plan/")
+                or path == "/api/v1/financial-accounts"
+                or path.startswith("/api/v1/financial-accounts/")
             )
             and not path.endswith("/preview")
             and 200 <= status < 300

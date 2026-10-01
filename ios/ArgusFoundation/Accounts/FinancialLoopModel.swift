@@ -16,6 +16,7 @@ final class FinancialLoopModel: ObservableObject {
     }
     @Published private(set) var accountReads: [UUID: AccountReadState] = [:]
     func read(_ accountID: UUID) -> AccountReadState { accountReads[accountID] ?? AccountReadState() }
+    @Published var assetEditor: FinancialAssetEditor?
     @Published var editor: FinancialEditor?
     @Published var activityEditor: FinancialActivityEditor?
     @Published private(set) var pendingConfirmation: PendingFinancialConfirmation?
@@ -35,13 +36,17 @@ final class FinancialLoopModel: ObservableObject {
 
     init(controller: SessionController, accounts: AccountsModel, journal: FinancialWriteJournal) {
         self.controller = controller; self.accounts = accounts; self.journal = journal
+        accounts.confirmCreate = { [weak self] command in
+            guard let self else { throw SessionFailure.staleOperation }
+            return try await self.confirmAccount(command, accountID: nil, suffix: "", method: "POST", key: command.idempotencyKey)
+        }
     }
 
     func bind(_ snapshot: SessionSnapshot?) {
         guard identity?.revision != snapshot?.revision || identity?.profile?.id != snapshot?.profile?.id || identity?.phase != snapshot?.phase else { return }
         generation = UUID(); identity = snapshot?.phase == .authenticated ? snapshot : nil
         home = nil; accountReads = [:]
-        editor = nil; activityEditor = nil; recovering = false; recoveryErrorKey = nil
+        assetEditor = nil; editor = nil; activityEditor = nil; recovering = false; recoveryErrorKey = nil
         if let identity {
             do { pendingConfirmation = try journal.pending(for: identity) }
             catch { pendingConfirmation = nil; recoveryErrorKey = "auth.error.storage" }
@@ -201,6 +206,13 @@ final class FinancialLoopModel: ObservableObject {
                     goals.confirmed(operation)
                     debts.confirmed(operation)
                 }
+            } else if write.route == "financial-accounts" {
+                let account = try await controller.sendAccountConfirmation(write, expectedIdentity: identity)
+                guard generation == ticket else { return }
+                try journal.clear(write, for: identity); pendingConfirmation = nil
+                assetEditor = nil; accounts.discard(); accounts.accept(account)
+                if write.path.isEmpty { accounts.select(account) }
+                await refresh()
             } else {
                 let receipt = try await controller.sendFinancialConfirmation(write, expectedIdentity: identity)
                 guard generation == ticket else { return }
@@ -250,7 +262,45 @@ final class FinancialLoopModel: ObservableObject {
         }
     }
 
+    func asset(_ account: FinancialAccount, correcting: FinancialAssetEstimate? = nil, details: Bool = false) {
+        guard identity != nil, pendingConfirmation == nil else { return }
+        assetEditor = FinancialAssetEditor(account: account, correcting: correcting, details: details, loop: self)
+    }
+
+    func previewAsset(_ accountID: UUID, command: FinancialAssetEstimateCommand) async throws -> FinancialAssetPreview {
+        guard let identity else { throw SessionFailure.unauthorized }
+        return try await controller.assetEstimatePreview(accountId: accountID, command: command, expectedIdentity: identity)
+    }
+
+    func confirmAccount<Command: Encodable>(_ command: Command, accountID: UUID?, suffix: String, method: String, key: UUID) async throws -> FinancialAccount {
+        guard let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }) else { throw SessionFailure.unauthorized }
+        let ticket = generation
+        let encoder = JSONEncoder(); encoder.outputFormatting = .sortedKeys
+        let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: accountID, route: "financial-accounts",
+            path: accountID.map { "/" + $0.uuidString + suffix } ?? "", method: method, body: try encoder.encode(command), key: key)
+        try journal.begin(write, for: identity)
+        pendingConfirmation = write
+        do {
+            let account = try await controller.sendAccountConfirmation(write, expectedIdentity: identity)
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            try journal.clear(write, for: identity); pendingConfirmation = nil
+            accounts.accept(account); await refresh()
+            return account
+        } catch {
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            let current = await controller.snapshot()
+            guard generation == ticket else { throw SessionFailure.staleOperation }
+            if current != identity { bind(current); sessionChanged?(current); throw error }
+            if case SessionFailure.rejected(let status, _) = error, (400..<500).contains(status), status != 408 {
+                try journal.clear(write, for: identity); pendingConfirmation = nil
+                if let accountID { await accounts.refresh(accountID) }
+            }
+            throw error
+        }
+    }
+
     var pendingTitle: String {
+        if pendingConfirmation?.route == "financial-accounts" { return "assets.pending" }
         guard let operation = pendingConfirmation?.planOperation else { return "loop.pending.title" }
         switch operation {
         case .createGoal, .editGoal, .allocateGoals, .linkGoal, .recordGoal, .releaseGoal: return "goal.pending"

@@ -27,6 +27,9 @@ struct AccountForm: View {
                         } else {
                             currencyControl
                         }
+                        if draft.mode == .create && ["property", "vehicle", "other_asset"].contains(draft.type) {
+                            AssetShareControl(share: binding(\.share)).disabled(locked)
+                        }
                         if draft.mode != .create {
                             savedDetails(draft)
                         }
@@ -110,7 +113,7 @@ struct AccountForm: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(draft.base?.nature == "liability" || ["credit_card", "other_debt"].contains(draft.type)
-                     ? "accounts.amount.owed" : "accounts.amount")
+                     ? "accounts.amount.owed" : ["property", "vehicle", "other_asset"].contains(draft.type) ? "assets.whole" : "accounts.amount")
                     .font(ArgusStyle.body(14, relativeTo: .subheadline))
                 Spacer()
                 if draft.mode == .create { currencyControl }
@@ -164,8 +167,10 @@ struct AccountForm: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                     ForEach(primaryTypes, id: \.self) { type in typeButton(type) }
                 }
-                DisclosureGroup("accounts.otherAssets", isExpanded: $otherAssets) {
+                DisclosureGroup(isExpanded: $otherAssets) {
                     ForEach(["property", "vehicle", "other_asset"], id: \.self) { type in typeButton(type) }
+                } label: {
+                    Text("accounts.otherAssets").accessibilityIdentifier("accounts.otherAssets")
                 }.font(ArgusStyle.body(13, relativeTo: .caption)).padding(.top, 4)
             }.disabled(locked)
         } else if draft.mode == .create {
@@ -202,12 +207,12 @@ struct AccountForm: View {
     }
 
     @ViewBuilder private func savedDetails(_ draft: AccountDraft) -> some View {
-        if draft.mode == .metadata {
+        if draft.mode == .metadata && draft.base?.isOptionalAsset != true {
             DisclosureGroup("accounts.ownership") {
                 field("accounts.share", text: binding(\.share), identifier: "accounts.share").keyboardType(.decimalPad)
                 Text("accounts.share.help").font(ArgusStyle.body(12, relativeTo: .caption))
             }.disabled(locked)
-        } else {
+        } else if draft.mode == .opening {
             DisclosureGroup("accounts.date.details") {
                 DatePicker("accounts.date", selection: dateBinding, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
                     .environment(\.timeZone, TimeZone(identifier: draft.timeZone) ?? .gmt)

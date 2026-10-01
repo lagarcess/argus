@@ -27,6 +27,7 @@ AccountType = Literal[
 Nature = Literal["asset", "liability"]
 
 ACCOUNT_TYPES: tuple[str, ...] = get_args(AccountType)
+OPTIONAL_ASSET_TYPES = frozenset({"property", "vehicle", "other_asset"})
 LIABILITY_TYPES = frozenset({"credit_card", "other_debt"})
 
 
@@ -152,6 +153,10 @@ def plan_account_edit(
         changes["archived"] = edit.archived
     if edit.ownership_share_bps is not None:
         share = validate_share(edit.ownership_share_bps)
+        if share != account.ownership_share_bps and account.type in OPTIONAL_ASSET_TYPES:
+            raise RecordingInputError(
+                "asset_details_required", "Review asset ownership with its related debt."
+            )
         if share != account.ownership_share_bps:
             changes["ownership_share_bps"] = share
     return changes

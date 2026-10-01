@@ -2083,6 +2083,134 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/asset-details:
+    put:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetDetailsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetDetailsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/asset-estimates:
+    post:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetEstimateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetOperationResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-accounts/{account_id}/asset-estimates/preview:
+    post:
+      tags:
+      - financial-accounts
+      - financial-accounts
+      parameters:
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetEstimateRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-accounts/{account_id}/balance-checks:
     get:
       tags:
@@ -5079,6 +5207,259 @@ components:
         computation route and never rewrites the stored answer. The run dossier is
 
         unchanged.'
+    AssetChangeResponse:
+      properties:
+        version:
+          type: integer
+        previous_share_bps:
+          type: integer
+        ownership_share_bps:
+          type: integer
+        previous_debt_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        related_debt_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_by:
+          type: string
+        recorded_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - version
+      - previous_share_bps
+      - ownership_share_bps
+      - previous_debt_account_id
+      - related_debt_account_id
+      - recorded_by
+      - recorded_at
+    AssetDetailsRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        ownership_share_bps:
+          type: integer
+          maximum: 10000.0
+          minimum: 1.0
+        related_debt_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - ownership_share_bps
+      - related_debt_account_id
+    AssetDetailsResponse:
+      properties:
+        account:
+          $ref: '#/components/schemas/FinancialAccountResponse'
+        change_version:
+          type: integer
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - account
+      - change_version
+      - replayed
+    AssetEstimate:
+      properties:
+        revision:
+          type: integer
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        estimate_basis:
+          anyOf:
+          - type: string
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+        record_id:
+          type: string
+        kind:
+          type: string
+          enum:
+          - opening
+          - value_update
+        revisions:
+          items:
+            $ref: '#/components/schemas/AssetEstimateRevision'
+          type: array
+      type: object
+      required:
+      - revision
+      - amount_minor
+      - amount
+      - as_of
+      - time_zone
+      - estimate_basis
+      - reason
+      - recorded_by
+      - recorded_at
+      - record_id
+      - kind
+      - revisions
+    AssetEstimateRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        amount:
+          type: string
+          maxLength: 40
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+          maxLength: 64
+        estimate_basis:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        record_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expected_revision:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+        preview_token:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - amount
+      - as_of
+      - time_zone
+    AssetEstimateRevision:
+      properties:
+        revision:
+          type: integer
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        as_of:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        estimate_basis:
+          anyOf:
+          - type: string
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - revision
+      - amount_minor
+      - amount
+      - as_of
+      - time_zone
+      - estimate_basis
+      - reason
+      - recorded_by
+      - recorded_at
+    AssetOperationResponse:
+      properties:
+        account:
+          $ref: '#/components/schemas/FinancialAccountResponse'
+        record_id:
+          type: string
+        revision:
+          type: integer
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - account
+      - record_id
+      - revision
+      - replayed
+    AssetPreviewResponse:
+      properties:
+        account:
+          $ref: '#/components/schemas/FinancialAccountResponse'
+        preview_token:
+          type: string
+      type: object
+      required:
+      - account
+      - preview_token
+    AssetProjection:
+      properties:
+        personal_position_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        current_estimate:
+          anyOf:
+          - $ref: '#/components/schemas/AssetEstimate'
+          - type: 'null'
+        estimates:
+          items:
+            $ref: '#/components/schemas/AssetEstimate'
+          type: array
+        related_debt_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        changes:
+          items:
+            $ref: '#/components/schemas/AssetChangeResponse'
+          type: array
+      type: object
+      required:
+      - personal_position_minor
+      - current_estimate
+      - estimates
+      - related_debt_account_id
+      - changes
     BacktestJob:
       properties:
         id:
@@ -7612,6 +7993,10 @@ components:
         opening:
           anyOf:
           - $ref: '#/components/schemas/OpeningResponse'
+          - type: 'null'
+        asset:
+          anyOf:
+          - $ref: '#/components/schemas/AssetProjection'
           - type: 'null'
       type: object
       required:

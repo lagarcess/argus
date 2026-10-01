@@ -41,7 +41,8 @@ def hydrate(connection: Connection, stored: StoredAccount) -> StoredAccount:
         "where r.user_id=%s and r.account_id=%s and r.record_kind <> 'opening_balance' order by r.id,v.revision",
         (account.user_id, account.id),
     ).fetchall()
-    expenses, checks = {}, []
+    expenses: dict[str, list[ExpenseRevision]] = {}
+    checks: dict[str, CheckRecord] = {}
     for rid, kind, rev, amount, stamp, zone, reason, by, at, details in rows:
         rid = str(rid)
         if kind in {
@@ -78,35 +79,49 @@ def hydrate(connection: Connection, stored: StoredAccount) -> StoredAccount:
                 )
             )
         elif kind == "balance_check":
-            checks.append(
-                CheckRecord(
-                    rid,
-                    account.id,
-                    amount,
-                    stamp,
-                    zone,
-                    details["expected_minor"],
-                    details["difference_minor"],
-                    details["reviewed_version"],
-                    str(by) if by else None,
-                    at,
-                    source=details["source"],
-                    kind=details["kind"],
-                    note=details.get("note"),
+            prior = checks.get(rid)
+            checks[rid] = CheckRecord(
+                rid,
+                account.id,
+                amount,
+                stamp,
+                zone,
+                details["expected_minor"],
+                details["difference_minor"],
+                details["reviewed_version"],
+                str(by) if by else None,
+                at,
+                source=details["source"],
+                kind=details["kind"],
+                note=details.get("note"),
+                revision=rev,
+                estimate_basis=details.get("estimate_basis"),
+                reason=reason,
+                prior_revisions=(
+                    *prior.prior_revisions,
+                    replace(prior, prior_revisions=()),
                 )
+                if prior
+                else (),
             )
     links = connection.execute(
         "select observation_id,observation_revision,activity_id,activity_revision,included from public.financial_observation_coverage where user_id=%s and account_id=%s",
         (account.user_id, account.id),
     ).fetchall()
-    return replace(
-        stored,
-        expenses=tuple(
-            ExpenseRecord(rid, account.id, tuple(revs)) for rid, revs in expenses.items()
-        ),
-        checks=tuple(sorted(checks, key=lambda c: c.reviewed_version)),
-        coverage=tuple(
-            Coverage(str(o), ov, str(a), av, value) for o, ov, a, av, value in links
+    from argus.domain.recording.asset_postgres import hydrate_asset
+
+    return hydrate_asset(
+        connection,
+        replace(
+            stored,
+            expenses=tuple(
+                ExpenseRecord(rid, account.id, tuple(revs))
+                for rid, revs in expenses.items()
+            ),
+            checks=tuple(sorted(checks.values(), key=lambda c: c.reviewed_version)),
+            coverage=tuple(
+                Coverage(str(o), ov, str(a), av, value) for o, ov, a, av, value in links
+            ),
         ),
     )
 
@@ -160,7 +175,7 @@ def mutate(
                     record.amount_minor,
                     record.as_of,
                     record.time_zone,
-                    None,
+                    record.reason,
                     record.recorded_by,
                     record.recorded_at,
                 )
@@ -171,6 +186,7 @@ def mutate(
                     "source": record.source,
                     "kind": record.kind,
                     "note": record.note,
+                    "estimate_basis": record.estimate_basis,
                 }
             else:
                 r = record.current
@@ -180,7 +196,7 @@ def mutate(
                     details = {"note": r.note, "category_id": r.category_id}
                 else:
                     amount, stamp = r.amount_minor, r.as_of
-                    details = {}
+                    details = {"estimate_basis": r.estimate_basis}
                 zone, reason, by, at = r.time_zone, r.reason, r.recorded_by, r.recorded_at
             connection.execute(
                 "insert into public.financial_records(id,account_id,user_id,record_kind,current_revision,created_at) values(%s,%s,%s,%s,%s,%s) on conflict(id) do update set current_revision=excluded.current_revision",

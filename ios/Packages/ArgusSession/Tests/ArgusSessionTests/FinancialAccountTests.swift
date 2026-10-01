@@ -97,7 +97,7 @@ final class FinancialAccountTests: XCTestCase, @unchecked Sendable {
     }
 }
 
-private struct AccountFixture {
+struct AccountFixture {
     let server: AccountServer
     let client: SessionController
     init() throws {
@@ -111,7 +111,7 @@ private struct AccountFixture {
     }
 }
 
-private actor AccountServer {
+actor AccountServer {
     static let id = UUID()
     let auth = AuthServer()
     var statuses: [Int] = []

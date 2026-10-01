@@ -13,7 +13,11 @@ import pytest
 
 
 @pytest.mark.parametrize("enabled", [False, True])
-def test_response_loss_is_explicit_runner_opt_in(tmp_path, monkeypatch, enabled):
+@pytest.mark.parametrize("api_port", [58500, 59300])
+@pytest.mark.parametrize("user_index", [0, 1])
+def test_response_loss_is_explicit_runner_opt_in(
+    tmp_path, monkeypatch, enabled, api_port, user_index
+):
     script = tmp_path / "ios/scripts/auth/run-ui.py"
     script.parent.mkdir(parents=True)
     shutil.copyfile(Path(__file__).with_name("run-ui.py"), script)
@@ -23,7 +27,7 @@ def test_response_loss_is_explicit_runner_opt_in(tmp_path, monkeypatch, enabled)
     work.joinpath("client.json").write_text(
         json.dumps(
             {
-                "apiURL": "http://127.0.0.1:58500/api/v1",
+                "apiURL": f"http://127.0.0.1:{api_port}/api/v1",
                 "supabaseURL": "http://127.0.0.1:58501",
                 "users": [
                     {"email": "a@example.invalid", "password": "synthetic-a"},
@@ -51,6 +55,9 @@ def test_response_loss_is_explicit_runner_opt_in(tmp_path, monkeypatch, enabled)
 
     monkeypatch.setattr("subprocess.run", run)
     args = [str(script), "owned-simulator", "--accounts", "--port-base", "58500"]
+    args += ["--user-index", str(user_index)]
+    if api_port != 58500:
+        args += ["--api-port", str(api_port)]
     monkeypatch.setattr(
         sys,
         "argv",
@@ -71,6 +78,17 @@ def test_response_loss_is_explicit_runner_opt_in(tmp_path, monkeypatch, enabled)
         runpy.run_path(str(script), run_name="__main__")
     assert exit.value.code == 0
     assert len(observed) == 1
+    assert (
+        observed[0]["ARGUS_TEST_EMAIL"]
+        == ["a@example.invalid", "b@example.invalid"][user_index]
+    )
+    assert (
+        observed[0]["ARGUS_TEST_EMAIL_B"]
+        == ["b@example.invalid", "a@example.invalid"][user_index]
+    )
+    assert (
+        observed[0]["ARGUS_TEST_FAULT_URL"] == f"http://127.0.0.1:{api_port + 12}/__fault"
+    )
     assert observed[0]["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == str(enabled).lower()
     assert observed[0].get("ARGUS_TEST_GOAL_SUPPORTED") == (
         "DOP 400.00" if enabled else None

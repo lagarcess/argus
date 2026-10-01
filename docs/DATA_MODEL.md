@@ -2734,3 +2734,30 @@ Loan source record revisions retain total movement and `details.interest_minor`.
 Recording position and spending remain the actual owners. Loan interest and fees contribute once, scoped to funding account and selected/default existing category. Return costs reduce spending in the return period; principal and cards do not count. Debt progress, forecast remainders, recorded clear/reopening and savings backing concerns derive from current canonical revisions. Conditional payoff remains an explicit monthly model, separate from actual position and scheduled cash commitments.
 
 Debt-plan archive preserves canonical payments and claimed occurrence snapshots. The shared occurrence projection marks retained archived intentions `plan_archived`, suppressing only residual forecast movement. Restore derives the same residual from current canonical activity.
+
+
+## Connected personal asset estimates and links
+
+`financial_accounts` remains the asset identity and ownership-share owner.
+Opening and value-update revisions remain the whole-estimate owner. Optional
+`estimate_basis` lives in that exact revision's `details` object. Existing
+revisions without it mean unspecified basis. A correction retains the record
+identity and original observation order, appends one revision and hydrates only
+one current observation for that identity. No attributed value or equity is stored.
+
+`financial_asset_details` has one row per account/owner and one nullable
+`related_debt_account_id`. Owner-qualified foreign keys bind both existing
+accounts; type checks require an optional asset and a liability respectively.
+`financial_asset_changes` retains the accepted account version, previous/new
+ownership share, previous/new debt ID, actor, timestamp, idempotency key and
+request hash. Details, account share/version and accepted change commit together.
+Changes are append-only and unique by owner/account/key and account/version.
+They are non-money receipts, never financial records. Registered-owner RLS
+allows reads; only the service writes. Existing debt balances and plans remain
+canonical and unchanged. Current details are a pointer, not a money allocation.
+
+The existing record/revision receipt owns estimate retry identity. Details
+changes replay their accepted version before stale-version validation. Account
+metadata/link type validation is serialized with details writes. Existing
+owner-scoped native financial journals persist pending account creation and
+asset commands until an accepted response or explicit failure resolution.

@@ -30,6 +30,7 @@ class OpeningRevision:
     reason: str | None
     recorded_by: str | None
     recorded_at: datetime
+    estimate_basis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,7 @@ class OpeningWrite:
     as_of: datetime
     time_zone: str
     reason: str | None
+    estimate_basis: str | None = None
 
 
 def plan_opening_write(
@@ -124,7 +126,11 @@ def plan_opening_write(
             "date_in_future", "a balance date cannot be in the future"
         )
     return OpeningWrite(
-        amount_minor=amount_minor, as_of=stamp, time_zone=zone, reason=cleaned_reason
+        amount_minor=amount_minor,
+        as_of=stamp,
+        time_zone=zone,
+        reason=cleaned_reason,
+        estimate_basis=current.estimate_basis if current else None,
     )
 
 

@@ -350,6 +350,7 @@ class FinancialLoopService:
             write.reason,
             stored.account.user_id,
             now,
+            current.estimate_basis if current else None,
         )
         opening = OpeningRecord(
             stored.opening.id if stored.opening else str(uuid4()),

@@ -597,3 +597,31 @@
 "plan.exclusion.plan_archived" = "Plan archivado";
 
 "debt.funding.assigned" = "Asignado a metas de ahorro";
+
+"assets.whole" = "Valor estimado del bien completo";
+"assets.personal %@" = "Tu aporte con %@%% de propiedad";
+"assets.share.allSummary" = "Eres dueño de todo";
+"assets.share.summary %@" = "Te pertenece el %@%%";
+"assets.share.all" = "Todo";
+"assets.share.half" = "La mitad";
+"assets.share.other" = "Otra parte";
+"assets.share.changed %@ %@" = "La propiedad cambió de %@%% a %@%%";
+"assets.debt" = "Deuda relacionada";
+"assets.debt.none" = "Sin deuda relacionada";
+"assets.debt.help" = "Elige una deuda existente. Vincularla no cambia su saldo ni sus pagos.";
+"assets.debt.removed %@" = "Se quitó el vínculo con %@";
+"assets.debt.added %@" = "Se vinculó con %@";
+"assets.update" = "Actualizar estimado";
+"assets.correct" = "Corregir este estimado";
+"assets.details" = "Propiedad y deuda relacionada";
+"assets.date" = "Fecha del estimado";
+"assets.basis" = "Base del estimado";
+"assets.basis.unspecified" = "Base no registrada";
+"assets.noncash" = "Un valor registrado de un bien. No es dinero disponible para gastar.";
+"assets.history" = "Historial de estimados";
+"assets.details.history" = "Historial de propiedad y vínculos";
+"assets.revision %lld" = "Revisión %lld";
+"assets.pending" = "Confirmación de cuenta pendiente";
+"assets.back" = "Volver al bien";
+"assets.error.dateOrder" = "La fecha debe quedar entre los estimados anterior y siguiente.";
+"assets.error.debt" = "Elige una cuenta de deuda existente.";
