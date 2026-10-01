@@ -75,6 +75,9 @@ struct ConnectedCuadraoShell: View {
             if let loop = auth.financialLoop, let accounts = auth.accounts {
                 ConnectedCuadraoHome(loop: loop, accounts: accounts, tab: $tab, accountPath: $accountPath,
                                      navigationScroll: navigationScroll, showUpdates: { sheet = .updates })
+            } else {
+                ProgressView("accounts.loading")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         case .plan:
             NavigationStack {
@@ -102,7 +105,10 @@ struct ConnectedCuadraoShell: View {
         switch value {
         case .accounts:
             tab = .home
-            if let id = auth.accounts?.selectedID {
+            if let accounts = auth.accounts, let loop = auth.financialLoop, let account = accounts.selected {
+                accountPath = [account.id]
+                Task { await accounts.open(account); await loop.open(account) }
+            } else if let id = auth.accounts?.selectedID {
                 accountPath = [id]
             }
             if destination != .home { destination = .home }
