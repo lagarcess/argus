@@ -79,6 +79,12 @@ services:
         sync: false
       - key: PLAID_COUNTRY_CODES
         value: "US"
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false
       - key: ARGUS_IN_PLACE_CARD_EDITS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED

@@ -85,6 +85,9 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         from argus.api.plaid import start_plaid
 
         start_plaid(ingestion_hub())
+        from argus.api.gmail import start_gmail
+
+        start_gmail(ingestion_hub(), pool)
     except Exception as exc:
         logger.warning(
             "Ingestion hub construction failed; surface stays off",
@@ -97,6 +100,9 @@ def stop_ingestion(app) -> None:  # noqa: ANN001
     from argus.api.plaid import stop_plaid
 
     stop_plaid()
+    from argus.api.gmail import stop_gmail
+
+    stop_gmail()
     configure_ingestion_hub(None)
 
 

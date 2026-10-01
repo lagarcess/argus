@@ -90,7 +90,10 @@
         "ARGUS_INGESTION_SECRET_KEY",
         "PLAID_CLIENT_ID",
         "PLAID_SECRET",
-        "PLAID_WEBHOOK_URL"
+        "PLAID_WEBHOOK_URL",
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_SECRET",
+        "GOOGLE_OAUTH_REDIRECT_URI"
       ]
     },
     "web": {
