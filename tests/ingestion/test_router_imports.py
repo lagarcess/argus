@@ -13,6 +13,7 @@ ROUTERS = [
     "argus.api.routers.ingestion_shortcuts",
     "argus.api.routers.financial_connections",
     "argus.api.routers.financial_connections_schemas",
+    "argus.api.routers.financial_imports",
 ]
 
 
