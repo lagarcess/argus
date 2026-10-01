@@ -162,6 +162,7 @@ struct AccountSummary: View {
             if account.balance.state == .known, let amount = account.balance.amount {
                 Text(verbatim: account.currency + " " + AccountPresentation.amount(amount, locale: locale))
                     .font(large ? ArgusStyle.display(30) : ArgusStyle.body()).monospacedDigit()
+                    .accessibilityIdentifier("accounts.balance." + account.currency)
             } else { Text("accounts.unknown") }
             if account.type == "credit_card", (account.balance.creditMinor ?? 0) > 0 {
                 Text("accounts.creditBalance").font(ArgusStyle.body(12, relativeTo: .caption))

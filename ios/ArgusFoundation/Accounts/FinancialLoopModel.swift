@@ -69,7 +69,14 @@ final class FinancialLoopModel: ObservableObject {
         guard let identity else { return }
         let ticket = generation
         let request = UUID()
-        accountReads[account.id] = AccountReadState(loading: true, request: request)
+        // Keep prior activity/checks visible while refreshing. Clearing them made
+        // post-confirm UITests lose "DOP 7,000.00" from check history for the
+        // whole reload window (AccountSummary balance is a11y-combined).
+        var loading = accountReads[account.id] ?? AccountReadState()
+        loading.loading = true
+        loading.errorKey = nil
+        loading.request = request
+        accountReads[account.id] = loading
         defer {
             if generation == ticket, accountReads[account.id]?.request == request { accountReads[account.id]?.loading = false }
         }

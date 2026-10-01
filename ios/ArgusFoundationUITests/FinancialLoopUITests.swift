@@ -223,6 +223,8 @@ final class FinancialLoopUITests: XCTestCase {
         XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
         capture("expense-review")
         tapVisible(app.buttons["loop.confirm"])
+        // Wait for the editor sheet to dismiss before balance assertions.
+        XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 12))
     }
 
     func assertHome(_ expected: Decimal) {
@@ -250,7 +252,11 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func assertText(_ value: String) {
-        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", value)).firstMatch.waitForExistence(timeout: 12))
+        let predicate = NSPredicate(format: "label CONTAINS %@", value)
+        let staticText = app.staticTexts.matching(predicate).firstMatch
+        if staticText.waitForExistence(timeout: 8) { return }
+        // AccountSummary combines children; balance may only appear on the combined element.
+        XCTAssertTrue(app.descendants(matching: .any).matching(predicate).firstMatch.waitForExistence(timeout: 8))
     }
     func tapVisible(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))

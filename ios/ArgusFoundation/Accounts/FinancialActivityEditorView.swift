@@ -41,7 +41,10 @@ struct FinancialActivityEditorView: View {
                     } else if model.canConfirm {
                         Button {
                             focused = false
-                            Task { await model.confirm() }
+                            Task {
+                                await model.confirm()
+                                if model.phase == .saved { dismiss() }
+                            }
                         } label: {
                             Text(model.phase == .uncertain ? "accounts.retry" : model.isCorrection ? "loop.activity.saveCorrection" : "loop.activity.confirm")
                                 .frame(maxWidth: .infinity)
