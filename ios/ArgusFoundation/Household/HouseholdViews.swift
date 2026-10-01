@@ -32,6 +32,7 @@ struct HouseholdControls: View {
             }
         }
         .padding(.horizontal, 24)
+        .environment(\.colorScheme, .light)
         .onAppear {
             model.navigateToAccounts = { destination = .accounts }
             model.addAccount = { Task { await model.select(nil); destination = .accounts; auth.accounts?.create() } }
@@ -197,6 +198,7 @@ struct HouseholdConnectedDestination: View {
             }
             HouseholdDestination(model: model, tab: tab, active: active)
         }.background(Color.white).tint(WelcomePalette.pine)
+        .environment(\.colorScheme, .light)
     }
 }
 
