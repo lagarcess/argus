@@ -8,10 +8,9 @@ remotely, or financial/permission contracts implemented.
 
 Open the existing simulator mirror at http://localhost:3200/.
 First-use Home offers Añadir cuenta. Space + → Hogar → Crear Hogar opens an empty
-Household. Invitar a alguien → sample name → Preparar invitación produces the
-pending state. Ver invitación allows cancellation or an explicitly labelled
-Simular aceptación control. Acceptance shows a joined household without creating
-or sharing accounts. Añadir cuenta conjunta uses the existing native add form.
+Household. The original name-entry invitation mock is superseded by the
+[native invitation-link preview](../invitation-link/README.md). It now uses the
+system share sheet, followed by an explicitly labelled recipient preview.
 
 Long-press the Cuadrao brand to switch between first use, populated Home and a
 joined household with no shared accounts. These preview switches reset sample
@@ -55,7 +54,9 @@ text, small-device or physical-phone matrix was run in this pass.
 
 ## Still open
 
-This completes a reviewable first-use proposal, not the complete household flow.
+This records the original first-use proposal, not the complete household flow.
+Invitation screenshots and checks below are historical; see the invitation-link
+continuation for the current sender and recipient UI.
 Invitation delivery/contact selection, recipient acceptance screen, expired or
 revoked invitations, existing-account sharing consent/permissions, member removal
 and leaving remain to design. Invitation name/preparation and simulated acceptance

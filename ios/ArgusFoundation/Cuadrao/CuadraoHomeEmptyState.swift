@@ -2,7 +2,7 @@ import SwiftUI
 
 // In-memory design fixtures. No invitations or membership changes leave this canvas.
 enum CanvasHouseholdState {
-    case alone, pending(String), joined(String)
+    case alone, invitation(CanvasHouseholdInvitation), joined(String)
 }
 
 struct CuadraoHomeEmptyState: View {
@@ -25,10 +25,10 @@ struct CuadraoHomeEmptyState: View {
                 case .alone:
                     RegistrationButton(title: spanish ? "Invitar a alguien" : "Invite someone", action: household)
                     secondary(spanish ? "Añadir cuenta conjunta" : "Add a joint account", action: addAccount)
-                case .pending(let name):
+                case .invitation:
                     VStack(alignment: .leading, spacing: 8) {
-                        Label(name, systemImage: "envelope")
-                        Text(spanish ? "Invitación pendiente" : "Invitation pending").font(.subheadline).foregroundStyle(.secondary)
+                        Label(spanish ? "Enlace de invitación" : "Invitation link", systemImage: "link")
+                        Text(spanish ? "Nadie se ha unido todavía" : "No one has joined yet").font(.subheadline).foregroundStyle(.secondary)
                         Button(spanish ? "Ver invitación" : "View invitation", action: household).frame(minHeight: 44)
                     }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
                         .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 18))
@@ -52,7 +52,7 @@ struct CuadraoHomeEmptyState: View {
         guard shared else { return spanish ? "Empieza con una cuenta." : "Start with one account." }
         switch data.household {
         case .alone: return spanish ? "Un lugar para\nlo de ustedes." : "A place for\nwhat you share."
-        case .pending: return spanish ? "Tu hogar ya\ntiene su espacio." : "Your household\nhas a home here."
+        case .invitation: return spanish ? "Tu hogar ya\ntiene su espacio." : "Your household\nhas a home here."
         case .joined: return spanish ? "Ya están aquí.\nAhora, lo compartido." : "You're both here.\nNow, what you share."
         }
     }
@@ -64,8 +64,8 @@ struct CuadraoHomeEmptyState: View {
         switch data.household {
         case .alone: return spanish ? "Invita a quien comparte contigo. Tus cuentas personales siguen siendo privadas."
             : "Invite someone you share with. Your personal accounts stay private."
-        case .pending: return spanish ? "Mientras acepta, puedes añadir una cuenta conjunta. Tus cuentas personales siguen siendo privadas."
-            : "While you wait, you can add a joint account. Your personal accounts stay private."
+        case .invitation: return spanish ? "Comparte el enlace cuando quieras. También puedes empezar con una cuenta conjunta."
+            : "Share the link when you’re ready. You can also start with a joint account."
         case .joined: return spanish ? "Todavía no hay cuentas compartidas. Unirse al hogar no comparte las cuentas personales."
             : "There are no shared accounts yet. Joining a household doesn't share personal accounts."
         }

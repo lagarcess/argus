@@ -26,29 +26,41 @@ struct CuadraoHouseholdSheet: View {
     let data: CuadraoAccountsPreview
     let spanish: Bool
     @Environment(\.dismiss) private var dismiss
-    @State private var name = ""
+    @State private var sharing: CanvasHouseholdInvitation?
     @State private var cancelInvitation = false
-    @FocusState private var focused: Bool
-    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     switch data.household {
-                    case .alone: inviteForm
-                    case .pending(let name):
-                        RegistrationHeading(title: spanish ? "Esperando a \(name)." : "Waiting for \(name).",
-                            detail: spanish ? "Cuando acepte, verá solo las cuentas que compartan en Hogar."
-                                : "Once they accept, they'll see only the accounts shared in Household.")
-                        Label(spanish ? "Invitación pendiente" : "Invitation pending", systemImage: "envelope")
+                    case .alone:
+                        RegistrationHeading(title: spanish ? "Invita a quien\ncomparte contigo." : "Invite someone\nyou share with.",
+                            detail: spanish ? "Envía un enlace por la app que prefieras. Tus cuentas personales siguen siendo privadas."
+                                : "Send a link using the app you prefer. Your personal accounts stay private.")
+                        RegistrationButton(title: spanish ? "Compartir invitación" : "Share invitation") {
+                            let invitation = CanvasHouseholdInvitation()
+                            data.household = .invitation(invitation)
+                            sharing = invitation
+                        }
+                        previewNotice
+                    case .invitation(let invitation):
+                        RegistrationHeading(title: spanish ? "Tu invitación,\nlista para compartir." : "Your invitation,\nready to share.",
+                            detail: spanish ? "Nadie se ha unido todavía. Compartir el enlace no da acceso hasta que se acepte la invitación."
+                                : "No one has joined yet. Sharing the link doesn't grant access until the invitation is accepted.")
+                        Label(spanish ? "Enlace disponible" : "Link available", systemImage: "link")
                             .foregroundStyle(.secondary)
+                        RegistrationButton(title: spanish ? "Compartir invitación" : "Share invitation") { sharing = invitation }
                         Button(spanish ? "Cancelar invitación" : "Cancel invitation", role: .destructive) { cancelInvitation = true }
                             .frame(minHeight: 44)
                         Divider()
-                        Text(spanish ? "Vista previa" : "Design preview").font(.caption).foregroundStyle(.secondary)
-                        Button(spanish ? "Simular aceptación" : "Simulate acceptance") {
-                            data.household = .joined(name); dismiss()
-                        }.frame(minHeight: 44)
+                        NavigationLink {
+                            CuadraoInvitationRecipient(data: data, invitation: invitation, spanish: spanish)
+                        } label: {
+                            Label(spanish ? "Ver como invitado" : "Preview as recipient", systemImage: "person.crop.rectangle")
+                                .frame(minHeight: 44)
+                        }.accessibilityIdentifier("household-recipient-preview")
+                        previewNotice
                     case .joined(let name):
                         RegistrationHeading(title: spanish ? "Su hogar." : "Your household.",
                             detail: spanish ? "Las cuentas personales siguen siendo privadas." : "Personal accounts remain private.")
@@ -62,30 +74,19 @@ struct CuadraoHouseholdSheet: View {
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { dismiss() } } }
                 .confirmationDialog(spanish ? "¿Cancelar esta invitación?" : "Cancel this invitation?",
                     isPresented: $cancelInvitation, titleVisibility: .visible) {
-                    Button(spanish ? "Cancelar invitación" : "Cancel invitation", role: .destructive) {
-                        data.household = .alone; dismiss()
-                    }
+                    Button(spanish ? "Cancelar invitación" : "Cancel invitation", role: .destructive) { data.household = .alone }
                     Button(spanish ? "Volver" : "Go back", role: .cancel) {}
+                } message: {
+                    Text(spanish ? "Este enlace dejará de servir para unirse al hogar." : "This link will no longer allow someone to join the household.")
                 }
         }.tint(WelcomePalette.pine).presentationDetents([.large]).presentationDragIndicator(.visible)
+            .sheet(item: $sharing) { invitation in
+                CuadraoInvitationShareSheet(invitation: invitation, spanish: spanish)
+            }
     }
-    private var inviteForm: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            RegistrationHeading(title: spanish ? "¿Con quién compartes?" : "Who do you share with?",
-                detail: spanish ? "Invitar a alguien no comparte tus cuentas personales." : "Inviting someone doesn't share your personal accounts.")
-            VStack(alignment: .leading, spacing: 10) {
-                Text(spanish ? "Nombre" : "Name").font(.subheadline)
-                TextField(spanish ? "Ej. Alex" : "e.g. Alex", text: $name)
-                    .textContentType(.givenName).focused($focused).submitLabel(.done)
-                    .onSubmit { focused = false }.modifier(RegistrationField(focused: focused))
-                    .onChange(of: name) { _, value in if value.count > 40 { name = String(value.prefix(40)) } }
-                    .accessibilityIdentifier("household-invite-name")
-            }
-            RegistrationButton(title: spanish ? "Preparar invitación" : "Prepare invitation", enabled: !trimmedName.isEmpty) {
-                data.household = .pending(trimmedName); dismiss()
-            }
-            Text(spanish ? "Vista previa: esta invitación no se envía." : "Design preview: this invitation is not sent.")
-                .font(.footnote).foregroundStyle(.secondary)
-        }
+    private var previewNotice: some View {
+        Text(spanish ? "Vista previa · El enlace es de ejemplo y no permite acceder a ningún hogar."
+             : "Design preview · This sample link doesn't grant access to any household.")
+            .font(.footnote).foregroundStyle(.secondary)
     }
 }

@@ -155,3 +155,18 @@ record the native journey and its limits. This advances the earlier checkpoint's
 first-use/empty-household rows; it does not close the complete invitation, sharing
 or member-management design. The recipient acceptance screen and production
 invitation mechanism remain open. Preview-only simulation is labelled explicitly.
+
+## Household invitation-link proposal — September 30, 2026
+
+Founder approved replacing the name-entry mock with a native share-sheet link and
+recipient acceptance preview. Compartir invitación lets the system offer installed
+sharing destinations; no contact permission or custom WhatsApp integration is
+required by this design. Creating/copying/sharing a link is distinct from delivery
+and membership: closing the sheet never asserts either. The recipient can accept
+or choose Ahora no, with private accounts preserved.
+
+[Current invitation preview and evidence](../reports/evidence/cuadrao-native-design/invitation-link/README.md)
+supersedes the earlier pending-name and Simular aceptación controls. Spanish is
+primary, with English copy alongside it. Links are nonfunctional examples and
+acceptance affects only in-memory sample state. Auth/install handoff, real invite
+rules and shared-account permissions remain open production contracts.
