@@ -7466,7 +7466,7 @@ adds shared Plan; Household Argus remains outside its scope.
 
 ## Shared Household planning contract sketch
 
-**Status:** Worker implementation contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Native implementation and local schema are present; complete connected acceptance, independent review and publication are pending. This is not hosted enablement or delivery. The manifest owns the exact verification state.
+**Status:** Worker implementation contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026, published in [PR #773](https://github.com/lagarcess/argus/pull/773). The connected four-kind native journey, committed-response-loss recovery, three identities and disabled-feature checks passed against real isolated local Auth/API/Postgres at source `41cd27ac`; independent affected review is clean. Publication CI gates remain on the PR. This is local verification, not hosted enablement or physical-iPhone delivery. The manifest owns the exact verification state.
 
 The canonical Recording resolver owns complete original transaction revisions
 before disclosure. The scoped shared adapter composes independent plan consent
@@ -7665,6 +7665,18 @@ retains their original records. Remaining members still need live membership
 and their existing explicit plan consent; removal or revocation ends access.
 Rejoining creates no automatic consent or ownership transfer.
 
+A contributing member's departure also ends access to that person's future
+private financial changes, even when another member owns the active plan. Pin
+the last authorized original and related activity revisions for previously
+shared history; later Personal corrections must not alter another person's
+disclosed history. Remaining current members' contributions continue to update.
+Historical expenses and payments do not disappear or reverse on departure.
+Retained savings assignments do not establish current backing after consent
+ends: current supported credit is unknown and `needs_review`, while last
+authorized amounts remain history. No private withdrawal, correction or pool
+shortfall may be inferred from later changes. New membership and consent cannot
+overwrite the old authorized history.
+
 Allocation/schema/RLS source, migration/backfill code and synthetic tests on a
 new isolated disposable local database are expressly authorized. Remove legacy
 JSON allocations only after complete validated backfill and migration of all
@@ -7678,8 +7690,9 @@ Personal behavior.
 The ingestion owner consumes these contracts from its own branch; this lane
 does not edit ingestion. Migration versions `20261002120000`–`20261002120300`
 are reserved for ingestion and unused here. The older #772 migration version
-`20261001190000` collides with this lane's allocation cutover; ingestion must
-move that draft into its reserved range before the branches are combined.
+`20261001190000` collided with this lane's allocation cutover. Its owner
+renumbered all four ingestion migrations into this reserved range at verified
+#772 head `5608a83ef7a28c3359195e947acc12c428cbe4f0`; no collision remains.
 
 - `MoneyService.preview`, `write`, `detail` and `history` keep their existing
   keyword signatures, including optional `activity_id` and the write's
@@ -7705,6 +7718,8 @@ move that draft into its reserved range before the branches are combined.
   content conflicts. Household adapters additionally bind membership and
   recheck live account/plan authority before replay; leaving, removal or
   revocation never resurrects access through a receipt.
+  Shared-plan history pins ended contributors at their last authorized facts;
+  this does not change ingestion's owner-authorized current activity reads.
 - Goal allocation load/persist signatures remain unchanged and use the
   normalized relation, with stable consent IDs. Shared and Personal savings
   consume the same `pool_assignments` / `pool_facts` owner. Import intake does

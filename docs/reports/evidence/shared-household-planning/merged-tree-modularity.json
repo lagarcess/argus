@@ -1,0 +1,10 @@
+{
+  "source_head": "41cd27ac93a0e00f39f8190aea0838aa1b59104f",
+  "original_base": "15e57931584b21dd7f9e453dbeb9127fc4b8cff3",
+  "current_integration": "15e57931584b21dd7f9e453dbeb9127fc4b8cff3",
+  "reconciliation_merge": null,
+  "semantic_overlap": "No integration advance; base is an ancestor of current worker",
+  "would_be_merged_tree": "5913b81de93cb54d6430dd9641bc75c914b96fab",
+  "head_tree": "5913b81de93cb54d6430dd9641bc75c914b96fab",
+  "modularity": "pass; zero watched-file budget violations"
+}

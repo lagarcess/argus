@@ -1,0 +1,27 @@
+{
+  "source_head": "942f1f009a5927816176d166f6c1357577e0ce51",
+  "integration": "15e57931584b21dd7f9e453dbeb9127fc4b8cff3",
+  "counts": {
+    "passed": 481,
+    "failed": 0,
+    "skipped": 0
+  },
+  "isolated_database": "127.0.0.1:59752 (NEW ios-accounts-59750)",
+  "schema_rehearsal": "test_goal_allocations_postgres.py intentionally excluded during native writes; its earlier independent cutover/rollback evidence is retained",
+  "logs": [
+    "backend-final.txt",
+    "backend-final-junit.xml"
+  ],
+  "independent_review": {
+    "reviewer": "shared_plan_independent_review",
+    "whole_diff": "5bd9417a671b6dbdabe2c558794c55d289410352; five confirmed findings fixed",
+    "affected_delta": "942f1f009a5927816176d166f6c1357577e0ce51",
+    "outcome": "clean bounded delta, including departed-contributor privacy, retained signed facts, Personal bridge, UI driver and Needs review notice",
+    "execution": "Read-only review; reviewer did not run services or tests.",
+    "latest_native_delta": "41cd27ac93a0e00f39f8190aea0838aa1b59104f",
+    "latest_native_outcome": "Clean affected-only review of menu wait, distinct contribution action identifiers and plan-edit permission copy; no unchanged-code review expansion."
+  },
+  "native_status": "Four assembled native cases passed at41cd27ac; see native-provenance.json and independent readbacks",
+  "limits": "Local financial/domain proof; no physical-phone/internet or hosted migration claim",
+  "financial_source_retained": "942f1f009 to41cd27ac changes only native views, strings and UI driver; no backend/migration/session changes"
+}

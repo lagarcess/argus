@@ -2798,9 +2798,9 @@ Debt-plan archive preserves canonical payments and claimed occurrence snapshots.
 
 ## Shared Household planning storage sketch
 
-**Status:** Worker storage contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Additive schema/cutover source is applied only to NEW disposable Postgres59752. Connected acceptance and review remain pending; no existing demo or hosted database is migrated. The [API contract](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the scoped public wire and approved permission/departure rules.
+**Status:** Worker storage contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Schema/cutover source is applied only to NEW disposable Postgres on port 59752. The connected native journey and focused independent review passed; exact publication gates are recorded on PR #773. No existing demo or hosted database is migrated. The [API contract](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the scoped public wire and approved permission/departure rules.
 
-The selected candidate adds consent and responsibility references to existing
+The implemented design adds consent and responsibility references to existing
 owner-qualified definitions. The alternative adds Household scope directly to
 every canonical definition and replaces owner-qualified readers with scope
 readers. References retain existing Personal ownership, identities, and
@@ -2880,7 +2880,7 @@ Private cross-owner attribution cannot remain directly readable through the
 definition owner's `financial_plan_links.owner_read` policy. Shared claim rows
 require service projection; existing same-owner Personal rows retain their read
 policy. Private residual account references likewise cannot enter an owner-
-readable goal body. The proposed canonical `financial_goal_allocations` relation
+readable goal body. The canonical `financial_goal_allocations` relation
 stores `goal_id`, `goal_owner_id`, `account_id`, `account_owner_id`, and
 `unlinked_minor`, with both owner-qualified FKs and a unique goal/account key.
 Existing JSON residuals backfill into that relation and cease to be a second
@@ -2957,6 +2957,25 @@ Owner departure pins retained definition, claim, activity and allocation
 those previously shared facts. Remaining readers still need their live granted
 membership incarnation; archived plans provide no future projections or writes.
 Private post-departure edits cannot enter retained history.
+
+Contributor departure uses the same canonical retention owner even on an active
+plan owned by someone else. The protected retention relations pin exact
+original/related activity and allocation revision references to the ended
+membership incarnation. `membership_ended_at` records that access boundary;
+signed `last_applied_minor` and nonnegative `last_supported_minor` are immutable
+last-authorized disclosure evidence, never editable current money or pool
+totals. Current Goal backing is null/`needs_review` after that consent ends.
+Remaining members' current activity continues through the ordinary canonical
+reader. Distinct allocation revisions preserve history when fresh explicit
+consent follows rejoining.
+
+Migration `20261002050000` fails atomically if a legacy active binding already
+contains a departed contributor without its authorized retention boundary.
+Today's private state cannot safely backfill a past consent boundary. Recover
+verified history before such a cutover; never invent a snapshot or hide the
+gap through a fallback. Its rehearsal/application is limited to NEW local
+Postgres59752, which retained seven account rows unchanged; it does not authorize
+any existing demonstration, hosted or production migration.
 
 ### Transactions, receipts, and migration risks
 

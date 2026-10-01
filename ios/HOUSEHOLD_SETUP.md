@@ -31,7 +31,7 @@ Departure returns to Personal without deleting legitimate financial records.
 Run from the assigned worker
 `/Users/garces/.codex/worktrees/shared-household-planning/private-alpha-next`.
 Its new disposable allocation is `ios-accounts-59750`: API59750, Auth59751,
-Postgres59752 and CAPTCHA59755. Its three synthetic users, prepared Household
+Postgres on port 59752 and CAPTCHA59755. Its three synthetic users, prepared Household
 and seven personal accounts are retained in ignored 0600 files under
 `ios/.build/accounts-local-59750`. The other Household/financial demos and the
 phone stack are separate. Never run configure, seed, reset or migrations against
@@ -61,6 +61,29 @@ uses only bundle `local.argus.shared-household-planning-demo` and cache
 Do not select the booted design simulator by default. Its UUID `8AFB6084…`
 and `/private/tmp/cuadrao-native-design-build` are protected.
 
+For manual use, launch only the assigned installation:
+
+```bash
+xcrun simctl launch C93072E7-D29A-4B0A-BE76-E6418E4E9F88 \
+  local.argus.shared-household-planning-demo
+```
+
+The installed demo retains user A. Use **Household**, choose **Shared plans 0e957ed2**, then **Plan**. Open **Native household budget C6E10C**, bill, goal or debt. The budget shows 40 actual against 100 limit and 70/30 intentions; the bill shows 60 agreed/20 paid, goal 20 backed and debt 20 paid. Switch to Home or Search, inspect your original entry, correct it, and return with refreshed progress. To check view-only behavior, sign out and use retained member B from the private fixture.
+
+Use the saved registered user, choose **Household**, then **Plan**. Create a
+shared plan with the plus control; People shows the explicit rights and unequal
+responsibilities. Record or link a contribution, then open its original entry
+to inspect or correct it. Home and Household Search use those same records.
+The two retained member logins and unauthorized third synthetic identity are
+in the ignored 0600 `client.json`; do not publish or copy that file into evidence.
+
+Do not rerun `shared-plans-journey.py prepare` after contributions change the
+balances. Preparation intentionally rejects changed data rather than resetting
+it. Keep the retained journal, accounts, activity and prior native plans. An
+active budget with identical accounts/categories/currency/month is a real
+duplicate-scope conflict; edit it or choose another scope instead of creating a
+second copy. Archive preserves its activity and history.
+
 The reproducible native runner selects the safe retained fixture and refuses
 other devices, ports or bundles:
 
@@ -70,7 +93,7 @@ python3 ios/scripts/auth/run-ui.py C93072E7-D29A-4B0A-BE76-E6418E4E9F88 \
   --only ArgusFoundationUITests/FinancialLoopUITests/testSharedPlanningFourKindsPrivateContributionsCorrectionsAndReopen
 ```
 
-That case creates new synthetic plans and records real local activity. Keep
+The retained C6E10C journey already passed. That case creates new synthetic plans and records real local activity; an identical active budget scope correctly conflicts. For a repeat, first archive the existing budget through its own UI/API, preserving activity, or use another scope. Do not blindly rerun it or reset data. Keep
 its records; never reset the demo to make a retry appear green. The separate
 three-identity case checks current Auth identity, personal-account isolation,
 Household selection and Spanish relaunch. The opted-in response-loss case uses
@@ -233,3 +256,5 @@ xctestrun environment; the runner's in-memory fixture API URL may be overridden
 to 59620 without changing the credential fixture. Keep Auth59501, PG59502,
 CAPTCHA59505 and the assigned simulator/bundle/cache. Restore API59520 afterward.
 This test performs no financial writes and requires no client capability flag.
+
+The accepted shared-planning recording and exact-source proof are in [the durable evidence packet](../docs/reports/evidence/shared-household-planning/native-provenance.json) and [short recording](../docs/reports/evidence/shared-household-planning/shared-plan-demo.mp4). The existing execution manifest remains the sole progress/remaining-work map.
