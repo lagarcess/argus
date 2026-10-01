@@ -67,7 +67,9 @@ extension FinancialLoopUITests {
         assertHome(baseline + 1250000)
         app.buttons["tab.search"].tap()
         let query = app.textFields["search.query"]
-        tapVisible(query); query.typeText("Updated home " + stamp + "\n")
+        tapVisible(query)
+        if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); query.tap() }
+        query.typeText("Updated home " + stamp + "\n")
         tapVisible(app.buttons["search.filter.account"])
         let houseID = try XCTUnwrap(UUID(uuidString: house.id)).uuidString
         let hit = app.buttons["search.row.account." + houseID]
@@ -79,6 +81,7 @@ extension FinancialLoopUITests {
         assertAssetContribution("DOP 2,250,000.00", in: detail)
         scrollMoneyTop(); tapVisible(detail.buttons["search.back"])
         XCTAssertEqual(query.value as? String, "Updated home " + stamp)
+        XCTAssertTrue(app.buttons["search.filter.account"].isSelected)
         capture("asset-search-origin-preserved")
         app.terminate()
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO"]
@@ -94,6 +97,7 @@ extension FinancialLoopUITests {
         scrollMoneyTop(); tapVisible(detail.buttons["search.back"])
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         XCTAssertEqual(query.value as? String, "Updated home " + stamp)
+        XCTAssertTrue(app.buttons["search.filter.account"].isSelected)
         capture("asset-restored-spanish-relaunch")
     }
 
