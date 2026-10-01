@@ -1787,6 +1787,9 @@ The earlier paused calendar experiment is superseded by this implementation.
 [Verification and phone handoff](../reports/evidence/cuadrao-native-design/home-insights/README.md)
 record checks and their limits. This is UI-only; canonical connected history,
 provider/analytics integration and production promotion remain outside this delivery.
+Typography follow-up `9e64509f` restores compact system distribution rows and
+shared rounded money/percentage styles; [focused proof](../reports/evidence/cuadrao-native-design/home-insights/typography/README.md)
+records the unchanged interaction checks and updated visual review.
 
 **Future beta experiment — not activated:** after the approved bar experience is
 usable, consider PostHog assignment in a reviewed TestFlight build: bar baseline
