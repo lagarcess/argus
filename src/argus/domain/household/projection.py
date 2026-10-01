@@ -99,8 +99,6 @@ def activity(
 def positions(records: list[StoredAccount]) -> list[dict[str, Any]]:
     result = {}
     for s in records:
-        if s.account.archived:
-            continue
         group = result.setdefault(
             s.account.currency,
             {

@@ -1966,11 +1966,18 @@ invitation ID. It stores neither capabilities nor protected snapshots. Exact
 retry returns only current state of that original outcome; invite replay returns
 token-null metadata under current admin authorization. Financial receipts remain
 Recording-owned, with actor/household/membership-qualified scope and live grant
-checks before replay. All Household authorization tables and receipts are
+checks before replay. Committed financial receipts replay before rejecting an
+old Household generation; generation checks continue to protect new writes.
+All Household authorization tables and receipts are
 service-owned, RLS-enabled, with no direct anon/authenticated table grants.
 
 Financial records and legitimate activity survive leave/removal/closure.
-Historical identity FKs retain the landed deletion behavior. Closing a household
+The forward `20261001130000_household_grant_deletion.sql` migration makes both
+membership-bound grant FKs cascade on membership deletion. Leave, removal and
+closure continue to preserve revoked grant rows; deleting an auth user removes
+the authorization edges referencing their deleted membership. It never deletes
+another owner's financial accounts or legitimate record history. Historical
+identity FKs retain the landed deletion behavior. Closing a household
 is explicit; an administrator transfers authority to a current member or closes
 before leaving. API shapes and read redaction are owned by
 [API_CONTRACT.md](API_CONTRACT.md#174-households-canonical-membership-and-financial-adapters).

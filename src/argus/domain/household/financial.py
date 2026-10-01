@@ -200,8 +200,6 @@ class HouseholdFinancialService:
             scope = resolve(c, actor, h, m)
             if scope.membership_id != membership_id:
                 raise HouseholdUnavailable()
-            if scope.authorization_version != expected_household_version:
-                raise StaleVersion()
             targets = {
                 a
                 for a in (
@@ -236,6 +234,8 @@ class HouseholdFinancialService:
                     tuple(str(a) for a in receipt[3]),
                     True,
                 )
+            if scope.authorization_version != expected_household_version:
+                raise StaleVersion()
             result = plan(
                 records,
                 request,

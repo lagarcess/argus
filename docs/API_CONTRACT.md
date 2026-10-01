@@ -7411,6 +7411,8 @@ lifecycle test adapter answers 404 on these financial routes.
 
 `GET /api/v1/households/{id}/snapshot` returns
 `{household_id,membership_id,authorization_version,accounts,activities,positions}`.
+Archived authorized accounts remain in positions and unknown counts; archive
+changes organization only.
 An account wraps the canonical account projection with `owner_name,permission,is_owner`.
 An activity wraps canonical activity with `author_name,can_edit,private_counterpart`.
 Hidden counterpart IDs, linked private purchases/reversals, private primary
@@ -7439,7 +7441,10 @@ subtotal separately. No private plan data is included.
 The service locks Household authorization, then canonical owner/account locks.
 It checks all old/new/reverse refund or reversal dependencies before the money
 planner and before replay. Every participating account needs a live edit grant
-and one original owner. Recording owns calculations and owner-qualified rows;
+and one original owner. An exact committed receipt replays after those live
+checks even if an unrelated Household command advanced the authorization
+generation; stale generations still reject new previews and writes. Recording
+owns calculations and owner-qualified rows;
 `recorded_by` is the actual authenticated actor. Receipt identity includes actor,
 household and membership incarnation. Native changes of identity, membership,
 permission generation or scope discard protected reads; denied reads return to
