@@ -114,6 +114,18 @@ def setup(journal, client):
             },
         },
     )
+    command(
+        journal,
+        client,
+        "cash_selection",
+        "PUT",
+        "/financial-plan/selection",
+        lambda: {
+            "expected_version": get(client, "/financial-plan")["selection"]["version"],
+            "account_ids": [ids["cash"]],
+            "time_zone": ZONE,
+        },
+    )
     if "baseline_plan" not in journal.state:
         plan = get(client, "/financial-plan")
         journal.state["baseline_plan"] = {
@@ -311,7 +323,7 @@ def readback(journal, client):
     )
     plan = get(client, "/financial-plan")
     baseline = journal.state["baseline_plan"]
-    for key in ("currencies", "budgets", "goals"):
+    for key in ("budgets", "goals"):
         require(plan[key] == baseline[key], "Asset writes changed Plan " + key)
     pools = {row["account_id"]: row for row in plan["goal_pools"]}
     previous_pools = {row["account_id"]: row for row in baseline["goal_pools"]}
@@ -354,9 +366,27 @@ def readback(journal, client):
         plan["goals"][0]["supported_minor"] == "50000", "Valuation became savings backing"
     )
     require(
-        next(c for c in plan["currencies"] if c["currency"] == "DOP")["starting_minor"]
-        == "100000",
-        "Valuation became forecast cash",
+        plan["selection"]["account_ids"] == [ids["cash"]],
+        "Forecast selected an asset or debt",
+    )
+    require(
+        len(plan["currencies"]) == 1,
+        "Forecast did not preserve the selected DOP cash group",
+    )
+    forecast = plan["currencies"][0]
+    require(
+        forecast["currency"] == "DOP"
+        and forecast["account_ids"] == [ids["cash"]]
+        and forecast["unknown_account_ids"] == []
+        and forecast["known_starting_minor"] == "100000"
+        and forecast["starting_minor"] == "100000"
+        and forecast["expected_income_minor"] == "0"
+        and forecast["expected_bills_minor"] == "0"
+        and forecast["transfer_effect_minor"] == "0"
+        and forecast["net_cash_change_minor"] == "0"
+        and forecast["ending_minor"] == "100000"
+        and pools[ids["cash"]]["backing_minor"] == "100000",
+        "Valuation changed forecast or eligible cash backing",
     )
     require(
         all(
