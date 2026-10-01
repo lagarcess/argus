@@ -82,10 +82,15 @@ class IngestionHub:
 
     def disconnect(self, *, user_id: str, connection_id: str) -> DisconnectOutcome:
         connection = self.connections.get(user_id=user_id, connection_id=connection_id)
-        if connection.status == "disconnected":
-            return DisconnectOutcome(connection, "not_applicable", 0)
-        revocation: Revocation = "not_applicable"
         adapter = self._adapters.get(connection.source)
+        if connection.status == "disconnected":
+            # Already ended: never contact the provider again, but finish any
+            # local cleanup a failed earlier attempt left behind. Both cleanup
+            # steps are idempotent.
+            return DisconnectOutcome(
+                connection, "not_applicable", self._cleanup(adapter, connection)
+            )
+        revocation: Revocation = "not_applicable"
         if adapter is None and connection.secret is not None:
             # A provider grant exists but nothing here can revoke it (the
             # connector is switched off): say so instead of implying success.
@@ -104,12 +109,15 @@ class IngestionHub:
         ended = self.connections.disconnect(
             user_id=user_id, connection_id=connection_id, now=self.clock()
         )
-        cleanup = getattr(adapter, "forget", None)
-        if cleanup is not None:
-            cleanup(ended)
-        removed = 0
-        if self.sink is not None:
-            removed = self.sink.forget_connection(
-                user_id=user_id, connection_id=connection_id
-            )
-        return DisconnectOutcome(ended, revocation, removed)
+        return DisconnectOutcome(ended, revocation, self._cleanup(adapter, ended))
+
+    def _cleanup(self, adapter: SourceAdapter | None, ended: SourceConnection) -> int:
+        """Connector-owned local state, then unreviewed evidence. Safe to
+        repeat; a retry after a partial failure completes what is left."""
+
+        forget = getattr(adapter, "forget", None)
+        if forget is not None:
+            forget(ended)
+        if self.sink is None:
+            return 0
+        return self.sink.forget_connection(user_id=ended.user_id, connection_id=ended.id)
