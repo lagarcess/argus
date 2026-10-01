@@ -3242,6 +3242,361 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports:
+    get:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: state
+        in: query
+        required: false
+        schema:
+          enum:
+          - open
+          - accepted
+          - dismissed
+          type: string
+          default: open
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportEventListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports/accept-batch:
+    post:
+      tags:
+      - financial-accounts
+      - financial-imports
+      description: 'Record the reviewed batch; anything with an open question is returned
+
+        as ``needs_review`` and left untouched.'
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptBatchBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptBatchResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports/{event_id}:
+    get:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportEventResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportEventResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports/{event_id}/accept:
+    post:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportAcceptResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports/{event_id}/link-activity:
+    post:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkActivityBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportEventResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports/{event_id}/merge:
+    post:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportEventResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports/{event_id}/preview:
+    post:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreviewBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-imports/{event_id}/{action}:
+    post:
+      tags:
+      - financial-accounts
+      - financial-imports
+      parameters:
+      - name: event_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: action
+        in: path
+        required: true
+        schema:
+          enum:
+          - dismiss
+          - reopen
+          - acknowledge
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportEventResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-plan:
     get:
       tags:
@@ -6406,6 +6761,39 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
+    AcceptBatchBody:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/BatchItem'
+          type: array
+          maxItems: 100
+          minItems: 1
+      additionalProperties: false
+      type: object
+      required:
+      - items
+    AcceptBatchResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/BatchOutcome'
+          type: array
+      type: object
+      required:
+      - items
+    AcceptBody:
+      properties:
+        version:
+          type: integer
+          minimum: 1.0
+        request:
+          $ref: '#/components/schemas/MoneyRequest'
+      additionalProperties: false
+      type: object
+      required:
+      - version
+      - request
     AcceptInvitationRequest:
       properties:
         token:
@@ -7430,6 +7818,43 @@ components:
       type: object
       required:
       - state
+    BatchItem:
+      properties:
+        event_id:
+          type: string
+        version:
+          type: integer
+          minimum: 1.0
+      additionalProperties: false
+      type: object
+      required:
+      - event_id
+      - version
+    BatchOutcome:
+      properties:
+        event_id:
+          type: string
+        outcome:
+          type: string
+          enum:
+          - accepted
+          - needs_review
+        activity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        replayed:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - event_id
+      - outcome
     BatchReceipt:
       properties:
         receipts:
@@ -11032,6 +11457,288 @@ components:
       - created_at
       - closed_at
       - members
+    ImportAcceptResponse:
+      properties:
+        event:
+          $ref: '#/components/schemas/ImportEventResponse'
+        activity:
+          $ref: '#/components/schemas/MoneyActivityResponse'
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - event
+      - activity
+      - replayed
+    ImportAttachmentResponse:
+      properties:
+        media_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+        size_bytes:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        sha256:
+          anyOf:
+          - type: string
+          - type: 'null'
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - media_type
+      - size_bytes
+      - sha256
+      - filename
+    ImportEventListResponse:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ImportEventResponse'
+          type: array
+      type: object
+      required:
+      - items
+    ImportEventResponse:
+      properties:
+        id:
+          type: string
+        state:
+          type: string
+          enum:
+          - open
+          - accepting
+          - accepted
+          - dismissed
+        evidence:
+          type: string
+        version:
+          type: integer
+        attention:
+          anyOf:
+          - type: string
+          - type: 'null'
+        attention_detail:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+        possible_duplicates:
+          items:
+            type: string
+          type: array
+        existing_activity_matches:
+          items:
+            type: string
+          type: array
+        activity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        facts:
+          $ref: '#/components/schemas/ImportFactsResponse'
+        resolution:
+          additionalProperties: true
+          type: object
+        unresolved:
+          items:
+            type: string
+          type: array
+        account_shared_with_household:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+        observations:
+          items:
+            $ref: '#/components/schemas/ImportObservationResponse'
+          type: array
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - id
+      - state
+      - evidence
+      - version
+      - attention
+      - attention_detail
+      - possible_duplicates
+      - existing_activity_matches
+      - activity_id
+      - facts
+      - resolution
+      - unresolved
+      - account_shared_with_household
+      - observations
+      - created_at
+      - updated_at
+    ImportFactsResponse:
+      properties:
+        amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          anyOf:
+          - type: string
+          - type: 'null'
+        direction:
+          anyOf:
+          - type: string
+          - type: 'null'
+        occurred_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+        account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        kind:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - amount
+      - currency
+      - direction
+      - occurred_on
+      - account_id
+      - kind
+    ImportObservationResponse:
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+          enum:
+          - plaid
+          - gmail
+          - shortcuts
+          - statement
+        connection_id:
+          type: string
+        external_id:
+          type: string
+        evidence:
+          anyOf:
+          - type: string
+          - type: 'null'
+        status:
+          anyOf:
+          - type: string
+          - type: 'null'
+        live:
+          type: boolean
+        revisions:
+          type: integer
+        observed_at:
+          anyOf:
+          - type: string
+          - type: 'null'
+        occurred_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+        posted_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+        due_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          anyOf:
+          - type: string
+          - type: 'null'
+        direction:
+          anyOf:
+          - type: string
+          - type: 'null'
+        merchant:
+          anyOf:
+          - type: string
+          - type: 'null'
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+        excerpt:
+          anyOf:
+          - type: string
+          - type: 'null'
+        balance_scope:
+          anyOf:
+          - type: string
+          - type: 'null'
+        institution:
+          anyOf:
+          - type: string
+          - type: 'null'
+        account_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        account_mask:
+          anyOf:
+          - type: string
+          - type: 'null'
+        attachments:
+          items:
+            $ref: '#/components/schemas/ImportAttachmentResponse'
+          type: array
+        redacted:
+          type: boolean
+      type: object
+      required:
+      - id
+      - source
+      - connection_id
+      - external_id
+      - evidence
+      - status
+      - live
+      - revisions
+      - observed_at
+      - occurred_on
+      - posted_on
+      - due_on
+      - amount
+      - currency
+      - direction
+      - merchant
+      - description
+      - excerpt
+      - balance_scope
+      - institution
+      - account_name
+      - account_mask
+      - attachments
+      - redacted
+    ImportPreviewResponse:
+      properties:
+        event:
+          $ref: '#/components/schemas/ImportEventResponse'
+        preview:
+          $ref: '#/components/schemas/MoneyPreviewResponse'
+      type: object
+      required:
+      - event
+      - preview
     InvitationCreated:
       properties:
         id:
@@ -11092,6 +11799,18 @@ components:
       - expires_at
       - available
     JsonValue: {}
+    LinkActivityBody:
+      properties:
+        version:
+          type: integer
+          minimum: 1.0
+        activity_id:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - version
+      - activity_id
     LinkReceipt:
       properties:
         occurrence:
@@ -11746,6 +12465,18 @@ components:
       - explain_prior_decision
       - inspect_memory
       description: Closed purposes that cannot change canonical investing behavior.
+    MergeBody:
+      properties:
+        version:
+          type: integer
+          minimum: 1.0
+        into_event_id:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - version
+      - into_event_id
     Message:
       properties:
         id:
@@ -12729,6 +13460,13 @@ components:
       - currency_fraction_digits
       - amount_minor
       - unknown_count
+    PreviewBody:
+      properties:
+        overrides:
+          additionalProperties: true
+          type: object
+      additionalProperties: false
+      type: object
     ProfilePatch:
       properties:
         display_name:
@@ -14354,6 +15092,19 @@ components:
       - time_zone
       - start_at
       - end_at_exclusive
+    ResolveBody:
+      properties:
+        version:
+          type: integer
+          minimum: 1.0
+        changes:
+          additionalProperties: true
+          type: object
+      additionalProperties: false
+      type: object
+      required:
+      - version
+      - changes
     ResultReadoutContent:
       properties:
         schema_version:
@@ -15411,6 +16162,15 @@ components:
       - guest
       - capabilities
       - public_account_access_enabled
+    VersionBody:
+      properties:
+        version:
+          type: integer
+          minimum: 1.0
+      additionalProperties: false
+      type: object
+      required:
+      - version
     VersionRequest:
       properties:
         expected_version:

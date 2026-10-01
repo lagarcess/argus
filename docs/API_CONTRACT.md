@@ -7682,3 +7682,82 @@ Otherwise the field stays empty and is listed as uncertain. `card` becomes the
 account hint name and `card_last4` its mask; nothing else is inferred. A
 `message_capture` becomes `unclassified` evidence: inert text (`excerpt`,
 `sender` as description) with `kind` and every money field unresolved.
+
+## Import review queue (default-off)
+
+Same gate as connected sources: `ARGUS_INGESTION_ENABLED` inside
+`ARGUS_FINANCIAL_ACCOUNTS_ENABLED`, flag before authentication, registered
+only. Reconciliation is the single sink for every connector, so this is the
+one place imports are reviewed. Nothing here writes activity except `accept`
+and `accept-batch`, which record through the existing money service
+(`MoneyService.preview`/`write`, the same rules, receipts and coverage
+questions as `/financial-activities`).
+
+Event shape: `{id,state,evidence,version,attention,attention_detail,
+possible_duplicates,existing_activity_matches,activity_id,facts,resolution,
+unresolved,account_shared_with_household,observations,created_at,updated_at}`.
+
+- `state`: `open|accepting|accepted|dismissed`. Open drafts affect no balance,
+  budget, goal, Home or search.
+- `facts`: `{amount,currency,direction,occurred_on,account_id,kind}`, the
+  person's resolution first, then the most authoritative live observation
+  (posted before pending; statement, Plaid, Gmail, Shortcuts). `kind` may be a
+  proposal from the source's hint or direction; the person confirms it in
+  preview. Amounts are positive decimal strings; currency is never guessed.
+- `unresolved`: fields that must be supplied before preview
+  (`amount|currency|occurred_on|account_id|kind` and anything the source
+  marked uncertain).
+- `attention`: `source_changed` (a source revised an accepted event; detail
+  carries `before`/`after`), `source_removed`, `possible_duplicate`,
+  `ambiguous_match` (several events matched equally; none was linked).
+- `existing_activity_matches`: recorded activity on the same account with the
+  same amount and currency within five days that no import points to yet.
+- `account_shared_with_household`: whether the resolved account is explicitly
+  shared, shown before confirming; importing never creates a grant.
+- `observations[]`: each source's own view (`source,connection_id,external_id,
+  evidence,status,live,revisions,observed_at,occurred_on,posted_on,due_on,
+  amount,currency,direction,merchant,description,excerpt,balance_scope,
+  institution,account_name,account_mask,attachments,redacted`). Text is inert
+  provider content. `live=false` means removed or superseded (pending replaced
+  by posted). `redacted=true` keeps only provenance after a disconnect.
+
+Routes under `/api/v1/financial-imports`:
+
+- GET `?state=open|accepted|dismissed` returns `{items}` (default `open`,
+  which includes `accepting`).
+- GET `/{id}` returns one event.
+- PATCH `/{id}` `{version,changes}` sets the person's resolution. Allowed keys:
+  `kind,account_id,destination_account_id,amount,currency,occurred_on,
+  direction,category_id,source_id,purchase_activity_id,note,time_zone`; `null`
+  clears one. Setting `account_id` remembers the mapping for that source's
+  account hint, so later imports from it resolve automatically. Re-checks
+  possible duplicates.
+- POST `/{id}/merge` `{version,into_event_id}`: the person says two events are
+  the same purchase. Refused when one source reported both
+  (`import_merge_same_source`) or both are already recorded
+  (`import_merge_two_records`). An accepted event survives.
+- POST `/{id}/dismiss|reopen|acknowledge` `{version}`. `acknowledge` clears a
+  source-changed or source-removed warning after the person checked the record.
+- POST `/{id}/link-activity` `{version,activity_id}`: the purchase is already
+  recorded (manual, voice, earlier import). One import per activity
+  (`activity_already_linked`).
+- POST `/{id}/preview` `{overrides?}` returns `{event,preview}` where `preview`
+  is the money service preview (`reviewed_request`, `preview_token`, affected
+  accounts and coverage questions). Refused for `import_unresolved`,
+  `import_currency_mismatch` (no conversion), `import_not_activity` (balances,
+  due-date and statement notices are evidence, not money that moved).
+- POST `/{id}/accept` `{version,request}` with `Idempotency-Key` (at most 80
+  characters) records the reviewed request. The event is claimed first: a
+  retry with the same key replays the same activity; another key answers 409
+  `import_already_accepted` or `import_accept_in_progress`.
+- POST `/accept-batch` `{items:[{event_id,version}]}` (at most 100) with
+  `Idempotency-Key` (at most 40 characters) records each item that has no open
+  question and returns `{items:[{event_id,outcome,activity_id?,replayed?,code?}]}`.
+  `needs_review` codes: `stale_version`, `import_unresolved`,
+  `import_possible_duplicate` (flagged, or named by another open import),
+  `balance_coverage_required`, and the preview refusals above. Retrying the
+  same batch key replays recorded items.
+
+Problems: 404 `financial_import_not_found`; 409 `stale_version` and the
+conflicts above; 422 validation codes; recording errors use the existing
+financial-accounts problems.

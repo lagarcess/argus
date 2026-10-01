@@ -73,7 +73,7 @@ email bodies or provider payloads through the contract.
 | Provider auth, fetch, pagination, provider retries, extraction | Each connector | Reconciliation |
 | Stable `external_id`; same-source re-delivery, provider modifications and removals expressed as candidates | Each connector | Reconciliation (does not re-derive provider identity) |
 | Connection status, freshness, attention warnings, cursor, sync lease, credential sealing, keyed identifier digests | `ingestion.connections` + `IngestionHub` (shared) | Connectors (they call it) |
-| Evidence storage, cross-source matching, event grouping, review queue | Reconciliation (single owner, wave 2) | Connectors |
+| Evidence storage, cross-source matching, event grouping, review queue, reviewed batches | Reconciliation (`ingestion.reconcile`, single owner, wave 2) | Connectors |
 | Account mapping (hint to `financial_accounts` row) | Reconciliation, confirmed by the person | Connectors |
 | Corrections from sources after acceptance (amount changed, removed) | Reconciliation raises a review item; the person corrects through existing activity correction | Anyone silently editing canonical rows |
 | Canonical writes, money rules, idempotency, household projection | `MoneyService` and existing recording owners | Ingestion |
@@ -84,14 +84,21 @@ email bodies or provider payloads through the contract.
    fingerprint is a no-op; a changed fingerprint is a new revision of it.
 2. `replaces_external_id`: the new observation supersedes the named one inside
    the same event (pending to posted), even when the amount changed.
-3. Different sources may join one event when account, currency, direction and
-   amount agree and the dates fall within the source-specific window. An event
-   holds at most one live observation per source; two different observations
-   from the same source are two different purchases unless rule 2 links them.
+3. Different sources join one event automatically only on a *strong* match:
+   equal amount, known and equal currency, dates within five days, both sides
+   on the same person-confirmed account, and no contradiction in direction or
+   card mask. An event holds at most one live observation per source; two
+   different observations from the same source are two different purchases
+   unless rule 2 links them.
 4. Equal amount and date alone never merge anything. When more than one event
    could match, nothing is linked automatically; the person decides.
-5. Statements match against accepted activity and open drafts the same way and
-   never add a second copy of activity already recorded.
+5. Statements match against accepted events and open drafts the same way and
+   never add a second copy of activity already recorded. Activity recorded by
+   other means (manual, voice) is offered as `existing_activity_matches` for
+   the person to link instead of recording again.
+6. A reviewed batch records only items with no open question (nothing
+   unresolved, no duplicate flag, no balance-coverage question, unchanged
+   since review); every other item stays for individual review.
 
 ## Evidence is not a conclusion
 

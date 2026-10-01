@@ -112,6 +112,9 @@ Default-off, registered-only (`ARGUS_INGESTION_ENABLED`):
 financial_source_connections
 financial_source_gmail_senders
 financial_shortcut_device_tokens
+financial_import_events
+financial_import_observations
+financial_import_account_links
 ```
 
 Optional or later:
@@ -2881,3 +2884,31 @@ token itself is never stored) and `created_at`. Disconnect deletes the row, and
 intake also requires the connection to be live. Row level security is enabled
 with no policies and every client grant revoked, so no client role can read or
 write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.
+
+## Import reconciliation
+
+Default-off with `ARGUS_INGESTION_ENABLED`. Lane spec:
+[financial-ingestion-connectors](specs/lanes/financial-ingestion-connectors.md).
+None of these rows is a financial record or affects balances.
+
+- `financial_import_observations`: one row per `(user_id, connection_id,
+  external_id)`; the contract candidate JSON (bounded, inert text, attachment
+  references only), its content fingerprint, revision count and `live` flag
+  (false when the source removed it or a newer observation superseded it).
+  Cascades with its connection and its event.
+- `financial_import_events`: groups observations of one real-world fact; holds
+  state, the person's `resolution`, attention, possible duplicates, the match
+  anchor date, the accepting idempotency key and, once accepted, the recorded
+  `activity_id`. A check ties `state='accepted'` to a non-null `activity_id`;
+  a unique index allows one event per `(user_id, activity_id)`, so one purchase
+  cannot be recorded or linked twice.
+- `financial_import_account_links`: person-confirmed mapping from
+  `(connection_id, account_key)` to an owned `financial_accounts` row
+  (owner-qualified foreign key); deleted on disconnect.
+
+All writes run in one per-person transaction under a transaction-scoped
+advisory lock. Registered owners may `SELECT`; no client role writes. Proven
+by `tests/test_ingestion_reconcile_postgres.py`. On disconnect, unreviewed
+observations (and events left empty) are deleted; observations of accepted
+events are reduced to provenance (source, connection, external id, dates,
+status) and kept with the record.

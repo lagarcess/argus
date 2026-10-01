@@ -80,7 +80,7 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         else:
             connections = InMemoryConnectionRepository()
         configure_ingestion_hub(
-            IngestionHub(connections, box=box, sink=None, clock=_clock)
+            IngestionHub(connections, box=box, sink=_reconciliation(pool), clock=_clock)
         )
         from argus.api.plaid import start_plaid
 
@@ -97,6 +97,25 @@ def start_ingestion(app) -> None:  # noqa: ANN001
             failure_mode=type(exc).__name__,
         )
         configure_ingestion_hub(None)
+
+
+def _reconciliation(pool):  # noqa: ANN001, ANN202
+    """The one candidate sink: every connector's evidence reaches review here."""
+
+    from argus.domain.ingestion.reconcile.service import ReconciliationService
+    from argus.domain.ingestion.reconcile.store import InMemoryImportStore
+    from argus.domain.recording.money_service import MoneyService
+
+    accounts = financial_accounts_service()
+    if api_state.PERSISTENCE_MODE == "supabase":
+        from argus.domain.ingestion.reconcile.store_postgres import (
+            PostgresImportStore,
+        )
+
+        store = PostgresImportStore(pool)
+    else:
+        store = InMemoryImportStore()
+    return ReconciliationService(store, MoneyService(accounts), _clock)
 
 
 def stop_ingestion(app) -> None:  # noqa: ANN001
