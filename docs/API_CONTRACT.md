@@ -7325,121 +7325,120 @@ Unknown assets and debts may link. Omission never withdraws a known estimate.
 
 ---
 
-# 17.4 Households (membership, invitations, account grants)
+# 17.4 Households (canonical membership and financial adapters)
 
-Registered users create a household, invite a partner with a synthetic local
-link, accept membership, and explicitly share selected accounts. Spec:
-[`docs/specs/lanes/household-permission-policy.md`](specs/lanes/household-permission-policy.md).
-Policy founder-approved 2026-10-01. Create ≠ invite ≠ share account. Acceptance
-is membership only. Shared accounts start `view`; `edit` requires an explicit
-grant and never confers ownership, membership administration, or resharing.
-Leave/removal revokes membership and that member's grants; owners retain
-financial records. Local invitations are synthetic (no email/WhatsApp delivery).
+Registered-only, default-off `ARGUS_HOUSEHOLDS_ENABLED`. The landed
+`households`, `household_members`, `household_invitations`, and
+`household_account_grants` remain the only Household authority. Personal
+financial endpoints remain strict-owner. While disabled, Household routes
+return `404 households_unavailable` before authentication. Responses are
+`Cache-Control: no-store`. The [permission policy](specs/lanes/household-permission-policy.md)
+owns member powers; local links are synthetic and never deliver messages.
 
-Behind default-off `ARGUS_HOUSEHOLDS_ENABLED`. While off (or durable mode with
-no `DATABASE_URL`), every route below returns `404 households_unavailable`
-before authentication. When on, routes require a verified registered session
-(`401` / `403 account_conversion_required` as for financial accounts).
+## Lifecycle commands and recovery
 
-## Household shape
+All lifecycle mutations require `Idempotency-Key` (1–128 visible ASCII
+characters), and commands against an existing household require body
+`expected_version` >= 1. The existing default-off #763 wire is extended here;
+mutations now return a `CommandResult`, including leave/revoke/remove:
 
 ```json
-{
-  "id": "uuid",
-  "name": "Home",
-  "status": "active",
-  "admin_user_id": "uuid",
-  "created_by": "uuid",
-  "created_at": "2026-10-01T12:00:00Z",
-  "closed_at": null,
-  "members": [
-    {
-      "user_id": "uuid",
-      "role": "admin",
-      "joined_at": "2026-10-01T12:00:00Z"
-    }
-  ]
-}
+{"household_id":"uuid","membership_id":"uuid","state":"active",
+ "replayed":false,"invitation":null}
 ```
 
-Member roles on the wire are `admin` (current administrator) or `member`.
-The creator starts as admin. Closing sets `status` to `closed` and ends active
-memberships without deleting financial accounts.
+`state` is `active` or `departed` for the original membership. A receipt replay
+never creates another household or membership, never reactivates a departed
+membership, and returns no protected household snapshot. Key reuse with another
+body returns `409 idempotency_conflict`; stale versions return `409` through
+Recording's canonical stale-version error. Exact bytes are retained by the
+native actor-partitioned journal until a definite response. Invitation creation
+returns `invitation: {id,household_id,expires_at,state,token}`; token appears only
+in the first response. Lost-response retry returns metadata with `token:null`:
+revoke and replace that invitation to obtain a usable link. Receipts do not
+store token plaintext or financial payloads.
 
-## `POST /api/v1/households`
+| Endpoint | Body in addition to `expected_version` when scoped |
+| --- | --- |
+| `POST /api/v1/households` | `name` optional <=80; `display_name` 1–60; no version |
+| `POST /api/v1/households/{id}/invitations` | none; current admin only |
+| `POST /api/v1/households/{id}/invitations/{invitation_id}/revoke` | none; current admin only |
+| `POST /api/v1/household-invitations/preview` | `token`; no version/key or consumption |
+| `POST /api/v1/household-invitations/accept` | `token`, `display_name`; no version |
+| `POST /api/v1/households/{id}/leave` | none; admin must explicitly transfer or close first |
+| `POST /api/v1/households/{id}/members/{user_id}/remove` | none; admin removes another current member |
+| `POST /api/v1/households/{id}/transfer-admin` | `user_id` of a current member |
+| `POST /api/v1/households/{id}/close` | none; admin only |
 
-Create a household. Body: optional `name` (1–80 characters). Response `201`
-with the household including the creator as the sole admin member. Does not
-create invitations or account grants.
+Preview returns `{name,expires_at,available}`. Invitations expire after seven
+UTC days, can be revoked, and have one acceptor. Same-recipient acceptance
+retries return their original membership outcome even after departure/closure
+or later rejoin. A fresh invitation creates a new membership incarnation.
 
-## `GET /api/v1/households`
+`GET /api/v1/households` returns `{households:[HouseholdRecord]}`; GET by ID
+returns one current authorized record, otherwise 404. A HouseholdRecord retains
+`id,name,status,admin_user_id,created_by,created_at,closed_at,members` and adds
+`version,membership_id,admin_membership_id,invitations,shares`. Each current
+member contains `user_id,membership_id,display_name,role,joined_at,is_self,is_admin`.
+Only admins receive invitation metadata. `shares` contains only the caller's
+own account consent, grouped as `{account_id,recipients:[{membership_id,permission}]}`.
 
-List households where the caller has an active membership.
+## Explicit account consent
 
-## `GET /api/v1/households/{id}`
+Each grant names one current recipient membership and binds its original owner
+membership. `permission` is `view` by default or explicit `edit`. This one stored
+permission authorizes activity editing, never account metadata, ownership,
+membership administration, or resharing. Joining/rejoining alone grants nothing.
+Departure withdraws outbound shares and recipient access immediately; closure
+ends all grants without deleting financial records or legitimate activity.
 
-Return one household and its active member list. Non-members receive
-`404 household_not_found`.
+- `POST /api/v1/households/{id}/account-grants`: owner body
+  `{expected_version,account_id,recipient_membership_id,permission}`.
+- `PATCH /api/v1/households/{id}/account-grants/{grant_id}`: owner body
+  `{expected_version,permission}`.
+- `DELETE /api/v1/households/{id}/account-grants/{grant_id}`: owner/admin body
+  `{expected_version}`.
+- `PUT /api/v1/households/{id}/accounts/{account_id}/grants`: owner atomically
+  replaces chosen recipients with `{expected_version,recipients:[{membership_id,permission}]}`.
+  Empty recipients withdraws sharing. This is separate from account creation.
+- `GET /api/v1/households/{id}/accounts`: authorized identification rows only,
+  deduplicated per account even when several recipient grants exist.
 
-## `POST /api/v1/households/{id}/invitations`
+## Financial scope and projections
 
-Admin only. Creates a revocable, single-use invitation that expires in seven
-days. Response includes `id`, `expires_at`, and `token` once (synthetic local
-link material). Argus stores only a hash of the token.
+`GET /api/v1/households/{id}/snapshot` returns
+`{household_id,membership_id,authorization_version,accounts,activities,positions}`.
+An account wraps the canonical account projection with `owner_name,permission,is_owner`.
+An activity wraps canonical activity with `author_name,can_edit,private_counterpart`.
+Hidden counterpart IDs, linked private purchases/reversals, private primary
+amount/note, and private payment breakdowns are redacted after full canonical
+owner rendering. Historical reads, Search, and receipts use that same projection.
+Raw author IDs are null in Household projections; Personal author fields retain
+their existing contract. Household asset change authors are likewise nullable.
 
-## `POST /api/v1/households/{id}/invitations/{invitation_id}/revoke`
+Positions contain `currency,currency_fraction_digits,amount_minor,unknown_count`.
+Only granted recorded owner shares contribute, once per account, without FX.
+An incomplete currency shows Balance unknown primarily and its canonical Known
+subtotal separately. No private plan data is included.
 
-Admin only. Revokes an unused invitation.
+- GET `/{id}/accounts/{account_id}` returns `{account,activities}`.
+- GET `/{id}/activities/{activity_id}/history` returns `{items}`.
+- GET `/{id}/search?q=&cursor=&limit=` returns `{items,next_cursor}`; each hit
+  has `id,kind,title,account_id,activity_id`. Cursor identity binds actor,
+  membership, current authorization version, query and visible records.
+- GET `/{id}/activity-options` derives eligible editable accounts and canonical
+  categories/sources/activity rules from Recording.
+- POST `/{id}/activities/preview` and POST `/{id}/activities/{activity_id}/preview`
+  accept `{membership_id,expected_version,activity:<MoneyRequest>}`.
+- POST `/{id}/activities` and PATCH `/{id}/activities/{activity_id}` accept that
+  same envelope with the reviewed request/token and `Idempotency-Key`.
 
-## `POST /api/v1/household-invitations/accept`
-
-Body: `{ "token": "..." }`. Authenticated registered user accepts. Success
-creates membership only. Same-recipient retries after membership already exists
-return the household without duplicating membership (`200`). Expired, revoked,
-or already-consumed (different acceptor) tokens return `409` with a specific
-code (`invitation_expired`, `invitation_revoked`, `invitation_consumed`).
-
-## `POST /api/v1/households/{id}/leave`
-
-Active member leaves. Revokes that person's outbound account grants to the
-household. Admin must transfer administration or close the household before
-leaving when they are the sole admin.
-
-## `POST /api/v1/households/{id}/members/{user_id}/remove`
-
-Admin removes another member. Same grant revocation as leave.
-
-## `POST /api/v1/households/{id}/transfer-admin`
-
-Admin only. Body: `{ "user_id": "..." }` naming an active member. Transfers
-administration.
-
-## `POST /api/v1/households/{id}/close`
-
-Admin only. Closes the household, ends memberships, revokes outstanding
-invitations and grants. Financial accounts and history remain with owners.
-
-## `POST /api/v1/households/{id}/account-grants`
-
-Account owner (who must be an active household member) shares one of their
-accounts with the household. Body: `{ "account_id": "uuid", "permission": "view" | "edit" }`.
-Default permission is `view`. Does not move `space_id` or invent money.
-Edit does not grant ownership, admin, or resharing. Response includes grant id,
-account id, owner user id, permission, and timestamps.
-
-## `PATCH /api/v1/households/{id}/account-grants/{grant_id}`
-
-Account owner updates `permission` between `view` and `edit`.
-
-## `DELETE /api/v1/households/{id}/account-grants/{grant_id}`
-
-Account owner or household admin revokes the grant.
-
-## `GET /api/v1/households/{id}/accounts`
-
-Lists accounts the caller may see in this household: active grants whose
-household the caller actively belongs to. Each item includes account projection
-fields needed for identification (`id`, `type`, `currency`, `nickname`,
-`archived`, `ownership_share_bps`, owner `user_id`) plus `permission`
-(`view`|`edit`) and `grant_id`. Private unshared accounts never appear.
-Unauthorized account ids are absent (not disclosed).
+The service locks Household authorization, then canonical owner/account locks.
+It checks all old/new/reverse refund or reversal dependencies before the money
+planner and before replay. Every participating account needs a live edit grant
+and one original owner. Recording owns calculations and owner-qualified rows;
+`recorded_by` is the actual authenticated actor. Receipt identity includes actor,
+household and membership incarnation. Native changes of identity, membership,
+permission generation or scope discard protected reads; denied reads return to
+Personal, preserving uncertain command recovery. Household Plan/Argus remain
+explicitly unsupported in this bounded native lane.

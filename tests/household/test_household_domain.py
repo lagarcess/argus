@@ -53,9 +53,7 @@ def test_invitation_expiry_and_revoke() -> None:
     service = HouseholdService(InMemoryHouseholdRepository(accounts, clock=now))
     alice = str(uuid4())
     bob = str(uuid4())
-    household = service.create(
-        user_id=alice, request=CreateHouseholdRequest(name="Casa")
-    )
+    household = service.create(user_id=alice, request=CreateHouseholdRequest(name="Casa"))
     invite = service.invite(user_id=alice, household_id=household.id)
 
     clock["now"] = clock["now"] + timedelta(days=8)
@@ -76,10 +74,16 @@ def test_share_defaults_to_view() -> None:
     service = HouseholdService(InMemoryHouseholdRepository(accounts))
     alice = str(uuid4())
     household = service.create(user_id=alice, request=CreateHouseholdRequest())
+    invite = service.invite(user_id=alice, household_id=household.id)
+    member = service.accept(user_id=str(uuid4()), token=invite.token)
     account = accounts.add(user_id=alice)
     grant = service.create_grant(
         user_id=alice,
         household_id=household.id,
-        request=CreateAccountGrantRequest(account_id=account.id),
+        request=CreateAccountGrantRequest(
+            account_id=account.id,
+            recipient_membership_id=member.membership_id,
+            expected_version=household.version,
+        ),
     )
     assert grant.permission == "view"

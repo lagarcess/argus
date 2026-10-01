@@ -150,7 +150,11 @@ def require_households_context(
 def domain_problem(request: Request, error: Exception) -> HTTPException:
     if isinstance(error, HouseholdError):
         status = 404 if error.code.endswith("not_found") else 409
-        if error.code in {"account_not_owned", "household_admin_required", "not_a_member"}:
+        if error.code in {
+            "account_not_owned",
+            "household_admin_required",
+            "not_a_member",
+        }:
             status = 403
         if error.code == "must_transfer_or_close":
             status = 409
@@ -161,4 +165,6 @@ def domain_problem(request: Request, error: Exception) -> HTTPException:
             title=error.code.replace("_", " ").capitalize(),
             detail=error.detail,
         )
-    raise error
+    from argus.api.financial_accounts import domain_problem as financial_problem
+
+    return financial_problem(request, error)

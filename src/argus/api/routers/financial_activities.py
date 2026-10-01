@@ -21,8 +21,8 @@ from argus.domain.recording.money_responses import (
     PurchasePageResponse,
 )
 from argus.domain.recording.money_schemas import (
+    DESTINATION_ELIGIBILITY,
     ELIGIBILITY,
-    LIQUID_TYPES,
     SOURCE_IDS,
     MoneyRequest,
 )
@@ -55,12 +55,7 @@ def options(
                 for s in context.service.list_accounts(user_id=context.user_id)
             ],
             "eligibility": ELIGIBILITY,
-            "destination_eligibility": {
-                "transfer": LIQUID_TYPES,
-                "card_payment": ["credit_card"],
-                "debt_payment": ["other_debt"],
-                "payment_reversal": ["credit_card", "other_debt"],
-            },
+            "destination_eligibility": DESTINATION_ELIGIBILITY,
             "categories": CATEGORY_IDS,
             "sources": SOURCE_IDS,
         },

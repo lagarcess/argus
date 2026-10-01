@@ -80,3 +80,10 @@ class MoneyRequest(BaseModel):
         if any(v < 1 for v in value.values()):
             raise ValueError("Account versions must be positive.")
         return {str(UUID(k)): v for k, v in value.items()}
+
+DESTINATION_ELIGIBILITY = {
+    "transfer": LIQUID_TYPES,
+    "card_payment": ("credit_card",),
+    "debt_payment": ("other_debt",),
+    "payment_reversal": ("credit_card", "other_debt"),
+}

@@ -115,91 +115,51 @@ class HouseholdApi:
         self.user_id = user_id
         self._headers = {"Authorization": f"Bearer {token}"}
 
-    def create_household(self, body: dict | None = None):
-        return self._client.post(
-            "/api/v1/households", json=body or {}, headers=self._headers
+    def write(self, path, body=None, *, method="POST", key=None, version_household=None):
+        value = dict(body or {})
+        if version_household and "expected_version" not in value:
+            result = self.get_household(version_household)
+            value["expected_version"] = result.json().get("version", 1)
+        return self._client.request(
+            method,
+            "/api/v1" + path,
+            json=value,
+            headers=self._headers | {"Idempotency-Key": key or str(uuid4())},
         )
+
+    def create_household(self, body=None, key=None):
+        return self.write("/households", body, key=key)
 
     def list_households(self):
         return self._client.get("/api/v1/households", headers=self._headers)
 
-    def get_household(self, household_id: str):
+    def get_household(self, hid):
+        return self._client.get("/api/v1/households/" + hid, headers=self._headers)
+
+    def invite(self, hid):
+        return self.write(f"/households/{hid}/invitations", version_household=hid)
+
+    def accept(self, token):
+        return self.write(
+            "/household-invitations/accept", {"token": token, "display_name": "Recipient"}
+        )
+
+    def shared_accounts(self, hid):
         return self._client.get(
-            f"/api/v1/households/{household_id}", headers=self._headers
+            f"/api/v1/households/{hid}/accounts", headers=self._headers
         )
 
-    def invite(self, household_id: str):
-        return self._client.post(
-            f"/api/v1/households/{household_id}/invitations", headers=self._headers
-        )
-
-    def revoke_invite(self, household_id: str, invitation_id: str):
-        return self._client.post(
-            f"/api/v1/households/{household_id}/invitations/{invitation_id}/revoke",
-            headers=self._headers,
-        )
-
-    def accept(self, token: str):
-        return self._client.post(
-            "/api/v1/household-invitations/accept",
-            json={"token": token},
-            headers=self._headers,
-        )
-
-    def leave(self, household_id: str):
-        return self._client.post(
-            f"/api/v1/households/{household_id}/leave", headers=self._headers
-        )
-
-    def remove(self, household_id: str, member_user_id: str):
-        return self._client.post(
-            f"/api/v1/households/{household_id}/members/{member_user_id}/remove",
-            headers=self._headers,
-        )
-
-    def transfer_admin(self, household_id: str, user_id: str):
-        return self._client.post(
-            f"/api/v1/households/{household_id}/transfer-admin",
-            json={"user_id": user_id},
-            headers=self._headers,
-        )
-
-    def close(self, household_id: str):
-        return self._client.post(
-            f"/api/v1/households/{household_id}/close", headers=self._headers
-        )
-
-    def share(self, household_id: str, account_id: str, permission: str = "view"):
-        return self._client.post(
-            f"/api/v1/households/{household_id}/account-grants",
-            json={"account_id": account_id, "permission": permission},
-            headers=self._headers,
-        )
-
-    def update_grant(self, household_id: str, grant_id: str, permission: str):
-        return self._client.patch(
-            f"/api/v1/households/{household_id}/account-grants/{grant_id}",
-            json={"permission": permission},
-            headers=self._headers,
-        )
-
-    def revoke_grant(self, household_id: str, grant_id: str):
-        return self._client.delete(
-            f"/api/v1/households/{household_id}/account-grants/{grant_id}",
-            headers=self._headers,
-        )
-
-    def shared_accounts(self, household_id: str):
-        return self._client.get(
-            f"/api/v1/households/{household_id}/accounts", headers=self._headers
+    def share(self, hid, aid, mid, permission="view"):
+        return self.write(
+            f"/households/{hid}/account-grants",
+            {"account_id": aid, "recipient_membership_id": mid, "permission": permission},
+            version_household=hid,
         )
 
     def create_account(self, body: dict, *, key: str | None = None):
         headers = dict(self._headers)
         headers["Idempotency-Key"] = key or str(uuid4())
-        return self._client.post(
-            "/api/v1/financial-accounts", json=body, headers=headers
-        )
+        return self._client.post("/api/v1/financial-accounts", json=body, headers=headers)
 
 
 @pytest.fixture
