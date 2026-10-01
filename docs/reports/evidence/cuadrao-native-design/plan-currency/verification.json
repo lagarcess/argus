@@ -1,0 +1,61 @@
+{
+  "sourceCommit": "9441e2c3f6b07d2111a276a95771759764fa6409",
+  "decision": "Choose one currency at creation; fixed afterward. All plan amounts, splits and repayments use it. No conversion or mixed-currency expenses.",
+  "supported": [
+    "DOP",
+    "USD",
+    "EUR"
+  ],
+  "legacy": "Previously saved shared previews remain DOP with their original amounts.",
+  "nativeTests": {
+    "passed": 4,
+    "failed": 0,
+    "captured": "2026-10-01T15:56:36Z",
+    "coverage": [
+      "Personal EUR creation and locked editing in English",
+      "Shared USD creation, split, repayment and locked editing in Spanish",
+      "DOP expense, unequal split and repayment regression",
+      "DOP shared savings creation in English dark mode"
+    ]
+  },
+  "deterministicChecks": {
+    "personal": 56,
+    "shared": 45,
+    "result": "passed"
+  },
+  "warning": "The existing unlocated invalid-frame diagnostic still appears when opening native keyboards. Screenshots inspected; no new clipping identified.",
+  "scope": "UI-only local preview; no APIs, exchange rates, payments or invitations",
+  "captures": [
+    {
+      "file": "currency-personal-fixed-en.png",
+      "sha256": "516563ab0aa42e1f7528950c7d301e73cd68f3aa17c8b37d3d03d52f908170d2"
+    },
+    {
+      "file": "currency-personal-choice-en.png",
+      "sha256": "dd4dbaa6c616b4f39b080e2ec0d9de3a259dc5699127d04cb431d13e20b8f059"
+    },
+    {
+      "file": "currency-group-fixed-es.png",
+      "sha256": "be9d1c67f4c272dd81d0eafeebc0b8e752337a28faaa69e79a07d94cd442e096"
+    },
+    {
+      "file": "currency-dollar-balance-es.png",
+      "sha256": "4467d011b4a70e0e982736cf33ef4fca4ec1cd4bd226205e76aed7faf940ed36"
+    },
+    {
+      "file": "currency-dollar-split-es.png",
+      "sha256": "f8aa97312f63ce018dbd597fa5e353ea79e316c8b5720a4e773e9f4834177c1f"
+    },
+    {
+      "file": "currency-group-choice-es.png",
+      "sha256": "9ddc25baeb2632c01e0388b50160d20f142e8db6cc6e69b5df0a1268d629690e"
+    }
+  ],
+  "physicalDevice": {
+    "signedBuild": "passed",
+    "installation": "passed on retry",
+    "installationSequence": 3340,
+    "launch": "Device disconnected immediately after connecting; user can open installed preview manually",
+    "firstInstallationAttempt": "Transient remote connection failure"
+  }
+}
