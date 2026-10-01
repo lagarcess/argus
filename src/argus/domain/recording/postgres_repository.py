@@ -105,6 +105,22 @@ class PostgresFinancialAccountRepository:
             connection.execute("set transaction isolation level repeatable read")
             return self._load(connection, user_id, account_id)
 
+    def get_any_account(self, *, account_id: str) -> StoredAccount | None:
+        """Load by id after household authorization; not a client route."""
+
+        with self._pool.connection() as connection:
+            connection.execute("set transaction isolation level repeatable read")
+            row = connection.execute(
+                f"select {_ACCOUNT_COLUMNS} from public.financial_accounts where id = %s",
+                (account_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            openings = self._openings(connection, str(row[1]), [str(row[0])])
+            return hydrate(
+                connection, StoredAccount(_facts(row), openings.get(str(row[0])))
+            )
+
     def update_account(
         self,
         *,

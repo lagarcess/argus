@@ -7322,3 +7322,124 @@ Linking never changes money, currency, debt plans or access. Multiple assets
 may independently reference the same debt; Home still counts that debt account
 once. Currency totals stay separate. Archive preserves position and history.
 Unknown assets and debts may link. Omission never withdraws a known estimate.
+
+---
+
+# 17.4 Households (membership, invitations, account grants)
+
+Registered users create a household, invite a partner with a synthetic local
+link, accept membership, and explicitly share selected accounts. Spec:
+[`docs/specs/lanes/household-permission-policy.md`](specs/lanes/household-permission-policy.md).
+Policy founder-approved 2026-10-01. Create ≠ invite ≠ share account. Acceptance
+is membership only. Shared accounts start `view`; `edit` requires an explicit
+grant and never confers ownership, membership administration, or resharing.
+Leave/removal revokes membership and that member's grants; owners retain
+financial records. Local invitations are synthetic (no email/WhatsApp delivery).
+
+Behind default-off `ARGUS_HOUSEHOLDS_ENABLED`. While off (or durable mode with
+no `DATABASE_URL`), every route below returns `404 households_unavailable`
+before authentication. When on, routes require a verified registered session
+(`401` / `403 account_conversion_required` as for financial accounts).
+
+## Household shape
+
+```json
+{
+  "id": "uuid",
+  "name": "Home",
+  "status": "active",
+  "admin_user_id": "uuid",
+  "created_by": "uuid",
+  "created_at": "2026-10-01T12:00:00Z",
+  "closed_at": null,
+  "members": [
+    {
+      "user_id": "uuid",
+      "role": "admin",
+      "joined_at": "2026-10-01T12:00:00Z"
+    }
+  ]
+}
+```
+
+Member roles on the wire are `admin` (current administrator) or `member`.
+The creator starts as admin. Closing sets `status` to `closed` and ends active
+memberships without deleting financial accounts.
+
+## `POST /api/v1/households`
+
+Create a household. Body: optional `name` (1–80 characters). Response `201`
+with the household including the creator as the sole admin member. Does not
+create invitations or account grants.
+
+## `GET /api/v1/households`
+
+List households where the caller has an active membership.
+
+## `GET /api/v1/households/{id}`
+
+Return one household and its active member list. Non-members receive
+`404 household_not_found`.
+
+## `POST /api/v1/households/{id}/invitations`
+
+Admin only. Creates a revocable, single-use invitation that expires in seven
+days. Response includes `id`, `expires_at`, and `token` once (synthetic local
+link material). Argus stores only a hash of the token.
+
+## `POST /api/v1/households/{id}/invitations/{invitation_id}/revoke`
+
+Admin only. Revokes an unused invitation.
+
+## `POST /api/v1/household-invitations/accept`
+
+Body: `{ "token": "..." }`. Authenticated registered user accepts. Success
+creates membership only. Same-recipient retries after membership already exists
+return the household without duplicating membership (`200`). Expired, revoked,
+or already-consumed (different acceptor) tokens return `409` with a specific
+code (`invitation_expired`, `invitation_revoked`, `invitation_consumed`).
+
+## `POST /api/v1/households/{id}/leave`
+
+Active member leaves. Revokes that person's outbound account grants to the
+household. Admin must transfer administration or close the household before
+leaving when they are the sole admin.
+
+## `POST /api/v1/households/{id}/members/{user_id}/remove`
+
+Admin removes another member. Same grant revocation as leave.
+
+## `POST /api/v1/households/{id}/transfer-admin`
+
+Admin only. Body: `{ "user_id": "..." }` naming an active member. Transfers
+administration.
+
+## `POST /api/v1/households/{id}/close`
+
+Admin only. Closes the household, ends memberships, revokes outstanding
+invitations and grants. Financial accounts and history remain with owners.
+
+## `POST /api/v1/households/{id}/account-grants`
+
+Account owner (who must be an active household member) shares one of their
+accounts with the household. Body: `{ "account_id": "uuid", "permission": "view" | "edit" }`.
+Default permission is `view`. Does not move `space_id` or invent money.
+Edit does not grant ownership, admin, or resharing. Response includes grant id,
+account id, owner user id, permission, and timestamps.
+
+## `PATCH /api/v1/households/{id}/account-grants/{grant_id}`
+
+Account owner updates `permission` between `view` and `edit`.
+
+## `DELETE /api/v1/households/{id}/account-grants/{grant_id}`
+
+Account owner or household admin revokes the grant.
+
+## `GET /api/v1/households/{id}/accounts`
+
+Lists accounts the caller may see in this household: active grants whose
+household the caller actively belongs to. Each item includes account projection
+fields needed for identification (`id`, `type`, `currency`, `nickname`,
+`archived`, `ownership_share_bps`, owner `user_id`) plus `permission`
+(`view`|`edit`) and `grant_id`. Private unshared accounts never appear.
+Unauthorized account ids are absent (not disclosed).
