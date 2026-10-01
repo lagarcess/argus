@@ -20,18 +20,24 @@ class World:
     accounts: FinancialAccountService
     user: str
     connect: Callable[[str], str]
+    disconnect: Callable[[str], None]
 
 
 def build(repository: Any, store: Any, connections: Any, user: str) -> World:
     accounts = FinancialAccountService(repository, lambda: NOW)
-    recon = ReconciliationService(store, MoneyService(accounts), lambda: NOW)
+    recon = ReconciliationService(
+        store, MoneyService(accounts), lambda: NOW, connections=connections
+    )
 
     def connect(source: str) -> str:
         return connections.create(
             user_id=user, source=source, external_ref=str(uuid4()), label=None, now=NOW
         ).id
 
-    return World(recon, accounts, user, connect)
+    def disconnect(connection_id: str) -> None:
+        connections.disconnect(user_id=user, connection_id=connection_id, now=NOW)
+
+    return World(recon, accounts, user, connect, disconnect)
 
 
 def memory_pair() -> tuple[World, World]:

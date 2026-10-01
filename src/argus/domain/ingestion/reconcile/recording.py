@@ -1,9 +1,11 @@
 """Recording reviewed imports: preview, accept, reviewed batches, linking.
 
 Canonical writes happen in exactly one place, ``accept``, through
-``MoneyService.write`` with an idempotency key derived from the event. An
-event is claimed before the write, so two concurrent accepts with different
-keys cannot record the same purchase twice; a retry with the same key replays.
+``MoneyService.write`` with an idempotency key derived from the event and the
+key that claimed it. The claim stores the reviewed request, so an acceptance
+interrupted after the money write committed is completed by replaying that
+same request and key, never by a second write under another key. Only errors
+the money service raises before writing release the claim.
 """
 
 from __future__ import annotations
@@ -14,31 +16,47 @@ from datetime import date, datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from pydantic import ValidationError
+
 from argus.domain.ingestion.reconcile.matching import ACTIVITY_EVIDENCE
 from argus.domain.ingestion.reconcile.model import (
     EventNotFound,
+    ImportEvent,
     ReconcileError,
     StaleEvent,
 )
-from argus.domain.recording.errors import IdempotencyConflict
-from argus.domain.recording.money_schemas import MoneyRequest
+from argus.domain.recording.errors import (
+    AccountNotFound,
+    IdempotencyConflict,
+    RecordingInputError,
+    StaleVersion,
+)
+from argus.domain.recording.money_schemas import DESTINATION_ELIGIBILITY, MoneyRequest
 
 DEFAULT_ZONE = "America/Santo_Domingo"
-_PAIRED = {"transfer", "card_payment", "debt_payment"}
 MAX_CLIENT_KEY = 80
 MAX_BATCH_KEY = 40
 MAX_BATCH = 100
+# Refusals the money service raises before it writes anything.
+_NOT_WRITTEN = (RecordingInputError, StaleVersion, AccountNotFound, ValidationError)
+_ITEM_REFUSALS = (
+    *_NOT_WRITTEN,
+    ReconcileError,
+    StaleEvent,
+    EventNotFound,
+    IdempotencyConflict,
+)
 
 
 class Recording:
     """Mixed into ``ReconciliationService``; uses its ``store``, ``money``,
-    ``clock``, ``detail`` and ``_remember_account``."""
+    ``clock``, ``detail``, ``_editable`` and ``_remember_account``."""
 
     def preview(
         self, *, user_id: str, event_id: str, overrides: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         detail = self.detail(user_id=user_id, event_id=event_id)
-        if detail["state"] not in ("open", "accepting"):
+        if detail["state"] != "open":
             raise ReconcileError(
                 "import_not_open", "This import is not waiting for review."
             )
@@ -68,68 +86,36 @@ class Recording:
         now = self.clock()
         with self.store.transaction(user_id) as tx:
             event = tx.event(event_id)
-            claimed = event.state in ("accepting", "accepted")
-            if claimed and event.accept_key != idempotency_key:
-                code = (
-                    "import_already_accepted"
-                    if event.state == "accepted"
-                    else ("import_accept_in_progress")
-                )
-                raise ReconcileError(code, "This import is already being recorded.")
-            if not claimed:
+            if event.state == "open":
                 if event.version != version:
                     raise StaleEvent()
-                if event.state != "open":
-                    raise ReconcileError("import_not_open", "Reopen it to record it.")
                 if event.evidence not in ACTIVITY_EVIDENCE:
                     raise ReconcileError(
                         "import_not_activity",
                         "This is information, not money that moved.",
                     )
-                tx.put_event(
-                    _bump(
-                        replace(event, state="accepting", accept_key=idempotency_key), now
-                    )
+                pending = request.model_dump(mode="json")
+                event = _bump(
+                    replace(
+                        event,
+                        state="accepting",
+                        accept_key=idempotency_key,
+                        resolution={**event.resolution, "pending_request": pending},
+                    ),
+                    now,
                 )
-        try:
-            result = self.money.write(
-                user_id=user_id,
-                request=request,
-                idempotency_key=f"imp:{event_id}:{idempotency_key}",
+                tx.put_event(event)
+            elif event.state not in ("accepting", "accepted"):
+                raise ReconcileError("import_not_open", "Reopen it to record it.")
+        if event.accept_key != idempotency_key:
+            if event.state == "accepting":
+                # Someone else's interrupted acceptance: finish it, do not
+                # record a second time under this key.
+                self._complete(user_id, event)
+            raise ReconcileError(
+                "import_already_accepted", "This import is already recorded."
             )
-        except IdempotencyConflict:
-            # The key already recorded a different request; keep the claim so
-            # the original record stays linked to this event.
-            raise
-        except Exception:
-            with self.store.transaction(user_id) as tx:
-                current = tx.event(event_id)
-                if current.state == "accepting" and current.accept_key == idempotency_key:
-                    tx.put_event(
-                        _bump(replace(current, state="open", accept_key=None), now)
-                    )
-            raise
-        activity_id = result["activity"]["activity_id"]
-        with self.store.transaction(user_id) as tx:
-            current = tx.event(event_id)
-            if current.state == "accepting":
-                recorded = request.model_dump(
-                    mode="json",
-                    exclude={"preview_token", "coverage", "expected_versions"},
-                )
-                current = replace(
-                    current,
-                    state="accepted",
-                    activity_id=activity_id,
-                    attention=None,
-                    attention_detail=None,
-                    possible_duplicates=(),
-                    resolution={**current.resolution, "accepted_request": recorded},
-                )
-                account = request.account_id or request.source_account_id
-                if account:
-                    self._remember_account(tx, current, account, now)
-                tx.put_event(_bump(current, now))
+        result = self._write(user_id, event, request, now)
         return {
             "event": self.detail(user_id=user_id, event_id=event_id),
             "activity": result["activity"],
@@ -148,8 +134,9 @@ class Recording:
         Each item names the event version the person saw, so nothing changed
         since review is recorded. An item is recorded only when it has no open
         question: nothing unresolved, no duplicate warning, and a preview that
-        is ready without balance-coverage answers. Every other item is returned
-        as ``needs_review`` with its reason; nothing about it changes.
+        is ready without balance-coverage answers. Every other item, including
+        one the money service refuses, is returned as ``needs_review`` with
+        its reason; nothing about it changes.
         """
 
         if len(idempotency_key) > MAX_BATCH_KEY:
@@ -162,42 +149,63 @@ class Recording:
                 results.append(
                     self._accept_one(user_id, event_id, version, idempotency_key)
                 )
-            except (ReconcileError, StaleEvent, EventNotFound) as error:
-                code = getattr(error, "code", None) or (
-                    "stale_version"
-                    if isinstance(error, StaleEvent)
-                    else "financial_import_not_found"
-                )
+            except _ITEM_REFUSALS as error:
                 results.append(
-                    {"event_id": event_id, "outcome": "needs_review", "code": code}
+                    {
+                        "event_id": event_id,
+                        "outcome": "needs_review",
+                        "code": _code(error),
+                    }
                 )
         return results
 
+    def link_activity(
+        self, *, user_id: str, event_id: str, activity_id: str, version: int
+    ) -> dict[str, Any]:
+        """The purchase is already recorded (by hand, by voice, earlier import)."""
+
+        activity = self.money.detail(user_id=user_id, activity_id=activity_id)
+        now = self.clock()
+        with self.store.transaction(user_id) as tx:
+            event = self._editable(tx, event_id, version)
+            if tx.events(("accepting",)):
+                # Its new activity is not linked yet; linking now could point
+                # two imports at it.
+                raise ReconcileError(
+                    "import_accept_in_progress", "Another import is being recorded."
+                )
+            if activity["activity_id"] in tx.activity_links():
+                raise ReconcileError(
+                    "activity_already_linked", "Another import already points to it."
+                )
+            event = replace(
+                event,
+                state="accepted",
+                activity_id=activity["activity_id"],
+                resolution={**event.resolution, "accepted": _recorded(activity)},
+            )
+            tx.put_event(_bump(event, now))
+        return self.detail(user_id=user_id, event_id=event_id)
+
+    # --- Internals -----------------------------------------------------
     def _accept_one(
         self, user_id: str, event_id: str, version: int, batch_key: str
     ) -> dict[str, Any]:
         key = f"b:{batch_key}:{event_id}"
         with self.store.transaction(user_id) as tx:
             event = tx.event(event_id)
-            # Named as a possible duplicate by another open import: decide
-            # them together, never by batch.
-            contested = any(
-                event_id in other.possible_duplicates for other in tx.events(("open",))
-            )
-        if event.state == "accepted" and event.accept_key == key:
-            # A retried batch: this item was already recorded by this batch.
-            return {
-                "event_id": event_id,
-                "outcome": "accepted",
-                "activity_id": event.activity_id,
-                "replayed": True,
-            }
-        resuming = event.state == "accepting" and event.accept_key == key
+        if event.state in ("accepted", "accepting") and event.accept_key == key:
+            # A retried batch: this item was already claimed by this batch.
+            result = self._write(user_id, event, None, self.clock())
+            return _outcome(event_id, result["activity"]["activity_id"], True)
         detail = self.detail(user_id=user_id, event_id=event_id)
-        if detail["version"] != version and not resuming:
+        if detail["version"] != version:
             raise StaleEvent()
-        if not resuming and (
-            contested or detail["attention"] or detail["existing_activity_matches"]
+        if (
+            detail["attention"]
+            or detail["possible_duplicates"]
+            or detail["existing_activity_matches"]
+            or detail["recorded_duplicates"]
         ):
             raise ReconcileError(
                 "import_possible_duplicate", "Review this one individually."
@@ -217,39 +225,76 @@ class Recording:
             version=version,
             request=request,
         )
-        return {
-            "event_id": event_id,
-            "outcome": "accepted",
-            "activity_id": result["activity"]["activity_id"],
-            "replayed": result["replayed"],
-        }
+        return _outcome(event_id, result["activity"]["activity_id"], result["replayed"])
 
-    def link_activity(
-        self, *, user_id: str, event_id: str, activity_id: str, version: int
+    def _complete(self, user_id: str, event: ImportEvent) -> None:
+        try:
+            self._write(user_id, event, None, self.clock())
+        except _NOT_WRITTEN:
+            pass  # released back to open by _write
+
+    def _write(
+        self,
+        user_id: str,
+        event: ImportEvent,
+        request: MoneyRequest | None,
+        now: datetime,
     ) -> dict[str, Any]:
-        """The purchase is already recorded (by hand, by voice, earlier import)."""
+        """Write (or replay) under the claiming key, then finalize the event."""
 
-        self.money.detail(user_id=user_id, activity_id=activity_id)  # owner check
-        now = self.clock()
-        with self.store.transaction(user_id) as tx:
-            event = self._editable(tx, event_id, version)
-            if activity_id in tx.linked_activity_ids():
+        if request is None:
+            stored = event.resolution.get("pending_request")
+            if stored is None and event.state == "accepted":
+                stored = event.resolution.get("accepted_request")
+            if stored is None:
                 raise ReconcileError(
-                    "activity_already_linked", "Another import already points to it."
+                    "import_not_open", "Nothing is waiting to be recorded."
                 )
-            tx.put_event(
-                _bump(
-                    replace(
-                        event,
-                        state="accepted",
-                        activity_id=activity_id,
-                        attention=None,
-                        possible_duplicates=(),
-                    ),
-                    now,
-                )
+            request = MoneyRequest.model_validate(stored)
+        try:
+            result = self.money.write(
+                user_id=user_id,
+                request=request,
+                idempotency_key=f"imp:{event.id}:{event.accept_key}",
             )
-        return self.detail(user_id=user_id, event_id=event_id)
+        except _NOT_WRITTEN:
+            self._release(user_id, event, now)
+            raise
+        activity = result["activity"]
+        with self.store.transaction(user_id) as tx:
+            current = tx.event(event.id)
+            if current.state == "accepting":
+                resolution = dict(current.resolution)
+                resolution["accepted_request"] = resolution.pop("pending_request", None)
+                resolution["accepted"] = _recorded(activity)
+                current = replace(
+                    current,
+                    state="accepted",
+                    activity_id=activity["activity_id"],
+                    resolution=resolution,
+                )
+                if current.attention not in ("possible_duplicate", "ambiguous_match"):
+                    current = replace(current, attention=None, attention_detail=None)
+                account = request.account_id or request.source_account_id
+                if account:
+                    self._remember_account(tx, current, account, now)
+                tx.put_event(_bump(current, now))
+        return result
+
+    def _release(self, user_id: str, event: ImportEvent, now: datetime) -> None:
+        with self.store.transaction(user_id) as tx:
+            current = tx.event(event.id)
+            if current.state == "accepting" and current.accept_key == event.accept_key:
+                resolution = dict(current.resolution)
+                resolution.pop("pending_request", None)
+                tx.put_event(
+                    _bump(
+                        replace(
+                            current, state="open", accept_key=None, resolution=resolution
+                        ),
+                        now,
+                    )
+                )
 
     def _draft(self, user_id: str, detail: dict[str, Any]) -> dict[str, Any]:
         facts, resolution = detail["facts"], detail["resolution"]
@@ -280,7 +325,7 @@ class Recording:
             "time_zone": zone,
             "note": resolution.get("note") or _merchant(detail),
         }
-        if kind in _PAIRED:
+        if kind in DESTINATION_ELIGIBILITY:
             draft["source_account_id"] = account_id
             draft["destination_account_id"] = resolution.get("destination_account_id")
         else:
@@ -289,6 +334,49 @@ class Recording:
             if resolution.get(field):
                 draft[field] = resolution[field]
         return draft
+
+
+def _recorded(activity: dict[str, Any]) -> dict[str, Any]:
+    """Facts of the recorded activity, kept so the event can still be matched
+    after its evidence is redacted (a disconnect)."""
+
+    when = activity["occurred_at"]
+    if isinstance(when, str):
+        when = datetime.fromisoformat(when)
+    try:
+        when = when.astimezone(ZoneInfo(activity.get("time_zone") or DEFAULT_ZONE))
+    except (ZoneInfoNotFoundError, ValueError):
+        pass
+    legs = activity.get("legs") or []
+    return {
+        "activity_id": activity["activity_id"],
+        "kind": activity["kind"],
+        "amount": activity["amount"],
+        "currency": activity["currency"],
+        "occurred_on": when.date().isoformat(),
+        "account_id": legs[0]["account_id"] if legs else None,
+    }
+
+
+def _outcome(event_id: str, activity_id: str, replayed: bool) -> dict[str, Any]:
+    return {
+        "event_id": event_id,
+        "outcome": "accepted",
+        "activity_id": activity_id,
+        "replayed": replayed,
+    }
+
+
+def _code(error: Exception) -> str:
+    if isinstance(error, (ReconcileError, RecordingInputError)):
+        return error.code
+    return {
+        StaleEvent: "stale_version",
+        StaleVersion: "stale_version",
+        EventNotFound: "financial_import_not_found",
+        AccountNotFound: "financial_account_not_found",
+        IdempotencyConflict: "idempotency_conflict",
+    }.get(type(error), "validation_error")
 
 
 def _merchant(detail: dict[str, Any]) -> str | None:
@@ -306,5 +394,5 @@ def _start_of_day(day: str, zone: str) -> datetime:
     return datetime.combine(date.fromisoformat(day), time(0, 0), tzinfo=tz)
 
 
-def _bump(event: Any, now: datetime) -> Any:
+def _bump(event: ImportEvent, now: datetime) -> ImportEvent:
     return replace(event, updated_at=now, version=event.version + 1)

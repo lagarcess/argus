@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any, Literal, TypeVar
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from pydantic import ValidationError
 
 from argus.api.dependencies import problem
 from argus.api.financial_accounts import domain_problem
@@ -90,6 +91,14 @@ def _problem(request: Request, error: Exception) -> HTTPException:
             code="stale_version",
             title="Stale Version",
             detail="This import changed since you last read it. Reload and try again.",
+        )
+    if isinstance(error, ValidationError):
+        return problem(
+            request,
+            status_code=422,
+            code="validation_error",
+            title="Validation Error",
+            detail="The proposed activity is not valid.",
         )
     if isinstance(error, ReconcileError):
         return problem(
@@ -183,6 +192,7 @@ def merge_import(
             event_id=event_id,
             into_event_id=body.into_event_id,
             version=body.version,
+            into_version=body.into_version,
         ),
     )
 

@@ -107,8 +107,10 @@ def event_facts(
     observations: list[Observation],
     links: Mapping[tuple[str, str], str],
 ) -> Facts:
-    """Person's resolution first, then the most authoritative observation,
-    then any live observation that knows a field the primary does not."""
+    """What was recorded first (an accepted event's facts outlive its
+    evidence, e.g. after a disconnect), then the person's resolution, then
+    the most authoritative observation, then any live observation that knows
+    a field the primary does not."""
 
     ordered = []
     first = primary(observations)
@@ -117,7 +119,7 @@ def event_facts(
         ordered.extend(
             observation_facts(o, links) for o in observations if o.live and o is not first
         )
-    r = event.resolution
+    r = {**event.resolution, **recorded_facts(event.resolution.get("accepted"))}
 
     def pick(name: str) -> Any:
         if r.get(name) is not None:
@@ -137,6 +139,24 @@ def event_facts(
         mask=pick("mask"),
         kind=pick("kind"),
     )
+
+
+def recorded_facts(recorded: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Facts of the activity an event was accepted as (stored at acceptance)."""
+
+    if not recorded:
+        return {}
+    return {
+        k: v
+        for k, v in {
+            "amount": recorded.get("amount"),
+            "currency": recorded.get("currency"),
+            "occurred_on": recorded.get("occurred_on"),
+            "account_id": recorded.get("account_id"),
+            "kind": recorded.get("kind"),
+        }.items()
+        if v is not None
+    }
 
 
 def compare(new: Facts, existing: Facts) -> Strength | None:

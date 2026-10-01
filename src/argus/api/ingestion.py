@@ -80,7 +80,12 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         else:
             connections = InMemoryConnectionRepository()
         configure_ingestion_hub(
-            IngestionHub(connections, box=box, sink=_reconciliation(pool), clock=_clock)
+            IngestionHub(
+                connections,
+                box=box,
+                sink=_reconciliation(pool, connections),
+                clock=_clock,
+            )
         )
         from argus.api.plaid import start_plaid
 
@@ -99,7 +104,7 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         configure_ingestion_hub(None)
 
 
-def _reconciliation(pool):  # noqa: ANN001, ANN202
+def _reconciliation(pool, connections):  # noqa: ANN001, ANN202
     """The one candidate sink: every connector's evidence reaches review here."""
 
     from argus.domain.ingestion.reconcile.service import ReconciliationService
@@ -115,7 +120,9 @@ def _reconciliation(pool):  # noqa: ANN001, ANN202
         store = PostgresImportStore(pool)
     else:
         store = InMemoryImportStore()
-    return ReconciliationService(store, MoneyService(accounts), _clock)
+    return ReconciliationService(
+        store, MoneyService(accounts), _clock, connections=connections
+    )
 
 
 def stop_ingestion(app) -> None:  # noqa: ANN001

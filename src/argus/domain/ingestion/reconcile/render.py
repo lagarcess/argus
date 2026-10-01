@@ -15,7 +15,10 @@ from argus.domain.ingestion.reconcile.matching import (
     primary,
 )
 from argus.domain.ingestion.reconcile.model import ImportEvent, Observation
+from argus.domain.recording.money_schemas import DESTINATION_ELIGIBILITY
 
+# Stored on the event for recovery and matching, not person-supplied values.
+_INTERNAL = frozenset({"accepted", "accepted_request", "pending_request"})
 _UNCERTAIN_TO_FACT = {
     "amount": "amount",
     "currency": "currency",
@@ -50,6 +53,11 @@ def unresolved(
     }
     if event.evidence == "unclassified" and not event.resolution.get("kind"):
         missing.add("kind")
+    kind = event.resolution.get("kind") or proposed_kind(facts)
+    if kind in DESTINATION_ELIGIBILITY and not event.resolution.get(
+        "destination_account_id"
+    ):
+        missing.add("destination_account_id")
     first = primary(observations)
     if first is not None:
         for field in first.candidate.get("uncertain") or ():
@@ -100,6 +108,7 @@ def event_view(
     facts: Facts,
     *,
     existing_activity_matches: list[str],
+    recorded_duplicates: list[str],
     account_shared: bool | None,
 ) -> dict[str, Any]:
     return {
@@ -111,6 +120,7 @@ def event_view(
         "attention_detail": event.attention_detail,
         "possible_duplicates": list(event.possible_duplicates),
         "existing_activity_matches": existing_activity_matches,
+        "recorded_duplicates": recorded_duplicates,
         "activity_id": event.activity_id,
         "facts": {
             "amount": str(facts.amount) if facts.amount is not None else None,
@@ -120,9 +130,7 @@ def event_view(
             "account_id": facts.account_id,
             "kind": proposed_kind(facts),
         },
-        "resolution": {
-            k: v for k, v in event.resolution.items() if k != "accepted_request"
-        },
+        "resolution": {k: v for k, v in event.resolution.items() if k not in _INTERNAL},
         "unresolved": unresolved(event, observations, facts),
         "account_shared_with_household": account_shared,
         "observations": [observation_view(o) for o in observations],

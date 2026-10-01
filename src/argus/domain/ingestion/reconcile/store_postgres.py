@@ -109,13 +109,14 @@ class _PostgresTx:
             )
         ]
 
-    def linked_activity_ids(self) -> set[str]:
+    def activity_links(self) -> dict[str, str]:
         rows = self._rows(
-            """select activity_id::text as activity_id from public.financial_import_events
+            """select activity_id::text as activity_id, id::text as event_id
+            from public.financial_import_events
             where user_id = %s and activity_id is not null""",
             (self._user,),
         )
-        return {r["activity_id"] for r in rows}
+        return {r["activity_id"]: r["event_id"] for r in rows}
 
     def links(self) -> dict[tuple[str, str], str]:
         rows = self._rows(

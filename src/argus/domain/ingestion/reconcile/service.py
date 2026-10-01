@@ -6,13 +6,20 @@ Recording reviewed imports (the only canonical write) lives in ``recording``.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, get_args
+from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from argus.domain.ingestion.connections import (
+    LIVE,
+    ConnectionNotFound,
+    ConnectionRepository,
+)
 from argus.domain.ingestion.contract import ImportCandidate
-from argus.domain.ingestion.reconcile import intake
+from argus.domain.ingestion.reconcile import duplicates, intake
 from argus.domain.ingestion.reconcile.matching import (
     ACTIVITY_EVIDENCE,
     account_key,
@@ -33,28 +40,46 @@ from argus.domain.ingestion.reconcile.recording import Recording
 from argus.domain.ingestion.reconcile.render import event_view, proposed_kind, unresolved
 from argus.domain.ingestion.reconcile.store import ImportStore, ImportTx
 from argus.domain.ingestion.sink import SubmitResult
+from argus.domain.recording.loop_schemas import CATEGORY_IDS
 from argus.domain.recording.money_reads import current_activities
+from argus.domain.recording.money_schemas import SOURCE_IDS, ActivityKind
 from argus.domain.recording.money_service import MoneyService
 
 
 class ReconciliationService(Recording):
     def __init__(
-        self, store: ImportStore, money: MoneyService, clock: Callable[[], datetime]
+        self,
+        store: ImportStore,
+        money: MoneyService,
+        clock: Callable[[], datetime],
+        *,
+        connections: ConnectionRepository | None = None,
     ) -> None:
         self.store = store
         self.money = money
         self.clock = clock
+        self.connections = connections
 
     # --- CandidateSink -------------------------------------------------
     def submit(
         self, *, user_id: str, connection_id: str, candidates: Sequence[ImportCandidate]
     ) -> SubmitResult:
+        def is_live() -> bool:
+            if self.connections is None:
+                return True
+            try:
+                row = self.connections.get(user_id=user_id, connection_id=connection_id)
+            except ConnectionNotFound:
+                return False
+            return row.status in LIVE
+
         return intake.submit(
             self.store,
             self.clock(),
             user_id=user_id,
             connection_id=connection_id,
             candidates=candidates,
+            is_live=is_live,
         )
 
     def forget_connection(self, *, user_id: str, connection_id: str) -> int:
@@ -64,14 +89,20 @@ class ReconciliationService(Recording):
 
     # --- Review --------------------------------------------------------
     def list(self, *, user_id: str, states: tuple[str, ...]) -> list[dict[str, Any]]:
-        accounts = self.money.accounts.list_accounts(user_id=user_id)
+        activities = current_activities(
+            self.money.accounts.list_accounts(user_id=user_id)
+        )
         with self.store.transaction(user_id) as tx:
-            return [self._view(tx, e, accounts) for e in tx.events(states)]
+            context = _ViewContext(tx.links(), tx.activity_links(), activities)
+            return [self._view(tx, e, context) for e in tx.events(states)]
 
     def detail(self, *, user_id: str, event_id: str) -> dict[str, Any]:
-        accounts = self.money.accounts.list_accounts(user_id=user_id)
+        activities = current_activities(
+            self.money.accounts.list_accounts(user_id=user_id)
+        )
         with self.store.transaction(user_id) as tx:
-            return self._view(tx, tx.event(event_id), accounts)
+            context = _ViewContext(tx.links(), tx.activity_links(), activities)
+            return self._view(tx, tx.event(event_id), context)
 
     def resolve(
         self, *, user_id: str, event_id: str, version: int, changes: dict[str, Any]
@@ -94,12 +125,21 @@ class ReconciliationService(Recording):
             event = replace(event, resolution=resolution)
             if cleaned.get("account_id"):
                 self._remember_account(tx, event, cleaned["account_id"], now)
-            event = self._recheck_duplicates(tx, event)
-            tx.put_event(_bump(event, now))
+            event = intake.reanchor(tx, event)
+            previous = event.possible_duplicates
+            event = _bump(self._recheck_duplicates(tx, event), now)
+            tx.put_event(event)
+            duplicates.mirror(tx, event, previous, now)
         return self.detail(user_id=user_id, event_id=event_id)
 
     def merge(
-        self, *, user_id: str, event_id: str, into_event_id: str, version: int
+        self,
+        *,
+        user_id: str,
+        event_id: str,
+        into_event_id: str,
+        version: int,
+        into_version: int,
     ) -> dict[str, Any]:
         """The person says two events are the same purchase."""
 
@@ -111,6 +151,12 @@ class ReconciliationService(Recording):
             if source.version != version:
                 raise StaleEvent()
             target = tx.event(into_event_id)
+            if target.version != into_version:
+                raise StaleEvent()
+            if "dismissed" in (source.state, target.state):
+                raise ReconcileError(
+                    "import_dismissed", "Reopen the dismissed import first."
+                )
             if "accepting" in (source.state, target.state):
                 raise ReconcileError("import_accept_in_progress", "Try again shortly.")
             if source.state == target.state == "accepted":
@@ -131,22 +177,24 @@ class ReconciliationService(Recording):
                 )
             for observation in moving:
                 tx.put_observation(replace(observation, event_id=survivor.id))
+            # The absorbed event's open questions become the survivor's.
+            others = (
+                set(survivor.possible_duplicates) | set(absorbed.possible_duplicates)
+            ) - {
+                survivor.id,
+                absorbed.id,
+            }
+            duplicates.forget(tx, absorbed, now)
             tx.delete_event(absorbed.id)
-            anchors = [d for d in (survivor.anchor_on, absorbed.anchor_on) if d]
+            survivor = tx.event(survivor.id)
+            previous = survivor.possible_duplicates
             survivor = replace(
                 survivor,
-                anchor_on=min(anchors) if anchors else None,
                 resolution={**absorbed.resolution, **survivor.resolution},
-                possible_duplicates=tuple(
-                    d
-                    for d in survivor.possible_duplicates
-                    if d not in (absorbed.id, survivor.id)
-                ),
             )
-            if survivor.attention in ("possible_duplicate", "ambiguous_match"):
-                if not survivor.possible_duplicates:
-                    survivor = replace(survivor, attention=None)
-            tx.put_event(_bump(survivor, now))
+            survivor = _bump(intake.reanchor(tx, duplicates.flag(survivor, others)), now)
+            tx.put_event(survivor)
+            duplicates.mirror(tx, survivor, previous, now)
             survivor_id = survivor.id
         return self.detail(user_id=user_id, event_id=survivor_id)
 
@@ -173,36 +221,51 @@ class ReconciliationService(Recording):
         return self.detail(user_id=user_id, event_id=event_id)
 
     def acknowledge(self, *, user_id: str, event_id: str, version: int) -> dict[str, Any]:
-        """Clear a source-changed warning after the person checked the record."""
+        """The person checked it: clear a source warning, or say a possible
+        duplicate is a different purchase (cleared on both events)."""
 
         now = self.clock()
         with self.store.transaction(user_id) as tx:
             event = tx.event(event_id)
             if event.version != version:
                 raise StaleEvent()
+            duplicates.forget(tx, event, now)
+            event = tx.event(event_id)
             tx.put_event(
-                _bump(replace(event, attention=None, attention_detail=None), now)
+                _bump(
+                    replace(
+                        event,
+                        attention=None,
+                        attention_detail=None,
+                        possible_duplicates=(),
+                    ),
+                    now,
+                )
             )
         return self.detail(user_id=user_id, event_id=event_id)
 
     # --- Internals -----------------------------------------------------
-    def _view(self, tx: ImportTx, event: ImportEvent, accounts: list) -> dict[str, Any]:
+    def _view(
+        self, tx: ImportTx, event: ImportEvent, context: _ViewContext
+    ) -> dict[str, Any]:
         observations = tx.observations(event.id)
-        facts = event_facts(event, observations, tx.links())
-        matches: list[str] = []
+        facts = event_facts(event, observations, context.links)
+        unlinked: list[str] = []
+        recorded: list[str] = []
         if event.state == "open" and event.evidence in ACTIVITY_EVIDENCE:
-            linked = tx.linked_activity_ids()
-            matches = [
-                a
-                for a in activity_matches(facts, current_activities(accounts))
-                if a not in linked
-            ]
+            for activity_id in activity_matches(facts, context.activities):
+                owner = context.activity_links.get(activity_id)
+                if owner is None:
+                    unlinked.append(activity_id)
+                elif owner != event.id:
+                    recorded.append(owner)
         shared = tx.account_shared(facts.account_id) if facts.account_id else None
         return event_view(
             event,
             observations,
             facts,
-            existing_activity_matches=matches,
+            existing_activity_matches=unlinked,
+            recorded_duplicates=recorded,
             account_shared=shared,
         )
 
@@ -252,15 +315,7 @@ class ReconciliationService(Recording):
                 continue
             if compare(facts, other_facts) is not None:
                 found.append(other.id)
-        if found:
-            return replace(
-                event,
-                possible_duplicates=tuple(sorted(found)),
-                attention="possible_duplicate",
-            )
-        if event.attention in ("possible_duplicate", "ambiguous_match"):
-            return replace(event, possible_duplicates=(), attention=None)
-        return event
+        return duplicates.flag(event, found)
 
 
 def _clean_resolution(changes: dict[str, Any]) -> dict[str, Any]:
@@ -289,7 +344,38 @@ def _clean_resolution(changes: dict[str, Any]) -> dict[str, Any]:
         raise ReconcileError("direction_invalid", "Use outflow or inflow.")
     if cleaned.get("note") is not None:
         cleaned["note"] = str(cleaned["note"])[:200]
+    if cleaned.get("kind") is not None and cleaned["kind"] not in get_args(ActivityKind):
+        raise ReconcileError("kind_invalid", "Choose an available activity type.")
+    if (
+        cleaned.get("category_id") is not None
+        and cleaned["category_id"] not in CATEGORY_IDS
+    ):
+        raise ReconcileError("category_unknown", "Choose an available category.")
+    if cleaned.get("source_id") is not None and cleaned["source_id"] not in SOURCE_IDS:
+        raise ReconcileError("source_unknown", "Choose an available income source.")
+    if cleaned.get("time_zone") is not None:
+        try:
+            ZoneInfo(str(cleaned["time_zone"]))
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ReconcileError(
+                "time_zone_unknown", "Choose a valid time zone."
+            ) from None
+    for field in ("account_id", "destination_account_id", "purchase_activity_id"):
+        if cleaned.get(field) is not None:
+            try:
+                cleaned[field] = str(UUID(str(cleaned[field])))
+            except ValueError:
+                raise ReconcileError(f"{field}_invalid", "Use a valid id.") from None
     return cleaned
+
+
+@dataclass(frozen=True)
+class _ViewContext:
+    """Loaded once per list/detail call, not once per event."""
+
+    links: dict[tuple[str, str], str]
+    activity_links: dict[str, str]
+    activities: list[dict[str, Any]]
 
 
 def _bump(event: ImportEvent, now: datetime) -> ImportEvent:

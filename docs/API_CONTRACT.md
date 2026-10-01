@@ -7694,24 +7694,30 @@ and `accept-batch`, which record through the existing money service
 questions as `/financial-activities`).
 
 Event shape: `{id,state,evidence,version,attention,attention_detail,
-possible_duplicates,existing_activity_matches,activity_id,facts,resolution,
-unresolved,account_shared_with_household,observations,created_at,updated_at}`.
+possible_duplicates,existing_activity_matches,recorded_duplicates,activity_id,
+facts,resolution,unresolved,account_shared_with_household,observations,
+created_at,updated_at}`.
 
 - `state`: `open|accepting|accepted|dismissed`. Open drafts affect no balance,
   budget, goal, Home or search.
-- `facts`: `{amount,currency,direction,occurred_on,account_id,kind}`, the
-  person's resolution first, then the most authoritative live observation
+- `facts`: `{amount,currency,direction,occurred_on,account_id,kind}`; for an
+  accepted event the recorded activity's facts first (they outlive redacted
+  evidence), then the person's resolution, then the most authoritative live observation
   (posted before pending; statement, Plaid, Gmail, Shortcuts). `kind` may be a
   proposal from the source's hint or direction; the person confirms it in
   preview. Amounts are positive decimal strings; currency is never guessed.
 - `unresolved`: fields that must be supplied before preview
-  (`amount|currency|occurred_on|account_id|kind` and anything the source
-  marked uncertain).
+  (`amount|currency|occurred_on|account_id|kind`, `destination_account_id`
+  for two-account kinds, and anything the source marked uncertain).
 - `attention`: `source_changed` (a source revised an accepted event; detail
   carries `before`/`after`), `source_removed`, `possible_duplicate`,
   `ambiguous_match` (several events matched equally; none was linked).
+  `possible_duplicates` is symmetric: both events carry the warning until the
+  person merges them or acknowledges that they differ.
 - `existing_activity_matches`: recorded activity on the same account with the
-  same amount and currency within five days that no import points to yet.
+  same amount and currency within five days that no import points to yet
+  (linkable). `recorded_duplicates`: other import events whose recorded
+  activity matches the same way (merge into them instead of recording again).
 - `account_shared_with_household`: whether the resolved account is explicitly
   shared, shown before confirming; importing never creates a grant.
 - `observations[]`: each source's own view (`source,connection_id,external_id,
@@ -7732,32 +7738,43 @@ Routes under `/api/v1/financial-imports`:
   clears one. Setting `account_id` remembers the mapping for that source's
   account hint, so later imports from it resolve automatically. Re-checks
   possible duplicates.
-- POST `/{id}/merge` `{version,into_event_id}`: the person says two events are
-  the same purchase. Refused when one source reported both
-  (`import_merge_same_source`) or both are already recorded
-  (`import_merge_two_records`). An accepted event survives.
+- POST `/{id}/merge` `{version,into_event_id,into_version}`: the person says
+  two events are the same purchase; both versions are checked. Refused when
+  one source reported both (`import_merge_same_source`), both are already
+  recorded (`import_merge_two_records`) or either is dismissed
+  (`import_dismissed`). An accepted event survives and takes over the other's
+  open duplicate questions.
 - POST `/{id}/dismiss|reopen|acknowledge` `{version}`. `acknowledge` clears a
-  source-changed or source-removed warning after the person checked the record.
+  source warning after the person checked the record, or records that a
+  possible duplicate is a different purchase (cleared on both events).
 - POST `/{id}/link-activity` `{version,activity_id}`: the purchase is already
   recorded (manual, voice, earlier import). One import per activity
-  (`activity_already_linked`).
+  (`activity_already_linked`); refused with `import_accept_in_progress` while
+  another import is being recorded.
 - POST `/{id}/preview` `{overrides?}` returns `{event,preview}` where `preview`
   is the money service preview (`reviewed_request`, `preview_token`, affected
   accounts and coverage questions). Refused for `import_unresolved`,
   `import_currency_mismatch` (no conversion), `import_not_activity` (balances,
   due-date and statement notices are evidence, not money that moved).
 - POST `/{id}/accept` `{version,request}` with `Idempotency-Key` (at most 80
-  characters) records the reviewed request. The event is claimed first: a
-  retry with the same key replays the same activity; another key answers 409
-  `import_already_accepted` or `import_accept_in_progress`.
+  characters) records the reviewed request. The event is claimed first and the
+  claim stores the reviewed request: a retry with the same key replays the
+  same activity; another key first completes an interrupted claim by
+  replaying its stored request under its own key, then answers 409
+  `import_already_accepted`. Only refusals the money service raises before
+  writing release the claim.
 - POST `/accept-batch` `{items:[{event_id,version}]}` (at most 100) with
   `Idempotency-Key` (at most 40 characters) records each item that has no open
   question and returns `{items:[{event_id,outcome,activity_id?,replayed?,code?}]}`.
   `needs_review` codes: `stale_version`, `import_unresolved`,
-  `import_possible_duplicate` (flagged, or named by another open import),
-  `balance_coverage_required`, and the preview refusals above. Retrying the
-  same batch key replays recorded items.
+  `import_possible_duplicate` (any duplicate warning or matching record),
+  `balance_coverage_required`, the preview refusals above, and any money
+  service refusal (its own code) for that item alone. Retrying the same batch
+  key replays recorded items.
 
 Problems: 404 `financial_import_not_found`; 409 `stale_version` and the
-conflicts above; 422 validation codes; recording errors use the existing
-financial-accounts problems.
+conflicts above; 422 validation codes (`validation_error`, `kind_invalid`,
+`category_unknown`, `source_unknown`, `time_zone_unknown`, `*_id_invalid`);
+recording errors use the existing financial-accounts problems. Evidence a
+connector submits after its connection ended is ignored (counted unchanged),
+so an in-flight sync cannot recreate drafts a disconnect removed.

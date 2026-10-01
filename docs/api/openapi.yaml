@@ -11535,6 +11535,10 @@ components:
           items:
             type: string
           type: array
+        recorded_duplicates:
+          items:
+            type: string
+          type: array
         activity_id:
           anyOf:
           - type: string
@@ -11572,6 +11576,7 @@ components:
       - attention_detail
       - possible_duplicates
       - existing_activity_matches
+      - recorded_duplicates
       - activity_id
       - facts
       - resolution
@@ -12472,11 +12477,15 @@ components:
           minimum: 1.0
         into_event_id:
           type: string
+        into_version:
+          type: integer
+          minimum: 1.0
       additionalProperties: false
       type: object
       required:
       - version
       - into_event_id
+      - into_version
     Message:
       properties:
         id:

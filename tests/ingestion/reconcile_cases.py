@@ -59,7 +59,16 @@ def tap(conn, eid="tap-1", amount="12.50", **extra):
     )
 
 
-def plaid(conn, eid, amount="12.50", status="pending", currency="USD", **extra):
+def plaid(
+    conn,
+    eid,
+    amount="12.50",
+    status="pending",
+    currency="USD",
+    kind_hint="expense",
+    direction="outflow",
+    **extra,
+):
     return cand(
         conn,
         eid,
@@ -67,11 +76,11 @@ def plaid(conn, eid, amount="12.50", status="pending", currency="USD", **extra):
         status=status,
         amount=amount,
         currency=currency,
-        direction="outflow",
+        direction=direction,
         occurred_on=DAY,
         account={"external_account_id": "acc-1", "mask": "4321"},
         merchant="CAFE UNO",
-        kind_hint="expense",
+        kind_hint=kind_hint,
         **extra,
     )
 
@@ -194,6 +203,9 @@ def test_same_purchase_from_four_sources_is_one_event_and_one_record(world):
         event_id=email["id"],
         into_event_id=event["id"],
         version=email["version"],
+        into_version=world.recon.detail(user_id=world.user, event_id=event["id"])[
+            "version"
+        ],
     )
     assert merged["id"] == event["id"]
     assert sorted(o["source"] for o in merged["observations"]) == [
@@ -275,6 +287,7 @@ def test_equal_amount_and_date_never_merge_distinct_purchases(world):
             event_id=a["id"],
             into_event_id=b["id"],
             version=a["version"],
+            into_version=b["version"],
         )
     assert caught.value.code == "import_merge_same_source"
 
@@ -611,3 +624,333 @@ def test_reviewed_batch_records_clear_items_and_returns_exceptions(world):
     assert replayed["replayed"] is True
     assert replayed["activity_id"] == outcome[by_amount["40"]["id"]]["activity_id"]
     assert len(activities(world)) == 1
+
+
+# --- Review regressions (#772 review) ------------------------------------
+
+
+def _open(world, source=None, external_id=None):
+    events = world.recon.list(user_id=world.user, states=("open",))
+    return [
+        e
+        for e in events
+        if (source is None or e["observations"][0]["source"] == source)
+        and (external_id is None or e["observations"][0]["external_id"] == external_id)
+    ]
+
+
+def test_reconnected_source_cannot_record_an_accepted_purchase_again(world):
+    card = new_account(world)
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "txn-1", status="posted"))
+    event = only(world)
+    event = world.recon.resolve(
+        user_id=world.user,
+        event_id=event["id"],
+        version=event["version"],
+        changes={"account_id": card},
+    )
+    accepted = accept(world, event)["activity"]["activity_id"]
+    world.disconnect(bank)
+    world.recon.forget_connection(user_id=world.user, connection_id=bank)
+    again = world.connect("plaid")
+    submit(world, again, plaid(again, "txn-1", status="posted"))
+    [draft] = _open(world)
+    assert draft["possible_duplicates"] == [event["id"]]
+    flagged = world.recon.detail(user_id=world.user, event_id=event["id"])
+    assert flagged["possible_duplicates"] == [draft["id"]]
+    result = world.recon.accept_batch(
+        user_id=world.user, items=[(draft["id"], draft["version"])], idempotency_key="b1"
+    )
+    assert result[0]["outcome"] == "needs_review"
+    assert [a["activity_id"] for a in activities(world)] == [accepted]
+    merged = world.recon.merge(
+        user_id=world.user,
+        event_id=draft["id"],
+        into_event_id=event["id"],
+        version=draft["version"],
+        into_version=world.recon.detail(user_id=world.user, event_id=event["id"])[
+            "version"
+        ],
+    )
+    assert merged["id"] == event["id"] and merged["state"] == "accepted"
+
+
+def test_possible_duplicates_are_flagged_on_both_events(world):
+    card = new_account(world)
+    gmail, bank = world.connect("gmail"), world.connect("plaid")
+    link_accounts(world, card, (bank, plaid(bank, "seed", amount="1")))
+    submit(
+        world,
+        gmail,
+        cand(
+            gmail,
+            "m1",
+            source="gmail",
+            amount="12.50",
+            currency="USD",
+            occurred_on=DAY,
+            account={"mask": "4321"},
+        ),
+    )
+    [first] = _open(world, "gmail")
+    submit(world, bank, plaid(bank, "t1", status="posted"))
+    [second] = _open(world, "plaid", "t1")
+    first = world.recon.detail(user_id=world.user, event_id=first["id"])
+    assert second["possible_duplicates"] == [first["id"]]
+    assert first["possible_duplicates"] == [second["id"]]
+    assert first["attention"] == second["attention"] == "possible_duplicate"
+    accept(world, second, key="k-b")
+    first = world.recon.detail(user_id=world.user, event_id=first["id"])
+    result = world.recon.accept_batch(
+        user_id=world.user, items=[(first["id"], first["version"])], idempotency_key="b2"
+    )
+    assert result[0]["outcome"] == "needs_review"
+    # The person says they are different purchases: both sides clear.
+    cleared = world.recon.acknowledge(
+        user_id=world.user, event_id=first["id"], version=first["version"]
+    )
+    assert cleared["possible_duplicates"] == [] and cleared["attention"] is None
+    second = world.recon.detail(user_id=world.user, event_id=second["id"])
+    assert second["possible_duplicates"] == []
+
+
+def test_match_window_follows_the_date_a_person_supplies(world):
+    card = new_account(world)
+    gmail, bank = world.connect("gmail"), world.connect("plaid")
+    link_accounts(world, card, (bank, plaid(bank, "seed", amount="1")))
+    submit(
+        world,
+        gmail,
+        cand(
+            gmail,
+            "m1",
+            source="gmail",
+            amount="12.50",
+            currency="USD",
+            direction="outflow",
+            account={"mask": "4321"},
+        ),
+    )
+    [email] = _open(world, "gmail")
+    world.recon.resolve(
+        user_id=world.user,
+        event_id=email["id"],
+        version=email["version"],
+        changes={"occurred_on": DAY.isoformat(), "account_id": card},
+    )
+    submit(world, bank, plaid(bank, "t1", status="posted"))
+    [posted] = [
+        e
+        for e in world.recon.list(user_id=world.user, states=("open",))
+        if e["observations"][0]["external_id"] in ("t1", "m1")
+        and len(e["observations"]) == 2
+    ] or [None]
+    if posted is None:  # not auto-linked: it must at least be flagged both ways
+        [bank_event] = _open(world, "plaid", "t1")
+        assert bank_event["possible_duplicates"] == [email["id"]]
+
+
+def test_removed_then_replaced_evidence_comes_back(world):
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "pend"))
+    submit(world, bank, cand(bank, "pend", source="plaid", status="removed"))
+    assert _open(world) == []
+    submit(world, bank, plaid(bank, "post", status="posted", replaces="pend"))
+    [back] = _open(world)
+    states = {o["external_id"]: o["live"] for o in back["observations"]}
+    assert states == {"pend": False, "post": True}
+
+
+def test_source_removed_warning_clears_when_evidence_returns(world):
+    card = new_account(world)
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "pend"))
+    event = only(world)
+    event = world.recon.resolve(
+        user_id=world.user,
+        event_id=event["id"],
+        version=event["version"],
+        changes={"account_id": card},
+    )
+    accept(world, event)
+    submit(world, bank, cand(bank, "pend", source="plaid", status="removed"))
+    assert only(world, "accepted")["attention"] == "source_removed"
+    submit(world, bank, plaid(bank, "post", status="posted", replaces="pend"))
+    assert only(world, "accepted")["attention"] is None
+
+
+def test_batch_returns_money_refusals_per_item(world):
+    card = new_account(world)
+    bank = world.connect("plaid")
+    link_accounts(world, card, (bank, plaid(bank, "seed", amount="1")))
+    submit(
+        world,
+        bank,
+        plaid(bank, "pay", kind_hint="card_payment", direction="inflow"),
+        plaid(bank, "ok", amount="40"),
+    )
+    payment = next(e for e in _open(world) if e["facts"]["kind"] == "card_payment")
+    assert "destination_account_id" in payment["unresolved"]
+    items = [(e["id"], e["version"]) for e in _open(world)]
+    results = world.recon.accept_batch(
+        user_id=world.user, items=items, idempotency_key="b1"
+    )
+    assert sorted(r["outcome"] for r in results) == ["accepted", "needs_review"]
+
+
+def test_invalid_resolution_is_refused_before_it_is_stored(world):
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "t1"))
+    event = only(world)
+    for changes, code in (
+        ({"kind": "bogus"}, "kind_invalid"),
+        ({"category_id": "nope"}, "category_unknown"),
+        ({"time_zone": "Mars/Base"}, "time_zone_unknown"),
+    ):
+        with pytest.raises(ReconcileError) as caught:
+            world.recon.resolve(
+                user_id=world.user,
+                event_id=event["id"],
+                version=event["version"],
+                changes=changes,
+            )
+        assert caught.value.code == code
+
+
+def test_evidence_arriving_after_disconnect_is_ignored(world):
+    shortcuts = world.connect("shortcuts")
+    submit(world, shortcuts, tap(shortcuts))
+    world.disconnect(shortcuts)
+    world.recon.forget_connection(user_id=world.user, connection_id=shortcuts)
+    late = submit(world, shortcuts, tap(shortcuts, "tap-late"))
+    assert late.recorded == 0
+    assert _open(world) == []
+
+
+def test_merge_refuses_dismissed_events_and_checks_both_versions(world):
+    shortcuts, bank = world.connect("shortcuts"), world.connect("plaid")
+    submit(world, shortcuts, tap(shortcuts))
+    submit(world, bank, plaid(bank, "t1"))
+    tap_event, bank_event = _open(world, "shortcuts")[0], _open(world, "plaid")[0]
+    with pytest.raises(StaleEvent):
+        world.recon.merge(
+            user_id=world.user,
+            event_id=tap_event["id"],
+            into_event_id=bank_event["id"],
+            version=tap_event["version"],
+            into_version=bank_event["version"] + 3,
+        )
+    dismissed = world.recon.dismiss(
+        user_id=world.user,
+        event_id=bank_event["id"],
+        version=world.recon.detail(user_id=world.user, event_id=bank_event["id"])[
+            "version"
+        ],
+    )
+    tap_event = world.recon.detail(user_id=world.user, event_id=tap_event["id"])
+    with pytest.raises(ReconcileError) as caught:
+        world.recon.merge(
+            user_id=world.user,
+            event_id=tap_event["id"],
+            into_event_id=bank_event["id"],
+            version=tap_event["version"],
+            into_version=dismissed["version"],
+        )
+    assert caught.value.code == "import_dismissed"
+
+
+def test_interrupted_acceptance_resumes_without_a_second_record(world, monkeypatch):
+    card = new_account(world)
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "t1"))
+    event = only(world)
+    event = world.recon.resolve(
+        user_id=world.user,
+        event_id=event["id"],
+        version=event["version"],
+        changes={"account_id": card},
+    )
+    preview = world.recon.preview(user_id=world.user, event_id=event["id"])["preview"]
+    request = MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
+        update={"preview_token": preview["preview_token"]}
+    )
+    real_write = world.recon.money.write
+
+    def committed_then_lost(**kwargs):
+        real_write(**kwargs)
+        raise ConnectionError("response lost after commit")
+
+    monkeypatch.setattr(world.recon.money, "write", committed_then_lost)
+    with pytest.raises(ConnectionError):
+        world.recon.accept(
+            user_id=world.user,
+            event_id=event["id"],
+            idempotency_key="k1",
+            version=event["version"],
+            request=request,
+        )
+    monkeypatch.setattr(world.recon.money, "write", real_write)
+    assert (
+        world.recon.detail(user_id=world.user, event_id=event["id"])["state"]
+        == "accepting"
+    )
+    # A different key cannot record again; it completes the original instead.
+    with pytest.raises(ReconcileError) as caught:
+        world.recon.accept(
+            user_id=world.user,
+            event_id=event["id"],
+            idempotency_key="k2",
+            version=event["version"],
+            request=request,
+        )
+    assert caught.value.code == "import_already_accepted"
+    assert only(world, "accepted")["activity_id"]
+    assert len(activities(world)) == 1
+
+
+def test_linking_waits_while_an_import_is_being_recorded(world):
+    card = new_account(world)
+    money = MoneyService(world.accounts)
+    request = MoneyRequest(
+        kind="expense",
+        account_id=card,
+        amount="40",
+        occurred_at=datetime(2026, 9, 18, 15, tzinfo=timezone.utc),
+    )
+    preview = money.preview(user_id=world.user, request=request)
+    manual = money.write(
+        user_id=world.user,
+        request=MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
+            update={"preview_token": preview["preview_token"]}
+        ),
+        idempotency_key="manual-40",
+    )["activity"]["activity_id"]
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "t1"), plaid(bank, "t2", amount="40"))
+    first, second = sorted(_open(world), key=lambda e: e["facts"]["amount"])
+    from dataclasses import replace
+
+    with world.recon.store.transaction(world.user) as tx:
+        tx.put_event(replace(tx.event(first["id"]), state="accepting", accept_key="k"))
+    with pytest.raises(ReconcileError) as caught:
+        world.recon.link_activity(
+            user_id=world.user,
+            event_id=second["id"],
+            activity_id=manual,
+            version=second["version"],
+        )
+    assert caught.value.code == "import_accept_in_progress"
+
+
+def test_deleted_events_leave_no_dangling_duplicate_references(world):
+    shortcuts, bank = world.connect("shortcuts"), world.connect("plaid")
+    submit(world, shortcuts, tap(shortcuts))
+    submit(world, bank, plaid(bank, "t1"))
+    tap_event = _open(world, "shortcuts")[0]
+    bank_event = _open(world, "plaid")[0]
+    assert bank_event["possible_duplicates"] == [tap_event["id"]]
+    world.disconnect(shortcuts)
+    world.recon.forget_connection(user_id=world.user, connection_id=shortcuts)
+    bank_event = world.recon.detail(user_id=world.user, event_id=bank_event["id"])
+    assert bank_event["possible_duplicates"] == [] and bank_event["attention"] is None

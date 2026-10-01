@@ -196,3 +196,36 @@ def test_flag_off_hides_the_queue(surface_env, gateway):  # noqa: ANN001
             test_client.get(IMPORTS),
         ):
             assert response.status_code == 404
+
+
+def test_invalid_review_input_is_a_client_problem(client, plaid):  # noqa: ANN001, F811
+    account = checking_account(client)
+    client.post(
+        "/api/v1/financial-connections/plaid/exchange",
+        json={"public_token": PUBLIC_TOKEN},
+        headers=bearer(ALICE),
+    )
+    [event] = client.get(IMPORTS, headers=bearer(ALICE)).json()["items"]
+    event = client.patch(
+        f"{IMPORTS}/{event['id']}",
+        json={"version": event["version"], "changes": {"account_id": account}},
+        headers=bearer(ALICE),
+    ).json()
+    bogus = client.post(
+        f"{IMPORTS}/{event['id']}/preview",
+        json={"overrides": {"kind": "bogus"}},
+        headers=bearer(ALICE),
+    )
+    assert bogus.status_code == 422 and bogus.json()["code"] == "validation_error"
+    stored = client.patch(
+        f"{IMPORTS}/{event['id']}",
+        json={"version": event["version"], "changes": {"kind": "bogus"}},
+        headers=bearer(ALICE),
+    )
+    assert stored.status_code == 422 and stored.json()["code"] == "kind_invalid"
+    merge = client.post(
+        f"{IMPORTS}/{event['id']}/merge",
+        json={"version": event["version"], "into_event_id": event["id"]},
+        headers=bearer(ALICE),
+    )
+    assert merge.status_code == 422

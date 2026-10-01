@@ -66,6 +66,7 @@ class ImportEventResponse(BaseModel):
     attention_detail: dict[str, Any] | None
     possible_duplicates: list[str]
     existing_activity_matches: list[str]
+    recorded_duplicates: list[str]
     activity_id: str | None
     facts: ImportFactsResponse
     resolution: dict[str, Any]
@@ -91,6 +92,7 @@ class ResolveBody(VersionBody):
 
 class MergeBody(VersionBody):
     into_event_id: str
+    into_version: int = Field(ge=1)
 
 
 class LinkActivityBody(VersionBody):
