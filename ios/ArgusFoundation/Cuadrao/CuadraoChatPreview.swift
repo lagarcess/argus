@@ -51,6 +51,7 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
 
 @Observable final class CuadraoChatPreview {
     let voice = CuadraoVoicePreview()
+    let voiceMessage = CuadraoVoiceMessagePreview()
     var threads: [CanvasChatThread] = []
     var current = CanvasChatThread()
     var temporary = false
@@ -72,17 +73,17 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
         }
     }
     var hasTemporaryContent: Bool {
-        temporary && (!current.turns.isEmpty || !current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !current.attachments.isEmpty)
+        temporary && (!current.turns.isEmpty || !current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !current.attachments.isEmpty || voiceMessage.state != .idle)
     }
-    func newChat() { voice.end(); current = CanvasChatThread(); responseState = .complete }
-    func open(_ thread: CanvasChatThread) { if current.id != thread.id { voice.end() }; current = thread; thread.unread = false; responseState = .complete }
+    func newChat() { voice.end(); voiceMessage.cancel(); current = CanvasChatThread(); responseState = .complete }
+    func open(_ thread: CanvasChatThread) { if current.id != thread.id { voice.end(); voiceMessage.cancel() }; current = thread; thread.unread = false; responseState = .complete }
     func startTemporary() {
         guard !temporary else { return }
         suspended = current; temporary = true; contextEnabled = false; newChat()
     }
     func endTemporary() {
         guard temporary else { return }
-        voice.end()
+        voice.end(); voiceMessage.cancel()
         current = suspended ?? CanvasChatThread(); suspended = nil; temporary = false; contextEnabled = false
         responseState = .complete
     }

@@ -93,7 +93,7 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         app.buttons["Descartar"].tap()
         let entry = app.buttons["chat-voice-entry"]
         let origin = entry.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        origin.press(forDuration: 0.7, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: -130)),
+        origin.press(forDuration: 0.7, thenDragTo: origin.withOffset(CGVector(dx: -130, dy: 0)),
                      withVelocity: .slow, thenHoldForDuration: 1)
         XCTAssertFalse(app.staticTexts["voice-message-status"].exists)
         XCTAssertFalse(app.buttons["voice-minimize"].exists)
@@ -110,21 +110,40 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         XCTAssertFalse(app.buttons["voice-minimize"].exists)
         capture(app, "typed-draft-preserved")
     }
-    func testExplicitVoiceMessageAlternative() {
+    func testLockedRecordingAndCleanAttachments() {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
         app.buttons["cuadrao-tab-2"].tap()
         app.buttons["chat-attach"].tap()
-        app.buttons["chat-voice-message"].tap()
-        XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 3))
-        capture(app, "voice-message-accessible-recording")
-        app.buttons["voice-message-stop"].tap()
-        XCTAssertEqual(app.staticTexts["voice-message-status"].label, "Revisar mensaje · Vista previa")
-        capture(app, "voice-message-review")
-        app.buttons["voice-message-send"].tap()
-        XCTAssertEqual(app.staticTexts["voice-message-status"].label, "Mensaje de voz · Vista previa")
-        XCTAssertFalse(app.buttons["voice-minimize"].exists)
+        XCTAssertFalse(app.buttons["chat-voice-message"].exists)
+        for label in ["Recibo", "Foto", "Archivo"] { XCTAssertTrue(app.buttons[label].exists) }
+        capture(app, "attachments-only")
+        app.buttons["chat-attach"].tap()
+        for target in ["chat-composer-entry", "chat-voice-entry"] {
+            lockRecording(app.buttons[target])
+            XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 3))
+            XCTAssertFalse(app.buttons["cuadrao-tab-0"].exists)
+            XCTAssertFalse(app.buttons["voice-minimize"].exists)
+            capture(app, "locked-" + target)
+            app.buttons["voice-message-stop"].tap()
+            XCTAssertEqual(app.staticTexts["voice-message-status"].label, "Revisar mensaje · Vista previa")
+            XCTAssertTrue(app.buttons["cuadrao-tab-4"].waitForExistence(timeout: 3))
+            app.buttons["cuadrao-tab-4"].tap()
+            app.buttons["cuadrao-tab-2"].tap()
+            XCTAssertEqual(app.staticTexts["voice-message-status"].label, "Revisar mensaje · Vista previa")
+            capture(app, "review-preserved")
+            app.buttons["Descartar"].tap()
+        }
+        lockRecording(app.buttons["chat-voice-entry"])
+        app.buttons["voice-message-cancel"].tap()
+        XCTAssertTrue(app.buttons["cuadrao-tab-4"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["voice-message-status"].exists)
+    }
+    private func lockRecording(_ target: XCUIElement) {
+        let origin = target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        origin.press(forDuration: 0.7, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: -135)),
+                     withVelocity: .slow, thenHoldForDuration: 0.5)
     }
     func testEnglishVoiceAndLargeText() {
         continueAfterFailure = false
@@ -134,6 +153,12 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         app.buttons["cuadrao-tab-2"].tap()
         XCTAssertEqual(app.buttons["chat-composer-entry"].label, "Type or hold to speak")
         capture(app, "english-composer")
+        lockRecording(app.buttons["chat-voice-entry"])
+        XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.buttons["voice-message-stop"].label, "Stop")
+        capture(app, "locked-english")
+        app.buttons["voice-message-stop"].tap()
+        app.buttons["Discard"].tap()
         app.buttons["chat-voice-entry"].tap()
         XCTAssertEqual(app.staticTexts["voice-status"].label, "I'm listening")
         capture(app, "english-voice-expanded")
@@ -153,6 +178,11 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         capture(app, "voice-large-text")
         app.buttons["voice-end"].tap()
         XCTAssertTrue(app.buttons["chat-voice-entry"].waitForExistence(timeout: 3))
+        lockRecording(app.buttons["chat-voice-entry"])
+        XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 3))
+        capture(app, "locked-large-text")
+        app.buttons["voice-message-stop"].tap()
+        XCTAssertTrue(app.buttons["voice-message-send"].waitForExistence(timeout: 3))
     }
     private func swipeVoice(_ title: XCUIElement) {
         let center = title.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))

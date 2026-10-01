@@ -8,7 +8,7 @@ struct CuadraoVoiceEntry: UIViewRepresentable {
     var composer = false
     let tap: () -> Void
     let beginHold: () -> Void
-    let drag: (Double) -> Void
+    let drag: (Double, Double) -> CuadraoVoiceMessagePreview.DragFeedback
     let release: () -> Void
     let cancel: () -> Void
     let accessibleRecord: () -> Void
@@ -58,7 +58,7 @@ struct CuadraoVoiceEntry: UIViewRepresentable {
         view.accessibilityHint = composer ? (spanish ? "Toca para escribir. Mantén para grabar un mensaje." : "Tap to type. Hold to record a message.") : (spanish ? "Toca para conversar. Mantén para grabar un mensaje." : "Tap to converse. Hold to record a message.")
         view.activate = tap
         view.accessibilityCustomActions = [UIAccessibilityCustomAction(
-            name: spanish ? "Grabar mensaje de voz" : "Record voice message",
+            name: spanish ? "Grabar sin mantener" : "Record hands-free",
             target: context.coordinator, selector: #selector(Coordinator.recordAccessibly))]
     }
     static func dismantleUIView(_ uiView: VoiceTouchSurface, coordinator: Coordinator) {
@@ -69,7 +69,6 @@ struct CuadraoVoiceEntry: UIViewRepresentable {
         var parent: CuadraoVoiceEntry
         var holding = false
         private var origin = CGPoint.zero
-        private var armed = false
         init(_ parent: CuadraoVoiceEntry) { self.parent = parent }
         @objc func tap(_ gesture: UITapGestureRecognizer) {
             guard gesture.state == .ended, !holding else { return }
@@ -79,20 +78,22 @@ struct CuadraoVoiceEntry: UIViewRepresentable {
         @objc func hold(_ gesture: UILongPressGestureRecognizer) {
             switch gesture.state {
             case .began:
-                holding = true; armed = false
+                holding = true
                 origin = gesture.location(in: gesture.view?.window)
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 parent.beginHold()
             case .changed:
-                let distance = Double(origin.y - gesture.location(in: gesture.view?.window).y)
-                let next = distance >= CuadraoVoiceMessagePreview.cancelDistance
-                if next != armed { UISelectionFeedbackGenerator().selectionChanged(); armed = next }
-                parent.drag(distance)
+                let point = gesture.location(in: gesture.view?.window)
+                switch parent.drag(Double(origin.x - point.x), Double(origin.y - point.y)) {
+                case .none: break
+                case .cancelChanged: UISelectionFeedbackGenerator().selectionChanged()
+                case .locked: UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
             case .ended:
-                parent.release(); holding = false; armed = false
+                holding = false; parent.release()
             case .cancelled, .failed:
                 if holding { parent.cancel() }
-                holding = false; armed = false
+                holding = false
             default: break
             }
         }

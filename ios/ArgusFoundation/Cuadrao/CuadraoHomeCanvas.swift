@@ -6,6 +6,8 @@ struct CuadraoHomeCanvas: View {
     @State private var populated = (CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
     @State private var selectedTab: CuadraoTab = .home
     @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var chatEditing = false
     @State private var voiceProposal: CanvasVoiceProposal?
     @State private var pendingTab: CuadraoTab?
@@ -70,15 +72,31 @@ struct CuadraoHomeCanvas: View {
                 CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
             }
             if (accountPath.isEmpty || selectedTab != .home) && !(selectedTab == .assistant && chatEditing) {
-            CuadraoNavigationBar(selection: tabSelection,
-                compact: selectedTab == .home && navigationScroll.compact, spanish: spanish)
-                .padding(.horizontal, 20)
-                .frame(height: 64, alignment: .bottom)
-                .padding(.bottom, 8)
+            ZStack {
+                if chat.voiceMessage.state != .recording {
+                    CuadraoNavigationBar(selection: tabSelection,
+                        compact: selectedTab == .home && navigationScroll.compact, spanish: spanish)
+                        .padding(.horizontal, 20)
+                        .frame(height: 64, alignment: .bottom)
+                        .padding(.bottom, 8)
+                        .transition(.opacity)
+                }
+            }.frame(height: 72)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chat.voiceMessage.state == .recording)
             }
             }
         }
         .cuadraoSoftScrollEdges()
+        .overlay(alignment: .bottom) {
+            if chat.voiceMessage.state == .recording {
+                GeometryReader { geometry in
+                    CuadraoVoiceRecordingOverlay(message: chat.voiceMessage, spanish: spanish)
+                        .frame(height: typeSize.isAccessibilitySize ? geometry.size.height : min(460, geometry.size.height))
+                        .frame(maxHeight: .infinity, alignment: .bottom)
+                }.ignoresSafeArea(edges: .bottom)
+                    .allowsHitTesting(chat.voiceMessage.locked && !chat.voiceMessage.held)
+            }
+        }
         .fullScreenCover(isPresented: Binding(
             get: { chat.voice.active && chat.voice.presentation == .expanded },
             set: { if !$0 && chat.voice.active && chat.voice.presentation == .expanded { chat.voice.presentation = .compact } })) {
