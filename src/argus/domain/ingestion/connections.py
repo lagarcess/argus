@@ -12,17 +12,49 @@ or the cursor, so existing evidence and its freshness stay truthful.
 
 from __future__ import annotations
 
+import re
 import threading
 import uuid
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Literal, Protocol
 
-from argus.domain.ingestion.contract import SourceKind
+from argus.domain.ingestion.contract import SourceKind, inert_text
 
 ConnectionStatus = Literal["active", "needs_reauth", "error", "disconnected"]
 LIVE: frozenset[str] = frozenset({"active", "needs_reauth", "error"})
 DEFAULT_LEASE = timedelta(minutes=5)
+_CODE = re.compile(r"^[a-z0-9_]{1,64}$")
+
+
+# One domain boundary for both repositories, matching the migration's checks,
+# so the in-memory twin cannot accept what Postgres would refuse.
+def checked_ref(value: str) -> str:
+    if not 1 <= len(value) <= 200:
+        raise ValueError("external_ref must be 1-200 characters")
+    return value
+
+
+def checked_label(value: str | None) -> str | None:
+    return inert_text(value, 80)
+
+
+def checked_code(value: str) -> str:
+    if not _CODE.match(value):
+        raise ValueError("codes are 1-64 lowercase letters, digits or underscores")
+    return value
+
+
+def checked_cursor(value: str | None) -> str | None:
+    if value is not None and len(value) > 4096:
+        raise ValueError("cursor exceeds 4096 characters")
+    return value
+
+
+def checked_holder(value: str) -> str:
+    if not 1 <= len(value) <= 64:
+        raise ValueError("lease holder must be 1-64 characters")
+    return value
 
 
 class ConnectionNotFound(LookupError):
@@ -134,10 +166,20 @@ class ConnectionRepository(Protocol):
     ) -> bool: ...
 
     def record_failure(
-        self, *, connection_id: str, code: str, status: ConnectionStatus, now: datetime
+        self,
+        *,
+        connection_id: str,
+        code: str,
+        status: ConnectionStatus,
+        now: datetime,
+        holder: str | None = None,
     ) -> SourceConnection:
         """Record an actionable failure and release the sync lease, so a sync
-        that was already running cannot report success over it."""
+        that was already running cannot report success over it.
+
+        A sync reporting its own failure passes ``holder``: if it no longer
+        holds the lease (another sync took over), nothing changes. Provider
+        signals such as webhooks pass no holder and always apply."""
         ...
 
     def flag_attention(
@@ -167,6 +209,7 @@ class InMemoryConnectionRepository:
         secret: bytes | None = None,
         connection_id: str | None = None,
     ) -> SourceConnection:
+        external_ref, label = checked_ref(external_ref), checked_label(label)
         with self._lock:
             for row in self._rows.values():
                 if (
@@ -250,6 +293,7 @@ class InMemoryConnectionRepository:
         now: datetime,
         ttl: timedelta = DEFAULT_LEASE,
     ) -> bool:
+        checked_holder(holder)
         with self._lock:
             row = self._rows.get(connection_id)
             if row is None or row.status not in LIVE:
@@ -270,6 +314,7 @@ class InMemoryConnectionRepository:
         now: datetime,
         ttl: timedelta = DEFAULT_LEASE,
     ) -> bool:
+        checked_holder(holder)
         with self._lock:
             row = self._rows.get(connection_id)
             if (
@@ -300,6 +345,7 @@ class InMemoryConnectionRepository:
         cursor: str | None,
         now: datetime,
     ) -> bool:
+        checked_cursor(cursor)
         with self._lock:
             row = self._rows.get(connection_id)
             if (
@@ -323,12 +369,21 @@ class InMemoryConnectionRepository:
             return True
 
     def record_failure(
-        self, *, connection_id: str, code: str, status: ConnectionStatus, now: datetime
+        self,
+        *,
+        connection_id: str,
+        code: str,
+        status: ConnectionStatus,
+        now: datetime,
+        holder: str | None = None,
     ) -> SourceConnection:
         if status == "disconnected":
             raise ValueError("use disconnect() to end a connection")
+        checked_code(code)
         with self._lock:
             row = self._live(connection_id)
+            if holder is not None and row.lease_holder != holder:
+                return row  # a stale sync; the current one owns the state
             # Ends any sync in flight: its finish must not overwrite this.
             return self._put(
                 replace(
@@ -345,6 +400,7 @@ class InMemoryConnectionRepository:
     def flag_attention(
         self, *, connection_id: str, code: str, now: datetime
     ) -> SourceConnection:
+        checked_code(code)
         with self._lock:
             row = self._live(connection_id)
             return self._put(replace(row, attention_code=code, attention_at=now), now)

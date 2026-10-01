@@ -201,3 +201,70 @@ def test_renew_extends_only_a_lease_still_held(repo, users):
     assert repo.get(user_id=users["owner"], connection_id=row.id).lease_holder is None
     assert repo.lease(connection_id=row.id, holder="other", now=NOW)
     assert not repo.renew(connection_id=row.id, holder="sync", now=NOW)
+
+
+def test_stale_sync_failure_cannot_overwrite_a_newer_sync(repo, users):
+    """A sync that lost its lease reports a failure after another sync
+    succeeded: the failure is fenced off. Provider signals (webhooks) pass no
+    holder and still apply."""
+
+    row = make(repo, users["owner"])
+    assert repo.lease(connection_id=row.id, holder="a", now=NOW)
+    later = NOW + timedelta(minutes=6)
+    assert repo.lease(connection_id=row.id, holder="b", now=later)
+    assert repo.record_success(
+        connection_id=row.id, holder="b", expected_cursor=None, cursor="c1", now=later
+    )
+    stale = repo.record_failure(
+        connection_id=row.id,
+        code="plaid_unavailable",
+        status="error",
+        now=later,
+        holder="a",
+    )
+    assert stale.status == "active" and stale.last_error_code is None
+    signal = repo.record_failure(
+        connection_id=row.id,
+        code="plaid_item_login_required",
+        status="needs_reauth",
+        now=later,
+    )
+    assert signal.status == "needs_reauth"
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("external_ref", "x" * 201),
+        ("external_ref", ""),
+    ],
+)
+def test_both_repositories_refuse_values_storage_cannot_hold(repo, users, field, value):
+    values = {"external_ref": "item-1"} | {field: value}
+    with pytest.raises(ValueError):
+        repo.create(user_id=users["owner"], source="plaid", label=None, now=NOW, **values)
+
+
+def test_labels_are_normalized_identically_and_codes_and_cursors_checked(repo, users):
+    row = repo.create(
+        user_id=users["owner"], source="plaid", external_ref="item-l",
+        label="Banco‮ " + "x" * 200, now=NOW,
+    )  # fmt: skip
+    assert len(row.label) <= 80 and "‮" not in row.label
+    with pytest.raises(ValueError):
+        repo.record_failure(
+            connection_id=row.id, code="Bad Code!", status="error", now=NOW
+        )
+    with pytest.raises(ValueError):
+        repo.flag_attention(connection_id=row.id, code="x" * 65, now=NOW)
+    assert repo.lease(connection_id=row.id, holder="h", now=NOW)
+    with pytest.raises(ValueError):
+        repo.record_success(
+            connection_id=row.id,
+            holder="h",
+            expected_cursor=None,
+            cursor="c" * 4097,
+            now=NOW,
+        )
+    with pytest.raises(ValueError):
+        repo.lease(connection_id=row.id, holder="h" * 65, now=NOW)
