@@ -88,23 +88,26 @@ struct CuadraoHomeDistribution: View {
     private var distributionBar: some View {
         GeometryReader { geometry in
             let width = max(0, geometry.size.width - 8)
-            HStack(spacing: 0) {
+            ZStack(alignment: .topLeading) {
                 ForEach(kinds) { kind in
                     let active = selectedKind == nil || selectedKind == kind
-                    Button { select(kind) } label: {
-                        CuadraoAllocationBlock(color: color(kind), filled: active, exposedSide: kind == kinds.first || selectedKind == kind)
-                            .frame(width: width * fraction(amount(rows(kind))), height: 62)
-                    }.buttonStyle(.plain)
-                        .offset(y: !reduceMotion && selectedKind == kind ? -10 : 0)
-                        .opacity(active ? 1 : 0.28)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityAddTraits(.isButton)
-                        .accessibilityAction { select(kind) }
-                        .accessibilityLabel(kind.title(spanish))
-                        .accessibilityValue(percent(amount(rows(kind))))
-                        .accessibilityIdentifier("home-distribution-segment-" + kind.rawValue)
+                    let segmentWidth = width * fraction(amount(rows(kind)))
+                    let start = width * kinds.prefix { $0 != kind }.reduce(0.0) { $0 + fraction(amount(rows($1))) }
+                    ZStack(alignment: .topLeading) {
+                        CuadraoAllocationBlock(color: color(kind), filled: active,
+                            exposedSide: kind == kinds.first || selectedKind == kind,
+                            start: start, segmentWidth: segmentWidth)
+                        Button { select(kind) } label: {
+                            Color.clear.frame(width: segmentWidth, height: 62).contentShape(Rectangle())
+                        }.buttonStyle(.plain).offset(x: start + 8, y: 22)
+                            .accessibilityLabel(kind.title(spanish))
+                            .accessibilityValue(percent(amount(rows(kind))))
+                            .accessibilityIdentifier("home-distribution-segment-" + kind.rawValue)
+                    }
+                    .offset(y: !reduceMotion && selectedKind == kind ? -10 : 0)
+                    .opacity(active ? 1 : 0.28)
                 }
-            }.padding(.top, 22)
+            }
         }.frame(height: 104)
     }
     private func categoryRow(_ kind: CanvasAccountKind) -> some View {
@@ -154,23 +157,31 @@ private struct CuadraoAllocationBlock: View {
     let color: Color
     let filled: Bool
     let exposedSide: Bool
+    let start: CGFloat
+    let segmentWidth: CGFloat
     var body: some View {
-        Canvas { context, size in
+        Canvas { context, _ in
             let depth: CGFloat = 8
-            let front = Path(CGRect(x: 0, y: depth, width: size.width, height: size.height - depth))
+            let topY: CGFloat = 22
+            let front = Path(CGRect(x: start + depth, y: topY + depth, width: segmentWidth, height: 54))
             let top = Path { path in
-                path.move(to: .zero); path.addLine(to: CGPoint(x: size.width, y: 0))
-                path.addLine(to: CGPoint(x: size.width + depth, y: depth)); path.addLine(to: CGPoint(x: depth, y: depth)); path.closeSubpath()
+                path.move(to: CGPoint(x: start, y: topY))
+                path.addLine(to: CGPoint(x: start + segmentWidth, y: topY))
+                path.addLine(to: CGPoint(x: start + segmentWidth + depth, y: topY + depth))
+                path.addLine(to: CGPoint(x: start + depth, y: topY + depth)); path.closeSubpath()
             }
-            let face = front.offsetBy(dx: depth, dy: 0)
             let side = Path { path in
-                path.move(to: .zero); path.addLine(to: CGPoint(x: depth, y: depth))
-                path.addLine(to: CGPoint(x: depth, y: size.height)); path.addLine(to: CGPoint(x: 0, y: size.height - depth)); path.closeSubpath()
+                path.move(to: CGPoint(x: start, y: topY))
+                path.addLine(to: CGPoint(x: start + depth, y: topY + depth))
+                path.addLine(to: CGPoint(x: start + depth, y: topY + 62))
+                path.addLine(to: CGPoint(x: start, y: topY + 54)); path.closeSubpath()
             }
             context.fill(top, with: .color(color.opacity(filled ? 0.55 : 0.04)))
             if exposedSide { context.fill(side, with: .color(color.opacity(filled ? 0.65 : 0.04))) }
-            context.fill(face, with: .color(color.opacity(filled ? 0.8 : 0.03)))
-            for path in (exposedSide ? [top, side, face] : [top, face]) { context.stroke(path, with: .color(filled ? .white.opacity(0.65) : color), lineWidth: 0.75) }
-        }.accessibilityHidden(true)
+            context.fill(front, with: .color(color.opacity(filled ? 0.8 : 0.03)))
+            for path in (exposedSide ? [top, side, front] : [top, front]) {
+                context.stroke(path, with: .color(filled ? .white.opacity(0.65) : color), lineWidth: 0.75)
+            }
+        }.accessibilityHidden(true).allowsHitTesting(false)
     }
 }
