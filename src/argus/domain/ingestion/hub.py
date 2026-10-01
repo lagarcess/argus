@@ -86,6 +86,10 @@ class IngestionHub:
             return DisconnectOutcome(connection, "not_applicable", 0)
         revocation: Revocation = "not_applicable"
         adapter = self._adapters.get(connection.source)
+        if adapter is None and connection.secret is not None:
+            # A provider grant exists but nothing here can revoke it (the
+            # connector is switched off): say so instead of implying success.
+            revocation = "failed"
         if adapter is not None:
             try:
                 adapter.revoke(connection, self.credential(connection))
