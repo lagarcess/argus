@@ -82,6 +82,9 @@ async def lifespan(app: FastAPI):
     )
 
     start_financial_accounts(app)
+    from argus.api.ingestion import start_ingestion, stop_ingestion
+
+    start_ingestion(app)
     from argus.api.households import start_households, stop_households
 
     start_households(app)
@@ -97,6 +100,7 @@ async def lifespan(app: FastAPI):
         await research_pricing_recorder.close()
         stop_personalization_memory(app)
         stop_households(app)
+        stop_ingestion(app)
         stop_financial_accounts(app)
         if checkpointer_cm is not None:
             await checkpointer_cm.__aexit__(None, None, None)

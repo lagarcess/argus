@@ -1,0 +1,74 @@
+"""Provider credentials at rest: one key, one envelope, bound to its connection.
+
+Plaid access tokens and Google refresh tokens are server-side only. They are
+sealed with AES-256-GCM under ``ARGUS_INGESTION_SECRET_KEY`` (32 random bytes,
+URL-safe base64) and the associated data binds each ciphertext to its
+``source:connection_id``, so a row copied onto another connection fails to
+open. Plaintext never leaves the adapter call that needs it and is never
+logged, returned by an API, or stored elsewhere.
+"""
+
+from __future__ import annotations
+
+import base64
+import binascii
+import os
+import secrets
+
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+KEY_ENV = "ARGUS_INGESTION_SECRET_KEY"
+_VERSION = b"\x01"
+_NONCE_BYTES = 12
+
+
+class SecretBoxUnavailable(RuntimeError):
+    """No usable key: connectors that need stored credentials stay off."""
+
+
+class SecretUnreadable(RuntimeError):
+    """Ciphertext is not for this connection, or the key changed."""
+
+
+class SecretBox:
+    def __init__(self, key: bytes) -> None:
+        if len(key) != 32:
+            raise SecretBoxUnavailable("ingestion secret key must be 32 bytes")
+        self._aead = AESGCM(key)
+
+    @classmethod
+    def from_env(cls) -> SecretBox:
+        raw = os.getenv(KEY_ENV, "").strip()
+        if not raw:
+            raise SecretBoxUnavailable(f"{KEY_ENV} is not configured")
+        try:
+            key = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+        except (binascii.Error, ValueError):
+            raise SecretBoxUnavailable(f"{KEY_ENV} is not base64") from None
+        return cls(key)
+
+    def seal(self, plaintext: str, *, source: str, connection_id: str) -> bytes:
+        nonce = secrets.token_bytes(_NONCE_BYTES)
+        sealed = self._aead.encrypt(
+            nonce, plaintext.encode(), _aad(source, connection_id)
+        )
+        return _VERSION + nonce + sealed
+
+    def open(self, envelope: bytes, *, source: str, connection_id: str) -> str:
+        if len(envelope) <= 1 + _NONCE_BYTES or envelope[:1] != _VERSION:
+            raise SecretUnreadable("unknown credential envelope")
+        nonce = envelope[1 : 1 + _NONCE_BYTES]
+        try:
+            plain = self._aead.decrypt(
+                nonce, envelope[1 + _NONCE_BYTES :], _aad(source, connection_id)
+            )
+        except InvalidTag:
+            raise SecretUnreadable(
+                "credential does not open for this connection"
+            ) from None
+        return plain.decode()
+
+
+def _aad(source: str, connection_id: str) -> bytes:
+    return f"argus-ingestion:{source}:{connection_id}".encode()
