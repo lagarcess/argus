@@ -232,26 +232,26 @@ def _after_change(tx: ImportTx, event_id: str, before: Facts, now: datetime) -> 
     observations = tx.observations(event_id)
     after = _evidence(tx, event)
     live = any(o.live for o in observations)
-    recorded = recorded_facts(event.resolution.get("accepted"))
-    if recorded:
-        # Compare with what was recorded, not with the previous evidence: a
-        # replacement that restores the recorded facts is not a change.
-        before = replace(
-            before,
-            amount=Decimal(recorded["amount"]) if "amount" in recorded else None,
-            currency=recorded.get("currency"),
-            occurred_on=date.fromisoformat(recorded["occurred_on"])
-            if "occurred_on" in recorded
-            else None,
-        )
-    changed = {
-        name: {
-            "before": _plain(getattr(before, name)),
-            "after": _plain(getattr(after, name)),
-        }
-        for name in _MONEY_FACTS
-        if _differs(name, getattr(before, name), getattr(after, name))
-    }
+    recorded = _as_facts(recorded_facts(event.resolution.get("accepted")))
+    changed = {}
+    for name in _MONEY_FACTS:
+        previous, current = getattr(before, name), getattr(after, name)
+        on_record = getattr(recorded, name) if recorded else None
+        if previous is not None:
+            # The source changed its story, and not back to what was recorded.
+            # A person's correction at review is never itself a change.
+            if not _differs(name, previous, current):
+                continue
+            if on_record is not None and not _differs(name, on_record, current):
+                continue
+            baseline = previous
+        elif on_record is not None and _differs(name, on_record, current):
+            # The source had nothing live (withdrawn, then replaced) and now
+            # disagrees with the record.
+            baseline = on_record
+        else:
+            continue
+        changed[name] = {"before": _plain(baseline), "after": _plain(current)}
     withdrawn = (event.attention_detail or {}).get("reason") == "source_removed"
     if event.state in ("accepted", "accepting"):
         if not live:
@@ -261,14 +261,35 @@ def _after_change(tx: ImportTx, event_id: str, before: Facts, now: datetime) -> 
         elif event.attention == "source_removed":
             event = replace(event, attention=None, attention_detail=None)
     elif event.state == "open" and not live:
+        duplicates.forget(tx, event, now)
         event = replace(
-            event, state="dismissed", attention_detail={"reason": "source_removed"}
+            event,
+            state="dismissed",
+            attention=None,
+            possible_duplicates=(),
+            attention_detail={"reason": "source_removed"},
         )
     elif event.state == "dismissed" and live and withdrawn:
         # Withdrawn by the source, then replaced (pending removed, posted
         # later): the purchase is real again and back in review.
         event = replace(event, state="open", attention_detail=None)
     tx.put_event(_bump(reanchor(tx, event), now))
+
+
+def _as_facts(recorded: dict[str, Any]) -> Facts | None:
+    if not recorded:
+        return None
+    return Facts(
+        amount=Decimal(recorded["amount"]) if "amount" in recorded else None,
+        currency=recorded.get("currency"),
+        direction=None,
+        occurred_on=date.fromisoformat(recorded["occurred_on"])
+        if "occurred_on" in recorded
+        else None,
+        account_id=recorded.get("account_id"),
+        mask=None,
+        kind=recorded.get("kind"),
+    )
 
 
 def _differs(name: str, before: Any, after: Any) -> bool:

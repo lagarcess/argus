@@ -105,6 +105,14 @@ class _MemoryTx:
         }
 
     def put_event(self, event: ImportEvent) -> None:
+        if event.activity_id and any(
+            e.id != event.id
+            and e.user_id == self._user
+            and e.activity_id == event.activity_id
+            for e in self._s.events.values()
+        ):
+            # Mirrors the database's one-import-per-activity unique index.
+            raise ValueError("activity already has an import event")
         self._s.events[event.id] = event
 
     def delete_event(self, event_id: str) -> None:

@@ -12,10 +12,10 @@ from uuid import uuid4
 import pytest
 from argus.domain.ingestion.contract import ImportCandidate
 from argus.domain.ingestion.reconcile.model import ReconcileError, StaleEvent
-from argus.domain.recording.errors import IdempotencyConflict
 from argus.domain.recording.money_schemas import MoneyRequest
 from argus.domain.recording.money_service import MoneyService
 from argus.domain.recording.schemas import CreateFinancialAccountRequest
+from psycopg.errors import UniqueViolation
 
 NOW = datetime(2026, 9, 20, 18, tzinfo=timezone.utc)
 DAY = date(2026, 9, 18)
@@ -120,7 +120,9 @@ def link_accounts(world, account, *pairs):
 
     for conn, candidate in pairs:
         submit(world, conn, candidate)
-    for event in world.recon.list(user_id=world.user, states=("open",)):
+    for listed in world.recon.list(user_id=world.user, states=("open",)):
+        # Re-read: resolving one event may update its duplicate partner.
+        event = world.recon.detail(user_id=world.user, event_id=listed["id"])
         world.recon.resolve(
             user_id=world.user,
             event_id=event["id"],
@@ -402,15 +404,17 @@ def test_acceptance_is_idempotent_and_single_under_concurrency(world):
         request=reviewed,
     )
     assert again["replayed"] is True
+    # A different body under the claiming key replays what was recorded; it
+    # never records the new body.
     other = reviewed.model_copy(update={"amount": "13"})
-    with pytest.raises((IdempotencyConflict, ReconcileError)):
-        world.recon.accept(
-            user_id=world.user,
-            event_id=event["id"],
-            idempotency_key=winner_key(winner, ids),
-            version=1,
-            request=other,
-        )
+    replay = world.recon.accept(
+        user_id=world.user,
+        event_id=event["id"],
+        idempotency_key=winner_key(winner, ids),
+        version=1,
+        request=other,
+    )
+    assert replay["replayed"] and replay["activity"]["amount"] == "12.50"
     assert len(activities(world)) == 1
 
 
@@ -954,3 +958,208 @@ def test_deleted_events_leave_no_dangling_duplicate_references(world):
     world.recon.forget_connection(user_id=world.user, connection_id=shortcuts)
     bank_event = world.recon.detail(user_id=world.user, event_id=bank_event["id"])
     assert bank_event["possible_duplicates"] == [] and bank_event["attention"] is None
+
+
+# --- Second review regressions (#772 fix review) -------------------------
+
+
+def _accepted(world, bank, eid="t1", **changes):
+    card = new_account(world)
+    submit(world, bank, plaid(bank, eid))
+    event = only(world)
+    event = world.recon.resolve(
+        user_id=world.user,
+        event_id=event["id"],
+        version=event["version"],
+        changes={"account_id": card, **changes},
+    )
+    accept(world, event)
+    return only(world, "accepted")
+
+
+def test_a_person_correction_is_not_reported_as_a_source_change(world):
+    bank = world.connect("plaid")
+    _accepted(world, bank, amount="15")  # evidence says 12.50
+    submit(world, bank, plaid(bank, "t1", status="posted"))  # status-only revision
+    assert only(world, "accepted")["attention"] is None
+
+
+def test_an_acknowledged_source_change_stays_acknowledged(world):
+    bank = world.connect("plaid")
+    _accepted(world, bank)
+    submit(world, bank, plaid(bank, "t1", amount="15"))
+    flagged = only(world, "accepted")
+    assert flagged["attention"] == "source_changed"
+    world.recon.acknowledge(
+        user_id=world.user, event_id=flagged["id"], version=flagged["version"]
+    )
+    submit(world, bank, plaid(bank, "t1", amount="15", status="posted"))
+    assert only(world, "accepted")["attention"] is None
+
+
+def test_warning_raised_while_recording_survives_completion(world, monkeypatch):
+    card = new_account(world)
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "t1"))
+    event = only(world)
+    event = world.recon.resolve(
+        user_id=world.user,
+        event_id=event["id"],
+        version=event["version"],
+        changes={"account_id": card},
+    )
+    preview = world.recon.preview(user_id=world.user, event_id=event["id"])["preview"]
+    request = MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
+        update={"preview_token": preview["preview_token"]}
+    )
+    real_write = world.recon.money.write
+
+    def lost(**kwargs):
+        real_write(**kwargs)
+        raise ConnectionError("lost")
+
+    monkeypatch.setattr(world.recon.money, "write", lost)
+    with pytest.raises(ConnectionError):
+        world.recon.accept(
+            user_id=world.user,
+            event_id=event["id"],
+            idempotency_key="k1",
+            version=event["version"],
+            request=request,
+        )
+    monkeypatch.setattr(world.recon.money, "write", real_write)
+    submit(world, bank, cand(bank, "t1", source="plaid", status="removed"))
+    done = world.recon.accept(
+        user_id=world.user,
+        event_id=event["id"],
+        idempotency_key="k1",
+        version=event["version"],
+        request=request,
+    )
+    assert done["event"]["state"] == "accepted"
+    assert done["event"]["attention"] == "source_removed"
+
+
+def test_a_note_edit_does_not_reraise_an_answered_duplicate_question(world):
+    shortcuts, bank = world.connect("shortcuts"), world.connect("plaid")
+    submit(world, shortcuts, tap(shortcuts))
+    submit(world, bank, plaid(bank, "t1"))
+    flagged = _open(world, "plaid")[0]
+    assert flagged["possible_duplicates"]
+    cleared = world.recon.acknowledge(
+        user_id=world.user, event_id=flagged["id"], version=flagged["version"]
+    )
+    edited = world.recon.resolve(
+        user_id=world.user,
+        event_id=flagged["id"],
+        version=cleared["version"],
+        changes={"note": "Café con Ana"},
+    )
+    assert edited["possible_duplicates"] == [] and edited["attention"] is None
+    assert _open(world, "shortcuts")[0]["possible_duplicates"] == []
+
+
+@pytest.mark.parametrize("how", ["person", "source"])
+def test_dismissal_clears_the_partner_events_duplicate_flag(world, how):
+    shortcuts, bank = world.connect("shortcuts"), world.connect("plaid")
+    submit(world, shortcuts, tap(shortcuts))
+    submit(world, bank, plaid(bank, "t1"))
+    tap_event = _open(world, "shortcuts")[0]
+    assert tap_event["possible_duplicates"]
+    bank_event = _open(world, "plaid")[0]
+    if how == "person":
+        world.recon.dismiss(
+            user_id=world.user, event_id=bank_event["id"], version=bank_event["version"]
+        )
+    else:
+        submit(world, bank, cand(bank, "t1", source="plaid", status="removed"))
+    tap_event = world.recon.detail(user_id=world.user, event_id=tap_event["id"])
+    assert tap_event["possible_duplicates"] == [] and tap_event["attention"] is None
+
+
+def test_retry_under_the_claiming_key_replays_the_claimed_request(world, monkeypatch):
+    card = new_account(world)
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "t1"))
+    event = only(world)
+    event = world.recon.resolve(
+        user_id=world.user,
+        event_id=event["id"],
+        version=event["version"],
+        changes={"account_id": card},
+    )
+    preview = world.recon.preview(user_id=world.user, event_id=event["id"])["preview"]
+    request = MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
+        update={"preview_token": preview["preview_token"]}
+    )
+
+    def down(**_kwargs):
+        raise ConnectionError("before commit")
+
+    monkeypatch.setattr(world.recon.money, "write", down)
+    with pytest.raises(ConnectionError):
+        world.recon.accept(
+            user_id=world.user,
+            event_id=event["id"],
+            idempotency_key="k1",
+            version=event["version"],
+            request=request,
+        )
+    monkeypatch.undo()
+    different = request.model_copy(update={"note": "other body"})
+    done = world.recon.accept(
+        user_id=world.user,
+        event_id=event["id"],
+        idempotency_key="k1",
+        version=event["version"],
+        request=different,
+    )
+    assert done["activity"]["note"] == request.note
+
+
+def test_an_unreadable_claim_is_released_not_stuck(world):
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "t1"))
+    event = only(world)
+    from dataclasses import replace as dc_replace
+
+    with world.recon.store.transaction(world.user) as tx:
+        current = tx.event(event["id"])
+        tx.put_event(
+            dc_replace(
+                current,
+                state="accepting",
+                accept_key="k",
+                resolution={"pending_request": {"kind": "bogus"}},
+            )
+        )
+    with pytest.raises(ReconcileError):
+        world.recon.accept(
+            user_id=world.user,
+            event_id=event["id"],
+            idempotency_key="other",
+            version=1,
+            request=MoneyRequest(
+                kind="expense", amount="1", occurred_at=NOW, account_id=str(uuid4())
+            ),
+        )
+    assert world.recon.detail(user_id=world.user, event_id=event["id"])["state"] == "open"
+
+
+def test_store_refuses_two_imports_for_one_activity(world):
+    bank = world.connect("plaid")
+    submit(world, bank, plaid(bank, "a"), plaid(bank, "b", amount="40"))
+    first, second = _open(world)
+    from dataclasses import replace as dc_replace
+
+    activity = str(uuid4())
+    # Memory raises ValueError; Postgres's unique index raises UniqueViolation.
+    with pytest.raises((ValueError, UniqueViolation)):
+        with world.recon.store.transaction(world.user) as tx:
+            tx.put_event(
+                dc_replace(tx.event(first["id"]), state="accepted", activity_id=activity)
+            )
+            tx.put_event(
+                dc_replace(tx.event(second["id"]), state="accepted", activity_id=activity)
+            )
+    assert len(_open(world)) == 2

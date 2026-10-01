@@ -7755,8 +7755,10 @@ created_at,updated_at}`.
 - `unresolved`: fields that must be supplied before preview
   (`amount|currency|occurred_on|account_id|kind`, `destination_account_id`
   for two-account kinds, and anything the source marked uncertain).
-- `attention`: `source_changed` (a source revised an accepted event; detail
-  carries `before`/`after`), `source_removed`, `possible_duplicate`,
+- `attention`: `source_changed` (a source revised an accepted event's
+  amount, currency or date beyond the window, and not back to what was
+  recorded; a person's correction at review never counts; detail carries
+  `before`/`after`), `source_removed`, `possible_duplicate`,
   `ambiguous_match` (several events matched equally; none was linked).
   `possible_duplicates` is symmetric: both events carry the warning until the
   person merges them or acknowledges that they differ.
@@ -7783,14 +7785,18 @@ Routes under `/api/v1/financial-imports`:
   direction,category_id,source_id,purchase_activity_id,note,time_zone`; `null`
   clears one. Setting `account_id` remembers the mapping for that source's
   account hint, so later imports from it resolve automatically. Re-checks
-  possible duplicates.
+  possible duplicates only when a matching fact changes (amount, currency,
+  date, account, direction, mask), so a note or category edit keeps the
+  person's earlier answer.
 - POST `/{id}/merge` `{version,into_event_id,into_version}`: the person says
   two events are the same purchase; both versions are checked. Refused when
   one source reported both (`import_merge_same_source`), both are already
   recorded (`import_merge_two_records`) or either is dismissed
   (`import_dismissed`). An accepted event survives and takes over the other's
   open duplicate questions.
-- POST `/{id}/dismiss|reopen|acknowledge` `{version}`. `acknowledge` clears a
+- POST `/{id}/dismiss|reopen|acknowledge` `{version}`. Dismissing, by the
+  person or because every source withdrew it, also clears the event from its
+  partners' possible duplicates. `acknowledge` clears a
   source warning after the person checked the record, or records that a
   possible duplicate is a different purchase (cleared on both events).
 - POST `/{id}/link-activity` `{version,activity_id}`: the purchase is already
@@ -7800,15 +7806,18 @@ Routes under `/api/v1/financial-imports`:
 - POST `/{id}/preview` `{overrides?}` returns `{event,preview}` where `preview`
   is the money service preview (`reviewed_request`, `preview_token`, affected
   accounts and coverage questions). Refused for `import_unresolved`,
-  `import_currency_mismatch` (no conversion), `import_not_activity` (balances,
+  `import_currency_mismatch` (no conversion), `activity_invalid` (overrides
+  that do not form a valid activity), `import_not_activity` (balances,
   due-date and statement notices are evidence, not money that moved).
 - POST `/{id}/accept` `{version,request}` with `Idempotency-Key` (at most 80
   characters) records the reviewed request. The event is claimed first and the
   claim stores the reviewed request: a retry with the same key replays the
-  same activity; another key first completes an interrupted claim by
+  claimed request and its activity (whatever the retry's body says); another key first completes an interrupted claim by
   replaying its stored request under its own key, then answers 409
   `import_already_accepted`. Only refusals the money service raises before
-  writing release the claim.
+  writing release the claim, as does a stored claim that no longer
+  validates. Warnings raised while an acceptance was in flight (a source
+  withdrew or changed it) stay on the accepted event.
 - POST `/accept-batch` `{items:[{event_id,version}]}` (at most 100) with
   `Idempotency-Key` (at most 40 characters) records each item that has no open
   question and returns `{items:[{event_id,outcome,activity_id?,replayed?,code?}]}`.
@@ -7819,7 +7828,7 @@ Routes under `/api/v1/financial-imports`:
   key replays recorded items.
 
 Problems: 404 `financial_import_not_found`; 409 `stale_version` and the
-conflicts above; 422 validation codes (`validation_error`, `kind_invalid`,
+conflicts above; 422 validation codes (`activity_invalid`, `kind_invalid`,
 `category_unknown`, `source_unknown`, `time_zone_unknown`, `*_id_invalid`);
 recording errors use the existing financial-accounts problems. Evidence a
 connector submits after its connection ended is ignored (`SubmitResult.ignored`),

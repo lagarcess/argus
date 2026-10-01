@@ -120,16 +120,26 @@ class ReconciliationService(Recording):
         now = self.clock()
         with self.store.transaction(user_id) as tx:
             event = self._editable(tx, event_id, version)
+            links = tx.links()
+            matched_before = _match_key(
+                event_facts(event, tx.observations(event.id), links)
+            )
             resolution = {**event.resolution, **cleaned}
             resolution = {k: v for k, v in resolution.items() if v is not None}
             event = replace(event, resolution=resolution)
             if cleaned.get("account_id"):
                 self._remember_account(tx, event, cleaned["account_id"], now)
             event = intake.reanchor(tx, event)
-            previous = event.possible_duplicates
-            event = _bump(self._recheck_duplicates(tx, event), now)
-            tx.put_event(event)
-            duplicates.mirror(tx, event, previous, now)
+            facts = event_facts(event, tx.observations(event.id), tx.links())
+            if _match_key(facts) == matched_before:
+                # A note or category edit: keep the person's earlier answer
+                # about duplicates instead of raising the question again.
+                tx.put_event(_bump(event, now))
+            else:
+                previous = event.possible_duplicates
+                event = _bump(self._recheck_duplicates(tx, event), now)
+                tx.put_event(event)
+                duplicates.mirror(tx, event, previous, now)
         return self.detail(user_id=user_id, event_id=event_id)
 
     def merge(
@@ -192,7 +202,17 @@ class ReconciliationService(Recording):
                 survivor,
                 resolution={**absorbed.resolution, **survivor.resolution},
             )
-            survivor = _bump(intake.reanchor(tx, duplicates.flag(survivor, others)), now)
+            survivor = _bump(
+                intake.reanchor(
+                    tx,
+                    duplicates.flag(
+                        survivor,
+                        others,
+                        ambiguous=survivor.attention == "ambiguous_match",
+                    ),
+                ),
+                now,
+            )
             tx.put_event(survivor)
             duplicates.mirror(tx, survivor, previous, now)
             survivor_id = survivor.id
@@ -202,7 +222,17 @@ class ReconciliationService(Recording):
         now = self.clock()
         with self.store.transaction(user_id) as tx:
             event = self._editable(tx, event_id, version)
-            tx.put_event(_bump(replace(event, state="dismissed"), now))
+            # A dismissed event is no longer anyone's possible duplicate.
+            duplicates.forget(tx, event, now)
+            event = replace(
+                tx.event(event_id),
+                state="dismissed",
+                possible_duplicates=(),
+                attention=None
+                if event.attention in duplicates.DUPLICATE_ATTENTION
+                else event.attention,
+            )
+            tx.put_event(_bump(event, now))
         return self.detail(user_id=user_id, event_id=event_id)
 
     def reopen(self, *, user_id: str, event_id: str, version: int) -> dict[str, Any]:
@@ -315,7 +345,11 @@ class ReconciliationService(Recording):
                 continue
             if compare(facts, other_facts) is not None:
                 found.append(other.id)
-        return duplicates.flag(event, found)
+        return duplicates.flag(
+            event,
+            found,
+            ambiguous=event.attention == "ambiguous_match" and len(found) > 1,
+        )
 
 
 def _clean_resolution(changes: dict[str, Any]) -> dict[str, Any]:
@@ -367,6 +401,19 @@ def _clean_resolution(changes: dict[str, Any]) -> dict[str, Any]:
             except ValueError:
                 raise ReconcileError(f"{field}_invalid", "Use a valid id.") from None
     return cleaned
+
+
+def _match_key(facts: Any) -> tuple[Any, ...]:
+    """The facts duplicate matching depends on."""
+
+    return (
+        facts.amount,
+        facts.currency,
+        facts.occurred_on,
+        facts.account_id,
+        facts.direction,
+        facts.mask,
+    )
 
 
 @dataclass(frozen=True)

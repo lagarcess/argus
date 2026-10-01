@@ -216,7 +216,7 @@ def test_invalid_review_input_is_a_client_problem(client, plaid):  # noqa: ANN00
         json={"overrides": {"kind": "bogus"}},
         headers=bearer(ALICE),
     )
-    assert bogus.status_code == 422 and bogus.json()["code"] == "validation_error"
+    assert bogus.status_code == 422 and bogus.json()["code"] == "activity_invalid"
     stored = client.patch(
         f"{IMPORTS}/{event['id']}",
         json={"version": event["version"], "changes": {"kind": "bogus"}},

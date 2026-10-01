@@ -64,9 +64,14 @@ class Recording:
             raise ReconcileError(
                 "import_not_activity", "This is information, not money that moved."
             )
-        request = MoneyRequest.model_validate(
-            {**self._draft(user_id, detail), **(overrides or {})}
-        )
+        try:
+            request = MoneyRequest.model_validate(
+                {**self._draft(user_id, detail), **(overrides or {})}
+            )
+        except ValidationError:
+            raise ReconcileError(
+                "activity_invalid", "The proposed activity is not valid."
+            ) from None
         return {
             "event": detail,
             "preview": self.money.preview(user_id=user_id, request=request),
@@ -84,9 +89,11 @@ class Recording:
         if len(idempotency_key) > MAX_CLIENT_KEY:
             raise ReconcileError("idempotency_key_too_long", "Use at most 80 characters.")
         now = self.clock()
+        claimed_now = False
         with self.store.transaction(user_id) as tx:
             event = tx.event(event_id)
             if event.state == "open":
+                claimed_now = True
                 if event.version != version:
                     raise StaleEvent()
                 if event.evidence not in ACTIVITY_EVIDENCE:
@@ -115,7 +122,9 @@ class Recording:
             raise ReconcileError(
                 "import_already_accepted", "This import is already recorded."
             )
-        result = self._write(user_id, event, request, now)
+        # A retry of an already-claimed acceptance replays what was claimed,
+        # not whatever this request body says.
+        result = self._write(user_id, event, request if claimed_now else None, now)
         return {
             "event": self.detail(user_id=user_id, event_id=event_id),
             "activity": result["activity"],
@@ -242,16 +251,16 @@ class Recording:
     ) -> dict[str, Any]:
         """Write (or replay) under the claiming key, then finalize the event."""
 
-        if request is None:
-            stored = event.resolution.get("pending_request")
-            if stored is None and event.state == "accepted":
-                stored = event.resolution.get("accepted_request")
-            if stored is None:
-                raise ReconcileError(
-                    "import_not_open", "Nothing is waiting to be recorded."
-                )
-            request = MoneyRequest.model_validate(stored)
         try:
+            if request is None:
+                stored = event.resolution.get("pending_request")
+                if stored is None and event.state == "accepted":
+                    stored = event.resolution.get("accepted_request")
+                if stored is None:
+                    raise ReconcileError(
+                        "import_not_open", "Nothing is waiting to be recorded."
+                    )
+                request = MoneyRequest.model_validate(stored)
             result = self.money.write(
                 user_id=user_id,
                 request=request,
@@ -273,8 +282,8 @@ class Recording:
                     activity_id=activity["activity_id"],
                     resolution=resolution,
                 )
-                if current.attention not in ("possible_duplicate", "ambiguous_match"):
-                    current = replace(current, attention=None, attention_detail=None)
+                # Keep any warning raised while this was being recorded (a
+                # source withdrew or changed it); the person must see it.
                 account = request.account_id or request.source_account_id
                 if account:
                     self._remember_account(tx, current, account, now)
