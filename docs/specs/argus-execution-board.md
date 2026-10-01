@@ -31,9 +31,15 @@ design-branch work or another delivery lane.
   `.env.example`, `render.yaml`, `.github/argus-env.sh` and the private-alpha
   release profile. Migration `20261001090000_household_membership.sql` is not
   applied to production by this landing.
-- Remaining MVEE Household work: native projections/adapters, shared plans and
-  private-source contributions, external invitation delivery, and physical-phone
-  proof. Detail: [landing report](../reports/2026-10-01-pr-763-integration-landing.md).
+- Accepted proof for this land is hermetic only: `tests/household/` runs in
+  `PERSISTENCE_MODE=memory` with mocked Supabase gateway and auth-session checks
+  (`tests/household/conftest.py`). No durable real Auth/Postgres/RLS evidence is
+  cited here.
+- Remaining MVEE Household work: real local Auth/API/Postgres and RLS
+  verification of the landed migration and lock paths; native
+  projections/adapters; shared plans and private-source contributions; external
+  invitation delivery; and physical-phone proof. Detail:
+  [landing report](../reports/2026-10-01-pr-763-integration-landing.md).
 
 ## Connected Spaces and Household lane
 
@@ -49,12 +55,14 @@ merge-ready PR targeting `codex/private-alpha-next`.
 **Recovery branch:** `codex/connected-spaces-household`.
 **Isolated checkout:**
 `/Users/garces/.codex/worktrees/connected-spaces-household/private-alpha-next`.
-**Current status:** API/Postgres membership lifecycle landed through
+**Current status:** default-off membership API/code landed through
 [PR #763](https://github.com/lagarcess/argus/pull/763); the integration landing
-above owns the merge grant. Hermetic two-user create→invite→accept→grant→
-revoke/leave proof is retained in `tests/household/`. Native adapters,
-simulator exclusivity and physical-phone proof were not part of this land.
-No deploy, hosted change, paid provider or phone change is authorized.
+above owns the merge grant. Hermetic in-memory two-user
+create→invite→accept→grant→revoke/leave proof is retained in `tests/household/`
+(mocked Auth/Supabase; not real Postgres/RLS). Real Auth/API/Postgres and RLS
+verification of migration, locking and policies remains pending. Native
+adapters, simulator exclusivity and physical-phone proof were not part of this
+land. No deploy, hosted change, paid provider or phone change is authorized.
 
 ### Recovered decisions and approved permission policy
 
@@ -160,9 +168,11 @@ Imports, chat/voice context, Updates, notifications, rebrand and Profile proposa
 are excluded here, not newly deferred from the MVEE. Their readers must inherit
 this authorization owner when separately assigned.
 
-API/Postgres membership READY criteria were met at Exact head `7b80190d` and
-landed through the merge grant above. Native Home/Accounts/Search adapters and
-physical-phone proof remain future assigned work, not claimed by this land.
+Default-off membership API/code and hermetic in-memory lifecycle proof landed at
+Exact head `7b80190d` through the merge grant above. Real Auth/API/Postgres and
+RLS verification (migration, locking, policies) remains explicitly pending; do
+not treat this land as Auth/Postgres READY. Native Home/Accounts/Search adapters
+and physical-phone proof also remain future assigned work.
 
 ## PR #759 integration landing
 
@@ -2215,7 +2225,7 @@ sequence rather than a separate deferral policy in this document.
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
 | [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762; #763 landed membership/grants API default-off | Native Household context projections remain; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof; later private lifecycle/move evidence remains required |
-| [Household][mvee-household], D07 | Existing identities/accounts/history and fixed #762 create/invite/accept/People flow; **#763 landed** default-off membership/invitations/grants API with hermetic two-user proof; permission policy founder-approved 2026-10-01 | Native Home/Accounts/Search adapters, shared plans, private contributions, external invite delivery and physical-phone proof remain | Household captain; one membership/authorization writer | Identities; locked member/edit/departure policy; existing financial adapters | Hermetic Auth/API/Postgres lifecycle landed; native simulator (third UUID) and physical-phone journeys remain required |
+| [Household][mvee-household], D07 | Existing identities/accounts/history and fixed #762 create/invite/accept/People flow; **#763 landed** default-off membership/invitations/grants API with hermetic in-memory two-user proof; permission policy founder-approved 2026-10-01 | Real Auth/API/Postgres and RLS verification of migration/locks/policies; native Home/Accounts/Search adapters; shared plans; private contributions; external invite delivery; physical-phone proof | Household captain; one membership/authorization writer | Identities; locked member/edit/departure policy; existing financial adapters | Hermetic memory lifecycle landed; real Auth/Postgres/RLS, native simulator (third UUID) and physical-phone journeys remain required |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |

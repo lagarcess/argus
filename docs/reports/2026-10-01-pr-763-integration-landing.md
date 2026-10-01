@@ -14,11 +14,15 @@ Default-off Household membership lifecycle behind `ARGUS_HOUSEHOLDS_ENABLED`:
 create household, synthetic invite, accept, explicit account grants (view/edit),
 leave/remove/revoke/close/transfer-admin, security-definer membership RLS helper,
 and deletion-safe historical attribution (`ON DELETE SET NULL` with active-admin
-CHECK). Hermetic two-user lifecycle proof is in `tests/household/`.
+CHECK). Hermetic two-user lifecycle proof is in `tests/household/`, which
+asserts `PERSISTENCE_MODE == "memory"` and mocks the Supabase gateway plus
+auth-session checks. That is not real Auth/Postgres/RLS verification.
 
 Native Home/Accounts/Search projections, physical-phone proof, shared plans,
 private-source contributions, and external invitation delivery remain outside
-this land. #760 / design / sim / deploy were not touched. Exposure stays
+this land. Real local Auth/API/Postgres and RLS verification of the migration,
+locking and policies remains explicitly pending; no durable real-stack household
+evidence is cited. #760 / design / sim / deploy were not touched. Exposure stays
 default-off; no hosted migration or activation.
 
 ## Accepted evidence
@@ -28,8 +32,9 @@ default-off; no hosted migration or activation.
   resolved; **0** unresolved review threads; `mergeable_state: clean`.
 - Original integration base `9b5e8643` unchanged through merge; no intervening
   semantic overlap or reconciliation merge.
-- Hermetic household domain/lifecycle tests and OpenAPI compatibility passed on
-  the review-fix head before promote.
+- Hermetic in-memory household domain/lifecycle tests and OpenAPI compatibility
+  passed on the review-fix head before promote. No real Auth/Postgres/RLS
+  household proof is claimed or linked.
 
 ## Documentation and environment audit
 
