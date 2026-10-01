@@ -3997,6 +3997,448 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/household-invitations/accept:
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitationRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households:
+    get:
+      tags:
+      - households
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdListResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHouseholdRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}:
+    get:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/account-grants:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountGrantRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountGrantRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/account-grants/{grant_id}:
+    patch:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: grant_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountGrantRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountGrantRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: grant_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/accounts:
+    get:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedAccountListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/close:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/invitations:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationCreated'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/invitations/{invitation_id}/revoke:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: invitation_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/leave:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/members/{member_user_id}/remove:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: member_user_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/transfer-admin:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferAdminRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/market/session:
     get:
       tags:
@@ -4790,6 +5232,16 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
+    AcceptInvitationRequest:
+      properties:
+        token:
+          type: string
+          maxLength: 200
+          minLength: 8
+      additionalProperties: false
+      type: object
+      required:
+      - token
     AccessApprovalResponse:
       properties:
         approved:
@@ -4851,6 +5303,37 @@ components:
       - can_search_current_workspace
       - can_use_grounded_discovery
       - can_submit_feedback
+    AccountGrantRecord:
+      properties:
+        id:
+          type: string
+        household_id:
+          type: string
+        account_id:
+          type: string
+        owner_user_id:
+          type: string
+        permission:
+          type: string
+          enum:
+          - view
+          - edit
+        created_at:
+          type: string
+          format: date-time
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - household_id
+      - account_id
+      - owner_user_id
+      - permission
+      - created_at
     AccountHit:
       properties:
         kind:
@@ -7016,6 +7499,22 @@ components:
       required:
       - observation_id
       - included
+    CreateAccountGrantRequest:
+      properties:
+        account_id:
+          type: string
+          maxLength: 80
+          minLength: 1
+        permission:
+          type: string
+          enum:
+          - view
+          - edit
+          default: view
+      additionalProperties: false
+      type: object
+      required:
+      - account_id
     CreateFinancialAccountRequest:
       properties:
         type:
@@ -7064,6 +7563,15 @@ components:
       required:
       - type
       - currency
+    CreateHouseholdRequest:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+      additionalProperties: false
+      type: object
     CurrencySummaryResponse:
       properties:
         currency:
@@ -8739,6 +9247,71 @@ components:
       - created_at
       - conversation_id
       - expires_at
+    HouseholdListResponse:
+      properties:
+        households:
+          items:
+            $ref: '#/components/schemas/HouseholdRecord'
+          type: array
+      type: object
+      required:
+      - households
+    HouseholdRecord:
+      properties:
+        id:
+          type: string
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        status:
+          type: string
+          enum:
+          - active
+          - closed
+        admin_user_id:
+          type: string
+        created_by:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        closed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        members:
+          items:
+            $ref: '#/components/schemas/MemberRecord'
+          type: array
+      type: object
+      required:
+      - id
+      - name
+      - status
+      - admin_user_id
+      - created_by
+      - created_at
+      - closed_at
+      - members
+    InvitationCreated:
+      properties:
+        id:
+          type: string
+        household_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        token:
+          type: string
+      type: object
+      required:
+      - id
+      - household_id
+      - expires_at
+      - token
     JsonValue: {}
     LinkReceipt:
       properties:
@@ -8885,6 +9458,23 @@ components:
       required:
       - session
       - interest
+    MemberRecord:
+      properties:
+        user_id:
+          type: string
+        role:
+          type: string
+          enum:
+          - admin
+          - member
+        joined_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - user_id
+      - role
+      - joined_at
     MemoryAvailabilityResponse:
       properties:
         available:
@@ -12445,6 +13035,51 @@ components:
       - unassessed
       - clear
       - restricted
+    SharedAccountListResponse:
+      properties:
+        accounts:
+          items:
+            $ref: '#/components/schemas/SharedAccountView'
+          type: array
+      type: object
+      required:
+      - accounts
+    SharedAccountView:
+      properties:
+        grant_id:
+          type: string
+        account_id:
+          type: string
+        owner_user_id:
+          type: string
+        permission:
+          type: string
+          enum:
+          - view
+          - edit
+        type:
+          type: string
+        currency:
+          type: string
+        nickname:
+          anyOf:
+          - type: string
+          - type: 'null'
+        archived:
+          type: boolean
+        ownership_share_bps:
+          type: integer
+      type: object
+      required:
+      - grant_id
+      - account_id
+      - owner_user_id
+      - permission
+      - type
+      - currency
+      - nickname
+      - archived
+      - ownership_share_bps
     SignupRequest:
       properties:
         email:
@@ -12518,6 +13153,16 @@ components:
       type: object
       required:
       - message
+    TransferAdminRequest:
+      properties:
+        user_id:
+          type: string
+          maxLength: 80
+          minLength: 1
+      additionalProperties: false
+      type: object
+      required:
+      - user_id
     UnboundedAllowance:
       properties:
         hour:
@@ -12539,6 +13184,17 @@ components:
         Compute is never metered. A signed-in account''s grounding is bounded only
 
         by the shared research ceiling, a circuit breaker rather than an allowance.'
+    UpdateAccountGrantRequest:
+      properties:
+        permission:
+          type: string
+          enum:
+          - view
+          - edit
+      additionalProperties: false
+      type: object
+      required:
+      - permission
     UsageAllowance:
       properties:
         hour:
