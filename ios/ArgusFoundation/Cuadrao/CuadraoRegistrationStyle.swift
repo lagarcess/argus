@@ -28,12 +28,12 @@ struct RegistrationButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                if busy { ProgressView().tint(.white) }
+                if busy { ProgressView().tint(WelcomePalette.onAccent) }
                 Text(title)
             }
             .font(.system(.body, weight: .semibold))
             .frame(maxWidth: .infinity, minHeight: 56)
-            .foregroundStyle(enabled || busy ? .white : Color(white: 0.43))
+            .foregroundStyle(enabled || busy ? WelcomePalette.onAccent : Color.secondary)
             .background(enabled || busy ? WelcomePalette.pine : WelcomePalette.sage,
                         in: RoundedRectangle(cornerRadius: 16))
             .contentShape(RoundedRectangle(cornerRadius: 16))
@@ -51,10 +51,10 @@ struct RegistrationField: ViewModifier {
         content
             .padding(.horizontal, 16)
             .frame(minHeight: 58)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+            .background(WelcomePalette.background, in: RoundedRectangle(cornerRadius: 14))
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(invalid ? Color.red : focused ? WelcomePalette.pine : Color(white: 0.80),
+                    .stroke(invalid ? Color.red : focused ? WelcomePalette.pine : WelcomePalette.border,
                             lineWidth: focused || invalid ? 1.5 : 1)
             }
     }

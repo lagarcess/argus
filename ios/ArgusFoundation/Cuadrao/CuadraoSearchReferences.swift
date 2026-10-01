@@ -74,7 +74,7 @@ struct CuadraoSearchReferenceDetail: View {
                     }
                 }
             }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
-        }.background(Color.white)
+        }.background(WelcomePalette.background)
             .navigationTitle(item.kind.title(spanish)).navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
     }

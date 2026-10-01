@@ -46,7 +46,7 @@ struct CuadraoHomeCanvas: View {
                 .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
                     enabled: selectedTab == .home && sheet == nil && accountPath.isEmpty))
                 .safeAreaPadding(.bottom, 80)
-                .background(Color.white)
+                .background(WelcomePalette.background)
                 .navigationTitle("").navigationBarTitleDisplayMode(.inline)
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: UUID.self) { id in
@@ -69,7 +69,7 @@ struct CuadraoHomeCanvas: View {
                 .padding(.bottom, 8)
             }
         }
-        .tint(WelcomePalette.pine).foregroundStyle(Color(white: 0.08))
+        .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
         .onChange(of: data.selectedSpaceID) { _, _ in
             ordering = false; archivedID = nil; accountPath = []; navigationScroll = CuadraoNavigationScroll()
@@ -151,7 +151,7 @@ struct CuadraoHomeCanvas: View {
                     ForEach(data.active) { account in
                         CanvasAccountRow(account: account, spanish: spanish)
                             .padding(.trailing, 20)
-                            .listRowInsets(EdgeInsets()).listRowBackground(Color.white)
+                            .listRowInsets(EdgeInsets()).listRowBackground(WelcomePalette.background)
                             .frame(height: reorderRowHeight)
                     }.onMove { from, to in data.move(from: from, to: to) }
                 }.listStyle(.plain).scrollDisabled(true)
@@ -240,7 +240,7 @@ struct CuadraoHomeCanvas: View {
         NavigationStack {
             ContentUnavailableView(tab.title(spanish: spanish), systemImage: tab.symbol,
                 description: Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home."))
-                .background(Color.white)
+                .background(WelcomePalette.background)
         }
         .toolbar(.hidden, for: .tabBar)
         }

@@ -64,7 +64,7 @@ struct CuadraoInvitationRecipient: View {
                     RegistrationButton(title: spanish ? "Volver" : "Go back") { dismiss() }
                 }
             }.padding(24)
-        }.background(Color.white)
+        }.background(WelcomePalette.background)
             .navigationTitle(spanish ? "Vista del invitado" : "Recipient preview")
             .navigationBarTitleDisplayMode(.inline)
     }

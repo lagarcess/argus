@@ -73,7 +73,7 @@ struct CuadraoFirstAccountSheet: View {
                 }.padding(24)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(Color.white)
+            .background(WelcomePalette.background)
             .navigationTitle(existing == nil ? (spanish ? "Añadir cuenta" : "Add account") : (spanish ? "Editar cuenta" : "Edit account"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -106,7 +106,7 @@ struct CuadraoFirstAccountSheet: View {
                 .clipped()
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: hint)
                 .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 16)
-                .background(Color.white)
+                .background(WelcomePalette.background)
             }
         }.tint(WelcomePalette.pine)
         .onAppear {
@@ -163,7 +163,7 @@ struct CuadraoFirstAccountSheet: View {
                         CanvasAccountIcon(kind: item, size: 26)
                         Text(item.title(spanish)).font(.caption).multilineTextAlignment(.center).foregroundStyle(.primary)
                     }.frame(maxWidth: .infinity, minHeight: 91)
-                        .background(kind == item ? WelcomePalette.sage : Color(white: 0.965), in: RoundedRectangle(cornerRadius: 16))
+                        .background(kind == item ? WelcomePalette.sage : WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 16))
                 }.buttonStyle(.plain).accessibilityIdentifier("account-type-" + item.rawValue)
             }
         }

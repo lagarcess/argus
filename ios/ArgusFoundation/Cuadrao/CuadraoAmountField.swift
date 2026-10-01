@@ -25,8 +25,8 @@ struct CuadraoAmountField: View {
                     .frame(minHeight: 60)
             }
             .padding(.horizontal, 18).padding(.vertical, 4)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
-            .overlay { RoundedRectangle(cornerRadius: 18).stroke(error.isEmpty ? Color(white: 0.78) : .red.opacity(0.7)) }
+            .background(WelcomePalette.background, in: RoundedRectangle(cornerRadius: 18))
+            .overlay { RoundedRectangle(cornerRadius: 18).stroke(error.isEmpty ? WelcomePalette.border : .red.opacity(0.7)) }
             if !error.isEmpty { Text(error).font(.footnote).foregroundStyle(.red).accessibilityIdentifier("amount-error") }
         }
         .sheet(isPresented: $choosingCurrency) {

@@ -35,7 +35,7 @@ struct CuadraoAccountCanvas: View {
                         RegistrationButton(title: spanish ? "Añadir movimiento" : "Add transaction") { record(accountID) }
                         Button(spanish ? "Comprobar balance" : "Check balance") { showingBalanceInfo = true }
                             .font(.system(size: 13, weight: .medium)).padding(.horizontal, 16).frame(minHeight: 44)
-                            .overlay { Capsule().stroke(Color(white: 0.8), lineWidth: 1) }
+                            .overlay { Capsule().stroke(WelcomePalette.border, lineWidth: 1) }
                     }
                     VStack(alignment: .leading, spacing: 16) {
                         Text(spanish ? "Movimientos" : "Activity").font(.system(.title2, design: .serif))
@@ -51,7 +51,7 @@ struct CuadraoAccountCanvas: View {
                                 HStack(spacing: 14) {
                                     Image(systemName: entry.income ? "arrow.down.left" : "arrow.up.right")
                                         .frame(width: 38, height: 38)
-                                        .background(Color(white: 0.96), in: Circle()).accessibilityHidden(true)
+                                        .background(WelcomePalette.surface, in: Circle()).accessibilityHidden(true)
                                     VStack(alignment: .leading, spacing: 5) {
                                         Text(entry.title).font(.body)
                                         Text(entry.date, format: .dateTime.day().month(.abbreviated))
@@ -66,7 +66,7 @@ struct CuadraoAccountCanvas: View {
                         }
                     }
                 }.padding(24).padding(.bottom, 32)
-            }.background(Color.white)
+            }.background(WelcomePalette.background)
                 .navigationTitle("").navigationBarTitleDisplayMode(.inline)
                 .toolbar(.visible, for: .navigationBar)
                 .toolbar {
@@ -134,7 +134,7 @@ struct CuadraoTransactionCanvas: View {
                         DatePicker(spanish ? "Fecha" : "Date", selection: $date, in: ...Date.now, displayedComponents: .date)
                     }
                 }.padding(24)
-            }.background(Color.white)
+            }.background(WelcomePalette.background)
                 .navigationTitle(reviewing ? (spanish ? "Revisar movimiento" : "Review transaction") : (spanish ? "Añadir movimiento" : "Add transaction"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -155,7 +155,7 @@ struct CuadraoTransactionCanvas: View {
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                             reviewing = true
                         }
-                    }.padding(24).background(Color.white)
+                    }.padding(24).background(WelcomePalette.background)
                 }
         }.tint(WelcomePalette.pine).onAppear { currency = account.currency }
     }

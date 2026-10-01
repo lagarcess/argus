@@ -12,7 +12,7 @@ struct CuadraoProfilePage: View {
     var body: some View {
         Form { content.listRowBackground(CanvasSettingsStyle.surface) }
             .environment(\.defaultMinListRowHeight, 52)
-            .scrollContentBackground(.hidden).background(Color.white)
+            .scrollContentBackground(.hidden).background(WelcomePalette.background)
             .navigationTitle(route.title(spanish)).navigationBarTitleDisplayMode(.large)
             .toolbar(.visible, for: .navigationBar)
             .onAppear { if route == .feedback { feedback = profile.feedback } }
@@ -62,7 +62,10 @@ struct CuadraoProfilePage: View {
     private var preferences: some View {
         Group {
             Section {
-                LabeledContent(spanish ? "Apariencia" : "Appearance", value: spanish ? "Claro" : "Light")
+                CuadraoAppearancePicker(spanish: spanish)
+            } header: { Text(spanish ? "Apariencia" : "Appearance") }
+              footer: { Text(spanish ? "Sistema sigue la apariencia de tu iPhone." : "System follows your iPhone’s appearance.") }
+            Section {
                 LabeledContent(spanish ? "Idioma" : "Language", value: spanish ? "Español" : "English")
             } header: { Text(spanish ? "Pantalla" : "Display") }
             Section {
@@ -212,7 +215,12 @@ struct CuadraoProfilePage: View {
     }
 
     private func link(_ route: CanvasProfileRoute) -> some View {
-        NavigationLink(value: route) { Text(route.title(spanish)).frame(minHeight: 30) }
+        NavigationLink(value: route) {
+            HStack(spacing: 14) {
+                CanvasProfileIcon(route: route)
+                Text(route.title(spanish)).frame(minHeight: 30)
+            }
+        }
     }
     private func previewAction(_ title: String) -> some View {
         Button(title) { notice = title }.foregroundStyle(.primary).frame(minHeight: 30)

@@ -65,8 +65,8 @@ enum CanvasProfileRoute: Hashable {
 }
 
 enum CanvasSettingsStyle {
-    static let surface = Color(white: 0.965)
-    static let separator = Color.black.opacity(0.065)
+    static let surface = WelcomePalette.surface
+    static let separator = WelcomePalette.separator
 }
 
 struct CuadraoProfileCanvas: View {
@@ -90,7 +90,7 @@ struct CuadraoProfileCanvas: View {
                         .accessibilityIdentifier("cuadrao.profile.signout")
                 }.padding(.horizontal, 24).padding(.top, 32).padding(.bottom, 24)
             }
-            .background(Color.white).toolbar(.hidden, for: .navigationBar)
+            .background(WelcomePalette.background).toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: CanvasProfileRoute.self) { route in
                 CuadraoProfilePage(route: route, profile: $profile, spanish: spanish, includeExamples: includeExamples)
             }
@@ -132,7 +132,7 @@ struct CuadraoProfileCanvas: View {
                 }.buttonStyle(.plain)
                 if route != routes.last {
                     Rectangle().fill(CanvasSettingsStyle.separator).frame(height: 0.5)
-                        .padding(.horizontal, 18).accessibilityHidden(true)
+                        .padding(.leading, 54).padding(.trailing, 18).accessibilityHidden(true)
                 }
             }
         }.background(CanvasSettingsStyle.surface, in: RoundedRectangle(cornerRadius: 22))
@@ -155,11 +155,26 @@ struct CanvasProfileAvatar: View {
     }
 }
 
+struct CanvasProfileIcon: View {
+    let route: CanvasProfileRoute
+    var body: some View {
+        Group {
+            if route == .notifications {
+                Image("CuadraoNotifications").resizable().scaledToFit()
+            } else {
+                Image(systemName: route.symbol).font(.system(size: 19, weight: .regular))
+                    .environment(\.symbolVariants, .none)
+            }
+        }.frame(width: 22, height: 22).foregroundStyle(.secondary).accessibilityHidden(true)
+    }
+}
+
 struct CanvasProfileRow: View {
     let route: CanvasProfileRoute
     let spanish: Bool
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
+            CanvasProfileIcon(route: route)
             Text(route.title(spanish)).font(.body)
             Spacer(minLength: 8)
             Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
@@ -215,7 +230,7 @@ struct CuadraoProfileEditor: View {
                      : "Enter a name up to 60 characters and a preferred name up to 40.")
                     .font(.footnote).foregroundStyle(.secondary).listRowBackground(Color.clear)
             }
-        }.scrollContentBackground(.hidden).background(Color.white)
+        }.scrollContentBackground(.hidden).background(WelcomePalette.background)
             .navigationTitle(spanish ? "Editar perfil" : "Edit profile").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

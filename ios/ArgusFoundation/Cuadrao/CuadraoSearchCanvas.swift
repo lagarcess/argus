@@ -89,7 +89,7 @@ struct CuadraoSearchCanvas: View {
                                 NavigationLink(value: Route.account(account.id)) {
                                     resultRow(account.displayName(spanish), detail: subtitle(account))
                                 }.buttonStyle(.plain)
-                                Divider().foregroundStyle(Color(white: 0.94))
+                                Divider().foregroundStyle(WelcomePalette.separator)
                             }
                         }
                         if (kind == .all || kind == .activity) && !activity.isEmpty {
@@ -100,7 +100,7 @@ struct CuadraoSearchCanvas: View {
                                         resultRow(entry.title, detail: account.displayName(spanish) + " · " + account.currency + " "
                                             + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
                                     }.buttonStyle(.plain)
-                                    Divider().foregroundStyle(Color(white: 0.94))
+                                    Divider().foregroundStyle(WelcomePalette.separator)
                                 }
                             }
                         }
@@ -120,7 +120,7 @@ struct CuadraoSearchCanvas: View {
                 }.scrollDismissesKeyboard(.interactively)
             }
             .padding(.horizontal, 24).padding(.top, 24)
-            .background(Color.white)
+            .background(WelcomePalette.background)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
                 switch route {
@@ -156,7 +156,7 @@ struct CuadraoSearchCanvas: View {
                     if filterCount > 0 { Text(String(filterCount)).font(.caption) }
                 }.frame(minWidth: 44, minHeight: 48)
             }.accessibilityLabel(spanish ? "Filtros, \(filterCount) activos" : "Filters, \(filterCount) active")
-        }.overlay(alignment: .bottom) { Rectangle().fill(Color(white: 0.9)).frame(height: 1) }
+        }.overlay(alignment: .bottom) { Rectangle().fill(WelcomePalette.separator).frame(height: 1) }
     }
 
     private var filterSheet: some View {
@@ -193,7 +193,7 @@ struct CuadraoSearchCanvas: View {
                         resultRow(account.displayName(spanish), detail: subtitle(account))
                     }.buttonStyle(.plain)
                 }.padding(24)
-            }.background(Color.white).navigationTitle(spanish ? "Movimiento" : "Activity")
+            }.background(WelcomePalette.background).navigationTitle(spanish ? "Movimiento" : "Activity")
                 .navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
         } else {
             ContentUnavailableView(spanish ? "Movimiento no disponible" : "Activity unavailable", systemImage: "doc.text.magnifyingglass")

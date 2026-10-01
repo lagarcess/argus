@@ -21,12 +21,13 @@ struct ArgusFoundationApp: App {
     @StateObject private var auth = ProfileAuthModel()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppearancePreference.storageKey) private var appearance = AppearancePreference.system
+    @AppStorage(CuadraoAppearancePicker.storageKey) private var previewAppearance = AppearancePreference.light
 
     var body: some Scene {
         WindowGroup {
             if CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--cuadrao-design") {
                 CuadraoCanvas()
-                    .preferredColorScheme(.light)
+                    .preferredColorScheme(previewAppearance.colorScheme)
             } else {
             FoundationShell(appearance: $appearance)
                 .environmentObject(auth)

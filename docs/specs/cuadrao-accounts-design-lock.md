@@ -346,3 +346,33 @@ not founder-approved visual lock.
 
 The underlying capability gaps listed above are still pending. No backend or
 financial flow changes, new simulators, new build caches, merge or deployment.
+
+## Mobbin research standard and appearance proposal — September 30, 2026
+
+Founder rejected the icon-free Profile revision. Simplification must not strip
+useful visual detail. Icons, typography, separator insets, grouping, control states
+and the complete interaction path all require deliberate treatment.
+
+For subsequent design work, select references by the specific task, not a permanent
+favorite app or a finance-only shortlist. Use Mobbin's screen and flow search plus
+its website: Top rated / Most popular, rating counts, categories, UI Elements,
+pattern filters, related apps and animation references where relevant. Inspect
+actual screens; reject wrong-app search hits. Track what was observed, what is
+borrowed, and why it fits Cuadrao. Ratings are a discovery signal, not a verdict.
+HTML remains the functional inventory; approved founder decisions take precedence.
+Do not present sampled flow screenshots as exhaustive review or static images as
+proof of motion timing.
+
+Current proposal restores consistent outline icons (including the approved bell),
+icon-aligned inset separators and adds Claro / Oscuro / Sistema preview tiles under
+Perfil > Preferencias. Selection has both a border and checkmark. The miniature
+artwork depicts Cuadrao and is original; no reference-app assets are copied.
+
+One namespaced local appearance preference drives the design preview's root scheme.
+System follows iOS; default remains Light. Shared semantic colors keep the picker,
+Profile, Home and active canvas surfaces coherent. Connected Argus appearance/auth
+settings remain separate. Dark colors are a working design proposal, not a final
+brand lock or full dark-mode acceptance across every flow.
+
+See the current research and verification in
+[appearance notes](../reports/evidence/cuadrao-native-design/profile/appearance.md).

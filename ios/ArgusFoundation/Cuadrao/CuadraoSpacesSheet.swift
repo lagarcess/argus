@@ -78,7 +78,7 @@ private struct CuadraoSpaceNameForm: View {
                     data.saveSpace(kind: kind, name: name, existing: existing); finished()
                 }
             }.padding(24)
-        }.background(Color.white)
+        }.background(WelcomePalette.background)
             .navigationTitle(existing == nil ? kind.title(spanish) : (spanish ? "Cambiar nombre" : "Rename"))
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { name = existing?.name ?? "" }

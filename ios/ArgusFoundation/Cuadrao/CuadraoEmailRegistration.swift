@@ -73,10 +73,10 @@ struct CuadraoEmailRegistration: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
                 .padding(.bottom, 20)
-                .background(Color.white)
+                .background(WelcomePalette.background)
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
