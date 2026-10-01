@@ -6,3 +6,7 @@ interaction and accessibility labels are retained. Build succeeded without
 reported warnings/errors; Home screenshot visually inspected; git diff --check
 passed. Build log: `build_run_sim_2026-10-01T00-34-05-759Z_pid12375_251b4e31.log`.
 Existing simulator and build cache reused. No backend changes.
+
+Follow-up: Updates tray now reads the same CuadraoNotifications asset as the Home
+header. Build succeeded and the opened Spanish tray was visually inspected.
+Log: `build_run_sim_2026-10-01T00-36-05-408Z_pid12375_9da025b8.log`.

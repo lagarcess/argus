@@ -268,8 +268,15 @@ struct CuadraoHomeCanvas: View {
             if let account = data.account(id) { CuadraoTransactionCanvas(data: data, account: account, spanish: spanish) }
         case .updates:
             NavigationStack {
-                ContentUnavailableView(spanish ? "Novedades" : "Updates", systemImage: "bell",
-                    description: Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home."))
+                ContentUnavailableView {
+                    Label {
+                        Text(spanish ? "Novedades" : "Updates")
+                    } icon: {
+                        Image("CuadraoNotifications").resizable().scaledToFit().frame(width: 40, height: 40)
+                    }
+                } description: {
+                    Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home.")
+                }
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { sheet = nil } } }
             }
         }
