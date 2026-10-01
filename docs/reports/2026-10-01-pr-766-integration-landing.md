@@ -37,7 +37,7 @@ enablement remain outside this land. Design checkpoints `1dcd12a5` and
   disposition: no intervening tip move after reconcile; no runtime/API/data/UI/
   migration/env/test overlap requiring re-proof.
 - Durable packet:
-  [docs/reports/evidence/connected-household-native/](../evidence/connected-household-native/README.md).
+  [docs/reports/evidence/connected-household-native/](evidence/connected-household-native/README.md).
   Terminal scoped audit on the PR supersedes the earlier fda readiness note.
 
 ## Documentation and environment audit
