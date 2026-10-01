@@ -86,6 +86,19 @@ writer is `shared_plan_implementation`; its first bounded output is the technica
 contract. No dependent permission or contribution UI begins before the two
 narrow founder decisions are answered.
 
+The proposed technical shape is preserved in the existing
+[API contract](../API_CONTRACT.md#shared-household-planning-contract-sketch) and
+[data model](../DATA_MODEL.md#shared-household-planning-storage-sketch). It is
+not implemented or enabled. The architecture check identified a required
+complete-transaction/current-revision resolver, actual leg owners, safe read
+projections, global claim uniqueness, one normalized savings allocation owner,
+and ordered cross-owner locks. Raw owner-readable claims and cascade deletion
+must not expose or erase another person's private financial records. These
+requirements remain implementation and database verification work, not proof
+of delivery. No new simulator, service or database was created while the
+interaction and custody answers remain pending. Bounded read-only scouts and
+contract preparation are complete; no agent has ongoing implementation work.
+
 The checkpoint's temporary groups, splitting and guest proposals do not define
 Household permissions. Guest finance remains registered-only. A narrow proposed
 People & permissions / private-contribution review interaction is pending the
