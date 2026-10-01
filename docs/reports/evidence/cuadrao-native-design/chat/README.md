@@ -100,3 +100,10 @@ this simulator until it is released. Final visual/keyboard/discard-dialog
 acceptance is pending and must be repeated after release. Prior screenshots do
 not certify this change. No new simulator, backend behavior, retention policy
 or Profile changes.
+
+## New-chat icon correction
+
+Founder selected the original HTML bubble-plus icon over square-and-pencil.
+The exact vector now serves both the header (including “Nuevo chat normal” from
+temporary mode) and the history sheet. Existing exit confirmation and new-chat
+behavior are unchanged. Simulator visual checks remain pending its release.

@@ -21,3 +21,7 @@ These redraws are not claimed to be original vendor SVGs.
 CuadraoTemporaryChat: exact dashed conversation SVG path from the founder-approved
 HTML chat-mode.js, reaffirmed September 30, 2026. Stroke 1.7, round caps/joins,
 24-point viewBox. Shared by the temporary entry, hero and active status.
+
+`CuadraoNewChat` preserves the exact `inheritedIcons.newchat` paths from the HTML
+`inherited-ui.js`, including the 2-point round stroke from `chat-shell.css`.
+The header and history sheet use this same bubble-plus asset for new regular chat.

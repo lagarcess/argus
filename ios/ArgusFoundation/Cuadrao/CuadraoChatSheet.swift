@@ -150,7 +150,11 @@ struct CuadraoChatSheet: View {
             }.listStyle(.plain).searchable(text: $query, prompt: es ? "Buscar chats" : "Search chats")
             Button {
                 requestExit(.newRegular)
-            } label: { Label(es ? "Nuevo chat" : "New chat", systemImage: "square.and.pencil").frame(minHeight: 44) }
+            } label: {
+                Label { Text(es ? "Nuevo chat" : "New chat") } icon: {
+                    Image("CuadraoNewChat").resizable().scaledToFit().frame(width: 20, height: 20)
+                }.frame(minHeight: 44)
+            }
             Text(es ? "Vista previa · Conversaciones locales de ejemplo" : "Preview · Local example conversations")
                 .font(.caption).foregroundStyle(.secondary).padding(.bottom, 16)
         }

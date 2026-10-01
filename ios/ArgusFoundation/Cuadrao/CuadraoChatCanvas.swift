@@ -43,10 +43,15 @@ struct CuadraoChatCanvas: View {
         HStack(spacing: 0) {
             control("clock.arrow.circlepath", es ? "Chats recientes" : "Recent chats", id: "chat-history") { sheet = .history }
             if active || store.temporary {
-                control("square.and.pencil", store.temporary ? (es ? "Nuevo chat normal" : "New regular chat") : (es ? "Nuevo chat" : "New chat"), id: "chat-new") {
+                Button {
                     if store.hasTemporaryContent { ending = true }
                     else { store.leaveTemporary(for: .newRegular) }
-                }
+                } label: {
+                    Image("CuadraoNewChat").resizable().scaledToFit().frame(width: 20, height: 20)
+                        .frame(width: 44, height: 44)
+                }.buttonStyle(.plain)
+                    .accessibilityLabel(store.temporary ? (es ? "Nuevo chat normal" : "New regular chat") : (es ? "Nuevo chat" : "New chat"))
+                    .accessibilityIdentifier("chat-new")
             } else { Color.clear.frame(width: 44, height: 44) }
             Spacer(minLength: 8)
             if active && !store.temporary {
