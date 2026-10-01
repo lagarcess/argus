@@ -751,6 +751,9 @@
 "sharedPlan.edit" = "Editar plan";
 "sharedPlan.team" = "Se hace en equipo";
 "sharedPlan.owner" = "Responsable del plan";
+"sharedPlan.permission.edit" = "Puede editar el plan";
+"sharedPlan.permission.view" = "Solo lectura";
+"sharedPlan.allowEditing" = "Permitir editar el plan";
 "sharedPlan.unassigned" = "Sin asignar";
 "sharedPlan.responsibility" = "Monto acordado para esta persona";
 "sharedPlan.responsibilityNotice" = "Los acuerdos pueden ser distintos para cada persona. Un acuerdo no confirma un pago ni un ahorro.";

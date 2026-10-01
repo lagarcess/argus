@@ -751,6 +751,9 @@
 "sharedPlan.edit" = "Edit plan";
 "sharedPlan.team" = "Better together";
 "sharedPlan.owner" = "Plan owner";
+"sharedPlan.permission.edit" = "Can edit plan";
+"sharedPlan.permission.view" = "View only";
+"sharedPlan.allowEditing" = "Allow plan editing";
 "sharedPlan.unassigned" = "Unassigned";
 "sharedPlan.responsibility" = "Agreed amount for this person";
 "sharedPlan.responsibilityNotice" = "Agreements may differ by person. An agreement does not confirm a payment or savings.";

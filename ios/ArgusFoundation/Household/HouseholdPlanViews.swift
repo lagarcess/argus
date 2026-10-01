@@ -117,7 +117,7 @@ struct HouseholdPlanDetailView: View {
                     Text("sharedPlan.team").font(ArgusStyle.display(22))
                     Text(plan.owner.displayName + " · " + NSLocalizedString("sharedPlan.owner", comment: ""))
                     ForEach(plan.participants) { person in
-                        HStack { Text(person.displayName); Spacer(); Text(LocalizedStringKey("household.permission." + person.permission.rawValue)).foregroundStyle(ArgusStyle.secondary) }
+                        HStack { Text(person.displayName); Spacer(); Text(LocalizedStringKey("sharedPlan.permission." + person.permission.rawValue)).foregroundStyle(ArgusStyle.secondary) }
                     }
                     ForEach(Array(plan.responsibilities.enumerated()), id: \.offset) { _, item in
                         VStack(alignment: .leading, spacing: 4) {

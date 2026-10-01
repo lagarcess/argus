@@ -18,7 +18,7 @@ struct HouseholdPlanPeopleFields: View {
                         if value { selected.insert(person.id) } else { selected.remove(person.id); editors.remove(person.id) }
                     })).disabled(!permissionsEditable).accessibilityIdentifier("sharedPlan.member." + person.id.uuidString)
                     if selected.contains(person.id) {
-                        Toggle("household.allowEditing", isOn: Binding(get: { editors.contains(person.id) }, set: { value in
+                        Toggle("sharedPlan.allowEditing", isOn: Binding(get: { editors.contains(person.id) }, set: { value in
                             if value { editors.insert(person.id) } else { editors.remove(person.id) }
                         })).disabled(!permissionsEditable).accessibilityIdentifier("sharedPlan.permission." + person.id.uuidString)
                     }
