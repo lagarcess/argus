@@ -1,45 +1,30 @@
 import XCTest
 
 final class CuadraoPolishUITests: XCTestCase {
-    func testHomeHoldReorderAndArchiveRecovery() {
+    func testHomeNativeSwipeDragAndArchiveRecovery() {
         continueAfterFailure = false
         let app = launch()
-        let homeAccounts = app.buttons["home-accounts-open"]
-        reveal(app, homeAccounts)
-        XCTAssertFalse(app.buttons["Opciones de cuentas"].exists)
-        XCTAssertTrue(app.buttons["home-account-add"].exists)
-        let account = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Día a día")).firstMatch
-        reveal(app, account)
-        account.press(forDuration: 0.7)
-        XCTAssertTrue(app.buttons["account-reorder"].waitForExistence(timeout: 3))
-        shot(app, "home-account-hold-es")
-        app.buttons["account-reorder"].tap()
-        XCTAssertEqual(app.buttons["accounts-order-toggle"].label, "Listo")
-        let handles = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Reorder"))
-        XCTAssertTrue(handles.firstMatch.waitForExistence(timeout: 3))
-        let first = handles.element(boundBy: 0)
-        let second = handles.element(boundBy: 1)
-        first.press(forDuration: 0.4, thenDragTo: second)
-        app.buttons["accounts-order-toggle"].tap()
-        shot(app, "accounts-management-es")
-        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "accounts-row-"))
-        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Día a día"))
-        rows.element(boundBy: 1).tap()
-        app.buttons["Opciones de cuenta"].tap()
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-account-"))
+        let first = app.buttons["home-account-00000000-0000-4000-8000-000000000001"]
+        let second = app.buttons["home-account-00000000-0000-4000-8000-000000000002"]
+        reveal(app, second)
+        let firstY = first.frame.minY
+        first.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: 0.7, thenDragTo: second.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)))
+        XCTAssertGreaterThan(first.frame.minY, firstY)
+        shot(app, "home-inline-reorder-es")
+        first.swipeRight()
+        XCTAssertTrue(app.buttons["Editar"].waitForExistence(timeout: 3))
+        app.buttons["Editar"].tap()
+        XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 3))
+        app.buttons["Cancelar"].tap()
+        first.swipeLeft()
+        XCTAssertTrue(app.buttons["Archivar"].waitForExistence(timeout: 3))
+        shot(app, "home-swipe-archive-es")
         app.buttons["Archivar"].tap()
-        XCTAssertTrue(app.buttons["accounts-archives"].waitForExistence(timeout: 3))
-        app.buttons["accounts-archives"].tap()
-        XCTAssertTrue(app.staticTexts["Día a día"].waitForExistence(timeout: 3))
-        shot(app, "account-archive-recovery-es")
-        app.buttons["Restaurar"].tap()
-        XCTAssertTrue(app.staticTexts["No hay cuentas archivadas"].exists)
-        app.buttons["Listo"].tap()
-        XCTAssertTrue(rows.containing(NSPredicate(format: "label CONTAINS %@", "Día a día")).firstMatch.exists)
-        app.buttons["Cerrar"].tap()
-        reveal(app, app.buttons["home-activity-add"])
-        shot(app, "home-section-shortcuts-es")
-        app.buttons["home-activity-add"].tap()
-        XCTAssertTrue(app.navigationBars["Añadir movimiento"].waitForExistence(timeout: 3))
+        XCTAssertFalse(first.exists)
+        app.buttons["Deshacer"].tap()
+        XCTAssertTrue(first.exists)
+        XCTAssertGreaterThan(rows.count, 1)
     }
     func testArchivesRemainReachableWhenAllAccountsArchived() {
         continueAfterFailure = false
@@ -53,6 +38,7 @@ final class CuadraoPolishUITests: XCTestCase {
         for _ in 0..<count {
             rows.firstMatch.tap()
             app.buttons["Opciones de cuenta"].tap()
+            app.buttons["Archivar"].tap()
             app.buttons["Archivar"].tap()
         }
         XCTAssertEqual(rows.count, 0)
@@ -89,10 +75,9 @@ final class CuadraoPolishUITests: XCTestCase {
         reveal(app, app.buttons["plan-forecast-scope"])
         app.buttons["plan-forecast-scope"].tap(); app.buttons["Household"].tap()
         shot(app, "plan-dark-large-en")
-        reveal(app, app.buttons["plan-space-filter"])
-        app.buttons["plan-space-filter"].tap(); app.buttons["Household"].tap()
-        XCTAssertEqual(app.buttons["plan-space-filter"].value as? String, "Household")
-        shot(app, "plan-filter-dark-large-en")
+        XCTAssertFalse(app.buttons["plan-space-filter"].exists)
+        reveal(app, app.buttons["plan-archives"])
+        shot(app, "plan-all-spaces-dark-large-en")
     }
     func testPlanScopeDoesNotChangeCreationDefault() {
         continueAfterFailure = false
@@ -101,7 +86,7 @@ final class CuadraoPolishUITests: XCTestCase {
         app.buttons["plan-forecast-scope"].tap()
         app.buttons["Hogar"].tap()
         XCTAssertTrue(app.buttons["plan-forecast-scope"].label.contains("Hogar"))
-        XCTAssertEqual(app.buttons["plan-space-filter"].value as? String, "Todos los espacios")
+        XCTAssertFalse(app.buttons["plan-space-filter"].exists)
         shot(app, "plan-local-forecast-scope-es")
         app.buttons["plan-create"].tap()
         XCTAssertTrue(app.buttons["plan-edit-space"].waitForExistence(timeout: 3))
@@ -138,7 +123,10 @@ final class CuadraoPolishUITests: XCTestCase {
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
         for _ in 0..<6 {
             if element.isHittable && element.frame.maxY < app.frame.maxY - 110 { return }
-            app.swipeUp()
+            let goingDown = !element.exists || element.frame.minY > app.frame.midY
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: goingDown ? 0.65 : 0.35))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: goingDown ? 0.4 : 0.6))
+            start.press(forDuration: 0.01, thenDragTo: end)
         }
         XCTAssertTrue(element.isHittable)
     }

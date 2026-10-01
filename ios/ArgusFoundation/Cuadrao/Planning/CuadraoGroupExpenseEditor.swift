@@ -30,13 +30,14 @@ struct CuadraoGroupExpenseEditor: View {
     private func shares(_ group: PlanGroup) -> [UUID: Int] {
         if group.kind == .saving { return payer.map { [$0: cents] } ?? [:] }
         if custom {
-            return Dictionary(uniqueKeysWithValues: group.members.filter { selected.contains($0.id) }.map {
+            return Dictionary(uniqueKeysWithValues: participants(group).filter { selected.contains($0.id) }.map {
                 let value = exactShares[$0.id] ?? 0
                 return ($0.id, value.isFinite && (0...CanvasMoney.maximumValue).contains(value) ? Int((value * 100).rounded()) : -1)
             })
         }
-        return PlanSharedExpense.equal(cents, among: group.members.filter { selected.contains($0.id) }.map(\.id))
+        return PlanSharedExpense.equal(cents, among: participants(group).filter { selected.contains($0.id) }.map(\.id))
     }
+    private func participants(_ group: PlanGroup) -> [PlanMember] { initial == nil ? group.activeMembers : group.members }
     var body: some View {
         NavigationStack {
             if let group {
@@ -46,7 +47,7 @@ struct CuadraoGroupExpenseEditor: View {
                         PlanAmountInput(value: $amount, currency: .constant(group.currency), error: $amountErrors.message(for: "amount"),
                                         title: spanish ? "Monto" : "Amount", identifier: "group-expense-amount", spanish: spanish)
                         Picker(group.kind == .saving ? (spanish ? "Aportó" : "Contributed by") : (spanish ? "Pagó" : "Paid by"), selection: $payer) {
-                            ForEach(group.members) { member in Text(member.name).tag(Optional(member.id)) }
+                            ForEach(participants(group)) { member in Text(member.name).tag(Optional(member.id)) }
                         }.pickerStyle(.menu)
                         if group.kind == .trip {
                             HStack {
@@ -59,7 +60,7 @@ struct CuadraoGroupExpenseEditor: View {
                                     }
                                 }.accessibilityIdentifier("group-split-method")
                             }
-                            ForEach(Array(group.members.enumerated()), id: \.element.id) { index, member in
+                            ForEach(Array(participants(group).enumerated()), id: \.element.id) { index, member in
                                 HStack(spacing: 12) {
                                     Button {
                                         if selected.contains(member.id) { selected.remove(member.id) } else { selected.insert(member.id) }
@@ -120,7 +121,7 @@ struct CuadraoGroupExpenseEditor: View {
                         }
                     }
                     .onAppear {
-                        payer = initial?.payer ?? group.me; selected = Set(initial?.shares.keys.map { $0 } ?? group.members.map(\.id))
+                        payer = initial?.payer ?? group.me; selected = Set(initial?.shares.keys.map { $0 } ?? group.activeMembers.map(\.id))
                         if let initial { title = initial.title; amount = Double(initial.cents) / 100; receipt = initial.receipt; exactShares = initial.shares.mapValues { Double($0) / 100 }; custom = !initial.draft }
                     }
             }

@@ -4,7 +4,7 @@ struct CuadraoAccountCanvas: View {
     let data: CuadraoAccountsPreview
     let accountID: UUID
     let spanish: Bool
-    let actions: (UUID) -> Void
+    let actions: (CanvasAccountSheet) -> Void
     let record: (UUID) -> Void
     @State private var showingBalanceInfo = false
 
@@ -88,7 +88,11 @@ struct CuadraoAccountCanvas: View {
         }
     }
     private var moreButton: some View {
-        Button { actions(accountID) } label: {
+        Menu {
+            Button(spanish ? "Cambiar nombre" : "Rename account", systemImage: "pencil") { actions(.rename(accountID)) }
+            Button(spanish ? "Añadir movimiento" : "Add transaction", systemImage: "plus") { record(accountID) }
+            Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { actions(.archive(accountID)) }
+        } label: {
             Image(systemName: "ellipsis").frame(width: 44, height: 44)
         }.buttonStyle(.plain)
             .accessibilityLabel(spanish ? "Opciones de cuenta" : "Account actions")

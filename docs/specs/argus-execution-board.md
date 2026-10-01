@@ -1826,6 +1826,35 @@ unchanged owners. iPhone build 3402 installed and launched (sequence 3412).
 This checkpoint does not authorize connected history, providers, analytics or a
 production release. Remaining work stays in the dispositions above and below.
 
+**Plan and Home collection simplification — UI-only implementation, October 1:**
+the Cuadrao guide supersedes the two-space-selector layout at `ebcc9760`.
+Removed the standalone month, Tus planes filter, header ellipsis and duplicate
+creation button in populated groups. Forecast-local space selection, all personal
+plans with metadata, contextual creation and separate archive recovery now share
+the existing owners. Preview tools live in the title hold menu.
+
+`CuadraoOrderedCollection` gives Home accounts, personal plans and groups one
+vocabulary: tap detail, leading Edit (including rename), trailing Archive with full
+swipe disabled, hold-and-drag ordering in place. Collection context menus and the
+account action tray are removed. Native iOS 27 containers own gesture arbitration;
+iOS 17–26 retain native drag/drop and explicit actions. Accessibility move actions
+and account management handles remain available. Order does not move records
+between spaces or change financial history. Fixture account order and saved
+plan/group order survive reopening locally.
+
+Group People owns invitations and member management, reached through avatars or
+the People segment. The local member scenario hides organizer controls. Removal
+requires a review, blocks outstanding balances, excludes former members from new
+expense defaults and retains historical participants and entries. C02 still owns
+real membership/guest access, authorization, retention and invitation delivery.
+The preview's role switch is not an authorization implementation.
+
+**Connected ordering disposition:** before connection, persist personal/viewer-local
+order through its canonical owner, including sync/conflict behavior. Group ordering
+must not silently reorder another member's view or alter shared financial records.
+Physical touch/VoiceOver acceptance and older-runtime behavior remain device
+acceptance work; simulator and state evidence describe their exact tested scope.
+
 **Future surface-connectivity pass — founder requested, not yet executed:** audit
 Home, Plan, Accounts, Chat and Search for meaningful row/action destinations,
 return paths, preserved space/currency/selection/scroll/draft context, and stale or

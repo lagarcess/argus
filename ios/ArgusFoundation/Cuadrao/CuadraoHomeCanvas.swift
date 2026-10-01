@@ -60,7 +60,7 @@ struct CuadraoHomeCanvas: View {
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: UUID.self) { id in
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
-                        actions: { sheet = .account(.actions($0)) }, record: { sheet = .account(.record($0)) })
+                        actions: { sheet = .account($0) }, record: { sheet = .account(.record($0)) })
                 }
             }
             .toolbar(.hidden, for: .tabBar)
@@ -215,20 +215,13 @@ struct CuadraoHomeCanvas: View {
                         .accessibilityIdentifier("home-account-add")
                 }
             }
-            ForEach(data.active) { account in
-                CanvasAccountRow(account: account, spanish: spanish)
-                    .gesture(LongPressGesture(minimumDuration: 0.45).exclusively(before: TapGesture()).onEnded { gesture in
-                        switch gesture {
-                        case .first: sheet = .account(.actions(account.id))
-                        case .second: accountPath.append(account.id)
-                        }
-                    })
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction { accountPath.append(account.id) }
-                    .accessibilityAction(named: Text(spanish ? "Opciones de cuenta" : "Account actions")) { sheet = .account(.actions(account.id)) }
-                    .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
-            }
+            CuadraoOrderedCollection(items: data.active, spanish: spanish, spacing: 0,
+                identifier: { "home-account-" + $0.id.uuidString },
+                open: { accountPath.append($0.id) }, edit: { sheet = .account(.rename($0.id)) },
+                archive: { data.archive($0.id, true); archivedID = $0.id }, reorder: data.reorder) { account in
+                    CanvasAccountRow(account: account, spanish: spanish)
+                        .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5).padding(.leading, 54) }
+                }
             if data.active.isEmpty { firstAccount }
         }
     }
@@ -290,7 +283,7 @@ struct CuadraoHomeCanvas: View {
         if tab == .search {
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
                 chat: chat, openChat: { thread in chat.open(thread); selectedTab = .assistant },
-                actions: { sheet = .account(.actions($0)) }, record: { sheet = .account(.record($0)) })
+                actions: { sheet = .account($0) }, record: { sheet = .account(.record($0)) })
         } else if tab == .assistant {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
         } else if tab == .profile {

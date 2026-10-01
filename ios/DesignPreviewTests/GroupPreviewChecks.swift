@@ -52,6 +52,16 @@ import Foundation
         loaded.archive(group.id, false)
         check(loaded.group(group.id)?.expenses == group.expenses, "Restore preserves split corrections")
         check(loaded.groups.last!.members.allSatisfy { loaded.groups.last!.balance($0.id) == 0 }, "Saving together is not borrowing")
+        let originalIDs = loaded.groups.map(\.id)
+        loaded.reorder(originalIDs.reversed())
+        check(CuadraoGroupPreview(spanish: true, defaults: defaults).groups.map(\.id) == originalIDs.reversed(), "Viewer order persists")
+        let guestID = group.members.last!.id
+        loaded.removeMember(ids[1], from: group.id)
+        check(loaded.group(group.id)!.activeMembers.contains { $0.id == ids[1] }, "Outstanding balance blocks removal")
+        loaded.removeMember(guestID, from: group.id)
+        check(!loaded.group(group.id)!.activeMembers.contains { $0.id == guestID }, "Settled guest leaves active roster")
+        check(loaded.group(group.id)!.expenses == group.expenses, "Member removal preserves financial history")
+        check(CuadraoGroupPreview(spanish: true, defaults: defaults).group(group.id)!.removedMemberIDs == [guestID], "Removal persists")
         loaded.resetExamples(spanish: true, empty: true)
         check(loaded.groups.isEmpty, "Cold start is genuinely empty")
         for currency in PlanCurrency.supported {

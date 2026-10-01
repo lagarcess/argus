@@ -7,7 +7,7 @@ struct CuadraoSearchCanvas: View {
     let includeExamples: Bool
     let chat: CuadraoChatPreview
     let openChat: (CanvasChatThread) -> Void
-    let actions: (UUID) -> Void
+    let actions: (CanvasAccountSheet) -> Void
     let record: (UUID) -> Void
     @State private var query = ""
     @State private var kind = Kind.all

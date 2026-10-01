@@ -66,12 +66,15 @@ struct CanvasActivity: Identifiable {
         guard let i = accounts.firstIndex(where: { $0.id == id }) else { return }
         accounts[i].archived = archived
     }
+    func reorder(_ ids: [UUID]) {
+        guard Set(ids) == Set(active.map(\.id)) else { return }
+        accounts = CuadraoCollectionOrder.applying(ids, to: accounts)
+        UserDefaults.standard.set(accounts.map { $0.id.uuidString }, forKey: "cuadrao.design.account-order")
+    }
     func move(from: IndexSet, to: Int) {
         var visible = active
         visible.move(fromOffsets: from, toOffset: to)
-        var iterator = visible.makeIterator()
-        let ids = Set(visible.map(\.id))
-        accounts = accounts.map { ids.contains($0.id) ? iterator.next()! : $0 }
+        reorder(visible.map(\.id))
     }
     func reset(populated: Bool, spanish: Bool) {
         household = populated ? .joined("Alex") : .alone
@@ -89,6 +92,15 @@ struct CanvasActivity: Identifiable {
             accounts.append(CanvasAccount(name: spanish ? "Fondo de la casa" : "Household fund",
                 kind: .savings, balance: 25000, spaceID: CanvasSpace.householdID, sharedWithHousehold: true))
         }
+        // Stable local fixture identities allow a viewer's order to survive relaunch.
+        for index in accounts.indices {
+            accounts[index].id = UUID(uuidString: String(format: "00000000-0000-4000-8000-%012d", index + 1))!
+        }
+        let orderKey = "cuadrao.design.account-order"
+        if ProcessInfo.processInfo.arguments.contains("--plan-reset") { UserDefaults.standard.removeObject(forKey: orderKey) }
+        let saved = (UserDefaults.standard.stringArray(forKey: orderKey) ?? []).compactMap(UUID.init(uuidString:))
+        let known = Set(accounts.map(\.id))
+        let order = saved.filter { known.contains($0) } + accounts.map(\.id).filter { !saved.contains($0) }
         balanceObservations = CanvasBalanceHistory.examples(accounts: accounts, now: .now)
         activity = []
         if let first = accounts.first, let cash = accounts.last(where: { $0.kind == .cash }) {
@@ -101,6 +113,7 @@ struct CanvasActivity: Identifiable {
             activity.append(CanvasActivity(accountID: shared.id, title: spanish ? "Supermercado" : "Groceries",
                 amount: 2450, date: .now, income: false))
         }
+        accounts = CuadraoCollectionOrder.applying(order, to: accounts)
     }
 }
 

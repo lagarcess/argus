@@ -91,7 +91,7 @@ content. Surface-specific gestures retain their existing meanings.
 
 Single-choice selectors show the current value and a downward chevron, with a
 checkmark on the selected option. Apply this grammar to space and currency choices,
-including Tus planes. Reserve the sliders/filter icon for controls that open
+where a choice is necessary. Reserve the sliders/filter icon for controls that open
 multiple filter dimensions. Align typography, caret weight and accessible touch
 targets across equivalent controls while retaining each surface's composition.
 Short choice lists can use native menus; long currency catalogs use a searchable
@@ -117,15 +117,27 @@ Future chart, receipt, provider and connected-delivery work stays in the roadmap
 
 ## Locked Plan hierarchy — October 1, 2026
 
-Share Home's interaction language while preserving Plan's hierarchy. Home's space
-selector scopes its financial snapshot; Plan's main distinction is Para ti / En
-grupo. Keep month and forecast space within the forecast rather than implying that
-one top-level selector scopes forecasts, personal goals and group plans together.
-In the forecast context, the month is quiet text and the space is the selectable
-control. Reuse Home's space names, selection feedback, menu styling and accessible
-touch targets. Hide the forecast-space menu when only one compatible space exists.
-Forecast scope never sets a new plan's space: creation uses the explicitly selected
-plan-list space, or Personal when the list shows all spaces, with an editable choice.
+Share Home's interaction language while preserving Plan's hierarchy. Plan's main
+distinction is Para ti / En grupo. The founder's subsequent whole-surface review
+supersedes the separate Tus planes space filter and standalone forecast-month row.
+
+Keep one space choice attached to the forecast, alongside Tu mes / Your month,
+not beside the page title. Dates remain explicit within the chart/readout; do not
+repeat October above it. Hide the choice when only one compatible space exists.
+Tus planes shows all active personal plans with space metadata on each card, without
+Todos or a second space filter. A forecast-space change never sets a new plan's
+space: creation starts with an explicit editable Personal choice.
+
+Keep the header's primary plus, whose action and accessible name follow Para ti /
+En grupo. Remove the header ellipsis: preview controls belong in the title hold
+menu, while each collection has a quiet archived-items destination for its own
+records, reachable after all items are archived. Keep a welcoming creation action
+in empty states; remove the duplicate group-create action from populated lists.
+Cards use the shared collection gestures below; detail retains visible editing,
+renaming and archive actions. Group People owns invitations and member management.
+Tapping the avatar stack opens People. Only the local organizer scenario exposes
+member management; removal is reviewed, blocks outstanding balances, and retains
+historical expenses/contributions. Connected permissions remain roadmap work.
 
 Same action, same behavior; different purpose, different composition. Shared
 money behavior, typography, icons, selectors, gestures and return paths provide
@@ -139,12 +151,27 @@ Implementation status and future work live in the
 
 Cuentas / Accounts and Movimientos / Activity share the same trailing plain plus.
 Home keeps quick creation and row gestures; no accounts-header ellipsis or redundant
-configuration cluster. Hold an account to reach its actions, including reorder when
-there are multiple active accounts. Preserve the equivalent accessibility action.
+configuration cluster. Account rows use the same collection gestures as Plan.
 Tapping the Accounts heading opens its management surface, where visible reorder
 and archived-account recovery remain discoverable. The entry remains available
 when all accounts are archived. Account detail retains visible owner actions;
 Home's shortcut does not become the only way to manage a record.
+
+## Collection gestures
+
+`CuadraoOrderedCollection` owns the shared interaction across Home account rows,
+personal plans and group cards. Tap opens detail; swipe right reveals Edit
+(including rename); swipe left reveals Archive. Neither swipe executes on a full
+swipe. Hold and drag reorders directly in place, without a context menu or an
+ordering tray. Sheets are for actual editing, invitation and review flows.
+
+Use native iOS 27 reorder/swipe containers. iOS 17–26 retain native drag/drop and
+visible Edit/Archive alternatives; the deployment minimum remains unchanged.
+Accessibility actions include Edit, Archive, Move up and Move down. The existing
+account management destination remains an alternative with visible order handles.
+`CuadraoCollectionOrder` applies only the visible IDs without moving hidden or
+archived records. Preview owners persist plan/group order and fixture account order;
+connected viewer-specific order is a future contract, not a shared financial edit.
 
 ## Home balance chart
 

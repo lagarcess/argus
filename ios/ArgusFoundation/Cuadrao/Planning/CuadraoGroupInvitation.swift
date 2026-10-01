@@ -26,7 +26,10 @@ struct CuadraoGroupInvitation: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                             PlanPrimaryButton(title: joined ? (spanish ? "Ya estás en el plan" : "You're in") : (spanish ? "Probar aceptación" : "Preview joining"), symbol: joined ? "checkmark" : "person.badge.plus") {
                                 var updated = group
-                                if !updated.members.contains(where: { $0.name == "Mar" }) { updated.members.append(.init(name: "Mar", symbol: "sparkles")); store.save(updated) }
+                                if let existing = updated.members.first(where: { $0.name == "Mar" }) {
+                                    updated.removedMemberIDs.removeAll { $0 == existing.id }
+                                } else { updated.members.append(.init(name: "Mar", symbol: "sparkles")) }
+                                store.save(updated)
                                 joined = true
                             }.disabled(joined).accessibilityIdentifier("group-invite-accept")
                             Text(spanish ? "Mar es una persona ficticia de esta vista previa." : "Mar is a fictional person in this preview.").font(.caption).foregroundStyle(.secondary)
@@ -50,7 +53,7 @@ struct CuadraoGroupInvitation: View {
                         if guest { ToolbarItem(placement: .topBarTrailing) { Button(spanish ? "Editar" : "Edit") { guest = false } } }
                     }
                     .sheet(isPresented: $code) { codeCard(group) }
-                    .onAppear { look = group.look; cover = group.cover; joined = group.members.contains { $0.name == "Mar" } }
+                    .onAppear { look = group.look; cover = group.cover; joined = group.activeMembers.contains { $0.name == "Mar" } }
                     .onChange(of: look) { _, value in var updated = group; updated.look = value; store.save(updated) }
                     .onChange(of: cover) { _, value in var updated = store.group(groupID) ?? group; updated.cover = value; store.save(updated) }
             }
@@ -68,14 +71,14 @@ struct CuadraoGroupInvitation: View {
         VStack(spacing: 0) {
             ZStack(alignment: .bottomLeading) {
                 PlanGroupArtwork(look: look, cover: cover).frame(height: 230)
-                PlanAvatarStack(members: group.members).padding(20)
+                PlanAvatarStack(members: group.activeMembers).padding(20)
             }
             VStack(alignment: .leading, spacing: 14) {
                 Text(spanish ? "HAY UN PLAN CONTIGO" : "YOU'RE PART OF THE PLAN").font(.system(size: 10, weight: .semibold)).tracking(1.8).foregroundStyle(look.color)
                 Text(group.name).font(.system(size: 32, weight: .regular, design: .serif))
                 Text(group.kind == .trip ? (spanish ? "Un buen rato. Las cuentas, claras." : "Good times. Clear shares.") : (spanish ? "Algo bonito que construir juntos." : "Something worth building together.")).font(.subheadline).foregroundStyle(.secondary)
                 Divider()
-                Label(spanish ? "\(group.members.count) personas en el plan" : "\(group.members.count) people in the plan", systemImage: "person.2").font(.subheadline)
+                Label(spanish ? "\(group.activeMembers.count) personas en el plan" : "\(group.activeMembers.count) people in the plan", systemImage: "person.2").font(.subheadline)
                 Text(spanish ? "Los montos se revisan dentro del grupo." : "Review amounts inside the group.").font(.caption).foregroundStyle(.secondary)
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }.background(look.color.opacity(0.065), in: RoundedRectangle(cornerRadius: 30)).clipShape(RoundedRectangle(cornerRadius: 30))
@@ -83,7 +86,7 @@ struct CuadraoGroupInvitation: View {
     private func codeCard(_ group: PlanGroup) -> some View {
         VStack(spacing: 24) {
             Text(group.name).font(CuadraoTypography.feature).multilineTextAlignment(.center)
-            PlanAvatarStack(members: group.members)
+            PlanAvatarStack(members: group.activeMembers)
             if let image = Self.qr("Cuadrao design preview | \(group.id.uuidString)") {
                 Image(uiImage: image).interpolation(.none).resizable().scaledToFit().frame(maxWidth: 245)
                     .padding(24).background(.white, in: RoundedRectangle(cornerRadius: 28))

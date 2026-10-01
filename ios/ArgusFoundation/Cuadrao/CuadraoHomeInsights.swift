@@ -28,7 +28,7 @@ struct CuadraoHomeInsights: View {
             }.accessibilityIdentifier("home-insights-content").background(WelcomePalette.background)
                 .navigationDestination(for: UUID.self) { id in
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
-                        actions: { accountSheet = .actions($0) }, record: { accountSheet = .record($0) })
+                        actions: { accountSheet = $0 }, record: { accountSheet = .record($0) })
                 }
                 .navigationTitle(space).navigationBarTitleDisplayMode(.inline)
                 .toolbar {

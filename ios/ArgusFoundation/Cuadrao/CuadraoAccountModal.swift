@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Shared account actions for Home, Search and insights navigation.
 enum CanvasAccountSheet: Identifiable {
-    case actions(UUID), rename(UUID), record(UUID), manageAccounts(editing: Bool), archived
+    case archive(UUID), rename(UUID), record(UUID), manageAccounts(editing: Bool), archived
     var id: String { "account-modal" }
 }
 
@@ -14,13 +14,8 @@ struct CuadraoAccountModal: View {
     let archived: (UUID) -> Void
     var body: some View {
         switch selection {
-        case .actions(let id):
-            if let account = data.account(id) {
-                CuadraoAccountActions(account: account, spanish: spanish,
-                    rename: { show(.rename(id)) }, record: { show(.record(id)) }, archive: {
-                        data.archive(id, true); archived(id)
-                    }, reorder: data.active.count > 1 ? { show(.manageAccounts(editing: true)) } : nil)
-            }
+        case .archive(let id):
+            CuadraoArchiveAccountReview(data: data, id: id, spanish: spanish) { archived(id) }
         case .manageAccounts(let editing):
             CuadraoAccountsCollection(data: data, spanish: spanish, editing: editing)
         case .archived:

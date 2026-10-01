@@ -12,8 +12,8 @@ struct CuadraoGroupDetail: View {
     @Environment(\.dismiss) private var dismiss
     private var group: PlanGroup? { store.group(groupID) }
     private enum GroupSheet: Identifiable {
-        case invite, edit, expense(PlanSharedExpense?), settle
-        var id: String { switch self { case .invite: "invite"; case .edit: "edit"; case .expense: "expense"; case .settle: "settle" } }
+        case invite, edit, expense(PlanSharedExpense?), settle, remove(PlanMember)
+        var id: String { switch self { case .invite: "invite"; case .edit: "edit"; case .expense: "expense"; case .settle: "settle"; case .remove: "remove" } }
     }
     var body: some View {
         Group {
@@ -35,12 +35,8 @@ struct CuadraoGroupDetail: View {
                 }.background(WelcomePalette.background).cuadraoSoftScrollEdges()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button { sheet = .invite } label: { Image(systemName: "person.badge.plus").frame(width: 44, height: 44) }
-                                .accessibilityLabel(spanish ? "Invitar al grupo" : "Invite to group").accessibilityIdentifier("group-invite")
-                        }
-                        ToolbarItem(placement: .topBarTrailing) {
                             Menu {
-                                Button(spanish ? "Editar grupo" : "Edit group", systemImage: "pencil") { sheet = .edit }
+                                if store.canManage { Button(spanish ? "Editar grupo" : "Edit group", systemImage: "pencil") { sheet = .edit } }
                                 Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { store.archive(group.id, true); dismiss() }
                             } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }.accessibilityIdentifier("group-options")
                         }
@@ -51,6 +47,7 @@ struct CuadraoGroupDetail: View {
                         case .edit: CuadraoGroupEditor(store: store, spanish: spanish, initial: group)
                         case .expense(let entry): CuadraoGroupExpenseEditor(store: store, groupID: group.id, initial: entry, spanish: spanish)
                         case .settle: CuadraoGroupSettlement(store: store, groupID: group.id, spanish: spanish)
+                        case .remove(let member): CuadraoGroupMemberReview(store: store, groupID: group.id, member: member, spanish: spanish)
                         }
                     }
                     .onAppear { people = Double(group.expectedPeople) }
@@ -62,9 +59,12 @@ struct CuadraoGroupDetail: View {
         VStack(alignment: .leading, spacing: 16) {
             PlanGroupArtwork(look: group.look, progress: group.kind == .saving ? group.progress : nil, cover: group.cover)
                 .frame(height: 145).clipShape(RoundedRectangle(cornerRadius: 28))
-                .overlay(alignment: .bottomLeading) { PlanAvatarStack(members: group.members).padding(16) }
+                .overlay(alignment: .bottomLeading) {
+                    Button { section = 2 } label: { PlanAvatarStack(members: group.activeMembers).padding(16) }
+                        .accessibilityLabel(spanish ? "Ver personas" : "View people").accessibilityIdentifier("group-people-open")
+                }
             Text(group.name).font(CuadraoTypography.screen)
-            Text(spanish ? "\(group.members.count) personas · \(group.kind.title(true))" : "\(group.members.count) people · \(group.kind.title(false))")
+            Text(spanish ? "\(group.activeMembers.count) personas · \(group.kind.title(true))" : "\(group.activeMembers.count) people · \(group.kind.title(false))")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -86,7 +86,7 @@ struct CuadraoGroupDetail: View {
             Slider(value: $people, in: 1...50, step: 1).tint(group.look.color).accessibilityLabel(spanish ? "Personas previstas" : "Expected people").accessibilityIdentifier("group-people-slider")
             Text(spanish ? "Estimado total: \(PlanFormat.amount(Double(group.estimatedCents) / 100, currency: group.currency)). Reparto igual; todavía no es una deuda." : "Total estimate: \(PlanFormat.amount(Double(group.estimatedCents) / 100, currency: group.currency)). Equal split; this isn't a debt yet.")
                 .font(.caption).foregroundStyle(.secondary)
-            if Int(people) != group.expectedPeople {
+            if store.canManage && Int(people) != group.expectedPeople {
                 Button(spanish ? "Guardar estimación" : "Save estimate") {
                     var updated = group; updated.expectedPeople = Int(people); store.save(updated); didSave = true
                 }.font(.subheadline.weight(.medium)).frame(minHeight: 44).accessibilityIdentifier("group-save-estimate")
@@ -159,17 +159,36 @@ struct CuadraoGroupDetail: View {
     }
     private func members(_ group: PlanGroup) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            ForEach(Array(group.members.enumerated()), id: \.element.id) { index, member in
+            ForEach(Array(group.activeMembers.enumerated()), id: \.element.id) { index, member in
                 HStack(spacing: 12) {
                     PlanMemberAvatar(member: member, index: index)
-                    Text(member.name); Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(member.name)
+                        if member.id == group.me && store.canManage { Text(spanish ? "Organiza" : "Organizer").font(.caption).foregroundStyle(.secondary) }
+                    }; Spacer()
                     VStack(alignment: .trailing, spacing: 4) {
                         Text(PlanFormat.amount(Double(group.kind == .saving ? group.paid(member.id) : abs(group.balance(member.id))) / 100, currency: group.currency)).font(.subheadline)
                         Text(group.kind == .saving ? (spanish ? "aportado" : "contributed") : group.balance(member.id) > 0 ? (spanish ? "por recuperar" : "to receive") : group.balance(member.id) < 0 ? (spanish ? "por pagar" : "to pay") : (spanish ? "al día" : "settled")).font(.caption).foregroundStyle(.secondary)
                     }
+                    if store.canManage && member.id != group.me {
+                        Button { sheet = .remove(member) } label: {
+                            Image(systemName: "person.crop.circle.badge.minus").frame(width: 44, height: 44)
+                        }.accessibilityLabel((spanish ? "Quitar a " : "Remove ") + member.name)
+                            .accessibilityIdentifier("group-remove-" + member.name)
+                    }
                 }
             }
-            Button { sheet = .invite } label: { Label(spanish ? "Invitar a alguien" : "Invite someone", systemImage: "person.badge.plus").frame(minHeight: 44) }
+            if store.canManage {
+                Button { sheet = .invite } label: { Label(spanish ? "Invitar a alguien" : "Invite someone", systemImage: "person.badge.plus").frame(minHeight: 44) }
+                    .accessibilityIdentifier("group-invite")
+            }
+            if !group.removedMemberIDs.isEmpty {
+                DisclosureGroup(spanish ? "Participaron antes" : "Former members") {
+                    ForEach(group.members.filter { group.removedMemberIDs.contains($0.id) }) { member in
+                        Text(member.name).font(.subheadline).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
             Text(spanish ? "Solo compartimos este plan. Las cuentas, otros planes y chats de cada quien siguen privados." : "Only this plan is shared. Everyone's accounts, other plans and chats stay private.").font(.caption).foregroundStyle(.secondary)
         }
     }

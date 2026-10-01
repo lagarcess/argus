@@ -13,14 +13,13 @@ struct CuadraoPlanCanvas: View {
         empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
     @State private var newGroup = false
     @State private var scope = "personal"
-    @State private var filter: String?
     @State private var selectedDay: Int?
     @State private var creation: PlanEditorRoute?
     @State private var resetConfirmation = false
     @State private var showEmpty = false
 
     private var forecast: CanvasForecast { CanvasForecast(household: scope == "household") }
-    private var active: [CanvasPlan] { store.plans.filter { !$0.archived && (filter == nil || $0.spaceID == filter) } }
+    private var active: [CanvasPlan] { store.plans.filter { !$0.archived } }
     private var selectedPoint: CanvasForecastPoint? {
         guard let selectedDay else { return nil }
         return (forecast.actual + forecast.projection(daily: store.daily(for: scope)).dropFirst()).first { $0.day == selectedDay }
@@ -37,7 +36,7 @@ struct CuadraoPlanCanvas: View {
                         Text(spanish ? "En grupo" : "Together").tag(true)
                     }.pickerStyle(.segmented).accessibilityIdentifier("plan-audience")
                     if together {
-                        CuadraoGroupCollection(store: groups, spanish: spanish, bottomSpace: bottomSpace, create: { newGroup = true })
+                        CuadraoGroupCollection(store: groups, spanish: spanish, bottomSpace: bottomSpace, create: { newGroup = true }, open: { path.append($0) })
                     } else {
                         if store.hasForecast { forecastOverview } else { forecastColdStart }
                         plans
@@ -66,7 +65,7 @@ struct CuadraoPlanCanvas: View {
             }
             .confirmationDialog(spanish ? "¿Cambiar el escenario de vista previa?" : "Change preview scenario?", isPresented: $resetConfirmation, titleVisibility: .visible) {
                 Button(spanish ? "Cambiar escenario" : "Change scenario", role: .destructive) {
-                    store.resetExamples(spanish: spanish, empty: showEmpty); groups.resetExamples(spanish: spanish, empty: showEmpty); filter = nil
+                    store.resetExamples(spanish: spanish, empty: showEmpty); groups.resetExamples(spanish: spanish, empty: showEmpty)
                 }
             } message: {
                 Text(spanish ? "Se reemplazarán solo los planes de esta vista previa." : "Only this preview's plans will be replaced.")
@@ -78,38 +77,33 @@ struct CuadraoPlanCanvas: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Plan").font(CuadraoTypography.screen)
+                    .contextMenu {
+                        Button(spanish ? "Ver primer uso" : "See first use") { showEmpty = true; resetConfirmation = true }
+                        Button(spanish ? "Restablecer ejemplos" : "Reset examples") { showEmpty = false; resetConfirmation = true }
+                    }
                 Text(spanish ? "Lo que viene, lo hacemos." : "Make what's next happen.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
-            Menu {
-                NavigationLink { CuadraoArchivedPlans(store: store, accounts: accounts, spanish: spanish, bottomSpace: bottomSpace) } label: { Label(spanish ? "Archivados" : "Archived", systemImage: "archivebox") }
-                Section(spanish ? "Vista previa" : "Preview") {
-                    Button(spanish ? "Ver primer uso" : "See first use") { showEmpty = true; resetConfirmation = true }
-                    Button(spanish ? "Restablecer ejemplos" : "Reset examples") { showEmpty = false; resetConfirmation = true }
-                }
-            } label: {
-                Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Circle())
-            }.accessibilityLabel(spanish ? "Opciones de Plan" : "Plan options").accessibilityIdentifier("plan-options")
             Button { if together { newGroup = true } else { creation = PlanEditorRoute(plan: newPlan) } } label: {
                 Image(systemName: "plus").font(.system(size: 20, weight: .medium))
                     .frame(width: 44, height: 44).background(WelcomePalette.sage, in: Circle())
-            }.accessibilityLabel(spanish ? "Crear plan" : "Create plan").accessibilityIdentifier("plan-create")
+            }.accessibilityLabel(together ? (spanish ? "Crear grupo" : "Create group") : (spanish ? "Crear plan" : "Create plan")).accessibilityIdentifier("plan-create")
         }
     }
 
     private var forecastSpaces: [CanvasSpace] { accounts.visibleSpaces.filter { $0.kind == .personal || $0.kind == .household } }
 
     private var newPlan: CanvasPlan {
-        CanvasPlan(name: "", spaceID: filter ?? CanvasSpace.personalID)
+        CanvasPlan(name: "", spaceID: CanvasSpace.personalID)
     }
 
     private var forecastOverview: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(spanish ? "Octubre" : "October")
+                Text(spanish ? "Tu mes" : "Your month")
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                Text("·").foregroundStyle(.tertiary).accessibilityHidden(true)
+                Spacer()
                 if forecastSpaces.count > 1 {
                     Menu {
                         ForEach(forecastSpaces) { space in
@@ -158,29 +152,19 @@ struct CuadraoPlanCanvas: View {
 
     private var plans: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Text(spanish ? "Tus planes" : "Your plans").font(CuadraoTypography.section)
-                Spacer()
-                Menu {
-                    CuadraoChoiceOption(title: spanish ? "Todos los espacios" : "All spaces", selected: filter == nil) { filter = nil }
-                    ForEach(accounts.visibleSpaces) { space in
-                        CuadraoChoiceOption(title: space.title(spanish), selected: filter == space.id) { filter = space.id }
-                    }
-                } label: {
-                    CuadraoChoiceLabel(title: filter.map { PlanFormat.space($0, accounts: accounts, spanish: spanish) } ?? (spanish ? "Todos" : "All"))
-                }.accessibilityLabel(spanish ? "Filtrar planes por espacio" : "Filter plans by space")
-                    .accessibilityValue(filter.map { PlanFormat.space($0, accounts: accounts, spanish: spanish) } ?? (spanish ? "Todos los espacios" : "All spaces"))
-                    .accessibilityIdentifier("plan-space-filter")
-            }
-            ForEach(active) { plan in
-                NavigationLink(value: plan.id) {
+            Text(spanish ? "Tus planes" : "Your plans").font(CuadraoTypography.section)
+            CuadraoOrderedCollection(items: active, spanish: spanish,
+                identifier: { "plan-row-\($0.kind.rawValue)-\($0.spaceID)" },
+                open: { path.append($0.id) }, edit: { creation = .init(plan: $0) },
+                archive: { store.archive($0.id, true) }, reorder: store.reorder) { plan in
                     PlanCard(plan: plan, space: PlanFormat.space(plan.spaceID, accounts: accounts, spanish: spanish), spanish: spanish)
-                }.buttonStyle(.plain).accessibilityIdentifier("plan-row-\(plan.kind.rawValue)-\(plan.spaceID)")
-                    .contextMenu {
-                        Button { creation = .init(plan: plan) } label: { Label(spanish ? "Editar" : "Edit", systemImage: "pencil") }
-                        Button { store.archive(plan.id, true) } label: { Label(spanish ? "Archivar" : "Archive", systemImage: "archivebox") }
-                    }
-            }
+                }
+            NavigationLink {
+                CuadraoArchivedPlans(store: store, accounts: accounts, spanish: spanish, bottomSpace: bottomSpace)
+            } label: {
+                Label(spanish ? "Archivados" : "Archived", systemImage: "archivebox")
+                    .font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44)
+            }.accessibilityIdentifier("plan-archives")
             if active.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?").font(CuadraoTypography.section)

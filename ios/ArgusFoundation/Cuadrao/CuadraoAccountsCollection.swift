@@ -50,7 +50,7 @@ struct CuadraoAccountsCollection: View {
                 }
                 .navigationDestination(for: UUID.self) { id in
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
-                        actions: { selection = .actions($0) }, record: { selection = .record($0) })
+                        actions: { selection = $0 }, record: { selection = .record($0) })
                 }
         }.tint(WelcomePalette.pine)
             .sheet(item: $selection) { item in

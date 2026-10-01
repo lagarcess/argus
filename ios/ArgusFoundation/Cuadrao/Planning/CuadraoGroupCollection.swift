@@ -5,6 +5,8 @@ struct CuadraoGroupCollection: View {
     let spanish: Bool
     let bottomSpace: CGFloat
     let create: () -> Void
+    let open: (UUID) -> Void
+    @State private var editing: PlanGroup?
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             HStack {
@@ -15,14 +17,14 @@ struct CuadraoGroupCollection: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
             }
-            ForEach(store.groups.filter { !$0.archived }) { group in
-                NavigationLink {
-                    CuadraoGroupDetail(store: store, groupID: group.id, spanish: spanish, bottomSpace: bottomSpace)
-                } label: {
+            CuadraoOrderedCollection(items: store.groups.filter { !$0.archived }, spanish: spanish, spacing: 22,
+                identifier: { "group-card-\($0.kind.rawValue)" },
+                open: { open($0.id) }, edit: { editing = $0 }, canEdit: { _ in store.canManage },
+                archive: { store.archive($0.id, true) }, reorder: store.reorder) { group in
                     VStack(alignment: .leading, spacing: 16) {
                         PlanGroupArtwork(look: group.look, progress: group.kind == .saving ? group.progress : nil, cover: group.cover)
                             .frame(height: 140)
-                            .overlay(alignment: .bottomLeading) { PlanAvatarStack(members: group.members).padding(16) }
+                            .overlay(alignment: .bottomLeading) { PlanAvatarStack(members: group.activeMembers).padding(16) }
                         VStack(alignment: .leading, spacing: 8) {
                             Text(group.name).font(CuadraoTypography.section).foregroundStyle(WelcomePalette.ink)
                             HStack {
@@ -39,22 +41,37 @@ struct CuadraoGroupCollection: View {
                             }
                         }.padding(.horizontal, 20).padding(.bottom, 20)
                     }.background(group.look.color.opacity(0.055), in: RoundedRectangle(cornerRadius: 28)).clipShape(RoundedRectangle(cornerRadius: 28))
-                }.buttonStyle(.plain).accessibilityIdentifier("group-card-\(group.kind.rawValue)")
-                    .contextMenu { Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { store.archive(group.id, true) } }
             }
-            PlanPrimaryButton(title: spanish ? "Armar un plan juntos" : "Make a plan together", symbol: "plus", action: create)
-                .accessibilityIdentifier("group-create")
-            if store.groups.contains(where: \.archived) {
-                DisclosureGroup(spanish ? "Planes archivados" : "Archived plans") {
-                    ForEach(store.groups.filter(\.archived)) { group in
-                        HStack {
-                            Text(group.name); Spacer()
-                            Button(spanish ? "Retomar" : "Restore") { store.archive(group.id, false) }
-                        }.font(.subheadline).padding(.vertical, 10)
-                    }
+            if store.groups.allSatisfy(\.archived) {
+                PlanPrimaryButton(title: spanish ? "Armar un plan juntos" : "Make a plan together", symbol: "plus", action: create)
+                    .accessibilityIdentifier("group-create")
+            }
+            NavigationLink {
+                CuadraoArchivedGroups(store: store, spanish: spanish)
+            } label: {
+                Label(spanish ? "Archivados" : "Archived", systemImage: "archivebox")
+                    .font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44)
+            }.accessibilityIdentifier("group-archives")
+        }.sheet(item: $editing) { CuadraoGroupEditor(store: store, spanish: spanish, initial: $0) }
+    }
+}
+
+private struct CuadraoArchivedGroups: View {
+    let store: CuadraoGroupPreview
+    let spanish: Bool
+    var body: some View {
+        List {
+            if store.groups.filter(\.archived).isEmpty {
+                ContentUnavailableView(spanish ? "Nada archivado" : "Nothing archived", systemImage: "archivebox")
+            }
+            ForEach(store.groups.filter(\.archived)) { group in
+                HStack {
+                    Text(group.name); Spacer()
+                    Button(spanish ? "Retomar" : "Restore") { store.archive(group.id, false) }.buttonStyle(.bordered)
                 }
             }
-        }
+        }.navigationTitle(spanish ? "Archivados" : "Archived").navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
     }
 }
 

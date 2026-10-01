@@ -43,7 +43,11 @@ struct PlanGroup: Identifiable, Codable, Equatable {
     var expenses: [PlanSharedExpense] = []
     var repayments: [PlanRepayment] = []
     var archived = false
+    var removedMemberIDs: [UUID] = []
+    var activeMembers: [PlanMember] { members.filter { !removedMemberIDs.contains($0.id) } }
     var me: UUID { members[0].id }
+    func canRemove(_ id: UUID) -> Bool { id != me && balance(id) == 0 && activeMembers.contains { $0.id == id } }
+
     var total: Int { expenses.filter { !$0.draft }.reduce(0) { $0 + $1.cents } }
     func paid(_ id: UUID) -> Int { expenses.filter { !$0.draft && $0.payer == id }.reduce(0) { $0 + $1.cents } }
     func share(_ id: UUID) -> Int { expenses.filter { !$0.draft }.reduce(0) { $0 + ($1.shares[id] ?? 0) } }
@@ -74,7 +78,7 @@ struct PlanGroup: Identifiable, Codable, Equatable {
 // Earlier previews supported DOP only. Preserve those saved groups and amounts.
 extension PlanGroup {
     enum CodingKeys: String, CodingKey {
-        case id, name, kind, currency, look, cover, members, estimatedCents, expectedPeople, expenses, repayments, archived
+        case id, name, kind, currency, look, cover, members, estimatedCents, expectedPeople, expenses, repayments, archived, removedMemberIDs
     }
     init(from decoder: Decoder) throws {
         let saved = try decoder.container(keyedBy: CodingKeys.self)
@@ -90,11 +94,19 @@ extension PlanGroup {
         expenses = try saved.decode([PlanSharedExpense].self, forKey: .expenses)
         repayments = try saved.decode([PlanRepayment].self, forKey: .repayments)
         archived = try saved.decode(Bool.self, forKey: .archived)
+        removedMemberIDs = try saved.decodeIfPresent([UUID].self, forKey: .removedMemberIDs) ?? []
     }
 }
 
 @Observable final class CuadraoGroupPreview {
     var groups: [PlanGroup] = []
+    // Local design role scenario, not an authorization contract.
+    var canManage: Bool { !ProcessInfo.processInfo.arguments.contains("--group-member") }
+    func removeMember(_ memberID: UUID, from groupID: UUID) {
+        guard canManage, var group = group(groupID), group.canRemove(memberID) else { return }
+        group.removedMemberIDs.append(memberID); save(group)
+    }
+
     private let defaults: UserDefaults?
     private let key = "cuadrao.design.groups.v1"
     init(spanish: Bool, defaults: UserDefaults? = .standard, reset: Bool = false, empty: Bool = false) {
@@ -107,6 +119,10 @@ extension PlanGroup {
         guard group.valid, self.group(group.id).map({ $0.currency == group.currency }) ?? true else { return }
         if let i = groups.firstIndex(where: { $0.id == group.id }) { groups[i] = group } else { groups.append(group) }
         persist()
+    }
+    func reorder(_ ids: [UUID]) {
+        guard Set(ids) == Set(groups.filter { !$0.archived }.map(\.id)) else { return }
+        groups = CuadraoCollectionOrder.applying(ids, to: groups); persist()
     }
     func archive(_ id: UUID, _ archived: Bool) {
         guard var group = group(id) else { return }; group.archived = archived; save(group)

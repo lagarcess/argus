@@ -167,6 +167,10 @@ struct CanvasForecast {
         if let i = plans.firstIndex(where: { $0.id == plan.id }) { plans[i] = plan } else { plans.append(plan) }
         persist()
     }
+    func reorder(_ ids: [UUID]) {
+        guard Set(ids) == Set(plans.filter { !$0.archived }.map(\.id)) else { return }
+        plans = CuadraoCollectionOrder.applying(ids, to: plans); persist()
+    }
     func archive(_ id: UUID, _ archived: Bool) {
         guard let i = plans.firstIndex(where: { $0.id == id }) else { return }
         plans[i].archived = archived; persist()
