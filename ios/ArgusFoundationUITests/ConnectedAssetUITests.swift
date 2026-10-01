@@ -105,7 +105,7 @@ extension FinancialLoopUITests {
         try signIn()
         let stamp = String(UUID().uuidString.prefix(5))
         _ = createAsset("Unknown asset " + stamp, type: "other_asset", amount: nil)
-        XCTAssertTrue(app.staticTexts["assets.unknown"].exists)
+        XCTAssertTrue(app.scrollViews["screen.accounts"].staticTexts["assets.unknown"].exists)
         _ = createAsset("Zero vehicle " + stamp, type: "vehicle", amount: "0")
         assertAssetContribution("DOP 0.00")
         capture("asset-zero-remains-known")
@@ -122,12 +122,13 @@ extension FinancialLoopUITests {
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("asset-create-response-lost")
         app.terminate(); app.launch()
-        let retry = app.buttons["loop.pending.retry"]
+        app.buttons["tab.home"].tap()
+        let retry = app.scrollViews["screen.home"].buttons["loop.pending.retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 20)); tapVisible(retry)
         XCTAssertTrue(retry.waitForNonExistence(timeout: 20))
         app.buttons["tab.accounts"].tap()
         if app.buttons["accounts.back"].exists { scrollMoneyTop(); tapVisible(app.buttons["accounts.back"]) }
-        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name))
+        let rows = app.scrollViews["screen.accounts"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name))
         XCTAssertEqual(rows.count, 1)
         tapVisible(rows.firstMatch); assertAssetContribution("DOP 1,000.00")
         capture("asset-create-recovered-once")
@@ -143,7 +144,7 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
         if half { tapVisible(app.buttons["assets.share.change"]); tapVisible(app.buttons["assets.share.half"]) }
         tapVisible(app.buttons["accounts.save"])
-        XCTAssertTrue(app.buttons["assets.update"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.scrollViews["screen.accounts"].buttons["assets.update"].waitForExistence(timeout: 15))
         scrollMoneyTop(); tapVisible(app.buttons["accounts.back"])
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
