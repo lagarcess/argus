@@ -209,6 +209,21 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         reviewedCommand = nil
     }
 
+    func answerAndReview(accountId: UUID, observationId: UUID, included: Bool, locale: Locale) async {
+        guard phase != .uncertain else { return }
+        answers.removeAll { $0.accountId == accountId && $0.observationId == observationId }
+        answers.append(.init(accountId: accountId, observationId: observationId, included: included))
+        // Wait out an in-flight review so a second observation answer is not dropped
+        // by guard !busy, then send every answer collected so far.
+        while busy {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        guard phase != .uncertain else { return }
+        preview = nil
+        reviewedCommand = nil
+        await review(locale: locale)
+    }
+
     func review(locale: Locale) async {
         guard !busy, phase != .uncertain else { return }
         phase = .loading; errorKey = nil

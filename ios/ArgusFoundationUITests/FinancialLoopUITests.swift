@@ -191,18 +191,36 @@ final class FinancialLoopUITests: XCTestCase {
         tapVisible(app.buttons["loop.review"])
         // Activity editor: loop.coverage.{yes|no}.<accountId>.<observationId>
         // Balance/opening editor: loop.coverage.{yes|no}.<kind>.<observationId>
+        // After a checked balance, one expense can ask about opening AND check —
+        // answer each distinct id once; re-tapping firstMatch never reaches the rest.
         let prefix = included ? "loop.coverage.yes." : "loop.coverage.no."
-        for _ in 0..<6 {
+        var answered = Set<String>()
+        for _ in 0..<8 {
             if app.buttons["loop.confirm"].waitForExistence(timeout: 2) { break }
-            let answer = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
-            if answer.waitForExistence(timeout: 1) {
+            let matches = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+            var tapped = false
+            for index in 0..<matches.count {
+                let answer = matches.element(boundBy: index)
+                let id = answer.identifier
+                guard !id.isEmpty, !answered.contains(id), answer.exists else { continue }
                 tapVisible(answer)
-            } else if !included {
+                answered.insert(id)
+                tapped = true
+                // Let the review round-trip finish before the next observation.
+                _ = app.buttons["loop.confirm"].waitForExistence(timeout: 4)
+                break
+            }
+            if tapped { continue }
+            if !included {
                 let opening = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no.opening.")).firstMatch
-                if opening.waitForExistence(timeout: 1) { tapVisible(opening) }
+                if opening.waitForExistence(timeout: 1), !answered.contains(opening.identifier) {
+                    tapVisible(opening)
+                    answered.insert(opening.identifier)
+                    continue
+                }
             }
         }
-        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 8))
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
         capture("expense-review")
         tapVisible(app.buttons["loop.confirm"])
     }

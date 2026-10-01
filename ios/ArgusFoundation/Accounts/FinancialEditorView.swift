@@ -17,7 +17,9 @@ struct FinancialEditorView: View {
                         Spacer()
                         Text(verbatim: model.account.currency).foregroundStyle(ArgusStyle.secondary)
                     }
-                    if model.canEdit || model.phase == .loading {
+                    if model.canEdit {
+                        // Keep entry off-screen during loading/coverage review so field
+                        // remounts cannot invalidate in-flight coverage answers.
                         entry
                     }
                     if let preview = model.expensePreview { expenseReview(preview) }
