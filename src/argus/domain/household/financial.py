@@ -39,13 +39,18 @@ class HouseholdFinancialService:
     def snapshot(self, actor: str, hid: str) -> dict:
         with self.households.transaction(actor, hid) as (c, h, m):
             scope = resolve(c, actor, h, m)
+            from . import planning_store
+            from .planning import SharedPlanningService
+
+            people = planning_store.members(c, hid)
             # Personal writes use the same owner locks, keeping one coherent read.
-            for owner in sorted({a.owner_id for a in scope.accounts.values()}):
+            owners = canonical_groups.owner_closure(
+                c, {p["user_id"] for p in people.values()}
+            )
+            for owner in owners:
                 owner_lock(c, owner)
             records = self.records(c, scope)
-            canonical = canonical_groups.load(
-                self.repository, c, {a.owner_id for a in scope.accounts.values()}
-            )
+            canonical = canonical_groups.load(self.repository, c, owners)
             projected = []
             for aid, number in canonical.current_visible(scope.accounts).items():
                 projected.append(
@@ -65,6 +70,19 @@ class HouseholdFinancialService:
                 ),
                 reverse=True,
             )
+            access = {
+                aid: (a.owner_id, a.permission, hid) for aid, a in scope.accounts.items()
+            }
+            access.update(
+                {
+                    s.account.id: (actor, "edit", None)
+                    for s in canonical.records
+                    if s.account.user_id == actor
+                }
+            )
+            plans = SharedPlanningService(self.households).snapshot_context(
+                (c, h, scope.membership_id, people, access, canonical), actor, hid
+            )["plans"]
             return {
                 "household_id": hid,
                 "membership_id": scope.membership_id,
@@ -72,6 +90,7 @@ class HouseholdFinancialService:
                 "accounts": [account(scope, s) for s in records],
                 "activities": projected,
                 "positions": positions(records),
+                "plans": plans,
             }
 
     def detail(self, actor: str, hid: str, aid: str) -> dict:
@@ -149,6 +168,19 @@ class HouseholdFinancialService:
                         "activity_id": a["activity_id"],
                     }
                 )
+        for item in snap["plans"]:
+            title = item["definition"]["name"]
+            if query in title.casefold():
+                items.append(
+                    dict(
+                        id=str(item["ref"]["id"]),
+                        kind="plan",
+                        title=title,
+                        account_id=None,
+                        activity_id=None,
+                        plan_ref=item["ref"],
+                    )
+                )
         basis = canonical_hash(
             {
                 "actor": actor,
@@ -160,6 +192,9 @@ class HouseholdFinancialService:
                 "accounts": [
                     (a["account"]["id"], a["account"]["version"])
                     for a in snap["accounts"]
+                ],
+                "plans": [
+                    (p["ref"], p["version"], p["archive_reason"]) for p in snap["plans"]
                 ],
             }
         )
@@ -206,8 +241,12 @@ class HouseholdFinancialService:
                 if a
             }
             owner = require_edit(scope, targets)
-            owner_lock(c, owner)
-            records = load_owner(self.repository, c, owner)
+            for dependency_owner in canonical_groups.owner_closure(c, {owner}):
+                owner_lock(c, dependency_owner)
+            canonical = canonical_groups.load(self.repository, c, {owner})
+            records = canonical_groups.VisibleAccounts(
+                load_owner(self.repository, c, owner), canonical
+            )
             required = dependencies(records, request, activity_id)
             require_edit(scope, required)
             receipt_scope = f"household:{hid}:{actor}:{scope.membership_id}"
@@ -229,6 +268,7 @@ class HouseholdFinancialService:
                     receipt[2],
                     tuple(str(a) for a in receipt[3]),
                     True,
+                    canonical,
                 )
             if scope.authorization_version != expected_household_version:
                 raise StaleVersion()
@@ -276,6 +316,7 @@ class HouseholdFinancialService:
                 result.revision,
                 result.affected,
                 False,
+                canonical_groups.load(self.repository, c, {owner}),
             )
 
     def receipt(
@@ -286,11 +327,17 @@ class HouseholdFinancialService:
         revision: int,
         affected: tuple[str, ...],
         replayed: bool,
+        canonical: canonical_groups.ResolvedGroups,
     ) -> dict:
         visible = [s for s in records if s.account.id in scope.accounts]
         return {
             "activity": activity(
-                scope, records, aid, revision, all_owner_records=records
+                scope,
+                records,
+                aid,
+                revision,
+                all_owner_records=records,
+                canonical=canonical,
             ),
             "accounts": [account(scope, s) for s in visible if s.account.id in affected],
             "replayed": replayed,

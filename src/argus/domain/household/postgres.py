@@ -476,6 +476,15 @@ class PostgresHouseholdRepository:
 
     def _close_locked(self, connection, *, household_id: str) -> None:  # noqa: ANN001
         now = self._clock()
+        from .planning_store import archive_owner
+
+        for (owner,) in connection.execute(
+            "select distinct owner_user_id from public.household_plan_bindings where household_id=%s and departed_at is null and revoked_at is null order by owner_user_id",
+            (household_id,),
+        ).fetchall():
+            archive_owner(
+                connection, household_id, str(owner), now, self._accounts._repository
+            )
         connection.execute(
             "update public.households set status = 'closed', closed_at = %s"
             " where id = %s and status = 'active'",
@@ -505,6 +514,9 @@ class PostgresHouseholdRepository:
         user_id: str,  # noqa: ANN001
     ) -> None:
         now = self._clock()
+        from .planning_store import archive_owner
+
+        archive_owner(connection, household_id, user_id, now, self._accounts._repository)
         connection.execute(
             "update public.household_members set left_at = %s"
             " where household_id = %s and user_id = %s and left_at is null",

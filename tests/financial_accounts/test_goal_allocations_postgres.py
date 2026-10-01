@@ -81,6 +81,11 @@ def legacy_schema(repository):
     with repository._pool.connection() as connection:
         with connection.transaction(force_rollback=True):
             connection.execute("set local lock_timeout='5s'")
+            # Reconstruct the pre-cutover schema only within this rollback rehearsal.
+            # The later immutable-history trigger must not observe synthetic legacy bodies.
+            connection.execute(
+                "alter table public.financial_goals disable trigger goal_revision"
+            )
             connection.execute(
                 "alter table public.financial_goals "
                 "drop constraint financial_goals_no_json_allocations"

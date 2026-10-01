@@ -39,7 +39,7 @@ def earliest(item: dict[str, Any], state: dict[str, Any], today: date) -> date:
             today,
             *[
                 date.fromisoformat(link["snapshot"]["due_date"]) + timedelta(days=1)
-                for key, link in state["links"].items()
+                for key, link in claims.protected_links(state).items()
                 if link.get("goal_id") == item["id"] and claims.occurrence_id(key, link)
             ],
         ]
@@ -214,7 +214,7 @@ def occurrences(state: dict[str, Any], until: date) -> dict[str, dict[str, Any]]
                     "destination_account_id": part["destination_account_id"],
                     "due_date": due.isoformat(),
                 }
-    for key, link in state["links"].items():
+    for key, link in claims.protected_links(state).items():
         oid = claims.occurrence_id(key, link)
         if link.get("goal_id") and oid:
             result[oid] = link["snapshot"] | {

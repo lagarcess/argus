@@ -39,7 +39,7 @@ def empty() -> dict[str, Any]:
     }
 
 
-def load(connection: Any, user_id: str) -> dict[str, Any]:
+def load(connection: Any, user_id: str, repository: Any = None) -> dict[str, Any]:
     state = empty()
     for did, body in connection.execute(
         "select id,body from public.financial_debt_plans where user_id=%s order by id",
@@ -73,7 +73,7 @@ def load(connection: Any, user_id: str) -> dict[str, Any]:
         snapshot,
         attribution,
     ) in connection.execute(
-        "select claim_id,occurrence_id,expectation_id,goal_id,debt_plan_id,activity_id,activity_revision,snapshot,attribution from public.financial_plan_links where user_id=%s",
+        "select claim_id,occurrence_id,expectation_id,goal_id,debt_plan_id,activity_id,activity_revision,snapshot,attribution from public.financial_plan_links where user_id=%s and binding_id is null",
         (user_id,),
     ).fetchall():
         state["links"][str(cid)] = {
@@ -91,6 +91,58 @@ def load(connection: Any, user_id: str) -> dict[str, Any]:
     ).fetchone()
     if row:
         state["selection"] = row[0]
+    if repository is not None:
+        from argus.domain.recording import canonical_groups
+        from argus.domain.recording.money_reads import render_activity
+
+        canonical = canonical_groups.load(repository, connection, {user_id})
+        state["_canonical_records"] = canonical.records
+        state["_canonical_activities"] = {
+            aid: render_activity(aid, canonical.history[aid], revision)
+            for aid, revision in canonical.current.items()
+        }
+        state["_pool_external"] = []
+        state["_shared_links"] = [
+            dict(
+                claim_id=str(cid),
+                occurrence_id=str(oid) if oid else None,
+                activity_id=str(aid),
+                expectation_id=str(eid) if eid else None,
+                goal_id=str(gid) if gid else None,
+                debt_plan_id=str(did) if did else None,
+                snapshot=snapshot,
+                attribution=attribution,
+                purpose=purpose,
+                released=released is not None,
+            )
+            for cid, oid, aid, eid, gid, did, snapshot, attribution, purpose, released in connection.execute(
+                "select l.claim_id,l.occurrence_id,l.activity_id,l.expectation_id,l.goal_id,l.debt_plan_id,l.snapshot,l.attribution,l.purpose,l.released_at "
+                "from public.financial_plan_links l join public.household_plan_bindings b on b.id=l.binding_id "
+                "where l.user_id=%s and b.departed_at is null and b.revoked_at is null",
+                (user_id,),
+            ).fetchall()
+        ]
+        for gid, aid, amount in connection.execute(
+            "select goal_id,account_id,unlinked_minor from public.financial_goal_allocations "
+            "where account_owner_id=%s and goal_owner_id<>%s",
+            (user_id, user_id),
+        ).fetchall():
+            state["_pool_external"].append(
+                dict(goal_id=str(gid), account_id=str(aid), amount=amount)
+            )
+        for gid, activity_id, attribution in connection.execute(
+            "select goal_id,activity_id,attribution from public.financial_plan_links "
+            "where goal_id is not null and purpose='goal_saving' and binding_id is not null and released_at is null "
+            "and attribution->>'destination_owner_id'=%s",
+            (user_id,),
+        ).fetchall():
+            state["_pool_external"].append(
+                dict(
+                    goal_id=str(gid),
+                    activity_id=str(activity_id),
+                    attribution=attribution,
+                )
+            )
     return state
 
 
@@ -105,13 +157,30 @@ def read(repository: Any, user_id: str) -> tuple[dict[str, Any], list[StoredAcco
             ]
     with repository._pool.connection() as connection, connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
-        return load(connection, user_id), load_owner(repository, connection, user_id)
+        from argus.domain.recording.canonical_groups import VisibleAccounts
+        from argus.domain.recording.canonical_groups import load as load_groups
+
+        return load(connection, user_id, repository), VisibleAccounts(
+            load_owner(repository, connection, user_id),
+            load_groups(repository, connection, {user_id}),
+        )
 
 
 def projected(
     accounts: list[StoredAccount], money: MoneyPlan, now: datetime
 ) -> list[StoredAccount]:
     from dataclasses import replace
+
+    canonical = getattr(accounts, "canonical", None)
+    if canonical is not None:
+        from argus.domain.recording.canonical_groups import VisibleAccounts
+        from argus.domain.recording.canonical_groups import projected as project_groups
+
+        current = project_groups(canonical, money, now)
+        visible = {s.account.id for s in accounts}
+        return VisibleAccounts(
+            [s for s in current.records if s.account.id in visible], current
+        )
 
     result = []
     for stored in accounts:
@@ -161,7 +230,11 @@ def write(
             states[user_id] = state
             return deepcopy(result)
     with repository._pool.connection() as connection, connection.transaction():
-        owner_lock(connection, user_id)
+        from argus.domain.recording.canonical_groups import VisibleAccounts, owner_closure
+        from argus.domain.recording.canonical_groups import load as load_groups
+
+        for owner in owner_closure(connection, {user_id}):
+            owner_lock(connection, owner)
         if not connection.execute(
             "select 1 from auth.users where id=%s and coalesce(is_anonymous,false)=false",
             (user_id,),
@@ -179,11 +252,16 @@ def write(
             "select id from public.financial_accounts where user_id=%s order by id for update",
             (user_id,),
         ).fetchall()
-        state = load(connection, user_id)
+        state = load(connection, user_id, repository)
         original_claims = set(state["links"])
-        result, money = action(state, load_owner(repository, connection, user_id))
+        accounts = VisibleAccounts(
+            load_owner(repository, connection, user_id),
+            load_groups(repository, connection, {user_id}),
+        )
+        result, money = action(state, accounts)
         if money:
             persist(connection, user_id, money)
+        connection.execute("select set_config('argus.plan_actor',%s,true)", (user_id,))
         for did, body in state["debts"].items():
             connection.execute(
                 "insert into public.financial_debt_plans(id,user_id,debt_account_id,body) values(%s,%s,%s,%s) on conflict(id) do update set body=excluded.body",
@@ -210,6 +288,17 @@ def write(
                 (user_id, cid),
             )
         for cid, link in state["links"].items():
+            conflict = connection.execute(
+                "select user_id,claim_id from public.financial_plan_links where activity_owner_id=%s and activity_id=%s and (released_at is null or occurrence_id is not null)",
+                (user_id, link["activity_id"]),
+            ).fetchone()
+            if conflict and (str(conflict[0]), str(conflict[1])) != (user_id, cid):
+                from argus.domain.planning.model import fail
+
+                fail(
+                    "activity_already_claimed",
+                    "This activity already has a plan attribution.",
+                )
             connection.execute(
                 "insert into public.financial_plan_links(user_id,claim_id,occurrence_id,expectation_id,goal_id,debt_plan_id,activity_id,activity_revision,snapshot,attribution) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) on conflict(user_id,claim_id) do update set occurrence_id=excluded.occurrence_id,activity_id=excluded.activity_id,activity_revision=excluded.activity_revision,snapshot=excluded.snapshot,attribution=excluded.attribution",
                 (
