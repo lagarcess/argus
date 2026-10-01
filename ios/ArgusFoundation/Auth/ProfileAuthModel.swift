@@ -11,6 +11,7 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var errorKey: String?
     @Published private(set) var accounts: AccountsModel?
     @Published private(set) var financialLoop: FinancialLoopModel?
+    @Published private(set) var household: HouseholdModel?
     @Published private(set) var financialSearch: FinancialSearchModel?
     let configuration: NativeAuthConfiguration?
     private let controller: SessionController?
@@ -40,6 +41,8 @@ final class ProfileAuthModel: ObservableObject {
             accounts?.financialChanged = { [weak self] in self?.financialSearch?.invalidate() }
             accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             if let accounts, let loadedConfiguration {
+                household = HouseholdModel(controller: loadedController, configuration: loadedConfiguration.session)
+                household?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
                 financialLoop = FinancialLoopModel(controller: loadedController, accounts: accounts,
                     journal: FinancialWriteJournal(configuration: loadedConfiguration.session))
                 financialLoop?.financialChanged = { [weak self] in self?.financialSearch?.invalidate() }
@@ -91,6 +94,7 @@ final class ProfileAuthModel: ObservableObject {
 
     func signOut() async {
         guard let controller else { return }
+        household?.bind(nil)
         financialSearch?.bind(nil)
         accounts?.bind(nil)
         financialLoop?.bind(nil)
@@ -122,6 +126,7 @@ final class ProfileAuthModel: ObservableObject {
     }
 
     private func accept(_ snapshot: SessionSnapshot) {
+        household?.bind(snapshot)
         financialSearch?.bind(snapshot)
         accounts?.bind(snapshot)
         financialLoop?.bind(snapshot)

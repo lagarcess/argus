@@ -70,3 +70,10 @@ class AccountNotOwned(HouseholdError):
 class GrantNotFound(HouseholdError):
     code = "account_grant_not_found"
     detail = "No such account grant."
+
+
+class HouseholdRule(HouseholdError):
+    def __init__(self, code: str):
+        self.code = code
+        self.detail = "The household changed. Refresh and try again."
+        super().__init__()

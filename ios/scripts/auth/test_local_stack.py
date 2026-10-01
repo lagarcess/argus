@@ -125,3 +125,102 @@ def test_occupied_ports_do_not_create_configuration(tmp_path, monkeypatch):
     with pytest.raises(SystemExit, match="occupied"):
         local_stack.configure(accounts=True)
     assert not allocation.stack.exists()
+
+
+@pytest.fixture
+def api_launch(tmp_path, monkeypatch):
+    monkeypatch.setattr(local_stack, "ROOT", tmp_path)
+    allocation = Allocation(True, 59500)
+    monkeypatch.setattr(local_stack, "ALLOCATION", allocation)
+    cfg = {
+        "API_URL": allocation.url(1),
+        "DB_URL": "postgresql://synthetic:synthetic@127.0.0.1:59502/postgres",
+        "ANON_KEY": "synthetic-anon",
+        "SERVICE_ROLE_KEY": "synthetic-service",
+        "JWT_SECRET": "synthetic-jwt",
+    }
+    status = MagicMock(return_value=cfg)
+    monkeypatch.setattr(local_stack, "status", status)
+    monkeypatch.setattr(local_stack.os, "chdir", lambda _: None)
+    launched = []
+    monkeypatch.setattr(local_stack.os, "execve", lambda *args: launched.append(args))
+    return status, launched
+
+
+@pytest.mark.parametrize("port,households", [(None, False), (59520, True)])
+def test_api_override_keeps_auth_database_and_sanitized_provider_environment(
+    api_launch, monkeypatch, port, households
+):
+    status, launched = api_launch
+    monkeypatch.setenv("ARGUS_HOUSEHOLDS_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_UNKNOWN_PROVIDER_TOKEN", "must-not-inherit")
+    monkeypatch.setenv("OPENAI_API_KEY", "must-not-inherit")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://hosted.invalid/database")
+    local_stack.api(
+        "/synthetic/python",
+        accounts_enabled=True,
+        api_port=port,
+        households_enabled=households,
+    )
+    status.assert_called_once_with()
+    assert len(launched) == 1
+    binary, command, environment = launched[0]
+    assert binary == "/synthetic/python"
+    assert command[command.index("--host") + 1] == "127.0.0.1"
+    assert command[command.index("--port") + 1] == str(port or 59500)
+    assert environment["SUPABASE_URL"] == "http://127.0.0.1:59501"
+    assert (
+        environment["DATABASE_URL"]
+        == "postgresql://synthetic:synthetic@127.0.0.1:59502/postgres"
+    )
+    assert environment["ARGUS_HOUSEHOLDS_ENABLED"] == str(households).lower()
+    assert environment["ARGUS_FINANCIAL_ACCOUNTS_ENABLED"] == "true"
+    assert environment["ARGUS_MARKET_DATA_PROVIDER_MODE"] == "synthetic_unit_fixture"
+    assert environment["OPENAI_API_KEY"] == ""
+    assert environment["RESEND_API_KEY"] == ""
+    assert "ARGUS_UNKNOWN_PROVIDER_TOKEN" not in environment
+
+
+@pytest.mark.parametrize(
+    "port", [0, 58399, 59901, 58700, 58749, 59501, 59502, 59505, 59506]
+)
+def test_api_rejects_unowned_phone_and_stack_reserved_ports_before_status(
+    api_launch, port
+):
+    status, launched = api_launch
+    with pytest.raises(SystemExit, match="Refusing"):
+        local_stack.api("/synthetic/python", api_port=port)
+    status.assert_not_called()
+    assert not launched
+
+
+@pytest.mark.parametrize(
+    "isolated,accounts", [(False, False), (False, True), (True, False)]
+)
+def test_household_exposure_requires_accounts_isolation(
+    api_launch, monkeypatch, isolated, accounts
+):
+    status, launched = api_launch
+    monkeypatch.setattr(local_stack, "ALLOCATION", Allocation(isolated, 59500))
+    with pytest.raises(SystemExit, match="require"):
+        local_stack.api(
+            "/synthetic/python",
+            api_port=59520,
+            accounts_enabled=accounts,
+            households_enabled=True,
+        )
+    status.assert_not_called()
+    assert not launched
+
+
+def test_api_root_dotenv_refusal_remains_in_force(api_launch, tmp_path):
+    _, launched = api_launch
+    (tmp_path / ".env").write_text("DO_NOT_READ=synthetic")
+    with pytest.raises(SystemExit, match="root .env"):
+        local_stack.api(
+            "/synthetic/python",
+            api_port=59520,
+            accounts_enabled=True,
+            households_enabled=True,
+        )
+    assert not launched

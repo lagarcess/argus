@@ -19,7 +19,9 @@ class HouseholdService:
         self._repository = repository
 
     def create(self, *, user_id: str, request: CreateHouseholdRequest) -> HouseholdRecord:
-        return self._repository.create_household(user_id=user_id, name=request.name)
+        return self._repository.create_household(
+            user_id=user_id, name=request.name, display_name=request.display_name
+        )
 
     def list(self, *, user_id: str) -> list[HouseholdRecord]:
         return self._repository.list_households(user_id=user_id)
@@ -39,8 +41,10 @@ class HouseholdService:
             user_id=user_id, household_id=household_id, invitation_id=invitation_id
         )
 
-    def accept(self, *, user_id: str, token: str) -> HouseholdRecord:
-        return self._repository.accept_invitation(user_id=user_id, token=token)
+    def accept(self, *, user_id: str, token: str, display_name: str = "Member"):
+        return self._repository.accept_invitation(
+            user_id=user_id, token=token, display_name=display_name
+        )
 
     def leave(self, *, user_id: str, household_id: str) -> None:
         self._repository.leave(user_id=user_id, household_id=household_id)
@@ -78,6 +82,7 @@ class HouseholdService:
             household_id=household_id,
             account_id=request.account_id,
             permission=request.permission,
+            recipient_membership_id=request.recipient_membership_id,
         )
 
     def update_grant(
@@ -95,9 +100,7 @@ class HouseholdService:
             permission=request.permission,
         )
 
-    def revoke_grant(
-        self, *, user_id: str, household_id: str, grant_id: str
-    ) -> None:
+    def revoke_grant(self, *, user_id: str, household_id: str, grant_id: str) -> None:
         self._repository.revoke_grant(
             user_id=user_id, household_id=household_id, grant_id=grant_id
         )
@@ -116,3 +119,53 @@ class HouseholdService:
             if item.account_id == account_id:
                 return item.permission
         return None
+
+    def execute(self, *, actor, operation, key, body, household_id, action):
+        if hasattr(self._repository, "connection"):
+            from .commands import execute
+
+            return execute(
+                self._repository,
+                actor=actor,
+                operation=operation,
+                key=key,
+                body=body,
+                household_id=household_id,
+                action=action,
+            )
+        return self._repository.execute(
+            actor=actor,
+            operation=operation,
+            key=key,
+            body=body,
+            household_id=household_id,
+            action=action,
+        )
+
+    def preview_invitation(self, *, user_id, token):
+        return self._repository.preview_invitation(user_id=user_id, token=token)
+
+    def replace_grants(self, *, user_id, household_id, account_id, recipients):
+        return self._repository.replace_grants(
+            user_id=user_id,
+            household_id=household_id,
+            account_id=account_id,
+            recipients=recipients,
+        )
+
+    @property
+    def clock(self):
+        return self._repository._clock
+
+    def transaction(self, actor, household_id):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def transaction():
+            with self._repository.connection() as c, c.transaction():
+                h = self._repository._require_member_row(
+                    c, user_id=actor, household_id=household_id
+                )
+                yield c, h, {"id": h["membership_id"]}
+
+        return transaction()

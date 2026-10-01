@@ -43,7 +43,7 @@ design-branch work or another delivery lane.
 
 ## Connected Spaces and Household lane
 
-**Original assignment, September 30, 2026 (historical authority; merge grant above).**
+**Native adapter assignment, September 30, continued under the approved policy.**
 Create a household, prepare an invitation, accept it as another registered
 person, explicitly share accounts, and see only permitted shared information in
 native Home, Accounts and Search. Prove the complete lifecycle with two
@@ -51,18 +51,94 @@ synthetic users against real local Auth/API/Postgres, including
 revocation/removal, recovery and English/Spanish. Stop at a reviewed,
 merge-ready PR targeting `codex/private-alpha-next`.
 
-**Fetched integration base:** `9b5e8643f0493145bd672c2af6e7508371d4cfa0`.
-**Recovery branch:** `codex/connected-spaces-household`.
-**Isolated checkout:**
-`/Users/garces/.codex/worktrees/connected-spaces-household/private-alpha-next`.
-**Current status:** default-off membership API/code landed through
-[PR #763](https://github.com/lagarcess/argus/pull/763); the integration landing
-above owns the merge grant. Hermetic in-memory two-user
-create→invite→accept→grant→revoke/leave proof is retained in `tests/household/`
-(mocked Auth/Supabase; not real Postgres/RLS). Real Auth/API/Postgres and RLS
-verification of migration, locking and policies remains pending. Native
-adapters, simulator exclusivity and physical-phone proof were not part of this
-land. No deploy, hosted change, paid provider or phone change is authorized.
+**Original assignment base:** `9b5e8643f0493145bd672c2af6e7508371d4cfa0`.
+**Current adapter base, fetched October 1:**
+`631d405142435d059ab6ef419f8235bf0ad52947`, including founder-merged #763
+(`fbcc399bdb888d89af594422cfa319a4c26c60e5`), #760
+(`819870e6fcfd28d469b12691fe2471e00e2000db`) and #765 landing documentation.
+**Current integration:** `09ce4e0af3b6df7a41e2d21c52c67b4fe7c82c0a`.
+#764 adds #763 landing documentation only. Reconciliation preserves that register
+and this native-adapter assignment; no runtime, UI, migration or test overlap.
+**Active recovery branch:** `codex/connected-household-native`.
+**Review PR:** [#766](https://github.com/lagarcess/argus/pull/766). Assembled
+local journey evidence is retained. Later default-off P1 class fixes are verified
+at sourcec38; consult the same PR terminal audit for renewed final-head CI and review readiness.
+No merge authority for this PR.
+**Active isolated checkout:**
+`/Users/garces/.codex/worktrees/connected-household-native/private-alpha-next`.
+**Current status:** connect the complete native household journey to landed
+#763 membership and #760's connected shell. One writer owns backend/native
+adapters, tests and API/data contracts; the captain owns this manifest, local
+runtime, assembled evidence, review and publication. The founder's #763 merge
+settles canonical membership ownership. Do not merge the earlier competing
+membership store or overwrite its occupied remote branch.
+
+The earlier local implementation remains frozen at
+`240854cd1fe1ae51a6999daab37e0aae651cb596` in
+`connected-spaces-household`, with reviewed source `33f741c8…`, runnable API
+59500 and preserved native/API/Postgres evidence. It is a recovery/reference
+checkpoint, not evidence that the new canonical adapter already works.
+Recapture assembled acceptance against the active branch before a READY claim.
+
+**Local delivery result:** canonical source `8e43fab960bde6542d82c21d197cd840ea68275e`,
+helper `095473a7`, reconciliation `4fed9efb` and native contrast `d1084805`.
+Fresh independent review identified three real issues: exact committed retry
+across an unrelated Household version, archived-money totals and deletion-safe
+grant FKs. All are fixed with clean affected reviews; helper and contrast deltas
+also reviewed clean. No unresolved independent findings.
+
+**Review follow-up:** the later P1 onfda found that a disabled Household route
+was misreported as access loss. Source `c38e4d107fd983cd95d5adf703513b913e443b0f`
+uses the existing typed server code to gate controls/routes/sheets, clear protected
+views and preserve original selection plus exact pending commands. Foreground
+restores availability without retrying writes automatically. Scoped removal
+stays meaningful; a429 keeps the pending journal, and a rejected H1 retry cannot
+clear valid current H2 selection. Fourteen actual model cases pass; scoped
+independent fix review is clean. Default-off native Home/Accounts/Search and
+English/Spanish reopen pass against real API59620/Auth/Postgres. Ten two-user
+API financial read checks and ten focused actual-Postgres regressions pass.
+Restoring API59520 rebuilds the original69447E demo with980 DOP/one20 DOP expense;
+new safe screenshots/short history recording are in the existing evidence packet.
+The PR remains non-draft. The captain finishes replies/reactions/resolution and
+final CI on this same PR before renewed READY. No hosted flag or infrastructure
+setting changes.
+
+Real Auth/API/Postgres acceptance covers named-current-member grants, view/edit
+separation, private-leg redaction, departure/rejoin/admin transfer/closure,
+retained owners' records, 50% asset attribution and unknown currency totals.
+Checks pass: 276 focused deterministic; 36 existing and six new actual-Postgres;
+fourteen production Household-model after the follow-up; session package64; local helper/secure runner37.
+The broad local suite cannot collect due to inherited SciPy `_spropack`; shared
+Python remains untouched. Full Linux CI passed at67e; final-head checks are the
+terminal PR gate, not inferred from that earlier head.
+
+Native setup reached acceptance and consent before the unchanged local login
+rate limit interrupted its ninth sign-in; that entire test is **not** reported
+passing. Same-fixture AAE272 continuation passed (224.032s), including expense25,
+original correction20, balance980, Search/back, Spanish relaunch and withdrawal.
+Confirmed response-loss creation/acceptance passed separately (228.443s) atd108,
+with two committed responses dropped and exact journal outcomes recovered.
+Finald108 native interaction retained fixture69447E, recording25 then correcting
+that original entry20 (1000→975→980), with readable Household colors under light
+and dark appearance. Current signed-in recipient can click through that fixture.
+[Durable packet and recording](../reports/evidence/connected-household-native/README.md)
+and [existing restart instructions](../../ios/HOUSEHOLD_SETUP.md) preserve the demo.
+
+**Remaining limits/polish:** physical iPhone/internet delivery and hosted migration
+remain unverified and unauthorized. Synthetic invitation links only; no delivery
+was sent. Shared Plan/budgets/goals/debt and Business/Custom remain outside this
+bounded assignment and retain their MVEE dependencies below. Existing #760
+shared navigation/Personal secondary colors on its white canvas and inherited
+Personal Search dark contrast need a later visual polish pass; this lane fixes only new Household
+inline contrast, preserves native sheet appearance and avoids design expansion.
+
+**Assigned resources:** simulator `C93072E7-D29A-4B0A-BE76-E6418E4E9F88`,
+new bundle `local.argus.household-current-demo`, cache
+`/private/tmp/argus-household-current-build`, new API 59520. Reuse this lane's
+synthetic Auth 59501, Postgres 59502 and CAPTCHA 59505 without resetting data;
+keep the old API/demo intact. Compact, the design simulator/cache and physical
+phone environment remain unmodified. No merge, deploy, hosted change, paid
+provider or phone change is authorized for this adapter.
 
 ### Recovered decisions and approved permission policy
 
@@ -81,9 +157,8 @@ household controls. Home retains the quiet Personal / Household / + selector;
 People owns invitations and member status. Sharing uses the native share sheet;
 dismissing it never asserts delivery or acceptance. The recipient can accept or
 choose Not now. Do not wait for the design PR to merge or import its unfinished
-Profile/chat proposals or wholesale runtime ancestry. This lane stays
-API/Postgres-first unless a **third** simulator UUID is pinned; do not use
-Compact `1A90F684…` or design `8AFB6084…` without orchestrator coordination.
+Profile/chat proposals or wholesale runtime ancestry. Use the explicitly assigned C930 simulator above for native proof. Never use
+Compact `1A90F684…` or design `8AFB6084…` for this lane.
 
 **Founder approved permission policy, 2026-10-01 (locked — implement this):**
 
@@ -93,9 +168,11 @@ Compact `1A90F684…` or design `8AFB6084…` without orchestrator coordination.
 - Shared accounts start **view-only**; editing only with an **explicit** grant.
 - Editing does **not** grant ownership, membership administration, or resharing
   rights. Owners retain ownership, sharing and account-removal powers.
-- Leave/removal revokes membership and that member's account grants; original
-  owners retain records/history (departure/closure preserves financial history).
-  Fresh sharing approval is required on rejoin.
+- Leave/removal revokes the departing person's access and withdraws their
+  shared accounts. Preserve original owners' records and legitimate transactions;
+  do not delete history, reverse spending or change ownership. Rejoining creates
+  a fresh membership that requires fresh sharing approval.
+- Closing the household preserves all owners' records and history.
 - Invitations: revocable, single-use, seven-day links; safe same-recipient
   acceptance retries. Local invitations are synthetic (no email/WhatsApp/
   external delivery in this lane).
@@ -147,13 +224,13 @@ one-way merges; do not edit #760's checkout or overwrite its connected owners.
 | Revoke, remove or leave safely | Preserved original financial records | Membership/grant revocation and retained-record explanation | Approved departure/custody | Access stops on API, Search, Home and relaunch; original owner retains unchanged identity/history |
 | Recover failures and stale views | Session epochs, exact-byte journals, CAS, idempotent writes | Household scope invalidation and confirmed-write retry integration | Above contracts | Interrupted/repeated writes create no duplicates; revoked access cannot replay protected data; en/es/native recording and Postgres readbacks |
 
-Verification must use a real isolated local Auth/API/Postgres stack and an
-explicitly assigned simulator UUID, not a sample-only canvas. #760 currently owns
+Verification uses a real isolated local Auth/API/Postgres stack and the assigned
+C930 simulator, not a sample-only canvas. #760 currently owns
 Compact `1A90F684-345F-465C-AA50-6A5298F34156`; Cuadrao exclusively owns
 `8AFB6084-8918-416E-9164-E21061306BEC` and
 `/private/tmp/cuadrao-native-design-build`. Neither is assigned to this lane.
-Assign an available simulator only after checking ownership/active use, with a
-separate bundle and disposable build cache. Preserve all demos and synthetic data;
+The assigned C930 simulator was checked for ownership and reused; use the separate
+current-demo bundle and disposable build cache recorded above. Preserve all demos and synthetic data;
 ports 58700–58749 and the physical-phone setup remain untouched.
 
 Keep local invitations synthetic. No email, WhatsApp, external delivery,
@@ -2258,8 +2335,8 @@ sequence rather than a separate deferral policy in this document.
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
 | [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
-| [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762; #763 landed membership/grants API default-off | Native Household context projections remain; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof; later private lifecycle/move evidence remains required |
-| [Household][mvee-household], D07 | Existing identities/accounts/history and fixed #762 create/invite/accept/People flow; **#763 landed** default-off membership/invitations/grants API with hermetic in-memory two-user proof; permission policy founder-approved 2026-10-01 | Real Auth/API/Postgres and RLS verification of migration/locks/policies; native Home/Accounts/Search adapters; shared plans; private contributions; external invite delivery; physical-phone proof | Household captain; one membership/authorization writer | Identities; locked member/edit/departure policy; existing financial adapters | Hermetic memory lifecycle landed; real Auth/Postgres/RLS, native simulator (third UUID) and physical-phone journeys remain required |
+| [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762 | Assigned Household context adapter in the active lane above; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof for this lane; later private lifecycle/move evidence remains required |
+| [Household][mvee-household], D07 | Existing identities/accounts/history, fixed #762 create/invite/accept/People flow and #763 landed default-off membership API | Active bounded lane: membership, invitations, explicit account grants; **permission policy founder-approved 2026-10-01**. Shared plans, private contributions, other consumers and live delivery retain their dependencies | Household captain; one membership/authorization writer | Identities; locked member/edit/departure policy; existing financial adapters | Two synthetic users on Auth/API/Postgres and assigned C930 native simulator; revocation/isolation; physical-phone and other shared journeys remain required |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |

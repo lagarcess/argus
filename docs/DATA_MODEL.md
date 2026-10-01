@@ -1931,55 +1931,56 @@ Archived accounts retain their money in this projection.
 
 ## 12.1.5 Households (membership, invitations, grants)
 
-Registered-only, behind `ARGUS_HOUSEHOLDS_ENABLED`. Spec:
-[`docs/specs/lanes/household-permission-policy.md`](specs/lanes/household-permission-policy.md).
-Migration `20261001090000_household_membership.sql`. Account ownership remains
-`financial_accounts.user_id`; grants never rewrite ownership or `space_id`.
+The landed `20261001090000_household_membership.sql` is extended by
+`20261001120000_household_consent_recovery.sql`, behind default-off
+`ARGUS_HOUSEHOLDS_ENABLED`. These remain the only Household membership tables.
+Financial ownership stays `financial_accounts.user_id`; no share changes
+`space_id`, financial ownership, or the Personal owner-only RLS policies.
 
-### households
+`households.version` is a positive CAS/authorization generation. Scoped commands
+serialize under the household row lock; financial adapters then acquire the
+existing Recording owner/account locks. `household_members.id` is the membership
+incarnation: leave/removal sets `left_at`, and a fresh invite creates a new ID.
+Members carry a user-supplied `display_name`; administrator authority remains
+`households.admin_user_id`, not a second stored role.
 
-| Field | Rule |
-| --- | --- |
-| `id` | uuid, server-assigned |
-| `name` | null or 1–80 characters |
-| `status` | `active` or `closed` |
-| `created_by` | creator; `auth.users` on delete set null (historical identity) |
-| `admin_user_id` | current administrator; on delete set null; CHECK requires non-null while `status = active` so an active admin must transfer or close before account deletion |
-| `created_at`, `closed_at` | timestamps; `closed_at` set only when status becomes `closed` |
+`household_invitations` stores only a token hash and seven-day UTC expiry.
+`accepted_membership_id` binds same-recipient retries to the original membership,
+including after departure, closure and rejoin. Historical accepted memberships
+are backfilled where the invitation acceptance timestamp identifies the row.
+Unresolvable historical outcomes fail closed. Token plaintext is returned once.
 
-Deletion-safe historical identity: attribution FKs use `ON DELETE SET NULL` so
-household history never blocks account deletion after closure/transfer. Active
-membership rows cascade with the member; financial accounts stay with owners.
+Each active `household_account_grants` row binds `owner_membership_id` and
+`recipient_membership_id` in the same household. The owner composite FK also
+binds `owner_user_id`; the financial account composite FK preserves original
+ownership. The unique active key is `(household_id,account_id,recipient_membership_id)`.
+`permission` is the sole view/edit fact. There is no global editable permission
+beside a recipient permission. Projections deduplicate these grant rows by
+account. Departure revokes both directions of consent; closure revokes all.
+All old unbound grant rows are preserved but revoked by the extension migration:
+no migration invents named consent. Future sharing requires an explicit choice.
 
-### household_members
+`household_command_receipts` has primary key `(actor_id,operation,idempotency_key)`
+and stores canonical body hash, household ID, original membership ID and optional
+invitation ID. It stores neither capabilities nor protected snapshots. Exact
+retry returns only current state of that original outcome; invite replay returns
+token-null metadata under current admin authorization. Financial receipts remain
+Recording-owned, with actor/household/membership-qualified scope and live grant
+checks before replay. Committed financial receipts replay before rejecting an
+old Household generation; generation checks continue to protect new writes.
+All Household authorization tables and receipts are
+service-owned, RLS-enabled, with no direct anon/authenticated table grants.
 
-Active membership is one row with `left_at` null. `(household_id, user_id)`
-unique among active rows via partial unique index. Leaving or removal sets
-`left_at` and does not delete financial history. A person may rejoin only through
-a fresh invitation; prior grants do not revive. Client SELECT RLS uses
-`is_active_household_member` (security definer) so membership self-reads do not
-recurse.
-
-### household_invitations
-
-Token material is hashed (`token_hash`); plaintext is returned once at create.
-`expires_at` is create time plus seven days. `revoked_at` and `accepted_by` /
-`accepted_at` enforce revocation and single-use. Same acceptor retry is safe.
-`accepted_by` may become null after the acceptor is deleted while `accepted_at`
-remains; CHECK requires `accepted_at` whenever `accepted_by` is set.
-
-### household_account_grants
-
-One active grant per `(household_id, account_id)`. `owner_user_id` must match
-`financial_accounts.user_id`. `permission` is `view` (default) or `edit`. Edit
-never implies ownership, admin, or resharing. Revocation sets `revoked_at`.
-Leave/removal of the owner revokes their outbound grants. Closure revokes all
-grants for the household.
-
-Writes are service-owned (security-definer helpers or server pool with
-application authorization). Client RLS allows registered owners/members to read
-only rows they are entitled to; clients hold no insert/update grant for
-membership or invitation mutation.
+Financial records and legitimate activity survive leave/removal/closure.
+The forward `20261001130000_household_grant_deletion.sql` migration makes both
+membership-bound grant FKs cascade on membership deletion. Leave, removal and
+closure continue to preserve revoked grant rows; deleting an auth user removes
+the authorization edges referencing their deleted membership. It never deletes
+another owner's financial accounts or legitimate record history. Historical
+identity FKs retain the landed deletion behavior. Closing a household
+is explicit; an administrator transfers authority to a current member or closes
+before leaving. API shapes and read redaction are owned by
+[API_CONTRACT.md](API_CONTRACT.md#174-households-canonical-membership-and-financial-adapters).
 
 ## 12.2 backtest_jobs
 

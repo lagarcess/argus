@@ -264,9 +264,9 @@ struct FinancialDomainPresenter: View {
     let search: FinancialSearchModel?
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
-            .sheet(item: $loop.assetEditor, onDismiss: refreshSearch) { editor in FinancialAssetForm(model: editor, accounts: accounts) }
-            .sheet(item: $accounts.draft, onDismiss: refreshSearch) { _ in AccountForm(model: accounts) }
-            .sheet(item: $plan.draft, onDismiss: refreshSearch) { draft in FinancialExpectationForm(model: plan, draft: draft, loop: loop) }
+            .sheet(item: $loop.assetEditor, onDismiss: refreshSearch) { editor in FinancialAssetForm(model: editor, accounts: accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
+            .sheet(item: $accounts.draft, onDismiss: refreshSearch) { _ in AccountForm(model: accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
+            .sheet(item: $plan.draft, onDismiss: refreshSearch) { draft in FinancialExpectationForm(model: plan, draft: draft, loop: loop).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
     }
     private func refreshSearch() { Task { await search?.refresh() } }
 }

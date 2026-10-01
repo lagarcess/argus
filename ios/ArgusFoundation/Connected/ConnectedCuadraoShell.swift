@@ -30,6 +30,7 @@ struct ConnectedCuadraoShell: View {
                     .padding(.bottom, 8)
             }
         }
+        .background { if let household = auth.household { HouseholdPresenter(model: household) } }
         .financialBudgetBackground(auth.financialLoop?.budgets)
         .financialGoalBackground(auth.financialLoop?.goals)
         .financialDebtBackground(auth.financialLoop?.debts)
@@ -70,6 +71,12 @@ struct ConnectedCuadraoShell: View {
     }
 
     @ViewBuilder private func tabContent(_ item: CuadraoTab) -> some View {
+        if item != .profile, let household = auth.household {
+            HouseholdDestinationRouter(model: household, tab: householdTab(item), active: tab == item, destination: $destination) { personalTabContent(item) }
+        } else { personalTabContent(item) }
+    }
+
+    @ViewBuilder private func personalTabContent(_ item: CuadraoTab) -> some View {
         switch item {
         case .home:
             if let loop = auth.financialLoop, let accounts = auth.accounts {
@@ -99,6 +106,10 @@ struct ConnectedCuadraoShell: View {
                 ConnectedCuadraoProfile(appearance: $appearance)
             }
         }
+    }
+
+    private func householdTab(_ item: CuadraoTab) -> AppDestination {
+        switch item { case .home, .profile: .home; case .plan: .plan; case .assistant: .argus; case .search: .search }
     }
 
     private func mapDestination(_ value: AppDestination) {

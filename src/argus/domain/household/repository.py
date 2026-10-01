@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from threading import RLock
 from typing import Protocol
 from uuid import uuid4
 
+from argus.domain.backtest_admission import canonical_hash
 from argus.domain.household.errors import (
     AccountNotOwned,
     AdminRequired,
@@ -23,14 +26,21 @@ from argus.domain.household.errors import (
     MustTransferOrClose,
 )
 from argus.domain.household.schemas import (
+    AcceptanceResult,
     AccountGrantRecord,
+    AccountShare,
+    CommandResult,
     HouseholdRecord,
     InvitationCreated,
+    InvitationMetadata,
+    InvitationPreview,
     MemberRecord,
     OwnedAccountRef,
     Permission,
+    Recipient,
     SharedAccountView,
 )
+from argus.domain.recording.errors import IdempotencyConflict, StaleVersion
 
 INVITE_TTL = timedelta(days=7)
 
@@ -45,6 +55,8 @@ def hash_token(token: str) -> str:
 
 @dataclass
 class _Member:
+    id: str
+    display_name: str
     user_id: str
     joined_at: datetime
     left_at: datetime | None = None
@@ -61,10 +73,13 @@ class _Invitation:
     revoked_at: datetime | None = None
     accepted_by: str | None = None
     accepted_at: datetime | None = None
+    accepted_membership_id: str | None = None
 
 
 @dataclass
 class _Grant:
+    owner_membership_id: str
+    recipient_membership_id: str
     id: str
     household_id: str
     account_id: str
@@ -83,13 +98,16 @@ class _Household:
     admin_user_id: str
     created_at: datetime
     closed_at: datetime | None = None
+    version: int = 1
     members: list[_Member] = field(default_factory=list)
     invitations: list[_Invitation] = field(default_factory=list)
     grants: list[_Grant] = field(default_factory=list)
 
 
 class AccountLookup(Protocol):
-    def owned_account(self, *, user_id: str, account_id: str) -> OwnedAccountRef | None: ...
+    def owned_account(
+        self, *, user_id: str, account_id: str
+    ) -> OwnedAccountRef | None: ...
 
     def account_by_id(self, *, account_id: str) -> OwnedAccountRef | None: ...
 
@@ -105,8 +123,12 @@ class InMemoryHouseholdRepository:
         self._clock = clock
         self._households: dict[str, _Household] = {}
         self._invites_by_hash: dict[str, str] = {}
+        self._receipts = {}
+        self._lock = RLock()
 
-    def create_household(self, *, user_id: str, name: str | None) -> HouseholdRecord:
+    def create_household(
+        self, *, user_id: str, name: str | None, display_name: str = "Member"
+    ) -> HouseholdRecord:
         now = self._clock()
         hid = str(uuid4())
         household = _Household(
@@ -116,14 +138,21 @@ class InMemoryHouseholdRepository:
             created_by=user_id,
             admin_user_id=user_id,
             created_at=now,
-            members=[_Member(user_id=user_id, joined_at=now)],
+            members=[
+                _Member(
+                    id=str(uuid4()),
+                    display_name=display_name,
+                    user_id=user_id,
+                    joined_at=now,
+                )
+            ],
         )
         self._households[hid] = household
-        return self._view(household)
+        return self._view(household, user_id)
 
     def list_households(self, *, user_id: str) -> list[HouseholdRecord]:
         return [
-            self._view(household)
+            self._view(household, user_id)
             for household in self._households.values()
             if household.status == "active"
             and any(m.user_id == user_id and m.left_at is None for m in household.members)
@@ -131,7 +160,7 @@ class InMemoryHouseholdRepository:
 
     def get_household(self, *, user_id: str, household_id: str) -> HouseholdRecord:
         household = self._require_member(user_id=user_id, household_id=household_id)
-        return self._view(household)
+        return self._view(household, user_id)
 
     def create_invitation(self, *, user_id: str, household_id: str) -> InvitationCreated:
         household = self._require_admin(user_id=user_id, household_id=household_id)
@@ -166,55 +195,66 @@ class InMemoryHouseholdRepository:
         if invite.revoked_at is None:
             invite.revoked_at = self._clock()
 
-    def accept_invitation(self, *, user_id: str, token: str) -> HouseholdRecord:
-        token_hash = hash_token(token)
-        household_id = self._invites_by_hash.get(token_hash)
-        if household_id is None:
+    def preview_invitation(self, *, user_id: str, token: str) -> InvitationPreview:
+        hid = self._invites_by_hash.get(hash_token(token))
+        if hid is None:
             raise InvitationNotFound()
-        household = self._households[household_id]
-        invite = next(i for i in household.invitations if i.token_hash == token_hash)
-        now = self._clock()
-        if invite.revoked_at is not None:
-            raise InvitationRevoked()
-        if invite.expires_at <= now:
-            raise InvitationExpired()
-        if invite.accepted_by is not None and invite.accepted_by != user_id:
-            raise InvitationConsumed()
-        if household.status != "active":
-            raise HouseholdClosed()
-
-        active = next(
-            (m for m in household.members if m.user_id == user_id and m.left_at is None),
-            None,
+        h = self._households[hid]
+        i = next(i for i in h.invitations if i.token_hash == hash_token(token))
+        return InvitationPreview(
+            name=h.name,
+            expires_at=i.expires_at,
+            available=i.accepted_at is None
+            and i.revoked_at is None
+            and h.status == "active"
+            and i.expires_at > self._clock(),
         )
-        if active is not None:
-            # Safe same-recipient retry: already a member.
-            if invite.accepted_by is None:
-                invite.accepted_by = user_id
-                invite.accepted_at = now
-            return self._view(household)
 
-        if invite.accepted_by is not None:
-            # Token already consumed by this user who later left; require a fresh invite.
-            raise InvitationConsumed()
-
-        invite.accepted_by = user_id
-        invite.accepted_at = now
-        household.members.append(_Member(user_id=user_id, joined_at=now))
-        return self._view(household)
+    def accept_invitation(
+        self, *, user_id: str, token: str, display_name: str = "Member"
+    ) -> AcceptanceResult:
+        hid = self._invites_by_hash.get(hash_token(token))
+        if hid is None:
+            raise InvitationNotFound()
+        h = self._households[hid]
+        i = next(i for i in h.invitations if i.token_hash == hash_token(token))
+        if i.accepted_at is not None:
+            if i.accepted_by != user_id or i.accepted_membership_id is None:
+                raise InvitationConsumed()
+            m = next(m for m in h.members if m.id == i.accepted_membership_id)
+            return AcceptanceResult(
+                household_id=hid,
+                membership_id=m.id,
+                state="active"
+                if m.left_at is None and h.status == "active"
+                else "departed",
+            )
+        if i.revoked_at is not None:
+            raise InvitationRevoked()
+        if i.expires_at <= self._clock():
+            raise InvitationExpired()
+        if h.status != "active":
+            raise HouseholdClosed()
+        m = next(
+            (m for m in h.members if m.user_id == user_id and m.left_at is None), None
+        )
+        if m is None:
+            m = _Member(
+                id=str(uuid4()),
+                display_name=display_name,
+                user_id=user_id,
+                joined_at=self._clock(),
+            )
+            h.members.append(m)
+        i.accepted_by = user_id
+        i.accepted_at = self._clock()
+        i.accepted_membership_id = m.id
+        return AcceptanceResult(household_id=hid, membership_id=m.id, state="active")
 
     def leave(self, *, user_id: str, household_id: str) -> None:
         household = self._require_member(user_id=user_id, household_id=household_id)
         if household.admin_user_id == user_id:
-            others = [
-                m
-                for m in household.members
-                if m.user_id != user_id and m.left_at is None
-            ]
-            if others:
-                raise MustTransferOrClose()
-            self.close(user_id=user_id, household_id=household_id)
-            return
+            raise MustTransferOrClose()
         self._end_membership(household, user_id)
 
     def remove_member(
@@ -240,7 +280,7 @@ class InMemoryHouseholdRepository:
     ) -> HouseholdRecord:
         household = self._require_admin(user_id=admin_user_id, household_id=household_id)
         if new_admin_user_id == admin_user_id:
-            return self._view(household)
+            return self._view(household, admin_user_id)
         member = next(
             (
                 m
@@ -252,7 +292,7 @@ class InMemoryHouseholdRepository:
         if member is None:
             raise MemberNotFound()
         household.admin_user_id = new_admin_user_id
-        return self._view(household)
+        return self._view(household, admin_user_id)
 
     def close(self, *, user_id: str, household_id: str) -> HouseholdRecord:
         household = self._require_admin(user_id=user_id, household_id=household_id)
@@ -268,7 +308,7 @@ class InMemoryHouseholdRepository:
         for grant in household.grants:
             if grant.revoked_at is None:
                 grant.revoked_at = now
-        return self._view(household)
+        return self._view(household, user_id)
 
     def create_grant(
         self,
@@ -277,16 +317,34 @@ class InMemoryHouseholdRepository:
         household_id: str,
         account_id: str,
         permission: Permission,
+        recipient_membership_id: str,
     ) -> AccountGrantRecord:
         household = self._require_member(user_id=user_id, household_id=household_id)
         account = self._accounts.owned_account(user_id=user_id, account_id=account_id)
         if account is None:
             raise AccountNotOwned()
+        owner = next(
+            m for m in household.members if m.user_id == user_id and m.left_at is None
+        )
+        recipient = next(
+            (
+                m
+                for m in household.members
+                if m.id == recipient_membership_id
+                and m.user_id != user_id
+                and m.left_at is None
+            ),
+            None,
+        )
+        if recipient is None:
+            raise MemberNotFound()
         existing = next(
             (
                 g
                 for g in household.grants
-                if g.account_id == account_id and g.revoked_at is None
+                if g.account_id == account_id
+                and g.recipient_membership_id == recipient_membership_id
+                and g.revoked_at is None
             ),
             None,
         )
@@ -297,6 +355,8 @@ class InMemoryHouseholdRepository:
             existing.permission = permission
             return self._grant_view(existing)
         grant = _Grant(
+            owner_membership_id=owner.id,
+            recipient_membership_id=recipient_membership_id,
             id=str(uuid4()),
             household_id=household.id,
             account_id=account_id,
@@ -327,9 +387,7 @@ class InMemoryHouseholdRepository:
         grant.permission = permission
         return self._grant_view(grant)
 
-    def revoke_grant(
-        self, *, user_id: str, household_id: str, grant_id: str
-    ) -> None:
+    def revoke_grant(self, *, user_id: str, household_id: str, grant_id: str) -> None:
         household = self._require_member(user_id=user_id, household_id=household_id)
         grant = next(
             (g for g in household.grants if g.id == grant_id and g.revoked_at is None),
@@ -346,9 +404,21 @@ class InMemoryHouseholdRepository:
     ) -> list[SharedAccountView]:
         household = self._require_member(user_id=user_id, household_id=household_id)
         views: list[SharedAccountView] = []
+        member = next(
+            m for m in household.members if m.user_id == user_id and m.left_at is None
+        )
+        seen = set()
         for grant in household.grants:
-            if grant.revoked_at is not None:
+            if (
+                grant.revoked_at is not None
+                or grant.account_id in seen
+                or (
+                    grant.owner_membership_id != member.id
+                    and grant.recipient_membership_id != member.id
+                )
+            ):
                 continue
+            seen.add(grant.account_id)
             account = self._accounts.account_by_id(account_id=grant.account_id)
             if account is None or account.user_id != grant.owner_user_id:
                 continue
@@ -374,7 +444,12 @@ class InMemoryHouseholdRepository:
             if member.user_id == user_id and member.left_at is None:
                 member.left_at = now
         for grant in household.grants:
-            if grant.owner_user_id == user_id and grant.revoked_at is None:
+            recipient = next(
+                m for m in household.members if m.id == grant.recipient_membership_id
+            )
+            if (
+                grant.owner_user_id == user_id or recipient.user_id == user_id
+            ) and grant.revoked_at is None:
                 grant.revoked_at = now
 
     def _require_member(self, *, user_id: str, household_id: str) -> _Household:
@@ -393,9 +468,13 @@ class InMemoryHouseholdRepository:
             raise AdminRequired()
         return household
 
-    def _view(self, household: _Household) -> HouseholdRecord:
+    def _view(self, household: _Household, actor: str) -> HouseholdRecord:
         members = [
             MemberRecord(
+                membership_id=m.id,
+                display_name=m.display_name,
+                is_self=m.user_id == actor,
+                is_admin=m.user_id == household.admin_user_id,
                 user_id=m.user_id,
                 role="admin" if m.user_id == household.admin_user_id else "member",
                 joined_at=m.joined_at,
@@ -404,7 +483,39 @@ class InMemoryHouseholdRepository:
             if m.left_at is None
         ]
         members.sort(key=lambda item: item.joined_at)
+        shares = {}
+        for g in household.grants:
+            if g.owner_user_id == actor and g.revoked_at is None:
+                shares.setdefault(g.account_id, []).append(
+                    Recipient(
+                        membership_id=g.recipient_membership_id, permission=g.permission
+                    )
+                )
         return HouseholdRecord(
+            version=household.version,
+            membership_id=next((m.membership_id for m in members if m.is_self), None),
+            admin_membership_id=next(
+                (m.membership_id for m in members if m.is_admin), None
+            ),
+            invitations=[
+                InvitationMetadata(
+                    id=i.id,
+                    expires_at=i.expires_at,
+                    state="accepted"
+                    if i.accepted_at
+                    else "revoked"
+                    if i.revoked_at
+                    else "expired"
+                    if i.expires_at <= self._clock()
+                    else "pending",
+                )
+                for i in household.invitations
+            ]
+            if actor == household.admin_user_id
+            else [],
+            shares=[
+                AccountShare(account_id=aid, recipients=rs) for aid, rs in shares.items()
+            ],
             id=household.id,
             name=household.name,
             status=household.status,  # type: ignore[arg-type]
@@ -418,6 +529,8 @@ class InMemoryHouseholdRepository:
     @staticmethod
     def _grant_view(grant: _Grant) -> AccountGrantRecord:
         return AccountGrantRecord(
+            owner_membership_id=grant.owner_membership_id,
+            recipient_membership_id=grant.recipient_membership_id,
             id=grant.id,
             household_id=grant.household_id,
             account_id=grant.account_id,
@@ -426,6 +539,98 @@ class InMemoryHouseholdRepository:
             created_at=grant.created_at,
             revoked_at=grant.revoked_at,
         )
+
+    def replace_grants(self, *, user_id, household_id, account_id, recipients):
+        h = self._require_member(user_id=user_id, household_id=household_id)
+        if self._accounts.owned_account(user_id=user_id, account_id=account_id) is None:
+            raise AccountNotOwned()
+        if len({r.membership_id for r in recipients}) != len(recipients):
+            raise MemberNotFound()
+        for r in recipients:
+            self.create_grant(
+                user_id=user_id,
+                household_id=household_id,
+                account_id=account_id,
+                permission=r.permission,
+                recipient_membership_id=r.membership_id,
+            )
+        for g in h.grants:
+            if (
+                g.account_id == account_id
+                and g.recipient_membership_id not in {r.membership_id for r in recipients}
+                and g.revoked_at is None
+            ):
+                g.revoked_at = self._clock()
+
+    def execute(self, *, actor, operation, key, body, household_id, action):
+        with self._lock:
+            identity = canonical_hash(body)
+            receipt = self._receipts.get((actor, operation, key))
+            if receipt:
+                if receipt[0] != identity:
+                    raise IdempotencyConflict()
+                _, hid, mid, iid = receipt
+                h = self._households[hid]
+                m = next((m for m in h.members if m.id == mid), None)
+                invitation = None
+                if iid:
+                    if not m or m.left_at or h.admin_user_id != actor:
+                        raise AdminRequired()
+                    i = next(i for i in h.invitations if i.id == iid)
+                    invitation = InvitationCreated(
+                        id=i.id, household_id=hid, expires_at=i.expires_at, token=None
+                    )
+                return CommandResult(
+                    household_id=hid,
+                    membership_id=mid,
+                    state="active"
+                    if m and m.left_at is None and h.status == "active"
+                    else "departed",
+                    replayed=True,
+                    invitation=invitation,
+                )
+            if household_id:
+                h = self._require_member(user_id=actor, household_id=household_id)
+                if body.get("expected_version") != h.version:
+                    raise StaleVersion()
+            before = deepcopy((self._households, self._invites_by_hash))
+            try:
+                value = action()
+                hid = household_id or (
+                    value.household_id
+                    if isinstance(value, AcceptanceResult)
+                    else value.id
+                )
+                h = self._households[hid]
+                mid = (
+                    value.membership_id
+                    if isinstance(value, AcceptanceResult)
+                    else next(
+                        (m.id for m in reversed(h.members) if m.user_id == actor), None
+                    )
+                )
+                i = value if isinstance(value, InvitationCreated) else None
+                if household_id or isinstance(value, AcceptanceResult):
+                    h.version += 1
+                self._receipts[(actor, operation, key)] = (
+                    identity,
+                    hid,
+                    mid,
+                    i.id if i else None,
+                )
+                m = next((m for m in h.members if m.id == mid), None)
+                return CommandResult(
+                    household_id=hid,
+                    membership_id=mid,
+                    state="active"
+                    if m and m.left_at is None and h.status == "active"
+                    else "departed",
+                    replayed=False,
+                    invitation=i,
+                )
+            except Exception:
+                self._households, self._invites_by_hash = before
+                raise
 
 
 def _trim_name(name: str | None) -> str | None:

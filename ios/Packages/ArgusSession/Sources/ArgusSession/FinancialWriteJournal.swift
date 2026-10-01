@@ -13,9 +13,11 @@ public struct PendingFinancialConfirmation: Codable, Equatable, Sendable {
     public let body: Data
     public let key: UUID
     public let planOperation: FinancialPlanOperation?
+    public let householdMembershipId: UUID?
+    public let householdAuthorizationVersion: Int?
 
     public init(ownerId: UUID, originAccountId: UUID?, route: String, path: String,
-                method: String, body: Data, key: UUID, planOperation: FinancialPlanOperation? = nil) {
+                method: String, body: Data, key: UUID, planOperation: FinancialPlanOperation? = nil, householdMembershipId: UUID? = nil, householdAuthorizationVersion: Int? = nil) {
         self.ownerId = ownerId
         self.originAccountId = originAccountId
         self.route = route
@@ -24,6 +26,8 @@ public struct PendingFinancialConfirmation: Codable, Equatable, Sendable {
         self.body = body
         self.key = key
         self.planOperation = planOperation
+        self.householdMembershipId = householdMembershipId
+        self.householdAuthorizationVersion = householdAuthorizationVersion
     }
 }
 
@@ -40,8 +44,8 @@ public final class FinancialWriteJournal: @unchecked Sendable {
     private let storage: any AuthLocalStorage
     private let prefix: String
 
-    public convenience init(configuration: SessionConfiguration) {
-        self.init(storage: DeviceKeychain(service: configuration.keychainService), prefix: configuration.storagePrefix)
+    public convenience init(configuration: SessionConfiguration, namespace: String = "") {
+        self.init(storage: DeviceKeychain(service: configuration.keychainService), prefix: configuration.storagePrefix + namespace)
     }
 
     init(storage: any AuthLocalStorage, prefix: String) {
@@ -57,7 +61,7 @@ public final class FinancialWriteJournal: @unchecked Sendable {
     public func begin(_ write: PendingFinancialConfirmation, for identity: SessionSnapshot) throws {
         let owner = try Self.owner(identity)
         guard write.ownerId == owner, !write.body.isEmpty,
-              write.method == "POST" || write.method == "PATCH" || write.method == "PUT",
+              write.method == "POST" || write.method == "PATCH" || write.method == "PUT" || write.method == "DELETE",
               !write.route.isEmpty, (write.path.isEmpty || write.path.hasPrefix("/")), !write.path.hasPrefix("//")
         else { throw FinancialWriteJournalError.invalidIdentity }
         try locked {

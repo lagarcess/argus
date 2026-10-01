@@ -1,11 +1,13 @@
 import Foundation
 
-public struct FinancialAsset: Codable, Equatable, Sendable {
+public typealias FinancialAsset = FinancialAssetValue<UUID>
+
+public struct FinancialAssetValue<Author: Codable & Equatable & Sendable>: Codable, Equatable, Sendable {
     public let personalPositionMinor: Int64?
     public let currentEstimate: FinancialAssetEstimate?
     public let estimates: [FinancialAssetEstimate]
     public let relatedDebtAccountId: UUID?
-    public let changes: [FinancialAssetChange]
+    public let changes: [FinancialAssetChangeValue<Author>]
     enum CodingKeys: String, CodingKey {
         case estimates, changes, personalPositionMinor = "personal_position_minor", currentEstimate = "current_estimate", relatedDebtAccountId = "related_debt_account_id"
     }
@@ -45,13 +47,15 @@ public struct FinancialAssetRevision: Codable, Equatable, Sendable {
     }
 }
 
-public struct FinancialAssetChange: Codable, Equatable, Sendable {
+public typealias FinancialAssetChange = FinancialAssetChangeValue<UUID>
+
+public struct FinancialAssetChangeValue<Author: Codable & Equatable & Sendable>: Codable, Equatable, Sendable {
     public let version: Int
     public let previousShareBps: Int
     public let ownershipShareBps: Int
     public let previousDebtAccountId: UUID?
     public let relatedDebtAccountId: UUID?
-    public let recordedBy: UUID
+    public let recordedBy: Author
     public let recordedAt: String
     enum CodingKeys: String, CodingKey {
         case version, previousShareBps = "previous_share_bps", ownershipShareBps = "ownership_share_bps", previousDebtAccountId = "previous_debt_account_id", relatedDebtAccountId = "related_debt_account_id", recordedBy = "recorded_by", recordedAt = "recorded_at"

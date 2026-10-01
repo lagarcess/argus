@@ -38,6 +38,13 @@ def running(handler_type):
         ("POST", "/api/v1/financial-accounts/example/asset-estimates", 503),
         ("GET", "/api/v1/financial-accounts/example", 200),
         ("POST", "/api/v1/financial-accounts-unrelated", 201),
+        ("GET", "/api/v1/households", 200),
+        ("POST", "/api/v1/households/example/activities/preview", 200),
+        ("POST", "/api/v1/household-invitations/preview", 200),
+        ("POST", "/api/v1/households", 409),
+        ("DELETE", "/api/v1/households/example", 200),
+        ("POST", "/api/v1/households-unrelated", 201),
+        ("POST", "/api/v1/household-invitations/accept-other", 200),
     ],
 )
 def test_fault_ignores_reads_previews_and_failed_writes(method, path, status):
@@ -51,6 +58,14 @@ def test_fault_ignores_reads_previews_and_failed_writes(method, path, status):
     "method,path",
     [
         ("POST", "/api/v1/financial-activities"),
+        ("POST", "/api/v1/households"),
+        ("POST", "/api/v1/households/example/invitations"),
+        ("POST", "/api/v1/household-invitations/accept"),
+        ("PUT", "/api/v1/households/example/accounts/account/grants"),
+        ("POST", "/api/v1/households/example/leave"),
+        ("POST", "/api/v1/households/example/activities"),
+        ("PATCH", "/api/v1/households/example/activities/activity"),
+        ("DELETE", "/api/v1/households/example/account-grants/grant"),
         ("POST", "/api/v1/financial-accounts"),
         ("PATCH", "/api/v1/financial-accounts/example"),
         ("POST", "/api/v1/financial-accounts/example/asset-estimates"),
@@ -78,6 +93,7 @@ def test_response_is_lost_only_after_upstream_accepts_the_write(method, path):
 
     API.do_PATCH = API.do_POST
     API.do_PUT = API.do_POST
+    API.do_DELETE = API.do_POST
     fault = Fault()
     with running(API) as upstream, running(handler(upstream, fault)) as proxy:
         client = http.client.HTTPConnection("127.0.0.1", proxy, timeout=3)

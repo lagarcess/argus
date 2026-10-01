@@ -103,6 +103,7 @@ def plan(
     now: datetime,
     *,
     legacy: bool = False,
+    actor_id: str | None = None,
 ) -> MoneyPlan:
     by_id = {s.account.id: s for s in accounts}
     old = activity(accounts, activity_id) if activity_id else None
@@ -312,7 +313,7 @@ def plan(
                 reviewed.note,
                 category,
                 reason,
-                stored.account.user_id,
+                actor_id if actor_id is not None else stored.account.user_id,
                 now,
                 request.kind,
                 role if role else current.current.role if current else "single",

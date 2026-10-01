@@ -3929,7 +3929,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SearchPage'
+                $ref: '#/components/schemas/argus__domain__financial_search__SearchPage'
         '422':
           description: Validation Error
           content:
@@ -4013,7 +4013,38 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HouseholdRecord'
+                $ref: '#/components/schemas/CommandResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/household-invitations/preview:
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcceptInvitationRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationPreview'
         '422':
           description: Validation Error
           content:
@@ -4062,7 +4093,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HouseholdRecord'
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4087,6 +4118,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       responses:
         '200':
           description: Successful Response
@@ -4118,6 +4150,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -4130,7 +4163,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountGrantRecord'
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4155,11 +4188,13 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       - name: grant_id
         in: path
         required: true
         schema:
           type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -4172,7 +4207,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccountGrantRecord'
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4196,14 +4231,26 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       - name: grant_id
         in: path
         required: true
         schema:
           type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionRequest'
       responses:
-        '204':
+        '200':
           description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4228,6 +4275,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       responses:
         '200':
           description: Successful Response
@@ -4235,6 +4283,322 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SharedAccountListResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/accounts/{account_id}:
+    get:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/accounts/{account_id}/grants:
+    put:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: account_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceAccountGrantsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/activities:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialCommand'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/activities/preview:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialCommand'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoneyPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/activities/{activity_id}:
+    patch:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: activity_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialCommand'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedReceipt'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/activities/{activity_id}/history:
+    get:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: activity_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityHistory'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/activities/{activity_id}/preview:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: activity_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancialCommand'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoneyPreviewResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/activity-options:
+    get:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdMoneyOptions'
         '422':
           description: Validation Error
           content:
@@ -4259,13 +4623,20 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionRequest'
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HouseholdRecord'
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4290,13 +4661,20 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionRequest'
       responses:
         '201':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InvitationCreated'
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4321,14 +4699,26 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       - name: invitation_id
         in: path
         required: true
         schema:
           type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionRequest'
       responses:
-        '204':
+        '200':
           description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4353,9 +4743,20 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionRequest'
       responses:
-        '204':
+        '200':
           description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -4380,14 +4781,113 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       - name: member_user_id
         in: path
         required: true
         schema:
           type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionRequest'
       responses:
-        '204':
+        '200':
           description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/search:
+    get:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+          default: ''
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 2048
+          - type: 'null'
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 30
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/argus__domain__household__financial_schemas__SearchPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/households/{household_id}/snapshot:
+    get:
+      tags:
+      - households
+      parameters:
+      - name: household_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
         '422':
           description: Validation Error
           content:
@@ -4412,6 +4912,7 @@ paths:
         required: true
         schema:
           type: string
+          format: uuid
       requestBody:
         required: true
         content:
@@ -4424,7 +4925,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HouseholdRecord'
+                $ref: '#/components/schemas/CommandResult'
         '422':
           description: Validation Error
           content:
@@ -5238,6 +5739,11 @@ components:
           type: string
           maxLength: 200
           minLength: 8
+        display_name:
+          type: string
+          maxLength: 60
+          minLength: 1
+          default: Member
       additionalProperties: false
       type: object
       required:
@@ -5303,37 +5809,6 @@ components:
       - can_search_current_workspace
       - can_use_grounded_discovery
       - can_submit_feedback
-    AccountGrantRecord:
-      properties:
-        id:
-          type: string
-        household_id:
-          type: string
-        account_id:
-          type: string
-        owner_user_id:
-          type: string
-        permission:
-          type: string
-          enum:
-          - view
-          - edit
-        created_at:
-          type: string
-          format: date-time
-        revoked_at:
-          anyOf:
-          - type: string
-            format: date-time
-          - type: 'null'
-      type: object
-      required:
-      - id
-      - household_id
-      - account_id
-      - owner_user_id
-      - permission
-      - created_at
     AccountHit:
       properties:
         kind:
@@ -5345,6 +5820,27 @@ components:
       type: object
       required:
       - account
+    AccountShare:
+      properties:
+        account_id:
+          type: string
+        recipients:
+          items:
+            $ref: '#/components/schemas/Recipient'
+          type: array
+      type: object
+      required:
+      - account_id
+      - recipients
+    ActivityHistory:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/SharedActivity'
+          type: array
+      type: object
+      required:
+      - items
     ActivityHit:
       properties:
         kind:
@@ -6822,6 +7318,30 @@ components:
       - note
       - recorded_at
       - recorded_by
+    CommandResult:
+      properties:
+        household_id:
+          type: string
+        membership_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        state:
+          type: string
+          enum:
+          - active
+          - departed
+        replayed:
+          type: boolean
+        invitation:
+          anyOf:
+          - $ref: '#/components/schemas/InvitationCreated'
+          - type: 'null'
+      type: object
+      required:
+      - household_id
+      - state
+      - replayed
     ComparedAnswer:
       properties:
         conversation_id:
@@ -7511,10 +8031,19 @@ components:
           - view
           - edit
           default: view
+        recipient_membership_id:
+          type: string
+          maxLength: 80
+          minLength: 1
+        expected_version:
+          type: integer
+          minimum: 1.0
       additionalProperties: false
       type: object
       required:
       - account_id
+      - recipient_membership_id
+      - expected_version
     CreateFinancialAccountRequest:
       properties:
         type:
@@ -7570,6 +8099,11 @@ components:
           - type: string
             maxLength: 80
           - type: 'null'
+        display_name:
+          type: string
+          maxLength: 60
+          minLength: 1
+          default: Member
       additionalProperties: false
       type: object
     CurrencySummaryResponse:
@@ -8521,6 +9055,22 @@ components:
       - updated_at
       - balance
       - opening
+    FinancialCommand:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        membership_id:
+          type: string
+          format: uuid
+        activity:
+          $ref: '#/components/schemas/MoneyRequest'
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - membership_id
+      - activity
     ForecastCurrency:
       properties:
         currency:
@@ -9247,6 +9797,243 @@ components:
       - created_at
       - conversation_id
       - expires_at
+    HouseholdAccountResponse:
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum:
+          - cash
+          - checking
+          - savings
+          - investment
+          - credit_card
+          - other_debt
+          - property
+          - vehicle
+          - other_asset
+        nature:
+          type: string
+          enum:
+          - asset
+          - liability
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        nickname:
+          anyOf:
+          - type: string
+          - type: 'null'
+        archived:
+          type: boolean
+        ownership_share_bps:
+          type: integer
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        balance:
+          $ref: '#/components/schemas/BalanceResponse'
+        opening:
+          anyOf:
+          - $ref: '#/components/schemas/OpeningResponse'
+          - type: 'null'
+        asset:
+          anyOf:
+          - $ref: '#/components/schemas/HouseholdAssetProjection'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - type
+      - nature
+      - currency
+      - currency_fraction_digits
+      - nickname
+      - archived
+      - ownership_share_bps
+      - version
+      - created_at
+      - updated_at
+      - balance
+      - opening
+    HouseholdActivityResponse:
+      properties:
+        activity_id:
+          type: string
+        revision:
+          type: integer
+        kind:
+          type: string
+          enum:
+          - expense
+          - income
+          - transfer
+          - card_payment
+          - refund
+          - debt_payment
+          - payment_reversal
+        amount_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        time_zone:
+          type: string
+        note:
+          anyOf:
+          - type: string
+          - type: 'null'
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        source_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        purchase_activity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        purchase_revision:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        principal_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        interest_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        fees_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        reversal_of_activity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        reversal_of_revision:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        counted_spending_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+        recorded_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+        legs:
+          items:
+            $ref: '#/components/schemas/MoneyLegResponse'
+          type: array
+      type: object
+      required:
+      - activity_id
+      - revision
+      - kind
+      - amount_minor
+      - amount
+      - currency
+      - currency_fraction_digits
+      - occurred_at
+      - time_zone
+      - note
+      - category_id
+      - source_id
+      - purchase_activity_id
+      - purchase_revision
+      - reason
+      - recorded_at
+      - recorded_by
+      - legs
+    HouseholdAssetChange:
+      properties:
+        version:
+          type: integer
+        previous_share_bps:
+          type: integer
+        ownership_share_bps:
+          type: integer
+        previous_debt_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        related_debt_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        recorded_by:
+          type: 'null'
+        recorded_at:
+          type: string
+          format: date-time
+      type: object
+      required:
+      - version
+      - previous_share_bps
+      - ownership_share_bps
+      - previous_debt_account_id
+      - related_debt_account_id
+      - recorded_by
+      - recorded_at
+    HouseholdAssetProjection:
+      properties:
+        personal_position_minor:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        current_estimate:
+          anyOf:
+          - $ref: '#/components/schemas/AssetEstimate'
+          - type: 'null'
+        estimates:
+          items:
+            $ref: '#/components/schemas/AssetEstimate'
+          type: array
+        related_debt_account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        changes:
+          items:
+            $ref: '#/components/schemas/HouseholdAssetChange'
+          type: array
+      type: object
+      required:
+      - personal_position_minor
+      - current_estimate
+      - estimates
+      - related_debt_account_id
+      - changes
     HouseholdListResponse:
       properties:
         households:
@@ -9256,8 +10043,59 @@ components:
       type: object
       required:
       - households
+    HouseholdMoneyOptions:
+      properties:
+        accounts:
+          items:
+            $ref: '#/components/schemas/HouseholdAccountResponse'
+          type: array
+        eligibility:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+        destination_eligibility:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+        categories:
+          items:
+            type: string
+          type: array
+        sources:
+          items:
+            type: string
+          type: array
+      type: object
+      required:
+      - accounts
+      - eligibility
+      - destination_eligibility
+      - categories
+      - sources
     HouseholdRecord:
       properties:
+        version:
+          type: integer
+        membership_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        admin_membership_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        invitations:
+          items:
+            $ref: '#/components/schemas/InvitationMetadata'
+          type: array
+        shares:
+          items:
+            $ref: '#/components/schemas/AccountShare'
+          type: array
         id:
           type: string
         name:
@@ -9291,6 +10129,7 @@ components:
           type: array
       type: object
       required:
+      - version
       - id
       - name
       - status
@@ -9309,13 +10148,55 @@ components:
           type: string
           format: date-time
         token:
+          anyOf:
+          - type: string
+          - type: 'null'
+        state:
           type: string
+          default: pending
       type: object
       required:
       - id
       - household_id
       - expires_at
       - token
+    InvitationMetadata:
+      properties:
+        id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        state:
+          type: string
+          enum:
+          - pending
+          - accepted
+          - revoked
+          - expired
+        token:
+          type: 'null'
+      type: object
+      required:
+      - id
+      - expires_at
+      - state
+    InvitationPreview:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expires_at:
+          type: string
+          format: date-time
+        available:
+          type: boolean
+      type: object
+      required:
+      - name
+      - expires_at
+      - available
     JsonValue: {}
     LinkReceipt:
       properties:
@@ -9464,6 +10345,16 @@ components:
       - interest
     MemberRecord:
       properties:
+        membership_id:
+          type: string
+        display_name:
+          type: string
+        is_self:
+          type: boolean
+          default: false
+        is_admin:
+          type: boolean
+          default: false
         user_id:
           type: string
         role:
@@ -9476,6 +10367,8 @@ components:
           format: date-time
       type: object
       required:
+      - membership_id
+      - display_name
       - user_id
       - role
       - joined_at
@@ -10902,6 +11795,22 @@ components:
       - change_minor
       - known_balance_minor
       - balance_minor
+    Position:
+      properties:
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
+        amount_minor:
+          type: integer
+        unknown_count:
+          type: integer
+      type: object
+      required:
+      - currency
+      - currency_fraction_digits
+      - amount_minor
+      - unknown_count
     ProfilePatch:
       properties:
         display_name:
@@ -12481,6 +13390,34 @@ components:
       - account_nickname
       - currency
       - currency_fraction_digits
+    Recipient:
+      properties:
+        membership_id:
+          type: string
+        permission:
+          type: string
+          enum:
+          - view
+          - edit
+          default: view
+      type: object
+      required:
+      - membership_id
+    ReplaceAccountGrantsRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+        recipients:
+          items:
+            $ref: '#/components/schemas/Recipient'
+          type: array
+          maxItems: 1000
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+      - recipients
     ReportingPeriod:
       properties:
         month:
@@ -12791,6 +13728,29 @@ components:
       required:
       - run_label
       - completed_at
+    SearchHit:
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum:
+          - account
+          - activity
+        title:
+          type: string
+        account_id:
+          type: string
+        activity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - kind
+      - title
+      - account_id
     SearchItem:
       properties:
         type:
@@ -12893,35 +13853,6 @@ components:
       - layer
       - fragment
       - count
-    SearchPage:
-      properties:
-        items:
-          items:
-            oneOf:
-            - $ref: '#/components/schemas/AccountHit'
-            - $ref: '#/components/schemas/ActivityHit'
-            - $ref: '#/components/schemas/ExpectationHit'
-            - $ref: '#/components/schemas/BudgetHit'
-            - $ref: '#/components/schemas/GoalHit'
-            - $ref: '#/components/schemas/DebtHit'
-            discriminator:
-              propertyName: kind
-              mapping:
-                account: '#/components/schemas/AccountHit'
-                activity: '#/components/schemas/ActivityHit'
-                budget: '#/components/schemas/BudgetHit'
-                debt: '#/components/schemas/DebtHit'
-                expectation: '#/components/schemas/ExpectationHit'
-                goal: '#/components/schemas/GoalHit'
-          type: array
-        next_cursor:
-          anyOf:
-          - type: string
-          - type: 'null'
-      type: object
-      required:
-      - items
-      - next_cursor
     SearchRetestAction:
       properties:
         type:
@@ -13039,6 +13970,25 @@ components:
       - unassessed
       - clear
       - restricted
+    SharedAccount:
+      properties:
+        account:
+          $ref: '#/components/schemas/HouseholdAccountResponse'
+        owner_name:
+          type: string
+        permission:
+          type: string
+          enum:
+          - view
+          - edit
+        is_owner:
+          type: boolean
+      type: object
+      required:
+      - account
+      - owner_name
+      - permission
+      - is_owner
     SharedAccountListResponse:
       properties:
         accounts:
@@ -13084,6 +14034,49 @@ components:
       - nickname
       - archived
       - ownership_share_bps
+    SharedActivity:
+      properties:
+        activity:
+          $ref: '#/components/schemas/HouseholdActivityResponse'
+        author_name:
+          type: string
+        can_edit:
+          type: boolean
+        private_counterpart:
+          type: boolean
+      type: object
+      required:
+      - activity
+      - author_name
+      - can_edit
+      - private_counterpart
+    SharedDetail:
+      properties:
+        account:
+          $ref: '#/components/schemas/SharedAccount'
+        activities:
+          items:
+            $ref: '#/components/schemas/SharedActivity'
+          type: array
+      type: object
+      required:
+      - account
+      - activities
+    SharedReceipt:
+      properties:
+        activity:
+          $ref: '#/components/schemas/SharedActivity'
+        accounts:
+          items:
+            $ref: '#/components/schemas/SharedAccount'
+          type: array
+        replayed:
+          type: boolean
+      type: object
+      required:
+      - activity
+      - accounts
+      - replayed
     SignupRequest:
       properties:
         email:
@@ -13113,6 +14106,34 @@ components:
       - email
       - password
       - captcha_token
+    Snapshot:
+      properties:
+        household_id:
+          type: string
+        membership_id:
+          type: string
+        authorization_version:
+          type: integer
+        accounts:
+          items:
+            $ref: '#/components/schemas/SharedAccount'
+          type: array
+        activities:
+          items:
+            $ref: '#/components/schemas/SharedActivity'
+          type: array
+        positions:
+          items:
+            $ref: '#/components/schemas/Position'
+          type: array
+      type: object
+      required:
+      - household_id
+      - membership_id
+      - authorization_version
+      - accounts
+      - activities
+      - positions
     StarterPromptsResponse:
       properties:
         prompts:
@@ -13159,6 +14180,9 @@ components:
       - message
     TransferAdminRequest:
       properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
         user_id:
           type: string
           maxLength: 80
@@ -13166,6 +14190,7 @@ components:
       additionalProperties: false
       type: object
       required:
+      - expected_version
       - user_id
     UnboundedAllowance:
       properties:
@@ -13190,6 +14215,9 @@ components:
         by the shared research ceiling, a circuit breaker rather than an allowance.'
     UpdateAccountGrantRequest:
       properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
         permission:
           type: string
           enum:
@@ -13198,6 +14226,7 @@ components:
       additionalProperties: false
       type: object
       required:
+      - expected_version
       - permission
     UsageAllowance:
       properties:
@@ -13392,6 +14421,58 @@ components:
       - guest
       - capabilities
       - public_account_access_enabled
+    VersionRequest:
+      properties:
+        expected_version:
+          type: integer
+          minimum: 1.0
+      additionalProperties: false
+      type: object
+      required:
+      - expected_version
+    argus__domain__financial_search__SearchPage:
+      properties:
+        items:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/AccountHit'
+            - $ref: '#/components/schemas/ActivityHit'
+            - $ref: '#/components/schemas/ExpectationHit'
+            - $ref: '#/components/schemas/BudgetHit'
+            - $ref: '#/components/schemas/GoalHit'
+            - $ref: '#/components/schemas/DebtHit'
+            discriminator:
+              propertyName: kind
+              mapping:
+                account: '#/components/schemas/AccountHit'
+                activity: '#/components/schemas/ActivityHit'
+                budget: '#/components/schemas/BudgetHit'
+                debt: '#/components/schemas/DebtHit'
+                expectation: '#/components/schemas/ExpectationHit'
+                goal: '#/components/schemas/GoalHit'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+      - next_cursor
+    argus__domain__household__financial_schemas__SearchPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/SearchHit'
+          type: array
+        next_cursor:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - items
+      - next_cursor
   responses:
     AuthSessionVerificationUnavailable:
       description: Bounded Supabase session verification is temporarily unavailable; retry

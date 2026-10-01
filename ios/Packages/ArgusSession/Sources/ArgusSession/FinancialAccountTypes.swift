@@ -2,7 +2,9 @@ import Foundation
 
 /// Wire values only. The server owns amount precision, currency validity and nature.
 /// Date strings preserve the recorded offset; no client normalization changes an instant.
-public struct FinancialAccount: Codable, Equatable, Sendable, Identifiable {
+public typealias FinancialAccount = FinancialAccountValue<UUID>
+
+public struct FinancialAccountValue<Author: Codable & Equatable & Sendable>: Codable, Equatable, Sendable, Identifiable {
     public let id: UUID
     public let type: String
     public let nature: String
@@ -16,7 +18,7 @@ public struct FinancialAccount: Codable, Equatable, Sendable, Identifiable {
     public let updatedAt: String
     public let balance: FinancialBalance
     public let opening: FinancialOpening?
-    public let asset: FinancialAsset?
+    public let asset: FinancialAssetValue<Author>?
     public var isOptionalAsset: Bool { ["property", "vehicle", "other_asset"].contains(type) }
     enum CodingKeys: String, CodingKey {
         case id, type, nature, currency, nickname, archived, version, balance, opening, asset

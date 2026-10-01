@@ -10,7 +10,8 @@ for configuration and verification. With native authentication configured,
 Accounts establishes balances, records and corrects expenses, and checks balances.
 Home reads the same canonical position and recorded-spending totals;
 the server feature flag remains authoritative. No financial records are stored
-in app preferences. Calculations, voice, sharing, monitoring and financial-provider
+in app preferences. Connected Household sharing uses the default-off canonical
+backend; see [Household setup and tests](HOUSEHOLD_SETUP.md). Calculations, voice, monitoring and financial-provider
 integrations remain outside this client.
 
 ## Run in Simulator
