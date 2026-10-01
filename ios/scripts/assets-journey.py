@@ -9,6 +9,7 @@ import json
 import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "ios/.build/accounts-local-59200"
@@ -309,8 +310,45 @@ def readback(journal, client):
         groups["USD"]["net_worth_minor"] == "50000", "USD mixed into another currency"
     )
     plan = get(client, "/financial-plan")
-    for key, value in journal.state["baseline_plan"].items():
-        require(plan[key] == value, "Asset writes changed Plan " + key)
+    baseline = journal.state["baseline_plan"]
+    for key in ("currencies", "budgets", "goals"):
+        require(plan[key] == baseline[key], "Asset writes changed Plan " + key)
+    pools = {row["account_id"]: row for row in plan["goal_pools"]}
+    previous_pools = {row["account_id"]: row for row in baseline["goal_pools"]}
+    require(
+        pools.keys() == previous_pools.keys(),
+        "Asset writes changed savings pool identities",
+    )
+    require(
+        pools[ids["cash"]] == previous_pools[ids["cash"]],
+        "Asset writes changed cash savings pool",
+    )
+    for account_id, pool in pools.items():
+        if account_id == ids["cash"]:
+            continue
+        require(
+            pool["state"] == "ineligible"
+            and pool["backing_minor"] is None
+            and pool["assigned_minor"] == "0"
+            and pool["available_minor"] is None
+            and pool["shortfall_minor"] is None
+            and pool["affected_goal_ids"] == []
+            and pool["affected_goal_names"] == [],
+            "Ineligible asset or debt became savings backing",
+        )
+        stable = {
+            key: value
+            for key, value in pool.items()
+            if key not in ("account_version", "as_of")
+        }
+        previous = {
+            key: value
+            for key, value in previous_pools[account_id].items()
+            if key not in ("account_version", "as_of")
+        }
+        require(
+            stable == previous, "Asset writes changed ineligible pool financial facts"
+        )
     require(plan["budgets"][0]["spent_minor"] == "0", "Valuation became budget spending")
     require(
         plan["goals"][0]["supported_minor"] == "50000", "Valuation became savings backing"
@@ -327,6 +365,32 @@ def readback(journal, client):
         ),
         "Valuation created money activity",
     )
+    search_path = "/financial-search?" + urlencode(
+        {"q": house["nickname"], "kind": "account"}
+    )
+    results = get(client, search_path)
+    require(
+        len(results["items"]) == 1 and results["items"][0]["account"] == house,
+        "Asset Search did not return its canonical account detail",
+    )
+    require(
+        get(client, search_path, owner=1)["items"] == [],
+        "Asset Search exposed another owner's record",
+    )
+    destination = get(
+        client, "/financial-accounts/" + results["items"][0]["account"]["id"]
+    )
+    linked = get(
+        client, "/financial-accounts/" + destination["asset"]["related_debt_account_id"]
+    )
+    require(
+        linked["id"] == ids["loan"] and linked["balance"]["amount_minor"] == -90000000,
+        "Search asset link opened a different debt or stale principal",
+    )
+    require(
+        get(client, search_path) == results,
+        "Linked debt read changed the originating Search results",
+    )
     return {
         "source_head": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
@@ -342,6 +406,8 @@ def readback(journal, client):
             "cross-currency",
             "archive-restore",
             "owner-isolation",
+            "search-canonical-detail-and-linked-debt",
+            "search-owner-isolation-and-return",
             "exact-replay",
         ],
         "currencies": groups,
