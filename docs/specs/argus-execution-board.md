@@ -79,6 +79,52 @@ shared-planning delivery. Code-only rollback is unsafe after cutover; restore
 validated ordered JSON from canonical rows in a coordinated transaction before
 using the legacy adapter. No existing or hosted environment was migrated.
 
+### Connected implementation checkpoint, October 1
+
+Five subsequent additive migrations were reviewed and applied **only** to NEW
+Postgres 59752: `20261002000000` shared-plan consent/revision/claim storage,
+`20261002010000` true original Money leg owners, and `20261002020000` retained
+consent revision bounds, `20261002030000` consent/claim lifecycle uniqueness,
+and `20261002040000` responsibility carry-forward for every canonical writer.
+All five ran in explicit transactions. Seven synthetic
+accounts and the one prepared Household remain intact. Raw shared claims,
+allocations and retained activity references stay service-only under RLS; history
+foreign keys retain restrictive deletion. No existing demo or hosted database was
+migrated. These schema checks do not establish the complete shared journey.
+
+The four-kind native forms compile against the fixed checkpoint presentation.
+The Session package executes 79 checks with four existing opt-in skips and zero
+failures (75 passed); production presentation models pass 24 checks. Scheduled
+forms use the canonical server cutoff and preserve recorded occurrences when
+changing intentions. Real connected acceptance is still in progress.
+Initial real-Postgres shared-budget proof keeps 70/30 planned amounts
+separate from 20/10 actual contributions, allows a view-only member's own link,
+redacts the other's private source and rejects the third identity. Full bills,
+goals, debt, corrections/recovery, cross-owner privacy and departure acceptance
+remain required before publication/readiness. The captain-owned UI launcher
+`--shared-plan-scene` selects only the assigned C930 simulator, new app/cache,
+59750 allocation and retained synthetic fixture; it refuses other devices/ports.
+Its bounded resource/recovery helper checks pass. Existing demos stay available.
+
+Backend checkpoint `82383423e23947adb156059b89d664695d7a97f9` implements
+all four kinds. The focused real-Postgres matrix passed 458 cases with zero
+skips; the final canonical adapter/currentness/Search delta passed 68. Native
+checkpoint `05d6c2e0dc820dbc9495fba1d076ea178f3c35fc` passed 77 Session checks
+(four existing opt-in skips), 24 Household presentation checks and five affected
+Personal recovery/original checks. The repaired broader Personal harness has
+six assertion failures in four cases, matching the exact integration baseline;
+it is not counted as a green full suite. Its baseline comparison will accompany
+the evidence. Assembled native acceptance and independent review remain pending.
+
+Fresh integration on October 1 remains `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`.
+Open ingestion lanes #768–#772 consume Recording and keep their own branches;
+they do not modify its canonical services. Versions `20261002120000` through
+`20261002120300` are reserved for ingestion. The older #772 migration at
+`20261001190000` collides with this lane's allocation cutover; its owner must
+move that draft into the reserved range before combining branches. This lane
+does not edit ingestion or its infrastructure. The consumer handoff lives in
+the existing [API contract](../API_CONTRACT.md#recording-consumer-handoff-for-ingestion-october-1).
+
 ### Outcome, owners and execution
 
 The captain owns this one lane through a merge-ready PR: two signed-in members
@@ -90,9 +136,9 @@ private unless explicitly shared. [MVEE Household][mvee-household] and
 [MVEE Plan][mvee-plan] retain product authority.
 
 The backend writer `shared_plan_implementation` owns financial rules, canonical
-services, schemas, routers, migrations and domain tests. A separate native-only
-writer will own transport/models/screens/localization after the typed wire is
-stable; it cannot change financial rules. Each shared surface has one writer.
+services, schemas, routers, migrations and domain tests. The native writer
+`shared_plan_native_scout` owns transport/models/screens/localization against
+the fixed typed wire; it cannot change financial rules. Each shared surface has one writer.
 The captain owns local fixture/runner helpers, UI acceptance tests, runtime
 resources, documentation, integration, durable evidence and release claims.
 Read-only scouts/reviewer own no source or runtime resources. No second
@@ -234,9 +280,9 @@ verify one connected shared journey at a time across all four plan types;
 integration reconciliation, merged-tree modularity and exact-head CI; (7) PR and
 restart handoff. Component checks do not establish assembled or phone delivery.
 
-The lane-owned Auth/Postgres allocation is assigned above. Native simulator
-assignment and assembled checks remain pending; no existing simulator, database
-or port is reassigned. No merge, deployment, hosted changes,
+The active resource assignment and implementation checkpoint above supersede
+these historical prerequisite states. Native assembled acceptance remains
+pending; all prior demos and the physical-phone environment stay preserved. No merge, deployment, hosted changes,
 production data, paid providers or physical-phone internet readiness is granted.
 The entire assigned shared-planning outcome remains required through resumed implementation; it is not narrowed or newly deferred.
 

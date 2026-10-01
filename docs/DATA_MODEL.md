@@ -2798,9 +2798,7 @@ Debt-plan archive preserves canonical payments and claimed occurrence snapshots.
 
 ## Shared Household planning storage sketch
 
-**Status:** Proposed additive contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. No shared-planning migration or writer is implemented. The independent
-Household read prerequisite now uses exact current group membership; it does not
-enable cross-owner posting or shared plans. The [API sketch](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the proposed public wire and the founder-approved permission/custody rules.
+**Status:** Worker storage contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Additive schema/cutover source is applied only to NEW disposable Postgres59752. Connected acceptance and review remain pending; no existing demo or hosted database is migrated. The [API contract](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the scoped public wire and approved permission/departure rules.
 
 The selected candidate adds consent and responsibility references to existing
 owner-qualified definitions. The alternative adds Household scope directly to
@@ -2812,7 +2810,7 @@ editable actual totals.
 
 ### Binding and participant records
 
-The proposed `household_plan_bindings` contains `id`, `household_id`,
+The `household_plan_bindings` contains `id`, `household_id`,
 `owner_membership_id`, `owner_user_id`, exactly one of `budget_id`,
 `expectation_id`, `goal_id`, or `debt_plan_id`, and `revoked_at`.
 The original definition ID remains its financial identity. Composite foreign
@@ -2821,11 +2819,11 @@ membership to the same Household. Binding lifecycle also records owner-departure
 archive, the retained authorized recipients and previously shared definition
 revision. Read-only archived history grants no write or future projection. An
 expectation binding admits bills, not
-private expected income. A partial unique key permits one active binding per
-canonical definition. There is no second plan amount, balance, name, schedule,
+private expected income. A partial unique key permits one live, non-departed binding per
+canonical definition; retained departed bindings preserve prior consent. There is no second plan amount, balance, name, schedule,
 completion flag, or owner in a copied body.
 
-The proposed `household_plan_participants` contains `binding_id`,
+The `household_plan_participants` contains `binding_id`,
 `membership_id`, one permission `view|edit`, and revocation state. Owner powers
 derive from original ownership; no stored owner role competes with that fact.
 The participant membership FK binds the same Household incarnation. Joining or
@@ -2847,8 +2845,10 @@ participants' private funding. These powers require distinct server checks.
 separates definition owner `user_id` from `activity_owner_id`, backfilled to the
 same value for existing rows. Definition foreign keys continue to use
 `user_id`. The exact activity-revision FK uses `activity_owner_id`. A unique
-`(activity_owner_id,activity_id)` replaces the existing same-owner uniqueness,
-so Personal and shared claim writers cannot assign one activity twice.
+`(activity_owner_id,activity_id)` over active or occurrence-bound claims replaces
+the existing same-owner uniqueness. Released unscheduled extras remain historical
+rows without reserving the active slot. Personal and shared writers cannot
+count one activity twice; scheduled claim lifecycle remains unchanged.
 
 Shared claims add binding, contributor membership, explicit purpose, and an
 optional budget purpose. Checks require one canonical definition purpose and
@@ -2896,10 +2896,9 @@ databases remain untouched.
 
 ### Smallest multi-owner Money extension
 
-Current `financial_activity_memberships.user_id` qualifies both the logical
-group and every financial record revision. That constraint intentionally
-rejects a transfer between owners. The proposed extension retains one group
-owner and adds `record_owner_id`, backfilled to `user_id`. Group/revision FKs
+The extended `financial_activity_memberships` retains one logical group
+owner in `user_id` and adds `record_owner_id`, completely backfilled from
+`user_id` for pre-extension rows. Group/revision FKs
 keep `user_id`; record/revision FKs use `record_owner_id`. Each leg stays bound
 to its original account and owner. Existing same-owner rows retain the same
 identity, revision, money facts, and coverage.
@@ -2949,6 +2948,15 @@ The group owner's existing membership SELECT policy cannot expose a foreign
 leg merely because `user_id` matches. Direct membership reads require the
 caller to own the leg as well. Account owners retain reads of their own
 financial records; full cross-owner group assembly remains service-owned.
+
+Consent history records `first_shared_revision` and each named recipient's
+`granted_revision`. New consent cannot expose earlier private revisions.
+Owner departure pins retained definition, claim, activity and allocation
+**revision references**, not copied balances/totals/ledgers. Service-only
+`household_plan_archived_*` relations and restrictive foreign keys preserve
+those previously shared facts. Remaining readers still need their live granted
+membership incarnation; archived plans provide no future projections or writes.
+Private post-departure edits cannot enter retained history.
 
 ### Transactions, receipts, and migration risks
 
