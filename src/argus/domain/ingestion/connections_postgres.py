@@ -20,6 +20,11 @@ from argus.domain.ingestion.connections import (
     ConnectionStatus,
     DuplicateConnection,
     SourceConnection,
+    checked_code,
+    checked_cursor,
+    checked_holder,
+    checked_label,
+    checked_ref,
 )
 from argus.domain.ingestion.contract import SourceKind
 
@@ -47,6 +52,7 @@ class PostgresConnectionRepository:
         secret: bytes | None = None,
         connection_id: str | None = None,
     ) -> SourceConnection:
+        external_ref, label = checked_ref(external_ref), checked_label(label)
         try:
             row = self._one(
                 f"""insert into public.financial_source_connections
@@ -129,6 +135,7 @@ class PostgresConnectionRepository:
         now: datetime,
         ttl: timedelta = DEFAULT_LEASE,
     ) -> bool:
+        checked_holder(holder)
         row = self._one(
             f"""update public.financial_source_connections
             set lease_holder = %s, lease_until = %s, last_attempt_at = %s
@@ -147,6 +154,7 @@ class PostgresConnectionRepository:
         now: datetime,
         ttl: timedelta = DEFAULT_LEASE,
     ) -> bool:
+        checked_holder(holder)
         row = self._one(
             f"""update public.financial_source_connections
             set lease_until = %s
@@ -173,6 +181,7 @@ class PostgresConnectionRepository:
         cursor: str | None,
         now: datetime,
     ) -> bool:
+        checked_cursor(cursor)
         row = self._one(
             f"""update public.financial_source_connections
             set sync_cursor = %s, status = 'active', last_success_at = %s,
@@ -186,26 +195,42 @@ class PostgresConnectionRepository:
         return row is not None
 
     def record_failure(
-        self, *, connection_id: str, code: str, status: ConnectionStatus, now: datetime
+        self,
+        *,
+        connection_id: str,
+        code: str,
+        status: ConnectionStatus,
+        now: datetime,
+        holder: str | None = None,
     ) -> SourceConnection:
         if status == "disconnected":
             raise ValueError("use disconnect() to end a connection")
+        checked_code(code)
         row = self._one(
             f"""update public.financial_source_connections
             set status = %s, last_error_code = %s, last_attempt_at = %s,
                 lease_holder = null, lease_until = null,
                 updated_at = %s, version = version + 1
             where id = %s::uuid and {_LIVE}
+              and (%s::text is null or lease_holder = %s)
             returning {_COLUMNS}""",
-            (status, code, now, now, _uuid(connection_id)),
+            (status, code, now, now, _uuid(connection_id), holder, holder),
         )
         if row is None:
-            raise ConnectionNotFound()
+            current = self._one(
+                f"""select {_COLUMNS} from public.financial_source_connections
+                where id = %s::uuid and {_LIVE}""",
+                (_uuid(connection_id),),
+            )
+            if current is None:
+                raise ConnectionNotFound()
+            return _row(current)  # a stale sync; the current one owns the state
         return _row(row)
 
     def flag_attention(
         self, *, connection_id: str, code: str, now: datetime
     ) -> SourceConnection:
+        checked_code(code)
         row = self._one(
             f"""update public.financial_source_connections
             set attention_code = %s, attention_at = %s,
