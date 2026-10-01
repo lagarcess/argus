@@ -113,9 +113,28 @@ redaction. Account positions load separately.
 [Commands and evidence](../reports/evidence/shared-household-planning/canonical-read-check.json)
 explicitly mark SQL-backed load/snapshot/history unverified without the local
 DSN. This step retains current write permissions and cross-owner rejection.
-No shared plan, contribution or native delivery is claimed. All bounded agents
-have stopped; no lane-owned service runs. Plan rights, custody, contributions
-and dependent UI remain blocked on the two answers.
+No shared plan, contribution or native delivery is claimed.
+
+Independent follow-up verification at `d3147db88e8b7efe01af0f23256b929b575b48a1`
+ran the same focused regression set against the new lane-owned local Postgres
+59702: **110 passed, zero skipped, zero failures**. This includes the SQL-backed
+resolver, Household visibility/history, correction, receipt and Personal debt
+regressions. The assigned local allocation is `ios-accounts-59700`, isolated
+Auth 59701 / Postgres 59702; API 59700 and CAPTCHA 59705 are reserved for later
+assembled work. Its configuration and state live only in this worker's ignored
+`ios/.build/accounts-local-59700`. Other allocations remain untouched.
+[CI at this head](https://github.com/lagarcess/argus/actions/runs/36901975308) is
+SUCCESS, including backend, frontend and required guest database/Auth gates.
+These checks do not prove shared planning or native acceptance.
+
+The sole writer's next independent prerequisite owns
+`src/argus/domain/planning/goal_allocations.py`, bounded `planning/storage.py`,
+one additive local-only allocation migration and focused PG tests. It replaces
+owner-readable goal-body residuals with one canonical owner-qualified allocation
+relation, retaining Personal API shape and the existing pool reducer. No shared
+rows, foreign-authority writers, plan permissions, custody or native UI are
+activated by this step. Plan rights, custody, contributions and dependent UI
+still await the two founder answers.
 
 The checkpoint's temporary groups, splitting and guest proposals do not define
 Household permissions. Guest finance remains registered-only. A narrow proposed
