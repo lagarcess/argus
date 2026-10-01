@@ -24,16 +24,21 @@ struct ArgusFoundationApp: App {
 
     var body: some Scene {
         WindowGroup {
-            FoundationShell(appearance: $appearance)
-                .environmentObject(auth)
-                .task { await auth.start() }
-                .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { Task { await auth.restore() } }
-                }
-                .preferredColorScheme(appearance.colorScheme)
-                .tint(ArgusStyle.ink)
-                .foregroundStyle(ArgusStyle.ink)
-                .font(ArgusStyle.body())
+            if ProcessInfo.processInfo.arguments.contains("--cuadrao-design") {
+                CuadraoCanvas()
+                    .preferredColorScheme(.light)
+            } else {
+                ConnectedCuadraoRoot(appearance: $appearance)
+                    .environmentObject(auth)
+                    .task { await auth.start() }
+                    .onChange(of: scenePhase) { _, phase in
+                        if phase == .active { Task { await auth.restore() } }
+                    }
+                    .preferredColorScheme(appearance.colorScheme)
+                    .tint(ArgusStyle.ink)
+                    .foregroundStyle(ArgusStyle.ink)
+                    .font(ArgusStyle.body())
+            }
         }
     }
 }

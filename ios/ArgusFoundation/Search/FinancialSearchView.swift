@@ -42,7 +42,9 @@ struct FinancialSearchView: View {
                         Button { model.update(query: "") } label: { Image(systemName: "xmark.circle.fill") }
                             .frame(width: 44, height: 44).accessibilityLabel("search.clear").accessibilityIdentifier("search.clear")
                     }
-                }.frame(minHeight: 48).overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
+                }.frame(minHeight: 48).overlay(alignment: .bottom) {
+                    Rectangle().fill(WelcomePalette.separator).frame(height: 1)
+                }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 24) {
                         filter(nil)
@@ -92,8 +94,10 @@ struct FinancialSearchView: View {
         Button { focused = false; model.update(kind: .some(kind)) } label: {
             Text(LocalizedStringKey("search.filter." + (kind?.rawValue ?? "all")))
                 .font(ArgusStyle.body(14)).frame(minWidth: 44, minHeight: 48)
-                .foregroundStyle(model.origin.kind == kind ? ArgusStyle.ink : ArgusStyle.secondary)
-                .overlay(alignment: .bottom) { Rectangle().fill(model.origin.kind == kind ? ArgusStyle.ink : .clear).frame(height: 1) }
+                .foregroundStyle(model.origin.kind == kind ? WelcomePalette.pine : ArgusStyle.secondary)
+                .overlay(alignment: .bottom) {
+                    Rectangle().fill(model.origin.kind == kind ? WelcomePalette.pine : .clear).frame(height: 2)
+                }
         }.buttonStyle(.plain).accessibilityIdentifier("search.filter." + (kind?.rawValue ?? "all"))
             .accessibilityAddTraits(model.origin.kind == kind ? .isSelected : [])
     }

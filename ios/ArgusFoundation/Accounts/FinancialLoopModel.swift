@@ -69,7 +69,14 @@ final class FinancialLoopModel: ObservableObject {
         guard let identity else { return }
         let ticket = generation
         let request = UUID()
-        accountReads[account.id] = AccountReadState(loading: true, request: request)
+        // Keep prior activity/checks visible while refreshing. Clearing them made
+        // post-confirm UITests lose "DOP 7,000.00" from check history for the
+        // whole reload window (AccountSummary balance is a11y-combined).
+        var loading = accountReads[account.id] ?? AccountReadState()
+        loading.loading = true
+        loading.errorKey = nil
+        loading.request = request
+        accountReads[account.id] = loading
         defer {
             if generation == ticket, accountReads[account.id]?.request == request { accountReads[account.id]?.loading = false }
         }
@@ -406,7 +413,9 @@ final class FinancialEditor: ObservableObject, Identifiable {
     var isCorrection: Bool { if case .expense(let value) = kind { return value != nil }; return false }
     var isCheck: Bool { if case .check = kind { return true }; return false }
     var busy: Bool { phase == .loading || phase == .saving }
-    var canEdit: Bool { phase == .editing || (phase == .review && expensePreview?.ready == false) }
+    /// Entry fields only while editing. Coverage review must not remount amount/date
+    /// controls — field didSet invalidate wiped coverage answers before confirm.
+    var canEdit: Bool { phase == .editing }
     var canConfirm: Bool { phase == .uncertain || (phase == .review && (checkPreview != nil || expensePreview?.ready == true)) }
     var readyToReview: Bool { !amount.isEmpty && (!isCorrection || !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
 
@@ -430,7 +439,9 @@ final class FinancialEditor: ObservableObject, Identifiable {
         guard !busy, phase != .uncertain else { return }
         coverage.removeAll { $0.observationId == observation }
         coverage.append(.init(observationId: observation, included: included))
-        phase = .editing; expensePreview = nil
+        // Stay in review while coverage is answered so entry remount + didSet
+        // invalidate does not wipe the coverage answers just recorded.
+        expensePreview = nil
     }
 
     func review(locale: Locale) async {

@@ -163,7 +163,9 @@ final class FinancialSearchModel: ObservableObject {
             case .account(let account):
                 let live = try await controller.financialAccount(id: account.id, expectedIdentity: identity)
                 guard detailRequest == ticket, self.identity == identity else { return }
-                accounts.upsert(live); destination = .account(live.id)
+                await accounts.open(live)
+                guard detailRequest == ticket, self.identity == identity else { return }
+                destination = .account(live.id)
             case .activity(let activity, _):
                 _ = try await controller.financialActivityDetail(activity.activityId, expectedIdentity: identity)
                 guard detailRequest == ticket, self.identity == identity else { return }

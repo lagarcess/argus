@@ -107,7 +107,9 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     var needsLoanSplit: Bool { kind == .debtPayment || kind == .paymentReversal && (returning?.principalMinor != nil || correcting?.principalMinor != nil) }
     var isCorrection: Bool { correcting != nil }
     var busy: Bool { phase == .loading || phase == .saving }
-    var canEdit: Bool { phase == .editing || (phase == .review && preview?.ready == false) }
+    /// Entry fields only while editing. Coverage review must not remount amount/date
+    /// controls — DatePicker jitter called invalidate() and wiped answers.
+    var canEdit: Bool { phase == .editing }
     var canConfirm: Bool { phase == .uncertain || (phase == .review && preview?.ready == true && reviewedCommand != nil) }
     var readyToReview: Bool {
         !amount.isEmpty && (!needsLoanSplit || (!principal.isEmpty && !interest.isEmpty && !fees.isEmpty)) && note.unicodeScalars.count <= 200 &&
@@ -201,7 +203,25 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         guard !busy, phase != .uncertain else { return }
         answers.removeAll { $0.accountId == accountId && $0.observationId == observationId }
         answers.append(.init(accountId: accountId, observationId: observationId, included: included))
-        phase = .editing; preview = nil; reviewedCommand = nil
+        // Stay in review while coverage is answered. Flipping to editing remounts
+        // entry controls; DatePicker/field didSet then invalidate() and wipe answers.
+        preview = nil
+        reviewedCommand = nil
+    }
+
+    func answerAndReview(accountId: UUID, observationId: UUID, included: Bool, locale: Locale) async {
+        guard phase != .uncertain else { return }
+        answers.removeAll { $0.accountId == accountId && $0.observationId == observationId }
+        answers.append(.init(accountId: accountId, observationId: observationId, included: included))
+        // Wait out an in-flight review so a second observation answer is not dropped
+        // by guard !busy, then send every answer collected so far.
+        while busy {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        guard phase != .uncertain else { return }
+        preview = nil
+        reviewedCommand = nil
+        await review(locale: locale)
     }
 
     func review(locale: Locale) async {

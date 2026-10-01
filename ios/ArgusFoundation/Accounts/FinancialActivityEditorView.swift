@@ -22,7 +22,9 @@ struct FinancialActivityEditorView: View {
                     if model.options == nil && model.phase == .editing {
                         if model.errorKey == nil { ProgressView("accounts.loading") }
                         else { Button("accounts.retry") { Task { await model.load() } }.frame(minHeight: 44) }
-                    } else if model.canEdit || model.phase == .loading {
+                    } else if model.canEdit {
+                        // Never remount entry during .loading/.review — DatePicker jitter
+                        // invalidate() wiped coverage answers before confirm could appear.
                         entry
                     }
                     if let preview = model.preview { review(preview) }
@@ -39,7 +41,10 @@ struct FinancialActivityEditorView: View {
                     } else if model.canConfirm {
                         Button {
                             focused = false
-                            Task { await model.confirm() }
+                            Task {
+                                await model.confirm()
+                                if model.phase == .saved { dismiss() }
+                            }
                         } label: {
                             Text(model.phase == .uncertain ? "accounts.retry" : model.isCorrection ? "loop.activity.saveCorrection" : "loop.activity.confirm")
                                 .frame(maxWidth: .infinity)
@@ -54,6 +59,9 @@ struct FinancialActivityEditorView: View {
                         } label: { Text("loop.review").frame(maxWidth: .infinity) }
                         .buttonStyle(PillButtonStyle()).disabled(!model.readyToReview || model.busy || model.options == nil)
                         .accessibilityIdentifier("loop.review")
+                        if model.phase == .review, model.preview?.ready == false {
+                            Button("loop.edit") { model.edit() }.frame(minHeight: 44).accessibilityIdentifier("loop.edit")
+                        }
                     }
                     if model.busy { ProgressView("accounts.loading") }
                 }.padding(24)
@@ -211,10 +219,14 @@ struct FinancialActivityEditorView: View {
                                 .font(ArgusStyle.body(12, relativeTo: .caption))
                             if model.phase != .uncertain {
                                 HStack {
-                                    Button("loop.coverage.yes") { respond(affected.accountId, observation, included: true) }
+                                    Button("loop.coverage.yes") {
+                                        Task { await respond(affected.accountId, observation, included: true) }
+                                    }
                                         .buttonStyle(PillButtonStyle(primary: observation.included == true))
                                         .accessibilityIdentifier("loop.coverage.yes." + affected.accountId.uuidString + "." + observation.observationId.uuidString)
-                                    Button("loop.coverage.no") { respond(affected.accountId, observation, included: false) }
+                                    Button("loop.coverage.no") {
+                                        Task { await respond(affected.accountId, observation, included: false) }
+                                    }
                                         .buttonStyle(PillButtonStyle(primary: observation.included == false))
                                         .accessibilityIdentifier("loop.coverage.no." + affected.accountId.uuidString + "." + observation.observationId.uuidString)
                                 }
@@ -247,9 +259,13 @@ struct FinancialActivityEditorView: View {
         }
     }
 
-    private func respond(_ accountId: UUID, _ observation: FinancialObservation, included: Bool) {
-        model.answer(accountId: accountId, observationId: observation.observationId, included: included)
-        Task { await model.review(locale: locale) }
+    private func respond(_ accountId: UUID, _ observation: FinancialObservation, included: Bool) async {
+        await model.answerAndReview(
+            accountId: accountId,
+            observationId: observation.observationId,
+            included: included,
+            locale: locale
+        )
     }
     private func balance(_ label: LocalizedStringKey, value: FinancialBalance, currency: String) -> some View {
         HStack {

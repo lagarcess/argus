@@ -230,7 +230,7 @@ extension FinancialLoopUITests {
         capture("isolation-a-pending-before-switch")
 
         try signIn(fresh: true, user: "B")
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         // B's own persisted row is the positive load barrier for absence claims.
         XCTAssertTrue(app.buttons["accounts.row." + other.id].waitForExistence(timeout: 20))
         XCTAssertFalse(app.buttons["accounts.row." + owner.id].exists)
@@ -347,7 +347,7 @@ extension FinancialLoopUITests {
     }
 
     func createMoneyAccount(_ name: String, type: String, amount: String? = nil, negative: Bool = false, currency: String = "DOP") -> MoneyAccount {
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         if app.buttons["accounts.back"].exists { scrollMoneyTop(); app.buttons["accounts.back"].tap() }
         tapVisible(app.buttons["accounts.add"])
         tapVisible(app.buttons["accounts.type." + type])
@@ -375,7 +375,7 @@ extension FinancialLoopUITests {
     }
 
     func openMoneyAccount(_ account: MoneyAccount) {
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         if app.buttons["accounts.back"].exists { scrollMoneyTop(); app.buttons["accounts.back"].tap() }
         tapVisible(app.buttons["accounts.row." + account.id])
         if !app.buttons["accounts.record"].waitForExistence(timeout: 10) {

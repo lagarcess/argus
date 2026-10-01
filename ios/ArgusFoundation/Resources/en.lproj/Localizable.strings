@@ -405,7 +405,7 @@
 
 "search.title" = "Find your financial records";
 "search.gate" = "Sign in to search your accounts, activity and Plan.";
-"search.placeholder.connected" = "Search your finances";
+"search.placeholder.connected" = "Search";
 "search.filter.all" = "All";
 "search.filter.account" = "Accounts";
 "search.filter.activity" = "Activity";
