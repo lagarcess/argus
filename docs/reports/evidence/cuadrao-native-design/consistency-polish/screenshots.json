@@ -1,0 +1,80 @@
+[
+  {
+    "file": "distribution-dark-large-en.jpg",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "captured_at": 1790889504.499,
+    "source": "034ae234b25d8662255251d8f346202d175ef222"
+  },
+  {
+    "file": "distribution-whole-es.jpg",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "captured_at": 1790889540.154,
+    "source": "034ae234b25d8662255251d8f346202d175ef222"
+  },
+  {
+    "file": "history-previous-inspect-es.jpg",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "captured_at": 1790889535.438,
+    "source": "034ae234b25d8662255251d8f346202d175ef222"
+  },
+  {
+    "file": "currency-search-es.jpg",
+    "test": "CuadraoPolishUITests/testAccountCurrencySearch()",
+    "captured_at": 1790889563.697,
+    "source": "034ae234b25d8662255251d8f346202d175ef222"
+  },
+  {
+    "file": "all-accounts-archived-es.jpg",
+    "test": "CuadraoPolishUITests/testArchivesRemainReachableWhenAllAccountsArchived()",
+    "captured_at": 1790889580.092,
+    "source": "034ae234b25d8662255251d8f346202d175ef222"
+  },
+  {
+    "file": "plan-filter-dark-large-en.jpg",
+    "test": "CuadraoPolishUITests/testLargeEnglishPlanControls()",
+    "captured_at": 1790889621.439,
+    "source": "034ae234b25d8662255251d8f346202d175ef222"
+  },
+  {
+    "file": "plan-local-forecast-scope-es.jpg",
+    "test": "CuadraoPolishUITests/testPlanScopeDoesNotChangeCreationDefault()",
+    "captured_at": 1790889631.74,
+    "source": "034ae234b25d8662255251d8f346202d175ef222"
+  },
+  {
+    "file": "home-section-shortcuts-es.jpg",
+    "test": "CuadraoPolishUITests/testHomeHoldReorderAndArchiveRecovery()",
+    "captured_at": 1790889959.198,
+    "source": "3b04bc2307a6bb08603082c34fb6cbbaa4062dd0"
+  },
+  {
+    "file": "account-archive-recovery-es.jpg",
+    "test": "CuadraoPolishUITests/testHomeHoldReorderAndArchiveRecovery()",
+    "captured_at": 1790889956.649,
+    "source": "3b04bc2307a6bb08603082c34fb6cbbaa4062dd0"
+  },
+  {
+    "file": "accounts-management-es.jpg",
+    "test": "CuadraoPolishUITests/testHomeHoldReorderAndArchiveRecovery()",
+    "captured_at": 1790889951.202,
+    "source": "3b04bc2307a6bb08603082c34fb6cbbaa4062dd0"
+  },
+  {
+    "file": "home-account-hold-es.jpg",
+    "test": "CuadraoPolishUITests/testHomeHoldReorderAndArchiveRecovery()",
+    "captured_at": 1790889946.682,
+    "source": "3b04bc2307a6bb08603082c34fb6cbbaa4062dd0"
+  },
+  {
+    "file": "accounts-dark-large-lower-en.jpg",
+    "test": "CuadraoPolishUITests/testLargeEnglishAccountManagement()",
+    "captured_at": 1790889972.102,
+    "source": "3b04bc2307a6bb08603082c34fb6cbbaa4062dd0"
+  },
+  {
+    "file": "accounts-dark-large-en.jpg",
+    "test": "CuadraoPolishUITests/testLargeEnglishAccountManagement()",
+    "captured_at": 1790889970.712,
+    "source": "3b04bc2307a6bb08603082c34fb6cbbaa4062dd0"
+  }
+]

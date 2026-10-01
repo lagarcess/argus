@@ -1797,6 +1797,35 @@ presentation. Back keeps the expanded category and scroll position, and edits re
 from the same account model. [Round-trip evidence](../reports/evidence/cuadrao-native-design/home-insights/account-connectivity/README.md)
 records native verification and physical-phone handoff.
 
+**Home/Plan consistency polish — implemented, UI only:** source `034ae234` plus account-row correction `3b04bc23`
+delivers the founder-approved reconciliation. The
+[Cuadrao guide](../../.agent/designs/cuadrao/DESIGN.md) owns the shared rules and
+component owners; [verification and phone handoff](../reports/evidence/cuadrao-native-design/consistency-polish/README.md)
+retain the native checks and screenshots.
+
+- Plan keeps Para ti / En grupo. Forecast month is quiet text, its space choice
+  stays local, and a new plan defaults from the explicit plan-list scope or Personal,
+  never from the forecast. Exploration is a secondary link.
+- Shared current-value/chevron labels and selected checkmarks reconcile Tus planes,
+  space and currency controls. Fixed currency stays static. Short native menus and
+  searchable currency catalogs retain their distinct roles; no conversion is added.
+- Expanded history uses icon view controls, compact localized periods, neighboring
+  card edges and bounded previous/next controls. Scrubbing and paging stay distinct.
+  Current distribution hides historical controls and says Activos · Hoy / Assets · Today;
+  history restores its chosen period on return. Compact Home remains quiet.
+- Home keeps matching trailing plus shortcuts for Cuentas and Movimientos, removes
+  the accounts ellipsis, and adds reorder to the account hold action. The Cuentas
+  heading opens a native management destination with visible ordering and archive
+  recovery, including when every account is archived. Existing account detail actions
+  remain available. The shared gallery shows the actual new controls.
+
+Nine native checks passed; the final account-row adjustment adds a passing two-case
+reorder/recovery and large-English verification. Fixed-currency creation, group
+split/repayment and forecast checks are retained from the prior passing batch on
+unchanged owners. iPhone build 3402 installed and launched (sequence 3412).
+This checkpoint does not authorize connected history, providers, analytics or a
+production release. Remaining work stays in the dispositions above and below.
+
 **Future surface-connectivity pass — founder requested, not yet executed:** audit
 Home, Plan, Accounts, Chat and Search for meaningful row/action destinations,
 return paths, preserved space/currency/selection/scroll/draft context, and stale or
