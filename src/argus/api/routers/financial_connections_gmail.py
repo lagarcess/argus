@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from argus.api.gmail import GmailContext, gmail_problem, require_gmail_context
-from argus.api.routers.financial_connections import (
+from argus.api.routers.financial_connections_schemas import (
     FinancialConnectionResponse,
     connection_response,
 )

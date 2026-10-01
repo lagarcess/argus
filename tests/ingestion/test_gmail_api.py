@@ -77,11 +77,9 @@ def test_missing_configuration_keeps_gmail_off_but_the_surface_on(
     ):
         assert gmail_connector() is None and ingestion_hub() is not None
         adapter = ingestion_hub().adapter("gmail")
-        if unset == "ARGUS_INGESTION_SECRET_KEY":
-            assert adapter is None
-        else:
-            # Disconnect can still revoke at Google and forget sender rows.
-            assert adapter is revoke_only_adapter() and adapter is not None
+        # Disconnect can still forget sender rows (and, with the sealing key,
+        # revoke at Google).
+        assert adapter is revoke_only_adapter() and adapter is not None
         response = client.post(f"{URL}/authorize", headers=bearer(ALICE))
         assert response.status_code == 404
         assert client.get(ROOT, headers=bearer(ALICE)).status_code == 200

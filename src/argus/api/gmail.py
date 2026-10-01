@@ -84,7 +84,7 @@ def start_gmail(
 ) -> None:
     configure_gmail_connector(None)
     _set_revoke_only(None)
-    if hub is None or hub.box is None:
+    if hub is None:
         return
     senders = _sender_repository(pool)
     if senders is None:
@@ -96,7 +96,10 @@ def start_gmail(
             "Gmail configuration is invalid; connector stays off", reason=str(exc)
         )
         config = None
-    if config is not None and config.configured:
+    # Without the sealing key the connector stays off, but the cleanup-only
+    # adapter below still forgets sender rows when a connection ends; its
+    # revocation reports failed because no stored token can be read.
+    if config is not None and config.configured and hub.box is not None:
         try:
             connector = GmailConnector(hub, config, senders=senders, transport=transport)
         except Exception as exc:

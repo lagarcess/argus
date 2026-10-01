@@ -7603,7 +7603,9 @@ client and an authorized test inbox exist:
   when both callbacks race; never revoked), 502 `gmail_refresh_token_missing`
   or `gmail_unavailable`. Any other failure after Google issued the grant
   (profile refused, Google or database unavailable) revokes that grant before
-  answering.
+  answering; if the connection was already stored, a new one is disconnected
+  with its senders removed and a reconnected one moves to `needs_reauth`
+  (`gmail_token_revoked`).
 - GET `/gmail/{id}/senders` and PUT `/gmail/{id}/senders` `{senders}` return
   `{senders: [{sender, kind: address|domain, created_at, backfilled_at}]}`.
   Entries are lowercased email addresses or domain names (a domain covers its
@@ -7627,9 +7629,9 @@ client and an authorized test inbox exist:
   `unreadable`. A message or attachment Gmail refuses on its own (oversized,
   malformed, another per-item 4xx) is skipped and the cursor moves past it;
   401/403, 429 and 5xx fail the sync. `ignored` counts candidates the sink
-  refused without recording. Nothing is
-  recorded and the cursor does not move for `no_sink`, `no_senders`, `failed`
-  or `sink_failed`. A disconnected connection answers 409
+  refused without recording; any ignored candidate makes the sync
+  `sink_failed`. Nothing is recorded and the cursor does not move for
+  `no_sink`, `no_senders`, `failed` or `sink_failed`. A disconnected connection answers 409
   `financial_connection_disconnected`.
 
 Each relevant message becomes one draft candidate with `source=gmail`,
@@ -7652,9 +7654,10 @@ retries of 429/5xx and `gmail_oauth_client_invalid` (status `error`), or
 with that code or 502 `gmail_unavailable`. Disconnect posts the refresh token to
 Google's revocation endpoint (a token Google no longer knows counts as revoked);
 after the local disconnect the adapter's `forget` hook deletes the sender
-allowlist, whether or not revocation succeeded. While the sealing key is set
-but the Google OAuth client is not, the routes answer 404 yet a revoke-only
-adapter still revokes and forgets on disconnect.
+allowlist, whether or not revocation succeeded. While the Google OAuth client
+or the sealing key is missing, the routes answer 404 yet a cleanup-only adapter
+still forgets the allowlist on disconnect; it also revokes at Google while the
+sealing key is set (without it revocation reports `failed`).
 
 Not end-to-end import: every Gmail draft is `unclassified` until the person
 fills it in, and drafts reach review only once reconciliation provides the

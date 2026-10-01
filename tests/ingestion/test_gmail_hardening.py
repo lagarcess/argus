@@ -115,7 +115,13 @@ def test_ignored_candidates_are_reported_not_counted_as_saved():
     fake = FakeGoogle(mails=[alert_es()])
     connector = make_connector(fake, sink=IgnoringSink())
     row = connect(connector, fake, ALICE).connection
-    assert connector.sync(row).ignored == 1
+    outcome = connector.sync(row)
+    assert (outcome.status, outcome.ignored) == ("sink_failed", 1)
+    # Not recorded, so not skipped: the cursor and sender backfill stay put.
+    stored = connector.hub.connections.get(user_id=ALICE, connection_id=row.id)
+    assert stored.cursor is None
+    rules = connector.senders.list(connection_id=row.id)
+    assert rules and all(rule.backfilled_at is None for rule in rules)
 
 
 def test_state_ledger_caps_each_person_without_locking_out_others():
@@ -230,12 +236,28 @@ def test_unconfigured_oauth_still_registers_a_revoke_only_adapter(monkeypatch):
     assert hub.connections.get(user_id=ALICE, connection_id=row.id).secret is None
 
 
-def test_without_a_sealing_key_nothing_is_registered():
-    hub = IngestionHub(
-        InMemoryConnectionRepository(), box=None, sink=None, clock=lambda: NOW
-    )
-    gmail_api.start_gmail(hub, None)
-    assert hub.adapter("gmail") is None and gmail_api.revoke_only_adapter() is None
+def test_without_a_sealing_key_disconnect_still_forgets_senders():
+    fake = FakeGoogle()
+    connector = make_connector(fake)
+    row = connect(connector, fake, ALICE).connection
+    # The service restarts without the sealing key: stored grants are
+    # unreadable, but sender rows must still go when the connection ends.
+    hub = IngestionHub(connector.hub.connections, box=None, sink=None, clock=fake.clock)
+    try:
+        gmail_api.start_gmail(hub, None, transport=httpx.MockTransport(fake))
+        adapter = hub.adapter("gmail")
+        assert gmail_api.gmail_connector() is None
+        assert adapter is gmail_api.revoke_only_adapter() and adapter is not None
+        senders = adapter.senders
+        senders.replace(
+            user_id=ALICE, connection_id=row.id, senders=("bank.test",), now=NOW
+        )
+        outcome = hub.disconnect(user_id=ALICE, connection_id=row.id)
+    finally:
+        gmail_api.stop_gmail()
+    assert outcome.provider_revocation == "failed" and not fake.revoked
+    assert senders.list(connection_id=row.id) == []
+    assert hub.connections.get(user_id=ALICE, connection_id=row.id).secret is None
 
 
 def test_forget_runs_even_when_google_revocation_fails():
