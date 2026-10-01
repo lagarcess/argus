@@ -52,7 +52,32 @@ resource assignment is `ios-accounts-59750`: API 59750 reserved, local Auth
 59753–59754 and 59757–59761. Configuration/state stays in this worker's ignored
 `ios/.build/accounts-local-59750`. Configure verifies every assigned port is
 unused and project ownership matches before starting. Old 59700 stays stopped
-and is never migrated. No simulator is assigned yet.
+and is never migrated. Response-loss proxy 59762 and optional mirror 59763 were
+verified unused before assignment. The explicitly assigned simulator is
+`C93072E7-D29A-4B0A-BE76-E6418E4E9F88`, this thread's retained Household device;
+no active native build was found. Use only the new bundle
+`local.argus.shared-household-planning-demo` and cache
+`/private/tmp/argus-shared-household-planning-native-build`. Preserve its existing
+`local.argus.household-current-demo` installation and
+`/private/tmp/argus-household-current-build`. Design device `8AFB6084…`, compact
+financial demos and the phone environment remain untouched.
+
+Canonical residual storage is implemented at
+`f32e301198c39a1bcafd24e698466b9fc6441439`. Migration
+`20261001190000_goal_residual_allocations.sql` was applied only to NEW Postgres
+59752. It validates every legacy allocation, backfills ordered owner-qualified
+rows, proves bidirectional multiset completeness, then removes the JSON field
+and rejects old writers in one explicit transaction. The Personal adapter reads
+and writes only this relation; no JSON fallback remains. Captain verification
+at that source passed **170 tests, zero skips/failures**, including zero/Int64
+bounds, malformed/foreign/duplicate rejection, rollback, RLS and existing
+Personal Goal/Budget/Debt/Plan regressions. Durable
+[cutover proof](../reports/evidence/shared-household-planning/allocation-cutover-check.json)
+links the command, JUnit and log. Extending shared claims/pools and all four
+connected native journeys remains required. This is storage progress, not
+shared-planning delivery. Code-only rollback is unsafe after cutover; restore
+validated ordered JSON from canonical rows in a coordinated transaction before
+using the legacy adapter. No existing or hosted environment was migrated.
 
 ### Outcome, owners and execution
 
@@ -64,10 +89,14 @@ third identity cannot discover or access these records. Personal plans remain
 private unless explicitly shared. [MVEE Household][mvee-household] and
 [MVEE Plan][mvee-plan] retain product authority.
 
-One implementation writer owns the coupled source surfaces below after the
-contract decision. Read-only scouts/reviewer own no source or runtime resources.
-The captain owns documentation, integration, independent assembled acceptance,
-evidence and release claims. No second allocation owner or financial ledger.
+The backend writer `shared_plan_implementation` owns financial rules, canonical
+services, schemas, routers, migrations and domain tests. A separate native-only
+writer will own transport/models/screens/localization after the typed wire is
+stable; it cannot change financial rules. Each shared surface has one writer.
+The captain owns local fixture/runner helpers, UI acceptance tests, runtime
+resources, documentation, integration, durable evidence and release claims.
+Read-only scouts/reviewer own no source or runtime resources. No second
+allocation owner or financial ledger.
 
 | Surface owned by this lane | Existing owner to retain | Bounded change |
 | --- | --- | --- |
@@ -79,8 +108,8 @@ evidence and release claims. No second allocation owner or financial ledger.
 | Bounded additive `supabase/migrations/` and `tests/household/`, `tests/planning/` | Owner-qualified integrity, RLS, transaction locks and receipts | Plan consent/claims; concurrency, privacy and Personal regression evidence |
 | `ios/Packages/ArgusSession/` Household/Plan types and transport | Auth, actor partitioning and durable exact-byte journal | Typed scoped commands/reads; preserve session and recovery ownership |
 | `ios/ArgusFoundation/Household/` and bounded new shared-plan module | Connected Household model and existing domain details | Shared lifecycle, participant rights and private contribution controls |
-| Shared native root, Connected shell, Home/Plan/Search mounting and localization | Landed #760/#766 composition | Serialize minimal integration changes with one source writer; no redesign |
-| `ios/ArgusFoundationUITests/` and `ios/FinancialModelTests/` | Native assembled proof and production model checks | Two-member/third-identity journey, English/Spanish, recovery and relaunch |
+| Shared native root, Connected shell, Home/Plan/Search mounting and localization | Landed #760/#766 composition | Native writer alone serializes minimal root/session changes; no redesign |
+| `ios/ArgusFoundationUITests/` and `ios/FinancialModelTests/` | Native assembled proof and production model checks | Captain owns UI acceptance; native writer owns model checks; no duplicate edits |
 | Existing API/data contracts, this board and lane evidence packet | Respective canonical document owners | Contract first; durable exact-head evidence and restart recipe |
 
 Open PR inventory at start found #762 (design-only), #732 (frozen web preview)
@@ -116,9 +145,9 @@ log are in the same baseline packet. This is not shared-planning native proof.
 Two code-grounded shapes were inspected: consent/responsibility references around
 canonical definitions, versus explicit Household scope embedded in definitions.
 Prefer the additive reference shape if it closes canonical global claims and
-private allocation without a second store of money. The sole implementation
-writer is `shared_plan_implementation`; its first bounded output is the technical
-contract. The founder restart above settles permissions and departure; dependent work
+private allocation without a second store of money. The backend implementation
+writer is `shared_plan_implementation`; the typed wire is its first integration
+checkpoint. The founder restart above settles permissions and departure; dependent work
 now follows those rules.
 
 The proposed technical shape is preserved in the existing
