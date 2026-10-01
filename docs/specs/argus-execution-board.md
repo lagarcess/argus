@@ -1849,6 +1849,13 @@ expense defaults and retains historical participants and entries. C02 still owns
 real membership/guest access, authorization, retention and invitation delivery.
 The preview's role switch is not an authorization implementation.
 
+**Verification checkpoint:** native UI tests for the ten focused journeys passed,
+plus 50 group and 58 Plan state checks. See the [durable collection evidence](../reports/evidence/cuadrao-native-design/collection-gestures/README.md).
+Final UI source is `0cba90ba` (implementation `a136c0af`); phone build 3404 was
+installed and launched on Sr.Garces i15, iOS 27.0.1 (installation sequence 2088). The icon-only native swipe controls preserve localized
+accessibility labels and avoid truncated captions. Physical gesture/VoiceOver
+acceptance remains distinct from simulator automation and installation proof.
+
 **Connected ordering disposition:** before connection, persist personal/viewer-local
 order through its canonical owner, including sync/conflict behavior. Group ordering
 must not silently reorder another member's view or alter shared financial records.

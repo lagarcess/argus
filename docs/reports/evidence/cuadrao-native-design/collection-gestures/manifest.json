@@ -1,0 +1,74 @@
+[
+  {
+    "image": "all-accounts-archived-es.png",
+    "test": "CuadraoPolishUITests/testArchivesRemainReachableWhenAllAccountsArchived()",
+    "capturedAt": 1790894156.145,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "accounts-dark-large-en.png",
+    "test": "CuadraoPolishUITests/testLargeEnglishAccountManagement()",
+    "capturedAt": 1790894181.566,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "plan-all-spaces-dark-large-en.png",
+    "test": "CuadraoPolishUITests/testLargeEnglishPlanControls()",
+    "capturedAt": 1790894197.238,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "plan-local-forecast-scope-es.png",
+    "test": "CuadraoPolishUITests/testPlanScopeDoesNotChangeCreationDefault()",
+    "capturedAt": 1790894207.185,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "group-people-owner.png",
+    "test": "CuadraoCollectionUITests/testGroupPeopleOwnerAndRemovalReview()",
+    "capturedAt": 1790894405.541,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "group-outstanding-removal-review.png",
+    "test": "CuadraoCollectionUITests/testGroupPeopleOwnerAndRemovalReview()",
+    "capturedAt": 1790894400.675,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "group-people-member-en.png",
+    "test": "CuadraoCollectionUITests/testMemberRoleAndLegacyControls()",
+    "capturedAt": 1790894418.882,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "groups-reordered.png",
+    "test": "CuadraoCollectionUITests/testGroupNativeReorderPersistenceAndRecovery()",
+    "capturedAt": 1790894602.865,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "plan-archive-recovery.png",
+    "test": "CuadraoCollectionUITests/testPersonalPlanSwipeEditArchiveRestore()",
+    "capturedAt": 1790894753.207,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "plan-swipe-archive.png",
+    "test": "CuadraoCollectionUITests/testPersonalPlanSwipeEditArchiveRestore()",
+    "capturedAt": 1790894750.151,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "home-swipe-archive-es.png",
+    "test": "CuadraoPolishUITests/testHomeNativeSwipeDragAndArchiveRecovery()",
+    "capturedAt": 1790894770.195,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  },
+  {
+    "image": "home-inline-reorder-es.png",
+    "test": "CuadraoPolishUITests/testHomeNativeSwipeDragAndArchiveRecovery()",
+    "capturedAt": 1790894764.37,
+    "simulator": "8AFB6084-8918-416E-9164-E21061306BEC"
+  }
+]
