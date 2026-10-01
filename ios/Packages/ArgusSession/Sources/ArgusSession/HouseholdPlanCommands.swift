@@ -73,6 +73,7 @@ public struct HouseholdPlanDefinitionInput<Value: Encodable & Sendable>: Encodab
 public struct HouseholdPlanDefinitionPatch: Encodable, Sendable {
     public var name: String?
     public var amount: String?
+    public var plannedContributionAmount: String?
     public var targetDate: String?
     public var includesTargetDate: Bool
     public var month: String?
@@ -81,13 +82,14 @@ public struct HouseholdPlanDefinitionPatch: Encodable, Sendable {
     public var schedule: FinancialPlanSchedule?
     public var effectiveDate: String?
     public var archived: Bool?
-    public init(name: String? = nil, amount: String? = nil, targetDate: String? = nil, includesTargetDate: Bool = false, month: String? = nil, categoryIds: [String]? = nil, includeUncategorized: Bool? = nil, schedule: FinancialPlanSchedule? = nil, effectiveDate: String? = nil, archived: Bool? = nil) {
-        self.name = name; self.amount = amount; self.targetDate = targetDate; self.includesTargetDate = includesTargetDate; self.month = month; self.categoryIds = categoryIds; self.includeUncategorized = includeUncategorized; self.schedule = schedule; self.effectiveDate = effectiveDate; self.archived = archived
+    public init(name: String? = nil, amount: String? = nil, plannedContributionAmount: String? = nil, targetDate: String? = nil, includesTargetDate: Bool = false, month: String? = nil, categoryIds: [String]? = nil, includeUncategorized: Bool? = nil, schedule: FinancialPlanSchedule? = nil, effectiveDate: String? = nil, archived: Bool? = nil) {
+        self.name = name; self.amount = amount; self.plannedContributionAmount = plannedContributionAmount; self.targetDate = targetDate; self.includesTargetDate = includesTargetDate; self.month = month; self.categoryIds = categoryIds; self.includeUncategorized = includeUncategorized; self.schedule = schedule; self.effectiveDate = effectiveDate; self.archived = archived
     }
-    enum CodingKeys: String, CodingKey { case name, amount, targetDate = "target_date", month, categoryIds = "category_ids", includeUncategorized = "include_uncategorized", schedule, effectiveDate = "effective_date", archived }
+    enum CodingKeys: String, CodingKey { case name, amount, plannedContributionAmount = "planned_contribution_amount", targetDate = "target_date", month, categoryIds = "category_ids", includeUncategorized = "include_uncategorized", schedule, effectiveDate = "effective_date", archived }
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(name, forKey: .name); try c.encodeIfPresent(amount, forKey: .amount)
+        try c.encodeIfPresent(plannedContributionAmount, forKey: .plannedContributionAmount)
         if includesTargetDate { try c.encode(targetDate, forKey: .targetDate) }
         try c.encodeIfPresent(month, forKey: .month); try c.encodeIfPresent(categoryIds, forKey: .categoryIds)
         try c.encodeIfPresent(includeUncategorized, forKey: .includeUncategorized); try c.encodeIfPresent(schedule, forKey: .schedule)

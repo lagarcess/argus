@@ -799,7 +799,7 @@
 "sharedPlan.hasTargetDate" = "Choose a target date";
 "sharedPlan.targetDate" = "Target date";
 "sharedPlan.hasContribution" = "Plan my recurring contribution";
-"sharedPlan.plannedContribution" = "My planned contribution";
+"sharedPlan.plannedContribution" = "Planned contribution";
 "sharedPlan.startDate" = "First date";
 "sharedPlan.hasEndDate" = "Choose an end date";
 "sharedPlan.endDate" = "End date";

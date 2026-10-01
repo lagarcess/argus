@@ -799,7 +799,7 @@
 "sharedPlan.hasTargetDate" = "Elegir fecha para la meta";
 "sharedPlan.targetDate" = "Fecha de la meta";
 "sharedPlan.hasContribution" = "Planear un aporte propio recurrente";
-"sharedPlan.plannedContribution" = "Mi aporte previsto";
+"sharedPlan.plannedContribution" = "Aporte previsto";
 "sharedPlan.startDate" = "Primera fecha";
 "sharedPlan.hasEndDate" = "Elegir fecha final";
 "sharedPlan.endDate" = "Fecha final";

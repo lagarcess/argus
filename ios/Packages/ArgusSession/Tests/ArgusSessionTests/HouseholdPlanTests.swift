@@ -75,14 +75,20 @@ final class HouseholdPlanTests: XCTestCase {
         XCTAssertNotNil(plan.definition.schedule)
         let effectiveDate = plan.definition.common.earliestEffectiveDate
         let schedule = FinancialPlanSchedule(cadence: .weekly, startDate: effectiveDate, endDate: nil, monthDays: [])
-        let command = HouseholdPlanEditCommand(scope: .init(membershipId: plan.membershipId, authorizationVersion: plan.authorizationVersion, planVersion: plan.version), definition: .init(schedule: schedule, effectiveDate: effectiveDate))
+        let plannedAmount = "12.75"
+        let targetAmount = "1000.00"
+        let command = HouseholdPlanEditCommand(scope: .init(membershipId: plan.membershipId, authorizationVersion: plan.authorizationVersion, planVersion: plan.version), definition: .init(amount: targetAmount, plannedContributionAmount: plannedAmount, schedule: schedule, effectiveDate: effectiveDate))
         let wire = try JSONSerialization.jsonObject(with: JSONEncoder().encode(command)) as! [String: Any]
         let patch = try XCTUnwrap(wire["definition"] as? [String: Any])
-        XCTAssertEqual(Set(patch.keys), ["schedule", "effective_date"])
+        XCTAssertEqual(Set(patch.keys), ["amount", "planned_contribution_amount", "schedule", "effective_date"])
+        XCTAssertEqual(patch["amount"] as? String, targetAmount)
+        XCTAssertEqual(patch["planned_contribution_amount"] as? String, plannedAmount)
         XCTAssertEqual(patch["effective_date"] as? String, effectiveDate)
         XCTAssertEqual((patch["schedule"] as? [String: Any])?["cadence"] as? String, schedule.cadence.rawValue)
         XCTAssertEqual((patch["schedule"] as? [String: Any])?["start_date"] as? String, schedule.startDate)
         XCTAssertEqual(wire["expected_plan_version"] as? Int, plan.version)
+        let unchanged = try JSONSerialization.jsonObject(with: JSONEncoder().encode(HouseholdPlanDefinitionPatch(name: "New title"))) as! [String: Any]
+        XCTAssertNil(unchanged["planned_contribution_amount"])
     }
     func testEveryDefinitionRequiresServerEffectiveDateWithoutLocalFallback() throws {
         for kind in HouseholdPlanKind.allCases {

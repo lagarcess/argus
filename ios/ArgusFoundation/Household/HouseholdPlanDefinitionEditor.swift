@@ -133,8 +133,8 @@ struct HouseholdPlanDefinitionEditor: View {
                 if hasTargetDate { DatePicker("sharedPlan.targetDate", selection: $targetDate, displayedComponents: .date) }
                 if editing == nil {
                     Toggle("sharedPlan.hasContribution", isOn: $hasContribution).accessibilityIdentifier("sharedPlan.hasContribution")
-                    if hasContribution { TextField("sharedPlan.plannedContribution", text: $contribution).keyboardType(.decimalPad).focused($focused).accessibilityIdentifier("sharedPlan.plannedContribution") }
                 }
+                if hasContribution { TextField("sharedPlan.plannedContribution", text: $contribution).keyboardType(.decimalPad).focused($focused).accessibilityIdentifier("sharedPlan.plannedContribution") }
             }
         }
         if usesSchedule {
@@ -167,7 +167,10 @@ struct HouseholdPlanDefinitionEditor: View {
                 amount = HouseholdPlanPresentation.decimal(plan.definition.amountMinor, digits: plan.definition.common.currencyFractionDigits)
                 if let s = plan.definition.schedule { cadence = s.cadence; startDate = PlanDate.parse(s.startDate) ?? startDate; endDate = s.endDate.flatMap(PlanDate.parse) ?? endDate; hasEnd = s.endDate != nil; secondDay = s.monthDays.last.map(String.init) ?? "15" }
                 if case .budget(_, _, let m, let c, let u, _) = plan.definition { month = m; categories = Set(c); uncategorized = u }
-                if case .goal(_, _, let d, let s, _) = plan.definition { hasTargetDate = d != nil; targetDate = d.flatMap(PlanDate.parse) ?? targetDate; hasContribution = s != nil }
+                if case .goal(_, _, let d, let s, let planned) = plan.definition {
+                    hasTargetDate = d != nil; targetDate = d.flatMap(PlanDate.parse) ?? targetDate; hasContribution = s != nil
+                    contribution = planned.map { HouseholdPlanPresentation.decimal($0, digits: plan.definition.common.currencyFractionDigits) } ?? ""
+                }
                 if usesSchedule, let minimum = earliestEffectiveDate { effectiveDate = minimum; startDate = minimum }
             }
         } catch { self.error = HouseholdPlanModel.message(error) }
@@ -178,7 +181,12 @@ struct HouseholdPlanDefinitionEditor: View {
             if let plan = editing {
                 guard let identity = model.identity, model.isCurrent(plan, identity), plan.canEdit else { error = "sharedPlan.changed"; return }
                 guard !usesSchedule || earliestEffectiveDate != nil else { error = "sharedPlan.changed"; return }
-                let patch = HouseholdPlanDefinitionPatch(name: name, amount: value, targetDate: kind == .goal && hasTargetDate ? PlanDate.string(targetDate) : nil, includesTargetDate: kind == .goal, month: kind == .budget ? month : nil, categoryIds: kind == .budget ? categories.sorted() : nil, includeUncategorized: kind == .budget ? uncategorized : nil, schedule: usesSchedule ? schedule : nil, effectiveDate: usesSchedule ? PlanDate.string(effectiveDate) : nil)
+                let plannedAmount: String?
+                if kind == .goal && hasContribution {
+                    guard let entered = try AccountEntry.amount(contribution, locale: locale) else { error = "household.reviewError"; return }
+                    plannedAmount = entered
+                } else { plannedAmount = nil }
+                let patch = HouseholdPlanDefinitionPatch(name: name, amount: value, plannedContributionAmount: plannedAmount, targetDate: kind == .goal && hasTargetDate ? PlanDate.string(targetDate) : nil, includesTargetDate: kind == .goal, month: kind == .budget ? month : nil, categoryIds: kind == .budget ? categories.sorted() : nil, includeUncategorized: kind == .budget ? uncategorized : nil, schedule: usesSchedule ? schedule : nil, effectiveDate: usesSchedule ? PlanDate.string(effectiveDate) : nil)
                 await model.submit(HouseholdPlanEditCommand(scope: model.scope(plan), definition: patch), action: .edit(plan.ref)); return
             }
             guard let scope = model.scope, let options else { error = "sharedPlan.changed"; return }
