@@ -1,0 +1,2 @@
+26040af57a2aca965c6df60c45c9ad3e53cb43fd9d7ec6ba734e8254b54315c2  ios/ArgusFoundation/Cuadrao/CuadraoVoiceMessagePanel.swift
+666337e7863bd3b775cfffe61a21062e2ff3f30e096c4d5a2fe6846dfe130786  ios/ArgusFoundationUITests/CuadraoVoiceDesignUITests.swift

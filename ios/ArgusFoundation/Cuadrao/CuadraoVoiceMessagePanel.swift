@@ -56,7 +56,9 @@ struct CuadraoVoiceRecordingOverlay: View {
             }.accessibilityHidden(true)
             GeometryReader { geometry in
                 ScrollView {
-                    recordingContent.frame(minHeight: geometry.size.height, alignment: .bottom)
+                    recordingContent
+                        .frame(width: geometry.size.width)
+                        .frame(minHeight: geometry.size.height, alignment: .bottom)
                 }.defaultScrollAnchor(typeSize.isAccessibilitySize ? .top : .bottom).scrollBounceBehavior(.basedOnSize)
                     .scrollDisabled(message.held)
             }
