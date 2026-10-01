@@ -17,6 +17,7 @@ struct CuadraoAccountCanvas: View {
                             .frame(width: 58, height: 58)
                             .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 18))
                         Text(account.displayName(spanish)).font(CuadraoTypography.screen)
+                            .accessibilityIdentifier("account-detail-title")
                             .fixedSize(horizontal: false, vertical: true)
                         VStack(alignment: .leading, spacing: 9) {
                             Text(account.balanceLabel(spanish)).font(.subheadline).foregroundStyle(.secondary)
@@ -33,6 +34,7 @@ struct CuadraoAccountCanvas: View {
                     }
                     VStack(spacing: 12) {
                         RegistrationButton(title: spanish ? "Añadir movimiento" : "Add transaction") { record(accountID) }
+                            .accessibilityIdentifier("account-detail-record")
                         Button(spanish ? "Comprobar balance" : "Check balance") { showingBalanceInfo = true }
                             .font(.system(size: 13, weight: .medium)).padding(.horizontal, 16).frame(minHeight: 44)
                             .overlay { Capsule().stroke(WelcomePalette.border, lineWidth: 1) }

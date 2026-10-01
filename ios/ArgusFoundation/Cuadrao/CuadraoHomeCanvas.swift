@@ -29,7 +29,7 @@ struct CuadraoHomeCanvas: View {
 
     private enum HomeSheet: Identifiable {
         case add, options, archived, updates, spaces, customize, household, gallery
-        case actions(UUID), rename(UUID), record(UUID)
+        case account(CanvasAccountSheet)
         var id: String { "home-modal" }
     }
 
@@ -62,7 +62,7 @@ struct CuadraoHomeCanvas: View {
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: UUID.self) { id in
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
-                        actions: { sheet = .actions($0) }, record: { sheet = .record($0) })
+                        actions: { sheet = .account(.actions($0)) }, record: { sheet = .account(.record($0)) })
                 }
             }
             .toolbar(.hidden, for: .tabBar)
@@ -235,14 +235,14 @@ struct CuadraoHomeCanvas: View {
                     CanvasAccountRow(account: account, spanish: spanish)
                         .gesture(LongPressGesture(minimumDuration: 0.45).exclusively(before: TapGesture()).onEnded { gesture in
                             switch gesture {
-                            case .first: sheet = .actions(account.id)
+                            case .first: sheet = .account(.actions(account.id))
                             case .second: accountPath.append(account.id)
                             }
                         })
                         .accessibilityElement(children: .combine)
                         .accessibilityAddTraits(.isButton)
                         .accessibilityAction { accountPath.append(account.id) }
-                        .accessibilityAction(named: Text(spanish ? "Opciones de cuenta" : "Account actions")) { sheet = .actions(account.id) }
+                        .accessibilityAction(named: Text(spanish ? "Opciones de cuenta" : "Account actions")) { sheet = .account(.actions(account.id)) }
                         .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
                 }
             }
@@ -260,7 +260,7 @@ struct CuadraoHomeCanvas: View {
             HStack {
                 sectionTitle(spanish ? "Movimientos" : "Activity")
                 Spacer()
-                Button { if let account = data.active.first { sheet = .record(account.id) } } label: {
+                Button { if let account = data.active.first { sheet = .account(.record(account.id)) } } label: {
                     Image(systemName: "plus").frame(width: 44, height: 44)
                 }.accessibilityLabel(spanish ? "Añadir movimiento" : "Add activity")
             }
@@ -307,7 +307,7 @@ struct CuadraoHomeCanvas: View {
         if tab == .search {
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
                 chat: chat, openChat: { thread in chat.open(thread); selectedTab = .assistant },
-                actions: { sheet = .actions($0) }, record: { sheet = .record($0) })
+                actions: { sheet = .account(.actions($0)) }, record: { sheet = .account(.record($0)) })
         } else if tab == .assistant {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
         } else if tab == .profile {
@@ -345,17 +345,11 @@ struct CuadraoHomeCanvas: View {
                 Divider()
                 CanvasActionRow(title: spanish ? "Cuentas archivadas" : "Archived accounts", symbol: "archivebox") { sheet = .archived }
             }.padding(28).presentationDetents([.height(250)]).presentationDragIndicator(.visible)
-        case .actions(let id):
-            if let account = data.account(id) {
-                CuadraoAccountActions(account: account, spanish: spanish,
-                    rename: { sheet = .rename(id) }, record: { sheet = .record(id) }, archive: {
-                        data.archive(id, true); sheet = nil; accountPath = []; archivedID = id
-                    })
-            }
-        case .rename(let id):
-            if let account = data.account(id) { CuadraoRenameAccount(data: data, account: account, spanish: spanish) }
-        case .record(let id):
-            if let account = data.account(id) { CuadraoTransactionCanvas(data: data, account: account, spanish: spanish) }
+        case .account(let selection):
+            CuadraoAccountModal(data: data, selection: selection, spanish: spanish,
+                show: { sheet = .account($0) }, archived: {
+                    sheet = nil; accountPath = []; archivedID = $0
+                })
         case .updates:
             NavigationStack {
                 ContentUnavailableView {

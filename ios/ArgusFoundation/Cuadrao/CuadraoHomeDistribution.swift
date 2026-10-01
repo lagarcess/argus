@@ -84,6 +84,9 @@ struct CuadraoHomeDistribution: View {
                 }.font(CuadraoTypography.supporting)
             }
         }.sensoryFeedback(.selection, trigger: selectedKind)
+            .onChange(of: kinds) { _, available in
+                if let selectedKind, !available.contains(selectedKind) { self.selectedKind = nil }
+            }
     }
     private var distributionBar: some View {
         GeometryReader { geometry in
@@ -142,15 +145,19 @@ struct CuadraoHomeDistribution: View {
         }
     }
     private func accountRow(_ account: CanvasAccount, showPercent: Bool) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(account.displayName(spanish)).font(CuadraoTypography.supporting)
-            Spacer(minLength: 12)
-            VStack(alignment: .trailing, spacing: 5) {
-                if showPercent { Text(percent(value(account))).font(CuadraoTypography.rowAmount) }
-                Text(CanvasMoney.format(value(account), currency: currency)).font(CuadraoTypography.rowAmount).foregroundStyle(.secondary)
-            }
-        }.padding(.vertical, 15).padding(.leading, 12).accessibilityElement(children: .combine)
+        NavigationLink(value: account.id) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(account.displayName(spanish)).font(CuadraoTypography.supporting)
+                Spacer(minLength: 12)
+                VStack(alignment: .trailing, spacing: 5) {
+                    if showPercent { Text(percent(value(account))).font(CuadraoTypography.rowAmount) }
+                    Text(CanvasMoney.format(value(account), currency: currency)).font(CuadraoTypography.rowAmount).foregroundStyle(.secondary)
+                }
+                Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+            }.padding(.vertical, 15).padding(.leading, 12).contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityIdentifier("home-distribution-account-" + account.id.uuidString)
     }
+
 }
 
 private struct CuadraoAllocationBlock: View {

@@ -72,6 +72,46 @@ final class CuadraoHomeChartUITests: XCTestCase {
         app.buttons["home-history-done"].tap()
         XCTAssertTrue(app.staticTexts["home-greeting"].exists)
     }
+    func testDistributionAccountRoundTrip() {
+        continueAfterFailure = false
+        let app = launch()
+        app.buttons["home-history-expand"].tap()
+        app.segmentedControls["home-chart-view"].buttons["Distribución"].tap()
+        app.buttons["home-distribution-checking"].tap()
+        let content = app.scrollViews["home-insights-content"]
+        let link = content.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "home-distribution-account-", "Gastos de casa")).firstMatch
+        for _ in 0..<3 {
+            if link.isHittable && link.frame.maxY < app.frame.maxY - 50 { break }
+            content.swipeUp()
+        }
+        XCTAssertTrue(link.isHittable)
+        let linkID = link.identifier
+        let originalY = link.frame.minY
+        shot(app, "distribution-before-account-es")
+        link.tap()
+        XCTAssertEqual(app.staticTexts["account-detail-title"].label, "Gastos de casa")
+        shot(app, "distribution-account-detail-es")
+        app.buttons["account-detail-record"].tap()
+        XCTAssertTrue(app.navigationBars["Añadir movimiento"].waitForExistence(timeout: 3))
+        app.buttons["Cancelar"].tap()
+        app.buttons["Opciones de cuenta"].tap()
+        app.buttons["Cambiar nombre"].tap()
+        let field = app.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 3))
+        field.tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (field.value as? String ?? "").count))
+        field.typeText("Gastos del hogar")
+        app.buttons["Guardar"].tap()
+        XCTAssertEqual(app.staticTexts["account-detail-title"].label, "Gastos del hogar")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertEqual(app.buttons["home-distribution-checking"].value as? String, "Expandido")
+        let returned = content.buttons[linkID]
+        XCTAssertTrue(returned.label.contains("Gastos del hogar"), "Return must reflect the same account state")
+        XCTAssertEqual(returned.frame.minY, originalY, accuracy: 3, "Return preserves scroll position")
+        shot(app, "distribution-account-return-es")
+        app.buttons["home-history-done"].tap()
+        XCTAssertTrue(app.staticTexts["home-greeting"].exists)
+    }
     private func launch(english: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", english ? "dark" : "light"]

@@ -14,8 +14,7 @@ struct CuadraoHomeOverview: View {
             chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
             .id(data.selectedSpaceID + currency)
             .fullScreenCover(isPresented: $expanded) {
-                CuadraoHomeInsights(accounts: data.active.filter { $0.currency == currency },
-                    observations: data.balanceObservations, currency: currency, spanish: spanish,
+                CuadraoHomeInsights(data: data, currency: currency, spanish: spanish,
                     space: data.selectedSpace.title(spanish), shared: data.selectedSpace.kind == .household)
             }
     }
