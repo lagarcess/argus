@@ -40,6 +40,12 @@ class ConnectionNotReauthorizable(RuntimeError):
     """Update mode is only offered to a live Plaid connection that needs it."""
 
 
+@dataclass
+class _Stored:
+    # A live connection already holds the exchanged Item: never remove it.
+    held: bool = False
+
+
 @dataclass(frozen=True)
 class LinkToken:
     link_token: str
@@ -74,11 +80,29 @@ class PlaidLink:
         if box is None:
             raise SecretBoxUnavailable("credential sealing is not configured")
         access_token, item_id = self.client.exchange_public_token(public_token)
+        stored = _Stored()
+        try:
+            return self._store(user_id, access_token, item_id, stored)
+        except Exception:
+            # Unless a live connection (this person's or someone else's)
+            # already holds the Item, nothing stored the token: end the Item
+            # rather than leave Plaid access (and billing) the person cannot
+            # see or disconnect.
+            if not stored.held:
+                self._abandon(access_token)
+            raise
+
+    def _store(
+        self, user_id: str, access_token: str, item_id: str, stored: _Stored
+    ) -> ExchangeResult:
+        box = self.hub.box
+        assert box is not None
         live = self.hub.connections.find_live(source="plaid", external_ref=item_id)
-        mine = [row for row in live if row.user_id == user_id]
-        if mine:
-            return ExchangeResult(mine[0], created=False)
         if live:
+            stored.held = True
+            mine = [row for row in live if row.user_id == user_id]
+            if mine:
+                return ExchangeResult(mine[0], created=False)
             # Never revoke here: removing the Item would end the other
             # person's connection too.
             raise PlaidItemOwnedElsewhere()
@@ -96,16 +120,14 @@ class PlaidLink:
                 connection_id=connection_id,
             )
         except DuplicateConnection as duplicate:
-            # A concurrent retry of the same exchange won the insert.
+            # A concurrent exchange of the same Item won the insert.
+            stored.held = True
+            if duplicate.elsewhere:
+                raise PlaidItemOwnedElsewhere() from None
             existing = self.hub.connections.get(
                 user_id=user_id, connection_id=duplicate.existing_id
             )
             return ExchangeResult(existing, created=False)
-        except Exception:
-            # Nothing stored the token: end the Item rather than leave Plaid
-            # access (and billing) the person cannot see or disconnect.
-            self._abandon(access_token)
-            raise
         return ExchangeResult(row, created=True)
 
     def _abandon(self, access_token: str) -> None:

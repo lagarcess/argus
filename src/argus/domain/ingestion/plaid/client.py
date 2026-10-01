@@ -128,6 +128,18 @@ class PlaidClient:
         return key
 
 
+def is_transient(exc: PlaidError) -> bool:
+    """Worth retrying later: unreachable, rate limited (429) or a Plaid 5xx."""
+
+    status = exc.status or 0
+    return (
+        exc.error_code == UNREACHABLE
+        or exc.error_type == "RATE_LIMIT_EXCEEDED"
+        or status == 429
+        or status >= 500
+    )
+
+
 def _text(payload: dict[str, Any], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value:

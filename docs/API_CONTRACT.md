@@ -7515,13 +7515,21 @@ verification levels:
   returns 201 `{connection, created: true}`; the first sync runs after the
   response. A retried exchange or a re-link of an Item the caller already has
   returns 200 with the existing connection and `created: false`. An Item
-  connected by someone else answers 409 `plaid_item_unavailable`.
+  connected by someone else (checked first and enforced by the global live
+  `(source, external_ref)` index under races) answers 409
+  `plaid_item_unavailable` and is left in place. Any other failure after the
+  exchange removes the new Item at Plaid before the error is returned.
 - POST `/plaid/{id}/sync` runs one bounded sync and returns
-  `{connection, sync: {status, added, modified, removed, more_pending,
-  error_code}}`. `status` is
-  `synced|not_ready|busy|no_sink|failed|sink_failed|superseded`; `busy` means
-  another sync holds the lease, `no_sink`/`sink_failed` mean nothing was
-  recorded and the cursor did not move. A disconnected connection answers 409
+  `{connection, sync: {status, added, modified, removed, error_code}}`.
+  `status` is `synced|not_ready|busy|no_sink|failed|sink_failed|superseded`;
+  `busy` means another sync holds the lease; `no_sink`/`sink_failed` mean
+  nothing was recorded (including candidates the sink reports as `ignored`)
+  and the cursor did not move; `superseded` means the lease was lost (for
+  example a webhook recorded `needs_reauth`) or another writer moved the
+  cursor, so this run changed nothing. Only a complete update is handed over;
+  if it exceeds 200 pages or 8 minutes the sync fails with
+  `plaid_sync_incomplete`, keeps the status and cursor, and hands nothing
+  over. A disconnected connection answers 409
   `financial_connection_disconnected`.
 - POST `/plaid/{id}/link-token` creates a Link update-mode token for a
   connection in `needs_reauth` or `error`, or one carrying an
@@ -7536,8 +7544,12 @@ verification levels:
   `Plaid-Verification` JWT (ES256, key from `/webhook_verification_key/get`,
   `iat` within 5 minutes, `request_body_sha256` equal to the raw body hash) and
   returns 200 `{received: true}`; anything else answers 400
-  `plaid_webhook_rejected` with no reason, and an unreachable key endpoint
-  answers 503 `plaid_webhook_unverifiable`. Transactions updates sync the
+  `plaid_webhook_rejected` with no reason. When the key cannot be fetched
+  now (Plaid unreachable, 5xx, 429 / `RATE_LIMIT_EXCEEDED`, or the process's
+  key-fetch budget of 10 per minute is spent) it answers 503
+  `plaid_webhook_unverifiable` so Plaid redelivers. Stale or body-mismatched
+  tokens are refused before any key fetch; unknown kids are remembered for 5
+  minutes and keys are cached for 10 minutes. Transactions updates sync the
   Item's live connections after the response; Item errors such as
   `ITEM_LOGIN_REQUIRED` set `needs_reauth`, `USER_PERMISSION_REVOKED` sets
   `error`, and `LOGIN_REPAIRED` re-checks and resumes. `PENDING_EXPIRATION`
@@ -7550,5 +7562,6 @@ verification levels:
 (for example `plaid_item_login_required`); transient provider failures keep
 the connection's status. Plaid errors from Link routes answer 422
 `plaid_request_invalid` or 502 `plaid_unavailable` with
-`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`; an Item
-Plaid no longer knows counts as revoked.
+`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
+transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
+Item Plaid no longer knows counts as revoked.

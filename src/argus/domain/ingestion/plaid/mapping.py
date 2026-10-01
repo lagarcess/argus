@@ -60,25 +60,40 @@ _REVISION_FIELDS = (
 
 
 def account_hints(
-    accounts: list[dict[str, Any]], *, institution: str | None
-) -> dict[str, AccountHint]:
+    accounts: list[Any], *, institution: str | None
+) -> tuple[dict[str, AccountHint], int]:
+    """Hints by Plaid ``account_id`` plus how many accounts were unusable.
+
+    Each account is built on its own: one malformed account (bad id, a
+    non-ISO currency) is dropped and counted, never failing the whole sync.
+    Its transactions still carry their ``account_id`` when that id is valid.
+    """
+
     hints: dict[str, AccountHint] = {}
+    dropped = 0
     for account in accounts:
-        account_id = account.get("account_id")
-        if not isinstance(account_id, str):
-            continue
-        balances = account.get("balances") or {}
-        hints[account_id] = AccountHint(
-            external_account_id=account_id,
-            institution=institution,
-            name=account.get("official_name") or account.get("name"),
-            mask=account.get("mask"),
-            currency=balances.get("iso_currency_code")
-            if isinstance(balances, dict)
-            else None,
-            type_hint=_ACCOUNT_TYPES.get(str(account.get("type")), "unknown"),
-        )
-    return hints
+        try:
+            account_id = account.get("account_id")
+            if not isinstance(account_id, str):
+                raise ValueError("account without account_id")
+            balances = account.get("balances")
+            hints[account_id] = AccountHint(
+                external_account_id=account_id,
+                institution=institution,
+                name=_text(account.get("official_name")) or _text(account.get("name")),
+                mask=_text(account.get("mask")),
+                currency=balances.get("iso_currency_code")
+                if isinstance(balances, dict)
+                else None,
+                type_hint=_ACCOUNT_TYPES.get(str(account.get("type")), "unknown"),
+            )
+        except (ValueError, TypeError, AttributeError):
+            dropped += 1
+    return hints, dropped
+
+
+def _text(value: object) -> str | None:
+    return value if isinstance(value, str) else None
 
 
 def transaction_candidate(

@@ -14573,8 +14573,6 @@ components:
           type: integer
         removed:
           type: integer
-        more_pending:
-          type: boolean
         error_code:
           anyOf:
           - type: string
@@ -14586,7 +14584,6 @@ components:
       - added
       - modified
       - removed
-      - more_pending
       - error_code
     ToolResultRecomputeRequest:
       properties:

@@ -71,7 +71,6 @@ class SyncSummary(BaseModel):
     added: int
     modified: int
     removed: int
-    more_pending: bool
     error_code: str | None
 
 
@@ -164,7 +163,6 @@ def sync_plaid_connection(
             added=outcome.added,
             modified=outcome.modified,
             removed=outcome.removed,
-            more_pending=outcome.more_pending,
             error_code=outcome.error_code,
         ),
     )

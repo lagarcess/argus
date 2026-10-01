@@ -7,7 +7,7 @@ from argus.domain.ingestion.plaid import mapping
 
 from tests.ingestion.plaid_fakes import CARD, CHECKING, NOW, txn
 
-HINTS = mapping.account_hints([CHECKING, CARD], institution="First Platypus Bank")
+HINTS, _ = mapping.account_hints([CHECKING, CARD], institution="First Platypus Bank")
 
 
 def candidate(row):  # noqa: ANN001
