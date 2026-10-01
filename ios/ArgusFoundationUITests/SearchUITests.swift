@@ -13,13 +13,15 @@ extension FinancialLoopUITests {
         chooseSearchCurrency("DOP")
         let bankRow = searchRow(bank.name)
         tapVisible(bankRow)
+        // Connected keeps Home account detail mounted; scope in-detail chrome to search.detail.
+        // AccountForm / expectation editors present as sheets outside that subtree.
         let searchDetail = app.descendants(matching: .any)["search.detail"]
         XCTAssertTrue(searchDetail.waitForExistence(timeout: 10))
         XCTAssertTrue(searchDetail.buttons["accounts.edit"].waitForExistence(timeout: 10))
         tapVisible(searchDetail.buttons["accounts.edit"])
         replaceMoneyField("accounts.nickname", with: "Revised bank " + stamp)
-        dismissMoneyKeyboard(); tapVisible(searchDetail.buttons["accounts.save"])
-        XCTAssertTrue(searchDetail.buttons["accounts.save"].waitForNonExistence(timeout: 15))
+        dismissMoneyKeyboard(); tapVisible(app.buttons["accounts.save"])
+        XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 15))
         searchBack()
         XCTAssertTrue(app.staticTexts["search.empty"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.textFields["search.query"].value as? String, bank.name)
@@ -42,11 +44,10 @@ extension FinancialLoopUITests {
 
         searchFor(bill, kind: "expectation")
         tapVisible(searchRow(bill))
-        XCTAssertTrue(searchDetail.waitForExistence(timeout: 10))
-        XCTAssertTrue(searchDetail.textFields["plan.expectation.name"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textFields["plan.expectation.name"].waitForExistence(timeout: 10))
         replaceMoneyField("plan.expectation.amount", with: "35")
-        dismissMoneyKeyboard(); tapVisible(searchDetail.buttons["plan.expectation.save"])
-        XCTAssertTrue(searchDetail.buttons["plan.expectation.save"].waitForNonExistence(timeout: 15))
+        dismissMoneyKeyboard(); tapVisible(app.buttons["plan.expectation.save"])
+        XCTAssertTrue(app.buttons["plan.expectation.save"].waitForNonExistence(timeout: 15))
         let updated = NSPredicate(format: "label CONTAINS '35.00'")
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: updated, object: searchRow(bill))], timeout: 10), .completed)
         XCTAssertEqual(app.textFields["search.query"].value as? String, bill)
