@@ -1791,6 +1791,23 @@ Typography follow-up `9e64509f` restores compact system distribution rows and
 shared rounded money/percentage styles; [focused proof](../reports/evidence/cuadrao-native-design/home-insights/typography/README.md)
 records the unchanged interaction checks and updated visual review.
 
+**Distribution-to-account continuity, UI only:** `a01629f1` connects each expanded
+account row to the existing account detail, including shared rename/record/archive
+presentation. Back keeps the expanded category and scroll position, and edits read
+from the same account model. [Round-trip evidence](../reports/evidence/cuadrao-native-design/home-insights/account-connectivity/README.md)
+records native verification and physical-phone handoff.
+
+**Future surface-connectivity pass — founder requested, not yet executed:** audit
+Home, Plan, Accounts, Chat and Search for meaningful row/action destinations,
+return paths, preserved space/currency/selection/scroll/draft context, and stale or
+unavailable records. Reuse existing destination and state owners. Include chart
+inspection consistency: Home's preview has sparse observations (3–4 days recently,
+weekly further back), while Plan's example has daily points. Distinguish data
+resolution from gesture feedback; do not invent recorded daily balances to make a
+sparse history feel smoother. Set connected-history sampling and any explicitly
+labeled interpolation through the canonical series owner. No blanket navigation
+rewrite, provider work or new history store is assigned by this follow-up.
+
 **Future beta experiment — not activated:** after the approved bar experience is
 usable, consider PostHog assignment in a reviewed TestFlight build: bar baseline
 versus donut, holding category rows, values and interactions constant. Define the

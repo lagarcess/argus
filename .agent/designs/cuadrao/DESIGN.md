@@ -155,6 +155,11 @@ rows reveal the category's accounts, keeping amounts readable independently of t
 visual. Example: Todo → Ahorros → Mi tranquilidad / Fondo de la casa. Tiny segments
 remain reachable through rows. Tapping the selected category again or Todo restores
 the whole. Keep category colors stable across the bar, rows and drill-down.
+Category rows use a down/up chevron to expand or collapse. Account rows use a
+right chevron and push the existing account detail within the insights navigation
+stack. Back preserves the selected category and scroll position. Detail actions
+reuse `CuadraoAccountModal` and the shared account model; edits are reflected on
+return. Do not dismiss insights and strand the person at the Accounts root.
 
 Subtle depth is approved as a visual direction, with proportional front-facing
 widths; depth must not distort the financial comparison. The proposed gentle
