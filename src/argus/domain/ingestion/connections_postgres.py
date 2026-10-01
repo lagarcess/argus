@@ -26,6 +26,7 @@ from argus.domain.ingestion.contract import SourceKind
 _COLUMNS = (
     "id::text, user_id::text, source, status, label, external_ref, sync_cursor, "
     "secret_ciphertext, last_success_at, last_attempt_at, last_error_code, "
+    "attention_code, attention_at, "
     "lease_holder, lease_until, created_at, updated_at, disconnected_at, version"
 )
 _LIVE = "status <> 'disconnected'"
@@ -108,6 +109,7 @@ class PostgresConnectionRepository:
         row = self._one(
             f"""update public.financial_source_connections
             set secret_ciphertext = %s, status = %s, last_error_code = null,
+                attention_code = null, attention_at = null,
                 updated_at = %s, version = version + 1
             where id = %s::uuid and {_LIVE}
             returning {_COLUMNS}""",
@@ -181,13 +183,28 @@ class PostgresConnectionRepository:
             raise ConnectionNotFound()
         return _row(row)
 
+    def flag_attention(
+        self, *, connection_id: str, code: str, now: datetime
+    ) -> SourceConnection:
+        row = self._one(
+            f"""update public.financial_source_connections
+            set attention_code = %s, attention_at = %s,
+                updated_at = %s, version = version + 1
+            where id = %s::uuid and {_LIVE}
+            returning {_COLUMNS}""",
+            (code, now, now, _uuid(connection_id)),
+        )
+        if row is None:
+            raise ConnectionNotFound()
+        return _row(row)
+
     def disconnect(
         self, *, user_id: str, connection_id: str, now: datetime
     ) -> SourceConnection:
         row = self._one(
             f"""update public.financial_source_connections
             set status = 'disconnected', secret_ciphertext = null, sync_cursor = null,
-                lease_holder = null, lease_until = null, disconnected_at = %s,
+                attention_code = null, attention_at = null, lease_holder = null, lease_until = null, disconnected_at = %s,
                 updated_at = %s, version = version + 1
             where id = %s::uuid and user_id = %s and {_LIVE}
             returning {_COLUMNS}""",
@@ -231,6 +248,8 @@ def _row(row: dict[str, Any]) -> SourceConnection:
         last_success_at=row["last_success_at"],
         last_attempt_at=row["last_attempt_at"],
         last_error_code=row["last_error_code"],
+        attention_code=row["attention_code"],
+        attention_at=row["attention_at"],
         lease_holder=row["lease_holder"],
         lease_until=row["lease_until"],
         created_at=row["created_at"],
