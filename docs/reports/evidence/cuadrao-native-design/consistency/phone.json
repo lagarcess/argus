@@ -1,0 +1,11 @@
+{
+  "source_commit": "53285d5957f11abc6fe7200717412fafa29207db",
+  "signed_device_build": "passed",
+  "bundle_id": "local.cuadrao.design.47R3855RTJ",
+  "install": "success",
+  "installation_sequence": 3356,
+  "automatic_launch": "failed",
+  "launch_blocker": "iPhone locked; iOS rejected automatic launch",
+  "physical_touch_verification": "not performed; founder can unlock and open Cuadrao Preview",
+  "production_delivery": false
+}

@@ -1,0 +1,80 @@
+[
+  {
+    "file": "money-valid-plan-es.png",
+    "test": "CuadraoConsistencyUITests/testMoneyEntryAndBlankCreationSpanish()",
+    "captured_at": 1790875070.295,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "money-precision-error-es.png",
+    "test": "CuadraoConsistencyUITests/testMoneyEntryAndBlankCreationSpanish()",
+    "captured_at": 1790875061.833,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "profile-type-es.png",
+    "test": "CuadraoConsistencyUITests/testSurfaceTypographySpanish()",
+    "captured_at": 1790875105.482,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "search-type-es.png",
+    "test": "CuadraoConsistencyUITests/testSurfaceTypographySpanish()",
+    "captured_at": 1790875104.277,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "chat-type-es.png",
+    "test": "CuadraoConsistencyUITests/testSurfaceTypographySpanish()",
+    "captured_at": 1790875103.039,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "plan-type-es.png",
+    "test": "CuadraoConsistencyUITests/testSurfaceTypographySpanish()",
+    "captured_at": 1790875101.813,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "home-type-es.png",
+    "test": "CuadraoConsistencyUITests/testSurfaceTypographySpanish()",
+    "captured_at": 1790875100.43,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "amount-repayment-es.png",
+    "test": "CuadraoPlanCurrencyUITests/testSharedDollarSplitAndRepaymentSpanish()",
+    "captured_at": 1790875169.86,
+    "source": "precommit source; retained after gallery-only appearance fix"
+  },
+  {
+    "file": "gallery-money-large-en.png",
+    "test": "CuadraoConsistencyUITests/testReferenceGalleryAndSharedAccountsBehavior()",
+    "captured_at": 1790875247.659,
+    "source": "53285d5957f11abc6fe7200717412fafa29207db"
+  },
+  {
+    "file": "gallery-money-dark-en.png",
+    "test": "CuadraoConsistencyUITests/testReferenceGalleryAndSharedAccountsBehavior()",
+    "captured_at": 1790875239.824,
+    "source": "53285d5957f11abc6fe7200717412fafa29207db"
+  },
+  {
+    "file": "gallery-dark-large-en.png",
+    "test": "CuadraoConsistencyUITests/testReferenceGalleryAndSharedAccountsBehavior()",
+    "captured_at": 1790875233.546,
+    "source": "53285d5957f11abc6fe7200717412fafa29207db"
+  },
+  {
+    "file": "gallery-light-es.png",
+    "test": "CuadraoConsistencyUITests/testReferenceGalleryAndSharedAccountsBehavior()",
+    "captured_at": 1790875228.498,
+    "source": "53285d5957f11abc6fe7200717412fafa29207db"
+  },
+  {
+    "file": "plan-unequal-split-es.png",
+    "test": "CuadraoGroupDesignUITests/testSharedJourneySpanish()",
+    "captured_at": 1790875291.745,
+    "source": "53285d5957f11abc6fe7200717412fafa29207db"
+  }
+]

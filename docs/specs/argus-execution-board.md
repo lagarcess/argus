@@ -1748,8 +1748,9 @@ Founder assigned the four-point native UI pass on October 1: a living
 one Accounts/Plan money editor with empty creation amounts, and a native reference
 gallery. Existing account layouts, navigation, art and interaction meanings remain
 preserved. This is preview work; connected root/session/model owners are unchanged.
-Verification and the resulting checkpoint are recorded in the linked evidence
-when complete, not inferred from the assignment.
+The four pieces are implemented at `53285d59`; [verification and screenshots](../reports/evidence/cuadrao-native-design/consistency/README.md)
+record the focused native checks, shared-behavior checks and phone handoff.
+This does not close remaining C10 connected-delivery/accessibility work.
 
 **Home chart proposal, separately tracked under C05/C03:** a compact month view
 with one labeled amount/currency, solid recorded history, a Today marker and a
