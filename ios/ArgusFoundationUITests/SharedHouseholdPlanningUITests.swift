@@ -103,7 +103,7 @@ extension FinancialLoopUITests {
         for direction in [true, false] {
             for _ in 0..<15 {
                 if sharedControlIsVisible(control) { return }
-                let up = control.exists ? control.frame.midY >= sharedViewport.minY : direction
+                let up = control.exists ? control.frame.midY >= sharedScrollTarget.frame.minY : direction
                 swipeSharedContent(up: up)
             }
         }
@@ -116,19 +116,12 @@ extension FinancialLoopUITests {
     }
 
     private func sharedControlIsVisible(_ control: XCUIElement) -> Bool {
-        control.exists && control.isHittable && sharedViewport.contains(CGPoint(x: control.frame.midX, y: control.frame.midY))
+        control.exists && control.isHittable && app.frame.contains(CGPoint(x: control.frame.midX, y: control.frame.midY))
     }
 
     private var sharedScrollTarget: XCUIElement {
         ["sharedPlan.detail", "screen.plan", "screen.home", "screen.search"]
             .map { app.scrollViews[$0] }.first { $0.exists && $0.isHittable } ?? app
-    }
-
-    private var sharedViewport: CGRect {
-        let frame = sharedScrollTarget.frame
-        let top = max(frame.minY, 115)
-        let bottom = min(frame.maxY, app.frame.height - 130)
-        return CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
     }
 
     private func swipeSharedContent(up: Bool) {
