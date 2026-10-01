@@ -8,11 +8,16 @@ from argus.domain.recording.assets import AssetService
 from argus.domain.recording.errors import (
     AccountNotFound,
     IdempotencyConflict,
+    RecordingInputError,
     StaleVersion,
 )
 from argus.domain.recording.loop_reads import home_response
 from argus.domain.recording.repository import InMemoryFinancialAccountRepository
-from argus.domain.recording.schemas import CreateFinancialAccountRequest, account_response
+from argus.domain.recording.schemas import (
+    CreateFinancialAccountRequest,
+    EditFinancialAccountRequest,
+    account_response,
+)
 from argus.domain.recording.service import FinancialAccountService
 from faker import Faker
 
@@ -246,3 +251,68 @@ def test_concurrent_link_and_estimate_accept_only_one_version(assets):
         results = list(pool.map(lambda _: change(), range(2)))
     assert sum(r is not None for r in results) == 1
     assert service.get(user_id=owner, account_id=asset.account.id).account.version == 2
+
+
+@pytest.mark.parametrize("kind", ["property", "vehicle", "other_asset"])
+@pytest.mark.parametrize("share,personal_minor", [(5000, 500000), (3333, 333300)])
+def test_unknown_asset_details_lock_type_and_preserve_history(
+    assets, client, monkeypatch, kind, share, personal_minor
+):
+    from argus.api.financial_accounts import (
+        FinancialAccountsContext,
+        require_financial_accounts_context,
+    )
+
+    service, api, owner = assets
+    asset = create(service, owner, kind=kind, amount=None)
+    request = AssetDetailsRequest(
+        expected_version=1, ownership_share_bps=share, related_debt_account_id=None
+    )
+    key = str(uuid4())
+    accepted = api.details(owner, asset.account.id, request, key)
+    history = accepted.stored.asset_changes
+    assert accepted.stored.opening is None
+    assert not accepted.stored.has_records and not accepted.stored.has_activity
+    assert accepted.stored.related_debt_account_id is None
+    assert len(history) == 1
+    edit = EditFinancialAccountRequest(expected_version=2, type="checking")
+    with pytest.raises(RecordingInputError, match="type_locked"):
+        service.edit(user_id=owner, account_id=asset.account.id, request=edit)
+
+    monkeypatch.setitem(
+        client.app.dependency_overrides,
+        require_financial_accounts_context,
+        lambda: FinancialAccountsContext(service=service, user_id=owner),
+    )
+    response = client.patch(
+        "/api/v1/financial-accounts/" + asset.account.id,
+        json=edit.model_dump(exclude_none=True),
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "type_locked"
+    unchanged = service.get(user_id=owner, account_id=asset.account.id)
+    assert unchanged.account.type == kind
+    assert unchanged.account.version == 2
+    assert unchanged.asset_changes == history
+    archived = service.edit(
+        user_id=owner,
+        account_id=asset.account.id,
+        request=EditFinancialAccountRequest(
+            expected_version=2, nickname="Updated asset", archived=True
+        ),
+    )
+    restored = service.edit(
+        user_id=owner,
+        account_id=asset.account.id,
+        request=EditFinancialAccountRequest(expected_version=3, archived=False),
+    )
+    assert archived.account.archived and not restored.account.archived
+    assert restored.account.nickname == "Updated asset"
+    replay = api.details(owner, asset.account.id, request, key)
+    assert replay.replayed and replay.change_version == 2
+    assert replay.stored.account.version == 4
+    assert replay.stored.asset_changes == history
+    assert account_response(replay.stored).asset.changes[0].ownership_share_bps == share
+    valued, _ = estimate(api, owner, replay.stored, "10000", 1)
+    assert account_response(valued.stored).asset.personal_position_minor == personal_minor
+    assert valued.stored.asset_changes == history

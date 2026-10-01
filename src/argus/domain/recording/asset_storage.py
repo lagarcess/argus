@@ -46,9 +46,12 @@ def validate_type_change(
     target = changes.get("type", stored.account.type)
     if target == stored.account.type:
         return
-    if linked or (stored.account.type in OPTIONAL_ASSET_TYPES and stored.has_records):
+    if linked or (
+        stored.account.type in OPTIONAL_ASSET_TYPES
+        and (stored.has_records or stored.asset_changes)
+    ):
         raise RecordingInputError(
-            "type_locked", "Keep the type with its estimates and related accounts."
+            "type_locked", "Keep the type with its estimates and saved asset details."
         )
 
 

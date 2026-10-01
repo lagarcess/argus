@@ -7304,7 +7304,10 @@ ID; clients fetch/open that detail. `asset.changes` lists accepted versions,
 old/new share and old/new debt ID, author and recording time. Share changes to
 optional assets use this endpoint; generic PATCH rejects an actual share change
 for these types. Generic nickname/archive edits remain supported. Type changes
-cannot invalidate an asset/debt link or discard recorded estimate provenance.
+cannot invalidate an asset/debt link or discard recorded estimate or accepted
+asset-details provenance (`422 type_locked`), even if the estimate is unknown
+and the debt link is null. These non-money details do not prevent recording the
+first estimate later.
 
 Each write replays its accepted operation before comparing the current version.
 A reused key with different content conflicts. An accepted retry returns the
