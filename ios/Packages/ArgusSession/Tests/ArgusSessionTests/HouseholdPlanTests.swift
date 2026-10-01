@@ -68,6 +68,29 @@ final class HouseholdPlanTests: XCTestCase {
         XCTAssertTrue((try JSONSerialization.jsonObject(with: clear) as! [String: Any])["target_date"] is NSNull)
         XCTAssertNil((try JSONSerialization.jsonObject(with: unchanged) as! [String: Any])["target_date"])
     }
+    func testGoalScheduleEditCarriesCanonicalScheduleWithoutPrivateFundingSetup() throws {
+        var value = SharedPlanTestData.plan(.goal)
+        var definition = try XCTUnwrap(value["definition"] as? [String: Any]); definition["earliest_effective_date"] = "2026-10-08"; value["definition"] = definition
+        let plan = try JSONDecoder().decode(HouseholdPlan.self, from: JSONSerialization.data(withJSONObject: value))
+        XCTAssertNotNil(plan.definition.schedule)
+        let effectiveDate = plan.definition.common.earliestEffectiveDate
+        let schedule = FinancialPlanSchedule(cadence: .weekly, startDate: effectiveDate, endDate: nil, monthDays: [])
+        let command = HouseholdPlanEditCommand(scope: .init(membershipId: plan.membershipId, authorizationVersion: plan.authorizationVersion, planVersion: plan.version), definition: .init(schedule: schedule, effectiveDate: effectiveDate))
+        let wire = try JSONSerialization.jsonObject(with: JSONEncoder().encode(command)) as! [String: Any]
+        let patch = try XCTUnwrap(wire["definition"] as? [String: Any])
+        XCTAssertEqual(Set(patch.keys), ["schedule", "effective_date"])
+        XCTAssertEqual(patch["effective_date"] as? String, effectiveDate)
+        XCTAssertEqual((patch["schedule"] as? [String: Any])?["cadence"] as? String, schedule.cadence.rawValue)
+        XCTAssertEqual((patch["schedule"] as? [String: Any])?["start_date"] as? String, schedule.startDate)
+        XCTAssertEqual(wire["expected_plan_version"] as? Int, plan.version)
+    }
+    func testEveryDefinitionRequiresServerEffectiveDateWithoutLocalFallback() throws {
+        for kind in HouseholdPlanKind.allCases {
+            var value = SharedPlanTestData.plan(kind)
+            var definition = try XCTUnwrap(value["definition"] as? [String: Any]); definition.removeValue(forKey: "earliest_effective_date"); value["definition"] = definition
+            XCTAssertThrowsError(try JSONDecoder().decode(HouseholdPlan.self, from: JSONSerialization.data(withJSONObject: value)), kind.rawValue)
+        }
+    }
     func testLegacyHouseholdActivityJournalPreservesExactRecoveryEnvelope() throws {
         let actor = UUID(), household = UUID(), activity = UUID(), membership = UUID(), key = UUID()
         let body = Data(#"{ "activity": { "amount": "18.25", "preview_token": "reviewed" } }"#.utf8)
@@ -99,7 +122,7 @@ enum SharedPlanTestData {
     static func person() -> [String: Any] { ["membership_id": memberId.uuidString, "display_name": "Synthetic member"] }
     static func plan(_ kind: HouseholdPlanKind, version: Int = 1) -> [String: Any] {
         let schedule: [String: Any] = ["cadence": "monthly", "start_date": "2026-10-01", "end_date": NSNull(), "month_days": [1]]
-        var definition: [String: Any] = ["name": "Synthetic " + kind.rawValue, "currency": "DOP", "currency_fraction_digits": 2]
+        var definition: [String: Any] = ["name": "Synthetic " + kind.rawValue, "currency": "DOP", "currency_fraction_digits": 2, "earliest_effective_date": "2026-10-01"]
         var progress: [String: Any] = ["actual_minor": NSNull(), "applied_minor": "1700", "remaining_minor": NSNull(), "state": "unknown", "debt_balance_minor": NSNull(), "debt_state": NSNull()]
         switch kind {
         case .budget: definition.merge(["limit_minor": "10000", "month": "2026-10", "category_ids": ["groceries"], "include_uncategorized": false, "publish_budget_scope": true]) { _, n in n }; progress.merge(["gross_minor": "1900", "refunds_minor": "200", "spent_minor": "1700", "over_budget": false]) { _, n in n }

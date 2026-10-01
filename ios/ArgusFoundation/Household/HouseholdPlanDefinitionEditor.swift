@@ -23,6 +23,7 @@ struct HouseholdPlanDefinitionEditor: View {
     @State private var uncategorized = true
     @State private var cadence = FinancialPlanSchedule.Cadence.monthly
     @State private var startDate = Date()
+    @State private var effectiveDate = Date()
     @State private var endDate = Date()
     @State private var hasEnd = false
     @State private var secondDay = "15"
@@ -38,6 +39,8 @@ struct HouseholdPlanDefinitionEditor: View {
     @State private var loading = false
     private var accounts: [FinancialAccount] { options?.money.accounts.filter { options?.ownedAccountIds.contains($0.id) == true } ?? [] }
     private var existing: HouseholdPlanOptions.Existing? { options?.existingDefinitions.first { $0.id == existingId } }
+    private var usesSchedule: Bool { kind == .bill || kind == .debt || kind == .goal && hasContribution }
+    private var earliestEffectiveDate: Date? { editing.flatMap { PlanDate.parse($0.definition.common.earliestEffectiveDate) } }
     private var schedule: FinancialPlanSchedule {
         let day = Calendar.current.component(.day, from: startDate)
         return .init(cadence: cadence, startDate: PlanDate.string(startDate), endDate: hasEnd ? PlanDate.string(endDate) : nil, monthDays: cadence == .twiceMonthly ? [day, Int(secondDay) ?? 15] : cadence == .monthly ? [day] : [])
@@ -71,7 +74,7 @@ struct HouseholdPlanDefinitionEditor: View {
                     }
                     if let error { Text(LocalizedStringKey(error)).accessibilityIdentifier("sharedPlan.form.error") }
                     Button(sharing ? "sharedPlan.confirmShare" : editing == nil ? "sharedPlan.confirmCreate" : "sharedPlan.confirmEdit") { focused = false; Task { await save() } }
-                        .disabled(loading || model.pending || model.busy || (sharing && (existing == nil || existingVersion == nil))).accessibilityIdentifier("sharedPlan.confirm")
+                        .disabled(loading || model.pending || model.busy || (sharing && (existing == nil || existingVersion == nil)) || (editing != nil && usesSchedule && earliestEffectiveDate == nil)).accessibilityIdentifier("sharedPlan.confirm")
                 } else if loading { ProgressView("accounts.loading") }
                 else if let error { Text(LocalizedStringKey(error)); Button("accounts.retry") { Task { await load() } } }
             }
@@ -82,6 +85,7 @@ struct HouseholdPlanDefinitionEditor: View {
             }
             .task { await load() }
             .onChange(of: existingId) { _, _ in Task { await loadExistingScope() } }
+            .onChange(of: effectiveDate) { _, value in if editing != nil && usesSchedule && startDate < value { startDate = value } }
         }
     }
     private var selectedKind: HouseholdPlanKind { sharing ? existing?.ref.kind ?? .budget : kind }
@@ -133,10 +137,15 @@ struct HouseholdPlanDefinitionEditor: View {
                 }
             }
         }
-        if kind == .bill || kind == .debt || kind == .goal && hasContribution {
+        if usesSchedule {
             Section("sharedPlan.schedule") {
                 Picker("sharedPlan.schedule", selection: $cadence) { ForEach(FinancialPlanSchedule.Cadence.allCases, id: \.self) { Text(LocalizedStringKey("plan.repeat." + $0.rawValue)).tag($0) } }.accessibilityIdentifier("sharedPlan.cadence")
-                DatePicker("sharedPlan.startDate", selection: $startDate, displayedComponents: .date)
+                if editing != nil, let minimum = earliestEffectiveDate {
+                    DatePicker("plan.effectiveDate", selection: $effectiveDate, in: minimum..., displayedComponents: .date).accessibilityIdentifier("sharedPlan.effectiveDate")
+                    DatePicker("sharedPlan.startDate", selection: $startDate, in: effectiveDate..., displayedComponents: .date).accessibilityIdentifier("sharedPlan.startDate")
+                    Text("plan.cutover.hint").font(.footnote).foregroundStyle(ArgusStyle.secondary)
+                } else if editing != nil { Text("sharedPlan.changed") }
+                else { DatePicker("sharedPlan.startDate", selection: $startDate, displayedComponents: .date).accessibilityIdentifier("sharedPlan.startDate") }
                 Toggle("sharedPlan.hasEndDate", isOn: $hasEnd)
                 if hasEnd { DatePicker("sharedPlan.endDate", selection: $endDate, displayedComponents: .date) }
                 if cadence == .twiceMonthly { TextField("sharedPlan.secondDay", text: $secondDay).keyboardType(.numberPad).focused($focused) }
@@ -158,7 +167,8 @@ struct HouseholdPlanDefinitionEditor: View {
                 amount = HouseholdPlanPresentation.decimal(plan.definition.amountMinor, digits: plan.definition.common.currencyFractionDigits)
                 if let s = plan.definition.schedule { cadence = s.cadence; startDate = PlanDate.parse(s.startDate) ?? startDate; endDate = s.endDate.flatMap(PlanDate.parse) ?? endDate; hasEnd = s.endDate != nil; secondDay = s.monthDays.last.map(String.init) ?? "15" }
                 if case .budget(_, _, let m, let c, let u, _) = plan.definition { month = m; categories = Set(c); uncategorized = u }
-                if case .goal(_, _, let d, _, _) = plan.definition { hasTargetDate = d != nil; targetDate = d.flatMap(PlanDate.parse) ?? targetDate }
+                if case .goal(_, _, let d, let s, _) = plan.definition { hasTargetDate = d != nil; targetDate = d.flatMap(PlanDate.parse) ?? targetDate; hasContribution = s != nil }
+                if usesSchedule, let minimum = earliestEffectiveDate { effectiveDate = minimum; startDate = minimum }
             }
         } catch { self.error = HouseholdPlanModel.message(error) }
     }
@@ -167,7 +177,8 @@ struct HouseholdPlanDefinitionEditor: View {
             let value = try AccountEntry.amount(amount, locale: locale) ?? ""
             if let plan = editing {
                 guard let identity = model.identity, model.isCurrent(plan, identity), plan.canEdit else { error = "sharedPlan.changed"; return }
-                let patch = HouseholdPlanDefinitionPatch(name: name, amount: value, targetDate: kind == .goal && hasTargetDate ? PlanDate.string(targetDate) : nil, includesTargetDate: kind == .goal, month: kind == .budget ? month : nil, categoryIds: kind == .budget ? categories.sorted() : nil, includeUncategorized: kind == .budget ? uncategorized : nil, schedule: kind == .bill || kind == .debt ? schedule : nil, effectiveDate: kind == .bill || kind == .debt ? PlanDate.string(Date()) : nil)
+                guard !usesSchedule || earliestEffectiveDate != nil else { error = "sharedPlan.changed"; return }
+                let patch = HouseholdPlanDefinitionPatch(name: name, amount: value, targetDate: kind == .goal && hasTargetDate ? PlanDate.string(targetDate) : nil, includesTargetDate: kind == .goal, month: kind == .budget ? month : nil, categoryIds: kind == .budget ? categories.sorted() : nil, includeUncategorized: kind == .budget ? uncategorized : nil, schedule: usesSchedule ? schedule : nil, effectiveDate: usesSchedule ? PlanDate.string(effectiveDate) : nil)
                 await model.submit(HouseholdPlanEditCommand(scope: model.scope(plan), definition: patch), action: .edit(plan.ref)); return
             }
             guard let scope = model.scope, let options else { error = "sharedPlan.changed"; return }

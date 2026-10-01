@@ -4,7 +4,8 @@ public struct HouseholdPlanCommonDefinition: Decodable, Sendable {
     public let name: String
     public let currency: String
     public let currencyFractionDigits: Int
-    enum CodingKeys: String, CodingKey { case name, currency, currencyFractionDigits = "currency_fraction_digits" }
+    public let earliestEffectiveDate: String
+    enum CodingKeys: String, CodingKey { case name, currency, currencyFractionDigits = "currency_fraction_digits", earliestEffectiveDate = "earliest_effective_date" }
 }
 public enum HouseholdPlanDefinition: Sendable {
     case budget(HouseholdPlanCommonDefinition, limit: String, month: String, categories: [String], uncategorized: Bool, published: Bool)
