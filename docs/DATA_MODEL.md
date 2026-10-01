@@ -2847,7 +2847,8 @@ provider credential (`secret_ciphertext`, AES-256-GCM bound to
 `source:id`, key `ARGUS_INGESTION_SECRET_KEY`). One live row per
 `(user_id, source, external_ref)`; webhooks resolve by `(source, external_ref)`.
 Cursor advances are compare-and-set under the lease; failures never clear
-`last_success_at` or the cursor. A check constraint keeps disconnected rows free
+`last_success_at` or the cursor, and recording a failure releases the lease so
+a sync already in flight cannot report success over it. A check constraint keeps disconnected rows free
 of credential, cursor and lease.
 
 Registered owners may `SELECT` only the non-secret columns (column grant); no

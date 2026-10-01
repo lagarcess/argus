@@ -23,6 +23,9 @@ class SubmitResult:
     unchanged: int
     # Status ``removed`` applied to previously recorded evidence.
     withdrawn: int
+    # Refused without recording, e.g. the connection ended while the batch
+    # was in flight. A connector must not report these as saved.
+    ignored: int = 0
 
 
 class CandidateSink(Protocol):

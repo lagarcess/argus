@@ -7488,7 +7488,8 @@ re-authorization or disconnect. Credentials, cursors and sync leases are never r
   oldest first.
 - POST `/api/v1/financial-connections/{id}/disconnect` returns
   `{connection,provider_revocation,unreviewed_removed}`.
-  `provider_revocation` is `revoked|failed|not_applicable`. The stored
+  `provider_revocation` is `revoked|failed|not_applicable`; it is `failed`
+  when a provider grant exists but its connector is switched off. The stored
   credential and cursor are deleted even when provider revocation fails, and
   unreviewed drafts from that connection are removed; confirmed activity stays.
   Repeating the call returns the ended connection with `not_applicable` and `0`.

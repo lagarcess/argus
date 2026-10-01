@@ -174,6 +174,7 @@ class PostgresConnectionRepository:
         row = self._one(
             f"""update public.financial_source_connections
             set status = %s, last_error_code = %s, last_attempt_at = %s,
+                lease_holder = null, lease_until = null,
                 updated_at = %s, version = version + 1
             where id = %s::uuid and {_LIVE}
             returning {_COLUMNS}""",

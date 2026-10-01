@@ -115,7 +115,10 @@ class ConnectionRepository(Protocol):
 
     def record_failure(
         self, *, connection_id: str, code: str, status: ConnectionStatus, now: datetime
-    ) -> SourceConnection: ...
+    ) -> SourceConnection:
+        """Record an actionable failure and release the sync lease, so a sync
+        that was already running cannot report success over it."""
+        ...
 
     def flag_attention(
         self, *, connection_id: str, code: str, now: datetime
@@ -284,8 +287,16 @@ class InMemoryConnectionRepository:
             raise ValueError("use disconnect() to end a connection")
         with self._lock:
             row = self._live(connection_id)
+            # Ends any sync in flight: its finish must not overwrite this.
             return self._put(
-                replace(row, status=status, last_error_code=code, last_attempt_at=now),
+                replace(
+                    row,
+                    status=status,
+                    last_error_code=code,
+                    last_attempt_at=now,
+                    lease_holder=None,
+                    lease_until=None,
+                ),
                 now,
             )
 
