@@ -135,3 +135,19 @@ def test_mask_keeps_last_four_digits_only():
 def test_extra_fields_are_refused_so_connectors_cannot_smuggle_raw_content():
     with pytest.raises(ValidationError):
         candidate(raw_body="<html>")
+
+
+def test_unclassified_evidence_always_needs_a_person_to_say_what_it_is():
+    item = ImportCandidate(
+        source=ref(external_id="msg-9"),
+        evidence="unclassified",
+        excerpt="Alerta: consumo con su tarjeta",
+    )
+    assert {"kind", "amount", "currency", "occurred_on", "direction", "account"} <= (
+        item.unresolved()
+    )
+
+
+def test_card_name_alone_is_an_account_hint_to_confirm():
+    item = candidate(account={"name": "Visa Oro"})
+    assert "account" not in item.unresolved()

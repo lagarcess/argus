@@ -9458,6 +9458,15 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        attention_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        attention_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
         created_at:
           type: string
           format: date-time
@@ -9476,6 +9485,8 @@ components:
       - last_success_at
       - last_attempt_at
       - last_error_code
+      - attention_code
+      - attention_at
       - created_at
       - disconnected_at
     ForecastCurrency:

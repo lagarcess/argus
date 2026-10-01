@@ -35,6 +35,13 @@ class SourceAdapter(Protocol):
         ...
 
 
+class LocalCleanup(Protocol):
+    """Optional adapter hook: delete connector-owned local state (a sender
+    list, a device token digest) after the connection has ended."""
+
+    def forget(self, connection: SourceConnection) -> None: ...
+
+
 @dataclass(frozen=True)
 class DisconnectOutcome:
     connection: SourceConnection
@@ -93,6 +100,9 @@ class IngestionHub:
         ended = self.connections.disconnect(
             user_id=user_id, connection_id=connection_id, now=self.clock()
         )
+        cleanup = getattr(adapter, "forget", None)
+        if cleanup is not None:
+            cleanup(ended)
         removed = 0
         if self.sink is not None:
             removed = self.sink.forget_connection(

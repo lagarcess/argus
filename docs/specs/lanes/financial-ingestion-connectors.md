@@ -53,7 +53,7 @@ connector emits only this, through `CandidateSink.submit`.
 | Source identity | `source.source`, `source.connection_id`, `source.external_id` | The triple names one observation; re-delivery of the triple is the same evidence |
 | Provider change | `source.revision`, `source.replaces_external_id` | A newer observation of the same fact; Plaid posted rows name their pending row |
 | Observation time | `source.observed_at` | When the source produced or Argus fetched it; excluded from the content fingerprint |
-| Kind of evidence | `evidence` | `transaction`, `balance`, `statement_period`, `due_notice`, `payment_notice` |
+| Kind of evidence | `evidence` | `transaction`, `balance`, `statement_period`, `due_notice`, `payment_notice`, `unclassified` (something financial arrived; the person says what it is) |
 | Lifecycle | `status` | `pending`, `posted`, `unknown`, `removed` |
 | Account reference | `account.*` | External id, institution, name, last-four mask, currency, type hint. Never a Cuadrao account id |
 | Dates | `occurred_on`, `occurred_at`, `posted_on`, `due_on`, `period_*` | Activity date, settlement date, due date and statement period stay separate (MVEE §5 Dates) |
@@ -72,7 +72,7 @@ email bodies or provider payloads through the contract.
 | --- | --- | --- |
 | Provider auth, fetch, pagination, provider retries, extraction | Each connector | Reconciliation |
 | Stable `external_id`; same-source re-delivery, provider modifications and removals expressed as candidates | Each connector | Reconciliation (does not re-derive provider identity) |
-| Connection status, freshness, cursor, sync lease, credential sealing | `ingestion.connections` + `IngestionHub` (shared) | Connectors (they call it) |
+| Connection status, freshness, attention warnings, cursor, sync lease, credential sealing, keyed identifier digests | `ingestion.connections` + `IngestionHub` (shared) | Connectors (they call it) |
 | Evidence storage, cross-source matching, event grouping, review queue | Reconciliation (single owner, wave 2) | Connectors |
 | Account mapping (hint to `financial_accounts` row) | Reconciliation, confirmed by the person | Connectors |
 | Corrections from sources after acceptance (amount changed, removed) | Reconciliation raises a review item; the person corrects through existing activity correction | Anyone silently editing canonical rows |

@@ -50,3 +50,12 @@ def test_key_comes_from_env_and_absence_keeps_connectors_off(monkeypatch):
         KEY_ENV, base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("=")
     )
     assert SecretBox.from_env().seal("x", source="gmail", connection_id="c")
+
+
+def test_digest_is_keyed_and_purpose_separated():
+    first, second = box(), box()
+    value = "jane@example.test"
+    assert first.digest(value, purpose="gmail") == first.digest(value, purpose="gmail")
+    assert first.digest(value, purpose="gmail") != first.digest(value, purpose="other")
+    assert first.digest(value, purpose="gmail") != second.digest(value, purpose="gmail")
+    assert value not in first.digest(value, purpose="gmail")

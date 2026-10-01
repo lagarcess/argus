@@ -2836,7 +2836,8 @@ Default-off with `ARGUS_INGESTION_ENABLED`. Lane spec:
 
 `financial_source_connections` holds one row per person-authorized connection
 (Plaid Item, Gmail mailbox, Shortcuts device). It owns status, last successful
-and last attempted refresh, the last actionable error code, the provider sync
+and last attempted refresh, the last actionable error code, an attention warning
+(`attention_code`, `attention_at`) that successful syncs do not clear, the provider sync
 cursor, a short sync lease (`lease_holder`, `lease_until`) and the sealed
 provider credential (`secret_ciphertext`, AES-256-GCM bound to
 `source:id`, key `ARGUS_INGESTION_SECRET_KEY`). One live row per

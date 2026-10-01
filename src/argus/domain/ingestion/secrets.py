@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
+import hmac
 import os
 import secrets
 
@@ -36,6 +38,7 @@ class SecretBox:
         if len(key) != 32:
             raise SecretBoxUnavailable("ingestion secret key must be 32 bytes")
         self._aead = AESGCM(key)
+        self._key = key
 
     @classmethod
     def from_env(cls) -> SecretBox:
@@ -68,6 +71,16 @@ class SecretBox:
                 "credential does not open for this connection"
             ) from None
         return plain.decode()
+
+    def digest(self, value: str, *, purpose: str) -> str:
+        """Keyed, purpose-separated digest for identifiers that must be
+        matched but never stored readable (a mailbox address). Not for
+        secrets that need to be opened again."""
+
+        subkey = hmac.new(
+            self._key, f"argus-ingestion-digest:{purpose}".encode(), hashlib.sha256
+        ).digest()
+        return hmac.new(subkey, value.encode(), hashlib.sha256).hexdigest()
 
 
 def _aad(source: str, connection_id: str) -> bytes:

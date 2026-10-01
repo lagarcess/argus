@@ -39,6 +39,9 @@ class Adapter:
         if self.fail:
             raise RuntimeError("provider down")
 
+    def forget(self, connection):  # noqa: ANN001
+        self.forgot = connection.status
+
 
 def connect(identities, token: str, ref: str = "item-1"):  # noqa: ANN001
     hub = ingestion_hub()
@@ -89,7 +92,8 @@ def test_list_shows_status_and_freshness_without_secrets(client, identities):
     assert item["status"] == "active" and item["label"] == "Chase"
     assert set(item) == {
         "id", "source", "status", "label", "last_success_at", "last_attempt_at",
-        "last_error_code", "created_at", "disconnected_at",
+        "last_error_code", "attention_code", "attention_at", "created_at",
+        "disconnected_at",
     }  # fmt: skip
     assert client.get(URL, headers=bearer(BOB)).json()["items"] == []
 
@@ -113,6 +117,8 @@ def test_disconnect_always_deletes_local_credential_and_unreviewed_evidence(
     stored = hub.connections.get(user_id=identities[ALICE]["id"], connection_id=row.id)
     assert stored.secret is None
     assert sink.forgotten == [(identities[ALICE]["id"], row.id)]
+    # Connector-owned local state is cleaned up after the connection ended.
+    assert adapter.forgot == "disconnected"
     # Repeating is harmless and does not call the provider again.
     again = client.post(f"{URL}/{row.id}/disconnect", headers=bearer(ALICE)).json()
     assert again["provider_revocation"] == "not_applicable"
