@@ -67,6 +67,19 @@ final class CuadraoPolishUITests: XCTestCase {
         app.buttons["Listo"].tap()
         XCTAssertEqual(rows.count, 1)
     }
+    func testLargeEnglishAccountManagement() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--plan-reset", "--design-english", "-cuadrao.design.appearance", "dark",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"]
+        app.launch()
+        reveal(app, app.buttons["home-accounts-open"])
+        app.buttons["home-accounts-open"].tap()
+        XCTAssertTrue(app.buttons["accounts-order-toggle"].waitForExistence(timeout: 3))
+        shot(app, "accounts-dark-large-en")
+        app.swipeUp()
+        shot(app, "accounts-dark-large-lower-en")
+    }
     func testLargeEnglishPlanControls() {
         continueAfterFailure = false
         let app = XCUIApplication()
