@@ -2859,7 +2859,7 @@ existing activity tables written only through `MoneyService`.
 ### Gmail sender allowlist
 
 `financial_source_gmail_senders` (migration
-`20261001160000_financial_source_gmail_senders.sql`) holds the senders a person
+`20261002120100_financial_source_gmail_senders.sql`) holds the senders a person
 chose for one Gmail connection: `(connection_id, sender)` primary key,
 `user_id`, `created_at` and `backfilled_at` (when that sender's lookback window
 was last searched; null means the next sync searches it). `sender` is a
