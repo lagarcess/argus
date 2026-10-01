@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** October 1, 2026.
-**Execution state:** Tip lineage includes [PR #760](https://github.com/lagarcess/argus/pull/760) Connected Cuadrao auth/Home (product squash `819870e6fcfd28d469b12691fe2471e00e2000db` from Compact-verified Exact head `0462f3ade6d347bd13644eda5636264c007034c0`; docs landing `#765` as `631d4051…`) and [PR #763](https://github.com/lagarcess/argus/pull/763) default-off Household membership API (`fbcc399bdb888d89af594422cfa319a4c26c60e5` from Exact head `7b80190d…`, hermetic in-memory proof only; docs landing `#764`). Real Auth/API/Postgres and RLS verification for Household remains pending. Design checkpoints remain founder-named only. Chat/voice stack remains parked. All landed personal financial journeys and their demonstrations remain preserved. No deployment, hosted enablement, paid providers, signing or `main` promotion is authorized by these landings.
+**Execution state:** Tip lineage includes [PR #766](https://github.com/lagarcess/argus/pull/766) Household native consent + canonical financial activity (product squash `079ec8d819f8e2513cc624bfa7a4eb9ca60c7627` from Exact head `04831ccb12a46b89a3cd5f5391139d3589321815` onto tip `09ce4e0a…`), [PR #760](https://github.com/lagarcess/argus/pull/760) Connected Cuadrao auth/Home (product squash `819870e6…`; docs landing `#765`), and [PR #763](https://github.com/lagarcess/argus/pull/763) default-off Household membership API (`fbcc399b…`; docs landing `#764`). Household remains server-default-off. Physical iPhone/internet delivery and hosted enablement remain pending. Design checkpoints remain founder-named only. Chat/voice stack remains parked. All landed personal financial journeys and their demonstrations remain preserved. No deployment, hosted enablement, paid providers, signing or `main` promotion is authorized by these landings.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,41 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## PR #766 integration landing
+
+Founder-confirmed squash merge of the verified Household native head;
+integration landing completes the register under standing Project authority.
+This grant does not authorize deployment, hosted configuration changes, paid
+providers, phone-environment actions, design-checkpoint adoption, chat/voice
+stack work or another delivery lane.
+
+- [PR #766](https://github.com/lagarcess/argus/pull/766) squash-merged at
+  **October 1, 2026, 15:10:45 UTC** as
+  `079ec8d819f8e2513cc624bfa7a4eb9ca60c7627`, from verified Exact head
+  `04831ccb12a46b89a3cd5f5391139d3589321815` onto tip
+  `09ce4e0af3b6df7a41e2d21c52c67b4fe7c82c0a`. Integration was already an
+  ancestor of the worker; no additional reconcile merge was required at
+  promote. Prior one-way reconcile `4fed9efb…` had absorbed #763/#760/#765
+  landing docs only (no intervening runtime/API/data/UI/migration/env/test
+  overlap).
+- Pre-merge Exact head: PR CI / push CI / local smoke / Supabase Preview
+  SUCCESS; Codex follow-up clean; **0** unresolved review threads; modularity
+  budget clean.
+- `ARGUS_HOUSEHOLDS_ENABLED` remains default-off in `.env.example`,
+  `render.yaml`, and `.github/argus-env.sh`. Additive consent/grant migrations
+  are not applied to production by this landing.
+- Accepted proof retains the assembled native/API/Postgres packet under
+  [connected-household-native evidence](../reports/evidence/connected-household-native/README.md),
+  including default-off Personal surfaces, enabled 980 DOP / one 20 DOP
+  correction demo, and response-loss recovery. Full native setup hit the local
+  sign-in rate limit and is **not** claimed passing; same-fixture continuation
+  and focused gates are.
+- Remaining outside this land: physical iPhone/internet delivery; external
+  invitation delivery; shared Plan/budgets/goals/debt; Business/Custom;
+  hosted enablement; design-checkpoint adoption; Accounts tab; Apple on the
+  connected path. Detail:
+  [landing report](../reports/2026-10-01-pr-766-integration-landing.md).
 
 ## PR #763 integration landing
 
@@ -35,110 +70,36 @@ design-branch work or another delivery lane.
   `PERSISTENCE_MODE=memory` with mocked Supabase gateway and auth-session checks
   (`tests/household/conftest.py`). No durable real Auth/Postgres/RLS evidence is
   cited here.
-- Remaining MVEE Household work: real local Auth/API/Postgres and RLS
-  verification of the landed migration and lock paths; native
-  projections/adapters; shared plans and private-source contributions; external
-  invitation delivery; and physical-phone proof. Detail:
+- Remaining MVEE Household work after this membership land was completed for the
+  bounded native consent/activity package by [PR #766](#pr-766-integration-landing).
+  Shared plans/contributions, external invitation delivery, physical-phone
+  proof, and hosted enablement remain outside. Detail:
   [landing report](../reports/2026-10-01-pr-763-integration-landing.md).
 
 ## Connected Spaces and Household lane
 
-**Native adapter assignment, September 30, continued under the approved policy.**
-Create a household, prepare an invitation, accept it as another registered
-person, explicitly share accounts, and see only permitted shared information in
-native Home, Accounts and Search. Prove the complete lifecycle with two
-synthetic users against real local Auth/API/Postgres, including
-revocation/removal, recovery and English/Spanish. Stop at a reviewed,
-merge-ready PR targeting `codex/private-alpha-next`.
+**Landed via [PR #766](https://github.com/lagarcess/argus/pull/766)** (Exact head
+`04831ccb12a46b89a3cd5f5391139d3589321815`; product squash
+`079ec8d819f8e2513cc624bfa7a4eb9ca60c7627` onto tip `09ce4e0a…`). See
+[PR #766 integration landing](#pr-766-integration-landing).
 
-**Original assignment base:** `9b5e8643f0493145bd672c2af6e7508371d4cfa0`.
-**Current adapter base, fetched October 1:**
-`631d405142435d059ab6ef419f8235bf0ad52947`, including founder-merged #763
-(`fbcc399bdb888d89af594422cfa319a4c26c60e5`), #760
-(`819870e6fcfd28d469b12691fe2471e00e2000db`) and #765 landing documentation.
-**Current integration:** `09ce4e0af3b6df7a41e2d21c52c67b4fe7c82c0a`.
-#764 adds #763 landing documentation only. Reconciliation preserves that register
-and this native-adapter assignment; no runtime, UI, migration or test overlap.
-**Active recovery branch:** `codex/connected-household-native`.
-**Review PR:** [#766](https://github.com/lagarcess/argus/pull/766). Assembled
-local journey evidence is retained. Later default-off P1 class fixes are verified
-at sourcec38; consult the same PR terminal audit for renewed final-head CI and review readiness.
-No merge authority for this PR.
-**Active isolated checkout:**
-`/Users/garces/.codex/worktrees/connected-household-native/private-alpha-next`.
-**Current status:** connect the complete native household journey to landed
-#763 membership and #760's connected shell. One writer owns backend/native
-adapters, tests and API/data contracts; the captain owns this manifest, local
-runtime, assembled evidence, review and publication. The founder's #763 merge
-settles canonical membership ownership. Do not merge the earlier competing
-membership store or overwrite its occupied remote branch.
+This lane connected Household consent and canonical financial projections to
+landed #763 membership and #760's connected shell under the approved permission
+policy. `ARGUS_HOUSEHOLDS_ENABLED` stays server-default-off. Durable evidence:
+[connected-household-native](../reports/evidence/connected-household-native/README.md).
+Restart recipe: [ios/HOUSEHOLD_SETUP.md](../../ios/HOUSEHOLD_SETUP.md).
 
-The earlier local implementation remains frozen at
-`240854cd1fe1ae51a6999daab37e0aae651cb596` in
-`connected-spaces-household`, with reviewed source `33f741c8…`, runnable API
-59500 and preserved native/API/Postgres evidence. It is a recovery/reference
-checkpoint, not evidence that the new canonical adapter already works.
-Recapture assembled acceptance against the active branch before a READY claim.
+**Remaining outside the landed package:** physical iPhone/internet delivery;
+external invitation delivery; shared Plan/budgets/goals/debt; Business/Custom
+lifecycle; hosted migration/enablement; Accounts tab; Apple on the connected
+path; design-checkpoint adoption (`1dcd12a5` / `1b2005fd9` parked). Existing
+#760 shared-shell / Personal Search dark contrast polish remains recorded, not
+claimed fixed here.
 
-**Local delivery result:** canonical source `8e43fab960bde6542d82c21d197cd840ea68275e`,
-helper `095473a7`, reconciliation `4fed9efb` and native contrast `d1084805`.
-Fresh independent review identified three real issues: exact committed retry
-across an unrelated Household version, archived-money totals and deletion-safe
-grant FKs. All are fixed with clean affected reviews; helper and contrast deltas
-also reviewed clean. No unresolved independent findings.
-
-**Review follow-up:** the later P1 onfda found that a disabled Household route
-was misreported as access loss. Source `c38e4d107fd983cd95d5adf703513b913e443b0f`
-uses the existing typed server code to gate controls/routes/sheets, clear protected
-views and preserve original selection plus exact pending commands. Foreground
-restores availability without retrying writes automatically. Scoped removal
-stays meaningful; a429 keeps the pending journal, and a rejected H1 retry cannot
-clear valid current H2 selection. Fourteen actual model cases pass; scoped
-independent fix review is clean. Default-off native Home/Accounts/Search and
-English/Spanish reopen pass against real API59620/Auth/Postgres. Ten two-user
-API financial read checks and ten focused actual-Postgres regressions pass.
-Restoring API59520 rebuilds the original69447E demo with980 DOP/one20 DOP expense;
-new safe screenshots/short history recording are in the existing evidence packet.
-The PR remains non-draft. The captain finishes replies/reactions/resolution and
-final CI on this same PR before renewed READY. No hosted flag or infrastructure
-setting changes.
-
-Real Auth/API/Postgres acceptance covers named-current-member grants, view/edit
-separation, private-leg redaction, departure/rejoin/admin transfer/closure,
-retained owners' records, 50% asset attribution and unknown currency totals.
-Checks pass: 276 focused deterministic; 36 existing and six new actual-Postgres;
-fourteen production Household-model after the follow-up; session package64; local helper/secure runner37.
-The broad local suite cannot collect due to inherited SciPy `_spropack`; shared
-Python remains untouched. Full Linux CI passed at67e; final-head checks are the
-terminal PR gate, not inferred from that earlier head.
-
-Native setup reached acceptance and consent before the unchanged local login
-rate limit interrupted its ninth sign-in; that entire test is **not** reported
-passing. Same-fixture AAE272 continuation passed (224.032s), including expense25,
-original correction20, balance980, Search/back, Spanish relaunch and withdrawal.
-Confirmed response-loss creation/acceptance passed separately (228.443s) atd108,
-with two committed responses dropped and exact journal outcomes recovered.
-Finald108 native interaction retained fixture69447E, recording25 then correcting
-that original entry20 (1000→975→980), with readable Household colors under light
-and dark appearance. Current signed-in recipient can click through that fixture.
-[Durable packet and recording](../reports/evidence/connected-household-native/README.md)
-and [existing restart instructions](../../ios/HOUSEHOLD_SETUP.md) preserve the demo.
-
-**Remaining limits/polish:** physical iPhone/internet delivery and hosted migration
-remain unverified and unauthorized. Synthetic invitation links only; no delivery
-was sent. Shared Plan/budgets/goals/debt and Business/Custom remain outside this
-bounded assignment and retain their MVEE dependencies below. Existing #760
-shared navigation/Personal secondary colors on its white canvas and inherited
-Personal Search dark contrast need a later visual polish pass; this lane fixes only new Household
-inline contrast, preserves native sheet appearance and avoids design expansion.
-
-**Assigned resources:** simulator `C93072E7-D29A-4B0A-BE76-E6418E4E9F88`,
-new bundle `local.argus.household-current-demo`, cache
-`/private/tmp/argus-household-current-build`, new API 59520. Reuse this lane's
-synthetic Auth 59501, Postgres 59502 and CAPTCHA 59505 without resetting data;
-keep the old API/demo intact. Compact, the design simulator/cache and physical
-phone environment remain unmodified. No merge, deploy, hosted change, paid
-provider or phone change is authorized for this adapter.
+Worker branch `codex/connected-household-native` and its isolated checkout are
+closed for active delivery after this landing. Earlier competing membership
+store at `240854cd…` / `connected-spaces-household` remains recovery/reference
+only.
 
 ### Recovered decisions and approved permission policy
 
