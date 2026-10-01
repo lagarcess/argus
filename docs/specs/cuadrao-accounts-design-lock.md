@@ -300,3 +300,29 @@ relaunch; this is phone design review, not connected internet delivery.
 Search copy refinement: remove the separate Buscar/Search heading. The field
 placeholder is simply Buscar/Search; the selected tab, magnifier and categories
 provide context without repeating the app name.
+
+## Profile proposal for review — September 30, 2026
+
+Founder requested translating the HTML foundation into a less cluttered native
+Profile using Mobbin. Preserve the App / Account / Support hierarchy, identity
+entry and existing capability inventory. The proposal removes root-row subtitles,
+preview-sign-in links, oversized watermark/version treatment and repeated titles.
+It keeps short labels, quiet group headings, the approved bell asset and a separate
+sign-out action. Household/space management stays in Home space controls.
+
+The identity row opens staged name/preferred-name editing. Preferences,
+personalization, notifications, security, data/privacy, usage and help have native
+destinations. Data/privacy accesses the same fixture definitions as Search for
+Memory, Files and Chats. Account/security/legal actions explain their disconnected
+status only when selected. No real session, password, data deletion, permission,
+notification, assistant prompt or support submission is changed. Appearance and
+language are read-only in this pass; dark mode remains deferred. Preview state
+is in-memory, not a persistence or connected-settings claim.
+
+Remaining: profile photo/avatar customization, full locale/theme behavior, complete
+notification scheduling, formatting/voice/advanced controls, real memory/file/chat
+management, feedback submission, real usage/auth/security/legal wiring, larger text
+and complete English/device interaction acceptance. These remain existing scope,
+not capabilities removed to simplify the root screen.
+
+[Profile reference and acceptance notes](../reports/evidence/cuadrao-native-design/profile/README.md).

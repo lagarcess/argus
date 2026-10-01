@@ -234,6 +234,8 @@ struct CuadraoHomeCanvas: View {
         if tab == .search {
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
                 actions: { sheet = .actions($0) }, record: { sheet = .record($0) })
+        } else if tab == .profile {
+            CuadraoProfileCanvas(spanish: spanish, includeExamples: populated)
         } else {
         NavigationStack {
             ContentUnavailableView(tab.title(spanish: spanish), systemImage: tab.symbol,
