@@ -139,6 +139,23 @@ class PostgresConnectionRepository:
         )
         return row is not None
 
+    def renew(
+        self,
+        *,
+        connection_id: str,
+        holder: str,
+        now: datetime,
+        ttl: timedelta = DEFAULT_LEASE,
+    ) -> bool:
+        row = self._one(
+            f"""update public.financial_source_connections
+            set lease_until = %s
+            where id = %s::uuid and {_LIVE} and lease_holder = %s and lease_until > %s
+            returning id""",
+            (now + ttl, _uuid(connection_id), holder, now),
+        )
+        return row is not None
+
     def release(self, *, connection_id: str, holder: str) -> None:
         self._one(
             """update public.financial_source_connections

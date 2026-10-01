@@ -109,6 +109,18 @@ class ConnectionRepository(Protocol):
         ttl: timedelta = DEFAULT_LEASE,
     ) -> bool: ...
 
+    def renew(
+        self,
+        *,
+        connection_id: str,
+        holder: str,
+        now: datetime,
+        ttl: timedelta = DEFAULT_LEASE,
+    ) -> bool:
+        """Extend a lease only while ``holder`` still holds it; never re-take
+        a lease a failure released or another sync acquired."""
+        ...
+
     def release(self, *, connection_id: str, holder: str) -> None: ...
 
     def record_success(
@@ -248,6 +260,27 @@ class InMemoryConnectionRepository:
             self._rows[connection_id] = replace(
                 row, lease_holder=holder, lease_until=now + ttl, last_attempt_at=now
             )
+            return True
+
+    def renew(
+        self,
+        *,
+        connection_id: str,
+        holder: str,
+        now: datetime,
+        ttl: timedelta = DEFAULT_LEASE,
+    ) -> bool:
+        with self._lock:
+            row = self._rows.get(connection_id)
+            if (
+                row is None
+                or row.status not in LIVE
+                or row.lease_holder != holder
+                or row.lease_until is None
+                or row.lease_until <= now
+            ):
+                return False
+            self._rows[connection_id] = replace(row, lease_until=now + ttl)
             return True
 
     def release(self, *, connection_id: str, holder: str) -> None:
