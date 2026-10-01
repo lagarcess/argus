@@ -307,8 +307,8 @@ Founder requested translating the HTML foundation into a less cluttered native
 Profile using Mobbin. Preserve the App / Account / Support hierarchy, identity
 entry and existing capability inventory. The proposal removes root-row subtitles,
 preview-sign-in links, oversized watermark/version treatment and repeated titles.
-It keeps short labels, quiet group headings, the approved bell asset and a separate
-sign-out action. Household/space management stays in Home space controls.
+The initial visual treatment was rejected as too generic and is superseded by
+the revision below. The capability inventory remains intact. Household/space management stays in Home space controls.
 
 The identity row opens staged name/preferred-name editing. Preferences,
 personalization, notifications, security, data/privacy, usage and help have native
@@ -326,3 +326,23 @@ and complete English/device interaction acceptance. These remain existing scope,
 not capabilities removed to simplify the root screen.
 
 [Profile reference and acceptance notes](../reports/evidence/cuadrao-native-design/profile/README.md).
+
+## Profile flow revision for review — September 30, 2026
+
+Founder clarified the sources: HTML owns the functional inventory and existing
+interactions; Mobbin informs a better native hierarchy and flow. Do not equate
+removing descriptions with completing the design. This revision is a proposal,
+not founder-approved visual lock.
+
+- One compact identity header with a visible Edit profile affordance.
+- Three softly grouped destination blocks. Root captions and decorative row icons
+  are removed; approved navigation/header artwork is unchanged.
+- Editing opens a focused sheet with labeled name/preferred-name fields, Cancel,
+  and Save enabled only for valid changes. Values derive from one local profile.
+- Child settings use consistent group surfaces, spacing and native large titles.
+- Privacy separates content from sharing/recovery; help reveals the feedback
+  form on a child page instead of starting with a text box.
+- Feedback remains an in-memory draft owned by the profile, never a support send.
+
+The underlying capability gaps listed above are still pending. No backend or
+financial flow changes, new simulators, new build caches, merge or deployment.

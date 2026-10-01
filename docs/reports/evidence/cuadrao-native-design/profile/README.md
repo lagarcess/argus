@@ -1,29 +1,50 @@
-# Cuadrao Profile proposal
+# Cuadrao Profile flow revision
 
-September 30, 2026. Native UI-only redesign of the HTML profile foundation.
+September 30, 2026. UI-only proposal, awaiting founder visual approval. Replaces
+the initial Profile treatment rejected as generic. HTML remains the functional
+inventory; this pass refines hierarchy, presentation and local editing.
 
-## References inspected
+## References actually inspected
 
-The local mobile-lock/settings.png and settings.js root/child hierarchy were inspected before implementation.
+Mobbin returned flow previews, which were visually inspected; sampled previews
+are not a claim that every screen in every app was exhaustively audited.
 
-- [Things settings](https://mobbin.com/screens/fe872e1e-90a8-4409-a62f-8360b64d7080): short single-line destinations, help separated from preferences.
-- [Wise security/privacy](https://mobbin.com/screens/7ff1c601-1814-4eb0-85c2-8029227abfad): distinct account/security actions.
-- [Wise personal details](https://mobbin.com/screens/8c827bb0-573a-48c3-80ae-3951b85e568a): move identity detail behind one entry.
-- [Claude settings](https://mobbin.com/screens/737ee839-f3ec-4c8d-a5ec-a0ffa6b747df): account/app grouping; no upgrade promotion borrowed.
-- [Apple settings guidance](https://developer.apple.com/design/human-interface-guidelines/settings): keep settings relevant and avoid confusing duplication of system options.
+- [Claude editing profile](https://mobbin.com/flows/05a1eb18-d66b-4ff5-ad1d-528d215476b7): focused identity editing and explicit confirmation.
+- [Wise personal details](https://mobbin.com/flows/f8b5070c-d22d-4883-a2c8-174aec95d379): settings-to-identity separation.
+- [Airbnb account settings](https://mobbin.com/flows/c808890f-1025-46e0-a083-2da40e5a081f): root destinations and dedicated settings page.
+- [Revolut profile](https://mobbin.com/flows/b3e1e7fa-a35a-4402-a00d-449ff3483ef0): clear identity anchor and grouped destinations; no upsell/referral tiles borrowed.
+- [Claude memory summary](https://mobbin.com/flows/042680b7-2b5d-4c0a-9aba-e1e86f5c6d10): progressively disclosed memory management. Cuadrao retains confirmed context; automatic inference is not adopted.
+- [Apple settings](https://developer.apple.com/design/human-interface-guidelines/settings): relevant, organized app settings.
 
-Mobbin images were inspected inline, not copied into the app.
+Mobbin artwork was not copied into the product. The local HTML settings.js and
+previous reference notes provided the capability inventory.
 
-## Result
+## Implemented proposal
 
-One identity row; App (preferences, personalization, notifications); Cuenta (security, data/privacy, usage); Ayuda; sign out. Root has no repeated descriptions, giant branding/footer, or nested cards. All root destinations fit at the tested simulator size. The selected tab supplies screen context.
+Compact identity + Edit profile; three bounded, icon-free destination groups;
+consistent native child titles and surfaces; focused editing sheet with Save and
+Cancel; privacy content vs sharing/recovery grouping; feedback on a child page.
+All current root destinations remain reachable. Memory, files and chats still
+read Search's example definitions. One profile owner holds local preferences and
+feedback draft; name editing stages changes until Save.
 
-Native destinations use Form and NavigationStack. Name edits are staged with Save; preview account/preferences state has one local owner. Memory/files/chats reuse the search example definitions. Security/deletion/legal actions do not call services. Usage is explicitly unconnected. No fictional live usage counts or successful account mutations are shown.
+## Verification
 
-## Verification and limits
+- Simulator build passed without diagnostics; device build passed.
+- Visually inspected Spanish root, editing sheet, privacy, personalization and help.
+- Opened/dismissed edit sheet, reached privacy and Help > Feedback.
+- Changed response length Automatic > Brief, left and reopened Personalization,
+  and observed Brief retained. This checks local state propagation.
+- Saved profile.jpg, editor.jpg, privacy.jpg and personalization.jpg. Privacy
+  remains visually applicable after the later unrelated feedback/field-label edits.
+- Installed the separate Cuadrao Preview bundle on the paired iPhone. Launch
+  was blocked by the locked device; physical interaction is pending.
+- No extra simulator or build cache. Existing Argus app/session untouched.
 
-Simulator and physical-iPhone builds passed. Inspected root (profile.jpg), Data/privacy (privacy.jpg), notifications and personal editing controls. Navigated Data/privacy -> Memory -> shared example detail and back to root. Profile editing fields and Save are reachable; text-entry/save/cancel and toggle mutation were not accepted as verified because the automation bridge did not reliably change those controls.
-
-The separate Cuadrao Preview was installed on the paired iPhone. Automatic launch was blocked because the phone was locked; the installed update can be opened manually after unlocking. Existing Argus app identity/session is preserved. No additional simulator or build cache was created.
-
-These screenshots remain visually applicable after consolidating the example email into the single profile owner; rendered text is unchanged. Full English, Dynamic Type, VoiceOver, physical touch interaction and connected behavior remain pending. Profile photo, complete notifications/voice/advanced, real privacy management and service integration are follow-up work, not silently retired capabilities.
+Text-entry automation reported success without changing field values; edit Save,
+changed-draft Cancel and feedback input/save are NOT accepted as verified.
+Complete English, Dynamic Type and VoiceOver acceptance remain pending.
+Profile photo/avatar customization, full locale/theme settings, complete
+notification scheduling, formatting/voice/advanced controls, privacy management,
+feedback submission, real usage/auth/security/legal wiring remain follow-up scope.
+No real service mutation, support send, notifications, model calls or deployment.

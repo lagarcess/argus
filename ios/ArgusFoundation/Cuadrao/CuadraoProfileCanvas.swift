@@ -8,6 +8,7 @@ struct CanvasProfileDraft {
     var responseLength = 0
     var tone = 0
     var instructions = ""
+    var feedback = ""
     var push = false
     var email = false
     var budgets = true
@@ -20,7 +21,7 @@ struct CanvasProfileDraft {
 
 enum CanvasProfileRoute: Hashable {
     case personal, preferences, personalization, notifications, security, privacy, usage, help
-    case memory, files, conversations, shared, removed, voice, advanced
+    case memory, files, conversations, shared, removed, voice, advanced, feedback
     func title(_ es: Bool) -> String {
         switch self {
         case .personal: es ? "Mi perfil" : "My profile"
@@ -38,6 +39,7 @@ enum CanvasProfileRoute: Hashable {
         case .removed: es ? "Movimientos eliminados" : "Removed activity"
         case .voice: es ? "Voz" : "Voice"
         case .advanced: es ? "Más opciones" : "More options"
+        case .feedback: es ? "Comentarios" : "Feedback"
         }
     }
     var symbol: String {
@@ -57,8 +59,14 @@ enum CanvasProfileRoute: Hashable {
         case .removed: "trash"
         case .voice: "waveform"
         case .advanced: "ellipsis"
+        case .feedback: "bubble.left"
         }
     }
+}
+
+enum CanvasSettingsStyle {
+    static let surface = Color(white: 0.965)
+    static let separator = Color.black.opacity(0.065)
 }
 
 struct CuadraoProfileCanvas: View {
@@ -66,40 +74,29 @@ struct CuadraoProfileCanvas: View {
     let includeExamples: Bool
     @State private var profile = CanvasProfileDraft()
     @State private var signOut = false
+    @State private var editor: CanvasProfileRoute?
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    NavigationLink(value: CanvasProfileRoute.personal) {
-                        HStack(spacing: 16) {
-                            Text(String(profile.name.prefix(1)).uppercased())
-                                .font(.title2.weight(.medium)).frame(width: 58, height: 58)
-                                .foregroundStyle(WelcomePalette.pine)
-                                .background(WelcomePalette.sage, in: Circle())
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(profile.name).font(.title3.weight(.semibold))
-                                Text(profile.emailAddress).font(.subheadline).foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 8)
-                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-                        }.padding(.vertical, 8).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.profile.identity")
-                    group("App", routes: [.preferences, .personalization, .notifications])
-                    group(spanish ? "Cuenta" : "Account", routes: [.security, .privacy, .usage])
-                    group(spanish ? "Ayuda" : "Support", routes: [.help])
+                VStack(alignment: .leading, spacing: 24) {
+                    identity.padding(.bottom, 8)
+                    group([.preferences, .personalization, .notifications])
+                    group([.security, .privacy, .usage])
+                    group([.help])
                     Button(spanish ? "Cerrar sesión" : "Sign out") { signOut = true }
-                        .font(.body).foregroundStyle(.secondary).frame(minHeight: 44)
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
                         .accessibilityIdentifier("cuadrao.profile.signout")
-                }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 24)
+                }.padding(.horizontal, 24).padding(.top, 32).padding(.bottom, 24)
             }
             .background(Color.white).toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: CanvasProfileRoute.self) { route in
-                if route == .personal {
-                    CuadraoProfileEditor(profile: $profile, spanish: spanish)
-                } else {
-                    CuadraoProfilePage(route: route, profile: $profile, spanish: spanish, includeExamples: includeExamples)
-                }
+                CuadraoProfilePage(route: route, profile: $profile, spanish: spanish, includeExamples: includeExamples)
+            }
+            .sheet(item: $editor) { _ in
+                NavigationStack { CuadraoProfileEditor(profile: $profile, spanish: spanish) }
+                    .tint(WelcomePalette.pine)
             }
             .alert(spanish ? "Cerrar sesión" : "Sign out", isPresented: $signOut) {
                 Button(spanish ? "Entendido" : "Got it", role: .cancel) {}
@@ -110,15 +107,51 @@ struct CuadraoProfileCanvas: View {
         }.toolbar(.hidden, for: .tabBar)
     }
 
-    private func group(_ title: String, routes: [CanvasProfileRoute]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary).accessibilityAddTraits(.isHeader)
+    private var identity: some View {
+        Button { editor = .personal } label: {
+            HStack(spacing: 18) {
+                CanvasProfileAvatar(name: profile.name)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(profile.name).font(.system(.title2, design: .default, weight: .semibold))
+                        .foregroundStyle(.primary)
+                    Text(profile.emailAddress).font(.subheadline).foregroundStyle(.secondary)
+                    Text(spanish ? "Editar perfil" : "Edit profile")
+                        .font(.subheadline.weight(.medium)).foregroundStyle(WelcomePalette.pine)
+                        .padding(.top, 4)
+                }
+                Spacer(minLength: 0)
+            }.contentShape(Rectangle())
+        }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.profile.identity")
+    }
+
+    private func group(_ routes: [CanvasProfileRoute]) -> some View {
+        VStack(spacing: 0) {
             ForEach(routes, id: \.self) { route in
-                NavigationLink(value: route) { CanvasProfileRow(route: route, spanish: spanish) }
-                    .buttonStyle(.plain)
-                if route != routes.last { Divider().padding(.leading, 40) }
+                NavigationLink(value: route) {
+                    CanvasProfileRow(route: route, spanish: spanish)
+                }.buttonStyle(.plain)
+                if route != routes.last {
+                    Rectangle().fill(CanvasSettingsStyle.separator).frame(height: 0.5)
+                        .padding(.horizontal, 18).accessibilityHidden(true)
+                }
             }
-        }
+        }.background(CanvasSettingsStyle.surface, in: RoundedRectangle(cornerRadius: 22))
+    }
+}
+
+extension CanvasProfileRoute: Identifiable {
+    var id: Self { self }
+}
+
+struct CanvasProfileAvatar: View {
+    let name: String
+    var body: some View {
+        Text(String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased())
+            .font(.system(.title, design: .rounded, weight: .medium))
+            .frame(width: 64, height: 64)
+            .foregroundStyle(WelcomePalette.pine)
+            .background(WelcomePalette.sage, in: Circle())
+            .accessibilityHidden(true)
     }
 }
 
@@ -126,18 +159,13 @@ struct CanvasProfileRow: View {
     let route: CanvasProfileRoute
     let spanish: Bool
     var body: some View {
-        HStack(spacing: 16) {
-            Group {
-                if route == .notifications {
-                    Image("CuadraoNotifications").resizable().scaledToFit()
-                } else {
-                    Image(systemName: route.symbol).font(.system(size: 20, weight: .regular))
-                }
-            }.frame(width: 24, height: 24).foregroundStyle(.secondary).accessibilityHidden(true)
+        HStack(spacing: 12) {
             Text(route.title(spanish)).font(.body)
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
-        }.frame(minHeight: 48).contentShape(Rectangle())
+            Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.tertiary).accessibilityHidden(true)
+        }.padding(.horizontal, 18).padding(.vertical, 16)
+            .frame(minHeight: 56).contentShape(Rectangle())
     }
 }
 
@@ -156,33 +184,56 @@ struct CuadraoProfileEditor: View {
     private var valid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && name.count <= 60 && preferred.count <= 40
     }
+    private var changed: Bool {
+        name.trimmingCharacters(in: .whitespacesAndNewlines) != profile.name ||
+        preferred.trimmingCharacters(in: .whitespacesAndNewlines) != profile.preferredName
+    }
     var body: some View {
         Form {
             Section {
-                TextField(spanish ? "Nombre" : "Name", text: $name).textContentType(.name)
-                    .accessibilityIdentifier("cuadrao.profile.name")
-                TextField(spanish ? "Cómo te llamamos" : "What we call you", text: $preferred)
-                    .accessibilityIdentifier("cuadrao.profile.preferred")
-            } header: { Text(spanish ? "Tus datos" : "Your details") }
-            Section {
-                LabeledContent(spanish ? "Correo" : "Email", value: profile.emailAddress)
+                HStack { Spacer(); CanvasProfileAvatar(name: name); Spacer() }
+                    .padding(.vertical, 12).listRowBackground(Color.clear)
             }
+            Section {
+                field(spanish ? "Nombre" : "Name", text: $name, id: "cuadrao.profile.name")
+                    .textContentType(.name)
+                field(spanish ? "Cómo te llamamos" : "What we call you", text: $preferred,
+                      id: "cuadrao.profile.preferred")
+                    .textContentType(.nickname)
+            } footer: {
+                Text(spanish ? "Usaremos tu nombre preferido al conversar contigo."
+                     : "We’ll use your preferred name when we talk with you.")
+            }.listRowBackground(CanvasSettingsStyle.surface)
+            Section {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(spanish ? "Correo" : "Email").font(.subheadline).foregroundStyle(.secondary)
+                    Text(profile.emailAddress)
+                }.padding(.vertical, 6)
+            }.listRowBackground(CanvasSettingsStyle.surface)
             if !valid {
                 Text(spanish ? "Escribe un nombre de hasta 60 caracteres y un nombre preferido de hasta 40."
                      : "Enter a name up to 60 characters and a preferred name up to 40.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(.secondary).listRowBackground(Color.clear)
             }
         }.scrollContentBackground(.hidden).background(Color.white)
-            .navigationTitle(spanish ? "Mi perfil" : "My profile").navigationBarTitleDisplayMode(.inline)
-            .toolbar(.visible, for: .navigationBar)
+            .navigationTitle(spanish ? "Editar perfil" : "Edit profile").navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(spanish ? "Cancelar" : "Cancel") { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(spanish ? "Guardar" : "Save") {
                         profile.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
                         profile.preferredName = preferred.trimmingCharacters(in: .whitespacesAndNewlines)
                         dismiss()
-                    }.disabled(!valid)
+                    }.disabled(!valid || !changed).accessibilityIdentifier("cuadrao.profile.save")
                 }
             }
+    }
+    private func field(_ label: String, text: Binding<String>, id: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label).font(.subheadline).foregroundStyle(.secondary)
+            TextField(label, text: text).accessibilityLabel(label).accessibilityIdentifier(id)
+        }.padding(.vertical, 6)
     }
 }

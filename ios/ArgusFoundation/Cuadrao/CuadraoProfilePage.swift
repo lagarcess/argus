@@ -10,10 +10,12 @@ struct CuadraoProfilePage: View {
     @State private var draftSaved = false
 
     var body: some View {
-        Form { content }
+        Form { content.listRowBackground(CanvasSettingsStyle.surface) }
+            .environment(\.defaultMinListRowHeight, 52)
             .scrollContentBackground(.hidden).background(Color.white)
-            .navigationTitle(route.title(spanish)).navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(route.title(spanish)).navigationBarTitleDisplayMode(.large)
             .toolbar(.visible, for: .navigationBar)
+            .onAppear { if route == .feedback { feedback = profile.feedback } }
             .alert(notice ?? "", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
                 Button(spanish ? "Entendido" : "Got it", role: .cancel) { notice = nil }
             } message: {
@@ -35,6 +37,7 @@ struct CuadraoProfilePage: View {
                     description: Text(spanish ? "Verás tu disponibilidad y cuándo se renueva al conectar tu cuenta." : "Your allowance and reset time will appear when your account is connected."))
             }
         case .help: help
+        case .feedback: feedbackForm
         case .memory, .files, .conversations: records
         case .shared:
             empty(spanish ? "Sin conversaciones compartidas" : "No shared conversations", detail: spanish ? "Los enlaces que compartas aparecerán aquí." : "Links you share will appear here.")
@@ -132,8 +135,11 @@ struct CuadraoProfilePage: View {
     private var privacy: some View {
         Group {
             Section {
-                link(.memory); link(.files); link(.conversations); link(.shared); link(.removed)
+                link(.memory); link(.files); link(.conversations)
             } header: { Text(spanish ? "Tus datos" : "Your data") }
+            Section {
+                link(.shared); link(.removed)
+            } header: { Text(spanish ? "Compartir y recuperar" : "Sharing and recovery") }
             Section {
                 Button(spanish ? "Solicitar eliminación de cuenta" : "Request account deletion", role: .destructive) {
                     notice = spanish ? "Eliminar cuenta" : "Delete account"
@@ -177,18 +183,31 @@ struct CuadraoProfilePage: View {
     private var help: some View {
         Group {
             Section {
-                TextField(spanish ? "Cuéntanos qué pasó o qué mejorarías" : "Tell us what happened or what could be better", text: $feedback, axis: .vertical)
-                    .lineLimit(4...8).onChange(of: feedback) { _, _ in draftSaved = false }
-                Button(spanish ? "Guardar borrador" : "Save draft") { draftSaved = true }
-                    .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                if draftSaved { Label(spanish ? "Borrador listo. No se ha enviado." : "Draft ready. Not sent.", systemImage: "checkmark").font(.footnote) }
-            } header: { Text(spanish ? "Comentarios" : "Feedback") }
-              footer: { Text(spanish ? "El borrador permanece en esta pantalla de la vista previa. No adjunta conversaciones ni datos personales." : "The draft stays on this preview screen. No conversations or personal data are attached.") }
-            Section {
                 previewAction(spanish ? "Centro de ayuda" : "Help center")
+                link(.feedback)
+            }
+            Section {
                 previewAction(spanish ? "Términos de uso" : "Terms of use")
                 previewAction(spanish ? "Política de privacidad" : "Privacy policy")
             } header: { Text(spanish ? "Acerca de Cuadrao" : "About Cuadrao") }
+        }
+    }
+
+    private var feedbackForm: some View {
+        Section {
+            TextField(spanish ? "Cuéntanos qué pasó o qué mejorarías" : "Tell us what happened or what could be better", text: $feedback, axis: .vertical)
+                .lineLimit(5...10).onChange(of: feedback) { _, _ in draftSaved = false }
+            Button(spanish ? "Guardar borrador" : "Save draft") {
+                profile.feedback = feedback
+                draftSaved = true
+            }.disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if draftSaved {
+                Label(spanish ? "Borrador guardado" : "Draft saved", systemImage: "checkmark")
+                    .foregroundStyle(WelcomePalette.pine).font(.subheadline)
+            }
+        } footer: {
+            Text(spanish ? "El borrador dura hasta cerrar la vista previa. No se envía ni se adjuntan datos."
+                 : "The draft lasts until you close the preview. Nothing is sent and no data is attached.")
         }
     }
 
