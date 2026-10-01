@@ -372,6 +372,9 @@ private struct ConnectedAccountRow: View {
                     .font(.body.weight(.medium))
                 Text(LocalizedStringKey("accounts.type." + account.type))
                     .font(.caption).foregroundStyle(.secondary)
+                if account.isOptionalAsset {
+                    Text("assets.whole").font(.caption2).foregroundStyle(.secondary)
+                }
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 5) {
