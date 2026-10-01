@@ -101,28 +101,47 @@ def actuals(c, b, canonical, claimed):
         aid: render_activity(aid, canonical.history[aid], revision)
         for aid, revision in canonical.current.items()
     }
+    frozen = c.execute(
+        "select claim_id,activity_id,activity_revision,released,membership_ended_at,last_applied_minor from public.household_plan_archived_claims where binding_id=%s",
+        (b["id"],),
+    ).fetchall()
+    roots = set()
+    for cid, aid, _, released, ended, applied in frozen:
+        key = str(cid)
+        if key not in claimed:
+            continue
+        claimed[key] = claimed[key] | dict(
+            released=released, retained=ended is not None, retained_applied=applied
+        )
+        roots.add(str(aid))
+    retained = {}
+    for aid, revision in c.execute(
+        "select activity_id,activity_revision from public.household_plan_archived_activities where binding_id=%s",
+        (b["id"],),
+    ).fetchall():
+        history = canonical.history.get(str(aid), {})
+        if revision not in history:
+            raise HouseholdNotFound()
+        retained[str(aid)] = render_activity(str(aid), history, revision)
+    for cid, aid, revision, _, __, ___ in frozen:
+        history = canonical.history.get(str(aid), {})
+        if str(cid) not in claimed:
+            continue
+        if revision not in history:
+            raise HouseholdNotFound()
+        retained[str(aid)] = render_activity(str(aid), history, revision)
     if b["departed_at"]:
-        frozen = c.execute(
-            "select claim_id,activity_id,activity_revision,released from public.household_plan_archived_claims where binding_id=%s",
-            (b["id"],),
-        ).fetchall()
-        retained = {}
-        for aid, revision in c.execute(
-            "select activity_id,activity_revision from public.household_plan_archived_activities where binding_id=%s",
-            (b["id"],),
-        ).fetchall():
-            history = canonical.history.get(str(aid), {})
-            if revision in history:
-                retained[str(aid)] = render_activity(str(aid), history, revision)
-        for cid, aid, revision, released in frozen:
-            key = str(cid)
-            if key not in claimed:
-                continue
-            claimed[key] = claimed[key] | dict(released=released)
-            history = canonical.history.get(str(aid), {})
-            if revision in history:
-                retained[str(aid)] = render_activity(str(aid), history, revision)
         actual = retained
+    else:
+        # Only the ended contributor's original/dependencies are clipped. Other
+        # current contributions remain live; later private refunds/returns do not.
+        actual = {
+            aid: entry
+            for aid, entry in actual.items()
+            if aid not in roots
+            and entry["purchase_activity_id"] not in roots
+            and entry["reversal_of_activity_id"] not in roots
+        } | retained
     return actual
 
 
@@ -131,24 +150,31 @@ def allocations(c, b, people, actor_mid, repository, pools):
         return []
     if b["departed_at"]:
         rows = c.execute(
-            """select r.allocation_id,r.contributor_membership_id,r.account_owner_id,r.account_id,r.unlinked_minor
+            """select r.allocation_id,r.contributor_membership_id,r.account_owner_id,r.account_id,r.unlinked_minor,a.membership_ended_at
             from public.household_plan_archived_allocations a join public.financial_goal_allocation_revisions r
-            on r.allocation_id=a.allocation_id and r.revision=a.revision where a.binding_id=%s order by r.allocation_id""",
+            on r.allocation_id=a.allocation_id and r.revision=a.revision where a.binding_id=%s and a.owner_archived order by r.allocation_id""",
             (b["id"],),
         ).fetchall()
     else:
         rows = c.execute(
-            "select id,contributor_membership_id,account_owner_id,account_id,unlinked_minor from public.financial_goal_allocations where binding_id=%s order by id",
+            "select r.id,r.contributor_membership_id,r.account_owner_id,r.account_id,r.unlinked_minor,a.membership_ended_at "
+            "from public.financial_goal_allocations r left join public.household_plan_archived_allocations a "
+            "on a.binding_id=r.binding_id and a.allocation_id=r.id and a.revision=r.revision "
+            "where r.binding_id=%s order by r.id",
             (b["id"],),
         ).fetchall()
     result = []
-    for identifier, mid, owner, aid, amount in rows:
+    for identifier, mid, owner, aid, amount, ended in rows:
         mid, owner, aid = str(mid), str(owner), str(aid)
-        if owner not in pools and not b["departed_at"]:
+        if owner not in pools and not b["departed_at"] and ended is None:
             pools[owner] = pool(c, repository, owner)
         facts = pools.get(owner, {})
         supported = (
-            amount if amount == 0 or facts.get(aid, {}).get("state") == "backed" else None
+            amount
+            if amount == 0
+            or ended is None
+            and facts.get(aid, {}).get("state") == "backed"
+            else None
         )
         result.append(
             dict(
@@ -157,7 +183,7 @@ def allocations(c, b, people, actor_mid, repository, pools):
                 assigned_minor=str(amount),
                 supported_minor=str(supported) if supported is not None else None,
                 status="current" if supported is not None else "needs_review",
-                can_edit=mid == actor_mid and not b["departed_at"],
+                can_edit=mid == actor_mid and not b["departed_at"] and ended is None,
             )
         )
     return result
@@ -197,10 +223,15 @@ def public(
                     accepted["destination_owner_id"],
                     accepted["destination_account_id"],
                 )
-                if owner not in pools and not b["departed_at"]:
+                if (
+                    owner not in pools
+                    and not b["departed_at"]
+                    and not link.get("retained")
+                ):
                     pools[owner] = pool(c, repository, owner)
                 if (
                     value is not None
+                    and not link.get("retained")
                     and pools.get(owner, {}).get(aid, {}).get("state") == "backed"
                 ):
                     applied = value

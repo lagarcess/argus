@@ -200,7 +200,6 @@ def archive_owner(c: Any, hid: str, user_id: str, now: Any, repository: Any) -> 
     if not rows:
         return
     from argus.domain.recording import canonical_groups
-    from argus.domain.recording.money_reads import render_activity
 
     from . import planning_projection as projection
     from .planning_progress import selected_budget_facts
@@ -222,16 +221,17 @@ def archive_owner(c: Any, hid: str, user_id: str, now: Any, repository: Any) -> 
         (owners,),
     ).fetchall()
     canonical = canonical_groups.load(repository, c, owners)
-    actual = {
-        aid: render_activity(aid, canonical.history[aid], revision)
-        for aid, revision in canonical.current.items()
-    }
     for bid, kind, did, publish in rows:
         body = definition(c, kind, str(did), user_id)
         b = dict(
-            id=str(bid), kind=kind, definition_id=str(did), publish_budget_scope=publish
+            id=str(bid),
+            kind=kind,
+            definition_id=str(did),
+            publish_budget_scope=publish,
+            departed_at=None,
         )
         claimed = projection.links(c, b)
+        actual = projection.actuals(c, b, canonical, claimed)
         activity_ids = {link["activity_id"] for link in claimed.values()}
         activity_ids.update(
             aid
@@ -248,8 +248,8 @@ def archive_owner(c: Any, hid: str, user_id: str, now: Any, repository: Any) -> 
                     (aid,),
                 ).fetchone()[0]
                 c.execute(
-                    "insert into public.household_plan_archived_activities values(%s,%s,%s,%s)",
-                    (bid, aid, owner, canonical.current[aid]),
+                    "insert into public.household_plan_archived_activities values(%s,%s,%s,%s) on conflict(binding_id,activity_id) do nothing",
+                    (bid, aid, owner, actual[aid]["revision"]),
                 )
         c.execute(
             "update public.household_plan_bindings set departed_at=%s,retained_revision=%s where id=%s",
@@ -257,12 +257,15 @@ def archive_owner(c: Any, hid: str, user_id: str, now: Any, repository: Any) -> 
         )
         c.execute(
             """insert into public.household_plan_archived_claims
+            (binding_id,claim_id,activity_id,activity_owner_id,activity_revision,released)
             select l.binding_id,l.claim_id,g.id,g.user_id,g.current_revision,l.released_at is not null
             from public.financial_plan_links l join public.financial_activity_groups g
-            on g.id=l.activity_id and g.user_id=l.activity_owner_id where l.binding_id=%s""",
+            on g.id=l.activity_id and g.user_id=l.activity_owner_id where l.binding_id=%s on conflict(binding_id,claim_id) do nothing""",
             (bid,),
         )
         c.execute(
-            "insert into public.household_plan_archived_allocations select binding_id,id,revision from public.financial_goal_allocations where binding_id=%s",
+            "insert into public.household_plan_archived_allocations(binding_id,allocation_id,revision) "
+            "select binding_id,id,revision from public.financial_goal_allocations where binding_id=%s "
+            "on conflict(binding_id,allocation_id,revision) do update set owner_archived=true",
             (bid,),
         )

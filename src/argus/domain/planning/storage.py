@@ -58,10 +58,13 @@ def shared_links(connection: Any, user_id: str) -> list[dict[str, Any]]:
             attribution=attribution,
             purpose=purpose,
             released=released is not None,
+            retained=ended is not None,
+            retained_applied=applied,
         )
-        for cid, oid, activity_owner, aid, eid, gid, did, snapshot, attribution, purpose, released in connection.execute(
-            "select l.claim_id,l.occurrence_id,l.activity_owner_id,l.activity_id,l.expectation_id,l.goal_id,l.debt_plan_id,l.snapshot,l.attribution,l.purpose,l.released_at "
+        for cid, oid, activity_owner, aid, eid, gid, did, snapshot, attribution, purpose, released, ended, applied in connection.execute(
+            "select l.claim_id,l.occurrence_id,l.activity_owner_id,l.activity_id,l.expectation_id,l.goal_id,l.debt_plan_id,l.snapshot,l.attribution,l.purpose,l.released_at,r.membership_ended_at,r.last_applied_minor "
             "from public.financial_plan_links l join public.household_plan_bindings b on b.id=l.binding_id "
+            "left join public.household_plan_archived_claims r on r.binding_id=l.binding_id and r.claim_id=l.claim_id "
             "where l.user_id=%s and b.departed_at is null and b.revoked_at is null",
             (user_id,),
         ).fetchall()
@@ -69,7 +72,10 @@ def shared_links(connection: Any, user_id: str) -> list[dict[str, Any]]:
 
 
 def claim_owners(user_id: str, links: list[dict[str, Any]]) -> set[str]:
-    return {user_id, *(link["activity_owner_id"] for link in links)}
+    return {
+        user_id,
+        *(link["activity_owner_id"] for link in links if not link["retained"]),
+    }
 
 
 def load(connection: Any, user_id: str, repository: Any = None) -> dict[str, Any]:
@@ -168,7 +174,9 @@ def load(connection: Any, user_id: str, repository: Any = None) -> dict[str, Any
             for owner in {
                 link["attribution"]["destination_owner_id"]
                 for link in state["_shared_links"]
-                if link["purpose"] == "goal_saving" and not link["released"]
+                if link["purpose"] == "goal_saving"
+                and not link["released"]
+                and not link["retained"]
             }
             if owner != user_id
         }

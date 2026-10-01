@@ -24,6 +24,8 @@ def credit(entry, accepted, purpose, actual, accounts):
 
 
 def supported_credit(state, link, actual, records, canonical):
+    if link.get("retained"):
+        return None if link["purpose"] == "goal_saving" else link["retained_applied"]
     amount = credit(
         actual.get(link["activity_id"]),
         link["attribution"],
