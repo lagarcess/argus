@@ -90,6 +90,37 @@ final class HouseholdModelTests: XCTestCase {
             XCTAssertEqual(reopened.selectedId, ended ? nil : HouseholdServer.household, code)
         }
     }
+    func testDeniedRetryForPreviousHouseholdPreservesCurrentScope() async throws {
+        let fixture = try HouseholdFixture()
+        let identity = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        let gate = RequestGate(); await fixture.server.holdInvitation(gate)
+        let request = Task { await fixture.model.versionCommand("/invitations") }
+        await gate.waitUntilStarted()
+        await fixture.model.select(HouseholdServer.secondHousehold)
+        await gate.release(); await request.value
+        let pending = try XCTUnwrap(fixture.model.pending)
+        XCTAssertEqual(pending.path, fixture.model.path(HouseholdServer.household, "/invitations"))
+        await fixture.model.open(HouseholdServer.account)
+        let currentDetail = try XCTUnwrap(fixture.model.detail?.account.account)
+        let currentVersion = fixture.model.snapshot?.authorizationVersion
+        await fixture.server.failNext(403, code: "not_a_member")
+        await fixture.model.retry()
+        XCTAssertTrue(fixture.model.active)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.secondHousehold)
+        XCTAssertEqual(fixture.model.household?.id, HouseholdServer.secondHousehold)
+        XCTAssertEqual(fixture.model.snapshot?.householdId, HouseholdServer.secondHousehold)
+        XCTAssertEqual(fixture.model.snapshot?.authorizationVersion, currentVersion)
+        XCTAssertEqual(fixture.model.detail?.account.account, currentDetail)
+        XCTAssertNotEqual(fixture.model.errorKey, "household.accessEnded")
+        XCTAssertNil(fixture.model.pending)
+        XCTAssertNil(try fixture.journal.pending(for: identity))
+        let reopened = HouseholdModel(controller: fixture.controller, configuration: fixture.configuration, journal: fixture.journal)
+        reopened.bind(identity)
+        XCTAssertEqual(reopened.selectedId, HouseholdServer.secondHousehold)
+        await reopened.refresh()
+        XCTAssertTrue(reopened.active)
+    }
     func testRateLimitedPendingRetryKeepsExactCommandUntilExplicitRetry() async throws {
         let fixture = try HouseholdFixture()
         let identity = try await fixture.login()

@@ -66,7 +66,7 @@ final class HouseholdModel: ObservableObject {
     }
     func refresh() async {
         guard let identity else { return }
-        let ticket = generation
+        let ticket = generation; let requestedHousehold = selectedId
         do {
             let result = try await controller.householdResponse(HouseholdList.self, expectedIdentity: identity)
             guard current(ticket, identity) else { return }
@@ -82,7 +82,7 @@ final class HouseholdModel: ObservableObject {
                 clear()
             }
             household = h; snapshot = values; availability = .available; errorKey = nil
-        } catch { await failed(error, ticket, identity, discovery: true) }
+        } catch { await failed(error, ticket, identity, householdId: requestedHousehold, discovery: true) }
     }
     func foreground() async { clear(); await refresh() }
     func open(_ id: UUID) async {
@@ -92,7 +92,7 @@ final class HouseholdModel: ObservableObject {
         do {
             let value = try await controller.householdResponse(HouseholdAccountDetail.self, path: path(selectedId, "/accounts/" + id.uuidString), expectedIdentity: identity)
             guard current(ticket, identity) else { return }; detail = value
-        } catch { await failed(error, ticket, identity) }
+        } catch { await failed(error, ticket, identity, householdId: selectedId) }
     }
     func back() { detail = nil; history = []; highlightActivityId = nil }
     func openSearchHit(_ hit: HouseholdSearchHit) async {
@@ -104,7 +104,7 @@ final class HouseholdModel: ObservableObject {
         do {
             let value = try await controller.householdResponse(HouseholdHistory.self, path: path(selectedId, "/activities/" + id.uuidString + "/history"), expectedIdentity: identity)
             guard current(ticket, identity) else { return }; history = value.items
-        } catch { await failed(error, ticket, identity) }
+        } catch { await failed(error, ticket, identity, householdId: selectedId) }
     }
     func find(_ query: String, more: Bool = false) async {
         guard isAvailable, let identity, let selectedId else { return }
@@ -121,7 +121,7 @@ final class HouseholdModel: ObservableObject {
         } catch {
             guard current(ticket, identity), searchGeneration == searchTicket else { return }
             searchState = .unavailable
-            handleAccessFailure(error)
+            handleAccessFailure(error, householdId: selectedId)
         }
     }
     func previewInvitation(_ token: String) async {
@@ -130,7 +130,7 @@ final class HouseholdModel: ObservableObject {
             let body = try JSONEncoder().encode(HouseholdCommand(token: Self.token(token)))
             let value = try await controller.householdResponse(HouseholdInvitationPreview.self, path: "/invitations/preview", method: "POST", body: body, expectedIdentity: identity)
             guard current(ticket, identity) else { return }; invitationPreview = value; reviewedInvitationToken = Self.token(token)
-        } catch { await failed(error, ticket, identity) }
+        } catch { await failed(error, ticket, identity, householdId: nil) }
     }
     func cancelInvitationReview() { invitationPreview = nil; reviewedInvitationToken = nil }
     static func token(_ input: String) -> String {
@@ -173,7 +173,7 @@ final class HouseholdModel: ObservableObject {
             if write.path.contains("/activities"), let query = lastSearchQuery { await find(query) }
         } catch {
             guard current(ticket, identity) else { return }
-            let accessFailure = handleAccessFailure(error)
+            let accessFailure = handleAccessFailure(error, householdId: requestHouseholdId(write.path))
             if availability != .disabled {
                 if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 && status != 429 {
                     try? journal.clear(write, for: identity); pending = nil
@@ -185,7 +185,7 @@ final class HouseholdModel: ObservableObject {
         }
     }
     private func send<Value: Decodable & Sendable>(_ write: PendingFinancialConfirmation, _ identity: SessionSnapshot) async throws -> Value {
-        if write.path.contains("/activities"), let id = write.path.split(separator: "/").first.flatMap({ UUID(uuidString: String($0)) }) {
+        if write.path.contains("/activities"), let id = requestHouseholdId(write.path) {
             let value = try await controller.householdResponse(Household.self, path: path(id), expectedIdentity: identity)
             guard value.membershipId == write.householdMembershipId else { throw SessionFailure.rejected(status: 404, code: "household_access_unavailable") }
         }
@@ -206,6 +206,9 @@ final class HouseholdModel: ObservableObject {
             try journal.begin(write, for: identity); pending = write; await retry()
         } catch { errorKey = "household.storageError" }
     }
+    private func requestHouseholdId(_ path: String) -> UUID? {
+        path.split(separator: "/").first.flatMap { UUID(uuidString: String($0)) }
+    }
     func path(_ id: UUID, _ suffix: String = "") -> String { "/" + id.uuidString + suffix }
     func current(_ ticket: UUID, _ session: SessionSnapshot) -> Bool { ticket == generation && identity?.revision == session.revision && identity?.profile?.id == session.profile?.id }
     func accessEnded() {
@@ -217,11 +220,13 @@ final class HouseholdModel: ObservableObject {
     }
     // Surface availability is server-owned; a disabled route says nothing about membership.
     @discardableResult
-    func handleAccessFailure(_ error: Error) -> Bool {
+    func handleAccessFailure(_ error: Error, householdId: UUID?) -> Bool {
         guard case SessionFailure.rejected(_, let code) = error else { return false }
         switch code {
         case "households_unavailable": suspend(.disabled)
-        case "household_not_found", "not_a_member", "household_closed", "household_access_unavailable": accessEnded()
+        case "household_not_found", "not_a_member", "household_closed", "household_access_unavailable":
+            if let householdId, householdId == selectedId { accessEnded() }
+            else { errorKey = "household.changed" }
         default: return false
         }
         return true
@@ -232,9 +237,9 @@ final class HouseholdModel: ObservableObject {
         errorKey = state == .unavailable ? "household.loadError" : nil
         // Keep actor-partitioned selection and exact pending bytes for explicit recovery.
     }
-    private func failed(_ error: Error, _ ticket: UUID, _ session: SessionSnapshot, discovery: Bool = false) async {
+    private func failed(_ error: Error, _ ticket: UUID, _ session: SessionSnapshot, householdId: UUID?, discovery: Bool = false) async {
         guard current(ticket, session) else { return }
-        if !handleAccessFailure(error) {
+        if !handleAccessFailure(error, householdId: householdId) {
             if discovery { suspend(.unavailable) }
             else { errorKey = "household.loadError" }
         }
