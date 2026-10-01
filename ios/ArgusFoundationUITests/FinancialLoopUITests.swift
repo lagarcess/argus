@@ -189,14 +189,20 @@ final class FinancialLoopUITests: XCTestCase {
 
     func reviewAndConfirm(included: Bool = false) {
         tapVisible(app.buttons["loop.review"])
-        for _ in 0..<4 {
+        // Activity editor: loop.coverage.{yes|no}.<accountId>.<observationId>
+        // Balance/opening editor: loop.coverage.{yes|no}.<kind>.<observationId>
+        let prefix = included ? "loop.coverage.yes." : "loop.coverage.no."
+        for _ in 0..<6 {
             if app.buttons["loop.confirm"].waitForExistence(timeout: 2) { break }
-            let opening = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no.opening.")).firstMatch
-            let prefix = included ? "loop.coverage.yes.balance_check." : "loop.coverage.no."
-            let answer = opening.exists ? opening : app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
-            if answer.exists { tapVisible(answer) }
+            let answer = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
+            if answer.waitForExistence(timeout: 1) {
+                tapVisible(answer)
+            } else if !included {
+                let opening = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "loop.coverage.no.opening.")).firstMatch
+                if opening.waitForExistence(timeout: 1) { tapVisible(opening) }
+            }
         }
-        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 8))
         capture("expense-review")
         tapVisible(app.buttons["loop.confirm"])
     }
