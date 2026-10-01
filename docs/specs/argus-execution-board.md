@@ -42,6 +42,7 @@ evidence and release claims. No second allocation owner or financial ledger.
 | Surface owned by this lane | Existing owner to retain | Bounded change |
 | --- | --- | --- |
 | `src/argus/domain/household/` | Membership, grant incarnations and live authorization | Explicit plan consent and safe authorized projections/adapters |
+| `src/argus/domain/recording/canonical_groups.py`, bounded Money persistence/read changes | Recording owns exact logical groups, revisions and actual legs | Complete current-group resolution before authorized projection; only then a safe canonical cross-owner extension |
 | `src/argus/domain/planning/` | Budgets, recurrence, goal pools, debt intentions and canonical activity claims | Shared responsibilities and authorized participant activity linking without duplicate facts |
 | `src/argus/domain/financial_search.py` | Financial search and origin continuity | Authorized shared plan retrieval; no private funding disclosure |
 | `src/argus/api/routers/household*`, bounded new shared-plan router, router registration | Thin authenticated transport | Additive documented shared Plan routes using canonical services |
@@ -97,7 +98,11 @@ must not expose or erase another person's private financial records. These
 requirements remain implementation and database verification work, not proof
 of delivery. No new simulator, service or database was created while the
 interaction and custody answers remain pending. Bounded read-only scouts and
-contract preparation are complete; no agent has ongoing implementation work.
+contract preparation are complete. The sole writer may now implement the
+independent complete-group read prerequisite in `canonical_groups.py` and
+Household `financial.py`/`projection.py`, with focused boundary tests. This
+step retains current write permissions and cross-owner rejection. Plan rights,
+custody, contributions and dependent UI remain blocked on the two answers.
 
 The checkpoint's temporary groups, splitting and guest proposals do not define
 Household permissions. Guest finance remains registered-only. A narrow proposed
