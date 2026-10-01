@@ -24,15 +24,27 @@ existing owners and deferrals.
 **Recovery branch:** `codex/connected-personal-assets`.
 **Delivery checkout:**
 `/Users/garces/.codex/worktrees/connected-personal-assets/private-alpha-next`.
-**Current state:** the financial/API/database and native implementation are committed.
-The real local API journey passes independent currency/net-worth totals, selected
-older-estimate correction, debt-link updates, Search, owner isolation and unchanged
-cash/budgets/savings/forecast checks. Native package and recovery tests pass; the
-assembled simulator journey is under verification. The first fresh review of
-`158664979513048e64abe30a4f3972518e078c28` and its affected delta through
-`173c62200a88870f0300a5ae06528ac0fe4f8278` found no confirmed defects. This is
-component/API progress, not accepted phone delivery or a merge-ready claim.
-No unresolved financial product choice blocks the assigned journey.
+**Current state:** the complete assigned journey is locally verified in the native
+simulator against real Auth/API/Postgres and published in [PR #759](https://github.com/lagarcess/argus/pull/759).
+Two assembled native cases pass, including partial ownership, linked original
+debt, old-estimate correction, archive/restore, Search return, English/Spanish,
+reopening and recovery of a lost accepted create response with exactly one asset.
+The financial/API/OpenAPI/Postgres and recovery gate passes 394 checks; native
+package tests have 64 passes and four inherited opt-in live-auth skips.
+The fresh independent reviewer is clean through
+`0aabfb1605336d695fa59b636061e53995b65282`. The confirmed GitHub type-history
+finding is fixed at the shared guard and verified in memory and Postgres.
+The [durable evidence and restart guide](../reports/evidence/connected-personal-assets/README.md)
+record exact source/review SHAs, ten screenshots and the 60-second recording.
+Original and freshly fetched integration remain `9d6ed94491be9d904da881901a6d7a2dc8cf635b`;
+no reconciliation or intervening semantic overlap exists. Evidence is retained
+across the last test-selector and documentation/evidence deltas; the PR terminal
+audit records final-head revalidation, applicable CI, scoped follow-up review and
+unresolved-thread count after they finish. Stop at merge-ready; no merge is authorized.
+The direct API59300 demo remains runnable; the disposable response-loss helper is
+stopped. Other demonstrations, Cuadrao and the physical-phone environment remain
+preserved. This closes local personal-asset delivery, not physical-phone internet
+acceptance or the full MVEE. No financial product choice remains unresolved.
 
 ### Locked behavior and contract gates
 
@@ -130,12 +142,12 @@ The poteto Feature checklist records the delivery sequence.
 - [x] `architect` for parallel design exploration.
 - [x] Write the throughput checkpoint as four todo items.
 - [x] Delegate code-writing to a subagent using the configured feature model.
-- [ ] Verify on the matching surface.
+- [x] Verify on the matching surface.
 - [ ] Rebase into small, ordered commits. Stack follow-ups.
   Skip rebasing after evidence/publication under the repository one-way rules.
 - [ ] If the design is contested, `interrogate` before shipping.
   Skip unless the bounded design comparison identifies an unresolved conflict.
-- [ ] Run Opening a PR.
+- [x] Run Opening a PR.
 
 Reuse retained financial simulator `1A90F684-345F-465C-AA50-6A5298F34156` and a
 suitable lane-owned build cache. Preserve the installed debt demo, synthetic
@@ -1994,7 +2006,7 @@ sequence rather than a separate deferral policy in this document.
 | --- | --- | --- | --- | --- | --- |
 | [Access][mvee-access], D01 | Argus auth/recovery; Swift session/Keychain | Finish native/hosted auth adapter and guest conversion | Native continuity + Device/release | Identity API; signing/hosted access for phone proof | Physical-device auth recordings and session/identity test results |
 | [iPhone experience][mvee-platforms], D15 | Native shell; localization; design archive | Replace sample destinations with connected modules | Native continuity | Domain reads per destination | Device navigation/accessibility recordings against [native quality][mvee-quality] |
-| [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 native account/opening lifecycle and real local API | Extend saved assets and ownership/space behavior; verify existing lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
+| [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 account/opening lifecycle; PR #759 locally verifies personal assets, estimates, ownership shares, existing-debt links and net worth | Deliver existing space/shared ownership scope through its assigned owner; verify the assembled account/asset lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
