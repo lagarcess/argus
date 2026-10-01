@@ -103,6 +103,13 @@ for target in targets:
             "ARGUS_TEST_PASSWORD": cfg["users"][args.user_index]["password"],
         }
     )
+    if len(cfg["users"]) == 3:
+        target["EnvironmentVariables"].update(
+            {
+                "ARGUS_TEST_EMAIL_C": cfg["users"][2]["email"],
+                "ARGUS_TEST_PASSWORD_C": cfg["users"][2]["password"],
+            }
+        )
     if args.search_query is not None:
         target["EnvironmentVariables"]["ARGUS_TEST_SEARCH_QUERY"] = args.search_query
     if args.goal_supported is not None:

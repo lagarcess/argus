@@ -1,8 +1,11 @@
 """Isolation guards for independently runnable native demonstrations."""
 
+import io
 import json
+import stat
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import local_stack
 import pytest
@@ -224,3 +227,51 @@ def test_api_root_dotenv_refusal_remains_in_force(api_launch, tmp_path):
             households_enabled=True,
         )
     assert not launched
+
+
+@pytest.mark.parametrize("user_count", [2, 3])
+def test_seed_preserves_explicit_identities_and_refuses_replacement(
+    allocation, monkeypatch, user_count
+):
+    monkeypatch.setattr(
+        local_stack,
+        "status",
+        lambda: {
+            "API_URL": allocation.url(1),
+            "ANON_KEY": "synthetic-anon",
+            "SERVICE_ROLE_KEY": "synthetic-service",
+        },
+    )
+    (local_stack.ROOT / "ios/Config").mkdir(parents=True)
+    requested = []
+    identities = [str(uuid4()) for _ in range(user_count)]
+
+    def create(request):
+        assert request.full_url == allocation.url(1) + "/auth/v1/admin/users"
+        body = json.loads(request.data)
+        assert body["email_confirm"] is True
+        assert body["email"].endswith("@example.test")
+        requested.append(body)
+        return io.BytesIO(json.dumps({"id": identities[len(requested) - 1]}).encode())
+
+    monkeypatch.setattr(local_stack.urllib.request, "urlopen", create)
+    local_stack.seed(user_count=user_count)
+    path = allocation.work / "client.json"
+    fixture = json.loads(path.read_text())
+    assert [user["id"] for user in fixture["users"]] == identities
+    assert [user["email"] for user in fixture["users"]] == [
+        request["email"] for request in requested
+    ]
+    assert len({user["password"] for user in fixture["users"]}) == user_count
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    with pytest.raises(SystemExit, match="already exists"):
+        local_stack.seed(user_count=user_count)
+    assert len(requested) == user_count
+
+
+def test_seed_rejects_unsupported_count_before_contacting_auth(monkeypatch):
+    monkeypatch.setattr(
+        local_stack, "status", lambda: pytest.fail("Must not contact Auth")
+    )
+    with pytest.raises(ValueError):
+        local_stack.seed(user_count=4)
