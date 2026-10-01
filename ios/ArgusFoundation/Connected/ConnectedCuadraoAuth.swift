@@ -308,6 +308,8 @@ struct ConnectedEmailSignIn: View {
                 .textInputAutocapitalization(.never).autocorrectionDisabled()
                 .focused($focus, equals: .email).submitLabel(.next)
                 .onSubmit { focus = visible ? .visiblePassword : .password }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
                 .modifier(RegistrationField(focused: focus == .email, invalid: invalidEmail))
                 .disabled(surface == .loading)
                 .accessibilityLabel(Text("auth.email"))
@@ -335,6 +337,8 @@ struct ConnectedEmailSignIn: View {
                 .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.go)
                 .onSubmit { if ready { focus = nil; beginChallenge() } }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
                 .accessibilityLabel(Text("auth.password"))
                 .accessibilityIdentifier("auth.password")
                 Button {
@@ -353,7 +357,7 @@ struct ConnectedEmailSignIn: View {
                 recover()
             }
             .font(.subheadline.weight(.medium)).foregroundStyle(WelcomePalette.pine)
-            .frame(minHeight: 44).disabled(surface == .loading)
+            .frame(minHeight: 44).contentShape(Rectangle()).disabled(surface == .loading)
             .accessibilityLabel(Text("auth.forgotPassword"))
             .accessibilityIdentifier("auth.forgotPassword")
         }
@@ -504,6 +508,8 @@ struct ConnectedEmailRegistration: View {
                 .focused($focus, equals: .email)
                 .submitLabel(.next)
                 .onSubmit { focus = passwordVisible ? .visiblePassword : .password }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
                 .modifier(RegistrationField(focused: focus == .email, invalid: emailError))
                 .disabled(surface == .loading)
                 .accessibilityLabel(Text("auth.email"))
@@ -534,6 +540,8 @@ struct ConnectedEmailRegistration: View {
                 .autocorrectionDisabled()
                 .submitLabel(.done)
                 .onSubmit { focus = nil }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
                 .accessibilityLabel(Text("auth.password"))
                 .accessibilityIdentifier("auth.password")
                 Button {

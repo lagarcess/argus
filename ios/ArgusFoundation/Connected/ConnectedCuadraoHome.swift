@@ -402,7 +402,16 @@ private struct ConnectedArchivedAccounts: View {
                     }
                     ForEach(archived) { account in
                         VStack(alignment: .leading, spacing: 0) {
-                            ConnectedAccountRow(account: account, spanish: spanish)
+                            Button {
+                                Task {
+                                    await accounts.open(account)
+                                    dismiss()
+                                }
+                            } label: {
+                                ConnectedAccountRow(account: account, spanish: spanish)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("accounts.row.\(account.id)")
                             CanvasActionRow(title: spanish ? "Restaurar" : "Restore", symbol: "arrow.uturn.backward") {
                                 Task { await accounts.archive(account) }
                             }.foregroundStyle(WelcomePalette.pine)

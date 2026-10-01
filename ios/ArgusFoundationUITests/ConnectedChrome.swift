@@ -13,6 +13,18 @@ extension XCUIApplication {
 
     /// Accounts live on Home in Connected; tip keeps a dedicated Accounts tab.
     func openAccountsList() {
+        // Connected hides the tab bar on account detail; pop before looking for tabs.
+        for _ in 0..<4 {
+            if buttons["accounts.manage.back"].waitForExistence(timeout: 1) {
+                buttons["accounts.manage.back"].tap()
+                continue
+            }
+            if buttons["accounts.back"].waitForExistence(timeout: 1) {
+                buttons["accounts.back"].tap()
+                continue
+            }
+            break
+        }
         if buttons["tab.accounts"].waitForExistence(timeout: 2) {
             buttons["tab.accounts"].tap()
         } else {
