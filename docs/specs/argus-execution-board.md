@@ -72,6 +72,20 @@ Root/session/model/API/migration overlap is reserved above; recheck before READY
 
 ### Decisions and verification disposition
 
+Pre-change deterministic baseline: **81 passed, 74 skipped, zero failures**
+(15.47s), recorded in [baseline.json](../reports/evidence/shared-household-planning/baseline.json).
+Skipped cases require the not-yet-assigned disposable Postgres DSN; they establish
+no database acceptance. Existing Household Plan is still explicitly unavailable.
+No new demo or shared-planning behavior is claimed at this checkpoint.
+
+Two code-grounded shapes were inspected: consent/responsibility references around
+canonical definitions, versus explicit Household scope embedded in definitions.
+Prefer the additive reference shape if it closes canonical global claims and
+private allocation without a second store of money. The sole implementation
+writer is `shared_plan_implementation`; its first bounded output is the technical
+contract. No dependent permission or contribution UI begins before the two
+narrow founder decisions are answered.
+
 The checkpoint's temporary groups, splitting and guest proposals do not define
 Household permissions. Guest finance remains registered-only. A narrow proposed
 People & permissions / private-contribution review interaction is pending the
