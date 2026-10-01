@@ -90,3 +90,34 @@ def test_wrong_environment_or_missing_third_identity_refused(
     path.chmod(0o600)
     with pytest.raises(journey.Refused):
         journey.load_client()
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/financial-plan/goals",
+        "/api/v1/households",
+        "/api/v1/households/owned/plan",
+    ],
+)
+def test_household_read_fault_is_scoped_one_shot_and_never_consumed_by_write(path):
+    spec = importlib.util.spec_from_file_location(
+        "financial_fault",
+        Path(__file__).parents[2] / "scripts/qa/financial_response_fault.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    fault = module.Fault()
+    fault.arm_read(path, 503)
+    assert fault.consume_read("GET", "/api/v1/auth/session") is None
+    assert fault.consume_read("POST", path) is None
+    assert fault.consume_read("GET", path) == (503, 0)
+    assert fault.consume_read("GET", path) is None
+    assert fault.read_consumed == 1
+    for unrelated in (
+        "/api/v1/auth",
+        "https://hosted.invalid",
+        "/api/v1/household-invitations",
+    ):
+        with pytest.raises(ValueError):
+            fault.arm_read(unrelated, 503)
