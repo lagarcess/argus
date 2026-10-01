@@ -6,7 +6,7 @@ Order that keeps evidence and the cursor truthful:
 2. Take the connection lease; a second webhook or a retried delivery for the
    same Item finds it held and returns ``busy``.
 3. Page with ``has_more`` from the cursor the sync started with, renewing the
-   lease before every page. A lease lost meanwhile (a webhook recorded
+   lease (held-only ``renew``) before every page. A lease lost meanwhile (a webhook recorded
    ``needs_reauth``, which releases it) stops the sync as ``superseded``. On
    ``TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION`` restart the whole loop from
    that same starting cursor, as Plaid requires (bounded attempts).
@@ -226,17 +226,13 @@ class PlaidSync:
     def _renew(self, current: SourceConnection, holder: str) -> None:
         """Extend the lease only while this sync still holds it.
 
-        The repository's ``lease`` would re-acquire a released lease, so the
-        holder is checked first: a release by ``record_failure`` (a webhook
-        said the Item needs re-authorization) ends this sync.
+        ``renew`` is one compare-and-set: it never re-takes a lease that
+        ``record_failure`` released (a webhook said the Item needs
+        re-authorization) or another sync acquired, so ``False`` ends this
+        sync before it fetches or records anything else.
         """
 
-        repo = self.hub.connections
-        try:
-            row = repo.get(user_id=current.user_id, connection_id=current.id)
-        except ConnectionNotFound:
-            raise _LeaseLost() from None
-        if row.lease_holder != holder or not repo.lease(
+        if not self.hub.connections.renew(
             connection_id=current.id, holder=holder, now=self.hub.clock(), ttl=LEASE_TTL
         ):
             raise _LeaseLost()

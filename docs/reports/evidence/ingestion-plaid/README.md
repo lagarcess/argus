@@ -35,7 +35,7 @@ adapter, connector), routes in
 | `PENDING_EXPIRATION`/`PENDING_DISCONNECT` flag `attention_code` on an `active` connection; a successful sync keeps it; update mode (`set_secret` with the existing envelope) clears it | Mocked provider; real Postgres | `test_expiring_consent_flags_attention_that_syncs_keep_and_update_mode_clears`, `test_exchange_sync_and_resync_on_postgres` |
 | Mutation during pagination restarts from the starting cursor | Mocked provider; also observed live once | tests below; a first lifecycle run at 19:30Z recorded `initial_sync.restarts=1` while Plaid was still writing the historical pull (that run's JSON was superseded by the committed run) |
 | Lease and cursor CAS under concurrency | Mocked provider on real Postgres | `tests/test_ingestion_plaid_postgres.py` |
-| A webhook's `needs_reauth` during a running sync wins (the contract's `record_failure` releases the lease; the sync renews its lease per page only while it still holds it and ends `superseded`) | Mocked provider; real Postgres | `test_plaid_sync_safety.py`, `test_webhook_needs_reauth_mid_sync_wins_on_postgres` |
+| A webhook's `needs_reauth` during a running sync wins (the contract's `record_failure` releases the lease; the sync renews its lease per page with the contract's held-only `renew`, one compare-and-set, and ends `superseded` when it returns false, so a failure recorded just before a renewal cannot be undone) | Mocked provider; real Postgres | `test_plaid_sync_safety.py`, `test_webhook_needs_reauth_mid_sync_wins_on_postgres`, `test_failure_between_pages_cannot_be_undone_by_renewal(_on_postgres)` |
 | Only complete updates are handed over; the page cap (200) or time bound (8 minutes) records `plaid_sync_incomplete` with the cursor unchanged | Mocked provider | `test_plaid_sync_safety.py` |
 | Malformed accounts or rows are dropped and counted, never failing a sync; sink-`ignored` candidates keep the cursor | Mocked provider | `test_plaid_sync_safety.py` |
 | Any failure after exchange removes the new Item, except when a live connection (this person's or, via the global index, someone else's) holds it | Mocked provider; real Postgres for the cross-person race | `test_plaid_exchange_revoke.py`, `test_an_item_held_by_another_person_is_refused_and_kept` |
@@ -53,13 +53,13 @@ environment, so live webhook delivery was not exercised.
 ```bash
 # Hermetic (no network)
 python -m pytest tests/ingestion/test_plaid_*.py -q --no-cov
-# 99 passed (api 8, link 15, mapping 16, sync 10, sync safety 7,
+# 100 passed (api 8, link 15, mapping 16, sync 10, sync safety 8,
 #   verification 14, verification limits 8, exchange/revoke 9, webhook api 12)
 
 # Real Postgres (wave-0 migration)
 ARGUS_DISPOSABLE_DATABASE_URL=postgresql://postgres@127.0.0.1:56811/argus_plaid \
   python -m pytest tests/test_ingestion_plaid_postgres.py -q --no-cov
-# 4 passed
+# 5 passed
 
 # Live Sandbox lifecycle: 21 Plaid calls
 PLAID_ENV=sandbox PLAID_CREDENTIALS_INJECTED=true \
@@ -118,13 +118,6 @@ for foreign (non-Dominican) accounts only, as the lane spec says.
   environment (plaid.com is blocked by the egress proxy), so they follow the
   API spec (`expired_at`) rather than a quoted cache duration. The key-fetch
   budget is per process; several API instances each have their own.
-- Lease renewal reads the holder and then extends the lease in two calls,
-  because the repository has no "renew only if held" operation. A
-  `record_failure` landing exactly between those two calls would let the
-  renewal re-acquire the lease and a later `record_success` return the
-  connection to `active`. The window is two consecutive statements per page;
-  closing it needs a contract-owned `renew(holder)` compare-and-set
-  (proposed to the contract owner).
 - If the database fails after an exchange before the Item's existing
   connection can be found (a retried exchange of an Item already stored), the
   Item is removed at Plaid; the stored connection then reports

@@ -91,17 +91,70 @@ def test_lease_is_renewed_for_every_page():
     )
     connector, row = connected(fake)
     repo = connector.hub.connections
+    acquired: list[str] = []
     renewals: list[str] = []
-    original = repo.lease
+    original_lease, original_renew = repo.lease, repo.renew
 
     def counting_lease(**kwargs):  # noqa: ANN003
+        acquired.append(kwargs["holder"])
+        return original_lease(**kwargs)
+
+    def counting_renew(**kwargs):  # noqa: ANN003
         renewals.append(kwargs["holder"])
+        return original_renew(**kwargs)
+
+    repo.lease, repo.renew = counting_lease, counting_renew
+    assert connector.sync(row).status == "synced"
+    # One acquisition, then one held-only renewal per page, same holder.
+    assert len(acquired) == 1 and len(renewals) == 2
+    assert set(renewals) == set(acquired)
+
+
+def failure_just_before_renewal(connector: PlaidConnector, row):  # noqa: ANN001
+    """Record ``needs_reauth`` immediately before the second page's renewal:
+    the narrowest window a read-then-lease renewal could not see."""
+
+    repo = connector.hub.connections
+    original = repo.renew
+    calls = []
+
+    def renew(**kwargs):  # noqa: ANN003
+        calls.append(kwargs)
+        if len(calls) == 2:
+            repo.record_failure(
+                connection_id=row.id,
+                code="plaid_item_login_required",
+                status="needs_reauth",
+                now=connector.hub.clock(),
+            )
         return original(**kwargs)
 
-    repo.lease = counting_lease
-    assert connector.sync(row).status == "synced"
-    # One acquisition plus one renewal per page, all by the same holder.
-    assert len(renewals) == 3 and len(set(renewals)) == 1
+    repo.renew = renew
+    return calls
+
+
+def test_failure_between_pages_cannot_be_undone_by_renewal():
+    fake = FakePlaid(
+        sync={
+            None: [page(added=[txn("t1", 1)], next_cursor="c1", has_more=True)],
+            "c1": [page(added=[txn("t2", 2)], next_cursor="c2")],
+        }
+    )
+    sink = RecordingSink()
+    connector, row = connected(fake, sink)
+    calls = failure_just_before_renewal(connector, row)
+    outcome = connector.sync(row)
+    assert len(calls) == 2 and outcome.status == "superseded"
+    after = stored(connector, row)
+    assert (after.status, after.cursor, after.lease_holder) == (
+        "needs_reauth",
+        None,
+        None,
+    )
+    assert sink.batches == []
+    assert [b.get("cursor") for p, b, _ in fake.calls if p == "/transactions/sync"] == [
+        None
+    ]
 
 
 def test_page_cap_records_incomplete_and_keeps_the_cursor():

@@ -24,7 +24,11 @@ from tests.ingestion.plaid_fakes import (
     page,
     txn,
 )
-from tests.ingestion.test_plaid_sync_safety import HookedFake, webhook_login_required
+from tests.ingestion.test_plaid_sync_safety import (
+    HookedFake,
+    failure_just_before_renewal,
+    webhook_login_required,
+)
 
 users = shared.users
 pytestmark = pytest.mark.skipif(
@@ -171,3 +175,26 @@ def test_an_item_held_by_another_person_is_refused_and_kept(repo, users):  # noq
     with pytest.raises(PlaidItemOwnedElsewhere):
         connector.link.exchange(user_id=users["owner"], public_token=PUBLIC_TOKEN)
     assert fake.paths().count("/item/remove") == 0
+
+
+def test_failure_between_pages_cannot_be_undone_by_renewal_on_postgres(repo, users):  # noqa: ANN001
+    owner = users["owner"]
+    fake = FakePlaid(
+        sync={
+            None: [page(added=[txn("t1", 1)], next_cursor="c1", has_more=True)],
+            "c1": [page(added=[txn("t2", 2)], next_cursor="c2")],
+        }
+    )
+    sink = RecordingSink()
+    connector = make_connector(fake, sink=sink, repo=repo)
+    row = connector.link.exchange(user_id=owner, public_token=PUBLIC_TOKEN).connection
+    calls = failure_just_before_renewal(connector, row)
+    outcome = connector.sync(row)
+    assert len(calls) == 2 and outcome.status == "superseded"
+    after = repo.get(user_id=owner, connection_id=row.id)
+    assert (after.status, after.cursor, after.lease_holder) == (
+        "needs_reauth",
+        None,
+        None,
+    )
+    assert sink.batches == []
