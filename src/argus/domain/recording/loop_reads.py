@@ -56,7 +56,7 @@ def check_response(stored: StoredAccount, check: CheckRecord) -> dict[str, Any]:
     gaps = residuals(stored.opening, stored.checks, stored.expenses, stored.coverage)
     return {
         "record_id": check.id,
-        "revision": 1,
+        "revision": check.revision,
         "kind": check.kind,
         "as_of": check.as_of,
         "time_zone": check.time_zone,
@@ -78,7 +78,11 @@ def operation_response(result: OperationResult) -> dict[str, Any]:
         body["activity"] = activity_response(result.stored, record, result.revision)
     elif result.kind == "balance_check":
         check = next(c for c in result.stored.checks if c.id == result.record_id)
-        body["check"] = check_response(result.stored, check)
+        accepted = next(
+            (c for c in (*check.prior_revisions, check) if c.revision == result.revision),
+            check,
+        )
+        body["check"] = check_response(result.stored, accepted)
     return body
 
 

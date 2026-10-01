@@ -16,8 +16,10 @@ public struct FinancialAccount: Codable, Equatable, Sendable, Identifiable {
     public let updatedAt: String
     public let balance: FinancialBalance
     public let opening: FinancialOpening?
+    public let asset: FinancialAsset?
+    public var isOptionalAsset: Bool { ["property", "vehicle", "other_asset"].contains(type) }
     enum CodingKeys: String, CodingKey {
-        case id, type, nature, currency, nickname, archived, version, balance, opening
+        case id, type, nature, currency, nickname, archived, version, balance, opening, asset
         case currencyFractionDigits = "currency_fraction_digits", ownershipShareBps = "ownership_share_bps"
         case createdAt = "created_at", updatedAt = "updated_at"
     }

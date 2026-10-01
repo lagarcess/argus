@@ -15,6 +15,7 @@ from argus.api.financial_accounts import (
     require_financial_accounts_context,
 )
 from argus.api.routers.financial_activities import router as money_router
+from argus.api.routers.financial_assets import router as asset_router
 from argus.api.routers.financial_debts import router as debt_router
 from argus.api.routers.financial_loop import router as loop_router
 from argus.api.routers.financial_plan import router as plan_router
@@ -147,6 +148,7 @@ def _required_idempotency_key(request: Request, raw: str | None) -> str:
 
 
 router.include_router(loop_router)
+router.include_router(asset_router)
 
 router.include_router(money_router)
 

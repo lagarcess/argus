@@ -41,7 +41,9 @@ def apply(stored: StoredAccount, mutation: Mutation, now: datetime) -> StoredAcc
             record,
         )
     elif isinstance(record, CheckRecord):
-        changes["checks"] = (*stored.checks, record)
+        changes["checks"] = tuple(c for c in stored.checks if c.id != record.id) + (
+            record,
+        )
     else:
         changes["opening"] = record
     return replace(stored, **changes)

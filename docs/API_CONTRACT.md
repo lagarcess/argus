@@ -7269,3 +7269,56 @@ Payment record/preview takes `expected_version`, canonical `activity`, optional 
 Money activities add `debt_payment` and `payment_reversal`. A loan payment requires explicit decimal `amount`, `principal`, `interest`, `fees`, two same-currency accounts and ordinary preview/confirm coverage. Total must equal the nonnegative split. Funding loses total; other debt gains principal. The existing `interest_fees` category is the default cost scope; an existing explicit category override is retained. Card payment remains an equal-leg movement with no spending. A real return is a NEW dated `payment_reversal` referencing `reversal_of_activity_id` and original accounts. Loan return components are explicit; card returns use amount only. Cumulative returns are capped component by component against the current original. Original and return corrections enforce current linked caps and dates. Returns restore cash, increase debt and reverse costs in their own period. They never erase or zero the historical payment.
 
 Canonical activity responses add `principal_minor`, `interest_minor`, `fees_minor`, `reversal_of_activity_id`, `reversal_of_revision`. Spending contributors also expose `counted_spending_minor`, the contextual amount counted by the shared Recording spending owner. Payment total remains visible independently. Registered financial Search adds a typed `debt` hit carrying canonical debt progress and the existing owner-scoped snapshot/cursor rules.
+
+## Connected personal assets and net worth
+
+Property, vehicle and other-asset accounts retain their account identity and
+whole-value observations. `FinancialAccountResponse.asset` is null for other
+types. For optional assets it contains `personal_position_minor`, a nullable
+`current_estimate` and `estimates` in original observation order. Each estimate
+has `record_id`, `revision`, `kind` (`opening` or `value_update`), whole
+`amount_minor`, `amount`, `as_of`, `time_zone`, optional `estimate_basis`,
+`reason`, `recorded_by`, `recorded_at`, and its immutable `revisions`.
+The current estimate names exactly the canonical position's selected revision.
+Unknown has no current estimate and null personal position. Zero is known.
+The server applies the account's ownership share once using existing rounding.
+
+`POST /financial-accounts/{id}/asset-estimates/preview` reviews a new estimate
+or correction. `POST /financial-accounts/{id}/asset-estimates` confirms the same
+body with `Idempotency-Key` and the returned `preview_token`. Both require `expected_version`, `amount`, `as_of`,
+`time_zone`, optional `estimate_basis` (200 characters), and optional `reason`.
+To correct, also provide `record_id` and `expected_revision`; both are required
+together, and a correction requires a reason. Without them a new value-update
+observation is appended. Corrections append a revision to the selected opening
+or value-update identity and retain original observation order. The response
+contains the canonical `account`; confirmation also returns `record_id`,
+`revision` and `replayed`. These commands create no income, expense or transfer.
+
+`PUT /financial-accounts/{id}/asset-details` requires `Idempotency-Key`,
+`expected_version`, `ownership_share_bps` (1 through 10,000), and
+`related_debt_account_id` (existing owned liability ID or null). It atomically
+updates the account share, its one optional debt link, accepted change history
+and receipt. The response contains `account`, accepted `change_version` and
+`replayed`. `asset.related_debt_account_id` is the canonical original account
+ID; clients fetch/open that detail. `asset.changes` lists accepted versions,
+old/new share and old/new debt ID, author and recording time. Share changes to
+optional assets use this endpoint; generic PATCH rejects an actual share change
+for these types. Generic nickname/archive edits remain supported. Type changes
+cannot invalidate an asset/debt link or discard recorded estimate or accepted
+asset-details provenance (`422 type_locked`), even if the estimate is unknown
+and the debt link is null. These non-money details do not prevent recording the
+first estimate later.
+
+Each write replays its accepted operation before comparing the current version.
+A reused key with different content conflicts. An accepted retry returns the
+original accepted record/revision or change version plus the current account.
+A stale fresh write changes nothing. Observation writes use the existing
+financial-operation receipt. Details use their accepted change as the receipt,
+without a fake financial record. Initial create keeps its existing body and
+receipt, and the native owner-scoped write journal retains pending creates
+across relaunch. Initial estimate basis is unspecified until explicitly recorded.
+
+Linking never changes money, currency, debt plans or access. Multiple assets
+may independently reference the same debt; Home still counts that debt account
+once. Currency totals stay separate. Archive preserves position and history.
+Unknown assets and debts may link. Omission never withdraws a known estimate.

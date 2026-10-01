@@ -171,6 +171,7 @@ struct AccountRow: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")).font(ArgusStyle.body(15))
                 Text(LocalizedStringKey("accounts.type." + account.type)).font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                if account.isOptionalAsset { Text("assets.whole").font(ArgusStyle.body(11, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary) }
             }
             Spacer(minLength: 8)
             Group {

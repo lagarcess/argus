@@ -13,6 +13,7 @@ final class AccountsModel: ObservableObject {
     @Published private(set) var latest: FinancialAccount?
     @Published private(set) var needsReview = false
     @Published private(set) var identity: SessionSnapshot?
+    var confirmCreate: ((CreateFinancialAccountRequest) async throws -> FinancialAccount)?
     var financialChanged: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
     private let controller: SessionController
@@ -80,13 +81,14 @@ final class AccountsModel: ObservableObject {
                         nickname: draft.nickname, amount: amount,
                         asOf: draft.amount.isEmpty ? nil : draft.asOf, timeZone: draft.timeZone, ownershipShareBps: share)
                 }
-                saved = try await self.controller.createFinancialAccount(self.pendingCreate!, expectedIdentity: identity)
+                guard let confirm = self.confirmCreate else { throw FinancialWriteJournalError.storageUnavailable }
+                saved = try await confirm(self.pendingCreate!)
             case .metadata:
                 guard let base = draft.base else { return }
                 saved = try await self.controller.updateFinancialAccount(id: base.id,
                     request: EditFinancialAccountRequest(expectedVersion: base.version, nickname: draft.nickname,
                         type: draft.type == base.type ? nil : draft.type,
-                        currency: draft.currency == base.currency ? nil : draft.currency, ownershipShareBps: share == base.ownershipShareBps ? nil : share), expectedIdentity: identity)
+                        currency: draft.currency == base.currency ? nil : draft.currency, ownershipShareBps: base.isOptionalAsset || share == base.ownershipShareBps ? nil : share), expectedIdentity: identity)
             case .opening:
                 guard let base = draft.base else { return }
                 guard let request = self.pendingOpening else {

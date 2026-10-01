@@ -107,10 +107,14 @@ struct AccountDetailView: View {
     @ObservedObject var loop: FinancialLoopModel
     @Environment(\.locale) private var locale
     var body: some View {
+        if account.isOptionalAsset { AssetDetailView(account: account, model: model, loop: loop) }
+        else {
         AccountSummary(account: account, large: true)
         AccountActivityView(loop: loop, account: account)
+        }
         Button("accounts.edit") { model.edit(account) }.buttonStyle(PillButtonStyle(primary: false))
             .accessibilityIdentifier("accounts.edit")
+        if !account.isOptionalAsset {
         Button(account.opening == nil ? "accounts.opening.add" : "accounts.opening.correct") { model.opening(account) }
             .buttonStyle(PillButtonStyle()).accessibilityIdentifier("accounts.opening")
         if let opening = account.opening {
@@ -125,6 +129,7 @@ struct AccountDetailView: View {
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
                     .accessibilityElement(children: .combine)
             }
+        }
         }
         Button(account.archived ? "accounts.restore" : "accounts.archive") { Task { await model.archive(account) } }
             .buttonStyle(PillButtonStyle(primary: false)).disabled(model.busy).accessibilityIdentifier("accounts.archive")

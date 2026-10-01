@@ -74,6 +74,9 @@ class CheckRecord:
     kind: Literal["balance_check", "value_update"] = "balance_check"
     revision: int = 1
     note: str | None = None
+    estimate_basis: str | None = None
+    reason: str | None = None
+    prior_revisions: tuple[CheckRecord, ...] = ()
 
 
 @dataclass(frozen=True)

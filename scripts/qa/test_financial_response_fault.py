@@ -32,6 +32,12 @@ def running(handler_type):
         ("POST", "/api/v1/financial-plan/occurrences/example/link/preview", 200),
         ("PUT", "/api/v1/financial-plan/selection", 409),
         ("GET", "/api/v1/financial-plan/expectations", 200),
+        ("POST", "/api/v1/financial-accounts/example/asset-estimates/preview", 200),
+        ("POST", "/api/v1/financial-accounts", 409),
+        ("PUT", "/api/v1/financial-accounts/example/asset-details", 404),
+        ("POST", "/api/v1/financial-accounts/example/asset-estimates", 503),
+        ("GET", "/api/v1/financial-accounts/example", 200),
+        ("POST", "/api/v1/financial-accounts-unrelated", 201),
     ],
 )
 def test_fault_ignores_reads_previews_and_failed_writes(method, path, status):
@@ -45,6 +51,10 @@ def test_fault_ignores_reads_previews_and_failed_writes(method, path, status):
     "method,path",
     [
         ("POST", "/api/v1/financial-activities"),
+        ("POST", "/api/v1/financial-accounts"),
+        ("PATCH", "/api/v1/financial-accounts/example"),
+        ("POST", "/api/v1/financial-accounts/example/asset-estimates"),
+        ("PUT", "/api/v1/financial-accounts/example/asset-details"),
         ("POST", "/api/v1/financial-plan/expectations"),
         ("PATCH", "/api/v1/financial-plan/expectations/example"),
         ("PUT", "/api/v1/financial-plan/selection"),

@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** connected personal debt-payment plans landed through PR #757 at `63b73ea80df9af2a61aa99f83afb9595408d0370`, preserving the locally verified native journey and approved principal-based loan rule. The founder authorized this merge and its bounded documentation landing only. Savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) remain landed with their demonstrations preserved. No deployment, hosted configuration change or next slice is authorized. Physical-iPhone testing belongs to its separate owner.
+**Execution state:** connected personal assets and net worth are authorized for implementation, local verification and publication through a merge-ready PR. Debt plans (#757/#758), savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) remain landed. Preserve their demonstrations and the separate phone-testing and Cuadrao environments. No merge, deployment, hosted configuration change, paid provider or next slice is authorized.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,171 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected personal assets and net worth lane
+
+**Founder assignment, September 30, 2026.** Add a property, vehicle or other
+asset, record its estimated whole value and personal ownership share, optionally
+link an existing debt, inspect Accounts/Home, correct the estimate, archive and
+restore, find it through Search and reopen with preserved state. This is the
+only active delivery lane. The full MVEE coverage below remains assigned to its
+existing owners and deferrals.
+
+**Original and freshly fetched integration:**
+`9d6ed94491be9d904da881901a6d7a2dc8cf635b`, including #757/#758.
+**Recovery branch:** `codex/connected-personal-assets`.
+**Delivery checkout:**
+`/Users/garces/.codex/worktrees/connected-personal-assets/private-alpha-next`.
+**Current state:** the complete assigned journey is locally verified in the native
+simulator against real Auth/API/Postgres and published in [PR #759](https://github.com/lagarcess/argus/pull/759).
+Two assembled native cases pass, including partial ownership, linked original
+debt, old-estimate correction, archive/restore, Search return, English/Spanish,
+reopening and recovery of a lost accepted create response with exactly one asset.
+The financial/API/OpenAPI/Postgres and recovery gate passes 394 checks; native
+package tests have 64 passes and four inherited opt-in live-auth skips.
+The fresh independent reviewer is clean through
+`0aabfb1605336d695fa59b636061e53995b65282`. The confirmed GitHub type-history
+finding is fixed at the shared guard and verified in memory and Postgres.
+The [durable evidence and restart guide](../reports/evidence/connected-personal-assets/README.md)
+record exact source/review SHAs, ten screenshots and the 60-second recording.
+Original and freshly fetched integration remain `9d6ed94491be9d904da881901a6d7a2dc8cf635b`;
+no reconciliation or intervening semantic overlap exists. Evidence is retained
+across the last test-selector and documentation/evidence deltas; the PR terminal
+audit records final-head revalidation, applicable CI, scoped follow-up review and
+unresolved-thread count after they finish. Stop at merge-ready; no merge is authorized.
+The direct API59300 demo remains runnable; the disposable response-loss helper is
+stopped. Other demonstrations, Cuadrao and the physical-phone environment remain
+preserved. This closes local personal-asset delivery, not physical-phone internet
+acceptance or the full MVEE. No financial product choice remains unresolved.
+
+### Locked behavior and contract gates
+
+The [MVEE optional-asset rules][mvee-accounts] own financial meaning. Store the
+whole estimate and explicit ownership share, applying the existing personal-share
+rounding once. Unknown and zero remain distinct. Display estimate date and basis.
+Estimates affect recorded net worth, never cash, income, spending, savings backing
+or expected cash movements. A debt link organizes two existing records and grants
+no permissions. The existing debt balance and its ownership rules remain canonical;
+linking never adds a liability or subtracts it again. Unknown asset value never
+prevents recording or linking a loan. Each currency remains separate.
+
+Reuse Accounts identity/types, Recording records/revisions, existing debt plans,
+Home position projection, native controls, write recovery and account Search.
+Extend the relevant API and data contracts alongside implementation. Do not
+introduce another ledger, valuation service or editable derived total. Preserve
+history, legacy account readers and all budget/savings/debt behavior. Account
+archive remains organizational and retains money totals, with restoration of the
+same identity. This lane adds neither disposal accounting nor new sharing rights.
+
+### Accepted implementation shape and decision trail
+
+`assets_financial_design` and `assets_native_design` recovered the canonical
+Recording, account projection, native detail/journal and Search contracts.
+`assets_architecture_judge`, using a fresh gpt-6-luna context, compared their
+complete alternatives against current integration. The captain selected the
+native reader's smaller shape, scored 23/25 against 20/25 for the broader shape.
+All readers completed and relinquished ownership without repository/runtime edits.
+
+Keep one typed asset projection on the existing account ID. Whole value and
+date remain the canonical opening or value-update observation; optional basis
+binds to that exact revision. Current ownership remains the account fact. Add
+one optional owner-qualified reference to an existing liability account, with no
+stored amount, equity or financial allocation. Share and link edits retain their
+accepted history and replay identity atomically. This is non-money history,
+not another value ledger or generic event-sourcing system. Reuse the current
+owner/account locks and replay-before-CAS discipline.
+
+Graft the financial reader's correction safeguard. Correct the selected
+observation revision, preserve previous revisions and its observation order,
+and hydrate one current observation per identity. A correction recorded today
+must not promote an older estimate over a later observation. New dated estimates
+and correction of erroneous estimates remain distinct. Add durable pending
+account-create recovery using the existing owner-scoped write journal, rather
+than preserving create requests only in memory.
+
+Reject a separate Asset identity, multiple debt links, creation of a new debt
+from this flow, debt allocation, sale/disposal and generic audit machinery.
+Existing 1–10,000 basis-point shares remain supported. Initially unknown assets
+can later receive a value; explicit zero remains known. Omitted values never
+withdraw a previous known estimate. Withdrawing a known estimate is not an
+assigned disposal/withdrawal contract and must not be faked by zero or deletion.
+Keep the dated last estimate visible.
+
+Model the Domain selected revision-bound estimate provenance and the existing
+account identity. Separate Before Serializing Shared State selected one coupled
+implementation writer. Prove It Works requires the actual native/API/database
+journey before readiness. Ordinary endpoint, schema and receipt details belong
+to that writer and must be documented before their code is committed.
+
+### Ownership, dependencies and acceptance
+
+The captain owns scope, contract selection, acceptance, evidence, environment,
+publication, integration reconciliation and this manifest. Read-only financial
+and native design readers return bounded alternatives. One exclusive writer
+then owns the coupled Recording, API, additive persistence, native and tests.
+The writer relinquishes its checkout before captain verification. One fresh
+independent reviewer checks the finished diff and only affected fixes afterward.
+
+| User outcome | Existing capability | Remaining work | Owner | Dependency | Assembled acceptance |
+| --- | --- | --- | --- | --- | --- |
+| Add property, vehicle or other asset with whole estimate and share | Nine account types, exact money, account identity and share | Compact native asset entry and canonical estimate facts | Implementation owner | Accepted account/estimate contract | Known, zero and unknown values; half and custom shares; API readback |
+| Understand personal net worth without treating estimates as cash | Home position and personal-share reducer | Estimate labels, provenance and connected detail | Same owner | Canonical asset read | Independent currency totals; no cash/spending/forecast change |
+| Link and inspect an existing debt | Canonical debt account and payment plans | Owner-scoped relation and original-debt destination | Same owner | Account identity and link contract | Debt update changes Home once; unknown asset still links; no duplicated balance |
+| Correct estimate or ownership and inspect history | Append-only revisions, CAS and journals | Estimate/history controls and durable correction provenance | Same owner | Atomic revision/receipt contract | Lost response, exact retry, stale rejection, previous basis retained |
+| Archive, restore, Search and reopen | Account lifecycle, Search origin and secure session | Asset detail reuse and refreshed return | Same owner | Existing account/navigation owners | Totals retained when archived; same query/filter/scroll; relaunch preserved |
+| Protect existing financial journeys and isolation | Budgets, goals, debts, ownership gates | Focused regression and English/Spanish proof | Captain and reviewer | Finished connected implementation | Real API/Postgres and native acceptance, no cross-owner disclosure |
+
+### Throughput and execution contract
+
+- **Blocking first steps.** Fetch integration, recover financial policy and
+  select the canonical shape before code or new environment setup.
+- **Independent workstreams.** Read-only backend/native recovery can run together.
+  Acceptance preparation uses separate temporary artifacts and no shared writes.
+- **Shared mutable state.** Recording truth, account snapshots and native
+  contracts have one writer in an exclusive checkout. Simulator use, builds and
+  test database changes remain serialized and owned by the captain.
+- **Smallest safe decomposition.** One implementation owner prevents competing
+  asset totals and revisions. Verify backend units, then the assembled native
+  journey and finally one fresh review. Extra feature workers do not earn a place.
+
+The poteto Feature checklist records the delivery sequence.
+
+- [x] `how` over the affected subsystem.
+- [x] `architect` for parallel design exploration.
+- [x] Write the throughput checkpoint as four todo items.
+- [x] Delegate code-writing to a subagent using the configured feature model.
+- [x] Verify on the matching surface.
+- [ ] Rebase into small, ordered commits. Stack follow-ups.
+  Skip rebasing after evidence/publication under the repository one-way rules.
+- [ ] If the design is contested, `interrogate` before shipping.
+  Skip unless the bounded design comparison identifies an unresolved conflict.
+- [x] Run Opening a PR.
+
+Reuse retained financial simulator `1A90F684-345F-465C-AA50-6A5298F34156` and a
+suitable lane-owned build cache. Preserve the installed debt demo, synthetic
+records, videos and restart guides. Cuadrao simulator
+`8AFB6084-8918-416E-9164-E21061306BEC`, cache
+`/private/tmp/cuadrao-native-design-build`, its checkouts and previews are forbidden.
+Phone ports 58700–58749, signing, certificates, services and data are forbidden.
+No new simulator is necessary. Keep temporary services limited and remove only
+owned disposable helpers after acceptance.
+
+Acceptance uses synthetic records on real isolated local Auth/API/Postgres and
+the native simulator. Independently expected totals cover partial ownership,
+unknown/zero, linked-debt updates, corrections, archive/restore, separate
+currencies, owner isolation, retries, interrupted writes and reopening. Include
+Search/detail/back continuity, English/Spanish and focused financial regressions.
+Commit durable screenshots, a short recording and concise restart instructions.
+
+Publication and the existing isolated automatic PR preview are authorized.
+Keep all infrastructure settings unchanged. Before readiness, fetch integration,
+reconcile one-way if advanced, audit semantic overlap, run affected checks and
+merged-tree modularity, and record exact source/evidence/review SHAs and terminal
+CI. Stop with a scoped PR targeting `codex/private-alpha-next`, clean fresh
+independent review and zero unresolved findings. No merge, deployment, hosted
+configuration, paid providers, production data, phone actions or subsequent lane.
+Pause only for a genuine unresolved financial product choice or an action outside
+this grant, while continuing independent authorized work.
 
 ## PR #757 integration landing
 
@@ -1841,7 +2006,7 @@ sequence rather than a separate deferral policy in this document.
 | --- | --- | --- | --- | --- | --- |
 | [Access][mvee-access], D01 | Argus auth/recovery; Swift session/Keychain | Finish native/hosted auth adapter and guest conversion | Native continuity + Device/release | Identity API; signing/hosted access for phone proof | Physical-device auth recordings and session/identity test results |
 | [iPhone experience][mvee-platforms], D15 | Native shell; localization; design archive | Replace sample destinations with connected modules | Native continuity | Domain reads per destination | Device navigation/accessibility recordings against [native quality][mvee-quality] |
-| [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 native account/opening lifecycle and real local API | Extend saved assets and ownership/space behavior; verify existing lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
+| [Accounts and assets][mvee-accounts], D02/D04 | Landed #745 account/opening lifecycle; PR #759 locally verifies personal assets, estimates, ownership shares, existing-debt links and net worth | Deliver existing space/shared ownership scope through its assigned owner; verify the assembled account/asset lifecycle on the phone after deployment/signing approval | Financial core | Existing account contract; D03 history; D07 for sharing | Device lifecycle recordings and persisted account/asset readbacks |
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |

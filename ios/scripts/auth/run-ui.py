@@ -20,9 +20,15 @@ parser.add_argument(
 )
 parser.add_argument("--captcha-mode", choices=["pass", "fail", "hold"], default="pass")
 parser.add_argument("--accounts", action="store_true")
+parser.add_argument("--user-index", type=int, choices=[0, 1], default=0)
 parser.add_argument("--language", choices=["en", "es-419"], default="en")
 parser.add_argument("--appearance", choices=["light", "dark", "system"], default="light")
 parser.add_argument("--port-base", type=int, default=58400)
+parser.add_argument(
+    "--api-port",
+    type=int,
+    help="Use a separate loopback API while reusing this allocation Auth",
+)
 parser.add_argument("--search-query", help="Reuse the isolated Search HTTP proof records")
 parser.add_argument(
     "--goal-supported",
@@ -40,9 +46,11 @@ DERIVED = DERIVED.with_name(DERIVED.name + allocation.suffix)
 if args.simulator == "8B7975F1-1338-4966-90E2-770416CAF174":
     raise SystemExit("Refusing founder-owned simulator")
 cfg = json.loads((WORK / "client.json").read_text())
-if cfg["apiURL"] != allocation.url() + "/api/v1" or cfg["supabaseURL"] != allocation.url(
-    1
-):
+api_port = args.api_port or args.port_base
+if not 58400 <= api_port <= 59900 or 58700 <= api_port <= 58749:
+    raise SystemExit("Refusing API port outside the owned local test range")
+api_origin = f"http://127.0.0.1:{api_port}"
+if cfg["apiURL"] != api_origin + "/api/v1" or cfg["supabaseURL"] != allocation.url(1):
     raise SystemExit("Fixture does not match this loopback allocation")
 stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 common = [
@@ -88,11 +96,11 @@ for target in targets:
             "ARGUS_TEST_LANGUAGE": args.language,
             "ARGUS_TEST_APPEARANCE": args.appearance,
             "ARGUS_TEST_RESPONSE_LOSS_PROXY": str(args.response_loss_proxy).lower(),
-            "ARGUS_TEST_FAULT_URL": allocation.url(12) + "/__fault",
-            "ARGUS_TEST_EMAIL_B": cfg["users"][1]["email"],
-            "ARGUS_TEST_PASSWORD_B": cfg["users"][1]["password"],
-            "ARGUS_TEST_EMAIL": cfg["users"][0]["email"],
-            "ARGUS_TEST_PASSWORD": cfg["users"][0]["password"],
+            "ARGUS_TEST_FAULT_URL": f"http://127.0.0.1:{api_port + 12}/__fault",
+            "ARGUS_TEST_EMAIL_B": cfg["users"][1 - args.user_index]["email"],
+            "ARGUS_TEST_PASSWORD_B": cfg["users"][1 - args.user_index]["password"],
+            "ARGUS_TEST_EMAIL": cfg["users"][args.user_index]["email"],
+            "ARGUS_TEST_PASSWORD": cfg["users"][args.user_index]["password"],
         }
     )
     if args.search_query is not None:
