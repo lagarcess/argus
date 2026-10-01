@@ -10,6 +10,95 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
+## Connected shared Household planning lane
+
+**Assigned 2026-10-01; active, not delivered.** Full original integration base:
+`15e57931584b21dd7f9e453dbeb9127fc4b8cff3`, freshly fetched and verified to
+include #763/#764, #760/#765 and #766/#767. Worker:
+`codex/shared-household-planning`, isolated managed worktree. Preserve the landed
+Household demo, personal financial demos, design simulator/cache and phone stack.
+
+**Explicit fixed design assignment:** founder chose
+`7f72dfd73d0c137a1118dffebe5219985577548a` in this lane's checkpoint question.
+`b32b0705359f02aab9c3091ab59d7067ab7ddf46` remains an older reference.
+Neither the moving design branch nor preview stores/fixtures establish connected
+functionality. Selective presentation only; no wholesale design merge.
+
+### Outcome, owners and execution
+
+The captain owns this one lane through a merge-ready PR: two signed-in members
+create, share, inspect, edit and manage budgets, bills, savings goals and debt
+commitments, with unequal responsibilities, actual versus planned progress,
+private funding, attributable corrections and durable recovery. An unauthorized
+third identity cannot discover or access these records. Personal plans remain
+private unless explicitly shared. [MVEE Household][mvee-household] and
+[MVEE Plan][mvee-plan] retain product authority.
+
+One implementation writer owns the coupled source surfaces below after the
+contract decision. Read-only scouts/reviewer own no source or runtime resources.
+The captain owns documentation, integration, independent assembled acceptance,
+evidence and release claims. No second allocation owner or financial ledger.
+
+| Surface owned by this lane | Existing owner to retain | Bounded change |
+| --- | --- | --- |
+| `src/argus/domain/household/` | Membership, grant incarnations and live authorization | Explicit plan consent and safe authorized projections/adapters |
+| `src/argus/domain/planning/` | Budgets, recurrence, goal pools, debt intentions and canonical activity claims | Shared responsibilities and authorized participant activity linking without duplicate facts |
+| `src/argus/domain/financial_search.py` | Financial search and origin continuity | Authorized shared plan retrieval; no private funding disclosure |
+| `src/argus/api/routers/household*`, bounded new shared-plan router, router registration | Thin authenticated transport | Additive documented shared Plan routes using canonical services |
+| Bounded additive `supabase/migrations/` and `tests/household/`, `tests/planning/` | Owner-qualified integrity, RLS, transaction locks and receipts | Plan consent/claims; concurrency, privacy and Personal regression evidence |
+| `ios/Packages/ArgusSession/` Household/Plan types and transport | Auth, actor partitioning and durable exact-byte journal | Typed scoped commands/reads; preserve session and recovery ownership |
+| `ios/ArgusFoundation/Household/` and bounded new shared-plan module | Connected Household model and existing domain details | Shared lifecycle, participant rights and private contribution controls |
+| Shared native root, Connected shell, Home/Plan/Search mounting and localization | Landed #760/#766 composition | Serialize minimal integration changes with one source writer; no redesign |
+| `ios/ArgusFoundationUITests/` and `ios/FinancialModelTests/` | Native assembled proof and production model checks | Two-member/third-identity journey, English/Spanish, recovery and relaunch |
+| Existing API/data contracts, this board and lane evidence packet | Respective canonical document owners | Contract first; durable exact-head evidence and restart recipe |
+
+Open PR inventory at start found #762 (design-only), #732 (frozen web preview)
+and #646 (unrelated chat); no open integration backend delivery PR. The design
+owner reports a clean checkpoint and a proposed, not started, typography/input
+pass. Its private checkout, physical-device signing and simulator remain untouched.
+Root/session/model/API/migration overlap is reserved above; recheck before READY.
+
+### Required journeys and proof
+
+| User outcome | Inherit | Remaining work | Actual dependency | Assembled acceptance |
+| --- | --- | --- | --- | --- |
+| Share/create/manage each of budget, bill, goal and debt commitment | Personal domain services and original identities | Explicit consent/participants, view/edit and archive/restore | Accepted plan permission interaction; canonical domain contract | A and B manage authorized definitions; C and unshared Personal IDs denied |
+| Agree unequal planned contributions | Canonical schedules, exact currency money | Named responsibilities, planned amounts separate from actual | Shared definition/participant contract | 70/30 intention remains distinct from 20/10 actually recorded, without forced equal split |
+| Record/link using private funding | Recording preview/confirm, original revisions, Plan claims | Explicit minimal contribution disclosure and atomic linking | Canonical account-owner boundary and one activity claim owner | Shared amount/date/person/status only; private source IDs/names/balances/notes/history absent through details, Home, Search, totals and receipts |
+| Correct and recover without duplicate money | CAS, owner locks, exact-byte journals, original activity screens | Scoped attribution, concurrent edit and live replay authorization | Current original permissions and membership incarnation | Correction recomputes progress; double-tap/lost response retries commit once; stale competing edit explicitly rejected |
+| Leave/remove/revoke safely | Landed membership and account grants | Shared-plan access/claim visibility invalidation | Existing approved departure policy; explicit plan consent | Access stops immediately and after relaunch, owner records and legitimate activity remain; rejoin does not revive old grants |
+| Refresh authorized Home/Plan/Search | Existing projections and navigation origin | One shared projection owner and context-preserving readers | All four canonical domain adapters | Both users refresh/reopen to consistent authorized progress; unknown/currency rules and Personal regressions hold |
+| Safe unavailable state | Server Household default-off and native availability owner | Shared-plan disabled-surface coverage | Existing server exposure gate | No protected read/write/UI or stale protected replay while disabled; no false departure or data loss |
+
+### Decisions and verification disposition
+
+The checkpoint's temporary groups, splitting and guest proposals do not define
+Household permissions. Guest finance remains registered-only. A narrow proposed
+People & permissions / private-contribution review interaction is pending the
+founder's answer; no dependent UI or permission implementation is claimed.
+Existing account edit grants never grant plan editing. Shared plan editing never
+authorizes private activity correction, ownership change or resharing.
+
+Grounding identified real owner-qualified Money/Plan boundaries and protected
+personal receipt payloads. Reuse must preserve those constraints and live
+Household checks before replay; do not pretend a foreign-owner transfer is
+already supported. Contract and smallest safe canonical extension are settled
+within this implementation before dependent writes, never as a parallel ledger.
+
+Execution checklist: (1) ground/record ownership and missing interaction;
+(2) choose the smallest canonical contract and privacy shape; (3) implement and
+verify one connected shared journey at a time across all four plan types;
+(4) assembled real Auth/API/Postgres/native proof and durable recording;
+(5) fresh independent review and only affected fixes; (6) fresh one-way
+integration reconciliation, merged-tree modularity and exact-head CI; (7) PR and
+restart handoff. Component checks do not establish assembled or phone delivery.
+
+Local resource assignment and native checks remain pending; no existing
+simulator/database/port is reassigned. No merge, deployment, hosted changes,
+production data, paid providers or physical-phone internet readiness is granted.
+The entire assigned shared-planning outcome remains required while its missing
+interaction is resolved; it is not newly deferred.
+
 ## PR #766 integration landing
 
 Founder-confirmed squash merge of the verified Household native head;
