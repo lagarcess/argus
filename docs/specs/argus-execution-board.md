@@ -24,6 +24,31 @@ Household demo, personal financial demos, design simulator/cache and phone stack
 Neither the moving design branch nor preview stores/fixtures establish connected
 functionality. Selective presentation only; no wholesale design merge.
 
+### Approved restart and policy, October 1
+
+Resume from published `6296b8840b6e4f07f0b3475ed50cc8c601db9ced`. Fresh
+integration remains `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`; no merge or
+semantic overlap is present at restart. The fixed design remains `7f72dfd7`.
+No other open integration backend lane was found.
+
+- View-only participants may record/link and correct their own contributions.
+  They cannot edit the plan, other participants' contributions or private
+  funding accounts. Original account/activity authorization remains separate.
+- Owner departure archives their shared plans as read-only for remaining
+  authorized members, retains previously shared history/linked transactions,
+  and removes future projections. Explain this before departure. No financial
+  activity deletion, private funding disclosure or ownership transfer.
+- Required allocation/schema/RLS source, migration and complete backfill are
+  approved in this worker. Test only in a new isolated disposable local
+  database. Remove JSON only after completeness is proved and all readers and
+  writers use the canonical owner. Existing demo/hosted databases are forbidden
+  targets; incomplete cutover must fail visibly rather than use a fallback.
+
+The prior product questions and automatic-review authorization blocker are
+resolved by this explicit grant. Full budgets, bills, goals and debt delivery
+remains required through native acceptance and merge-ready review. The new local
+resource assignment will be recorded below before use; old 59700 stays stopped.
+
 ### Outcome, owners and execution
 
 The captain owns this one lane through a merge-ready PR: two signed-in members
@@ -88,8 +113,8 @@ canonical definitions, versus explicit Household scope embedded in definitions.
 Prefer the additive reference shape if it closes canonical global claims and
 private allocation without a second store of money. The sole implementation
 writer is `shared_plan_implementation`; its first bounded output is the technical
-contract. No dependent permission or contribution UI begins before the two
-narrow founder decisions are answered.
+contract. The founder restart above settles permissions and departure; dependent work
+now follows those rules.
 
 The proposed technical shape is preserved in the existing
 [API contract](../API_CONTRACT.md#shared-household-planning-contract-sketch) and
@@ -138,13 +163,15 @@ one additive local-only allocation migration and focused PG tests. It replaces
 owner-readable goal-body residuals with one canonical owner-qualified allocation
 relation, retaining Personal API shape and the existing pool reducer. No shared
 rows, foreign-authority writers, plan permissions, custody or native UI are
-activated by this step. Plan rights, custody, contributions and dependent UI
-still await the two founder answers. Automatic approval review rejected the
+activated by this prerequisite alone. The approved restart now authorizes the
+required source/cutover and settles dependent rights/custody. Historically,
+automatic approval review rejected the
 combined storage/migration patch and then the strictly source-only proposal.
 Its stated reason was missing direct founder authorization for the allocation
 backfill, JSON-field removal and storage/RLS change. No source patch or database
-migration was applied. One narrow approval request now names the exact change
-and limits rehearsal to synthetic local Postgres 59702. Production migrations
+migration was applied before restart. The founder subsequently approved the
+exact change and requires a new disposable local test database; 59702 is not a
+migration target. Production migrations
 and hosted changes remain prohibited. The test-first
 [draft](../reports/evidence/shared-household-planning/goal-allocation-tests-pending.py.txt)
 is preserved outside test discovery: its initial case failed on the intended
@@ -154,8 +181,8 @@ adapter alone after a future durable cutover is unsafe.
 
 The checkpoint's temporary groups, splitting and guest proposals do not define
 Household permissions. Guest finance remains registered-only. A narrow proposed
-People & permissions / private-contribution review interaction is pending the
-founder's answer; no dependent UI or permission implementation is claimed.
+People & permissions / private-contribution review interaction is approved by
+the restart above; implementation and acceptance are still required.
 Existing account edit grants never grant plan editing. Shared plan editing never
 authorizes private activity correction, ownership change or resharing.
 
@@ -177,8 +204,7 @@ The lane-owned Auth/Postgres allocation is assigned above. Native simulator
 assignment and assembled checks remain pending; no existing simulator, database
 or port is reassigned. No merge, deployment, hosted changes,
 production data, paid providers or physical-phone internet readiness is granted.
-The entire assigned shared-planning outcome remains required while its missing
-interaction is resolved; it is not newly deferred.
+The entire assigned shared-planning outcome remains required through resumed implementation; it is not narrowed or newly deferred.
 
 ### Local restart while decisions are pending
 

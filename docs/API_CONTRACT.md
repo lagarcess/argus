@@ -7465,7 +7465,7 @@ explicitly unsupported in this bounded native lane.
 
 ## Shared Household planning contract sketch
 
-**Status:** Proposed technical extension for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Not implemented or enabled. The current unsupported state above remains accurate until implementation and acceptance. The People & permissions interaction and plan custody after owner departure await founder approval.
+**Status:** Proposed technical extension for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Founder-approved permissions and custody are recorded below; the wire remains an implementation contract proposal until connected acceptance. Not implemented or enabled. The current unsupported state above remains accurate until implementation and acceptance.
 
 The independent read prerequisite now resolves authoritative transaction
 revisions before Household visibility filtering. It preserves current write
@@ -7492,9 +7492,10 @@ chooses or replaces recipients. A recipient's sole stored permission is `view`
 or `edit`; the owner's edit and sharing powers derive from ownership. Account
 grants never grant plan editing. A plan editor never gains account editing,
 private activity correction, ownership, membership administration, or resharing.
-The proposed contribution exception permits a named participant to record or
-link their own authorized activity with a view-only plan grant. That exception
-awaits approval with the permission interaction.
+A named view-only participant may record/link and correct their own
+contributions. This grants neither definition editing nor another participant's
+contribution or private funding account access. The server enforces these
+separate powers; original activity/account authorization remains mandatory.
 
 Responsibilities contain `{membership_id,amount:decimal-string|null}`. Amounts
 are explicit, may be unequal, and describe intentions only. Null is unassigned,
@@ -7622,14 +7623,30 @@ authenticated session generation. Scope changes clear protected reads. Exact
 pending command bytes remain actor-partitioned for explicit recovery and never
 auto-submit under another membership or after access loss.
 
-### Unresolved decisions
+### Founder-approved permissions and departure
 
-The proposed People & permissions interaction, view-only contribution exception,
-and owner departure custody require founder approval before dependent
-permission or UI implementation. Proposed custody withdraws the departed
-owner's plan sharing and retains the canonical owner plan and each contributor's
-original financial records. It transfers no ownership and deletes or reverses
-no legitimate activity. Retaining financial history never grants continued
-access to a withdrawn plan or another person's private funding. The custody
-decision also determines the permitted retained plan view. This sketch does not
-claim those choices settled or the multi-owner migration validated.
+Approved October 1, 2026. The existing detail's People & permissions controls
+use named recipients, view by default, explicit edit, and unequal optional
+planned amounts. A participant reviews the person, amount, currency, date and
+status they disclose when recording/linking their own contribution. Their
+private source account, balance, notes and history stay private. View-only
+participation allows their own contribution commands and correction through
+original authorized activity; it does not permit plan editing or another
+participant's contribution commands.
+
+Before an owner leaves, the native flow explains that their shared plans become
+archived and read-only for remaining authorized members. Those members retain
+previously shared history and linked transactions through the safe projection.
+Archived plans contribute no future forecast movement. Departure never deletes
+financial activity, exposes private funding, or transfers ownership. The owner
+retains their original records. Remaining members still need live membership
+and their existing explicit plan consent; removal or revocation ends access.
+Rejoining creates no automatic consent or ownership transfer.
+
+Allocation/schema/RLS source, migration/backfill code and synthetic tests on a
+new isolated disposable local database are expressly authorized. Remove legacy
+JSON allocations only after complete validated backfill and migration of all
+readers/writers to the canonical allocation owner. No fallback may hide an
+incomplete cutover. Production, shared hosted databases and existing demos are
+not migration targets. The implementation must prove that boundary and preserve
+Personal behavior.

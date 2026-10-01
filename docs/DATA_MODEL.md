@@ -2800,7 +2800,7 @@ Debt-plan archive preserves canonical payments and claimed occurrence snapshots.
 
 **Status:** Proposed additive contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. No shared-planning migration or writer is implemented. The independent
 Household read prerequisite now uses exact current group membership; it does not
-enable cross-owner posting or shared plans. The [API sketch](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the proposed public wire and unresolved permission/custody decisions.
+enable cross-owner posting or shared plans. The [API sketch](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the proposed public wire and the founder-approved permission/custody rules.
 
 The selected candidate adds consent and responsibility references to existing
 owner-qualified definitions. The alternative adds Household scope directly to
@@ -2817,7 +2817,10 @@ The proposed `household_plan_bindings` contains `id`, `household_id`,
 `expectation_id`, `goal_id`, or `debt_plan_id`, and `revoked_at`.
 The original definition ID remains its financial identity. Composite foreign
 keys bind the selected definition to its original owner and the owner's current
-membership to the same Household. An expectation binding admits bills, not
+membership to the same Household. Binding lifecycle also records owner-departure
+archive, the retained authorized recipients and previously shared definition
+revision. Read-only archived history grants no write or future projection. An
+expectation binding admits bills, not
 private expected income. A partial unique key permits one active binding per
 canonical definition. There is no second plan amount, balance, name, schedule,
 completion flag, or owner in a copied body.
@@ -2834,8 +2837,9 @@ participant membership, optional explicit minor-unit amount, and their
 occurrence or period. They retain safe cutover and fulfilled snapshot rules.
 They contain intentions, never receipts, editable progress, or account balance.
 Every activity or definition edit retains the actual authenticated actor and
-append-only correction history. Permission and custody remain the explicit
-pending decisions linked above.
+append-only correction history. View-only participants may record/link and
+correct their own contributions, without definition editing or access to other
+participants' private funding. These powers require distinct server checks.
 
 ### One canonical claim and allocation owner
 
@@ -2883,7 +2887,12 @@ Existing JSON residuals backfill into that relation and cease to be a second
 authoritative allocation store. The Personal API's allocation shape remains
 derived and compatible. Only the safe API exposes shared residuals; there is no
 direct Household SELECT grant. This normalization is a required migration and
-deployment-compatibility risk, not a second allocation reducer.
+deployment-compatibility risk, not a second allocation reducer. Source changes
+and backfill rehearsal are approved only for a new disposable local test
+database. Validate every legacy allocation, exact amount, owner reference and
+row count before removing JSON; update all readers/writers in the same cutover.
+No incomplete migration fallback is permitted. Existing demos and hosted
+databases remain untouched.
 
 ### Smallest multi-owner Money extension
 
@@ -2946,8 +2955,12 @@ financial records; full cross-owner group assembly remains service-owned.
 Cross-owner groups cannot retain cascades that delete another account owner's
 leg, claim, or payment-return history when the group owner is removed. The
 migration must preserve surviving owners' financial history and reject an
-unsafe destructive deletion. Household departure and closure only withdraw
-authorization; they never delete these records. This lane does not add account
+unsafe destructive deletion. Owner departure archives their shared plans, retains the previously shared
+history for remaining authorized members and suppresses future projections.
+The retained view contains no private funding. Departure revokes the departing
+member's household access; removal/revocation still ends a recipient's access.
+Closure revokes household access while preserving owners' records and history.
+These operations never delete financial activity or transfer ownership. This lane does not add account
 deletion or define a new profile-erasure policy.
 
 Shared mutations take the Household row lock, resolve the current binding and
