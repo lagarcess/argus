@@ -188,3 +188,16 @@ def test_failure_reported_during_a_sync_wins_over_that_sync_finishing(repo, user
     current = repo.get(user_id=users["owner"], connection_id=row.id)
     assert current.status == "needs_reauth" and current.cursor is None
     assert current.last_error_code == "plaid_item_login_required"
+
+
+def test_renew_extends_only_a_lease_still_held(repo, users):
+    row = make(repo, users["owner"])
+    assert not repo.renew(connection_id=row.id, holder="sync", now=NOW)
+    assert repo.lease(connection_id=row.id, holder="sync", now=NOW)
+    assert repo.renew(connection_id=row.id, holder="sync", now=NOW + timedelta(minutes=4))
+    # A failure releases the lease; renewing must not take it back.
+    repo.record_failure(connection_id=row.id, code="x", status="needs_reauth", now=NOW)
+    assert not repo.renew(connection_id=row.id, holder="sync", now=NOW)
+    assert repo.get(user_id=users["owner"], connection_id=row.id).lease_holder is None
+    assert repo.lease(connection_id=row.id, holder="other", now=NOW)
+    assert not repo.renew(connection_id=row.id, holder="sync", now=NOW)
