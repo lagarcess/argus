@@ -430,7 +430,9 @@ final class FinancialEditor: ObservableObject, Identifiable {
         guard !busy, phase != .uncertain else { return }
         coverage.removeAll { $0.observationId == observation }
         coverage.append(.init(observationId: observation, included: included))
-        phase = .editing; expensePreview = nil
+        // Stay in review while coverage is answered so entry remount + didSet
+        // invalidate does not wipe the coverage answers just recorded.
+        expensePreview = nil
     }
 
     func review(locale: Locale) async {

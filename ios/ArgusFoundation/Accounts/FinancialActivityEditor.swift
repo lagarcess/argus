@@ -201,7 +201,10 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         guard !busy, phase != .uncertain else { return }
         answers.removeAll { $0.accountId == accountId && $0.observationId == observationId }
         answers.append(.init(accountId: accountId, observationId: observationId, included: included))
-        phase = .editing; preview = nil; reviewedCommand = nil
+        // Stay in review while coverage is answered. Flipping to editing remounts
+        // entry controls; DatePicker/field didSet then invalidate() and wipe answers.
+        preview = nil
+        reviewedCommand = nil
     }
 
     func review(locale: Locale) async {
