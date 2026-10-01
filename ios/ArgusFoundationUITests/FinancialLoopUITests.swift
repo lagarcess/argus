@@ -229,7 +229,7 @@ final class FinancialLoopUITests: XCTestCase {
         capture("expense-review")
         tapVisible(app.buttons["loop.confirm"])
         // accounts.record can exist under the sheet; require confirm gone + record hittable.
-        let dismissed = NSPredicate { _, _ in
+        let dismissed = NSPredicate { [app] _, _ in
             !app.buttons["loop.confirm"].exists
                 && app.buttons["accounts.record"].exists
                 && app.buttons["accounts.record"].isHittable
