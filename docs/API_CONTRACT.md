@@ -7491,3 +7491,56 @@ Connection shape:
   unreviewed drafts from that connection are removed; confirmed activity stays.
   Repeating the call returns the ended connection with `not_applicable` and `0`.
   Another person's or an unknown id answers 404 `financial_connection_not_found`.
+
+### Plaid connector (default-off)
+
+Mounted under `/api/v1/financial-connections/plaid`. Available only while the
+connected-sources surface above is on, `ARGUS_INGESTION_SECRET_KEY` is set and
+Plaid is configured (`PLAID_CLIENT_ID`/`PLAID_SECRET`, `PLAID_ENV`
+`sandbox|production`); otherwise every route, including the webhook, answers
+404 `financial_connections_unavailable`. User routes are registered-only like
+the routes above. Access tokens, cursors and provider payloads are never
+returned or logged; the only Plaid value returned is a Link token. Evidence and
+verification levels:
+[ingestion-plaid evidence](reports/evidence/ingestion-plaid/README.md).
+
+- POST `/plaid/link-token` with optional `{language: en|es}` returns
+  `{link_token, expiration}` for Link with `products=["transactions"]`, the
+  configured `PLAID_COUNTRY_CODES` and an opaque per-person `client_user_id`.
+- POST `/plaid/exchange` `{public_token}` (`public-...`) exchanges server-side,
+  seals the access token, labels the connection with the institution name and
+  returns 201 `{connection, created: true}`; the first sync runs after the
+  response. A retried exchange or a re-link of an Item the caller already has
+  returns 200 with the existing connection and `created: false`. An Item
+  connected by someone else answers 409 `plaid_item_unavailable`.
+- POST `/plaid/{id}/sync` runs one bounded sync and returns
+  `{connection, sync: {status, added, modified, removed, more_pending,
+  error_code}}`. `status` is
+  `synced|not_ready|busy|no_sink|failed|sink_failed|superseded`; `busy` means
+  another sync holds the lease, `no_sink`/`sink_failed` mean nothing was
+  recorded and the cursor did not move. A disconnected connection answers 409
+  `financial_connection_disconnected`.
+- POST `/plaid/{id}/link-token` creates a Link update-mode token for a
+  connection in `needs_reauth` or `error` (the Item is named server-side);
+  otherwise 409 `financial_connection_not_reauthorizable`.
+- POST `/plaid/{id}/reconnected` re-checks the Item after update mode. A
+  healthy Item returns the connection `active` with its cursor and
+  `last_success_at` kept and resumes syncing; a still-broken Item keeps its
+  status and actionable `last_error_code`.
+- POST `/plaid/webhook` takes no user session. It accepts only a valid
+  `Plaid-Verification` JWT (ES256, key from `/webhook_verification_key/get`,
+  `iat` within 5 minutes, `request_body_sha256` equal to the raw body hash) and
+  returns 200 `{received: true}`; anything else answers 400
+  `plaid_webhook_rejected` with no reason, and an unreachable key endpoint
+  answers 503 `plaid_webhook_unverifiable`. Transactions updates sync the
+  Item's live connections after the response; Item errors and
+  `PENDING_EXPIRATION`/`PENDING_DISCONNECT` set `needs_reauth`,
+  `USER_PERMISSION_REVOKED` sets `error`, `LOGIN_REPAIRED` re-checks and
+  resumes. Unknown Items and other environments are acknowledged and ignored.
+
+`last_error_code` for Plaid failures is `plaid_<lowercased Plaid error code>`
+(for example `plaid_item_login_required`); transient provider failures keep
+the connection's status. Plaid errors from Link routes answer 422
+`plaid_request_invalid` or 502 `plaid_unavailable` with
+`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`; an Item
+Plaid no longer knows counts as revoked.
