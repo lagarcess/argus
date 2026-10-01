@@ -19,10 +19,10 @@ struct CuadraoOrderedCollection<Item: Identifiable, Row: View>: View where Item.
                 ForEach(items) { item in
                     itemButton(item)
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            if canEdit(item) { Button(spanish ? "Editar" : "Edit", systemImage: "pencil") { edit(item) }.tint(.blue).accessibilityLabel(spanish ? "Editar" : "Edit") }
+                            if canEdit(item) { Button { edit(item) } label: { Image(systemName: "pencil") }.tint(.blue).accessibilityLabel(spanish ? "Editar" : "Edit") }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { archive(item) }.tint(.orange).accessibilityLabel(spanish ? "Archivar" : "Archive")
+                            Button { archive(item) } label: { Image(systemName: "archivebox") }.tint(.orange).accessibilityLabel(spanish ? "Archivar" : "Archive")
                         }
                 }.reorderable()
             }
