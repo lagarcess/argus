@@ -89,6 +89,18 @@ final class HouseholdPlanTests: XCTestCase {
         XCTAssertTrue((try JSONSerialization.jsonObject(with: clear) as! [String: Any])["target_date"] is NSNull)
         XCTAssertNil((try JSONSerialization.jsonObject(with: unchanged) as! [String: Any])["target_date"])
     }
+    func testPeopleConsentEncodesBudgetPolicyOnlyForBudgetAcrossEveryKind() throws {
+        for kind in HouseholdPlanKind.allCases {
+            for published in [false, true] {
+                let people = HouseholdPlanPeopleCommand(kind: kind, scope: .init(membershipId: SharedPlanTestData.memberId, authorizationVersion: 7, planVersion: 3), participants: [], responsibilities: [], publishBudgetScope: published)
+                let wire = try JSONSerialization.jsonObject(with: JSONEncoder().encode(people)) as! [String: Any]
+                XCTAssertEqual(wire["publish_budget_scope"] as? Bool, kind == .budget ? published : nil, kind.rawValue)
+                XCTAssertEqual(wire["expected_authorization_version"] as? Int, 7)
+                XCTAssertEqual(wire["expected_plan_version"] as? Int, 3)
+                XCTAssertNotNil(wire["participants"]); XCTAssertNotNil(wire["responsibilities"])
+            }
+        }
+    }
     func testGoalScheduleEditCarriesCanonicalScheduleWithoutPrivateFundingSetup() throws {
         var value = SharedPlanTestData.plan(.goal)
         var definition = try XCTUnwrap(value["definition"] as? [String: Any]); definition["earliest_effective_date"] = "2026-10-08"; value["definition"] = definition

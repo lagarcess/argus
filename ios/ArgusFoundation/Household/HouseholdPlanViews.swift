@@ -59,7 +59,7 @@ struct HouseholdPlanSummary: View {
                 if !compact { value("sharedPlan.limit", plan.definition.amountMinor); value("sharedPlan.gross", gross); value("sharedPlan.refunds", refunds); value("sharedPlan.remaining", c.remainingMinor) }
                 if over == true { Text("sharedPlan.overBudget").foregroundStyle(ArgusStyle.negative) }
             case .goal(let c, let planned, let projected):
-                value("sharedPlan.actual", c.actualMinor)
+                value("sharedPlan.actual", HouseholdPlanPresentation.backedSavings(c))
                 if !compact { value("sharedPlan.target", plan.definition.amountMinor); value("sharedPlan.planned", planned); value("sharedPlan.projected", projected); value("sharedPlan.remaining", c.remainingMinor); Text("sharedPlan.plannedNotice").font(.footnote).foregroundStyle(ArgusStyle.secondary) }
             case .bill(let c):
                 value("sharedPlan.paid", c.appliedMinor)
@@ -176,6 +176,7 @@ struct HouseholdPlanDetailView: View {
 }
 
 enum HouseholdPlanPresentation {
+    static func backedSavings(_ progress: HouseholdPlanCommonProgress) -> String? { progress.appliedMinor }
     static func money(_ minor: String?, plan: HouseholdPlan) -> String { money(minor, currency: plan.definition.common.currency, digits: plan.definition.common.currencyFractionDigits) }
     static func money(_ minor: String?, currency: String, digits: Int) -> String {
         guard let minor else { return currency + " " + NSLocalizedString("household.unknown", comment: "") }

@@ -27,6 +27,8 @@ with tempfile.TemporaryDirectory(prefix="argus-household-models-") as temporary:
     views = (root / "ios/ArgusFoundation/Household/HouseholdViews.swift").read_text()
     plan_views = (root / "ios/ArgusFoundation/Household/HouseholdPlanViews.swift").read_text()
     people = (root / "ios/ArgusFoundation/Household/HouseholdPlanPeople.swift").read_text()
+    definition_editor = (root / "ios/ArgusFoundation/Household/HouseholdPlanDefinitionEditor.swift").read_text()
+    (source / "HouseholdPlanDefinitionEdit.swift").write_text("import Foundation\nimport ArgusSession\n" + definition_editor[definition_editor.index("enum HouseholdPlanDefinitionEdit {"):])
     (source / "HouseholdPlanPresentation.swift").write_text("import Foundation\nimport ArgusSession\n" + plan_views[plan_views.index("enum HouseholdPlanPresentation {"):] + "\n" + people[people.index("enum PlanDate {"):] + "\n" + views[views.index("enum HouseholdMoney {"):views.index("struct HouseholdConnectedDestination:")])
     presentation = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
     (source / "AccountPresentation.swift").write_text(

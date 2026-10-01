@@ -42,8 +42,7 @@ struct HouseholdPlanDefinitionEditor: View {
     private var usesSchedule: Bool { kind == .bill || kind == .debt || kind == .goal && hasContribution }
     private var earliestEffectiveDate: Date? { editing.flatMap { PlanDate.parse($0.definition.common.earliestEffectiveDate) } }
     private var schedule: FinancialPlanSchedule {
-        let day = Calendar.current.component(.day, from: startDate)
-        return .init(cadence: cadence, startDate: PlanDate.string(startDate), endDate: hasEnd ? PlanDate.string(endDate) : nil, monthDays: cadence == .twiceMonthly ? [day, Int(secondDay) ?? 15] : cadence == .monthly ? [day] : [])
+        HouseholdPlanDefinitionEdit.schedule(original: editing?.definition.schedule, cadence: cadence, startDate: PlanDate.string(startDate), endDate: hasEnd ? PlanDate.string(endDate) : nil, secondDay: Int(secondDay) ?? 15)
     }
     var body: some View {
         NavigationStack {
@@ -85,7 +84,6 @@ struct HouseholdPlanDefinitionEditor: View {
             }
             .task { await load() }
             .onChange(of: existingId) { _, _ in Task { await loadExistingScope() } }
-            .onChange(of: effectiveDate) { _, value in if editing != nil && usesSchedule && startDate < value { startDate = value } }
         }
     }
     private var selectedKind: HouseholdPlanKind { sharing ? existing?.ref.kind ?? .budget : kind }
@@ -142,7 +140,7 @@ struct HouseholdPlanDefinitionEditor: View {
                 Picker("sharedPlan.schedule", selection: $cadence) { ForEach(FinancialPlanSchedule.Cadence.allCases, id: \.self) { Text(LocalizedStringKey("plan.repeat." + $0.rawValue)).tag($0) } }.accessibilityIdentifier("sharedPlan.cadence")
                 if editing != nil, let minimum = earliestEffectiveDate {
                     DatePicker("plan.effectiveDate", selection: $effectiveDate, in: minimum..., displayedComponents: .date).accessibilityIdentifier("sharedPlan.effectiveDate")
-                    DatePicker("sharedPlan.startDate", selection: $startDate, in: effectiveDate..., displayedComponents: .date).accessibilityIdentifier("sharedPlan.startDate")
+                    DatePicker("sharedPlan.startDate", selection: $startDate, displayedComponents: .date).accessibilityIdentifier("sharedPlan.startDate")
                     Text("plan.cutover.hint").font(.footnote).foregroundStyle(ArgusStyle.secondary)
                 } else if editing != nil { Text("sharedPlan.changed") }
                 else { DatePicker("sharedPlan.startDate", selection: $startDate, displayedComponents: .date).accessibilityIdentifier("sharedPlan.startDate") }
@@ -171,7 +169,7 @@ struct HouseholdPlanDefinitionEditor: View {
                     hasTargetDate = d != nil; targetDate = d.flatMap(PlanDate.parse) ?? targetDate; hasContribution = s != nil
                     contribution = planned.map { HouseholdPlanPresentation.decimal($0, digits: plan.definition.common.currencyFractionDigits) } ?? ""
                 }
-                if usesSchedule, let minimum = earliestEffectiveDate { effectiveDate = minimum; startDate = minimum }
+                if usesSchedule, let minimum = earliestEffectiveDate { effectiveDate = minimum }
             }
         } catch { self.error = HouseholdPlanModel.message(error) }
     }
@@ -186,14 +184,14 @@ struct HouseholdPlanDefinitionEditor: View {
                     guard let entered = try AccountEntry.amount(contribution, locale: locale) else { error = "household.reviewError"; return }
                     plannedAmount = entered
                 } else { plannedAmount = nil }
-                let patch = HouseholdPlanDefinitionPatch(name: name, amount: value, plannedContributionAmount: plannedAmount, targetDate: kind == .goal && hasTargetDate ? PlanDate.string(targetDate) : nil, includesTargetDate: kind == .goal, month: kind == .budget ? month : nil, categoryIds: kind == .budget ? categories.sorted() : nil, includeUncategorized: kind == .budget ? uncategorized : nil, schedule: usesSchedule ? schedule : nil, effectiveDate: usesSchedule ? PlanDate.string(effectiveDate) : nil)
+                let patch = HouseholdPlanDefinitionEdit.patch(plan: plan, name: name, amount: value, plannedAmount: plannedAmount, targetDate: hasTargetDate ? PlanDate.string(targetDate) : nil, month: month, categories: categories.sorted(), uncategorized: uncategorized, schedule: usesSchedule ? schedule : nil, effectiveDate: PlanDate.string(effectiveDate))
                 await model.submit(HouseholdPlanEditCommand(scope: model.scope(plan), definition: patch), action: .edit(plan.ref)); return
             }
             guard let scope = model.scope, let options else { error = "sharedPlan.changed"; return }
             let participants = options.people.filter { selected.contains($0.id) && $0.id != scope.membershipId }.map { HouseholdPlanParticipantWrite(membershipId: $0.id, permission: editors.contains($0.id) ? .edit : .view) }
             let period: HouseholdResponsibilityPeriod = selectedKind == .budget ? .month(month) : .agreedDate(PlanDate.string(startDate))
             let duties = try options.people.filter { selected.contains($0.id) || $0.id == scope.membershipId }.map { HouseholdPlanResponsibilityWrite(membershipId: $0.id, amount: try AccountEntry.amount(responsibilities[$0.id] ?? "", locale: locale), period: period) }
-            let people = HouseholdPlanPeopleCommand(scope: sharing ? .init(membershipId: scope.membershipId, authorizationVersion: scope.authorizationVersion, planVersion: existingVersion) : scope, participants: participants, responsibilities: duties, publishBudgetScope: publishBudgetScope)
+            let people = HouseholdPlanPeopleCommand(kind: selectedKind, scope: sharing ? .init(membershipId: scope.membershipId, authorizationVersion: scope.authorizationVersion, planVersion: existingVersion) : scope, participants: participants, responsibilities: duties, publishBudgetScope: publishBudgetScope)
             if sharing, let existing { await model.submit(people, action: .share(existing.ref)); return }
             switch kind {
             case .budget: await create(FinancialBudgetCommand(name: name, limit: value, currency: currency, month: month, accountIds: accountIds.sorted { $0.uuidString < $1.uuidString }, categoryIds: categories.sorted(), includeUncategorized: uncategorized), people)
@@ -242,5 +240,34 @@ struct HouseholdPlanDefinitionEditor: View {
         } catch {
             if existingId == existing.id { self.error = HouseholdPlanModel.message(error) }
         }
+    }
+}
+
+enum HouseholdPlanDefinitionEdit {
+    static func schedule(original: FinancialPlanSchedule?, cadence: FinancialPlanSchedule.Cadence, startDate: String, endDate: String?, secondDay: Int) -> FinancialPlanSchedule {
+        let day = Int(startDate.suffix(2)) ?? 1
+        let sameAnchor = original?.cadence == cadence && original?.startDate == startDate
+        let monthDays: [Int]
+        if sameAnchor, cadence == .monthly { monthDays = original?.monthDays ?? [] }
+        else if sameAnchor, cadence == .twiceMonthly, original?.monthDays.last == secondDay { monthDays = original?.monthDays ?? [] }
+        else { monthDays = cadence == .twiceMonthly ? [day, secondDay] : cadence == .monthly ? [day] : [] }
+        return .init(cadence: cadence, startDate: startDate, endDate: endDate, monthDays: monthDays)
+    }
+    static func patch(plan: HouseholdPlan, name: String, amount: String, plannedAmount: String?, targetDate: String?, month: String, categories: [String], uncategorized: Bool, schedule: FinancialPlanSchedule?, effectiveDate: String) -> HouseholdPlanDefinitionPatch {
+        let digits = plan.definition.common.currencyFractionDigits
+        var patch = HouseholdPlanDefinitionPatch(name: name == plan.definition.common.name ? nil : name, amount: amount == HouseholdPlanPresentation.decimal(plan.definition.amountMinor, digits: digits) ? nil : amount)
+        switch plan.definition {
+        case .budget(_, _, let originalMonth, let originalCategories, let originalUncategorized, _):
+            patch.month = month == originalMonth ? nil : month
+            patch.categoryIds = Set(categories) == Set(originalCategories) ? nil : categories
+            patch.includeUncategorized = uncategorized == originalUncategorized ? nil : uncategorized
+        case .goal(_, _, let originalDate, _, let originalPlanned):
+            patch.includesTargetDate = targetDate != originalDate; patch.targetDate = targetDate
+            if let plannedAmount, plannedAmount != originalPlanned.map({ HouseholdPlanPresentation.decimal($0, digits: digits) }) { patch.plannedContributionAmount = plannedAmount }
+        case .bill, .debt: break
+        }
+        if schedule != plan.definition.schedule { patch.schedule = schedule }
+        if patch.schedule != nil || patch.plannedContributionAmount != nil || plan.ref.kind == .debt && patch.amount != nil { patch.effectiveDate = effectiveDate }
+        return patch
     }
 }

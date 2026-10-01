@@ -129,7 +129,7 @@ struct HouseholdPlanPeopleEditor: View {
             }
             if plan.canManagePeople {
                 let participants = options.people.filter { selected.contains($0.id) && $0.id != plan.owner.id }.map { HouseholdPlanParticipantWrite(membershipId: $0.id, permission: editors.contains($0.id) ? .edit : .view) }
-                await model.submit(HouseholdPlanPeopleCommand(scope: model.scope(plan), participants: participants, responsibilities: responsibilities, publishBudgetScope: publishBudgetScope), action: .people(plan.ref))
+                await model.submit(HouseholdPlanPeopleCommand(kind: plan.ref.kind, scope: model.scope(plan), participants: participants, responsibilities: responsibilities, publishBudgetScope: publishBudgetScope), action: .people(plan.ref))
             } else {
                 await model.submit(HouseholdPlanEditCommand(scope: model.scope(plan), responsibilities: responsibilities), action: .edit(plan.ref))
             }

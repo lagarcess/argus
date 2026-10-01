@@ -36,18 +36,20 @@ public struct HouseholdPlanResponsibilityWrite: Encodable, Sendable {
     }
 }
 public struct HouseholdPlanPeopleCommand: Encodable, Sendable {
+    public let kind: HouseholdPlanKind
     public let scope: HouseholdPlanScope
     public let participants: [HouseholdPlanParticipantWrite]
     public let responsibilities: [HouseholdPlanResponsibilityWrite]
     public let publishBudgetScope: Bool
-    public init(scope: HouseholdPlanScope, participants: [HouseholdPlanParticipantWrite], responsibilities: [HouseholdPlanResponsibilityWrite], publishBudgetScope: Bool) {
-        self.scope = scope; self.participants = participants; self.responsibilities = responsibilities; self.publishBudgetScope = publishBudgetScope
+    public init(kind: HouseholdPlanKind, scope: HouseholdPlanScope, participants: [HouseholdPlanParticipantWrite], responsibilities: [HouseholdPlanResponsibilityWrite], publishBudgetScope: Bool) {
+        self.kind = kind; self.scope = scope; self.participants = participants; self.responsibilities = responsibilities; self.publishBudgetScope = publishBudgetScope
     }
     enum Keys: String, CodingKey { case participants, responsibilities, publishBudgetScope = "publish_budget_scope" }
     public func encode(to encoder: any Encoder) throws {
         try scope.encode(to: encoder)
         var c = encoder.container(keyedBy: Keys.self)
-        try c.encode(participants, forKey: .participants); try c.encode(responsibilities, forKey: .responsibilities); try c.encode(publishBudgetScope, forKey: .publishBudgetScope)
+        try c.encode(participants, forKey: .participants); try c.encode(responsibilities, forKey: .responsibilities)
+        if kind == .budget { try c.encode(publishBudgetScope, forKey: .publishBudgetScope) }
     }
 }
 public struct HouseholdPlanCreateCommand<Definition: Encodable & Sendable>: Encodable, Sendable {
@@ -162,7 +164,9 @@ extension SessionController {
               write.route == "households", write.path == "/" + id.uuidString + "/plan" + action.path,
               write.method == action.method, write.householdMembershipId != nil, write.householdAuthorizationVersion != nil else { throw SessionFailure.invalidResponse }
         let current = try await householdResponse(Household.self, path: "/" + id.uuidString, expectedIdentity: expectedIdentity)
-        guard current.membershipId == write.householdMembershipId, current.version == write.householdAuthorizationVersion else { throw SessionFailure.rejected(status: 409, code: "shared_plan_scope_changed") }
+        guard current.membershipId == write.householdMembershipId else { throw SessionFailure.rejected(status: 409, code: "shared_plan_scope_changed") }
+        // Consent writes advance authorization themselves. The server checks the
+        // exact receipt before CAS while still enforcing current access.
         return try await householdResponse(HouseholdPlanReceipt.self, path: write.path, method: write.method, body: write.body, key: write.key, expectedIdentity: expectedIdentity)
     }
 }

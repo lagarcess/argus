@@ -163,7 +163,7 @@ final class HouseholdModel: ObservableObject {
         guard isAvailable, let identity, let write = pending, !busy else { return }
         let operation = operation(write)
         if case .plan(let id, _) = operation {
-            guard selectedId == id, household?.membershipId == write.householdMembershipId, household?.version == write.householdAuthorizationVersion else { errorKey = "sharedPlan.changed"; return }
+            guard selectedId == id, household?.membershipId == write.householdMembershipId else { errorKey = "sharedPlan.changed"; return }
         }
         let ticket = generation; let attempt = UUID()
         writeAttempt = attempt; busy = true; errorKey = nil
