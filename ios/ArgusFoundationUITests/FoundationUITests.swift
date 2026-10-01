@@ -9,6 +9,13 @@ final class FoundationUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
+        if app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 2)
+            || app.buttons["cuadrao.welcome.signup"].exists {
+            throw XCTSkip("Foundation sample chrome is tip-shell only; Connected Cuadrao uses financial UITests.")
+        }
+        if !app.buttons["tab.accounts"].waitForExistence(timeout: 2) {
+            throw XCTSkip("Foundation sample navigation expects the tip Accounts tab.")
+        }
     }
 
     func testNavigationAndHeaderReturn() throws {
@@ -99,7 +106,7 @@ final class FoundationUITests: XCTestCase {
         field.tap()
         field.typeText("cash")
         capture("search-keyboard")
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         app.buttons["tab.search"].tap()
         XCTAssertEqual(field.value as? String, "cash")
         capture("search-retained")

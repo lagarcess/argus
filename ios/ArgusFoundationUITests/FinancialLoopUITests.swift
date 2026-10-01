@@ -8,7 +8,7 @@ final class FinancialLoopUITests: XCTestCase {
     func testArchiveManagementRestoresSameAccount() throws {
         try signIn(fresh: true)
         let baseline = homeValue()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         tapVisible(app.buttons["accounts.add"])
         app.buttons["accounts.type.checking"].tap()
         let nickname = "Archive review " + UUID().uuidString.prefix(6)
@@ -28,7 +28,7 @@ final class FinancialLoopUITests: XCTestCase {
         XCTAssertFalse(app.buttons[originalID].exists)
         capture("archive-active-list")
         assertHome(baseline + 125)
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         for _ in 0..<5 { if app.buttons["accounts.manage"].isHittable { break }; app.swipeDown() }
         app.buttons["accounts.manage"].tap()
         let archived = app.buttons[originalID]
@@ -49,7 +49,7 @@ final class FinancialLoopUITests: XCTestCase {
 
     func testAccountEntryKeepsUnknownAndSignedBalances() throws {
         try signIn()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 10))
         app.buttons["accounts.add"].tap()
         XCTAssertTrue(app.buttons["accounts.type.checking"].waitForExistence(timeout: 5))
@@ -82,7 +82,7 @@ final class FinancialLoopUITests: XCTestCase {
         app.buttons["accounts.save"].tap()
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "DOP -25.50")).firstMatch.waitForExistence(timeout: 10))
         app.terminate(); app.launch()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         tapVisible(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch)
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "DOP -25.50")).firstMatch.waitForExistence(timeout: 10))
         capture("account-preserved-after-reopen")
@@ -91,7 +91,7 @@ final class FinancialLoopUITests: XCTestCase {
     func testCompleteFinancialLoop() throws {
         try signIn()
         let baseline = homeValue()
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         if app.buttons["accounts.back"].exists { app.buttons["accounts.back"].tap() }
         tapVisible(app.buttons["accounts.add"])
         app.buttons["accounts.type.checking"].tap()
@@ -108,7 +108,7 @@ final class FinancialLoopUITests: XCTestCase {
         assertHome(baseline + 8000)
         assertText("Loop groceries")
         capture("connected-home-after-expense")
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "activity.row.")).firstMatch
         tapVisible(row)
         app.buttons["activity.correct"].tap()
@@ -135,9 +135,9 @@ final class FinancialLoopUITests: XCTestCase {
         assertText("Still unexplained DOP 0.00")
         assertText("Difference DOP -500.00")
         assertHome(baseline + 7000)
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         capture("late-expense-not-double-counted")
-        app.terminate(); app.launch(); app.buttons["tab.accounts"].tap()
+        app.terminate(); app.launch(); app.openAccountsList()
         let account = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch
         tapVisible(account)
         assertText("DOP 7,000.00")
@@ -153,7 +153,7 @@ final class FinancialLoopUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.staticTexts["home.netWorth.DOP"].waitForExistence(timeout: 15))
         capture("connected-home-spanish")
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         let account = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "accounts.row.")).firstMatch
         tapVisible(account)
         tapVisible(app.buttons["accounts.check"])
@@ -254,6 +254,40 @@ final class FinancialLoopUITests: XCTestCase {
         if app.buttons["debt.close"].waitForExistence(timeout: 2) {
             app.buttons["debt.close"].tap()
             XCTAssertTrue(app.otherElements["debt.detail"].waitForNonExistence(timeout: 10))
+        }
+        let connected = app.usesConnectedChrome
+            || app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 2)
+        if connected {
+            if fresh, app.buttons["header.profile"].waitForExistence(timeout: 2) {
+                app.buttons["header.profile"].tap()
+                if app.buttons["auth.signOut"].waitForExistence(timeout: 3) {
+                    app.buttons["auth.signOut"].tap()
+                    XCTAssertTrue(app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 20))
+                }
+            }
+            if !app.buttons["auth.signOut"].waitForExistence(timeout: 2) {
+                app.openSignedOutAuthEntry()
+                let emailField = app.textFields["auth.email"]
+                XCTAssertTrue(emailField.waitForExistence(timeout: 10))
+                emailField.tap(); emailField.typeText(email)
+                let passwordField = app.secureTextFields["auth.password"]
+                passwordField.tap()
+                UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: password]],
+                                             options: [.localOnly: true, .expirationDate: Date().addingTimeInterval(60)])
+                passwordField.press(forDuration: 1.2)
+                let paste = app.menuItems["Paste"]
+                if paste.waitForExistence(timeout: 3) { paste.tap() }
+                else { app.buttons["Paste"].tap() }
+                let permission = app.alerts.buttons["Allow Paste"]
+                if permission.waitForExistence(timeout: 1) { permission.tap() }
+                UIPasteboard.general.items = []
+                app.buttons["auth.submit"].tap()
+                XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 30))
+                app.buttons["header.profile"].tap()
+                XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 10))
+            }
+            app.buttons["tab.home"].tap()
+            return
         }
         app.buttons["header.profile"].tap()
         if !app.buttons["auth.signOut"].waitForExistence(timeout: 3), !app.textFields["auth.email"].exists {

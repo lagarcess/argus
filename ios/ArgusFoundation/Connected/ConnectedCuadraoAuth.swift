@@ -57,6 +57,7 @@ struct ConnectedCuadraoAuthFlow: View {
                                 .foregroundStyle(.white)
                                 .background(WelcomePalette.pine, in: RoundedRectangle(cornerRadius: 16))
                         }.buttonStyle(.plain)
+                        .accessibilityIdentifier("cuadrao.welcome.signup")
                         NavigationLink {
                             ConnectedCreateAccount(spanish: spanish, signingIn: true)
                         } label: {
@@ -68,6 +69,7 @@ struct ConnectedCuadraoAuthFlow: View {
                                         .stroke(Color(white: 0.80), lineWidth: 1)
                                 }
                         }.buttonStyle(.plain)
+                        .accessibilityIdentifier("cuadrao.welcome.signin")
                     }.padding(.bottom, 28)
                 }
                 .padding(.horizontal, 28)
@@ -251,7 +253,7 @@ struct ConnectedEmailSignIn: View {
                 focus = nil
                 beginChallenge()
             }
-            .accessibilityIdentifier("cuadrao.signin.submit")
+            .accessibilityIdentifier("auth.submit")
             .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 20)
             .background(Color.white)
         }
@@ -301,7 +303,7 @@ struct ConnectedEmailSignIn: View {
                 .onSubmit { focus = visible ? .visiblePassword : .password }
                 .modifier(RegistrationField(focused: focus == .email, invalid: invalidEmail))
                 .disabled(surface == .loading)
-                .accessibilityIdentifier("cuadrao.signin.email")
+                .accessibilityIdentifier("auth.email")
             if invalidEmail {
                 Label(spanish ? "Revisa el formato del correo." : "Check the email format.", systemImage: "exclamationmark.circle")
                     .font(.footnote).foregroundStyle(.red)
@@ -325,7 +327,7 @@ struct ConnectedEmailSignIn: View {
                 .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.go)
                 .onSubmit { if ready { focus = nil; beginChallenge() } }
-                .accessibilityIdentifier("cuadrao.signin.password")
+                .accessibilityIdentifier("auth.password")
                 Button {
                     let wasFocused = passwordFocused
                     visible.toggle()
@@ -343,7 +345,7 @@ struct ConnectedEmailSignIn: View {
             }
             .font(.subheadline.weight(.medium)).foregroundStyle(WelcomePalette.pine)
             .frame(minHeight: 44).disabled(surface == .loading)
-            .accessibilityIdentifier("cuadrao.signin.recover")
+            .accessibilityIdentifier("auth.forgotPassword")
         }
     }
 
@@ -439,7 +441,7 @@ struct ConnectedEmailRegistration: View {
                     focus = nil
                     beginChallenge()
                 }
-                .accessibilityIdentifier("cuadrao.signup.submit")
+                .accessibilityIdentifier("auth.submit")
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
                 .padding(.bottom, 20)
@@ -493,7 +495,7 @@ struct ConnectedEmailRegistration: View {
                 .onSubmit { focus = passwordVisible ? .visiblePassword : .password }
                 .modifier(RegistrationField(focused: focus == .email, invalid: emailError))
                 .disabled(surface == .loading)
-                .accessibilityIdentifier("cuadrao.signup.emailField")
+                .accessibilityIdentifier("auth.email")
             if emailError {
                 Label(spanish ? "Revisa el correo. Por ejemplo: nombre@ejemplo.com."
                       : "Check the email. For example: name@example.com.", systemImage: "exclamationmark.circle")
@@ -520,7 +522,7 @@ struct ConnectedEmailRegistration: View {
                 .autocorrectionDisabled()
                 .submitLabel(.done)
                 .onSubmit { focus = nil }
-                .accessibilityIdentifier("cuadrao.signup.password")
+                .accessibilityIdentifier("auth.password")
                 Button {
                     let wasFocused = passwordFocused
                     passwordVisible.toggle()

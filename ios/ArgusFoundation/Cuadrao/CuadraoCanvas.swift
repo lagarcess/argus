@@ -4,6 +4,9 @@ enum WelcomePalette {
     static let pine = Color(red: 0.16, green: 0.29, blue: 0.25)
     static let sage = Color(red: 0.91, green: 0.93, blue: 0.91)
     static let overlap = Color(red: 0.25, green: 0.38, blue: 0.33)
+    /// Preview surfaces only; Connected keeps tip appearance tokens.
+    static let background = Color.white
+    static let separator = Color(white: 0.85)
 }
 
 /// The native visual canvas. Add only the UI elements selected during design review.

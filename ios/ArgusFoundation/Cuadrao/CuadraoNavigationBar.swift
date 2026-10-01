@@ -34,6 +34,17 @@ enum CuadraoTab: Int, CaseIterable, Identifiable {
         default: Image(systemName: symbol)
         }
     }
+
+    /// Maps onto tip `tab.*` / `header.profile` identifiers (no Accounts tab).
+    var tipAccessibilityID: String {
+        switch self {
+        case .home: "tab.home"
+        case .plan: "tab.plan"
+        case .assistant: "tab.argus"
+        case .search: "tab.search"
+        case .profile: "header.profile"
+        }
+    }
 }
 
 struct CuadraoNavigationBar: View {
@@ -61,7 +72,8 @@ struct CuadraoNavigationBar: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tab.title(spanish: spanish))
-                .accessibilityIdentifier("cuadrao-tab-\(tab.rawValue)")
+                // Tip-compatible ids keep UITests working; Cuadrao ordinal remains for design evidence.
+                .accessibilityIdentifier(tab.tipAccessibilityID)
                 .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
         }

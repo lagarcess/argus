@@ -105,16 +105,20 @@ struct ConnectedCuadraoShell: View {
         switch value {
         case .accounts:
             tab = .home
-            if let accounts = auth.accounts, let loop = auth.financialLoop, let account = accounts.selected {
-                accountPath = [account.id]
-                Task { await accounts.open(account); await loop.open(account) }
-            } else if let id = auth.accounts?.selectedID {
-                accountPath = [id]
+            if let accounts = auth.accounts, let loop = auth.financialLoop {
+                if let account = accounts.selected {
+                    if accountPath != [account.id] { accountPath = [account.id] }
+                    Task { await accounts.open(account); await loop.open(account) }
+                } else if let id = accounts.selectedID {
+                    if accountPath != [id] { accountPath = [id] }
+                }
             }
             if destination != .home { destination = .home }
         case .plan: tab = .plan
         case .search: tab = .search
-        case .home: tab = .home
+        case .home:
+            tab = .home
+            if !accountPath.isEmpty { accountPath = [] }
         case .argus: tab = .assistant
         }
     }

@@ -15,7 +15,6 @@ struct ConnectedCuadraoHome: View {
     @Environment(\.locale) private var locale
     @State private var sheet: HomeSheet?
     @State private var choosingAccount = false
-    @State private var actionAccount: FinancialAccount?
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var activeAccounts: [FinancialAccount] { accounts.accounts.filter { !$0.archived } }
@@ -76,6 +75,7 @@ struct ConnectedCuadraoHome: View {
                 }
                 .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
             }
+            .accessibilityIdentifier("screen.home")
             .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
                 enabled: tab == .home && sheet == nil && accountPath.isEmpty))
             .safeAreaPadding(.bottom, 80)
@@ -89,14 +89,33 @@ struct ConnectedCuadraoHome: View {
                             AccountDetailView(account: account, model: accounts, loop: loop)
                         }.padding(24)
                     }
+                    .accessibilityIdentifier("screen.accounts")
                     .background(Color.white)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar(.visible, for: .navigationBar)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                accountPath = []
+                            } label: {
+                                Label("accounts.back", systemImage: "chevron.left")
+                            }
+                            .accessibilityIdentifier("accounts.back")
+                        }
+                    }
+                    .navigationBarBackButtonHidden(true)
                 }
             }
         }
         .task(id: accounts.identity?.revision) { await accounts.load(); await loop.refresh() }
         .onChange(of: accounts.accounts) { _, _ in Task { await loop.refresh() } }
+        .onChange(of: accounts.selectedID) { _, id in
+            if let id {
+                if accountPath != [id] { accountPath = [id] }
+            } else if !accountPath.isEmpty {
+                accountPath = []
+            }
+        }
         .onChange(of: accountPath) { _, path in
             if path.isEmpty, accounts.selectedID != nil { accounts.back() }
         }
@@ -109,30 +128,6 @@ struct ConnectedCuadraoHome: View {
             }
         }
         .sheet(item: $sheet) { item in modal(item) }
-        .confirmationDialog(
-            actionAccount.map { $0.nickname ?? NSLocalizedString("accounts.type." + $0.type, comment: "") } ?? "",
-            isPresented: Binding(get: { actionAccount != nil }, set: { if !$0 { actionAccount = nil } }),
-            titleVisibility: .visible
-        ) {
-            if let account = actionAccount {
-                Button(spanish ? "Cambiar nombre" : "Rename account") {
-                    accounts.edit(account); actionAccount = nil
-                }
-                Button(spanish ? "Añadir movimiento" : "Add transaction") {
-                    loop.record(account); actionAccount = nil
-                }
-                if account.archived {
-                    Button(spanish ? "Restaurar" : "Restore") {
-                        Task { await accounts.archive(account) }; actionAccount = nil
-                    }
-                } else {
-                    Button(spanish ? "Archivar" : "Archive", role: .destructive) {
-                        Task { await accounts.archive(account) }; actionAccount = nil
-                    }
-                }
-                Button("accounts.cancel", role: .cancel) { actionAccount = nil }
-            }
-        }
     }
 
     private var header: some View {
@@ -223,33 +218,31 @@ struct ConnectedCuadraoHome: View {
                     Button { accounts.create() } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
                         .accessibilityLabel(spanish ? "Añadir cuenta" : "Add account")
                         .accessibilityIdentifier("accounts.add")
-                    Button { sheet = .options } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                        .accessibilityLabel(spanish ? "Opciones de cuentas" : "Account options")
+                    Button { sheet = .archived } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                        .accessibilityLabel(spanish ? "Cuentas archivadas" : "Archived accounts")
+                        .accessibilityIdentifier("accounts.manage")
                 }
             }
             ForEach(activeAccounts) { account in
-                Button {
-                    Task {
-                        await accounts.open(account)
-                        await loop.open(account)
-                        accountPath.append(account.id)
+                ConnectedAccountRow(account: account, spanish: spanish)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        Task {
+                            await accounts.open(account)
+                            await loop.open(account)
+                        }
                     }
-                } label: {
-                    ConnectedAccountRow(account: account, spanish: spanish)
-                }
-                .buttonStyle(.plain)
-                .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in
-                    actionAccount = account
-                })
-                .contextMenu {
-                    Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.edit(account) }
-                    Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
-                    Button(spanish ? "Archivar" : "Archive", role: .destructive) {
-                        Task { await accounts.archive(account) }
+                    .contextMenu {
+                        Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.edit(account) }
+                        Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
+                        Button(spanish ? "Archivar" : "Archive", role: .destructive) {
+                            Task { await accounts.archive(account) }
+                        }
                     }
-                }
-                .accessibilityIdentifier("accounts.row.\(account.id)")
-                .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("accounts.row.\(account.id)")
+                    .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
             }
             if activeAccounts.isEmpty {
                 personalEmpty
@@ -301,7 +294,6 @@ struct ConnectedCuadraoHome: View {
                         Task {
                             await accounts.open(account)
                             await loop.open(account)
-                            accountPath.append(account.id)
                         }
                     } label: {
                         FinancialActivityRow(activity: entry, currency: account.currency)
@@ -321,6 +313,7 @@ struct ConnectedCuadraoHome: View {
                 CanvasActionRow(title: spanish ? "Cuentas archivadas" : "Archived accounts", symbol: "archivebox") {
                     sheet = .archived
                 }
+                .accessibilityIdentifier("accounts.manage")
             }.padding(28).presentationDetents([.height(200)]).presentationDragIndicator(.visible)
         case .archived:
             ConnectedArchivedAccounts(accounts: accounts, spanish: spanish)
@@ -421,6 +414,14 @@ private struct ConnectedArchivedAccounts: View {
                 .navigationTitle(spanish ? "Cuentas archivadas" : "Archived accounts")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Label("accounts.back", systemImage: "chevron.left")
+                        }
+                        .accessibilityIdentifier("accounts.manage.back")
+                    }
                     ToolbarItem(placement: .confirmationAction) {
                         Button(spanish ? "Listo" : "Done") { dismiss() }
                     }

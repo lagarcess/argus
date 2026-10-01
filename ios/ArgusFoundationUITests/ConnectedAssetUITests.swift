@@ -111,7 +111,7 @@ extension FinancialLoopUITests {
         assertAssetContribution("DOP 0.00")
         capture("asset-zero-remains-known")
         guard ProcessInfo.processInfo.environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == "true" else { return }
-        app.buttons["tab.accounts"].tap(); scrollMoneyTop(); tapVisible(app.buttons["accounts.back"])
+        app.openAccountsList(); scrollMoneyTop(); tapVisible(app.buttons["accounts.back"])
         tapVisible(app.buttons["accounts.add"]); tapVisible(app.buttons["accounts.otherAssets"])
         tapVisible(app.buttons["accounts.type.vehicle"])
         let name = "Recovered vehicle " + stamp
@@ -127,7 +127,7 @@ extension FinancialLoopUITests {
         let retry = app.scrollViews["screen.home"].buttons["loop.pending.retry"]
         XCTAssertTrue(retry.waitForExistence(timeout: 20)); tapVisible(retry)
         XCTAssertTrue(retry.waitForNonExistence(timeout: 20))
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         if app.buttons["accounts.back"].exists { scrollMoneyTop(); tapVisible(app.buttons["accounts.back"]) }
         let rows = app.scrollViews["screen.accounts"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name))
         XCTAssertEqual(rows.count, 1)
@@ -136,7 +136,7 @@ extension FinancialLoopUITests {
     }
 
     func createAsset(_ name: String, type: String, amount: String?, half: Bool = false) -> MoneyAccount {
-        app.buttons["tab.accounts"].tap()
+        app.openAccountsList()
         if app.buttons["accounts.back"].exists { scrollMoneyTop(); tapVisible(app.buttons["accounts.back"]) }
         tapVisible(app.buttons["accounts.add"]); tapVisible(app.buttons["accounts.otherAssets"])
         tapVisible(app.buttons["accounts.type." + type])

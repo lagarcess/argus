@@ -230,13 +230,20 @@ struct CuadraoHomeCanvas: View {
         Text(title).font(.system(.title2, design: .serif)).accessibilityAddTraits(.isHeader)
     }
 
-    private func destination(_ tab: CuadraoTab) -> some View {
-        NavigationStack {
-            ContentUnavailableView(tab.title(spanish: spanish), systemImage: tab.symbol,
-                description: Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home."))
-                .background(Color.white)
+    @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
+        if tab == .search {
+            // Design-preview Search from checkpoint a509cebde. Connected production
+            // still uses tip FinancialSearchDestination — Chats/Files/Memory stay sample-only here.
+            CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
+                actions: { sheet = .actions($0) }, record: { sheet = .record($0) })
+        } else {
+            NavigationStack {
+                ContentUnavailableView(tab.title(spanish: spanish), systemImage: tab.symbol,
+                    description: Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home."))
+                    .background(Color.white)
+            }
+            .toolbar(.hidden, for: .tabBar)
         }
-        .toolbar(.hidden, for: .tabBar)
     }
 
     @ViewBuilder private func modal(_ item: HomeSheet) -> some View {

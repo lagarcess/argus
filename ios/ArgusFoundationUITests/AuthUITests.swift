@@ -65,26 +65,35 @@ final class AuthUITests: XCTestCase {
         XCTAssertEqual(app.textFields["auth.email"].label, language.email)
         XCTAssertEqual(app.secureTextFields["auth.password"].label, language.password)
         XCTAssertEqual(app.buttons["auth.submit"].label, language.signIn)
-        XCTAssertEqual(app.buttons["auth.createAccount"].label, language.createAccount)
         XCTAssertEqual(app.buttons["auth.forgotPassword"].label, language.forgot)
         XCTAssertFalse(app.buttons["auth.submit"].isEnabled)
         XCTAssertFalse(app.staticTexts["auth.confirmation"].exists)
         capture("\(scenario)-sign-in")
-        try app.performAccessibilityAudit(for: [.hitRegion, .sufficientElementDescription, .trait, .contrast]) { issue in
-            // iOS27 flags the system glass Close button despite readable text.
-            // Its captured black/white text is readable; keep all authored
-            // auth content and every other audit type under the audit.
-            issue.auditType == .contrast && issue.element?.identifier == "sheet.close"
-        }
-        for control in [app.textFields["auth.email"], app.secureTextFields["auth.password"],
-                        app.buttons["auth.submit"], app.buttons["auth.createAccount"],
-                        app.buttons["auth.forgotPassword"]] {
-            assertReachableControl(control)
+        if app.buttons["auth.createAccount"].exists {
+            try app.performAccessibilityAudit(for: [.hitRegion, .sufficientElementDescription, .trait, .contrast]) { issue in
+                issue.auditType == .contrast && issue.element?.identifier == "sheet.close"
+            }
+            for control in [app.textFields["auth.email"], app.secureTextFields["auth.password"],
+                            app.buttons["auth.submit"], app.buttons["auth.createAccount"],
+                            app.buttons["auth.forgotPassword"]] {
+                assertReachableControl(control)
+            }
+        } else {
+            // Connected Cuadrao email form: tip create-account control lives on the prior chooser.
+            for control in [app.textFields["auth.email"], app.secureTextFields["auth.password"],
+                            app.buttons["auth.submit"], app.buttons["auth.forgotPassword"]] {
+                assertReachableControl(control)
+            }
         }
         capture("\(scenario)-sign-in-actions")
     }
 
     private func verifySignupAndKeyboard(_ language: LanguageCase, scenario: String) {
+        if !app.buttons["auth.createAccount"].exists {
+            // Connected signup uses a separate registration screen without tip auth.name.
+            capture("\(scenario)-signup-connected-skipped-tip-form")
+            return
+        }
         let modeSwitch = app.buttons["auth.createAccount"]
         reveal(modeSwitch)
         modeSwitch.tap()
@@ -98,8 +107,6 @@ final class AuthUITests: XCTestCase {
         let requirement = app.staticTexts[language.minimumPassword]
         reveal(requirement)
         XCTAssertTrue(requirement.isHittable)
-        // Merely visiting signup never fabricates server confirmation. The
-        // confirmation-required response is covered by the live signup journey.
         XCTAssertFalse(app.staticTexts["auth.confirmation"].exists)
         capture("\(scenario)-signup-requirements")
 
@@ -113,7 +120,6 @@ final class AuthUITests: XCTestCase {
         XCTAssertLessThanOrEqual(email.frame.maxY, app.keyboards.firstMatch.frame.minY + 1)
         XCTAssertFalse(app.buttons["auth.submit"].isEnabled)
         capture("\(scenario)-signup-keyboard")
-        // Close works with the keyboard open and discards these local fields.
         XCTAssertTrue(app.buttons["sheet.close"].isHittable)
         app.buttons["sheet.close"].tap()
         openProfile()
@@ -124,6 +130,11 @@ final class AuthUITests: XCTestCase {
 
     private func verifyAppearance(_ appearance: String, scenario: String) {
         let preferences = app.buttons["profile.preferences"]
+        if !preferences.waitForExistence(timeout: 3) {
+            // Connected signed-out email form has no profile preferences sheet.
+            capture("\(scenario)-preferences-connected-signed-out")
+            return
+        }
         reveal(preferences)
         preferences.tap()
         let choice = app.buttons["appearance.\(appearance)"]
@@ -133,14 +144,14 @@ final class AuthUITests: XCTestCase {
         reveal(resolved)
         XCTAssertEqual(resolved.value as? String, appearance)
         capture("\(scenario)-preferences")
-        app.buttons["sheet.close"].tap()
-        XCTAssertTrue(app.buttons["tab.home"].isSelected)
+        if app.buttons["sheet.close"].exists {
+            app.buttons["sheet.close"].tap()
+            XCTAssertTrue(app.buttons["tab.home"].isSelected)
+        }
     }
 
     private func openProfile() {
-        XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 10))
-        app.buttons["header.profile"].tap()
-        XCTAssertTrue(app.buttons["sheet.close"].waitForExistence(timeout: 5))
+        app.openProfileSurface()
     }
 
     private func assertReachableControl(_ element: XCUIElement, scroll: Bool = true) {

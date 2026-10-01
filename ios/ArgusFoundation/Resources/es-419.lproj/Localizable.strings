@@ -405,7 +405,7 @@
 
 "search.title" = "Encuentra tus registros financieros";
 "search.gate" = "Inicia sesión para buscar tus cuentas, movimientos y Plan.";
-"search.placeholder.connected" = "Busca en tus finanzas";
+"search.placeholder.connected" = "Buscar";
 "search.filter.all" = "Todo";
 "search.filter.account" = "Cuentas";
 "search.filter.activity" = "Movimientos";
