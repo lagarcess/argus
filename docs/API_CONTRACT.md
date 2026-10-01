@@ -7777,5 +7777,5 @@ Problems: 404 `financial_import_not_found`; 409 `stale_version` and the
 conflicts above; 422 validation codes (`validation_error`, `kind_invalid`,
 `category_unknown`, `source_unknown`, `time_zone_unknown`, `*_id_invalid`);
 recording errors use the existing financial-accounts problems. Evidence a
-connector submits after its connection ended is ignored (counted unchanged),
+connector submits after its connection ended is ignored (`SubmitResult.ignored`),
 so an in-flight sync cannot recreate drafts a disconnect removed.

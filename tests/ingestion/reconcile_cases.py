@@ -824,7 +824,7 @@ def test_evidence_arriving_after_disconnect_is_ignored(world):
     world.disconnect(shortcuts)
     world.recon.forget_connection(user_id=world.user, connection_id=shortcuts)
     late = submit(world, shortcuts, tap(shortcuts, "tap-late"))
-    assert late.recorded == 0
+    assert late.recorded == 0 and late.ignored == 1
     assert _open(world) == []
 
 

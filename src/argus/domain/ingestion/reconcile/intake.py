@@ -61,7 +61,7 @@ def submit(
         # Checked under the person's lock: a disconnect's cleanup takes the
         # same lock after the connection is marked ended.
         if not is_live():
-            return SubmitResult(0, len(candidates), 0)
+            return SubmitResult(0, 0, 0, ignored=len(candidates))
         for candidate in candidates:
             _record(tx, user_id, candidate, now, tally)
     return SubmitResult(tally.recorded, tally.unchanged, tally.withdrawn)
