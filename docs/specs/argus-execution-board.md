@@ -47,7 +47,12 @@ No other open integration backend lane was found.
 The prior product questions and automatic-review authorization blocker are
 resolved by this explicit grant. Full budgets, bills, goals and debt delivery
 remains required through native acceptance and merge-ready review. The new local
-resource assignment will be recorded below before use; old 59700 stays stopped.
+resource assignment is `ios-accounts-59750`: API 59750 reserved, local Auth
+59751 / disposable Postgres 59752, CAPTCHA 59755 reserved, helper ports
+59753–59754 and 59757–59761. Configuration/state stays in this worker's ignored
+`ios/.build/accounts-local-59750`. Configure verifies every assigned port is
+unused and project ownership matches before starting. Old 59700 stays stopped
+and is never migrated. No simulator is assigned yet.
 
 ### Outcome, owners and execution
 
