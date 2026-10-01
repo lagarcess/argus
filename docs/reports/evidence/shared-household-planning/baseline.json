@@ -17,5 +17,16 @@
   "pending_decisions": [
     "Plan-specific participant/view/edit and private-contribution interaction",
     "Shared-plan owner departure custody"
-  ]
+  ],
+  "native_transport_baseline": {
+    "tested_head": "150a9b10ff533478f30a83aa03c25f662130ade7",
+    "command": "env -u ARGUS_SESSION_LIVE_CONFIG swift test --package-path ios/Packages/ArgusSession --scratch-path /private/tmp/argus-shared-household-planning-swift-build --cache-path /private/tmp/argus-shared-household-planning-swift-cache --skip LiveSessionTests",
+    "passed": 64,
+    "skipped": 1,
+    "failed": 0,
+    "excluded": "LiveSessionTests; no live configuration supplied",
+    "skip_reason": "LiveFinancialAccountTests requires the isolated Auth fixture.",
+    "scope": "Existing native transport/session baseline only; no shared-planning UI or simulator acceptance.",
+    "log": "swift-baseline.txt"
+  }
 }

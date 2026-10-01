@@ -78,6 +78,10 @@ Pre-change deterministic baseline: **81 passed, 74 skipped, zero failures**
 Skipped cases require the not-yet-assigned disposable Postgres DSN; they establish
 no database acceptance. Existing Household Plan is still explicitly unavailable.
 No new demo or shared-planning behavior is claimed at this checkpoint.
+Existing native transport/session baseline also compiles: **64 passed, one
+opt-in local-service test skipped, zero failures**, at `150a9b10`. Live session
+tests were excluded and no Auth fixture was supplied. The command and durable
+log are in the same baseline packet. This is not shared-planning native proof.
 
 Two code-grounded shapes were inspected: consent/responsibility references around
 canonical definitions, versus explicit Household scope embedded in definitions.
