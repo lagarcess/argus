@@ -137,3 +137,14 @@ def test_disconnect_is_owner_only(client, identities):
         .status
         == "active"
     )
+
+
+def test_disconnect_without_a_registered_adapter_reports_failed_revocation(
+    client, identities
+):
+    hub = ingestion_hub()
+    hub._adapters.pop("plaid", None)
+    row = connect(identities, ALICE)  # holds a sealed provider credential
+    body = client.post(f"{URL}/{row.id}/disconnect", headers=bearer(ALICE)).json()
+    assert body["provider_revocation"] == "failed"
+    assert body["connection"]["status"] == "disconnected"
