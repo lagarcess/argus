@@ -1,4 +1,4 @@
-# Cuadrao Accounts: approved interaction decisions
+# Cuadrao native design: approved interaction decisions
 
 Status: founder-approved design direction, locked September 30, 2026.
 Applies to the Cuadrao native design canvas. This is not a financial API contract,
@@ -8,6 +8,84 @@ The founder approved preserving the previous evening's Accounts work as a whole,
 then carrying it into native UI. The source is the reviewed local HTML account
 study plus the explicit conversation decisions. References inform presentation;
 they do not reopen these decisions.
+
+## Current design checkpoint — September 30, 2026
+
+The founder requested locking the work so far, identifying remaining design work,
+and prioritizing a usable physical-iPhone experience. This section is the current
+summary; dated sections below retain decision history and supporting evidence.
+Locked means preserve the reviewed baseline, not final polish or connected delivery.
+
+| Surface | Preserve now | Still to design or verify |
+| --- | --- | --- |
+| Welcome and account access | Welcome composition, provisional mark/pine palette, Tus finanzas, en orden; create account, sign-in and recovery UI | Real auth states and handoff, device language selection, complete English parity, physical keyboard/accessibility review |
+| Home and navigation | Personal / Hogar / + selector; all active accounts; Movimientos distinct from Próximamente; Ordenar Inicio; icon-only navigation with approved Home, calendar, profile and bell artwork, including Novedades | Panorama meaning and useful content, realistic long/unknown/error/loading states, navigation motion and physical-device polish |
+| Accounts | Add/type/name/optional balance, currency entry, details, actions, reorder, archive/restore | Present the existing connected transaction inspection/correction, transfer/refund and reconciliation capabilities coherently; richer account/asset details; loading/failure/recovery presentation |
+| Household | Empty Home, create/open Hogar, native share-link preview, recipient accept/defer, Personas owns invitation/member status | Auth/install handoff, invitation expiry/revocation recovery, explicit sharing and visibility/editing explanations, leave/remove consequences under approved production contracts |
+| Plan | Calendar navigation icon | Cuadrao overview and detail presentation for budgets, savings goals, debt plans and commitments, using the delivery lane's existing capabilities |
+| Search | Navigation entry | Cuadrao search/results/detail presentation and empty/error states |
+| Assistant, Profile and Novedades | Placement; profile and bell artwork | Actual Cuadrao destination screens, minimum account/settings controls, assistant entry and result presentation, meaningful updates |
+| Shared visual system | Native SwiftUI, Spanish-first review, reusable components and vector assets, light mode | Final logo/brand decisions, consolidated typography/spacing, accessibility, language coverage and device verification; dark mode remains deferred |
+
+### What separates this canvas from daily phone use
+
+At design source `da2012f5a25f66b04828a2b37712a15b1b96c4c1`,
+`ArgusFoundationApp` selects `CuadraoCanvas` with `--cuadrao-design` and otherwise
+launches the connected `FoundationShell`. The design canvas is native code, but
+its accounts and household state are sample state. Apart from saved Home order,
+that preview is not durable financial storage. Other menu destinations remain
+placeholders. The welcome canvas currently pins Spanish: having English strings
+in source is not verified runtime localization parity.
+
+Two separate milestones prevent misleading completion claims:
+
+1. **Review on the phone:** install the existing design preview in a distinct app
+   identity, preserving the connected app/session. Verify navigation, keyboard,
+   safe areas and text at actual device size. This can precede the rest of the
+   design; sample data remains explicit. Current simulator proof does not prove
+   physical-device signing/install, launch from the app icon, or internet access.
+2. **Use with real records:** adapt the approved screens to existing session,
+   account and financial-operation owners. Start with sign in, Home, accounts,
+   record/inspect/correct and reopen, including failure/recovery and minimum
+   profile/sign-out controls. Preserve capabilities and canonical money rules;
+   do not create a parallel ledger or treat sample acceptance as real membership.
+   Real phone-over-internet delivery remains coordinated with the delivery lane.
+
+### Recommended priority, not a new implementation assignment
+
+- **Next local step:** physical-phone design preview and the focused reuse map
+  below. Use the current simulator/build cache for local checks; no new demo farm.
+- **Next design surface:** Plan as a complete overview-to-detail experience,
+  informed by the approved account controls and existing financial contracts.
+  Apply the established Mobbin/Apple reference exercise before design changes.
+- **Connection priority:** the personal account loop above, then Plan and Search.
+  Carry minimum account/settings and recovery UI with that usable loop instead
+  of waiting for a fully redesigned Profile. Existing assistant capabilities are
+  preserved; missing Cuadrao styling does not retire them.
+- **Subsequent design:** remaining household sharing/management, assistant,
+  Novedades and broader Profile. Final brand, dark mode and decorative motion do
+  not block a useful phone review.
+
+### Parallel VM candidate: connected-UI reuse map
+
+Proposed bounded read-only assignment, not dispatched by this checkpoint. Compare
+this exact design checkpoint with a freshly recorded integration SHA; account for
+active delivery changes separately. The delivery chat was inspected during this
+checkpoint and is actively finishing personal assets (PR #759), so that work is
+not available for a competing implementation assignment.
+
+Deliver one actionable matrix: Cuadrao screen/action -> existing native
+model/session/API owner -> required presentation adapter -> unresolved product
+choice, if any. Cover authentication, Home, accounts/activity/reconciliation,
+Plan and Search. Include existing test/evidence pointers, language/accessibility
+omissions, and the smallest safe connection sequence. Identify duplicated state
+that must be replaced by canonical owners; do not suggest synchronizing two ledgers.
+
+A Linux VM can inspect code and prepare this handoff. It cannot supply the local
+Xcode/signing/physical-iPhone acceptance evidence. No changes to SwiftUI, financial
+runtime, contracts, prompts, migrations, hosted settings, demo processes or
+simulators; no paid calls, push, merge or deployment. Keep the report in the VM's
+own workspace for review. Refresh references before any later implementation.
 
 ## Locked
 
@@ -28,12 +106,12 @@ they do not reopen these decisions.
 | Input tone/motion | Empty 0.00 is gray; positive entry uses a legible teal. Grouping motion must not delay the actual entered value. Respect Reduce Motion. |
 | Add action | Disabled while the type is missing or input needs correction. A contextual info lip slides above the action and collapses when valid. |
 | Copy | Name; Loan; Other assets. Remove fictional-information footer, Private to you, and leave-blank helper. Optional labels remain. |
-| Navigation | Home, Plan/target, assistant, Search, Profile. No visible icon labels. No Accounts tab. Exact approved Home icon; assistant mark remains provisional. Bell at upper right. |
+| Navigation | Home, Plan/calendar, assistant, Search, Profile. No visible icon labels. No Accounts tab. Exact approved Home icon; assistant mark remains provisional. Bell at upper right. |
 
 ## Still open or preserved elsewhere
 
-- Home composition beyond Accounts, final branding, typography/spacing polish,
-  assistant mark and navigation-bar motion remain open for review.
+- Home structure is locked as summarized above. Panorama content, final branding,
+  typography/spacing polish, assistant mark and navigation-bar motion remain open.
 - Swipe actions are deferred. Native does not inherit the green web swipe control.
 - Balance-check semantics and detailed reconciliation remain owned by the existing
   connected financial experience. Do not redesign them as part of this pass.
@@ -108,7 +186,7 @@ This is a presentation preference, not a new financial backend flow.
 Label refinement: **Ordenar Inicio** / **Reorder Home** replaces Personalizar Inicio /
 Customize Home. This control changes section order only.
 
-## Home surface checkpoint — September 30, 2026
+## Earlier Home checkpoint — before first-use and invitation work
 
 Founder requested preserving the current structure and explicitly tracking what
 remains. Home is structurally settled for continued design work, not visually
@@ -124,7 +202,8 @@ final typography, spacing and visual rhythm; menu-bar motion; realistic and
 long content; larger text, VoiceOver and physical-device review. Final brand
 identity and dark mode remain app-wide decisions.
 
-**First-use and Household coverage, inspected in the native canvas:**
+**Historical coverage before the continuations below; see the current checkpoint
+above for present status:**
 
 | State or flow | Current design state | Remaining design work |
 | --- | --- | --- |
@@ -141,7 +220,7 @@ account. This checkpoint does not approve a new permission model, invitation
 integration, financial rule or backend implementation. Household flow proposals
 still require the usual design-reference and founder review exercise.
 
-## First-use design proposal — September 30, 2026
+## First-use design baseline — September 30, 2026
 
 Implemented for founder review in the native sample canvas after the Mobbin pass:
 Personal with no accounts; Household creation introduction; Household alone;
@@ -153,10 +232,11 @@ Household pending/joined states do not create or share private account records.
 [First-use evidence and preview instructions](../reports/evidence/cuadrao-native-design/cold-start/README.md)
 record the native journey and its limits. This advances the earlier checkpoint's
 first-use/empty-household rows; it does not close the complete invitation, sharing
-or member-management design. The recipient acceptance screen and production
-invitation mechanism remain open. Preview-only simulation is labelled explicitly.
+or member-management design. The later invitation-link continuation supplies the
+recipient preview; the production invitation mechanism remains open. Preview-only
+simulation is labelled explicitly.
 
-## Household invitation-link proposal — September 30, 2026
+## Household invitation-link baseline — September 30, 2026
 
 Founder approved replacing the name-entry mock with a native share-sheet link and
 recipient acceptance preview. Compartir invitación lets the system offer installed
