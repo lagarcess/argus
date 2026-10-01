@@ -5,6 +5,9 @@ struct CuadraoHomeCanvas: View {
     @AppStorage("cuadrao.design.home-section-order") private var homeOrder = CuadraoHomeSection.defaultOrder
     @State private var populated = (CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
     @State private var selectedTab: CuadraoTab = .home
+    @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
+    @State private var chatEditing = false
+    @State private var pendingTab: CuadraoTab?
     @State private var navigationScroll = CuadraoNavigationScroll()
     @State private var sheet: HomeSheet?
     @State private var data = CuadraoAccountsPreview(
@@ -23,7 +26,7 @@ struct CuadraoHomeCanvas: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: tabSelection) {
             NavigationStack(path: $accountPath) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 36) {
@@ -61,14 +64,21 @@ struct CuadraoHomeCanvas: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if accountPath.isEmpty || selectedTab != .home {
-            CuadraoNavigationBar(selection: $selectedTab,
+            if (accountPath.isEmpty || selectedTab != .home) && !(selectedTab == .assistant && chatEditing) {
+            CuadraoNavigationBar(selection: tabSelection,
                 compact: selectedTab == .home && navigationScroll.compact, spanish: spanish)
                 .padding(.horizontal, 20)
                 .frame(height: 64, alignment: .bottom)
                 .padding(.bottom, 8)
             }
         }
+        .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
+            isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {
+            Button(spanish ? "Terminar y salir" : "End and leave", role: .destructive) {
+                let destination = pendingTab; chat.endTemporary(); pendingTab = nil
+                if let destination { selectedTab = destination }
+            }
+        } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
         .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
         .onChange(of: data.selectedSpaceID) { _, _ in
@@ -89,6 +99,16 @@ struct CuadraoHomeCanvas: View {
                     .padding(.horizontal, 20).padding(.bottom, 90)
             }
         }
+    }
+
+    private var tabSelection: Binding<CuadraoTab> {
+        Binding(get: { selectedTab }, set: { next in
+            if selectedTab == .assistant && next != .assistant && chat.hasTemporaryContent { pendingTab = next }
+            else {
+                if selectedTab == .assistant && next != .assistant && chat.temporary { chat.endTemporary() }
+                selectedTab = next
+            }
+        })
     }
 
     @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
@@ -233,7 +253,10 @@ struct CuadraoHomeCanvas: View {
     @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
         if tab == .search {
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
+                chat: chat, openChat: { thread in chat.open(thread); selectedTab = .assistant },
                 actions: { sheet = .actions($0) }, record: { sheet = .record($0) })
+        } else if tab == .assistant {
+            CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
         } else if tab == .profile {
             CuadraoProfileCanvas(spanish: spanish, includeExamples: populated)
         } else {

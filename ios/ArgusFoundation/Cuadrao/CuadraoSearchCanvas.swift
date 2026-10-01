@@ -5,6 +5,8 @@ struct CuadraoSearchCanvas: View {
     let data: CuadraoAccountsPreview
     let spanish: Bool
     let includeExamples: Bool
+    let chat: CuadraoChatPreview
+    let openChat: (CanvasChatThread) -> Void
     let actions: (UUID) -> Void
     let record: (UUID) -> Void
     @State private var query = ""
@@ -36,7 +38,8 @@ struct CuadraoSearchCanvas: View {
     }
     private var references: [CanvasSearchReference] {
         guard includeExamples, scope != .household else { return [] }
-        return CanvasSearchReference.examples(spanish).filter { matches($0.title + " " + $0.detail + " " + $0.content) }
+        return (CanvasSearchReference.examples(spanish).filter { $0.kind != .chats } + chat.references(spanish))
+            .filter { matches($0.title + " " + $0.detail + " " + $0.content) }
     }
     private var count: Int {
         (kind == .all || kind == .accounts ? accounts.count : 0)
@@ -109,9 +112,15 @@ struct CuadraoSearchCanvas: View {
                             if (kind == .all || kind == section) && !rows.isEmpty {
                                 heading(title(section), count: rows.count)
                                 ForEach(rows) { item in
-                                    NavigationLink(value: Route.reference(item.id)) {
-                                        resultRow(item.title, detail: item.detail)
-                                    }.buttonStyle(.plain)
+                                    if item.kind == .chats, let thread = chat.threads.first(where: { $0.id == item.id }) {
+                                        Button { focused = false; openChat(thread) } label: {
+                                            resultRow(item.title, detail: item.detail)
+                                        }.buttonStyle(.plain)
+                                    } else {
+                                        NavigationLink(value: Route.reference(item.id)) {
+                                            resultRow(item.title, detail: item.detail)
+                                        }.buttonStyle(.plain)
+                                    }
                                     Divider()
                                 }
                             }

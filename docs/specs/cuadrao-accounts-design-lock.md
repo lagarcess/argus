@@ -390,3 +390,13 @@ Next assignment is Mobbin research and a chat pitch. No chat implementation,
 Profile changes, backend work, builds, simulator creation or phone installation
 occur in this checkpoint. The proposal in the linked report requires founder
 feedback before implementation; existing locked chat behavior remains the baseline.
+
+## Native chat proposal implemented for review — September 30, 2026
+
+Founder authorized trying the researched proposal. Native welcome/composer,
+attachment staging, sample answer/calculation detail, chat history and temporary
+mode now replace the assistant placeholder. Search opens chats from the same local
+preview owner. Profile remains unchanged and unfinished. This is a reviewable
+design iteration, not a final visual lock or backend completion.
+
+See [chat evidence and limits](../reports/evidence/cuadrao-native-design/chat/README.md).
