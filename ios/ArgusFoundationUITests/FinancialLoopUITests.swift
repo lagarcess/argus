@@ -44,14 +44,16 @@ final class FinancialLoopUITests: XCTestCase {
         if app.buttons["accounts.back"].waitForExistence(timeout: 3) {
             app.buttons["accounts.back"].tap()
         }
-        // Tip manage is a pushed stack; Connected archived list is a sheet dismissed then detail opened.
-        if app.buttons["accounts.manage.back"].waitForExistence(timeout: 2) {
-            for _ in 0..<5 { if app.buttons["accounts.manage.back"].isHittable { break }; app.swipeDown() }
-            app.buttons["accounts.manage.back"].tap()
-        } else {
-            app.openAccountsList()
+        // Connected may already show the restored row on Home after detail pop; tip still needs manage.back.
+        if !app.buttons[originalID].waitForExistence(timeout: 3) {
+            let manageBack = app.buttons["accounts.manage.back"]
+            if manageBack.waitForExistence(timeout: 2), manageBack.isHittable {
+                manageBack.tap()
+            } else {
+                app.openAccountsList()
+            }
+            XCTAssertTrue(app.buttons[originalID].waitForExistence(timeout: 10))
         }
-        XCTAssertTrue(app.buttons[originalID].waitForExistence(timeout: 10))
         assertHome(baseline + 125)
     }
 
@@ -198,6 +200,8 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func assertHome(_ expected: Decimal) {
+        app.revealConnectedTabBar()
+        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
         let value = app.staticTexts["home.netWorth.DOP"]
         let predicate = NSPredicate { _, _ in
@@ -209,6 +213,8 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func homeValue() -> Decimal {
+        app.revealConnectedTabBar()
+        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
         let value = app.staticTexts["home.netWorth.DOP"]
         XCTAssertTrue(value.waitForExistence(timeout: 10))
@@ -294,6 +300,8 @@ final class FinancialLoopUITests: XCTestCase {
                 app.buttons["header.profile"].tap()
                 XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 10))
             }
+            app.revealConnectedTabBar()
+            XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
             app.buttons["tab.home"].tap()
             return
         }
