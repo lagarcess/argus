@@ -148,3 +148,32 @@ def test_disconnect_without_a_registered_adapter_reports_failed_revocation(
     body = client.post(f"{URL}/{row.id}/disconnect", headers=bearer(ALICE)).json()
     assert body["provider_revocation"] == "failed"
     assert body["connection"]["status"] == "disconnected"
+
+
+def test_retrying_a_disconnect_finishes_cleanup_that_failed(client, identities):
+    hub = ingestion_hub()
+    adapter = Adapter(fail=False)
+    hub.register(adapter)
+
+    class FlakySink(FakeSink):
+        def __init__(self) -> None:
+            super().__init__()
+            self.calls = 0
+
+        def forget_connection(self, *, user_id: str, connection_id: str) -> int:
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("database hiccup")
+            return super().forget_connection(user_id=user_id, connection_id=connection_id)
+
+    sink = FlakySink()
+    hub.sink = sink
+    row = connect(identities, ALICE)
+    first = client.post(f"{URL}/{row.id}/disconnect", headers=bearer(ALICE))
+    assert first.status_code == 500
+    retry = client.post(f"{URL}/{row.id}/disconnect", headers=bearer(ALICE)).json()
+    assert retry["connection"]["status"] == "disconnected"
+    assert retry["provider_revocation"] == "not_applicable"
+    assert retry["unreviewed_removed"] == 3
+    assert sink.forgotten == [(identities[ALICE]["id"], row.id)]
+    assert len(adapter.seen) == 1  # the provider is not asked twice
