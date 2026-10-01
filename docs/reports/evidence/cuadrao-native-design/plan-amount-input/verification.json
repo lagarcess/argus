@@ -34,7 +34,7 @@
     "reference": "https://support.apple.com/en-us/127565",
     "checked": "2026-10-01",
     "currentGap": "Receipt attachment only; item extraction, editable receipt lines, shared-item selection and tax/tip allocation are not implemented. Apple Cash payment execution is outside this UI-only preview.",
-    "adaptation": "Spanish-first scan or photo, review items, split equally or by item, preview shares, retain drafts and external repayment tracking in one fixed currency."
+    "dispositionOwner": "../../../../specs/argus-execution-board.md#c01--native-scan-and-receipt-split"
   },
   "captures": [
     {

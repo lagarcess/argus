@@ -1,5 +1,8 @@
 # Argus private iPhone execution manifest
 
+**Cuadrao design follow-ups, October 1:** [single disposition register](#cuadrao-design-dispositions).
+The delivery-lane snapshot below is unchanged by that documentation checkpoint.
+
 **Updated:** September 30, 2026.
 **Execution state:** [connected personal savings goals](#pr-755-integration-landing) are landed through [PR #755](https://github.com/lagarcess/argus/pull/755), with the locally verified native journey and runnable demonstration preserved. The founder authorized this merge and its bounded integration landing. No next slice or deployment is authorized. [Personal spending budgets](#pr-753-integration-landing), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) are landed with their demonstrations preserved. Physical-iPhone testing belongs to a separate owner and remains outside this lane.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
@@ -1645,6 +1648,113 @@ backend revision, environment, evidence and remaining gaps in this manifest.
 Check concise copy, icons, locked navigation and native interaction quality
 before repeating a pattern across screens.
 
+## Cuadrao design dispositions
+
+**Recorded October 1, 2026; founder requested consolidation and publication.**
+This is the single follow-up register for the Cuadrao design session. Update
+these entries here; design studies and checkpoint evidence link here instead of
+maintaining competing queues. The MVEE still owns approved ecosystem scope and
+technical contracts still own financial truth. These dispositions preserve future
+design intent, outstanding connections and unresolved ideas; they do not assign a
+new implementation lane, activate providers or change the connected delivery lane.
+Existing MVEE requirements are not newly deferred because the preview is unfinished.
+
+**Preserved preview:** branch `codex/cuadrao-design-scan-recents`, checkpoint
+`72a41cb5ad6aaf4718bbce4da7bba987dd02dd99` (UI source
+`91ba76c496444c07b28075303bdfcb47d8bc10fc`). The amount-entry checkpoint was signed,
+installed and launched on the physical iPhone, installation sequence 3348;
+[verification](../reports/evidence/cuadrao-native-design/plan-amount-input/verification.json)
+records two native journeys. Installation is not full physical-interaction or
+connected-financial acceptance. This section does not refresh the historical
+integration/PR status elsewhere in this manifest.
+
+Home structure/Spaces, first-use and household invitation previews, Search,
+chat/temporary mode/Recents, voice interaction states and the personal/shared Plan
+preview already exist. Profile remains an unfinished paused checkpoint; Novedades
+remains a placeholder. [Design history](cuadrao-accounts-design-lock.md),
+[Plan evidence](../reports/evidence/cuadrao-native-design/plan-social/verification.json),
+[fixed currency](../reports/evidence/cuadrao-native-design/plan-currency/verification.json)
+and [voice evidence](../reports/evidence/cuadrao-native-design/voice-simple/README.md)
+retain what was actually built. Preview fixtures/local state are not durable
+production records, real audio, real invitations or money movement.
+
+### Follow-up ownership and disposition
+
+C01–C10 identify this session's follow-ups under the existing D01–D15 work map,
+not a parallel delivery team. Owners below are responsibility areas, not a claim
+that a named worker has been dispatched. Link the assigned lane and its evidence
+here when work starts. Close an entry only against its stated remaining gap.
+
+| ID / topic | Disposition and existing baseline | Remaining work and closure evidence | Existing responsibility |
+| --- | --- | --- | --- |
+| **C01 — Scan and itemized bills** | **Future design locked; implementation unassigned.** Photo attachment, drafts, equal/custom amount splits and partial repayment previews exist. No receipt extraction or item selection exists. | Native capture and the receipt-review/split flow below; retain item corrections, interrupted drafts and exact share totals in Spanish/English evidence. Real extraction, storage and posting require the intake contracts. | Intake D08 + Planning/Home D06; Household D07 for shared access |
+| **C02 — Shared plans and invitations** | **UI baseline preserved; connection outstanding.** Para ti / En grupo, trip estimates, recorded expenses, own share versus group total, shared savings, local invitation/guest preview and sample QR exist. Short-lived groups are distinct from durable Spaces. | Resolve group membership/guest access, link expiry/revocation, permissions and canonical expense/contribution/repayment ownership before connecting. Estimates must stay separate from actuals; repayments must not imply a bank transfer. Verify two participants, partial repayments, correction/recovery and no duplicate personal spending. | Planning/Home D06 + Household D07 + Financial core D03/D04 |
+| **C03 — Forecasts and calculators** | **Preview built; canonical connection outstanding.** Spending-pace playground, low point, editable assumptions and goal/debt projections exist with illustrative data. | Reuse existing Argus forecast/calculation owners for Home, Plan and chat. Carry forward the Stake-style editable compound-interest assumptions and contribution/earnings curve as future UI work, with disclosed rate/cadence assumptions. Verify chart/readout agreement and actual versus projected values. Retain Apple Card-inspired explanations of upcoming payment and interest consequences as design input to the existing debt owner. A short contextual explanation may help; a blog/tips destination is not required. | Planning/Home D05/D06 + Conversation D09; domain series owners |
+| **C04 — Voice and chat continuity** | **Interaction preview built; runtime outstanding.** Immersive/minimized voice, swipe-down, voice-choice carousel, short-message hold/lock/cancel/review, native dictation coexistence, temporary mode and Recents gestures are already previewed. | Connect xAI live voice through the existing chat brain; inherit agentic app actions only under D14 activation. Reuse existing Argus dynamic greeting logic. Resolve audio/transcript retention, Temporary context, actual provider voices/selection, interruptions and background/locked-screen policy. Verify one session across surfaces, draft recovery, mute/end, real capture and truthful progress. | Conversation/voice D09/D13/D14 + Native continuity |
+| **C05 — Home, Accounts and household** | **Structure locked; detailed acceptance/connection outstanding.** Personal / Hogar / +, Movimientos / Próximamente, Ordenar Inicio, approved icons, cold starts and Personas-owned invitation status are preserved. | Finish Panorama meaning, realistic empty/unknown/loading/failure/long-content states and assembled account detail/correction/reconciliation presentation. Use existing financial semantics, including balance checks; do not invent another ledger. Connect household auth/install/acceptance/sharing/leave/remove flows under the MVEE. Inviting does not require an account first, expose private accounts or warrant a nagging Home banner. Verify relevant journeys and permission boundaries. | Planning/Home D05 + Financial core D02/D03/D04 + Household D07 |
+| **C06 — Search, Files and Memory** | **Preview destinations preserved; remaining owner connections outstanding.** Keep Chats, Files and Memory alongside financial results. | Connect the authorized record owners, destination/reopen flows, filters and recovery. Respect permissions, Temporary exclusions and memory consent/retention. Search and Profile read the same owners; this is not approval for generic RAG or new memory storage. | Native continuity D10 + Conversation D09 + Intake D08 |
+| **C07 — Profile and Updates** | **Profile polish paused by founder; Novedades not designed beyond placeholder.** Preserve identity/preferences and appearance/voice preview work already done. | Resume Profile hierarchy/child-page polish only when requested; connect auth/security, settings, usage, data controls, help/feedback and notification preferences through their owners. Design Updates around actual domain events with source links, avoiding duplicate invitation reminders. Verify language/accessibility and working controls, not static menus alone. | Native continuity D12 + Planning/Home D11 |
+| **C08 — Identity and social discovery** | **Research/decisions outstanding.** Group covers and sample invitation QR are not profile-photo upload, live profile QR or contacts discovery. | Decide avatar/username/profile-QR scope and guest identity before implementation; validate QR legibility and scan reliability. Contacts matching needs explicit opt-in and a data/access contract. Native sharing can hand off a link to WhatsApp; no automatic contact upload or WhatsApp integration is implied. Keep this separate from required household membership and parked growth work. | Native continuity D12 + Household D07; founder for unresolved product scope |
+| **C09 — Extra Plan refinements** | **Unassigned refinements/research, not promised capabilities.** Art, customization and gentle progress already inform Plan. | Exact target-date entry and personal cover photos remain refinements; group cover photos already exist. Forecast uncertainty bands require a valid model, not decorative precision. Habit/streak ideas need a helpful, non-punitive purpose. Rotating savings (“san” / Egyptian-style circles) remains research: sequence, missed contributions, custody and consent are unresolved. Existing shared savings does not implement a rotating pool or payouts. | Planning/Home D06; founder for additional scope |
+| **C10 — Consistency and phone handoff** | **Ongoing acceptance/connection work.** Plan amount controls now share one treatment; Home account amount entry has a separate preserved design. Both plan/group currency choices are fixed at creation. | Preserve welcome/sign-in/recovery UI and connect it to the existing auth/session owner. Final branding/assistant mark remain unresolved. Verify shared styling, approved icons, navigation/edge blur, Spanish-first/English parity, long values, Dynamic Type, VoiceOver, Reduce Motion, light/dark and physical touch. Diagnose the retained unlocated keyboard invalid-frame warning before claiming it resolved. Adapt preview views to canonical owners through the existing delivery lane; retain separate identities and truthful device evidence. | Native continuity D01/D15 + Device/release; domain owners for money/input contracts |
+
+### C01 — Native Scan and receipt split
+
+Preserve **Escanear / Scan**, with Foto / Photo and Archivo / File as independent
+entry points. The selected iOS capture component is Apple's native
+[VisionKit document scanner](https://developer.apple.com/documentation/visionkit/vndocumentcameraviewcontroller).
+Its page images feed the same interpretation/review path as uploaded photos;
+PDF conversion is optional. Capture does not itself extract trusted financial
+facts, approve a split or post an expense. The present chat Scan action is still
+a sample-attachment preview.
+
+The future receipt flow is **Scan/photo → review receipt → Por igual / Por consumo
+→ select items → review each person's share**. Preserve capture-now/finish-later
+drafts and the existing external repayment-tracking direction. Implementation
+must account for editable receipt lines and quantities, shared items, visible
+unassigned items and rounding so participant shares reconcile to the receipt.
+Keep receipt tax/service charges visible and distinguish already-included amounts
+from an optional added tip, avoiding double counting. Confirm corrections and
+shares before recording; joining/selecting an item does not mark anyone paid.
+
+**Currency is already locked, not new FX work:** choose DOP, USD or EUR when
+creating the plan/group; it cannot change after creation. Group expenses, splits
+and repayments inherit that currency. No mixed-currency reconciliation,
+conversion or silent rate lookup. Receipt extraction must not silently reinterpret
+a different printed currency as the group's currency; resolve that mismatch in
+review before posting, with the exact interaction selected in the assigned slice.
+
+Reference checked October 1, 2026:
+[Apple's iOS 27 split-bill guide](https://support.apple.com/en-us/127565), published
+September 14, 2026. It shows receipt review/editing, equal or item-based division,
+shared quantities, tax/tip allocation and payment tracking through Apple Cash.
+Use these interactions as a benchmark; Apple Cash's US payment rail is not part
+of this UI-only preview. Do not assume Apple's receipt intelligence or Split Bill
+is a public API reusable by Cuadrao. The native scanner and a future vision/OCR
+provider are separate decisions. Extraction accuracy, supported receipt samples,
+retention/access and canonical posting must be settled by the intake owner.
+
+**Closure:** recording this gap closes the design-session disposition only.
+It does not close C01 delivery. A later assigned slice must retain evidence for
+capture/photo, corrections, equal/item/shared splits, included tax/service and tip,
+rounding, draft reopen, recipient/organizer views and external repayment status.
+No automatic collections, bank settlement or live sharing claim follows from
+this decision.
+
+### Handoff and upkeep
+
+The founder reported sending the existing read-only VM reuse-map prompt; this
+session has no returned handoff to accept. Treat the
+[VM prompt](../reports/cuadrao-vm-handoff-prompt.md) as an assignment artifact,
+not a second roadmap or permission to launch a duplicate worker. Refresh its
+checkpoint and integration references when reviewing its output.
+
+Dated reports remain evidence of their exact source/build. Their old “next” or
+“remaining” statements are historical, including earlier chat/Plan placeholders,
+the removed voice pill, pre-Scan labels and earlier installation limitations.
+Use this register for follow-up status, link new proof here, and preserve the
+original observations rather than rewriting history into a shipped claim.
+
 ## Work map
 
 ### Complete MVEE coverage
@@ -1655,7 +1765,7 @@ expected behavior; this table stores execution metadata only. D01-D15 are work
 identifiers, not a second specification. A row's next integration task and planned
 evidence are not an exhaustive scope or a substitute for the linked requirement.
 
-**Current phone evidence:** none of the assembled outcomes is verified on the
+**Connected-delivery phone evidence at the historical lane snapshot:** none of the assembled outcomes is verified on the
 founder's physical iPhone. Reuse and gaps below include landed #745 and the
 landed personal recording, Plan/Home and Search journeys. Those local batches are complete; their owners and evidence are recorded above. Connected personal spending budgets are landed through PR #753; its terminal audit and landing record retain the local evidence. Connected personal savings goals are locally verified through the complete journey and are published in [PR #755](https://github.com/lagarcess/argus/pull/755), under
 the founder-approved account-backed allocation policy. Proposed owners must be bound to named

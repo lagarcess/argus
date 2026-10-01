@@ -189,6 +189,12 @@ requires explicit founder instruction.
 
 ### 1.6 Holds, later work and unresolved decisions
 
+The founder requested a single home for September 30–October 1 Cuadrao design
+follow-ups. Their preview status, future design dispositions and unresolved ideas
+are tracked in the [main execution roadmap](argus-execution-board.md#cuadrao-design-dispositions).
+This does not turn preview scope into connected delivery or defer existing MVEE
+requirements; the product-wide holds below still apply.
+
 - **Web remake:** frozen. Spend no resources on its implementation or polish now.
   Preserve the polished existing web as the reuse/design reference. A later
   marketing/download page may coexist with it; replacing web with a landing page

@@ -36,8 +36,9 @@ Run shared state checks with `python3 ios/DesignPreviewTests/run_temporary_chat.
 - [Native archive swipe](recents-archive-gesture.png)
 - [Recoverable deleted chat](recents-deleted-recovery.png)
 
-Scan currently opens the honest sample-attachment preview. Apple's native scanner
-is the locked future capture choice, not an implemented or shipped capability.
+Scan currently opens the honest sample-attachment preview. The future capture
+decision and delivery gap now live in
+[roadmap C01](../../../../specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
 Recents data remains local design state and resets on app relaunch.
 
 ## Physical delivery

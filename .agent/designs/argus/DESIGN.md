@@ -721,14 +721,9 @@ attachment label in the native canvas.
 
 - The attachment action is **Escanear** in Spanish and **Scan** in English,
   with a document-scanner symbol. Photos and files remain independent entry points.
-- Future iOS document capture uses Apple's native VisionKit
-  `VNDocumentCameraViewController`. Its scanned page images feed the same approved
-  document interpretation and user-review flow as other uploads. PDF conversion
-  is optional, not a prerequisite for vision-model input. Capture does not itself
-  classify, confirm, or save a financial record.
-- This is a future implementation decision, not scanner or provider activation.
-  The current design preview still attaches clearly identified sample documents;
-  camera permissions, real capture, upload and model processing remain unconnected.
+- The future native scanner, interpretation/review boundary and receipt-splitting
+  disposition are owned by [roadmap C01](../../../docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
+  The current preview still attaches sample documents; capture is not connected.
 - Recents uses title-first rows, separate Pinned/Recent sections, unread/current
   indicators, and one conversation object shared with Chat and Search. Do not repeat a sample subtitle on every row. Dates derive from the last
   message timestamp, shared with Search; metadata changes do not update recency.

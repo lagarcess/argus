@@ -1,5 +1,9 @@
 # Cuadrao chat: reference study and proposal
 
+**Follow-up owner:** [main roadmap, C04](../specs/argus-execution-board.md#cuadrao-design-dispositions).
+This is dated research/iteration history, not the current implementation queue;
+subsequent preview work and remaining delivery gaps are distinguished there.
+
 September 30, 2026. Research and pitch only. Profile UI is paused at `425ee881d`.
 This document does not approve a new backend capability or implement chat.
 

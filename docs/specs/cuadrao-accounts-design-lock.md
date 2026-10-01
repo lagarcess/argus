@@ -9,84 +9,13 @@ then carrying it into native UI. The source is the reviewed local HTML account
 study plus the explicit conversation decisions. References inform presentation;
 they do not reopen these decisions.
 
-## Current design checkpoint — September 30, 2026
+## Current checkpoint and follow-up owner
 
-The founder requested locking the work so far, identifying remaining design work,
-and prioritizing a usable physical-iPhone experience. This section is the current
-summary; dated sections below retain decision history and supporting evidence.
-Locked means preserve the reviewed baseline, not final polish or connected delivery.
-
-| Surface | Preserve now | Still to design or verify |
-| --- | --- | --- |
-| Welcome and account access | Welcome composition, provisional mark/pine palette, Tus finanzas, en orden; create account, sign-in and recovery UI | Real auth states and handoff, device language selection, complete English parity, physical keyboard/accessibility review |
-| Home and navigation | Personal / Hogar / + selector; all active accounts; Movimientos distinct from Próximamente; Ordenar Inicio; icon-only navigation with approved Home, calendar, profile and bell artwork, including Novedades | Panorama meaning and useful content, realistic long/unknown/error/loading states, navigation motion and physical-device polish |
-| Accounts | Add/type/name/optional balance, currency entry, details, actions, reorder, archive/restore | Present the existing connected transaction inspection/correction, transfer/refund and reconciliation capabilities coherently; richer account/asset details; loading/failure/recovery presentation |
-| Household | Empty Home, create/open Hogar, native share-link preview, recipient accept/defer, Personas owns invitation/member status | Auth/install handoff, invitation expiry/revocation recovery, explicit sharing and visibility/editing explanations, leave/remove consequences under approved production contracts |
-| Plan | Calendar navigation icon | Cuadrao overview and detail presentation for budgets, savings goals, debt plans and commitments, using the delivery lane's existing capabilities |
-| Search | Quiet field, categories, grouped results, scope/currency filters; accounts/activity share Home state; Plans/Chats/Files/Memory presentation examples | Connect all record owners, full destination experiences and loading/error/retry; advanced activity filters and device keyboard/localization acceptance |
-| Profile | Freeze the existing UI at code checkpoint `425ee881d`; identity editing, destination groups, restored icons and appearance tiles | Founder explicitly considers polish unfinished. Remaining visual/detail and interaction work stays open; do not resume until requested. |
-| Assistant and Novedades | Placement; original chat behavior/header/composer inventory; bell artwork | Chat is now research and pitch only, before native implementation. Meaningful updates remain undesigned. |
-| Shared visual system | Native SwiftUI, Spanish-first review, reusable components and vector assets; Light/Dark/System preview selection | Final logo/brand decisions, typography/spacing, accessibility, language coverage and device verification. Dark palette exists as a proposal and lacks complete acceptance. |
-
-### What separates this canvas from daily phone use
-
-Current update: a separate Cuadrao Preview has been installed on the paired iPhone. Search and Profile now have native design destinations. The latest launch attempt was blocked by the locked phone; installation is not full physical interaction acceptance. Sample financial state remains separate from connected records. The source snapshot below records the earlier checkpoint, not the latest surface inventory.
-
-#### Earlier source snapshot
-
-At design source `da2012f5a25f66b04828a2b37712a15b1b96c4c1`,
-`ArgusFoundationApp` selects `CuadraoCanvas` with `--cuadrao-design` and otherwise
-launches the connected `FoundationShell`. The design canvas is native code, but
-its accounts and household state are sample state. Apart from saved Home order,
-that preview is not durable financial storage. Other menu destinations remain
-placeholders. The welcome canvas currently pins Spanish: having English strings
-in source is not verified runtime localization parity.
-
-Two separate milestones prevent misleading completion claims:
-
-1. **Review on the phone:** install the existing design preview in a distinct app
-   identity, preserving the connected app/session. Verify navigation, keyboard,
-   safe areas and text at actual device size. This can precede the rest of the
-   design; sample data remains explicit. Current simulator proof does not prove
-   physical-device signing/install, launch from the app icon, or internet access.
-2. **Use with real records:** adapt the approved screens to existing session,
-   account and financial-operation owners. Start with sign in, Home, accounts,
-   record/inspect/correct and reopen, including failure/recovery and minimum
-   profile/sign-out controls. Preserve capabilities and canonical money rules;
-   do not create a parallel ledger or treat sample acceptance as real membership.
-   Real phone-over-internet delivery remains coordinated with the delivery lane.
-
-### Current founder priority
-
-- Profile is preserved as an unfinished checkpoint; pause its implementation.
-- Research the chat experience using Mobbin and the approved HTML inventory, then
-  present a concrete pitch before changing chat UI. See the
-  [chat research and proposal](../reports/cuadrao-chat-design-pitch.md).
-- Plan, Novedades and remaining household/detail work remain open. Their order
-  after chat is not newly assigned here.
-- Physical-phone design review continues to use the existing preview identity,
-  simulator and build cache. Connected delivery remains a separate lane.
-
-### Parallel VM candidate: connected-UI reuse map
-
-Proposed bounded read-only assignment, not dispatched by this checkpoint. Compare
-this exact design checkpoint with a freshly recorded integration SHA; account for
-active delivery changes separately. The delivery chat was inspected during this
-checkpoint and is actively finishing personal assets (PR #759), so that work is
-not available for a competing implementation assignment.
-
-Deliver one actionable matrix: Cuadrao screen/action -> existing native
-model/session/API owner -> required presentation adapter -> unresolved product
-choice, if any. Cover authentication, Home, accounts/activity/reconciliation,
-Plan and Search. Include existing test/evidence pointers, language/accessibility
-omissions, and the smallest safe connection sequence. Identify duplicated state
-that must be replaced by canonical owners; do not suggest synchronizing two ledgers.
-
-A Linux VM can inspect code and prepare this handoff. It cannot supply the local
-Xcode/signing/physical-iPhone acceptance evidence. No changes to SwiftUI, financial
-runtime, contracts, prompts, migrations, hosted settings, demo processes or
-simulators; no paid calls, push, merge or deployment. Keep the report in the VM's
-own workspace for review. Refresh references before any later implementation.
+The [main roadmap's Cuadrao design dispositions](argus-execution-board.md#cuadrao-design-dispositions)
+own the current checkpoint, remaining work, pauses, unresolved ideas and delivery
+handoffs. This file preserves approved interaction decisions and dated design
+history; it is not a separate work queue. Follow the roadmap before treating a
+historical “remaining” or “next assignment” statement below as current.
 
 ## Locked
 
@@ -109,18 +38,14 @@ own workspace for review. Refresh references before any later implementation.
 | Copy | Name; Loan; Other assets. Remove fictional-information footer, Private to you, and leave-blank helper. Optional labels remain. |
 | Navigation | Home, Plan/calendar, assistant, Search, Profile. No visible icon labels. No Accounts tab. Exact approved Home icon; assistant mark remains provisional. Bell at upper right. |
 
-## Still open or preserved elsewhere
+## Follow-up disposition
 
-- Home structure is locked as summarized above. Panorama content, final branding,
-  typography/spacing polish, assistant mark and navigation-bar motion remain open.
-- Swipe actions are deferred. Native does not inherit the green web swipe control.
-- Balance-check semantics and detailed reconciliation remain owned by the existing
-  connected financial experience. Do not redesign them as part of this pass.
-- Account-detail monthly summaries, richer editing metadata, transaction types,
-  inspection/correction and advanced asset details retain their existing product
-  contracts. Their absence from a visual canvas is not a product-scope deletion.
-- The current entry/review preview stages sample rows only; it does not implement
-  ledger effects, reconcile balances, persist data, or call the API.
+See the [main roadmap](argus-execution-board.md#cuadrao-design-dispositions),
+particularly C05 for Home/Accounts/household, C07 for the paused Profile and
+C10 for shared polish. Existing connected financial contracts retain balance-check,
+correction and reconciliation semantics. A missing preview control does not remove
+an existing capability. Recents swipe actions were subsequently implemented;
+that does not assign new swipe behavior to account rows.
 
 ## Reference exercise
 
@@ -198,13 +123,13 @@ Movimientos versus Próximamente; reorderable sections with Ordenar Inicio; fixe
 brand/space/navigation controls. Revisit these only through an explicit design
 change, rather than reopening them during routine polish.
 
-**Remaining Home detail work:** headline Panorama meaning and presentation;
+**Outstanding at this dated checkpoint (current disposition: roadmap C05/C10):** headline Panorama meaning and presentation;
 final typography, spacing and visual rhythm; menu-bar motion; realistic and
 long content; larger text, VoiceOver and physical-device review. Final brand
 identity and dark mode remain app-wide decisions.
 
-**Historical coverage before the continuations below; see the current checkpoint
-above for present status:**
+**Historical coverage before the continuations below; see the main roadmap
+for present status:**
 
 | State or flow | Current design state | Remaining design work |
 | --- | --- | --- |
@@ -319,7 +244,7 @@ notification, assistant prompt or support submission is changed. Appearance and
 language are read-only in this pass; dark mode remains deferred. Preview state
 is in-memory, not a persistence or connected-settings claim.
 
-Remaining: profile photo/avatar customization, full locale/theme behavior, complete
+Historical gaps at this proposal (current disposition: roadmap C07/C08): profile photo/avatar customization, full locale/theme behavior, complete
 notification scheduling, formatting/voice/advanced controls, real memory/file/chat
 management, feedback submission, real usage/auth/security/legal wiring, larger text
 and complete English/device interaction acceptance. These remain existing scope,
@@ -344,7 +269,7 @@ not founder-approved visual lock.
   form on a child page instead of starting with a text box.
 - Feedback remains an in-memory draft owned by the profile, never a support send.
 
-The underlying capability gaps listed above are still pending. No backend or
+At this dated checkpoint, the underlying capability gaps listed above were still pending; current disposition is in the main roadmap. No backend or
 financial flow changes, new simulators, new build caches, merge or deployment.
 
 ## Mobbin research standard and appearance proposal — September 30, 2026
@@ -386,7 +311,7 @@ Remaining work includes hierarchy/detail refinement, icon and spacing consistenc
 child-page completeness, editing/device behavior, localization and accessibility.
 Existing limitations in the Profile and appearance notes remain applicable.
 
-Next assignment is Mobbin research and a chat pitch. No chat implementation,
+The assignment at this historical checkpoint was Mobbin research and a chat pitch. No chat implementation,
 Profile changes, backend work, builds, simulator creation or phone installation
 occur in this checkpoint. The proposal in the linked report requires founder
 feedback before implementation; existing locked chat behavior remains the baseline.

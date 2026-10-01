@@ -1,5 +1,9 @@
 # Cuadrao voice interaction research
 
+**Follow-up owner:** [main roadmap, C04](../specs/argus-execution-board.md#cuadrao-design-dispositions).
+This is dated research/iteration history, not the current implementation queue;
+subsequent preview work and remaining delivery gaps are distinguished there.
+
 2026-09-30 research, implemented as a design preview on 2026-10-01 following checkpoint bd9890c71. Provider integration remains unconnected; see [implementation evidence](evidence/cuadrao-native-design/voice-system/README.md). The founder wants immersive full-screen voice, clearer minimized voice in chat, and consideration of a short spoken message alongside native dictation and live conversation.
 
 ## Findings
@@ -42,7 +46,7 @@ Use state-driven motion: expand/collapse should visually connect the sea/wavefor
 
 ## Implementation and review boundary
 
-Next design pass can address immersive presentation, integrated voice composer and simulated message-recording states together. It must remain truthful about the unconnected provider. Do not invent recorded audio, transcription success or agent actions. Whether a spoken prompt retains a playable audio message, its transcript, or both requires an explicit storage/privacy contract before delivery work. Voice input must reuse canonical conversation and action ownership, not create a second chat brain.
+The subsequent voice-system preview addressed immersive presentation, the integrated voice composer and simulated message-recording states together. It must remain truthful about the unconnected provider. Do not invent recorded audio, transcription success or agent actions. Whether a spoken prompt retains a playable audio message, its transcript, or both requires an explicit storage/privacy contract before delivery work. Voice input must reuse canonical conversation and action ownership, not create a second chat brain.
 
 Validate on the physical phone: people can predict tap versus hold; accidental touch/drag never sends; cancellation never starts live voice; keyboard dismissal restores navigation; minimize/mute/end are distinguishable; entering settings preserves the session; native dictation and live audio ownership do not compete during eventual integration. Compare the tap/hold prototype with separate labeled entry points if discoverability fails.
 

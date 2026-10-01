@@ -61,7 +61,10 @@ launches. Existing unrelated preview data is preserved.
   assume fixed monthly contributions and no returns. Debt assumes a disclosed
   fixed annual interest rate, monthly payments, no new purchases and no fees.
 
-## Delivery boundaries and future connection
+## Delivery boundaries at this checkpoint
+
+Current follow-up status lives in [roadmap C02/C03/C09](../../../../specs/argus-execution-board.md#cuadrao-design-dispositions).
+The following records this earlier build's boundaries, not a second current queue.
 
 No API, database, migrations, auth, model prompt, provider integration, money
 movement or production flags were changed. The separate connected Plan client,
