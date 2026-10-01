@@ -18,12 +18,15 @@ from argus.domain.recording.money_schemas import MoneyRequest
 from .access import HouseholdFinancialScope, dependencies, require_edit, resolve
 from .errors import HouseholdNotFound as HouseholdUnavailable
 from .errors import HouseholdRule
+from .postgres import PostgresHouseholdRepository
 from .projection import account, activity, positions
 from .service import HouseholdService
 
 
 class HouseholdFinancialService:
     def __init__(self, households: HouseholdService) -> None:
+        if not isinstance(households._repository, PostgresHouseholdRepository):
+            raise HouseholdUnavailable()
         self.households = households
         self.repository = households._repository._accounts._repository
 

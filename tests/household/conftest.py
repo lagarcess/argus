@@ -17,6 +17,8 @@ from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import SupabaseGateway
 from fastapi.testclient import TestClient
 
+from tests.household.financial_fixtures import lane as lane
+
 ALICE = "registered-alice"
 BOB = "registered-bob"
 GUEST = "guest-gina"

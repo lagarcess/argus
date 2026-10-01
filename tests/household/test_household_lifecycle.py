@@ -108,3 +108,11 @@ def test_flag_off_hides_surface(monkeypatch, gateway) -> None:  # noqa: ANN001
             404,
             "households_unavailable",
         )
+
+
+def test_financial_adapter_requires_durable_authorization(alice: HouseholdApi):
+    hid = alice.create_household().json()["household_id"]
+    response = alice._client.get(
+        f"/api/v1/households/{hid}/snapshot", headers=alice._headers
+    )
+    assert response.status_code == 404

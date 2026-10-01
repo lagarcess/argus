@@ -49,13 +49,23 @@ class Fault:
 
     def consume(self, method: str, path: str, status: int) -> bool:
         eligible = (
-            method in {"POST", "PATCH", "PUT"}
+            (
+                method in {"POST", "PATCH", "PUT"}
+                or (
+                    method == "DELETE"
+                    and path.startswith("/api/v1/households/")
+                    and "/account-grants/" in path
+                )
+            )
             and (
                 path == "/api/v1/financial-activities"
                 or path.startswith("/api/v1/financial-activities/")
                 or path.startswith("/api/v1/financial-plan/")
                 or path == "/api/v1/financial-accounts"
                 or path.startswith("/api/v1/financial-accounts/")
+                or path == "/api/v1/households"
+                or path.startswith("/api/v1/households/")
+                or path == "/api/v1/household-invitations/accept"
             )
             and not path.endswith("/preview")
             and 200 <= status < 300

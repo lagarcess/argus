@@ -7406,6 +7406,9 @@ ends all grants without deleting financial records or legitimate activity.
 
 ## Financial scope and projections
 
+Financial adapters require durable PostgreSQL authorization; the memory-only
+lifecycle test adapter answers 404 on these financial routes.
+
 `GET /api/v1/households/{id}/snapshot` returns
 `{household_id,membership_id,authorization_version,accounts,activities,positions}`.
 An account wraps the canonical account projection with `owner_name,permission,is_owner`.
