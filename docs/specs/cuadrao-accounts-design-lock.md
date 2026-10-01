@@ -24,10 +24,15 @@ Locked means preserve the reviewed baseline, not final polish or connected deliv
 | Household | Empty Home, create/open Hogar, native share-link preview, recipient accept/defer, Personas owns invitation/member status | Auth/install handoff, invitation expiry/revocation recovery, explicit sharing and visibility/editing explanations, leave/remove consequences under approved production contracts |
 | Plan | Calendar navigation icon | Cuadrao overview and detail presentation for budgets, savings goals, debt plans and commitments, using the delivery lane's existing capabilities |
 | Search | Quiet field, categories, grouped results, scope/currency filters; accounts/activity share Home state; Plans/Chats/Files/Memory presentation examples | Connect all record owners, full destination experiences and loading/error/retry; advanced activity filters and device keyboard/localization acceptance |
-| Assistant, Profile and Novedades | Placement; profile and bell artwork | Actual Cuadrao destination screens, minimum account/settings controls, assistant entry and result presentation, meaningful updates |
-| Shared visual system | Native SwiftUI, Spanish-first review, reusable components and vector assets, light mode | Final logo/brand decisions, consolidated typography/spacing, accessibility, language coverage and device verification; dark mode remains deferred |
+| Profile | Freeze the existing UI at code checkpoint `425ee881d`; identity editing, destination groups, restored icons and appearance tiles | Founder explicitly considers polish unfinished. Remaining visual/detail and interaction work stays open; do not resume until requested. |
+| Assistant and Novedades | Placement; original chat behavior/header/composer inventory; bell artwork | Chat is now research and pitch only, before native implementation. Meaningful updates remain undesigned. |
+| Shared visual system | Native SwiftUI, Spanish-first review, reusable components and vector assets; Light/Dark/System preview selection | Final logo/brand decisions, typography/spacing, accessibility, language coverage and device verification. Dark palette exists as a proposal and lacks complete acceptance. |
 
 ### What separates this canvas from daily phone use
+
+Current update: a separate Cuadrao Preview has been installed on the paired iPhone. Search and Profile now have native design destinations. The latest launch attempt was blocked by the locked phone; installation is not full physical interaction acceptance. Sample financial state remains separate from connected records. The source snapshot below records the earlier checkpoint, not the latest surface inventory.
+
+#### Earlier source snapshot
 
 At design source `da2012f5a25f66b04828a2b37712a15b1b96c4c1`,
 `ArgusFoundationApp` selects `CuadraoCanvas` with `--cuadrao-design` and otherwise
@@ -51,21 +56,16 @@ Two separate milestones prevent misleading completion claims:
    do not create a parallel ledger or treat sample acceptance as real membership.
    Real phone-over-internet delivery remains coordinated with the delivery lane.
 
-### Recommended priority, not a new implementation assignment
+### Current founder priority
 
-- **Next local step:** physical-phone design preview and the focused reuse map
-  below. Use the current simulator/build cache for local checks; no new demo farm.
-- **Updated founder priority:** carry the locked Search/Discover design into Cuadrao, including Chats, Files and Memory, before Plan.
-- **Following design surface:** Plan as a complete overview-to-detail experience,
-  informed by the approved account controls and existing financial contracts.
-  Apply the established Mobbin/Apple reference exercise before design changes.
-- **Connection priority:** the personal account loop above, then Plan and Search.
-  Carry minimum account/settings and recovery UI with that usable loop instead
-  of waiting for a fully redesigned Profile. Existing assistant capabilities are
-  preserved; missing Cuadrao styling does not retire them.
-- **Subsequent design:** remaining household sharing/management, assistant,
-  Novedades and broader Profile. Final brand, dark mode and decorative motion do
-  not block a useful phone review.
+- Profile is preserved as an unfinished checkpoint; pause its implementation.
+- Research the chat experience using Mobbin and the approved HTML inventory, then
+  present a concrete pitch before changing chat UI. See the
+  [chat research and proposal](../reports/cuadrao-chat-design-pitch.md).
+- Plan, Novedades and remaining household/detail work remain open. Their order
+  after chat is not newly assigned here.
+- Physical-phone design review continues to use the existing preview identity,
+  simulator and build cache. Connected delivery remains a separate lane.
 
 ### Parallel VM candidate: connected-UI reuse map
 
@@ -376,3 +376,17 @@ brand lock or full dark-mode acceptance across every flow.
 
 See the current research and verification in
 [appearance notes](../reports/evidence/cuadrao-native-design/profile/appearance.md).
+
+## Profile checkpoint and chat research handoff — September 30, 2026
+
+Founder requested leaving Profile as it stands because considerable design polish
+remains. Preserve code checkpoint `425ee881d` and its existing evidence. This is a
+pause and recoverable baseline, not approval of the visual design or completion.
+Remaining work includes hierarchy/detail refinement, icon and spacing consistency,
+child-page completeness, editing/device behavior, localization and accessibility.
+Existing limitations in the Profile and appearance notes remain applicable.
+
+Next assignment is Mobbin research and a chat pitch. No chat implementation,
+Profile changes, backend work, builds, simulator creation or phone installation
+occur in this checkpoint. The proposal in the linked report requires founder
+feedback before implementation; existing locked chat behavior remains the baseline.
