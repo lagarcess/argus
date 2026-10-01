@@ -170,3 +170,16 @@ supersedes the earlier pending-name and Simular aceptación controls. Spanish is
 primary, with English copy alongside it. Links are nonfunctional examples and
 acceptance affects only in-memory sample state. Auth/install handoff, real invite
 rules and shared-account permissions remain open production contracts.
+
+## Household concern separation — September 30, 2026
+
+Founder approved: Home owns the shared financial picture; **Personas / People**
+owns membership and invitation status. Remove Home's prominent pending-link card
+and status-dependent hero wording. Empty Hogar consistently emphasizes adding a
+joint account, with a quiet invitation shortcut before a link exists and Personas
+afterward. Populated Household also uses Personas. No invitation reminders,
+badges or delivery tracking are introduced.
+
+[Native visual check](../reports/evidence/cuadrao-native-design/household-people/README.md).
+This supersedes the invitation-status card in earlier first-use screenshots;
+existing invitation and acceptance behavior stays within the local design mock.

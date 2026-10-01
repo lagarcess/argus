@@ -127,7 +127,7 @@ struct CuadraoHomeCanvas: View {
         VStack(alignment: .leading, spacing: 12) {
             if data.selectedSpace.kind == .household && !data.active.isEmpty {
                 Button { sheet = .household } label: {
-                    Label(spanish ? "Personas e invitaciones" : "People and invitations", systemImage: "person.2")
+                    Label(spanish ? "Personas" : "People", systemImage: "person.2")
                         .font(.subheadline).frame(minHeight: 44)
                 }
             }

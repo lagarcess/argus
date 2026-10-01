@@ -7,6 +7,8 @@ Supersedes the name-entry/Simular aceptación mock in the cold-start checkpoint.
 
 Existing mirror: http://localhost:3200/.
 Hogar → Invitar a alguien → Compartir invitación opens the real iOS share sheet.
+After a link exists, the quiet Personas shortcut reopens its status and controls.
+Home no longer carries an invitation-status card; see the [People separation](../household-people/README.md).
 Close it with X to return. Ver como invitado shows the recipient screen with
 Aceptar invitación and Ahora no. Acceptance shows confirmation; Continuar returns
 to the sender's household preview with sample member Alex. No personal accounts

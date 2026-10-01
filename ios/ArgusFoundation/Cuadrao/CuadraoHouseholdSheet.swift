@@ -33,6 +33,8 @@ struct CuadraoHouseholdSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    Label(spanish ? "Tú" : "You", systemImage: "person.crop.circle")
+                    Divider()
                     switch data.household {
                     case .alone:
                         RegistrationHeading(title: spanish ? "Invita a quien\ncomparte contigo." : "Invite someone\nyou share with.",
@@ -64,13 +66,11 @@ struct CuadraoHouseholdSheet: View {
                     case .joined(let name):
                         RegistrationHeading(title: spanish ? "Su hogar." : "Your household.",
                             detail: spanish ? "Las cuentas personales siguen siendo privadas." : "Personal accounts remain private.")
-                        Label(spanish ? "Tú" : "You", systemImage: "person.crop.circle")
-                        Divider()
                         Label(name, systemImage: "person.crop.circle")
                     }
                 }.padding(24)
             }.background(Color.white)
-                .navigationTitle(spanish ? "Hogar" : "Household").navigationBarTitleDisplayMode(.inline)
+                .navigationTitle(spanish ? "Personas" : "People").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { dismiss() } } }
                 .confirmationDialog(spanish ? "¿Cancelar esta invitación?" : "Cancel this invitation?",
                     isPresented: $cancelInvitation, titleVisibility: .visible) {
