@@ -73,7 +73,7 @@ struct CuadraoGroupExpenseEditor: View {
                             }
                             if custom {
                                 let remainder = cents - shares(group).values.reduce(0, +)
-                                Text(remainder == 0 ? (spanish ? "Todo cuadra." : "It all adds up.") : (spanish ? "Por repartir: \(PlanFormat.amount(Double(remainder) / 100))" : "Left to split: \(PlanFormat.amount(Double(remainder) / 100))"))
+                                Text(remainder == 0 ? (spanish ? "Todo cuadra." : "It all adds up.") : remainder < 0 ? (spanish ? "Hay \(PlanFormat.amount(Double(-remainder) / 100)) de más." : "\(PlanFormat.amount(Double(-remainder) / 100)) over the total.") : (spanish ? "Por repartir: \(PlanFormat.amount(Double(remainder) / 100))" : "Left to split: \(PlanFormat.amount(Double(remainder) / 100))"))
                                     .font(.caption).foregroundStyle(remainder == 0 ? WelcomePalette.pine : .orange)
                             }
                         }

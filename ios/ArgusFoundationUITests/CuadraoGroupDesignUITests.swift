@@ -109,7 +109,7 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         return app
     }
     private func replace(_ field: XCUIElement, with text: String) {
-        field.tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (field.value as? String ?? "").count)); field.typeText(text)
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (field.value as? String ?? "").count)); field.typeText(text)
     }
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
         for _ in 0..<7 {
