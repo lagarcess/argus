@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** September 30, 2026.
-**Execution state:** connected personal assets and net worth landed through PR #759 at `0cd8d1658c8a58d0a8e29e3307f948aed11ecbc3`, preserving the locally verified native journey. The founder authorized the verified-head merge and complete bounded integration landing only. Debt plans (#757/#758), savings (#755/#756), budgets (#753/#754), Search (#751/#752), Plan/Home (#749/#750) and personal recording (#747/#748) remain landed with their demonstrations preserved. No deployment, hosted configuration change, paid provider or next slice is authorized. Physical-phone testing and Cuadrao belong to their separate owners.
+**Execution state:** connected Spaces and Household is the newly authorized bounded lane, currently recovering contracts and awaiting one founder decision on member powers, account editing and departure/custody. No dependent implementation has begun. Its freshly fetched base is `9b5e8643f0493145bd672c2af6e7508371d4cfa0`, including #759/#761. All landed personal financial journeys and their demonstrations remain preserved. #760 owns connected Cuadrao presentation and its Compact simulator; the active design checkout, design simulator and physical-phone environment remain separate. This assignment authorizes implementation, isolated local verification and reviewed PR publication, not merge, deployment, hosted changes, paid providers or phone changes.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -9,6 +9,130 @@
 commit and push on September 29, 2026. That grant authorized documentation preservation
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
+
+## Connected Spaces and Household lane
+
+**Assignment, September 30, 2026.** Create a household, prepare an invitation,
+accept it as another registered person, explicitly share accounts, and see only
+permitted shared information in native Home, Accounts and Search. Prove the
+complete lifecycle with two synthetic users against real local Auth/API/Postgres,
+including revocation/removal, recovery and English/Spanish. Stop at a reviewed,
+merge-ready PR targeting `codex/private-alpha-next`.
+
+**Fetched integration base:** `9b5e8643f0493145bd672c2af6e7508371d4cfa0`.
+**Recovery branch:** `codex/connected-spaces-household`.
+**Isolated checkout:**
+`/Users/garces/.codex/worktrees/connected-spaces-household/private-alpha-next`.
+**Current status:** source/contract recovery and read-only authorization impact
+mapping complete; one permission-policy question pending. No product code,
+migration, local test stack, installation or hosted action has started. Existing
+runtime services and demonstrations have not been stopped or modified.
+
+### Recovered decisions and pending policy
+
+[MVEE household][mvee-household] owns consent and financial meaning. Creation,
+invitation acceptance and account sharing are three separate operations.
+Acceptance grants membership only: no automatic joint account, financial-record
+ownership transfer, private account sharing, chat/document access or banking
+execution. Account ownership percentage remains a financial fact, never access.
+Keep one canonical account/history and count its permitted projection once.
+Sharing neither moves the account's private-space assignment nor posts money.
+
+Use the fixed [design handoff #762](https://github.com/lagarcess/argus/pull/762)
+source `a509cebde8990728693b09add7738856bc682a07`, specifically its
+`docs/specs/cuadrao-accounts-design-lock.md` household decisions and existing native
+household controls. Home retains the quiet Personal / Household / + selector;
+People owns invitations and member status. Sharing uses the native share sheet;
+dismissing it never asserts delivery or acceptance. The recipient can accept or
+choose Not now. Do not wait for the design PR to merge or import its unfinished
+Profile/chat proposals or wholesale runtime ancestry.
+
+**Founder decision requested, not yet approved:** creator administers invitations
+and membership; members see the member list and can leave; creator transfers
+administration or closes the household before departure. Accounts start view-only
+unless their owner explicitly grants activity editing; owners retain ownership,
+sharing and account-removal powers. Leaving/removal revokes membership and that
+person's sharing immediately, retains original owners' records, and requires fresh
+sharing approval on rejoin. The question is material because the MVEE and design
+lock explicitly leave member powers and departure/custody contracts open.
+Proposed invitation mechanics are revocable, single-use, seven-day links with safe
+same-recipient acceptance retries. Do not implement the dependent permission
+policy or label it founder-approved while the answer is pending.
+
+### Ownership, reuse and overlap
+
+The captain owns the coupled membership/authorization contract, implementation,
+manifest, integration and final delivery claim. One writer owns all shared backend
+and native transport surfaces; independent review/acceptance is read-only. The
+completed `household_authorization_scout` mapped existing owners without edits or
+runtime artifacts. Assign any further bounded writer only after the policy is
+settled; avoid competing permission implementations.
+
+Reuse `current_user` and the registered financial gate, the existing account
+repository and canonical Recording services, Plan snapshot reads used by Home and
+Search, and native session/journal recovery. Current financial repository access
+is strict owner equality; database transport bypasses caller RLS, so authorization
+must be checked server-side, including inside mutation transactions. Preserve
+owner-qualified money FKs, owner/account locking, actor attribution and replay
+identity. Never rewrite record ownership to make sharing work.
+
+Grant-filtered projections must not disclose hidden transfer/refund counterpart
+accounts, asset/debt links, history, private plans or source records indirectly.
+Separate durable record owner from authenticated actor before permitting editing;
+revocation must also prevent receipt replay from returning protected data.
+Current paired money activity requires one durable owner across its legs; do not
+silently invent cross-owner transfer accounting. Define the bounded adapter in the
+existing API/data contracts during implementation rather than duplicate money rules.
+
+[PR #760](https://github.com/lagarcess/argus/pull/760), inspected at
+`a2eaca12a937f18e640c803d09d234d7f132cf0c`, owns connected Cuadrao auth/Home/shell
+and selective Search presentation. It explicitly excludes household production.
+Household owns its new feature modules, authorization adapters and scoped tests.
+Shared overlap is the app/root mounting point, Home composition, Search context,
+native account responses and localization. Keep adapters separate, record the
+composition handoff, and reconcile against freshly fetched integration through
+one-way merges; do not edit #760's checkout or overwrite its connected owners.
+
+### Delivery and observable proof
+
+| User outcome | Existing capability | Remaining work and owner | Actual dependency | Assembled proof |
+| --- | --- | --- | --- | --- |
+| Create and reopen Household | Registered identities; fixed create/open design | Household membership storage/API/native controls; captain's single writer | Settled membership lifecycle | User A creates; relaunch returns to the same household with no auto-shared accounts |
+| Invite, defer and accept | Native share-sheet/recipient reference; existing auth return/recovery | Durable invitation lifecycle and authenticated acceptance | Membership contract; local link handoff | A creates link; B defers then accepts; repeat/lost-response acceptance creates one membership |
+| Choose exactly which accounts are shared | Canonical accounts/history; MVEE explicit consent | One account-grant owner plus permission preview/edit controls | Approved view/edit policy | B sees A's chosen account, never A's private account; unauthorized IDs and direct database access rejected |
+| Inspect shared Home/Accounts/Search | Financial projections and existing detail/Search continuity | Context-aware authorized projections and native adapters | Accepted membership and explicit account grants | Both users agree on canonical values; unknown/currency boundaries survive; hidden linked records do not leak |
+| Edit only where permitted | Existing money posting, correction and write journals | Actor-aware authorization adapter to existing writer | Explicit editing grant; existing canonical account/leg contract | View-only writes fail; permitted update retains actual author/history and refreshes both authorized views without duplicate money |
+| Revoke, remove or leave safely | Preserved original financial records | Membership/grant revocation and retained-record explanation | Approved departure/custody | Access stops on API, Search, Home and relaunch; original owner retains unchanged identity/history |
+| Recover failures and stale views | Session epochs, exact-byte journals, CAS, idempotent writes | Household scope invalidation and confirmed-write retry integration | Above contracts | Interrupted/repeated writes create no duplicates; revoked access cannot replay protected data; en/es/native recording and Postgres readbacks |
+
+Verification must use a real isolated local Auth/API/Postgres stack and an
+explicitly assigned simulator UUID, not a sample-only canvas. #760 currently owns
+Compact `1A90F684-345F-465C-AA50-6A5298F34156`; Cuadrao exclusively owns
+`8AFB6084-8918-416E-9164-E21061306BEC` and
+`/private/tmp/cuadrao-native-design-build`. Neither is assigned to this lane.
+Assign an available simulator only after checking ownership/active use, with a
+separate bundle and disposable build cache. Preserve all demos and synthetic data;
+ports 58700–58749 and the physical-phone setup remain untouched. No lane runtime
+has been provisioned while the product policy is pending.
+
+Keep local invitations synthetic. No email, WhatsApp, external delivery,
+shortener deployment or provider call is authorized here. The selected future
+do-blitz/Resend adapters depend on this invitation lifecycle and their separate
+service/deployment authority; do not substitute sending for acceptance proof.
+
+This bounded assignment connects Personal/Household contexts and account grants.
+Private Business/Custom lifecycle/account moves remain D04 work; shared budgets,
+goals, debt plans and private-source contributions remain D07/domain-adapter work.
+Imports, chat/voice context, Updates, notifications, rebrand and Profile proposals
+are excluded here, not newly deferred from the MVEE. Their readers must inherit
+this authorization owner when separately assigned.
+
+Before READY, fetch integration again; record semantic overlap and evidence
+retention, reconcile one-way, run applicable exact-head CI and merged-tree
+modularity checks, obtain fresh scoped independent review and resolve confirmed
+findings. Commit durable native/API/Postgres evidence and a short recording in
+this same PR; add concise restart instructions for the owned demo. No separate
+housekeeping roadmap/PR and no merge or hosted promotion are authorized.
 
 ## PR #759 integration landing
 
@@ -2060,8 +2184,8 @@ sequence rather than a separate deferral policy in this document.
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
 | [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
-| [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default in account model; design reference | Implement space lifecycle and account-move service | Financial core | Account identity; affected domain links | Device move/recovery recordings and linked-record identity checks |
-| [Household][mvee-household], D07 | Existing identities; selected invitation direction | Implement membership, permission adapters and invitation delivery | Household | Identities; affected domain adapters; open policy decisions | Two-user device journeys and permission readbacks across consumers |
+| [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762 | Assigned Household context adapter in the active lane above; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof for this lane; later private lifecycle/move evidence remains required |
+| [Household][mvee-household], D07 | Existing identities/accounts/history and fixed #762 create/invite/accept/People flow | Active bounded lane: membership, invitations, explicit account grants and Home/Accounts/Search; awaiting one policy decision. Shared plans, private contributions, other consumers and live delivery retain their dependencies | Household captain; one membership/authorization writer | Identities; approved member/edit/departure policy; existing financial adapters | Two synthetic users on real local Auth/API/Postgres and native simulator, revocation/isolation/recovery/en-es; physical-phone and other shared journeys remain required |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |
