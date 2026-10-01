@@ -180,6 +180,32 @@ production data, paid providers or physical-phone internet readiness is granted.
 The entire assigned shared-planning outcome remains required while its missing
 interaction is resolved; it is not newly deferred.
 
+### Local restart while decisions are pending
+
+Only the new `ios-accounts-59700` services were stopped; their local data is
+retained. Existing demos, design/phone environments and source remain intact.
+No native simulator was created and no connected API was started by this lane.
+From this worker worktree, restart the component test database with:
+
+```sh
+python3 ios/scripts/auth/local_stack.py start --accounts --port-base 59700
+```
+
+The 110-test reproduction command and exact checked source are in the linked
+Postgres proof. Use only its synthetic loopback Postgres 59702, never a hosted
+DSN. The pending allocation test draft is deliberately outside discovery until
+its prerequisite is authorized and implemented. Stop only this allocation with:
+
+```sh
+python3 ios/scripts/auth/local_stack.py stop --accounts --port-base 59700
+```
+
+This is a runnable database-check checkpoint, not a shared-planning app demo.
+The existing #766 native Household demo remains the connected demonstration;
+this lane's four shared-plan journeys, recording and assembled acceptance remain
+undelivered and required. The next writer resumes the existing branch and fixed
+design snapshot, not a new roadmap or a replacement environment.
+
 ## PR #766 integration landing
 
 Founder-confirmed squash merge of the verified Household native head;
