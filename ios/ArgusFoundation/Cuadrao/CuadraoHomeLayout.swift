@@ -47,7 +47,7 @@ struct CuadraoHomeLayoutSheet: View {
                 Section {
                     ForEach(sections) { section in
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(section.title(spanish)).font(.body.weight(.medium))
+                            Text(section.title(spanish)).font(CuadraoTypography.action)
                             Text(section.detail(spanish)).font(.subheadline).foregroundStyle(.secondary)
                         }.padding(.vertical, 12).padding(.trailing, 16)
                             .accessibilityElement(children: .combine)

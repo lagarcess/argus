@@ -82,7 +82,7 @@ struct CuadraoGroupInvitation: View {
     }
     private func codeCard(_ group: PlanGroup) -> some View {
         VStack(spacing: 24) {
-            Text(group.name).font(.system(.title, design: .serif)).multilineTextAlignment(.center)
+            Text(group.name).font(CuadraoTypography.feature).multilineTextAlignment(.center)
             PlanAvatarStack(members: group.members)
             if let image = Self.qr("Cuadrao design preview | \(group.id.uuidString)") {
                 Image(uiImage: image).interpolation(.none).resizable().scaledToFit().frame(maxWidth: 245)

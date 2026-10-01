@@ -40,7 +40,7 @@ struct CuadraoSpacesSheet: View {
             Image(systemName: kind.symbol).font(.title3).frame(width: 28).foregroundStyle(WelcomePalette.pine)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
-                Text(kind.title(spanish)).font(.body.weight(.medium))
+                Text(kind.title(spanish)).font(CuadraoTypography.action)
                 Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()

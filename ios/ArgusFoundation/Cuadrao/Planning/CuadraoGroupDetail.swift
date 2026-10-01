@@ -63,7 +63,7 @@ struct CuadraoGroupDetail: View {
             PlanGroupArtwork(look: group.look, progress: group.kind == .saving ? group.progress : nil, cover: group.cover)
                 .frame(height: 145).clipShape(RoundedRectangle(cornerRadius: 28))
                 .overlay(alignment: .bottomLeading) { PlanAvatarStack(members: group.members).padding(16) }
-            Text(group.name).font(.system(.largeTitle, design: .serif))
+            Text(group.name).font(CuadraoTypography.screen)
             Text(spanish ? "\(group.members.count) personas · \(group.kind.title(true))" : "\(group.members.count) people · \(group.kind.title(false))")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -79,7 +79,7 @@ struct CuadraoGroupDetail: View {
             }
         } else { balances(group) }
         VStack(alignment: .leading, spacing: 14) {
-            Text(spanish ? "¿Y si se suma alguien más?" : "What if someone else joins?").font(.system(.title2, design: .serif))
+            Text(spanish ? "¿Y si se suma alguien más?" : "What if someone else joins?").font(CuadraoTypography.section)
             Text(PlanFormat.amount(Double(group.estimatedCents) / 100 / people, currency: group.currency)).font(.system(size: 30, design: .rounded)).monospacedDigit().contentTransition(.numericText())
                 .accessibilityIdentifier("group-estimate-per-person")
             Text(spanish ? "por persona · \(Int(people)) personas previstas" : "per person · \(Int(people)) expected people").font(.subheadline).foregroundStyle(.secondary)

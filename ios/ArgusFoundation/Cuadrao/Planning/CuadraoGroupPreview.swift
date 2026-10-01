@@ -57,7 +57,7 @@ struct PlanGroup: Identifiable, Codable, Equatable {
     }
     mutating func record(_ expense: PlanSharedExpense) -> Bool {
         let ids = Set(members.map(\.id))
-        guard expense.cents >= (expense.draft ? 0 : 1), expense.cents <= 999999900, ids.contains(expense.payer),
+        guard expense.cents >= (expense.draft ? 0 : 1), expense.cents <= CanvasMoney.maximumCents, ids.contains(expense.payer),
               !expense.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               expense.draft || (expense.shares.values.allSatisfy { $0 >= 0 } && Set(expense.shares.keys).isSubset(of: ids)
                 && expense.shares.values.reduce(0, +) == expense.cents) else { return false }

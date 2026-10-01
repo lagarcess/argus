@@ -196,7 +196,7 @@ struct CuadraoSearchCanvas: View {
         if let entry = data.activity.first(where: { $0.id == id }), let account = data.account(entry.accountID) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    Text(entry.title).font(.system(.title, design: .serif))
+                    Text(entry.title).font(CuadraoTypography.feature)
                     Text(account.currency + " " + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
                         .font(.title).monospacedDigit()
                     LabeledContent(spanish ? "Tipo" : "Type", value: entry.income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
@@ -222,7 +222,7 @@ struct CuadraoSearchCanvas: View {
     private func resultRow(_ title: String, detail: String, date: Date? = nil) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.body.weight(.medium))
+                Text(title).font(CuadraoTypography.action)
                 Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)

@@ -12,14 +12,14 @@ struct CuadraoVoiceProposalCanvas: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    Text("Plan").font(.system(.largeTitle, design: .serif))
+                    Text("Plan").font(CuadraoTypography.screen)
                     Text(spanish ? "Lo conversamos. Aquí lo ves." : "Talk it through. See it here.")
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 20) {
                         Label(spanish ? "Propuesta de ejemplo" : "Example proposal", systemImage: "waveform")
                             .font(.caption).foregroundStyle(.secondary)
                         Text(spanish ? "Tu fondo de emergencia" : "Your emergency fund")
-                            .font(.system(.title2, design: .serif))
+                            .font(CuadraoTypography.section)
                         Text("DOP 3,000").font(.title.weight(.medium)).monospacedDigit()
                         Text(spanish ? "al mes · durante 6 meses" : "per month · for 6 months").foregroundStyle(.secondary)
                         Divider()
@@ -31,7 +31,7 @@ struct CuadraoVoiceProposalCanvas: View {
                                 .foregroundStyle(WelcomePalette.pine)
                         } else {
                             Button(spanish ? "Revisar propuesta" : "Review proposal") { reviewing = true }
-                                .font(.body.weight(.medium)).frame(maxWidth: .infinity, minHeight: 48)
+                                .font(CuadraoTypography.action).frame(maxWidth: .infinity, minHeight: 48)
                                 .foregroundStyle(WelcomePalette.onAccent)
                                 .background(WelcomePalette.pine, in: Capsule())
                         }

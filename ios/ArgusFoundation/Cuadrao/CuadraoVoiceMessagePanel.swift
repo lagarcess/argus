@@ -106,7 +106,7 @@ struct CuadraoVoiceRecordingOverlay: View {
                 .accessibilityIdentifier("voice-message-cancel")
             Button { message.stop() } label: {
                 Label(es ? "Detener" : "Stop", systemImage: "stop.fill")
-                    .font(.body.weight(.medium)).fixedSize(horizontal: false, vertical: true)
+                    .font(CuadraoTypography.action).fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 22).padding(.vertical, 10).frame(minHeight: 48)
                     .foregroundStyle(WelcomePalette.onAccent)
                     .background(WelcomePalette.pine, in: Capsule())

@@ -102,23 +102,6 @@ struct CanvasActivity: Identifiable {
     }
 }
 
-/// Formatting only; the preview does not connect to the financial ledger.
-enum CanvasMoney {
-    static let maximum = Decimal(string: "9999999.99")!
-    static func digits(_ currency: String) -> Int {
-        let formatter = NumberFormatter(); formatter.numberStyle = .currency
-        formatter.currencyCode = currency
-        return formatter.maximumFractionDigits
-    }
-    static func format(_ value: Decimal, currency: String) -> String {
-        let formatter = NumberFormatter(); formatter.locale = Locale(identifier: "en_US")
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = digits(currency)
-        formatter.maximumFractionDigits = digits(currency)
-        return formatter.string(from: NSDecimalNumber(decimal: value)) ?? "—"
-    }
-    static func raw(_ value: Decimal) -> String { NSDecimalNumber(decimal: value).stringValue }
-}
 
 struct CanvasAccountIcon: View {
     let kind: CanvasAccountKind
@@ -153,7 +136,7 @@ struct CanvasAccountRow: View {
                 .frame(width: 42, height: 42)
                 .background(WelcomePalette.sage.opacity(0.65), in: RoundedRectangle(cornerRadius: 13))
             VStack(alignment: .leading, spacing: 5) {
-                Text(account.displayName(spanish)).font(.body.weight(.medium))
+                Text(account.displayName(spanish)).font(CuadraoTypography.action)
                 Text(account.kind.title(spanish) + (account.sharedWithHousehold ? (spanish ? " · Conjunta" : " · Joint") : ""))
                     .font(.caption).foregroundStyle(.secondary)
             }

@@ -1696,7 +1696,7 @@ here when work starts. Close an entry only against its stated remaining gap.
 | **C07 — Profile and Updates** | **Profile polish paused by founder; Novedades not designed beyond placeholder.** Preserve identity/preferences and appearance/voice preview work already done. | Resume Profile hierarchy/child-page polish only when requested; connect auth/security, settings, usage, data controls, help/feedback and notification preferences through their owners. Design Updates around actual domain events with source links, avoiding duplicate invitation reminders. Verify language/accessibility and working controls, not static menus alone. | Native continuity D12 + Planning/Home D11 |
 | **C08 — Identity and social discovery** | **Research/decisions outstanding.** Group covers and sample invitation QR are not profile-photo upload, live profile QR or contacts discovery. | Decide avatar/username/profile-QR scope and guest identity before implementation; validate QR legibility and scan reliability. Contacts matching needs explicit opt-in and a data/access contract. Native sharing can hand off a link to WhatsApp; no automatic contact upload or WhatsApp integration is implied. Keep this separate from required household membership and parked growth work. | Native continuity D12 + Household D07; founder for unresolved product scope |
 | **C09 — Extra Plan refinements** | **Unassigned refinements/research, not promised capabilities.** Art, customization and gentle progress already inform Plan. | Exact target-date entry and personal cover photos remain refinements; group cover photos already exist. Forecast uncertainty bands require a valid model, not decorative precision. Habit/streak ideas need a helpful, non-punitive purpose. Rotating savings (“san” / Egyptian-style circles) remains research: sequence, missed contributions, custody and consent are unresolved. Existing shared savings does not implement a rotating pool or payouts. | Planning/Home D06; founder for additional scope |
-| **C10 — Consistency and phone handoff** | **Ongoing acceptance/connection work.** Plan amount controls now share one treatment; Home account amount entry has a separate preserved design. Both plan/group currency choices are fixed at creation. | Preserve welcome/sign-in/recovery UI and connect it to the existing auth/session owner. Final branding/assistant mark remain unresolved. Verify shared styling, approved icons, navigation/edge blur, Spanish-first/English parity, long values, Dynamic Type, VoiceOver, Reduce Motion, light/dark and physical touch. Diagnose the retained unlocated keyboard invalid-frame warning before claiming it resolved. Adapt preview views to canonical owners through the existing delivery lane; retain separate identities and truthful device evidence. | Native continuity D01/D15 + Device/release; domain owners for money/input contracts |
+| **C10 — Consistency and phone handoff** | **Ongoing acceptance/connection work.** Accounts and Plan now share typography roles and one money-editing implementation; their contextual layouts remain distinct. New plan/group amounts begin empty. A living Cuadrao guide and native reference gallery own consistency. Both plan/group currency choices are fixed at creation. | Preserve welcome/sign-in/recovery UI and connect it to the existing auth/session owner. Final branding/assistant mark remain unresolved. Verify shared styling, approved icons, navigation/edge blur, Spanish-first/English parity, long values, Dynamic Type, VoiceOver, Reduce Motion, light/dark and physical touch. Diagnose the retained unlocated keyboard invalid-frame warning before claiming it resolved. Adapt preview views to canonical owners through the existing delivery lane; retain separate identities and truthful device evidence. | Native continuity D01/D15 + Device/release; domain owners for money/input contracts |
 
 ### C01 — Native Scan and receipt split
 
@@ -1740,6 +1740,30 @@ capture/photo, corrections, equal/item/shared splits, included tax/service and t
 rounding, draft reopen, recipient/organizer views and external repayment status.
 No automatic collections, bank settlement or live sharing claim follows from
 this decision.
+
+### Cuadrao consistency pass and Home chart follow-up
+
+Founder assigned the four-point native UI pass on October 1: a living
+[Cuadrao guide](../../.agent/designs/cuadrao/DESIGN.md), shared typography roles,
+one Accounts/Plan money editor with empty creation amounts, and a native reference
+gallery. Existing account layouts, navigation, art and interaction meanings remain
+preserved. This is preview work; connected root/session/model owners are unchanged.
+Verification and the resulting checkpoint are recorded in the linked evidence
+when complete, not inferred from the assignment.
+
+**Home chart proposal, separately tracked under C05/C03:** a compact month view
+with one labeled amount/currency, solid recorded history, a Today marker and a
+clearly labeled dashed forecast only when its owner can supply one. Scrubbing
+shows date/value; further exploration belongs in Plan. References inspected on
+October 1: [Monzo balance](https://mobbin.com/screens/8e2b7c06-14e9-41cd-8114-2a5670c66485)
+and [bunq prediction](https://mobbin.com/screens/f5ca0ce0-971b-4d41-a5e3-d957be27fbec).
+These are captured visual references, not measured animation specifications.
+The recommendation is to implement the chart in a follow-up, not expand this
+four-point consistency pass. The founder has not yet approved a final chart.
+Home's current recorded position includes assets/debt; it must not silently become
+a projected spendable-cash series. Settle the metric, scope, period, missing-history
+state and the shared Plan data owner first. No second forecast calculation or
+fabricated Home history is authorized by this proposal.
 
 ### Handoff and upkeep
 

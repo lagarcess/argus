@@ -27,7 +27,7 @@ struct CuadraoHomeCanvas: View {
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
-        case add, options, archived, updates, spaces, customize, household
+        case add, options, archived, updates, spaces, customize, household, gallery
         case actions(UUID), rename(UUID), record(UUID)
         var id: String { "home-modal" }
     }
@@ -167,6 +167,8 @@ struct CuadraoHomeCanvas: View {
         HStack {
             CuadraoBrand()
                 .contextMenu {
+                    Button(spanish ? "Guía visual" : "Visual guide") { sheet = .gallery }
+                        .accessibilityIdentifier("cuadrao-gallery-open")
                     Button(spanish ? "Vista previa: primer uso" : "Preview: first use") {
                         populated = false; data.reset(populated: false, spanish: spanish); ordering = false
                     }
@@ -285,12 +287,12 @@ struct CuadraoHomeCanvas: View {
                 Text(detail).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(amount).font(.subheadline).monospacedDigit()
+            Text(amount).font(CuadraoTypography.rowAmount)
         }.padding(.vertical, 6)
     }
 
     private func sectionTitle(_ title: String) -> some View {
-        Text(title).font(.system(.title2, design: .serif)).accessibilityAddTraits(.isHeader)
+        Text(title).font(CuadraoTypography.section).accessibilityAddTraits(.isHeader)
     }
 
     @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
@@ -320,6 +322,7 @@ struct CuadraoHomeCanvas: View {
 
     @ViewBuilder private func modal(_ item: HomeSheet) -> some View {
         switch item {
+        case .gallery: CuadraoDesignGallery()
         case .household: CuadraoHouseholdSheet(data: data, spanish: spanish)
         case .customize: CuadraoHomeLayoutSheet(savedOrder: $homeOrder, spanish: spanish)
         case .spaces: CuadraoSpacesSheet(data: data, spanish: spanish)

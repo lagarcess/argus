@@ -124,7 +124,7 @@ struct CuadraoChatCanvas: View {
                     Spacer(minLength: 24)
                     if store.temporary {
                         Image("CuadraoTemporaryChat").resizable().scaledToFit().frame(width: 36, height: 36).foregroundStyle(.secondary)
-                        Text(es ? "Chat temporal" : "Temporary chat").font(.system(.title, design: .serif))
+                        Text(es ? "Chat temporal" : "Temporary chat").font(CuadraoTypography.feature)
                         Text(es ? "Fuera de tu historial.\nSin nuevas memorias." : "Outside your history.\nNo new memories.")
                             .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
                         Button { sheet = .temporary } label: {
@@ -136,7 +136,7 @@ struct CuadraoChatCanvas: View {
                     } else {
                         CuadraoBrand().scaleEffect(0.85).accessibilityLabel("Cuadrao")
                         Text(es ? "¿Qué vemos hoy?" : "What shall we look at?")
-                            .font(.system(.largeTitle, design: .serif)).multilineTextAlignment(.center)
+                            .font(CuadraoTypography.screen).multilineTextAlignment(.center)
                     }
                     Spacer(minLength: 32)
                 }.frame(maxWidth: .infinity, minHeight: geometry.size.height).padding(.horizontal, 24)

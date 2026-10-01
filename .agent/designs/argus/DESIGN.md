@@ -5,6 +5,10 @@ This guide owns Argus visual conventions and existing interaction detail. The
 surface structure, household contexts, and product behavior. New native
 implementations and exact glass materials require design/engineering work.
 
+The evolving native Cuadrao preview now has a scoped
+[Cuadrao design guide](../cuadrao/DESIGN.md). Its founder-approved native
+consistency work does not replace the production web conventions below.
+
 ## 1. Visual Theme & Atmosphere
 
 Argus should feel elegant, modern, crisp, and trustworthy across personal and

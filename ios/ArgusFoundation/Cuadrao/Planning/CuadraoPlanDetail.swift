@@ -56,13 +56,13 @@ struct CuadraoPlanDetail: View {
                     }
                 }
                 .sheet(isPresented: $exact) {
-                    PlanExactAmount(amount: Binding(get: { amount(plan) }, set: { draftAmount = $0; sliderCeiling = max(sliderCeiling, $0); saved = false }), maximum: 9999999, minimum: 1,
+                    PlanExactAmount(amount: Binding(get: { amount(plan) }, set: { draftAmount = $0; sliderCeiling = max(sliderCeiling, $0); saved = false }), maximum: CanvasMoney.maximumValue, minimum: 1,
                         title: plan.kind == .budget ? (spanish ? "Mi margen mensual" : "My monthly allowance") : (spanish ? "Cada mes" : "Each month"), currency: plan.currency, spanish: spanish)
                 }
                 .sheet(isPresented: $progressEntry) {
                     PlanExactAmount(amount: Binding(get: { plan.recorded }, set: { value in
                         var updated = plan; updated.recorded = value; store.save(updated)
-                    }), maximum: plan.kind == .debt ? plan.target : 9999999, title: plan.kind.recordedTitle(spanish), currency: plan.currency, spanish: spanish)
+                    }), maximum: plan.kind == .debt ? plan.target : CanvasMoney.maximumValue, title: plan.kind.recordedTitle(spanish), currency: plan.currency, spanish: spanish)
                 }
                 .confirmationDialog(spanish ? "¿Dejamos este plan en pausa?" : "Put this plan aside?", isPresented: $archive, titleVisibility: .visible) {
                     Button(spanish ? "Archivar plan" : "Archive plan") { store.archive(plan.id, true); dismiss() }
@@ -84,7 +84,7 @@ struct CuadraoPlanDetail: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(PlanFormat.space(plan.spaceID, accounts: accounts, spanish: spanish)).font(.caption).foregroundStyle(.secondary)
             HStack(alignment: .center, spacing: 16) {
-                Text(plan.name).font(.system(.title, design: .serif)).fixedSize(horizontal: false, vertical: true)
+                Text(plan.name).font(CuadraoTypography.feature).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 PlanLandscape(look: plan.look).frame(width: 70, height: 76)
             }
@@ -102,7 +102,7 @@ struct CuadraoPlanDetail: View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(plan.kind == .budget ? (spanish ? "Dale aire a tu mes." : "Give your month some room.") : plan.kind == .debt ? (spanish ? "Más cerca de soltarla." : "Closer to letting it go.") : (spanish ? "A tu ritmo, llegarías en" : "At your pace, you would arrive in"))
-                    .font(.system(.title2, design: .serif))
+                    .font(CuadraoTypography.section)
                 if plan.kind == .budget && plan.recorded > 0 {
                     let estimate = plan.projectedValue(at: CanvasForecast.lastDay, monthly: amount(plan))
                     Text(spanish ? "A este ritmo: \(PlanFormat.amount(estimate, currency: plan.currency)) al cierre. El margen no cambia el gasto previsto." : "At this pace: \(PlanFormat.amount(estimate, currency: plan.currency)) at month end. The allowance doesn't change projected spending.")
@@ -183,7 +183,7 @@ struct CuadraoPlanDetail: View {
     private func household(_ plan: CanvasPlan) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(spanish ? "Se hace en equipo." : "Better together.").font(.system(.title2, design: .serif))
+                Text(spanish ? "Se hace en equipo." : "Better together.").font(CuadraoTypography.section)
                 Spacer()
                 Button { people = true } label: { Image(systemName: "person.2").frame(width: 44, height: 44) }
                     .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")

@@ -49,12 +49,12 @@ import Foundation
         loaded.archive(goal.id, false)
         check(loaded.plan(goal.id)?.recorded == recorded, "Restore preserves progress")
         loaded.resetExamples(spanish: true, empty: true)
-        var new = CanvasPlan(name: "Nuevo plan"); new.recorded = 300
+        var new = CanvasPlan(name: "Nuevo plan", target: 1200, monthly: 100); new.recorded = 300
         loaded.save(new); loaded.enableForecastExample()
         check(loaded.plans == [new], "Exploring forecast from cold start preserves newly created plans")
         check(loaded.hasForecast, "Cold start can explore forecast independently")
         for currency in PlanCurrency.supported {
-            var fixed = CanvasPlan(name: "Fixed currency", currency: currency)
+            var fixed = CanvasPlan(name: "Fixed currency", currency: currency, target: 1200, monthly: 100)
             store.save(fixed)
             fixed.currency = PlanCurrency.supported.first { $0 != currency }!
             store.save(fixed)
@@ -65,6 +65,9 @@ import Foundation
             check(restored.plan(fixed.id)?.currency == currency, "The chosen currency survives reopening")
             check(restored.plan(fixed.id)?.target == fixed.target, "No conversion changes the amount")
         }
+        let empty = CanvasPlan(name: "")
+        check(empty.target == 0 && empty.monthly == 0, "Creation has no suggested financial amounts")
+        check(CanvasMoney.maximumValue == 9_999_999.99 && CanvasMoney.maximumCents == 999_999_999, "Money boundaries include cents")
         print("Passed \(count) Plan preview checks")
     }
 }

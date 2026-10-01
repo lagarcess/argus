@@ -7,7 +7,7 @@ struct RegistrationHeading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title)
-                .font(.system(.largeTitle, design: .serif))
+                .font(CuadraoTypography.screen)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             Text(detail)

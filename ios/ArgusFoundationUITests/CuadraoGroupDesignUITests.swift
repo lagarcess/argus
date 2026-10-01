@@ -61,6 +61,8 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         app.buttons["plan-create"].tap()
         app.textFields["group-name"].tap(); app.textFields["group-name"].typeText("Our summer\n")
         app.segmentedControls.buttons["Save together"].tap()
+        replace(app.textFields["group-estimate"], with: "48000")
+        app.toolbars.buttons["Done"].tap()
         reveal(app, app.buttons["group-save"])
         shot(app, "plan-group-create-en")
         app.buttons["group-save"].tap()

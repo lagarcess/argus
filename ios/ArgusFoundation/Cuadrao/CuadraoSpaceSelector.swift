@@ -36,7 +36,7 @@ struct CuadraoHomeOverview: View {
     private var currencies: [String] { Set(data.active.map(\.currency)).sorted() }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.system(.largeTitle, design: .serif)).fixedSize(horizontal: false, vertical: true)
+            Text(title).font(CuadraoTypography.screen).fixedSize(horizontal: false, vertical: true)
             if !data.active.isEmpty {
                 ForEach(currencies, id: \.self) { currency in
                     let accounts = data.active.filter { $0.currency == currency }
@@ -46,7 +46,7 @@ struct CuadraoHomeOverview: View {
                             total + (account.balance ?? 0) * (account.kind.isDebt ? -1 : 1)
                                 * Decimal(account.kind.isAsset ? account.share : 100) / 100
                         }, currency: currency))
-                        .font(.system(size: 38, weight: .medium, design: .rounded))
+                        .font(CuadraoTypography.amount)
                         .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                     }
                 }

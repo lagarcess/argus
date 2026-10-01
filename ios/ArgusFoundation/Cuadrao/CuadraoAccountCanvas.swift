@@ -16,14 +16,14 @@ struct CuadraoAccountCanvas: View {
                         CanvasAccountIcon(kind: account.kind, size: 30)
                             .frame(width: 58, height: 58)
                             .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 18))
-                        Text(account.displayName(spanish)).font(.system(.largeTitle, design: .serif))
+                        Text(account.displayName(spanish)).font(CuadraoTypography.screen)
                             .fixedSize(horizontal: false, vertical: true)
                         VStack(alignment: .leading, spacing: 9) {
                             Text(account.balanceLabel(spanish)).font(.subheadline).foregroundStyle(.secondary)
                             HStack(alignment: .firstTextBaseline, spacing: 9) {
                                 Text(account.currency).font(.subheadline).foregroundStyle(.secondary)
                                 Text(account.balance.map { CanvasMoney.format($0, currency: account.currency) } ?? "—")
-                                    .font(.system(size: 38, weight: .medium, design: .rounded))
+                                    .font(CuadraoTypography.amount)
                                     .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                             }
                             Text(account.balance == nil ? (spanish ? "Sin balance registrado" : "No balance recorded")
@@ -38,7 +38,7 @@ struct CuadraoAccountCanvas: View {
                             .overlay { Capsule().stroke(WelcomePalette.border, lineWidth: 1) }
                     }
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(spanish ? "Movimientos" : "Activity").font(.system(.title2, design: .serif))
+                        Text(spanish ? "Movimientos" : "Activity").font(CuadraoTypography.section)
                         let entries = data.activity.filter { $0.accountID == accountID }
                         if entries.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
@@ -59,7 +59,7 @@ struct CuadraoAccountCanvas: View {
                                     }
                                     Spacer()
                                     Text((entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                                        .font(.subheadline).monospacedDigit()
+                                        .font(CuadraoTypography.rowAmount)
                                 }.padding(.vertical, 10)
                                 Divider()
                             }
@@ -114,11 +114,11 @@ struct CuadraoTransactionCanvas: View {
                 VStack(alignment: .leading, spacing: 28) {
                     HStack(spacing: 12) {
                         CanvasAccountIcon(kind: account.kind)
-                        Text(account.displayName(spanish)).font(.body.weight(.medium))
+                        Text(account.displayName(spanish)).font(CuadraoTypography.action)
                     }.padding(.top, 8)
                     if reviewing {
                         Text((income ? "+" : "−") + CanvasMoney.format(Decimal(string: amount) ?? 0, currency: account.currency))
-                            .font(.system(size: 38, weight: .medium, design: .rounded)).monospacedDigit()
+                            .font(CuadraoTypography.amount).monospacedDigit()
                         LabeledContent(spanish ? "Moneda" : "Currency", value: account.currency)
                         LabeledContent(spanish ? "Tipo" : "Type", value: income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
                         if !title.isEmpty { LabeledContent(spanish ? "Concepto" : "Description", value: title) }

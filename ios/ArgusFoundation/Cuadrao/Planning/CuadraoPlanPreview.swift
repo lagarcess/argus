@@ -49,9 +49,9 @@ struct CanvasPlan: Identifiable, Codable, Equatable {
     var kind: CanvasPlanKind = .goal
     var spaceID = "personal"
     var currency = "DOP"
-    var target: Double = 60000
+    var target: Double = 0
     var recorded: Double = 0
-    var monthly: Double = 5000
+    var monthly: Double = 0
     var annualRate: Double = 0
     var look: CanvasPlanLook = .coast
     var archived = false

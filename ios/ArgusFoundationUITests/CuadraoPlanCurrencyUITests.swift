@@ -35,6 +35,8 @@ final class CuadraoPlanCurrencyUITests: XCTestCase {
         app.buttons["plan-create"].tap()
         app.textFields["group-name"].tap(); app.textFields["group-name"].typeText("Viaje en dólares\n")
         app.buttons["plan-edit-currency"].tap(); app.buttons["USD"].tap()
+        replace(app.textFields["group-estimate"], "48000")
+        app.toolbars.buttons["Listo"].tap()
         capture(app, "currency-group-choice-es")
         reveal(app, app.buttons["group-save"]); app.buttons["group-save"].tap()
         XCTAssertTrue(app.buttons["group-invite"].waitForExistence(timeout: 3))

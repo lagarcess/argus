@@ -10,7 +10,7 @@ struct CuadraoGroupCollection: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(spanish ? "Los buenos planes se comparten." : "Good plans bring us together.")
-                        .font(.system(.title2, design: .serif))
+                        .font(CuadraoTypography.section)
                     Text(spanish ? "Cada quien con su parte. Todos en el mismo plan." : "Your own share. One shared plan.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
@@ -24,7 +24,7 @@ struct CuadraoGroupCollection: View {
                             .frame(height: 140)
                             .overlay(alignment: .bottomLeading) { PlanAvatarStack(members: group.members).padding(16) }
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(group.name).font(.system(.title2, design: .serif)).foregroundStyle(WelcomePalette.ink)
+                            Text(group.name).font(CuadraoTypography.section).foregroundStyle(WelcomePalette.ink)
                             HStack {
                                 Text(group.kind.title(spanish))
                                 Spacer()

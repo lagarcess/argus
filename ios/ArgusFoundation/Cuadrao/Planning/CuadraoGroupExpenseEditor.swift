@@ -8,6 +8,7 @@ struct CuadraoGroupExpenseEditor: View {
     let spanish: Bool
     @State private var title = ""
     @State private var amount = 0.0
+    @State private var amountErrors: [String: String] = [:]
     @State private var payer: UUID?
     @State private var selected: Set<UUID> = []
     @State private var custom = false
@@ -18,15 +19,20 @@ struct CuadraoGroupExpenseEditor: View {
     @State private var discard = false
     @Environment(\.dismiss) private var dismiss
     private var group: PlanGroup? { store.group(groupID) }
-    private var cents: Int { amount.isFinite && (0...9999999).contains(amount) ? Int((amount * 100).rounded()) : 0 }
-    private var validDraft: Bool { (receipt != nil || !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) && amount.isFinite && (0...9999999).contains(amount) }
-    private var valid: Bool { !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && cents > 0 && payer != nil }
+    private var cents: Int { amount.isFinite && (0...CanvasMoney.maximumValue).contains(amount) ? Int((amount * 100).rounded()) : 0 }
+    private var hasAmountError: Bool {
+        amountErrors.contains { key, error in
+            !error.isEmpty && (key == "amount" || (custom && selected.contains { $0.uuidString == key }))
+        }
+    }
+    private var validDraft: Bool { !hasAmountError && (receipt != nil || !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) && amount.isFinite && (0...CanvasMoney.maximumValue).contains(amount) }
+    private var valid: Bool { !hasAmountError && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && cents > 0 && payer != nil }
     private func shares(_ group: PlanGroup) -> [UUID: Int] {
         if group.kind == .saving { return payer.map { [$0: cents] } ?? [:] }
         if custom {
             return Dictionary(uniqueKeysWithValues: group.members.filter { selected.contains($0.id) }.map {
                 let value = exactShares[$0.id] ?? 0
-                return ($0.id, value.isFinite && (0...9999999).contains(value) ? Int((value * 100).rounded()) : -1)
+                return ($0.id, value.isFinite && (0...CanvasMoney.maximumValue).contains(value) ? Int((value * 100).rounded()) : -1)
             })
         }
         return PlanSharedExpense.equal(cents, among: group.members.filter { selected.contains($0.id) }.map(\.id))
@@ -36,8 +42,8 @@ struct CuadraoGroupExpenseEditor: View {
             if let group {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        TextField(group.kind == .saving ? (spanish ? "¿Para qué aportas?" : "What are you saving for?") : (spanish ? "¿Qué pagaron?" : "What was it for?"), text: $title).font(.system(.title2, design: .serif)).accessibilityIdentifier("group-expense-name")
-                        PlanAmountInput(value: $amount, currency: .constant(group.currency),
+                        TextField(group.kind == .saving ? (spanish ? "¿Para qué aportas?" : "What are you saving for?") : (spanish ? "¿Qué pagaron?" : "What was it for?"), text: $title).font(CuadraoTypography.section).accessibilityIdentifier("group-expense-name")
+                        PlanAmountInput(value: $amount, currency: .constant(group.currency), error: $amountErrors.message(for: "amount"),
                                         title: spanish ? "Monto" : "Amount", identifier: "group-expense-amount", spanish: spanish)
                         Picker(group.kind == .saving ? (spanish ? "Aportó" : "Contributed by") : (spanish ? "Pagó" : "Paid by"), selection: $payer) {
                             ForEach(group.members) { member in Text(member.name).tag(Optional(member.id)) }
@@ -63,9 +69,16 @@ struct CuadraoGroupExpenseEditor: View {
                                     }.buttonStyle(.plain).accessibilityLabel("\(member.name), \(selected.contains(member.id) ? (spanish ? "incluido" : "included") : (spanish ? "excluido" : "excluded"))")
                                     Spacer()
                                     if custom && selected.contains(member.id) {
-                                        TextField("0", value: Binding(get: { exactShares[member.id] ?? 0 }, set: { exactShares[member.id] = $0 }), format: .number.precision(.fractionLength(0...2)))
-                                            .keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(maxWidth: 100).accessibilityLabel(spanish ? "Parte de \(member.name)" : "\(member.name)'s share")
-                                    } else { Text(PlanFormat.amount(Double(shares(group)[member.id] ?? 0) / 100, currency: group.currency)).font(.subheadline).monospacedDigit() }
+                                        VStack(alignment: .trailing) {
+                                            CanvasMoneyValueInput(value: Binding(get: { exactShares[member.id] ?? 0 }, set: { exactShares[member.id] = $0 }),
+                                                error: $amountErrors.message(for: member.id.uuidString), currency: group.currency, spanish: spanish,
+                                                identifier: "group-share-\(index)", title: spanish ? "Parte de \(member.name)" : "\(member.name)'s share",
+                                                size: .row, alignment: .right).frame(minWidth: 90, maxWidth: 140, minHeight: 44)
+                                            if let error = amountErrors[member.id.uuidString], !error.isEmpty {
+                                                Text(error).font(CuadraoTypography.caption).foregroundStyle(.red)
+                                            }
+                                        }
+                                    } else { Text(PlanFormat.amount(Double(shares(group)[member.id] ?? 0) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount) }
                                 }
                             }
                             if custom {
@@ -138,6 +151,7 @@ struct CuadraoGroupSettlement: View {
     @State private var from: UUID?
     @State private var to: UUID?
     @State private var amount = 0.0
+    @State private var amountErrors: [String: String] = [:]
     @Environment(\.dismiss) private var dismiss
     private var group: PlanGroup? { store.group(groupID) }
     private var maximum: Int { guard let group, let from, let to else { return 0 }; return max(0, min(-group.balance(from), group.balance(to))) }
@@ -148,7 +162,7 @@ struct CuadraoGroupSettlement: View {
                     Section {
                         Picker(spanish ? "Envió" : "Sent by", selection: $from) { ForEach(group.members.filter { group.balance($0.id) < 0 }) { Text($0.name).tag(Optional($0.id)) } }
                         Picker(spanish ? "Recibió" : "Received by", selection: $to) { ForEach(group.members.filter { group.balance($0.id) > 0 }) { Text($0.name).tag(Optional($0.id)) } }
-                        PlanAmountInput(value: $amount, currency: .constant(group.currency),
+                        PlanAmountInput(value: $amount, currency: .constant(group.currency), error: $amountErrors.message(for: "amount"),
                                         title: spanish ? "Monto devuelto" : "Amount repaid", identifier: "group-repayment-amount", spanish: spanish)
                     } footer: { Text(spanish ? "Registra dinero que ya se devolvió por fuera de Cuadrao. Puedes registrar una parte." : "Record money already returned outside Cuadrao. Partial repayments are welcome.") }
                     Section {
@@ -156,7 +170,7 @@ struct CuadraoGroupSettlement: View {
                             guard let from, let to else { return }
                             var updated = group
                             if updated.repay(from: from, to: to, cents: Int((amount * 100).rounded())) { store.save(updated); dismiss() }
-                        }.disabled(!amount.isFinite || amount < 0.01 || amount * 100 > Double(maximum)).accessibilityIdentifier("group-repayment-save")
+                        }.disabled(amountErrors.values.contains { !$0.isEmpty } || !amount.isFinite || amount < 0.01 || amount * 100 > Double(maximum)).accessibilityIdentifier("group-repayment-save")
                     }
                 }.navigationTitle(spanish ? "Vamos cuadrando" : "Settling up").navigationBarTitleDisplayMode(.inline)
                     .toolbar {

@@ -28,7 +28,7 @@ struct CuadraoForecastPlayground: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(spanish ? "Octubre" : "October") · \(scopeName)").font(.subheadline).foregroundStyle(.secondary)
                     Text(spanish ? "Tu mes tiene posibilidades." : "Your month has possibilities.")
-                        .font(.system(.title, design: .serif))
+                        .font(CuadraoTypography.feature)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     Text(point.map { "\($0.day) \(spanish ? "de octubre" : "October")\($0.day > CanvasForecast.today ? (spanish ? " · estimado" : " · estimated") : "")" }
@@ -113,7 +113,7 @@ struct CuadraoForecastPlayground: View {
                             Text(event.title(spanish)).font(.subheadline)
                             Text("\(event.day) oct.").font(.caption).foregroundStyle(.secondary)
                         }
-                        Spacer(); Text(PlanFormat.amount(event.amount)).font(.subheadline).monospacedDigit()
+                        Spacer(); Text(PlanFormat.amount(event.amount)).font(CuadraoTypography.rowAmount)
                     }
                 }
                 Text(spanish ? "Incluye estos pagos e ingresos previstos y el gasto diario del 13 al 31. No suma metas, ahorros ni cuentas privadas de otras personas." : "Includes these expected payments and income plus daily spending from the 13th to the 31st. Excludes goals, savings, and other people's private accounts.")
@@ -131,16 +131,13 @@ struct PlanExactAmount: View {
     let currency: String
     let spanish: Bool
     @State private var input: Double = 0
-    @FocusState private var focused: Bool
+    @State private var error = ""
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
             Form {
-                HStack {
-                    Text(currency).foregroundStyle(.secondary)
-                    TextField("0", value: $input, format: .number.precision(.fractionLength(0...2)))
-                        .keyboardType(.decimalPad).focused($focused).accessibilityIdentifier("plan-exact-input")
-                }
+                PlanAmountInput(value: $input, currency: .constant(currency), error: $error,
+                                title: title, identifier: "plan-exact-input", spanish: spanish)
                 if !input.isFinite || input < minimum || input > maximum {
                     Text(spanish ? "Usa un monto entre \(minimum.formatted()) y \(PlanFormat.amount(maximum, currency: currency))." : "Use an amount between \(minimum.formatted()) and \(PlanFormat.amount(maximum, currency: currency)).")
                         .font(.caption).foregroundStyle(.red)
@@ -150,10 +147,10 @@ struct PlanExactAmount: View {
                     ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cancelar" : "Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {
                         Button(spanish ? "Listo" : "Done") { amount = input; dismiss() }
-                            .disabled(!input.isFinite || input < minimum || input > maximum).accessibilityIdentifier("plan-exact-done")
+                            .disabled(!error.isEmpty || !input.isFinite || input < minimum || input > maximum).accessibilityIdentifier("plan-exact-done")
                     }
                 }
         }.presentationDetents([.medium]).presentationDragIndicator(.visible)
-            .onAppear { input = amount; focused = true }
+            .onAppear { input = amount }
     }
 }

@@ -3,6 +3,8 @@ import SwiftUI
 enum WelcomePalette {
     static let pine = adaptive(UIColor(red: 0.16, green: 0.29, blue: 0.25, alpha: 1),
                                UIColor(red: 0.67, green: 0.83, blue: 0.75, alpha: 1))
+    static let moneyInput = adaptive(UIColor(red: 0.18, green: 0.47, blue: 0.40, alpha: 1),
+                                     UIColor(red: 0.67, green: 0.83, blue: 0.75, alpha: 1))
     static let sage = adaptive(UIColor(red: 0.91, green: 0.93, blue: 0.91, alpha: 1),
                                UIColor(red: 0.17, green: 0.22, blue: 0.20, alpha: 1))
     static let overlap = adaptive(UIColor(red: 0.25, green: 0.38, blue: 0.33, alpha: 1),
@@ -30,7 +32,9 @@ struct CuadraoCanvas: View {
     private var spanish: Bool { language == "es" }
 
     var body: some View {
-        if Self.standalonePreview || ProcessInfo.processInfo.arguments.contains("--cuadrao-home") {
+        if ProcessInfo.processInfo.arguments.contains("--design-gallery") {
+            CuadraoDesignGallery()
+        } else if Self.standalonePreview || ProcessInfo.processInfo.arguments.contains("--cuadrao-home") {
             CuadraoHomeCanvas()
         } else {
         NavigationStack {
@@ -53,7 +57,7 @@ struct CuadraoCanvas: View {
                     VStack(spacing: 32) {
                         WelcomeSquares()
                         Text(spanish ? "Tus finanzas,\nen orden." : "Your finances,\nin order.")
-                            .font(.system(.largeTitle, design: .serif))
+                            .font(CuadraoTypography.screen)
                             .lineSpacing(2)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.center)

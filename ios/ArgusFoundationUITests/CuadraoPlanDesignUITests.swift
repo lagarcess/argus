@@ -45,6 +45,10 @@ final class CuadraoPlanDesignUITests: XCTestCase {
         XCTAssertTrue(app.textFields["plan-name"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.buttons["plan-save"].isEnabled)
         app.textFields["plan-name"].tap(); app.textFields["plan-name"].typeText("Mi próxima laptop\n")
+        app.textFields["plan-target"].tap(); app.textFields["plan-target"].typeText("60000")
+        app.toolbars.buttons["Listo"].tap()
+        app.textFields["plan-monthly"].tap(); app.textFields["plan-monthly"].typeText("5000")
+        app.toolbars.buttons["Listo"].tap()
         capture(app, "plan-create-es")
         reveal(app, app.buttons["plan-save"])
         app.buttons["plan-save"].tap()
@@ -130,7 +134,13 @@ final class CuadraoPlanDesignUITests: XCTestCase {
             app.buttons["plan-kind-\(kind)"].tap()
             app.textFields["plan-name"].tap()
             app.textFields["plan-name"].typeText((kind == "budget" ? "Mis salidas" : "Mi préstamo") + "\n")
+            app.textFields["plan-target"].tap(); app.textFields["plan-target"].typeText("60000")
+            app.toolbars.buttons["Listo"].tap()
             if kind == "budget" { XCTAssertFalse(app.textFields["plan-monthly"].exists) }
+            else {
+                app.textFields["plan-monthly"].tap(); app.textFields["plan-monthly"].typeText("5000")
+                app.toolbars.buttons["Listo"].tap()
+            }
             reveal(app, app.buttons["plan-save"])
             capture(app, "plan-create-\(kind)-es")
             app.buttons["plan-save"].tap()

@@ -7,15 +7,16 @@ struct CuadraoPlanEditor: View {
     let spanish: Bool
     var onSave: ((UUID) -> Void)?
     @State private var draft: CanvasPlan
+    @State private var amountErrors: [String: String] = [:]
     @State private var showDetails = false
     @State private var discard = false
     @FocusState private var nameFocused: Bool
     @Environment(\.dismiss) private var dismiss
     private var editing: Bool { store.plan(initial.id) != nil }
     private var valid: Bool {
-        !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.target.isFinite && (1...9999999).contains(draft.target)
-        && draft.recorded.isFinite && (0...9999999).contains(draft.recorded)
-        && draft.monthly.isFinite && (1...9999999).contains(draft.monthly)
+        amountErrors.allSatisfy { id, error in error.isEmpty || (draft.kind == .budget && id == "plan-monthly") } && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.target.isFinite && (0.01...CanvasMoney.maximumValue).contains(draft.target)
+        && draft.recorded.isFinite && (0...CanvasMoney.maximumValue).contains(draft.recorded)
+        && (draft.kind == .budget || (draft.monthly.isFinite && (0.01...CanvasMoney.maximumValue).contains(draft.monthly)))
         && draft.annualRate.isFinite && (0...100).contains(draft.annualRate)
         && (draft.kind != .debt || draft.recorded <= draft.target)
         && accounts.visibleSpaces.contains { $0.id == draft.spaceID }
@@ -32,7 +33,7 @@ struct CuadraoPlanEditor: View {
                     HStack(spacing: 18) {
                         PlanLandscape(look: draft.look).frame(width: 64, height: 70)
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(spanish ? "Dale un nombre." : "Make it yours.").font(.system(.title2, design: .serif))
+                            Text(spanish ? "Dale un nombre." : "Make it yours.").font(CuadraoTypography.section)
                             TextField(spanish ? "Por ejemplo, mi próximo viaje" : "For example, my next trip", text: $draft.name)
                                 .font(.body).focused($nameFocused).submitLabel(.done).onSubmit { nameFocused = false }
                                 .accessibilityIdentifier("plan-name")
@@ -87,7 +88,7 @@ struct CuadraoPlanEditor: View {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(months.map { $0 == 0 ? (spanish ? "Ya llegaste." : "You're there.") : PlanFormat.month(after: $0, spanish: spanish) }
                                  ?? (spanish ? "Prueba un aporte mayor" : "Try a higher amount"))
-                                .font(.system(.title2, design: .serif)).foregroundStyle(WelcomePalette.pine)
+                                .font(CuadraoTypography.section).foregroundStyle(WelcomePalette.pine)
                             Text(spanish ? "Fecha estimada con este ritmo. Puedes ajustarlo después." : "Estimated date at this pace. You can adjust it later.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
@@ -124,7 +125,7 @@ struct CuadraoPlanEditor: View {
     }
     private var kindPicker: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?").font(.system(.title2, design: .serif))
+            Text(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?").font(CuadraoTypography.section)
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) { kindButtons }
                 VStack(alignment: .leading, spacing: 8) { kindButtons }
@@ -144,7 +145,7 @@ struct CuadraoPlanEditor: View {
     private func amountRow(_ title: String, value: Binding<Double>, id: String, primary: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.caption).foregroundStyle(.secondary)
-            PlanAmountInput(value: value, currency: $draft.currency, title: title,
+            PlanAmountInput(value: value, currency: $draft.currency, error: $amountErrors.message(for: id), title: title,
                             identifier: id, spanish: spanish, currencySelectable: primary && !editing,
                             showCurrencyLock: primary && editing, prominent: primary)
         }.padding(18)

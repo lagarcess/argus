@@ -36,7 +36,7 @@ struct PlanPrimaryButton: View {
             HStack(spacing: 8) {
                 Text(title)
                 if let symbol { Image(systemName: symbol) }
-            }.font(.body.weight(.medium)).frame(maxWidth: .infinity, minHeight: 52)
+            }.font(CuadraoTypography.action).frame(maxWidth: .infinity, minHeight: 52)
                 .foregroundStyle(WelcomePalette.onAccent)
                 .background(WelcomePalette.pine, in: Capsule())
         }.buttonStyle(.plain)
@@ -89,7 +89,7 @@ struct PlanCard: View {
             HStack(alignment: .top, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(space).font(.caption).foregroundStyle(.secondary)
-                    Text(plan.name).font(.system(.title2, design: .serif)).foregroundStyle(WelcomePalette.ink)
+                    Text(plan.name).font(CuadraoTypography.section).foregroundStyle(WelcomePalette.ink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)

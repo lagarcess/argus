@@ -18,7 +18,7 @@ struct CuadraoTemporaryChatSettings: View {
             Divider()
             VStack(alignment: .leading, spacing: 12) {
                 Toggle(es ? "Usar mi contexto" : "Use my context", isOn: $store.useContext)
-                    .font(.body.weight(.medium)).disabled(store.contextLocked)
+                    .font(CuadraoTypography.action).disabled(store.contextLocked)
                     .accessibilityIdentifier("temporary-context")
                 Text(es ? "Tus memorias, preferencias de respuesta y registros financieros a los que tienes acceso." : "Your memories, response preferences and financial records you can access.")
                     .font(.subheadline).foregroundStyle(.secondary)
@@ -41,7 +41,7 @@ struct CuadraoTemporaryChatSettings: View {
             }.font(.subheadline)
             Button(action: returnToRegular) {
                 Text(es ? "Volver al chat normal" : "Return to regular chat")
-                    .font(.body.weight(.medium)).frame(maxWidth: .infinity, minHeight: 48)
+                    .font(CuadraoTypography.action).frame(maxWidth: .infinity, minHeight: 48)
             }.accessibilityIdentifier("temporary-return")
         }
     }
@@ -50,7 +50,7 @@ struct CuadraoTemporaryChatSettings: View {
         HStack(alignment: .top, spacing: 16) {
             Image(systemName: symbol).font(.system(size: 20)).frame(width: 24, height: 26)
             VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.body.weight(.medium))
+                Text(title).font(CuadraoTypography.action)
                 Text(detail).font(.subheadline).foregroundStyle(.secondary)
             }
         }

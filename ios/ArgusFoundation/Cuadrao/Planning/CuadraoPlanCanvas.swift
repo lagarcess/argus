@@ -77,7 +77,7 @@ struct CuadraoPlanCanvas: View {
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Plan").font(.system(.largeTitle, design: .serif))
+                Text("Plan").font(CuadraoTypography.screen)
                 Text(spanish ? "Lo que viene, lo hacemos." : "Make what's next happen.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
@@ -122,7 +122,7 @@ struct CuadraoPlanCanvas: View {
                 Text(selectedPoint.map { "\($0.day) oct. · \($0.day > CanvasForecast.today ? (spanish ? "estimado" : "estimated") : (spanish ? "registrado" : "recorded"))" } ?? (store.dailyAssumptions[scope] == nil ? (spanish ? "Balance estimado al cierre" : "Estimated closing balance") : (spanish ? "Con tu plan, cerrarías con" : "With your plan, you'd end with")))
                     .font(.subheadline).foregroundStyle(.secondary)
                 Text(PlanFormat.amount(selectedPoint?.balance ?? forecast.ending(daily: store.daily(for: scope))))
-                    .font(.system(size: 30, weight: .regular, design: .rounded)).monospacedDigit()
+                    .font(CuadraoTypography.amount).monospacedDigit()
                     .contentTransition(.numericText()).minimumScaleFactor(0.65).lineLimit(1)
                     .accessibilityIdentifier("plan-month-ending")
             }
@@ -142,7 +142,7 @@ struct CuadraoPlanCanvas: View {
         VStack(alignment: .leading, spacing: 18) {
             PlanLandscape(look: .sunshine).frame(height: 135)
             Text(spanish ? "Lo que viene empieza aquí." : "What's next starts here.")
-                .font(.system(.title, design: .serif))
+                .font(CuadraoTypography.feature)
             Text(spanish ? "Puedes hacer tu primer plan hoy. La proyección llegará cuando tengas movimientos e ingresos previstos." : "Make your first plan today. Your forecast will take shape with transactions and expected income.")
                 .font(.subheadline).foregroundStyle(.secondary)
             Button(spanish ? "Explorar un mes de ejemplo" : "Explore an example month") {
@@ -154,7 +154,7 @@ struct CuadraoPlanCanvas: View {
     private var plans: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                Text(spanish ? "Tus planes" : "Your plans").font(.system(.title2, design: .serif))
+                Text(spanish ? "Tus planes" : "Your plans").font(CuadraoTypography.section)
                 Spacer()
                 Menu {
                     Button(spanish ? "Todos los espacios" : "All spaces") { filter = nil }
@@ -177,7 +177,7 @@ struct CuadraoPlanCanvas: View {
             }
             if active.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?").font(.system(.title2, design: .serif))
+                    Text(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?").font(CuadraoTypography.section)
                     Text(spanish ? "Un viaje, un respiro, llegar a fin de mes con más espacio." : "A trip, a little breathing room, a month with more left over.")
                         .font(.subheadline).foregroundStyle(.secondary)
                     PlanPrimaryButton(title: spanish ? "Crear mi primer plan" : "Make my first plan", symbol: "plus") {
