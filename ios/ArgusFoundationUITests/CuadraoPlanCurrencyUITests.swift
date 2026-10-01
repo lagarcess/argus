@@ -1,0 +1,83 @@
+import XCTest
+
+final class CuadraoPlanCurrencyUITests: XCTestCase {
+    func testPersonalEuroCreationAndLockEnglish() {
+        continueAfterFailure = false
+        let app = openPlan(english: true)
+        app.buttons["plan-create"].tap()
+        app.textFields["plan-name"].tap(); app.textFields["plan-name"].typeText("Summer in euros\n")
+        reveal(app, app.buttons["plan-edit-currency"])
+        app.buttons["plan-edit-currency"].tap(); app.buttons["EUR"].tap()
+        capture(app, "currency-personal-choice-en")
+        app.buttons["plan-save"].tap()
+        XCTAssertTrue(app.buttons["plan-detail-options"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["EUR 0"].exists)
+        app.buttons["plan-detail-options"].tap(); app.buttons["Edit plan"].tap()
+        let fixed = app.descendants(matching: .any).matching(identifier: "plan-currency-fixed").firstMatch
+        reveal(app, fixed)
+        XCTAssertFalse(app.buttons["plan-edit-currency"].exists)
+        XCTAssertTrue(fixed.label.contains("EUR"))
+        capture(app, "currency-personal-fixed-en")
+        app.buttons["plan-save"].tap()
+        XCTAssertTrue(app.buttons["plan-detail-options"].waitForExistence(timeout: 3))
+    }
+    func testSharedDollarSplitAndRepaymentSpanish() {
+        continueAfterFailure = false
+        let app = openPlan()
+        app.segmentedControls["plan-audience"].buttons["En grupo"].tap()
+        app.buttons["plan-create"].tap()
+        app.textFields["group-name"].tap(); app.textFields["group-name"].typeText("Viaje en dólares\n")
+        app.buttons["plan-edit-currency"].tap(); app.buttons["USD"].tap()
+        capture(app, "currency-group-choice-es")
+        reveal(app, app.buttons["group-save"]); app.buttons["group-save"].tap()
+        XCTAssertTrue(app.buttons["group-invite"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["group-own-share"].label, "USD 0")
+        app.buttons["group-invite"].tap()
+        reveal(app, app.buttons["group-invite-preview"]); app.buttons["group-invite-preview"].tap()
+        reveal(app, app.buttons["group-invite-accept"]); app.buttons["group-invite-accept"].tap()
+        app.buttons["Cerrar"].tap()
+        app.segmentedControls["group-sections"].buttons["Gastos"].tap()
+        app.buttons["group-add-expense"].tap()
+        app.textFields["group-expense-name"].tap(); app.textFields["group-expense-name"].typeText("Cena\n")
+        replace(app.textFields["group-expense-amount"], "100")
+        if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }
+        XCTAssertTrue(app.staticTexts["USD"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label == %@", "USD 50")).count == 2)
+        capture(app, "currency-dollar-split-es")
+        reveal(app, app.buttons["group-expense-save"]); app.buttons["group-expense-save"].tap()
+        app.segmentedControls["group-sections"].buttons["El plan"].tap()
+        XCTAssertEqual(app.staticTexts["group-own-share"].label, "USD 50")
+        reveal(app, app.buttons["group-settle"]); app.buttons["group-settle"].tap()
+        XCTAssertTrue(app.staticTexts["USD"].exists)
+        replace(app.textFields["group-repayment-amount"], "20")
+        app.buttons["group-repayment-save"].tap()
+        capture(app, "currency-dollar-balance-es")
+        app.buttons["group-options"].tap(); app.buttons["Editar grupo"].tap()
+        let fixed = app.descendants(matching: .any).matching(identifier: "plan-currency-fixed").firstMatch
+        reveal(app, fixed)
+        XCTAssertTrue(fixed.label.contains("USD"))
+        XCTAssertFalse(app.buttons["plan-edit-currency"].exists)
+        capture(app, "currency-group-fixed-es")
+    }
+    private func openPlan(english: Bool = false) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", "light"] + (english ? ["--design-english"] : [])
+        app.launch(); app.buttons["cuadrao-tab-1"].tap(); return app
+    }
+    private func replace(_ field: XCUIElement, _ text: String) {
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (field.value as? String ?? "").count)); field.typeText(text)
+    }
+    private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
+        for _ in 0..<7 {
+            let bar = app.buttons["cuadrao-tab-0"]
+            if element.isHittable && element.frame.midY < (bar.exists ? bar.frame.minY - 12 : app.frame.maxY) { return }
+            app.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable)
+    }
+    private func capture(_ app: XCUIApplication, _ name: String) {
+        Thread.sleep(forTimeInterval: 0.6)
+        let item = XCTAttachment(screenshot: app.screenshot()); item.name = name; item.lifetime = .keepAlways; add(item)
+    }
+}

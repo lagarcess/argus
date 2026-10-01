@@ -34,6 +34,7 @@ struct PlanGroup: Identifiable, Codable, Equatable {
     var id = UUID()
     var name: String
     var kind: PlanGroupKind = .trip
+    var currency = "DOP"
     var look: CanvasPlanLook = .coast
     var cover: Data?
     var members: [PlanMember]
@@ -52,7 +53,7 @@ struct PlanGroup: Identifiable, Codable, Equatable {
     }
     var progress: Double { min(1, Double(total) / Double(max(1, estimatedCents))) }
     var valid: Bool {
-        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !members.isEmpty && estimatedCents > 0 && expectedPeople > 0
+        PlanCurrency.supported.contains(currency) && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !members.isEmpty && estimatedCents > 0 && expectedPeople > 0
     }
     mutating func record(_ expense: PlanSharedExpense) -> Bool {
         let ids = Set(members.map(\.id))
@@ -70,6 +71,28 @@ struct PlanGroup: Identifiable, Codable, Equatable {
     }
 }
 
+// Earlier previews supported DOP only. Preserve those saved groups and amounts.
+extension PlanGroup {
+    enum CodingKeys: String, CodingKey {
+        case id, name, kind, currency, look, cover, members, estimatedCents, expectedPeople, expenses, repayments, archived
+    }
+    init(from decoder: Decoder) throws {
+        let saved = try decoder.container(keyedBy: CodingKeys.self)
+        id = try saved.decode(UUID.self, forKey: .id)
+        name = try saved.decode(String.self, forKey: .name)
+        kind = try saved.decode(PlanGroupKind.self, forKey: .kind)
+        currency = try saved.decodeIfPresent(String.self, forKey: .currency) ?? "DOP"
+        look = try saved.decode(CanvasPlanLook.self, forKey: .look)
+        cover = try saved.decodeIfPresent(Data.self, forKey: .cover)
+        members = try saved.decode([PlanMember].self, forKey: .members)
+        estimatedCents = try saved.decode(Int.self, forKey: .estimatedCents)
+        expectedPeople = try saved.decode(Int.self, forKey: .expectedPeople)
+        expenses = try saved.decode([PlanSharedExpense].self, forKey: .expenses)
+        repayments = try saved.decode([PlanRepayment].self, forKey: .repayments)
+        archived = try saved.decode(Bool.self, forKey: .archived)
+    }
+}
+
 @Observable final class CuadraoGroupPreview {
     var groups: [PlanGroup] = []
     private let defaults: UserDefaults?
@@ -81,7 +104,7 @@ struct PlanGroup: Identifiable, Codable, Equatable {
     }
     func group(_ id: UUID) -> PlanGroup? { groups.first { $0.id == id } }
     func save(_ group: PlanGroup) {
-        guard group.valid else { return }
+        guard group.valid, self.group(group.id).map({ $0.currency == group.currency }) ?? true else { return }
         if let i = groups.firstIndex(where: { $0.id == group.id }) { groups[i] = group } else { groups.append(group) }
         persist()
     }

@@ -53,6 +53,18 @@ import Foundation
         loaded.save(new); loaded.enableForecastExample()
         check(loaded.plans == [new], "Exploring forecast from cold start preserves newly created plans")
         check(loaded.hasForecast, "Cold start can explore forecast independently")
+        for currency in PlanCurrency.supported {
+            var fixed = CanvasPlan(name: "Fixed currency", currency: currency)
+            store.save(fixed)
+            fixed.currency = PlanCurrency.supported.first { $0 != currency }!
+            store.save(fixed)
+            check(store.plan(fixed.id)?.currency == currency, "Currency cannot change after creating a personal plan")
+            fixed.currency = currency; fixed.name = "Renamed"; store.save(fixed)
+            check(store.plan(fixed.id)?.name == fixed.name, "Other plan details remain editable")
+            let restored = CuadraoPlanPreview(spanish: false, defaults: defaults)
+            check(restored.plan(fixed.id)?.currency == currency, "The chosen currency survives reopening")
+            check(restored.plan(fixed.id)?.target == fixed.target, "No conversion changes the amount")
+        }
         print("Passed \(count) Plan preview checks")
     }
 }

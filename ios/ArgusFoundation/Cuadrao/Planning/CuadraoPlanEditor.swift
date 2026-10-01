@@ -53,9 +53,10 @@ struct CuadraoPlanEditor: View {
                                 .font(.subheadline).frame(minHeight: 44)
                         }.accessibilityIdentifier("plan-edit-space")
                         Spacer()
-                        Picker(spanish ? "Moneda" : "Currency", selection: $draft.currency) {
-                            Text("DOP").tag("DOP"); Text("USD").tag("USD"); Text("EUR").tag("EUR")
-                        }.pickerStyle(.menu).accessibilityIdentifier("plan-edit-currency")
+                        PlanCurrencyChoice(currency: $draft.currency, locked: editing, spanish: spanish)
+                    }
+                    if !editing {
+                        Text(spanish ? "La moneda queda fija al crear el plan." : "Currency is fixed once you create the plan.").font(.caption).foregroundStyle(.secondary)
                     }
                     if draft.spaceID == "household" {
                         Text(spanish ? "Este plan pertenece a Hogar. Sus miembros podrán verlo; tus cuentas personales siguen siendo privadas." : "This plan belongs to Household. Its members will see it; your personal accounts stay private.")

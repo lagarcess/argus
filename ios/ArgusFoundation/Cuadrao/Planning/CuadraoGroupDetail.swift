@@ -42,7 +42,7 @@ struct CuadraoGroupDetail: View {
                             Menu {
                                 Button(spanish ? "Editar grupo" : "Edit group", systemImage: "pencil") { sheet = .edit }
                                 Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { store.archive(group.id, true); dismiss() }
-                            } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
+                            } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }.accessibilityIdentifier("group-options")
                         }
                     }
                     .sheet(item: $sheet) { route in
@@ -71,8 +71,8 @@ struct CuadraoGroupDetail: View {
     @ViewBuilder private func overview(_ group: PlanGroup) -> some View {
         if group.kind == .saving {
             VStack(alignment: .leading, spacing: 10) {
-                Text(PlanFormat.amount(Double(group.total) / 100)).font(.system(.largeTitle, design: .rounded)).monospacedDigit()
-                Text(spanish ? "reunido de \(PlanFormat.amount(Double(group.estimatedCents) / 100))" : "saved of \(PlanFormat.amount(Double(group.estimatedCents) / 100))").font(.subheadline).foregroundStyle(.secondary)
+                Text(PlanFormat.amount(Double(group.total) / 100, currency: group.currency)).font(.system(.largeTitle, design: .rounded)).monospacedDigit()
+                Text(spanish ? "reunido de \(PlanFormat.amount(Double(group.estimatedCents) / 100, currency: group.currency))" : "saved of \(PlanFormat.amount(Double(group.estimatedCents) / 100, currency: group.currency))").font(.subheadline).foregroundStyle(.secondary)
                 ProgressView(value: group.progress).tint(group.look.color)
                 Text(group.progress >= 1 ? (spanish ? "Llegamos. Qué buen equipo." : "We made it. What a team.") : (spanish ? "Cada aporte abre camino." : "Every contribution moves us forward."))
                     .font(.system(.title3, design: .serif)).foregroundStyle(group.look.color)
@@ -80,11 +80,11 @@ struct CuadraoGroupDetail: View {
         } else { balances(group) }
         VStack(alignment: .leading, spacing: 14) {
             Text(spanish ? "¿Y si se suma alguien más?" : "What if someone else joins?").font(.system(.title2, design: .serif))
-            Text(PlanFormat.amount(Double(group.estimatedCents) / 100 / people)).font(.system(size: 30, design: .rounded)).monospacedDigit().contentTransition(.numericText())
+            Text(PlanFormat.amount(Double(group.estimatedCents) / 100 / people, currency: group.currency)).font(.system(size: 30, design: .rounded)).monospacedDigit().contentTransition(.numericText())
                 .accessibilityIdentifier("group-estimate-per-person")
             Text(spanish ? "por persona · \(Int(people)) personas previstas" : "per person · \(Int(people)) expected people").font(.subheadline).foregroundStyle(.secondary)
             Slider(value: $people, in: 1...50, step: 1).tint(group.look.color).accessibilityLabel(spanish ? "Personas previstas" : "Expected people").accessibilityIdentifier("group-people-slider")
-            Text(spanish ? "Estimado total: \(PlanFormat.amount(Double(group.estimatedCents) / 100)). Reparto igual; todavía no es una deuda." : "Total estimate: \(PlanFormat.amount(Double(group.estimatedCents) / 100)). Equal split; this isn't a debt yet.")
+            Text(spanish ? "Estimado total: \(PlanFormat.amount(Double(group.estimatedCents) / 100, currency: group.currency)). Reparto igual; todavía no es una deuda." : "Total estimate: \(PlanFormat.amount(Double(group.estimatedCents) / 100, currency: group.currency)). Equal split; this isn't a debt yet.")
                 .font(.caption).foregroundStyle(.secondary)
             if Int(people) != group.expectedPeople {
                 Button(spanish ? "Guardar estimación" : "Save estimate") {
@@ -100,22 +100,22 @@ struct CuadraoGroupDetail: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(spanish ? "Tu parte" : "Your share").font(.subheadline).foregroundStyle(.secondary)
-                    Text(PlanFormat.amount(Double(group.share(group.me)) / 100)).font(.system(size: 30, design: .rounded)).monospacedDigit().accessibilityIdentifier("group-own-share")
+                    Text(PlanFormat.amount(Double(group.share(group.me)) / 100, currency: group.currency)).font(.system(size: 30, design: .rounded)).monospacedDigit().accessibilityIdentifier("group-own-share")
                 }
                 Spacer()
                 Image(systemName: "person.crop.circle").font(.title).foregroundStyle(group.look.color)
             }
             HStack {
-                metric(spanish ? "Total del grupo" : "Group total", cents: group.total)
+                metric(spanish ? "Total del grupo" : "Group total", cents: group.total, group: group)
                 Spacer()
-                metric(spanish ? "Pagaste" : "You paid", cents: group.paid(group.me))
+                metric(spanish ? "Pagaste" : "You paid", cents: group.paid(group.me), group: group)
             }
             Divider()
             HStack {
                 let balance = group.balance(group.me)
                 Text(balance == 0 ? (spanish ? "Todo cuadrado" : "All settled") : balance > 0 ? (spanish ? "Por recuperar" : "To receive") : (spanish ? "Por pagar" : "To pay"))
                 Spacer()
-                Text(PlanFormat.amount(Double(abs(balance)) / 100)).monospacedDigit()
+                Text(PlanFormat.amount(Double(abs(balance)) / 100, currency: group.currency)).monospacedDigit()
             }.font(.subheadline.weight(.medium)).foregroundStyle(group.look.color).accessibilityIdentifier("group-outstanding")
             if group.members.contains(where: { group.balance($0.id) < 0 }) {
                 Button(spanish ? "Ver cómo cuadramos" : "See how to settle up") { sheet = .settle }
@@ -123,8 +123,8 @@ struct CuadraoGroupDetail: View {
             }
         }
     }
-    private func metric(_ label: String, cents: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) { Text(label).font(.caption).foregroundStyle(.secondary); Text(PlanFormat.amount(Double(cents) / 100)).font(.subheadline.weight(.medium)).monospacedDigit() }
+    private func metric(_ label: String, cents: Int, group: PlanGroup) -> some View {
+        VStack(alignment: .leading, spacing: 6) { Text(label).font(.caption).foregroundStyle(.secondary); Text(PlanFormat.amount(Double(cents) / 100, currency: group.currency)).font(.subheadline.weight(.medium)).monospacedDigit() }
     }
     private func expenses(_ group: PlanGroup) -> some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -141,7 +141,7 @@ struct CuadraoGroupDetail: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(entry.draft && entry.cents == 0 ? (spanish ? "Total pendiente" : "Total pending") : PlanFormat.amount(Double(entry.cents) / 100)).font(.subheadline).foregroundStyle(WelcomePalette.ink)
+                        Text(entry.draft && entry.cents == 0 ? (spanish ? "Total pendiente" : "Total pending") : PlanFormat.amount(Double(entry.cents) / 100, currency: group.currency)).font(.subheadline).foregroundStyle(WelcomePalette.ink)
                     }.frame(minHeight: 64)
                 }.buttonStyle(.plain).accessibilityIdentifier("group-entry-\(entry.draft ? "draft" : "recorded")")
             }
@@ -150,7 +150,7 @@ struct CuadraoGroupDetail: View {
                 ForEach(group.repayments) { entry in
                     HStack {
                         Text("\(group.members.first { $0.id == entry.from }?.name ?? "") → \(group.members.first { $0.id == entry.to }?.name ?? "")")
-                        Spacer(); Text(PlanFormat.amount(Double(entry.cents) / 100))
+                        Spacer(); Text(PlanFormat.amount(Double(entry.cents) / 100, currency: group.currency))
                         Button { var updated = group; updated.repayments.removeAll { $0.id == entry.id }; store.save(updated) } label: { Image(systemName: "arrow.uturn.backward").frame(width: 44, height: 44) }.accessibilityLabel(spanish ? "Deshacer reembolso" : "Undo repayment")
                     }.font(.subheadline)
                 }
@@ -164,7 +164,7 @@ struct CuadraoGroupDetail: View {
                     PlanMemberAvatar(member: member, index: index)
                     Text(member.name); Spacer()
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text(PlanFormat.amount(Double(group.kind == .saving ? group.paid(member.id) : abs(group.balance(member.id))) / 100)).font(.subheadline)
+                        Text(PlanFormat.amount(Double(group.kind == .saving ? group.paid(member.id) : abs(group.balance(member.id))) / 100, currency: group.currency)).font(.subheadline)
                         Text(group.kind == .saving ? (spanish ? "aportado" : "contributed") : group.balance(member.id) > 0 ? (spanish ? "por recuperar" : "to receive") : group.balance(member.id) < 0 ? (spanish ? "por pagar" : "to pay") : (spanish ? "al día" : "settled")).font(.caption).foregroundStyle(.secondary)
                     }
                 }

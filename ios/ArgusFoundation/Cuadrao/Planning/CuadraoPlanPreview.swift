@@ -39,6 +39,10 @@ enum CanvasPlanLook: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum PlanCurrency {
+    static let supported = ["DOP", "USD", "EUR"]
+}
+
 struct CanvasPlan: Identifiable, Codable, Equatable {
     var id = UUID()
     var name: String
@@ -154,7 +158,9 @@ struct CanvasForecast {
     }
     func plan(_ id: UUID) -> CanvasPlan? { plans.first { $0.id == id } }
     func save(_ plan: CanvasPlan) {
-        guard !plan.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        guard PlanCurrency.supported.contains(plan.currency),
+              self.plan(plan.id).map({ $0.currency == plan.currency }) ?? true,
+              !plan.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               plan.target.isFinite, plan.target > 0, plan.recorded.isFinite, plan.recorded >= 0,
               plan.monthly.isFinite, plan.monthly > 0,
               plan.annualRate.isFinite, (0...100).contains(plan.annualRate) else { return }

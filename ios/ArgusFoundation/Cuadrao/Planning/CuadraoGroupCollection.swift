@@ -34,7 +34,7 @@ struct CuadraoGroupCollection: View {
                                 ProgressView(value: group.progress).tint(group.look.color)
                                 Text(spanish ? "\(Int(group.progress * 100))% reunido entre ustedes" : "\(Int(group.progress * 100))% saved together").font(.caption).foregroundStyle(.secondary)
                             } else {
-                                Text(spanish ? "Tu parte: \(PlanFormat.amount(Double(group.share(group.me)) / 100))" : "Your share: \(PlanFormat.amount(Double(group.share(group.me)) / 100))")
+                                Text(spanish ? "Tu parte: \(PlanFormat.amount(Double(group.share(group.me)) / 100, currency: group.currency))" : "Your share: \(PlanFormat.amount(Double(group.share(group.me)) / 100, currency: group.currency))")
                                     .font(.subheadline).foregroundStyle(WelcomePalette.ink)
                             }
                         }.padding(.horizontal, 20).padding(.bottom, 20)

@@ -1,7 +1,7 @@
 import Foundation
 
 @main struct GroupPreviewChecks {
-    static func main() {
+    static func main() throws {
         var count = 0
         func check(_ condition: @autoclosure () -> Bool, _ message: String) {
             precondition(condition(), message); count += 1
@@ -54,6 +54,27 @@ import Foundation
         check(loaded.groups.last!.members.allSatisfy { loaded.groups.last!.balance($0.id) == 0 }, "Saving together is not borrowing")
         loaded.resetExamples(spanish: true, empty: true)
         check(loaded.groups.isEmpty, "Cold start is genuinely empty")
+        for currency in PlanCurrency.supported {
+            var fixed = PlanGroup(name: "Fixed shared plan", currency: currency, members: group.members)
+            let total = 12345
+            check(fixed.record(.init(title: "Shared expense", cents: total, payer: fixed.me, shares: PlanSharedExpense.equal(total, among: fixed.members.map(\.id)))), "Expense uses its group's currency")
+            loaded.save(fixed)
+            let original = fixed
+            fixed.currency = PlanCurrency.supported.first { $0 != currency }!; loaded.save(fixed)
+            check(loaded.group(fixed.id) == original, "Currency change cannot relabel existing group amounts")
+            let reopened = CuadraoGroupPreview(spanish: false, defaults: defaults)
+            check(reopened.group(fixed.id)?.currency == currency, "Group currency survives reopening")
+            check(reopened.group(fixed.id)?.total == total, "Currency selection never converts amounts")
+        }
+        var empty = PlanGroup(name: "Empty locked group", currency: "EUR", members: group.members)
+        loaded.save(empty); empty.currency = "USD"; loaded.save(empty)
+        check(loaded.group(empty.id)?.currency == "EUR", "Currency locks on creation even before the first expense")
+        let legacy = try JSONEncoder().encode(group)
+        var fields = try JSONSerialization.jsonObject(with: legacy) as! [String: Any]
+        fields.removeValue(forKey: "currency")
+        let decoded = try JSONDecoder().decode(PlanGroup.self, from: JSONSerialization.data(withJSONObject: fields))
+        check(decoded.currency == "DOP", "Old DOP-only previews migrate explicitly")
+        check(decoded.expenses == group.expenses && decoded.total == group.total, "Migration preserves receipts and amounts")
         print("Passed \(count) group preview checks")
     }
 }

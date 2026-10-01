@@ -9,6 +9,7 @@ struct CuadraoGroupEditor: View {
     @State private var kind: PlanGroupKind = .trip
     @State private var look: CanvasPlanLook = .coast
     @State private var amount = 48000.0
+    @State private var currency = "DOP"
     @State private var people = 8
     @State private var discard = false
     @Environment(\.dismiss) private var dismiss
@@ -26,18 +27,22 @@ struct CuadraoGroupEditor: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(kind == .trip ? (spanish ? "Creemos que costará" : "We expect it to cost") : (spanish ? "Queremos reunir" : "We want to save")).foregroundStyle(.secondary)
                         HStack {
-                            Text("DOP").foregroundStyle(.secondary)
+                            PlanCurrencyChoice(currency: $currency, locked: initial != nil, spanish: spanish)
                             TextField("0", value: $amount, format: .number).keyboardType(.decimalPad).font(.title2).accessibilityIdentifier("group-estimate")
                         }
                         Stepper(spanish ? "\(people) personas previstas" : "\(people) expected people", value: $people, in: 1...50)
-                        Text(spanish ? "\(PlanFormat.amount(amount / Double(people))) por persona, si se divide igual." : "\(PlanFormat.amount(amount / Double(people))) each, if split equally.")
+                        Text(spanish ? "\(PlanFormat.amount(amount / Double(people), currency: currency)) por persona, si se divide igual." : "\(PlanFormat.amount(amount / Double(people), currency: currency)) each, if split equally.")
                             .font(.subheadline).foregroundStyle(look.color)
                     }.padding(20).background(look.color.opacity(0.07), in: RoundedRectangle(cornerRadius: 24))
+                    if initial == nil {
+                        Text(spanish ? "La moneda queda fija al crear el plan." : "Currency is fixed once you create the plan.").font(.caption).foregroundStyle(.secondary)
+                    }
                     Text(spanish ? "Es una idea de partida. Nadie debe dinero por aceptar una invitación." : "A starting estimate. Accepting an invitation doesn't create a debt.")
                         .font(.caption).foregroundStyle(.secondary)
                     PlanLookPicker(look: $look, spanish: spanish)
                     PlanPrimaryButton(title: initial == nil ? (spanish ? "Crear grupo" : "Create group") : (spanish ? "Guardar cambios" : "Save changes")) {
                         var group = initial ?? PlanGroup(name: name, members: [.init(name: spanish ? "Tú" : "You", symbol: "sun.max.fill")])
+                        group.currency = currency
                         group.name = name.trimmingCharacters(in: .whitespacesAndNewlines); group.kind = kind; group.look = look
                         group.estimatedCents = Int((amount * 100).rounded()); group.expectedPeople = people
                         store.save(group); dismiss(); onSave?(group.id)
@@ -53,7 +58,7 @@ struct CuadraoGroupEditor: View {
                 .confirmationDialog(spanish ? "¿Descartar cambios?" : "Discard changes?", isPresented: $discard, titleVisibility: .visible) {
                     Button(spanish ? "Descartar" : "Discard", role: .destructive) { dismiss() }
                 }
-        }.onAppear { if let initial { name = initial.name; kind = initial.kind; look = initial.look; amount = Double(initial.estimatedCents) / 100; people = initial.expectedPeople } }
+        }.onAppear { if let initial { name = initial.name; currency = initial.currency; kind = initial.kind; look = initial.look; amount = Double(initial.estimatedCents) / 100; people = initial.expectedPeople } }
             .interactiveDismissDisabled().presentationDragIndicator(.visible)
     }
 }

@@ -38,7 +38,7 @@ struct CuadraoGroupExpenseEditor: View {
                     VStack(alignment: .leading, spacing: 22) {
                         TextField(group.kind == .saving ? (spanish ? "¿Para qué aportas?" : "What are you saving for?") : (spanish ? "¿Qué pagaron?" : "What was it for?"), text: $title).font(.system(.title2, design: .serif)).accessibilityIdentifier("group-expense-name")
                         HStack {
-                            Text("DOP").foregroundStyle(.secondary)
+                            Text(group.currency).foregroundStyle(.secondary)
                             TextField("0", value: $amount, format: .number.precision(.fractionLength(0...2)))
                                 .keyboardType(.decimalPad).font(.system(size: 36, design: .rounded)).accessibilityIdentifier("group-expense-amount")
                         }
@@ -68,12 +68,12 @@ struct CuadraoGroupExpenseEditor: View {
                                     if custom && selected.contains(member.id) {
                                         TextField("0", value: Binding(get: { exactShares[member.id] ?? 0 }, set: { exactShares[member.id] = $0 }), format: .number.precision(.fractionLength(0...2)))
                                             .keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(maxWidth: 100).accessibilityLabel(spanish ? "Parte de \(member.name)" : "\(member.name)'s share")
-                                    } else { Text(PlanFormat.amount(Double(shares(group)[member.id] ?? 0) / 100)).font(.subheadline).monospacedDigit() }
+                                    } else { Text(PlanFormat.amount(Double(shares(group)[member.id] ?? 0) / 100, currency: group.currency)).font(.subheadline).monospacedDigit() }
                                 }
                             }
                             if custom {
                                 let remainder = cents - shares(group).values.reduce(0, +)
-                                Text(remainder == 0 ? (spanish ? "Todo cuadra." : "It all adds up.") : remainder < 0 ? (spanish ? "Hay \(PlanFormat.amount(Double(-remainder) / 100)) de más." : "\(PlanFormat.amount(Double(-remainder) / 100)) over the total.") : (spanish ? "Por repartir: \(PlanFormat.amount(Double(remainder) / 100))" : "Left to split: \(PlanFormat.amount(Double(remainder) / 100))"))
+                                Text(remainder == 0 ? (spanish ? "Todo cuadra." : "It all adds up.") : remainder < 0 ? (spanish ? "Hay \(PlanFormat.amount(Double(-remainder) / 100, currency: group.currency)) de más." : "\(PlanFormat.amount(Double(-remainder) / 100, currency: group.currency)) over the total.") : (spanish ? "Por repartir: \(PlanFormat.amount(Double(remainder) / 100, currency: group.currency))" : "Left to split: \(PlanFormat.amount(Double(remainder) / 100, currency: group.currency))"))
                                     .font(.caption).foregroundStyle(remainder == 0 ? WelcomePalette.pine : .orange)
                             }
                         }
@@ -151,7 +151,7 @@ struct CuadraoGroupSettlement: View {
                     Section {
                         Picker(spanish ? "Envió" : "Sent by", selection: $from) { ForEach(group.members.filter { group.balance($0.id) < 0 }) { Text($0.name).tag(Optional($0.id)) } }
                         Picker(spanish ? "Recibió" : "Received by", selection: $to) { ForEach(group.members.filter { group.balance($0.id) > 0 }) { Text($0.name).tag(Optional($0.id)) } }
-                        HStack { Text("DOP"); TextField("0", value: $amount, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad).accessibilityIdentifier("group-repayment-amount") }
+                        HStack { Text(group.currency); TextField("0", value: $amount, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad).accessibilityIdentifier("group-repayment-amount") }
                     } footer: { Text(spanish ? "Registra dinero que ya se devolvió por fuera de Cuadrao. Puedes registrar una parte." : "Record money already returned outside Cuadrao. Partial repayments are welcome.") }
                     Section {
                         Button(spanish ? "Registrar reembolso" : "Record repayment") {
