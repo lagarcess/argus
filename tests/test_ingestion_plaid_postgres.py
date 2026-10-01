@@ -12,6 +12,7 @@ import httpx
 import pytest
 from argus.domain.ingestion.plaid.config import PlaidConfig
 from argus.domain.ingestion.plaid.connector import PlaidConnector
+from argus.domain.ingestion.plaid.link import PlaidItemOwnedElsewhere
 
 from tests import test_financial_accounts_postgres as shared
 from tests.ingestion.plaid_fakes import (
@@ -22,6 +23,11 @@ from tests.ingestion.plaid_fakes import (
     make_connector,
     page,
     txn,
+)
+from tests.ingestion.test_plaid_sync_safety import (
+    HookedFake,
+    failure_just_before_renewal,
+    webhook_login_required,
 )
 
 users = shared.users
@@ -136,3 +142,59 @@ def test_concurrent_syncs_advance_the_cursor_once(repo, users):  # noqa: ANN001
     )
     repo.release(connection_id=row.id, holder="late")
     assert repo.get(user_id=owner, connection_id=row.id).cursor == "c1"
+
+
+def test_webhook_needs_reauth_mid_sync_wins_on_postgres(repo, users):  # noqa: ANN001
+    owner = users["owner"]
+    fake = HookedFake(
+        sync={
+            None: [page(added=[txn("t1", 1)], next_cursor="c1", has_more=True)],
+            "c1": [page(added=[txn("t2", 2)], next_cursor="c2")],
+        }
+    )
+    sink = RecordingSink()
+    connector = make_connector(fake, sink=sink, repo=repo)
+    row = connector.link.exchange(user_id=owner, public_token=PUBLIC_TOKEN).connection
+    fake.hook = webhook_login_required(connector, row)
+    assert connector.sync(row).status == "superseded"
+    after = repo.get(user_id=owner, connection_id=row.id)
+    assert (after.status, after.cursor, after.lease_holder) == (
+        "needs_reauth",
+        None,
+        None,
+    )
+    assert sink.batches == []
+
+
+def test_an_item_held_by_another_person_is_refused_and_kept(repo, users):  # noqa: ANN001
+    fake = FakePlaid()
+    connector = make_connector(fake, repo=repo)
+    connector.link.exchange(user_id=users["other"], public_token=PUBLIC_TOKEN)
+    # Skip the pre-check so the database's global index decides the race.
+    connector.hub.connections.find_live = lambda **kwargs: []
+    with pytest.raises(PlaidItemOwnedElsewhere):
+        connector.link.exchange(user_id=users["owner"], public_token=PUBLIC_TOKEN)
+    assert fake.paths().count("/item/remove") == 0
+
+
+def test_failure_between_pages_cannot_be_undone_by_renewal_on_postgres(repo, users):  # noqa: ANN001
+    owner = users["owner"]
+    fake = FakePlaid(
+        sync={
+            None: [page(added=[txn("t1", 1)], next_cursor="c1", has_more=True)],
+            "c1": [page(added=[txn("t2", 2)], next_cursor="c2")],
+        }
+    )
+    sink = RecordingSink()
+    connector = make_connector(fake, sink=sink, repo=repo)
+    row = connector.link.exchange(user_id=owner, public_token=PUBLIC_TOKEN).connection
+    calls = failure_just_before_renewal(connector, row)
+    outcome = connector.sync(row)
+    assert len(calls) == 2 and outcome.status == "superseded"
+    after = repo.get(user_id=owner, connection_id=row.id)
+    assert (after.status, after.cursor, after.lease_holder) == (
+        "needs_reauth",
+        None,
+        None,
+    )
+    assert sink.batches == []

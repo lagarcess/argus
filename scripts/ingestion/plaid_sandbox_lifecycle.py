@@ -92,7 +92,7 @@ def _outcome(outcome) -> dict[str, Any]:  # noqa: ANN001
         k: getattr(outcome, k)
         for k in (
             "status", "added", "modified", "removed", "pending", "posted",
-            "replacing", "skipped", "pages", "restarts", "more_pending", "error_code",
+            "replacing", "skipped", "skipped_accounts", "pages", "restarts", "error_code",
         )
     }  # fmt: skip
 

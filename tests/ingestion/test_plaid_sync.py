@@ -257,22 +257,3 @@ def test_transient_provider_failure_keeps_status():
     assert outcome.error_code == "plaid_institution_down"
     after = stored(connector, row)
     assert after.status == "active" and after.last_error_code == "plaid_institution_down"
-
-
-def test_page_cap_hands_over_what_was_read_and_continues_later():
-    fake = FakePlaid(
-        sync={
-            None: [page(added=[txn("t1", 1)], next_cursor="c1", has_more=True)],
-            "c1": [page(added=[txn("t2", 2)], next_cursor="c2", has_more=True)],
-            "c2": [page(added=[txn("t3", 3)], next_cursor="c3")],
-        }
-    )
-    sink = RecordingSink()
-    connector, row = connected(fake, sink)
-    connector.syncer.max_pages = 2
-    first = connector.sync(row)
-    assert (first.status, first.more_pending, first.added) == ("synced", True, 2)
-    assert stored(connector, row).cursor == "c2"
-    second = connector.sync(stored(connector, row))
-    assert (second.more_pending, second.added) == (False, 1)
-    assert stored(connector, row).cursor == "c3"

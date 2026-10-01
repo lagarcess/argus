@@ -172,6 +172,7 @@ class FakePlaid:
     errors: dict[str, list[dict]] = field(default_factory=dict)
     item_error: str | None = None
     jwk: dict[str, Any] | None = None
+    accounts: list[dict[str, Any]] | None = None
     removed_items: set[str] = field(default_factory=set)
     calls: list[tuple[str, dict[str, Any], dict[str, str]]] = field(default_factory=list)
 
@@ -244,7 +245,8 @@ class FakePlaid:
         )
 
     def _accounts_get(self, body: dict) -> httpx.Response:
-        return httpx.Response(200, json={"accounts": [CHECKING, CARD], "request_id": "r"})
+        accounts = [CHECKING, CARD] if self.accounts is None else self.accounts
+        return httpx.Response(200, json={"accounts": accounts, "request_id": "r"})
 
     def _transactions_sync(self, body: dict) -> httpx.Response:
         if self.item_error:
@@ -289,5 +291,6 @@ def make_connector(
         config or PlaidConfig(client_id="client-id", secret="plaid-secret-value"),
         transport=httpx.MockTransport(fake),
     )
+    connector.adapter.sleep = lambda seconds: None
     hub.register(connector.adapter)
     return connector
