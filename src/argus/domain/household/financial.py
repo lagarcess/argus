@@ -5,6 +5,7 @@ import json
 from typing import Any
 
 from argus.domain.backtest_admission import canonical_hash
+from argus.domain.recording import canonical_groups
 from argus.domain.recording.errors import (
     IdempotencyConflict,
     RecordingInputError,
@@ -12,7 +13,6 @@ from argus.domain.recording.errors import (
 )
 from argus.domain.recording.money_plan import plan, request_identity
 from argus.domain.recording.money_postgres import load_owner, owner_lock, persist
-from argus.domain.recording.money_reads import groups
 from argus.domain.recording.money_schemas import MoneyRequest
 
 from .access import HouseholdFinancialScope, dependencies, require_edit, resolve
@@ -43,27 +43,19 @@ class HouseholdFinancialService:
             for owner in sorted({a.owner_id for a in scope.accounts.values()}):
                 owner_lock(c, owner)
             records = self.records(c, scope)
-            owners = {
-                owner: load_owner(self.repository, c, owner)
-                for owner in sorted({a.owner_id for a in scope.accounts.values()})
-            }
-            current = dict(
-                c.execute(
-                    "select id,current_revision from public.financial_activity_groups where user_id=any(%s::uuid[])",
-                    (list(owners),),
-                ).fetchall()
+            canonical = canonical_groups.load(
+                self.repository, c, {a.owner_id for a in scope.accounts.values()}
             )
             projected = []
-            for aid, hist in groups(records).items():
-                number = next(
-                    (rev for key, rev in current.items() if str(key) == aid), max(hist)
-                )
-                if number not in hist:
-                    continue
-                owner = scope.accounts[hist[number][0][0].account.id].owner_id
+            for aid, number in canonical.current_visible(scope.accounts).items():
                 projected.append(
                     activity(
-                        scope, owners[owner], aid, number, all_owner_records=owners[owner]
+                        scope,
+                        canonical.records,
+                        aid,
+                        number,
+                        all_owner_records=canonical.records,
+                        canonical=canonical,
                     )
                 )
             projected.sort(
@@ -101,12 +93,10 @@ class HouseholdFinancialService:
             scope = resolve(c, actor, h, m)
             for owner in sorted({a.owner_id for a in scope.accounts.values()}):
                 owner_lock(c, owner)
-            records = [
-                s
-                for owner in sorted({a.owner_id for a in scope.accounts.values()})
-                for s in load_owner(self.repository, c, owner)
-            ]
-            hist = groups(records).get(aid)
+            canonical = canonical_groups.load(
+                self.repository, c, {a.owner_id for a in scope.accounts.values()}
+            )
+            hist = canonical.history.get(aid)
             if not hist or not any(
                 s.account.id in scope.accounts
                 for legs in hist.values()
@@ -115,7 +105,13 @@ class HouseholdFinancialService:
                 raise HouseholdUnavailable()
             return {
                 "items": [
-                    activity(scope, records, aid, revision)
+                    activity(
+                        scope,
+                        canonical.records,
+                        aid,
+                        revision,
+                        canonical=canonical,
+                    )
                     for revision in sorted(hist, reverse=True)
                     if any(s.account.id in scope.accounts for s, _, __ in hist[revision])
                 ]
