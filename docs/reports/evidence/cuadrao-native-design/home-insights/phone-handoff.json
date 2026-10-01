@@ -1,0 +1,12 @@
+{
+  "source": "2c5cf23bbaed77d19c07fa9ead3bccb906be342c",
+  "bundle_id": "local.cuadrao.design.47R3855RTJ",
+  "device_model": "iPhone 15",
+  "build": "succeeded",
+  "installation": "succeeded",
+  "installation_sequence": 3380,
+  "first_install_attempt": "CoreDevice 3002 remote connection failure; one retry succeeded",
+  "launch": "succeeded",
+  "physical_gesture_checks": "not performed; native journeys verified on designated simulator",
+  "first_launch_attempt": "CoreDevice 4000 remote process connection failure; one retry succeeded"
+}

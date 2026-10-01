@@ -102,12 +102,12 @@ or convert them. Personal/Hogar retain the existing account-scope owner.
 
 Tap to retain one observed date/value, hold and drag to inspect, and use Hoy/Today
 to return to the current balance. The native chart leaves regular vertical
-scrolling available. Keep the pine line, subtle fill, readable range labels and
-sample-history label in the preview. Missing history gets an empty state; no flat
+scrolling available. Keep the pine line, subtle fill and readable range labels.
+Keep test/sample provenance in preview tooling and evidence, not in Home content. Missing history gets an empty state; no flat
 line, inferred pre-account balances or forecast is invented. A new account or
 currency/kind/share change cannot silently borrow old example observations.
 
-The Home link opens Plan as a separate surface; it does not imply its sample
+The existing Próximamente / Upcoming link opens Plan as a separate surface; it does not imply its sample
 forecast is computed from Home's accounts. Connected history/forecast ownership
 and scope-preserving navigation remain in the main roadmap.
 
@@ -119,16 +119,55 @@ lives in `CuadraoHomeCanvas`; Profile edits and Home read the same value. A loca
 date sits above it. Space switching changes the financial scope, not the welcome.
 The greeting's context menu retains the preview gallery/reset tools.
 
-Evolución / Distribución (History / Breakdown) replace each other in one overview.
-History offers 1 month, 3 months, year to date and all available observations, with
-an expanded history sheet for selecting a calendar month. These filters never
-invent boundary balances. A past month shows only its recorded dates, not today's
-balance. Preview observations span multiple months and stay explicitly illustrative.
-Distribution uses a flat positive-assets bar with category disclosure rows; debts
-and other negative contributions appear separately. All values derive from the
-same signed contribution function, with asset shares and currency separation.
+### Locked Home and expanded insights direction — October 1, 2026
+
+This founder-approved direction supersedes the presentation at checkpoint
+`f989d2ec`.
+Implementation status and all future work belong only to the
+[main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-consistency-pass-and-home-chart-follow-up).
+
+**Quiet Home:** compact welcome, existing space selector, amount, one history line,
+and short available-history ranges (for example 1 mes / 1 month). Only offer ranges
+supported by the person's recorded history. Keep a subtle, accessible expand icon.
+Do not show Evolución / Distribución controls, insight paragraphs or test/sample
+copy on Home. Genuine unknown/partial values remain distinguishable from zero;
+removing preview disclosures does not authorize invented financial facts.
+
+**Expanded insights:** opening the chart creates the immersive detail surface.
+Evolución / Distribución live here. Evolución uses Semana / Mes / Año (Week / Month /
+Year), starts at the latest period, and allows swipe right to go back and swipe
+left toward the present, stopping at today. Its one short takeaway explains an
+observed change with a clear basis. Spending comparisons require equivalent elapsed
+periods; a balance change must not be described as earnings, spending or investment
+return. Inspection and period paging must coexist with vertical scrolling and
+accessible alternatives. The metric remains recorded net position unless separately
+changed; Apple spending visuals do not redefine that metric.
+
+**Distribución: decomposable bar, category rows, account detail.** The bar shows the
+whole positive asset distribution. Selecting a category emphasizes its segment;
+other segments recede or separate while preserving context. Matching expandable
+rows reveal the category's accounts, keeping amounts readable independently of the
+visual. Example: Todo → Ahorros → Mi tranquilidad / Fondo de la casa. Tiny segments
+remain reachable through rows. Tapping the selected category again or Todo restores
+the whole. Keep category colors stable across the bar, rows and drill-down.
+
+Subtle depth is approved as a visual direction, with proportional front-facing
+widths; depth must not distort the financial comparison. The proposed gentle
+separation/reassembly is our interaction design, not a claim that reference
+screenshots prove that animation. Use a simple fade with Reduce Motion. Account
+percentages retain the same positive-asset-total denominator through drill-down;
+any later within-category percentage needs an explicit denominator label. Debt and
+other negative balances stay separate. One currency at a time, with no conversion.
+The user-facing name stays Distribución / Breakdown, not Decomposition.
+
+The bar is the baseline. A donut remains only a future experiment candidate with
+the same rows, values and interactions; no chart-type chooser is required on Home.
 
 References: [Wealthsimple history](https://mobbin.com/screens/667bf371-6e73-42f5-b179-574e62d9b64b),
+[Apple Wallet periods](https://mobbin.com/screens/82a32fee-bf5f-4c39-b4b8-0e002de68d4c),
+[Apple comparison and paging](https://support.apple.com/en-us/102329),
 [Public allocation](https://mobbin.com/screens/07c1ff8c-f0da-4bf0-919a-d21b2ac5ff43),
-and [Origin disclosure](https://mobbin.com/screens/7edb40e1-bbbe-4c1a-9916-f10f943d7685).
-This is a founder-reviewable UI iteration; connected history remains in the roadmap.
+[Origin disclosure](https://mobbin.com/screens/7edb40e1-bbbe-4c1a-9916-f10f943d7685).
+Founder-supplied decomposition screenshots are retained with this decision's
+[reference evidence](../../../docs/reports/evidence/cuadrao-native-design/home-distribution-reference/README.md). They motivate the hierarchy and subtle depth; they are not
+Cuadrao implementation or acceptance evidence.

@@ -1,0 +1,62 @@
+[
+  {
+    "file": "quiet-home-household-es.png",
+    "source": "ffd23411",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790884241.153
+  },
+  {
+    "file": "quiet-home-es.png",
+    "source": "ffd23411",
+    "test": "CuadraoHomeChartUITests/testHomeBalanceChartAndSpaces()",
+    "timestamp": 1790884238.592
+  },
+  {
+    "file": "distribution-dark-large-expanded-en.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "timestamp": 1790884355.391
+  },
+  {
+    "file": "distribution-dark-large-en.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "timestamp": 1790884354.872
+  },
+  {
+    "file": "quiet-home-dark-large-en.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testDarkAndLargeEnglish()",
+    "timestamp": 1790884352.223
+  },
+  {
+    "file": "distribution-checking-es.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790884372.242
+  },
+  {
+    "file": "distribution-savings-es.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790884371.329
+  },
+  {
+    "file": "distribution-whole-es.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790884370.844
+  },
+  {
+    "file": "history-year-es.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790884367.735
+  },
+  {
+    "file": "history-previous-inspect-es.png",
+    "source": "2c5cf23b",
+    "test": "CuadraoHomeChartUITests/testHistoryRangesAndDistribution()",
+    "timestamp": 1790884364.68
+  }
+]

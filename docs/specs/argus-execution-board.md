@@ -1756,8 +1756,8 @@ This does not close remaining C10 connected-delivery/accessibility work.
 The native preview now shows a compact recorded-position chart (one month by default) with
 separate currencies, native tap/hold-and-drag inspection, Hoy/Today reset and
 Personal/Hogar scope. It shares the amount's debt/asset ownership calculation.
-Explicit example observations are labeled; missing history produces an empty
-state. No current activity is reverse-engineered into financial history.
+Example-observation provenance is retained in preview evidence; missing history
+produces an empty state. No current activity is reverse-engineered into financial history.
 References: [Monzo selected balance](https://mobbin.com/screens/25125eda-5e62-4166-9a68-9b25bcc349b6)
 and [Apple chart selection](https://developer.apple.com/videos/play/wwdc2023/10037/).
 
@@ -1771,7 +1771,35 @@ for design review, never inferred from activity. The same contribution owner pow
 history, current net position and distribution. This is a review iteration, not a
 connected history implementation or a promotion of the paused Profile redesign.
 Source checkpoint: `73ae78ec`; [screenshots and verification](../reports/evidence/cuadrao-native-design/home-perspectives/README.md).
-Physical iPhone installation and launch succeeded; founder visual acceptance remains open.
+Physical iPhone installation and launch succeeded. This delivered iteration is
+superseded by the founder-approved direction below; it is not acceptance of the
+final Home/insights design.
+
+**Founder design lock, October 1 — UI implemented:** the
+[Cuadrao design guide](../../.agent/designs/cuadrao/DESIGN.md#locked-home-and-expanded-insights-direction--october-1-2026)
+owns the quiet Home / expanded insights hierarchy and decomposable bar. Source
+`2c5cf23b` implements available-history Home ranges, full-screen calendar paging,
+short recorded-balance takeaways, proportional dimensional segments, category/account
+rows and return-to-whole. Positive-assets percentages share one denominator;
+negative balances remain separate. Spanish/English, larger text and Reduce Motion
+are supported. Preview provenance stays in evidence rather than Home copy.
+The earlier paused calendar experiment is superseded by this implementation.
+[Verification and phone handoff](../reports/evidence/cuadrao-native-design/home-insights/README.md)
+record checks and their limits. This is UI-only; canonical connected history,
+provider/analytics integration and production promotion remain outside this delivery.
+
+**Future beta experiment — not activated:** after the approved bar experience is
+usable, consider PostHog assignment in a reviewed TestFlight build: bar baseline
+versus donut, holding category rows, values and interactions constant. Define the
+hypothesis, stable assignment and exposure before launch; evaluate comprehension,
+account-finding success and preference, not raw taps or dwell time as success.
+Use qualitative feedback for a small cohort; do not declare a statistical winner
+without sufficient evidence. Do not send amounts, account names or transaction
+details in experiment events. Apply existing analytics/data-control contracts,
+accurate privacy disclosures and reviewer access to both bundled variants. No SDK,
+event changes, flags, hosted experiment, TestFlight upload or rollout is authorized
+by this design discussion. [Apple review rules](https://developer.apple.com/app-store/review/guidelines/)
+and [PostHog iOS experiments](https://github.com/PostHog/posthog.com/blob/master/contents/docs/libraries/ios/usage.mdx).
 
 **Still future:** connect canonical recorded-balance observations with clear date,
 account-membership, currency, valuation and ownership semantics; distinguish
