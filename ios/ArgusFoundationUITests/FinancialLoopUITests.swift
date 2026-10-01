@@ -312,7 +312,12 @@ final class FinancialLoopUITests: XCTestCase {
             app.buttons["auth.submit"].tap()
             XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 30))
         }
-        app.buttons["sheet.close"].tap()
+        if app.buttons["sheet.close"].waitForExistence(timeout: 2) {
+            app.buttons["sheet.close"].tap()
+        } else if app.buttons["tab.home"].exists {
+            // Connected profile is a tab destination, not a dismissible tip sheet.
+            app.buttons["tab.home"].tap()
+        }
     }
 
     func capture(_ name: String) {

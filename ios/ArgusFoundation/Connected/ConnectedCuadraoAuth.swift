@@ -10,9 +10,7 @@ struct ConnectedCuadraoAuthFlow: View {
     var body: some View {
         NavigationStack {
             Group {
-                if auth.confirmationRequired {
-                    ConnectedEmailConfirmation(spanish: spanish, email: auth.profile?.email ?? "")
-                } else if auth.state == .configurationInvalid {
+                if auth.state == .configurationInvalid {
                     authNotice(title: spanish ? "Configuración incompleta." : "Configuration incomplete.",
                                detail: String(localized: "auth.error.configuration"))
                 } else if auth.state == .pendingSignOut {
@@ -25,6 +23,14 @@ struct ConnectedCuadraoAuthFlow: View {
                         .toolbar(.hidden, for: .navigationBar)
                 }
             }
+        }
+        // Cover pushed email forms when signup requires confirmation (root swap alone can leave the stack).
+        .fullScreenCover(isPresented: Binding(
+            get: { auth.confirmationRequired },
+            set: { if !$0 { auth.returnToSignIn() } }
+        )) {
+            ConnectedEmailConfirmation(spanish: spanish, email: auth.profile?.email ?? "")
+                .environmentObject(auth)
         }
         .tint(WelcomePalette.pine)
         .foregroundStyle(Color(white: 0.08))
@@ -253,6 +259,7 @@ struct ConnectedEmailSignIn: View {
                 focus = nil
                 beginChallenge()
             }
+            .accessibilityLabel(Text("auth.signIn"))
             .accessibilityIdentifier("auth.submit")
             .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 20)
             .background(Color.white)
@@ -303,6 +310,7 @@ struct ConnectedEmailSignIn: View {
                 .onSubmit { focus = visible ? .visiblePassword : .password }
                 .modifier(RegistrationField(focused: focus == .email, invalid: invalidEmail))
                 .disabled(surface == .loading)
+                .accessibilityLabel(Text("auth.email"))
                 .accessibilityIdentifier("auth.email")
             if invalidEmail {
                 Label(spanish ? "Revisa el formato del correo." : "Check the email format.", systemImage: "exclamationmark.circle")
@@ -327,6 +335,7 @@ struct ConnectedEmailSignIn: View {
                 .textContentType(.password).textInputAutocapitalization(.never).autocorrectionDisabled()
                 .submitLabel(.go)
                 .onSubmit { if ready { focus = nil; beginChallenge() } }
+                .accessibilityLabel(Text("auth.password"))
                 .accessibilityIdentifier("auth.password")
                 Button {
                     let wasFocused = passwordFocused
@@ -345,6 +354,7 @@ struct ConnectedEmailSignIn: View {
             }
             .font(.subheadline.weight(.medium)).foregroundStyle(WelcomePalette.pine)
             .frame(minHeight: 44).disabled(surface == .loading)
+            .accessibilityLabel(Text("auth.forgotPassword"))
             .accessibilityIdentifier("auth.forgotPassword")
         }
     }
@@ -441,6 +451,7 @@ struct ConnectedEmailRegistration: View {
                     focus = nil
                     beginChallenge()
                 }
+                .accessibilityLabel(Text("auth.createAccount"))
                 .accessibilityIdentifier("auth.submit")
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
@@ -495,6 +506,7 @@ struct ConnectedEmailRegistration: View {
                 .onSubmit { focus = passwordVisible ? .visiblePassword : .password }
                 .modifier(RegistrationField(focused: focus == .email, invalid: emailError))
                 .disabled(surface == .loading)
+                .accessibilityLabel(Text("auth.email"))
                 .accessibilityIdentifier("auth.email")
             if emailError {
                 Label(spanish ? "Revisa el correo. Por ejemplo: nombre@ejemplo.com."
@@ -522,6 +534,7 @@ struct ConnectedEmailRegistration: View {
                 .autocorrectionDisabled()
                 .submitLabel(.done)
                 .onSubmit { focus = nil }
+                .accessibilityLabel(Text("auth.password"))
                 .accessibilityIdentifier("auth.password")
                 Button {
                     let wasFocused = passwordFocused
@@ -541,6 +554,7 @@ struct ConnectedEmailRegistration: View {
                   systemImage: password.count >= 8 ? "checkmark.circle.fill" : "circle")
                 .font(.footnote)
                 .foregroundStyle(password.count >= 8 ? WelcomePalette.pine : Color.secondary)
+                .accessibilityLabel(Text("auth.password.requirement"))
         }
     }
 

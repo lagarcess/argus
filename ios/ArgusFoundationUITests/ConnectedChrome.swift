@@ -7,6 +7,8 @@ extension XCUIApplication {
             || buttons["cuadrao.welcome.signup"].exists
             || buttons["cuadrao.signin.emailChoice"].exists
             || buttons["cuadrao.signup.email"].exists
+            // Signed-in Connected: tip Accounts tab is absent; profile is a tab, not a sheet.
+            || (buttons["tab.home"].exists && buttons["header.profile"].exists && !buttons["tab.accounts"].exists)
     }
 
     /// Accounts live on Home in Connected; tip keeps a dedicated Accounts tab.
