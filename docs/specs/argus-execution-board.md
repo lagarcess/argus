@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** October 1, 2026.
-**Execution state:** [PR #763](https://github.com/lagarcess/argus/pull/763) landed the default-off Household membership API (create → invite → accept → explicit grants) as `fbcc399bdb888d89af594422cfa319a4c26c60e5` from Exact head `7b80190d057c89b5f92b03845f374a810253dda1`, with hermetic in-memory lifecycle proof only. Permission policy remains founder-locked 2026-10-01. Real Auth/API/Postgres and RLS verification, native Home/Accounts/Search projections, shared plans/contributions, external invite delivery and physical-phone proof remain outside this land. All landed personal financial journeys and their demonstrations remain preserved. #760 owns connected Cuadrao presentation and its Compact simulator; the active design checkout, design simulator and physical-phone environment remain separate. This landing authorizes no deployment, hosted enablement, paid providers or phone changes.
+**Execution state:** Tip lineage includes [PR #760](https://github.com/lagarcess/argus/pull/760) Connected Cuadrao auth/Home (product squash `819870e6fcfd28d469b12691fe2471e00e2000db` from Compact-verified Exact head `0462f3ade6d347bd13644eda5636264c007034c0`; docs landing `#765` as `631d4051…`) and [PR #763](https://github.com/lagarcess/argus/pull/763) default-off Household membership API (`fbcc399bdb888d89af594422cfa319a4c26c60e5` from Exact head `7b80190d…`, hermetic in-memory proof only; docs landing `#764`). Real Auth/API/Postgres and RLS verification for Household remains pending. Design checkpoints remain founder-named only. Chat/voice stack remains parked. All landed personal financial journeys and their demonstrations remain preserved. No deployment, hosted enablement, paid providers, signing or `main` promotion is authorized by these landings.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -173,6 +173,40 @@ Exact head `7b80190d` through the merge grant above. Real Auth/API/Postgres and
 RLS verification (migration, locking, policies) remains explicitly pending; do
 not treat this land as Auth/Postgres READY. Native Home/Accounts/Search adapters
 and physical-phone proof also remain future assigned work.
+
+## PR #760 integration landing
+
+Standing founder promote authority merged the Compact-verified Connected
+Cuadrao head and completes this integration landing. This grant does not
+authorize deployment, hosted configuration changes, paid providers,
+phone-environment actions, design-checkpoint adoption, chat/voice stack work
+or another delivery lane.
+
+- [PR #760](https://github.com/lagarcess/argus/pull/760) product
+  squash-merged at **October 1, 2026** as
+  `819870e6fcfd28d469b12691fe2471e00e2000db`, from verified Exact head
+  `0462f3ade6d347bd13644eda5636264c007034c0` onto integration including
+  Household #763 (`fbcc399bdb888d89af594422cfa319a4c26c60e5`).
+- Exact merge integration CI/smoke, this landing-docs housekeeping merge
+  SHA, and final clean local/remote tip parity are recorded in the merged
+  PR landing comment after terminal checks (do not treat the product squash
+  as the lasting tip).
+- Compact exclusivity during verify: `1A90F684-345F-465C-AA50-6A5298F34156`
+  only. Design sim `8AFB6084…` off-limits. Design checkpoint `1dcd12a5`
+  adopt-into-#760 = none. Physical iPhone pending (`Device.local`) allowed.
+- Accepted Compact matrix at Exact-head lineage: Auth bilingual, account
+  entry, archive restore, Spanish check review, complete financial loop,
+  Connected Search editors, AuthJourney relaunch; post-#763-reconcile
+  complete-loop smoke PASS. Path overlap with #763 none; recording change
+  additive `get_any_account` only; iOS household/spaces remain design
+  preview; personal-loop Compact evidence retained.
+- Modularity clean on merged worker; review threads none; applicable CI
+  path-filtered skips (iOS-heavy). No new production configuration from
+  #760; financial/household flags remain default-off.
+- Remaining outside this land: chat/voice stack, design-checkpoint
+  adoption (founder-named only), physical-phone proof, Household native
+  adapters / real-stack proof (owned with #763). Detail:
+  [landing report](../reports/2026-10-01-pr-760-integration-landing.md).
 
 ## PR #759 integration landing
 
