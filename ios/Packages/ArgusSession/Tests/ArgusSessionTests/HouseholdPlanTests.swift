@@ -49,9 +49,20 @@ final class HouseholdPlanTests: XCTestCase {
         XCTAssertFalse(plan.canRestore)
     }
     func testSearchPlanHasNoInventedAccountDestination() throws {
-        let raw: [String: Any] = ["id": UUID().uuidString, "kind": "goal", "title": "Shared intention", "account_id": NSNull(), "activity_id": NSNull()]
+        for kind in HouseholdPlanKind.allCases {
+            let ref = HouseholdPlanRef(kind: kind, id: UUID())
+            let raw: [String: Any] = ["id": ref.id.uuidString, "kind": "plan", "title": "Shared intention", "account_id": NSNull(), "activity_id": NSNull(), "plan_ref": ["kind": kind.rawValue, "id": ref.id.uuidString]]
+            let hit = try JSONDecoder().decode(HouseholdSearchHit.self, from: JSONSerialization.data(withJSONObject: raw))
+            XCTAssertEqual(hit.kind, .plan); XCTAssertEqual(hit.planRef, ref)
+            XCTAssertNil(hit.accountId); XCTAssertNil(hit.activityId)
+        }
+    }
+    func testSearchPlanRequiresTypedDestinationWhileAccountHitRemainsCompatible() throws {
+        var raw: [String: Any] = ["id": UUID().uuidString, "kind": "plan", "title": "Shared intention", "account_id": NSNull(), "activity_id": NSNull()]
+        XCTAssertThrowsError(try JSONDecoder().decode(HouseholdSearchHit.self, from: JSONSerialization.data(withJSONObject: raw)))
+        let account = UUID(); raw["kind"] = "account"; raw["account_id"] = account.uuidString
         let hit = try JSONDecoder().decode(HouseholdSearchHit.self, from: JSONSerialization.data(withJSONObject: raw))
-        XCTAssertNil(hit.accountId); XCTAssertNil(hit.activityId)
+        XCTAssertEqual(hit.kind, .account); XCTAssertEqual(hit.accountId, account); XCTAssertNil(hit.planRef)
     }
     func testRestoreCapabilityIsExplicitEvenWhenArchiveIsReadOnly() throws {
         var wire = SharedPlanTestData.plan(.budget)

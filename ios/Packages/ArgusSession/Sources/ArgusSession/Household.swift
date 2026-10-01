@@ -139,12 +139,21 @@ public struct HouseholdSnapshot: Decodable, Sendable {
 public struct HouseholdAccountDetail: Decodable, Sendable { public let account: HouseholdAccount; public let activities: [HouseholdActivity] }
 public struct HouseholdHistory: Decodable, Sendable { public let items: [HouseholdActivity] }
 public struct HouseholdSearchHit: Decodable, Identifiable, Sendable {
+    public enum Kind: String, Decodable, Sendable { case account, activity, plan }
     public let id: UUID
-    public let kind: String
+    public let kind: Kind
     public let title: String
     public let accountId: UUID?
     public let activityId: UUID?
-    enum CodingKeys: String, CodingKey { case id, kind, title, accountId = "account_id", activityId = "activity_id" }
+    public let planRef: HouseholdPlanRef?
+    enum CodingKeys: String, CodingKey { case id, kind, title, accountId = "account_id", activityId = "activity_id", planRef = "plan_ref" }
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id); kind = try c.decode(Kind.self, forKey: .kind); title = try c.decode(String.self, forKey: .title)
+        accountId = try c.decodeIfPresent(UUID.self, forKey: .accountId); activityId = try c.decodeIfPresent(UUID.self, forKey: .activityId)
+        planRef = try c.decodeIfPresent(HouseholdPlanRef.self, forKey: .planRef)
+        if kind == .plan, planRef == nil { throw DecodingError.dataCorruptedError(forKey: .planRef, in: c, debugDescription: "A plan search hit requires its typed destination.") }
+    }
 }
 public struct HouseholdSearchPage: Decodable, Sendable {
     public let items: [HouseholdSearchHit]

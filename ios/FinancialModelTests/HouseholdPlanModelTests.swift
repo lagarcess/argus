@@ -10,17 +10,21 @@ final class HouseholdPlanModelTests: XCTestCase {
         await f.model.select(SharedPlanTestData.householdId)
         XCTAssertEqual(f.model.plan.state, .ready)
         XCTAssertEqual(f.model.plan.plans.map(\.ref.kind), HouseholdPlanKind.allCases)
-        await f.model.find("Synthetic")
-        let hit = try XCTUnwrap(f.model.search.first)
-        await f.model.openSearchHit(hit)
-        XCTAssertEqual(f.model.plan.origin, .search)
-        XCTAssertEqual(f.model.plan.detail?.ref.kind, .goal)
-        XCTAssertEqual(f.model.searchQuery, "Synthetic")
-        XCTAssertEqual(f.model.searchReturnAnchor, hit.id)
-        f.model.plan.back()
-        XCTAssertNil(f.model.plan.openedRef)
-        XCTAssertEqual(f.model.search.map(\.id), [hit.id])
-        XCTAssertEqual(f.model.searchQuery, "Synthetic")
+        for kind in HouseholdPlanKind.allCases {
+            await f.server.searchKind(kind); await f.model.find("Synthetic")
+            let hit = try XCTUnwrap(f.model.search.first)
+            XCTAssertEqual(hit.kind, .plan); XCTAssertEqual(hit.planRef?.kind, kind)
+            await f.model.openSearchHit(hit)
+            XCTAssertEqual(f.model.plan.origin, .search)
+            XCTAssertEqual(f.model.plan.detail?.ref, hit.planRef)
+            XCTAssertEqual(f.model.plan.detail?.ref.kind, kind)
+            XCTAssertEqual(f.model.searchQuery, "Synthetic")
+            XCTAssertEqual(f.model.searchReturnAnchor, hit.id)
+            f.model.plan.back()
+            XCTAssertNil(f.model.plan.openedRef)
+            XCTAssertEqual(f.model.search.map(\.id), [hit.id])
+            XCTAssertEqual(f.model.searchQuery, "Synthetic")
+        }
     }
     func testLateDetailAndSnapshotCannotCrossScopeOrSignOut() async throws {
         for entry in ["detail", "snapshot"] {
@@ -155,12 +159,14 @@ private actor SharedPlanServer {
     private var failuresRemaining = 0
     private var lose = false
     private var isViewer = false
+    private var resultKind = HouseholdPlanKind.goal
     private var membership = SharedPlanTestData.memberId
     private(set) var writes: [URLRequest] = []
     func hold(_ entry: String, _ gate: RequestGate) { self.gate = (entry, gate) }
     func reject(_ code: String, count: Int = 1) { failure = code; failuresRemaining = count }
     func loseNext() { lose = true }
     func viewer() { isViewer = true }
+    func searchKind(_ kind: HouseholdPlanKind) { resultKind = kind }
     func newMembership() { membership = UUID() }
     func writeCount() -> Int { writes.count }
     func household() -> [String: Any] { ["id": SharedPlanTestData.householdId.uuidString, "name": "Synthetic household", "version": 1, "membership_id": membership.uuidString, "admin_membership_id": membership.uuidString, "members": [], "invitations": [], "shares": []] }
@@ -191,8 +197,10 @@ private actor SharedPlanServer {
             let account: [String: Any] = ["id": Self.accountId.uuidString, "type": "cash", "nature": "asset", "currency": "DOP", "currency_fraction_digits": 2, "archived": false, "ownership_share_bps": 10000, "version": 4, "created_at": "2026-10-01T12:00:00Z", "updated_at": "2026-10-01T12:00:00Z", "balance": ["state": "unknown", "activity_since_tracking_minor": 0]]
             return response(request, 200, ["membership_id": membership.uuidString, "authorization_version": 1, "people": [SharedPlanTestData.person()], "owned_account_ids": [Self.accountId.uuidString], "money": ["accounts": [account], "eligibility": ["expense": ["cash"]], "destination_eligibility": [:], "categories": [], "sources": []], "existing_definitions": [], "purposes": ["budget": ["spending"]]])
         }
-        if path.hasSuffix("/search") { return response(request, 200, ["items": [["id": SharedPlanTestData.planId.uuidString, "kind": "goal", "title": "Synthetic goal", "account_id": NSNull(), "activity_id": NSNull()]], "next_cursor": NSNull()]) }
-        if path.hasSuffix(SharedPlanTestData.planId.uuidString) { return response(request, 200, plan(.goal)) }
+        if path.hasSuffix("/search") { return response(request, 200, ["items": [["id": SharedPlanTestData.planId.uuidString, "kind": "plan", "title": "Synthetic " + resultKind.rawValue, "account_id": NSNull(), "activity_id": NSNull(), "plan_ref": ["kind": resultKind.rawValue, "id": SharedPlanTestData.planId.uuidString]]], "next_cursor": NSNull()]) }
+        for kind in HouseholdPlanKind.allCases {
+            if path.hasSuffix("/plan" + HouseholdPlanRef(kind: kind, id: SharedPlanTestData.planId).path) { return response(request, 200, plan(kind)) }
+        }
         return response(request, 200, household())
     }
     private func response(_ request: URLRequest, _ status: Int, _ value: [String: Any]) -> (Data, URLResponse) { (try! JSONSerialization.data(withJSONObject: value), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!) }

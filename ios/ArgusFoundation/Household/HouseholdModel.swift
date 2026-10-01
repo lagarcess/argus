@@ -104,9 +104,9 @@ final class HouseholdModel: ObservableObject {
     func back() { detail = nil; history = []; highlightActivityId = nil }
     func openSearchHit(_ hit: HouseholdSearchHit) async {
         searchReturnAnchor = hit.id
-        if let kind = HouseholdPlanKind(rawValue: hit.kind) {
-            await plan.open(HouseholdPlanRef(kind: kind, id: hit.id), origin: .search)
-        } else if let accountId = hit.accountId {
+        if hit.kind == .plan, let ref = hit.planRef {
+            await plan.open(ref, origin: .search)
+        } else if hit.kind != .plan, let accountId = hit.accountId {
             await open(accountId)
             if detail?.account.account.id == accountId { highlightActivityId = hit.activityId }
         }
