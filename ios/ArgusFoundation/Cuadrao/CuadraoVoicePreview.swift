@@ -11,7 +11,7 @@ import Observation
 
     func start() {
         guard !active else { presentation = .expanded; return }
-        active = true; muted = false; phase = .listening; presentation = .compact
+        active = true; muted = false; phase = .listening; presentation = .expanded
     }
     func end() { active = false; muted = false; phase = .listening; presentation = .expanded }
     func interrupt() { phase = .listening }

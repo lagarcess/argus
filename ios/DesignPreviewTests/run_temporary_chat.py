@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory(prefix="cuadrao-chat-checks-") as folder:
     binary = work / "checks"
     subprocess.run([
         "xcrun", "swiftc", "-module-cache-path", "/private/tmp/cuadrao-native-design-build/ModuleCache.noindex",
-        str(canvas / "CuadraoChatPreview.swift"), str(canvas / "CuadraoVoicePreview.swift"), str(work / "References.swift"),
+        str(canvas / "CuadraoChatPreview.swift"), str(canvas / "CuadraoVoicePreview.swift"), str(canvas / "CuadraoVoiceMessagePreview.swift"), str(work / "References.swift"),
         str(Path(__file__).with_name("TemporaryChatChecks.swift")), "-o", str(binary)
     ], check=True)
     subprocess.run([str(binary)], check=True)

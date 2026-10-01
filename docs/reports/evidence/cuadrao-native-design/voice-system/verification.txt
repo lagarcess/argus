@@ -1,0 +1,27 @@
+cuadrao-voice-system-ui.log
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testExplicitVoiceMessageAlternative]' passed (8.922 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testHoldComposerAndWaveformWithoutStartingLiveVoice]' passed (16.806 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testVoiceChoiceAndProposalHandoff]' passed (37.539 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testVoiceStaysAvailableAcrossSheetsAndSurfaces]' passed (19.548 seconds).
+	 Executed 4 tests, with 0 failures (0 unexpected) in 82.814 (82.818) seconds
+	 Executed 4 tests, with 0 failures (0 unexpected) in 82.814 (82.819) seconds
+	 Executed 4 tests, with 0 failures (0 unexpected) in 82.814 (82.820) seconds
+	/tmp/cuadrao-native-design-build/Logs/Test/Test-ArgusFoundation-2026.10.01_00-37-31--0500.xcresult
+** TEST SUCCEEDED **
+cuadrao-voice-system-final-ui.log
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testEnglishVoiceAndLargeText]' passed (18.605 seconds).
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testHoldComposerAndWaveformWithoutStartingLiveVoice]' passed (17.230 seconds).
+	 Executed 2 tests, with 0 failures (0 unexpected) in 35.836 (35.838) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 35.836 (35.839) seconds
+	 Executed 2 tests, with 0 failures (0 unexpected) in 35.836 (35.840) seconds
+	/tmp/cuadrao-native-design-build/Logs/Test/Test-ArgusFoundation-2026.10.01_00-40-13--0500.xcresult
+** TEST SUCCEEDED **
+cuadrao-voice-system-layout-ui.log
+Test Case '-[ArgusFoundationUITests.CuadraoVoiceDesignUITests testHoldComposerAndWaveformWithoutStartingLiveVoice]' passed (17.594 seconds).
+	 Executed 1 test, with 0 failures (0 unexpected) in 17.594 (17.596) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 17.594 (17.597) seconds
+	 Executed 1 test, with 0 failures (0 unexpected) in 17.594 (17.598) seconds
+	/tmp/cuadrao-native-design-build/Logs/Test/Test-ArgusFoundation-2026.10.01_00-44-42--0500.xcresult
+** TEST SUCCEEDED **
+cuadrao-voice-system-device-delivery-build.log
+** BUILD SUCCEEDED **

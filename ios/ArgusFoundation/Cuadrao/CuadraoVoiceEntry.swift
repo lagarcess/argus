@@ -1,0 +1,105 @@
+import SwiftUI
+import UIKit
+
+/// UIKit recognizers make tap and press/drag/release mutually exclusive, including cancellation.
+struct CuadraoVoiceEntry: UIViewRepresentable {
+    let spanish: Bool
+    let cancelArmed: Bool
+    var composer = false
+    let tap: () -> Void
+    let beginHold: () -> Void
+    let drag: (Double) -> Void
+    let release: () -> Void
+    let cancel: () -> Void
+    let accessibleRecord: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeUIView(context: Context) -> VoiceTouchSurface {
+        let view = VoiceTouchSurface()
+        if composer {
+            let label = UILabel()
+            label.text = spanish ? "Escribe o mantén para hablar" : "Type or hold to speak"
+            label.font = .preferredFont(forTextStyle: .body)
+            label.adjustsFontForContentSizeCategory = true
+            label.textColor = .placeholderText; label.numberOfLines = 2
+            label.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 6),
+                label.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -6),
+                label.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            ])
+        } else {
+            let image = UIImageView(image: UIImage(systemName: "waveform",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)))
+            image.tintColor = UIColor(WelcomePalette.onAccent)
+            image.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(image)
+            NSLayoutConstraint.activate([
+                image.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                image.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+            ])
+        }
+        let hold = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.hold(_:)))
+        hold.minimumPressDuration = CuadraoVoiceMessagePreview.holdDelay
+        hold.allowableMovement = 18
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tap(_:)))
+        tap.require(toFail: hold)
+        view.addGestureRecognizer(hold); view.addGestureRecognizer(tap)
+        view.layer.cornerRadius = 22
+        view.isAccessibilityElement = true; view.accessibilityTraits = .button
+        view.accessibilityIdentifier = composer ? "chat-composer-entry" : "chat-voice-entry"
+        return view
+    }
+    func updateUIView(_ view: VoiceTouchSurface, context: Context) {
+        context.coordinator.parent = self
+        view.backgroundColor = composer ? .clear : UIColor(cancelArmed ? .red : WelcomePalette.pine)
+        view.accessibilityLabel = composer ? (spanish ? "Escribe o mantén para hablar" : "Type or hold to speak") : (spanish ? "Hablar con Cuadrao" : "Talk to Cuadrao")
+        view.accessibilityHint = composer ? (spanish ? "Toca para escribir. Mantén para grabar un mensaje." : "Tap to type. Hold to record a message.") : (spanish ? "Toca para conversar. Mantén para grabar un mensaje." : "Tap to converse. Hold to record a message.")
+        view.activate = tap
+        view.accessibilityCustomActions = [UIAccessibilityCustomAction(
+            name: spanish ? "Grabar mensaje de voz" : "Record voice message",
+            target: context.coordinator, selector: #selector(Coordinator.recordAccessibly))]
+    }
+    static func dismantleUIView(_ uiView: VoiceTouchSurface, coordinator: Coordinator) {
+        if coordinator.holding { coordinator.parent.cancel() }
+    }
+
+    final class Coordinator: NSObject {
+        var parent: CuadraoVoiceEntry
+        var holding = false
+        private var origin = CGPoint.zero
+        private var armed = false
+        init(_ parent: CuadraoVoiceEntry) { self.parent = parent }
+        @objc func tap(_ gesture: UITapGestureRecognizer) {
+            guard gesture.state == .ended, !holding else { return }
+            parent.tap()
+        }
+        @objc func recordAccessibly() -> Bool { parent.accessibleRecord(); return true }
+        @objc func hold(_ gesture: UILongPressGestureRecognizer) {
+            switch gesture.state {
+            case .began:
+                holding = true; armed = false
+                origin = gesture.location(in: gesture.view?.window)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                parent.beginHold()
+            case .changed:
+                let distance = Double(origin.y - gesture.location(in: gesture.view?.window).y)
+                let next = distance >= CuadraoVoiceMessagePreview.cancelDistance
+                if next != armed { UISelectionFeedbackGenerator().selectionChanged(); armed = next }
+                parent.drag(distance)
+            case .ended:
+                parent.release(); holding = false; armed = false
+            case .cancelled, .failed:
+                if holding { parent.cancel() }
+                holding = false; armed = false
+            default: break
+            }
+        }
+    }
+}
+
+final class VoiceTouchSurface: UIView {
+    var activate: (() -> Void)?
+    override func accessibilityActivate() -> Bool { activate?(); return true }
+}

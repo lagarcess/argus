@@ -7,12 +7,20 @@ struct CuadraoChatCanvas: View {
     @State private var sheet: CanvasChatSheet?
     @State private var tray = false
     @State private var ending = false
+    @State private var voiceMessage = CuadraoVoiceMessagePreview()
+    @AppStorage("cuadrao.design.voice-entry-learned") private var voiceEntryLearned = false
+    @Environment(\.scenePhase) private var scenePhase
     @FocusState private var focused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var es: Bool { spanish }
     private var active: Bool { !store.current.turns.isEmpty }
     private var ready: Bool { !store.current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !store.current.attachments.isEmpty }
+
+    private var holdOnComposer: Bool {
+        !focused && !ready && !store.voice.active && voiceMessage.state != .review
+            && !(voiceMessage.state == .recording && !voiceMessage.held)
+    }
 
     var body: some View {
         @Bindable var thread = store.current
@@ -21,20 +29,25 @@ struct CuadraoChatCanvas: View {
         }
         .cuadraoScrollBar(edge: .top) { header }
         .cuadraoScrollBar(edge: .bottom) {
-            VStack(spacing: 0) {
-                if store.voice.active && store.voice.presentation != .expanded {
-                    CuadraoVoiceBar(voice: store.voice, spanish: es)
-                }
-                composer(thread: $thread.draft)
-            }
+            composer(thread: $thread.draft)
         }
         .cuadraoSoftScrollEdges()
         .safeAreaPadding(.bottom, focused ? 0 : 80)
+        .overlay(alignment: .bottom) {
+            if voiceMessage.state == .recording && voiceMessage.held {
+                CuadraoVoiceRecordingOverlay(message: voiceMessage, spanish: es)
+                    .frame(height: 380).ignoresSafeArea(edges: .bottom).allowsHitTesting(false)
+            }
+        }
         .background(WelcomePalette.background)
         .foregroundStyle(WelcomePalette.ink)
         .toolbar(.hidden, for: .tabBar)
         .onChange(of: focused) { _, value in editing = value; if value { tray = false } }
-        .onDisappear { focused = false; editing = false }
+        .onDisappear { focused = false; editing = false; voiceMessage.cancel() }
+        .onChange(of: store.current.id) { _, _ in voiceMessage.cancel() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active && (voiceMessage.state == .recording || voiceMessage.state == .review) { voiceMessage.cancel() }
+        }
         .onAppear { if store.voice.active && store.voice.presentation == .keyboard { focused = true } }
         .onChange(of: store.voice.presentation) { _, value in
             focused = store.voice.active && value == .keyboard
@@ -195,7 +208,7 @@ struct CuadraoChatCanvas: View {
 
     private func composer(thread: Binding<String>) -> some View {
         VStack(spacing: 10) {
-            if !active && !store.temporary && !focused && !tray && !store.voice.active {
+            if !active && !store.temporary && !focused && !tray && !store.voice.active && voiceMessage.state == .idle {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(CanvasChatExample.allCases) { sample in
@@ -208,6 +221,13 @@ struct CuadraoChatCanvas: View {
                 }
             }
             VStack(alignment: .leading, spacing: 12) {
+                if store.voice.active {
+                    CuadraoVoiceBar(voice: store.voice, spanish: es, embedded: true)
+                    Divider().overlay(WelcomePalette.pine.opacity(0.12))
+                }
+                if voiceMessage.state != .idle && !(voiceMessage.state == .recording && voiceMessage.held) {
+                    CuadraoVoiceMessagePanel(message: voiceMessage, spanish: es)
+                }
                 if !store.current.attachments.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack {
@@ -217,31 +237,53 @@ struct CuadraoChatCanvas: View {
                         }
                     }
                 }
-                TextField(es ? "Escribe un mensaje" : "Write a message", text: thread, axis: .vertical)
+                TextField(holdOnComposer ? "" : (es ? "Escribe un mensaje" : "Write a message"), text: thread, axis: .vertical)
                     .font(.body).lineLimit(1...6).focused($focused)
-                    .padding(.horizontal, 6).padding(.top, 4)
+                    .padding(.horizontal, 6).padding(.top, 4).frame(minHeight: 44)
                     .accessibilityIdentifier("chat-composer")
+                    .accessibilityHidden(holdOnComposer)
+                    .disabled(voiceMessage.state == .recording || voiceMessage.state == .review)
+                    .overlay {
+                        if holdOnComposer {
+                            CuadraoVoiceEntry(spanish: es, cancelArmed: voiceMessage.cancelArmed, composer: true,
+                                tap: { focused = true }, beginHold: { beginVoiceMessage(held: true) },
+                                drag: { voiceMessage.drag(upwardDistance: $0) },
+                                release: { voiceMessage.release(); voiceEntryLearned = true },
+                                cancel: { voiceMessage.cancel() }, accessibleRecord: { beginVoiceMessage(held: false) })
+                        }
+                    }
                 HStack {
                     control(tray ? "xmark" : "plus", tray ? (es ? "Cerrar adjuntos" : "Close attachments") : (es ? "Adjuntar" : "Attach"), id: "chat-attach") {
                         focused = false
                         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { tray.toggle() }
                     }
                     Spacer()
-                    if ready || !store.voice.active {
-                        Button {
-                            focused = false; tray = false
-                            if ready { store.send(spanish: es) } else { store.voice.start() }
-                        } label: {
-                            Image(systemName: ready ? "arrow.up" : "waveform")
-                                .font(.system(size: 19, weight: .semibold))
+                    if ready {
+                        Button { focused = false; tray = false; store.send(spanish: es) } label: {
+                            Image(systemName: "arrow.up").font(.system(size: 19, weight: .semibold))
                                 .foregroundStyle(WelcomePalette.onAccent).frame(width: 44, height: 44)
                                 .background(WelcomePalette.pine, in: Circle())
-                        }.accessibilityLabel(ready ? (es ? "Enviar" : "Send") : (es ? "Hablar con Cuadrao" : "Talk to Cuadrao"))
-                            .accessibilityIdentifier("chat-send")
+                        }.accessibilityLabel(es ? "Enviar" : "Send").accessibilityIdentifier("chat-send")
+                            .disabled(voiceMessage.state == .recording || voiceMessage.state == .review)
+                    } else if !store.voice.active {
+                        CuadraoVoiceEntry(spanish: es, cancelArmed: voiceMessage.cancelArmed, tap: {
+                            guard voiceMessage.state != .recording, voiceMessage.state != .review else { return }
+                            focused = false; tray = false; voiceMessage.cancel(); voiceEntryLearned = true
+                            store.voice.start()
+                        }, beginHold: { beginVoiceMessage(held: true) }, drag: { voiceMessage.drag(upwardDistance: $0) },
+                           release: { voiceMessage.release(); voiceEntryLearned = true }, cancel: { voiceMessage.cancel() },
+                           accessibleRecord: { beginVoiceMessage(held: false) })
+                            .frame(width: 44, height: 44)
                     }
                 }
-                if tray {
+                if tray && voiceMessage.state != .recording {
                     Divider()
+                    if !store.voice.active {
+                        Button { beginVoiceMessage(held: false) } label: {
+                            Label(es ? "Mensaje de voz" : "Voice message", systemImage: "waveform")
+                                .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }.accessibilityIdentifier("chat-voice-message")
+                    }
                     HStack(spacing: 8) {
                         attachmentButton("camera", es ? "Recibo" : "Receipt")
                         attachmentButton("photo", es ? "Foto" : "Photo")
@@ -249,8 +291,26 @@ struct CuadraoChatCanvas: View {
                     }.padding(.bottom, 4)
                 }
             }.padding(12).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 26))
+                .overlay {
+                    if store.voice.active {
+                        RoundedRectangle(cornerRadius: 26).stroke(WelcomePalette.pine.opacity(0.16), lineWidth: 1)
+                    }
+                }
                 .padding(.horizontal, 16)
+            if voiceMessage.tooShort {
+                Text(es ? "Mantén un poco más para grabar." : "Hold a little longer to record.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if !voiceEntryLearned && !store.voice.active && !ready {
+                Text(es ? "Toca para conversar · Mantén para grabar" : "Tap to converse · Hold to record")
+                    .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 20)
+            }
         }.padding(.top, 8).padding(.bottom, 8)
+    }
+
+    private func beginVoiceMessage(held: Bool) {
+        guard !store.voice.active else { return }
+        focused = false; tray = false
+        voiceMessage.begin(liveVoiceActive: store.voice.active, held: held)
     }
 
     private func attachmentButton(_ symbol: String, _ title: String) -> some View {

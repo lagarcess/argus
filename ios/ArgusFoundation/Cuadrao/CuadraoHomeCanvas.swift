@@ -79,7 +79,7 @@ struct CuadraoHomeCanvas: View {
             }
         }
         .cuadraoSoftScrollEdges()
-        .sheet(isPresented: Binding(
+        .fullScreenCover(isPresented: Binding(
             get: { chat.voice.active && chat.voice.presentation == .expanded },
             set: { if !$0 && chat.voice.active && chat.voice.presentation == .expanded { chat.voice.presentation = .compact } })) {
             CuadraoLiveVoiceCanvas(chat: chat, spanish: spanish, keyboard: {
@@ -90,9 +90,6 @@ struct CuadraoHomeCanvas: View {
                 selectedTab = .plan
                 chat.voice.presentation = .compact
             })
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(32)
         }
         .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
             isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {

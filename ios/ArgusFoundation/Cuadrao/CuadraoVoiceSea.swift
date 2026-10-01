@@ -3,6 +3,7 @@ import SwiftUI
 /// Decorative preview motion. Replace the illustrated waveform with measured levels at integration.
 struct CuadraoVoiceSea: View {
     let voice: CuadraoVoicePreview
+    var cancelling = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
@@ -12,7 +13,7 @@ struct CuadraoVoiceSea: View {
             let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             Canvas { context, size in
                 let strength = voice.phase == .speaking ? 0.54 : 0.42
-                let colors = [Color(red: 0.12, green: 0.53, blue: 0.39),
+                let colors = cancelling ? [Color.red, Color(red: 0.95, green: 0.35, blue: 0.35), Color.red] : [Color(red: 0.12, green: 0.53, blue: 0.39),
                               Color(red: 0.38, green: 0.72, blue: 0.56),
                               Color(red: 0.12, green: 0.40, blue: 0.35)]
                 for index in 0..<3 {
@@ -34,6 +35,7 @@ struct CuadraoVoiceSea: View {
 struct CuadraoVoiceWave: View {
     let voice: CuadraoVoicePreview
     var compact = false
+    var cancelling = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
@@ -49,7 +51,7 @@ struct CuadraoVoiceWave: View {
                     let pulse = (sin(time * speed + Double(index) * 0.65) + 1) / 2
                     let height = voice.resting ? 3 : 4 + envelope * (compact ? 4 + pulse * 12 : 8 + pulse * 20)
                     let rect = CGRect(x: Double(index) * spacing, y: (size.height - height) / 2, width: 3, height: height)
-                    context.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(WelcomePalette.pine.opacity(0.25 + envelope * 0.65)))
+                    context.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color((cancelling ? Color.red : WelcomePalette.pine).opacity(0.25 + envelope * 0.65)))
                 }
             }
         }.frame(width: compact ? 25 : 230, height: compact ? 26 : 38).accessibilityHidden(true)

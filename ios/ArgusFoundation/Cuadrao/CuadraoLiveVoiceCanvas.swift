@@ -5,6 +5,7 @@ struct CuadraoLiveVoiceCanvas: View {
     let spanish: Bool
     let keyboard: () -> Void
     let showProposal: () -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var choosingVoice = false
     @State private var previewDetails = false
     private var es: Bool { spanish }
@@ -28,6 +29,13 @@ struct CuadraoLiveVoiceCanvas: View {
                 }.scrollBounceBehavior(.basedOnSize)
             }
         }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+            .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { value in
+                // Keep system-edge gestures and accessibility scrolling intact.
+                guard !typeSize.isAccessibilitySize, value.startLocation.y > 64,
+                      value.translation.height > 120,
+                      value.translation.height > abs(value.translation.width) * 2 else { return }
+                voice.presentation = .compact
+            })
             .sheet(isPresented: $choosingVoice) { CuadraoVoicePicker(spanish: es) }
             .confirmationDialog(es ? "Vista previa de diseño" : "Design preview",
                                 isPresented: $previewDetails, titleVisibility: .visible) {

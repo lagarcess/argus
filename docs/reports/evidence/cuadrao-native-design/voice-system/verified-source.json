@@ -1,0 +1,16 @@
+{
+  "ios/ArgusFoundation/Cuadrao/CuadraoChatCanvas.swift": "27c1d3df7237dc188a601bd2b4933f1f105a1e5a8e3eae1bdae83ad0e3b29036",
+  "ios/ArgusFoundation/Cuadrao/CuadraoHomeCanvas.swift": "f61f100ac44802c788a02360198e41dd5463131b590688b98534e3f047e73174",
+  "ios/ArgusFoundation/Cuadrao/CuadraoLiveVoiceCanvas.swift": "a6734c09aeb15b164bcf59a8169ee06efe40e618ab91dca77ad9655c1b440421",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoiceBar.swift": "2841f9c5cb592ca6c5e108f801f79d33dc87fd4307732a83ef7cb91bf4a931fd",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoiceEntry.swift": "900fff60553953021effbd1ba893d4713bb9231eba1bc79baa242b2c6183217a",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoiceMessagePanel.swift": "352c26683296cf2bfcf3e5d2b04562d37c3ce57815f9753c7fbe1c32284feb8b",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoiceMessagePreview.swift": "378027f6d488682c5560ca03ea87ae8b3ff43abec33062c81d7892e5694e0575",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoicePicker.swift": "16b6e988f6294db2de284fdb6cc5c461d7967bdfeca07ad651378b0b73794a68",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoicePreview.swift": "7738aca4118961900c187280536b03e72c65ea9ef7e74ffa044482d025878f84",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoiceProposalCanvas.swift": "c6d242e22e2690bf4818fc2a2fa8933e8c9c475266bf71aefb6b0accafe433dc",
+  "ios/ArgusFoundation/Cuadrao/CuadraoVoiceSea.swift": "e7e20c5669eeac0c01a0c9d2eac10fed6ab21d997112c106d35ed62e4d8b610e",
+  "ios/ArgusFoundationUITests/CuadraoVoiceDesignUITests.swift": "736308ae8229baef9b64420055760c73269b470bcdc0c28d2d26c0eee9475b9c",
+  "ios/DesignPreviewTests/TemporaryChatChecks.swift": "5b173c463c3f4e1b3ad00393e0aa0b0008b70b323feac16866f9e8e1d6907ecd",
+  "ios/DesignPreviewTests/run_temporary_chat.py": "1cdbf4fcdf64f82d13c92e8c1b02da870b8d12afec28b61c3cd9a864d6be7b2e"
+}
