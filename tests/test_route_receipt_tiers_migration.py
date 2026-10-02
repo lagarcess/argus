@@ -22,6 +22,11 @@ MIGRATION = (
 
 def test_tier_check_is_exactly_the_rendering_of_the_runtime_tiers() -> None:
     migration = MIGRATION.read_text(encoding="utf-8")
+    rendered = render_tier_check_constraint()
 
-    assert render_tier_check_constraint() in migration
+    assert rendered in migration
     assert migration.count(f"add constraint {TIER_CHECK_CONSTRAINT_NAME}") == 1
+    assert "not valid;" in rendered
+    assert "\ncommit;\n" in rendered
+    assert f"validate constraint {TIER_CHECK_CONSTRAINT_NAME};" in rendered
+    assert f"drop constraint if exists {TIER_CHECK_CONSTRAINT_NAME}" in rendered
