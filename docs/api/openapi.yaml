@@ -2734,6 +2734,208 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/gmail/authorize:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: Google consent URL for ``gmail.readonly``; valid for ten minutes.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorizeResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/gmail/callback:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: 'The web app posts Google''s ``code`` and ``state`` from the redirect.
+
+
+        201 creates the connection; 200 reconnects the caller''s existing
+
+        connection for the same mailbox (new credential, same cursor).'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallbackRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackResponse'
+        '200':
+          description: Reconnected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/gmail/{connection_id}/sender-suggestions:
+    get:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: Frequent recent senders from headers only; the person decides.
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuggestionsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/gmail/{connection_id}/senders:
+    get:
+      tags:
+      - financial-accounts
+      - financial-connections
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendersResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: 'Replace the allowlist. Newly added senders are searched over the
+
+        lookback window on the next sync.'
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendersRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendersResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/gmail/{connection_id}/sync:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/argus__api__routers__financial_connections_gmail__SyncResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-connections/plaid/exchange:
     post:
       tags:
@@ -2919,7 +3121,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncResponse'
+                $ref: '#/components/schemas/argus__api__routers__financial_connections_plaid__SyncResponse'
         '422':
           description: Validation Error
           content:
@@ -7490,6 +7692,18 @@ components:
       - estimates
       - related_debt_account_id
       - changes
+    AuthorizeResponse:
+      properties:
+        authorization_url:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+      type: object
+      required:
+      - authorization_url
+      - expires_at
     AuthorizedOriginal:
       properties:
         kind:
@@ -8264,6 +8478,46 @@ components:
       required:
       - success
       - deleted_count
+    CallbackRequest:
+      properties:
+        code:
+          type: string
+          maxLength: 512
+          minLength: 1
+          pattern: ^[\x21-\x7e]+$
+        state:
+          type: string
+          maxLength: 1024
+          minLength: 1
+          pattern: ^[A-Za-z0-9_-]+$
+        senders:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 20
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - code
+      - state
+    CallbackResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        created:
+          type: boolean
+        senders:
+          items:
+            $ref: '#/components/schemas/SenderResponse'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - created
+      - senders
     Candidates:
       properties:
         items:
@@ -15971,6 +16225,51 @@ components:
       - expected_version
       - account_ids
       - time_zone
+    SenderResponse:
+      properties:
+        sender:
+          type: string
+        kind:
+          type: string
+          enum:
+          - address
+          - domain
+        created_at:
+          type: string
+          format: date-time
+        backfilled_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - sender
+      - kind
+      - created_at
+      - backfilled_at
+    SendersRequest:
+      properties:
+        senders:
+          items:
+            type: string
+          type: array
+          maxItems: 20
+      additionalProperties: false
+      type: object
+      required:
+      - senders
+    SendersResponse:
+      properties:
+        senders:
+          items:
+            $ref: '#/components/schemas/SenderResponse'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - senders
     SensitivityStatus:
       type: string
       enum:
@@ -16482,47 +16781,33 @@ components:
       type: object
       required:
       - success
-    SyncResponse:
+    SuggestionResponse:
       properties:
-        connection:
-          $ref: '#/components/schemas/FinancialConnectionResponse'
-        sync:
-          $ref: '#/components/schemas/SyncSummary'
-      additionalProperties: false
-      type: object
-      required:
-      - connection
-      - sync
-    SyncSummary:
-      properties:
-        status:
+        sender:
           type: string
-          enum:
-          - synced
-          - not_ready
-          - busy
-          - no_sink
-          - failed
-          - sink_failed
-          - superseded
-        added:
+        domain:
+          type: string
+        messages:
           type: integer
-        modified:
-          type: integer
-        removed:
-          type: integer
-        error_code:
-          anyOf:
-          - type: string
-          - type: 'null'
+        authenticated:
+          type: boolean
       additionalProperties: false
       type: object
       required:
-      - status
-      - added
-      - modified
-      - removed
-      - error_code
+      - sender
+      - domain
+      - messages
+      - authenticated
+    SuggestionsResponse:
+      properties:
+        suggestions:
+          items:
+            $ref: '#/components/schemas/SuggestionResponse'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - suggestions
     ToolResultRecomputeRequest:
       properties:
         message_id:
@@ -16811,6 +17096,116 @@ components:
       type: object
       required:
       - received
+    argus__api__routers__financial_connections_gmail__SyncResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        sync:
+          $ref: '#/components/schemas/argus__api__routers__financial_connections_gmail__SyncSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - sync
+    argus__api__routers__financial_connections_gmail__SyncSummary:
+      properties:
+        status:
+          type: string
+          enum:
+          - synced
+          - busy
+          - no_sink
+          - no_senders
+          - failed
+          - sink_failed
+          - superseded
+        mode:
+          anyOf:
+          - type: string
+            enum:
+            - initial
+            - incremental
+            - recovery
+          - type: 'null'
+        messages:
+          type: integer
+        candidates:
+          type: integer
+        ignored:
+          type: integer
+        skipped:
+          additionalProperties:
+            type: integer
+          type: object
+        attachments:
+          type: integer
+        attachments_skipped:
+          additionalProperties:
+            type: integer
+          type: object
+        more_pending:
+          type: boolean
+        scan_truncated:
+          type: boolean
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - mode
+      - messages
+      - candidates
+      - ignored
+      - skipped
+      - attachments
+      - attachments_skipped
+      - more_pending
+      - scan_truncated
+      - error_code
+    argus__api__routers__financial_connections_plaid__SyncResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        sync:
+          $ref: '#/components/schemas/argus__api__routers__financial_connections_plaid__SyncSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - sync
+    argus__api__routers__financial_connections_plaid__SyncSummary:
+      properties:
+        status:
+          type: string
+          enum:
+          - synced
+          - not_ready
+          - busy
+          - no_sink
+          - failed
+          - sink_failed
+          - superseded
+        added:
+          type: integer
+        modified:
+          type: integer
+        removed:
+          type: integer
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - added
+      - modified
+      - removed
+      - error_code
     argus__domain__financial_search__SearchPage:
       properties:
         items:

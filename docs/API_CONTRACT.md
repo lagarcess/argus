@@ -7757,6 +7757,103 @@ re-authorization or disconnect. Credentials, cursors and sync leases are never r
   Repeating the call returns the ended connection with `not_applicable` and `0`.
   Another person's or an unknown id answers 404 `financial_connection_not_found`.
 
+### Gmail connector (default-off)
+
+Mounted under `/api/v1/financial-connections/gmail`. Available only while the
+connected-sources surface above is on, `ARGUS_INGESTION_SECRET_KEY` is set and
+the Google OAuth web client is configured (`GOOGLE_OAUTH_CLIENT_ID`,
+`GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`); otherwise every
+route answers 404 `financial_connections_unavailable`. Registered-only like the
+routes above. Google tokens, the mailbox address, cursors and message bodies
+are never returned or logged; the only Google value returned is the consent
+URL. Verification level is **mocked provider** until a Google Cloud OAuth
+client and an authorized test inbox exist:
+[ingestion-gmail evidence](reports/evidence/ingestion-gmail/README.md).
+
+- POST `/gmail/authorize` returns `{authorization_url, expires_at}`: Google's
+  consent URL for scope `https://www.googleapis.com/auth/gmail.readonly` only,
+  with `access_type=offline`, `prompt=consent`, `include_granted_scopes=true`,
+  PKCE `S256` and a sealed, single-use `state` bound to the caller that
+  expires after ten minutes.
+- POST `/gmail/callback` `{code, state, senders?}` is posted by the web app
+  page at `GOOGLE_OAUTH_REDIRECT_URI` with the caller's session. It exchanges
+  the code with the PKCE verifier, requires the granted scopes to include
+  `gmail.readonly`, reads the address with `users.getProfile`, seals the
+  refresh token and returns 201 `{connection, created: true, senders}`. The
+  connection `label` is the masked address (`j***@gmail.com`). Authorizing the
+  same mailbox again returns 200 with `created: false` and the same
+  connection, now `active` with the new credential and its cursor and
+  `last_success_at` kept. `senders` (optional, at most 20) sets the allowlist;
+  omitted keeps it. Problems: 400 `gmail_oauth_state_invalid`
+  (`context.reason` `invalid|expired|replayed`), 429
+  `gmail_oauth_rate_limited` (this person redeemed more than 20 states in ten
+  minutes; others are unaffected), 400 `gmail_authorization_code_invalid`, 422
+  `gmail_scope_not_granted` (partial consent; the grant is revoked and nothing
+  is stored), 422 `gmail_sender_invalid` (the state stays usable), 409
+  `gmail_mailbox_unavailable` (another person holds this mailbox, including
+  when both callbacks race; never revoked), 502 `gmail_refresh_token_missing`
+  or `gmail_unavailable`. Any other failure after Google issued the grant
+  (profile refused, Google or database unavailable) revokes that grant before
+  answering; if the connection was already stored, a new one is disconnected
+  with its senders removed and a reconnected one moves to `needs_reauth`
+  (`gmail_token_revoked`).
+- GET `/gmail/{id}/senders` and PUT `/gmail/{id}/senders` `{senders}` return
+  `{senders: [{sender, kind: address|domain, created_at, backfilled_at}]}`.
+  Entries are lowercased email addresses or domain names (a domain covers its
+  subdomains); anything else answers 422 `gmail_sender_invalid`. A sender added
+  later is searched over the 90-day lookback on the next sync
+  (`backfilled_at` stays null until then). PUT on a disconnected connection
+  answers 409 `financial_connection_disconnected`.
+- GET `/gmail/{id}/sender-suggestions` returns `{suggestions: [{sender,
+  domain, messages, authenticated}]}`: the most frequent senders among up to 50
+  messages of the last 60 days, read from headers only (`From`,
+  `Authentication-Results`), excluding senders already allowed. It does not
+  decide which senders are banks.
+- POST `/gmail/{id}/sync` runs one bounded sync and returns `{connection, sync:
+  {status, mode, messages, candidates, ignored, skipped, attachments,
+  attachments_skipped, more_pending, scan_truncated, error_code}}`. `status` is
+  `synced|busy|no_sink|no_senders|failed|sink_failed|superseded`; `mode` is
+  `initial|incremental|recovery`. `skipped` counts `not_allowlisted`,
+  `unverified_sender` (Gmail did not authenticate the `From` domain),
+  `hidden_label`, `gone`, `too_large` and `unreadable`; `attachments_skipped`
+  counts `media_type`, `too_large`, `empty`, `signature`, `limit` and
+  `unreadable`. A message or attachment Gmail refuses on its own (oversized,
+  malformed, another per-item 4xx) is skipped and the cursor moves past it;
+  401/403, 429 and 5xx fail the sync. `ignored` counts candidates the sink
+  refused without recording; any ignored candidate makes the sync
+  `sink_failed`. Nothing is recorded and the cursor does not move for
+  `no_sink`, `no_senders`, `failed` or `sink_failed`. A disconnected connection answers 409
+  `financial_connection_disconnected`.
+
+Each relevant message becomes one draft candidate with `source=gmail`,
+`external_id` = the Gmail message id (attachments as `<message id>:<part id>`
+references with SHA-256 and size), `observed_at` = Gmail's `internalDate`,
+`account.institution` = the sender domain and a capped inert `excerpt` (subject
+and visible text). Amount, currency, dates, direction and account are left for
+the person to resolve, and `evidence` is `unclassified` (the person says what
+it is) because no content is interpreted in this wave.
+
+When Google issues a time-limited grant (`refresh_token_expires_in` in the
+token response), the connection stays `active` and carries
+`attention_code=gmail_access_time_limited` until the person authorizes again.
+
+`last_error_code` for Gmail is `gmail_token_revoked` (revoked or expired grant,
+or a refused access token) and `gmail_scope_missing` or `gmail_access_denied`
+(status `needs_reauth`; authorize again), `gmail_unavailable` after bounded
+retries of 429/5xx and `gmail_oauth_client_invalid` (status `error`), or
+`gmail_credential_unavailable`. Other routes map the same Google failures to 409
+with that code or 502 `gmail_unavailable`. Disconnect posts the refresh token to
+Google's revocation endpoint (a token Google no longer knows counts as revoked);
+after the local disconnect the adapter's `forget` hook deletes the sender
+allowlist, whether or not revocation succeeded. While the Google OAuth client
+or the sealing key is missing, the routes answer 404 yet a cleanup-only adapter
+still forgets the allowlist on disconnect; it also revokes at Google while the
+sealing key is set (without it revocation reports `failed`).
+
+Not end-to-end import: every Gmail draft is `unclassified` until the person
+fills it in, and drafts reach review only once reconciliation provides the
+candidate sink; without it sync answers `no_sink`.
+
 ### Plaid connector (default-off)
 
 Mounted under `/api/v1/financial-connections/plaid`. Available only while the
