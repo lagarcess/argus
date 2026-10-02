@@ -6,7 +6,7 @@ final class CuadraoHomeChartUITests: XCTestCase {
         let app = launch()
         XCTAssertEqual(app.staticTexts["home-chart-amount"].label, "153,920.00")
         XCTAssertFalse(app.segmentedControls["home-chart-view"].exists)
-        XCTAssertFalse(app.buttons["home-range-year"].exists)
+        XCTAssertTrue(app.buttons["home-range-year"].exists)
         shot(app, "quiet-home-es")
         let chart = app.otherElements.matching(identifier: "home-balance-chart").firstMatch
         chart.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).tap()
@@ -149,6 +149,11 @@ final class CuadraoHomeChartUITests: XCTestCase {
         app.buttons["home-period-year"].tap()
         XCTAssertEqual(chart.value as? String, "0")
         shot(app, "activity-year-es")
+        chart.swipeRight(velocity: .fast)
+        XCTAssertEqual(chart.value as? String, "-1")
+        shot(app, "activity-full-previous-year-es")
+        chart.swipeRight(velocity: .fast)
+        XCTAssertEqual(chart.value as? String, "-1", "Oldest fully populated year is the boundary")
     }
     func testExpenseLargeEnglish() {
         continueAfterFailure = false

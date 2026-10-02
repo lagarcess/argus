@@ -32,3 +32,9 @@ The founder reaffirmed this specific shape with screenshot
 `codex-clipboard-299aa608-725e-4505-bff6-0d607c3c6ba1.png`.
 The chat header uses this asset rather than the system share symbol or the
 three-node `inheritedIcons.share` glyph.
+
+`CuadraoCategory-food`, `CuadraoCategory-groceries` and `CuadraoCategory-leisure`
+are original simple outline vectors added for Activity on October 1, 2026. They
+match Home's 24-point viewBox, 1.7-point round strokes and template rendering.
+They are not claimed to be copied vendor assets. Home/transport/other categories
+reuse the approved property/vehicle/asset paths directly, not a second redraw.

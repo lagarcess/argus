@@ -13,9 +13,7 @@ enum CanvasExpenseCategory: String, CaseIterable, Identifiable {
         case .other: es ? "Otros" : "Other"
         }
     }
-    var symbol: String {
-        switch self { case .food: "fork.knife"; case .groceries: "basket"; case .transport: "tram"; case .home: "house"; case .leisure: "sparkles"; case .other: "ellipsis" }
-    }
+
 }
 
 struct CanvasSpendingBucket: Identifiable {
@@ -60,14 +58,32 @@ enum CanvasSpendingHistory {
     }
     static func examples(accounts: [CanvasAccount], spanish: Bool, now: Date) -> [CanvasActivity] {
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: now)
-        let categories: [CanvasExpenseCategory] = [.food, .groceries, .transport, .home, .leisure]
+        let days = CanvasPreviewHistory.days(now: now)
         return accounts.filter { $0.kind == .checking || $0.kind == .cash }.enumerated().flatMap { index, account in
-            stride(from: 1, through: 270, by: 3).map { day in
-                let category = categories[(day / 3 + index) % categories.count]
-                let amount = Decimal([650, 2450, 320, 1800, 900][categories.firstIndex(of: category)!] + (day % 7) * 40)
-                return CanvasActivity(accountID: account.id, title: category.title(spanish), amount: amount,
-                    date: calendar.date(byAdding: .day, value: -day, to: today)!, income: false, category: category)
+            days.compactMap { date in
+                let seed = CanvasPreviewHistory.variation(date, salt: index)
+                let day = calendar.component(.day, from: date)
+                let month = calendar.component(.month, from: date)
+                var category: CanvasExpenseCategory
+                var amount: Int
+                var title: String
+                if account.sharedWithHousehold && day == 5 {
+                    category = .home; amount = 4800; title = spanish ? "Servicios del hogar" : "Household bills"
+                } else if account.sharedWithHousehold && seed % 11 == 0 {
+                    category = .groceries; amount = 1700 + seed % 1400; title = spanish ? "Compra de la semana" : "Weekly groceries"
+                } else if account.kind == .checking && !account.sharedWithHousehold && day == 2 {
+                    category = .home; amount = 12500; title = spanish ? "Alquiler" : "Rent"
+                } else if account.kind == .checking && day == 19 && [3, 7, 12].contains(month) {
+                    category = .leisure; amount = 3200 + seed % 5800; title = spanish ? "Escapada" : "Weekend away"
+                } else if account.kind == .cash && seed % 5 == 0 {
+                    category = .food; amount = 95 + seed % 180; title = spanish ? "Café y algo más" : "Coffee and a bite"
+                } else if account.kind == .checking && seed % 9 == 0 {
+                    category = .food; amount = 600 + seed % 1900; title = spanish ? "Comida fuera" : "Eating out"
+                } else if account.kind == .checking && seed % 13 == 0 {
+                    category = .transport; amount = 180 + seed % 750; title = spanish ? "Transporte" : "Getting around"
+                } else { return nil }
+                return CanvasActivity(accountID: account.id, title: title, amount: Decimal(amount),
+                    date: date, income: false, category: category)
             }
         }
     }

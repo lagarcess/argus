@@ -1746,7 +1746,9 @@ this decision.
 **Home activity refinement — October 1:** the UI preview now removes the greeting
 date and space-plus background, uses accepted household avatars above the amount,
 and adds Balance / Activity to expanded insights. Compact period and chart controls
-share a row; date headings, visible paging chevrons and Back to today are removed.
+share a row; visible paging chevrons and Back to today are removed. The final
+founder correction places the period label left and Balance / Activity right above
+the amount, with date ranges for week/month and the year for annual views.
 Swipes and VoiceOver period actions remain bounded. Expenses derive from the local
 activity list with typed categories, one currency and one space; category bars,
 period distribution and expandable rows share those records. Historical assets use
@@ -1759,6 +1761,12 @@ retain archived-account spending, and compare equivalent elapsed periods only wh
 coverage supports the comparison. Household identity must derive avatars/counts from
 accepted membership, with photos optional and invitation states excluded. These are
 part of existing Financial Core / Household delivery, not a new parallel roadmap.
+
+The populated design fixture uses one shared calendar window from the start of
+the previous year through yesterday. Sparse varied spending includes recurring
+bills, quiet days and occasional larger purchases; account history lists render
+lazily. It supports a complete previous-year view without filling every day with
+repeating category stacks, adding future observations or changing current balances.
 
 
 Founder assigned the four-point native UI pass on October 1: a living

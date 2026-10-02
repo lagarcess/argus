@@ -217,7 +217,10 @@ Do not show Evolución / Distribución controls, insight paragraphs or test/samp
 copy on Home. Genuine unknown/partial values remain distinguishable from zero;
 removing preview disclosures does not authorize invented financial facts.
 
-**Expanded insights:** Balance / Actividad is a native choice above the amount.
+**Expanded insights:** a single row above the amount places the selected period on
+the left and the native Balance / Actividad choice on the right. Week/month show
+the first and last calendar dates; year shows the year. Larger text can wrap this
+row without truncating either choice.
 Balance remains recorded net position. Activity uses expenses from the same local
 activity owner as the transaction list, filtered by space and currency. Transfers,
 income and changing balances do not become spending. Historical fixtures stay in
@@ -225,8 +228,8 @@ preview code; connected delivery is still roadmap work.
 
 **Controls:** Semana / Mes / Año and the chart / distribution icons share one compact
 row. Adapt to localized labels and larger text, preserving 44-point targets. No
-redundant period heading, previous/next chevrons or Back to today button in detail.
-Dates live on the chart axis. Swipe right for older periods, left toward the present;
+previous/next chevrons or Back to today button in detail. The single period label
+above the amount follows the selected range; tick context stays on the axis. Swipe right for older periods, left toward the present;
 stop at the oldest available period and today. Neighboring edges hint at available
 pages. VoiceOver custom Previous/Next period actions provide the same navigation.
 Long-press inspection must not page; vertical scrolling remains available.
@@ -239,6 +242,11 @@ unknown. The current snapshot says Activos · Hoy / Assets · Today.
 **Activity:** vertical bars stack expenses by category. Week and month use daily
 buckets; year uses months. Colors match category rows, which disclose the same
 expense records. The distribution icon shows the selected period's category shares.
+`CuadraoExpenseCategoryStyle` owns category colors and vector choices. Reuse
+WelcomePalette's Plan accents (pine, clay, sunshine, bloom and overlap); do not
+introduce the default neon chart palette. Category icons match Home's 24-point,
+1.7-point rounded vector family and 42-point soft tile. Reuse approved Home paths
+where their meaning fits; keep new outline vectors in the same asset catalog.
 One short insight explains either the largest category or a comparison; a running
 period compares the same elapsed span of the previous period. Totals remain actual
 recorded expenses, never projected spend or savings. Empty periods retain navigation

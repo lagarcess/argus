@@ -14,6 +14,16 @@ struct CuadraoHomeInsights: View {
     @State private var accountPath: [UUID] = []
     @State private var accountSheet: CanvasAccountSheet?
     @Environment(\.dismiss) private var dismiss
+    private var periodLabel: some View {
+        Text(range.periodLabel(spanish: spanish, offset: periodOffset))
+            .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("home-insight-period")
+    }
+    private var metricChoice: some View {
+        CuadraoChoiceMenu(title: spanish ? "Vista" : "View", selection: $activity,
+            values: [false, true], valueTitle: { value in value ? (spanish ? "Actividad" : "Activity") : "Balance" })
+            .accessibilityIdentifier("home-insight-metric")
+    }
     private var controls: CuadraoInsightControls { CuadraoInsightControls(range: $range, distribution: $distribution, spanish: spanish, activity: activity) }
     private var expenses: [CanvasActivity] {
         CanvasSpendingHistory.expenses(data.visibleActivity, accounts: data.scopedAccounts, currency: currency)
@@ -36,9 +46,17 @@ struct CuadraoHomeInsights: View {
         NavigationStack(path: $accountPath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    CuadraoChoiceMenu(title: spanish ? "Vista" : "View", selection: $activity,
-                        values: [false, true], valueTitle: { value in value ? (spanish ? "Actividad" : "Activity") : "Balance" })
-                        .accessibilityIdentifier("home-insight-metric")
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            periodLabel
+                            Spacer(minLength: 8)
+                            metricChoice
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            periodLabel
+                            metricChoice.frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                    }
                     if activity {
                         CuadraoSpendingChart(expenses: expenses, currency: currency, spanish: spanish,
                             distribution: distribution, range: range, periodOffset: $periodOffset, controls: controls)

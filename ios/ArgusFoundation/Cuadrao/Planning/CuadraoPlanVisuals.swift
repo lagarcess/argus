@@ -5,9 +5,9 @@ extension CanvasPlanLook {
     var color: Color {
         switch self {
         case .coast: WelcomePalette.pine
-        case .sunshine: Color(red: 0.67, green: 0.43, blue: 0.13)
-        case .bloom: Color(red: 0.48, green: 0.40, blue: 0.64)
-        case .clay: Color(red: 0.68, green: 0.36, blue: 0.26)
+        case .sunshine: WelcomePalette.sunshine
+        case .bloom: WelcomePalette.bloom
+        case .clay: WelcomePalette.clay
         }
     }
 }

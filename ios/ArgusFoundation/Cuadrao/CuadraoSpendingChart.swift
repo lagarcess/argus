@@ -1,19 +1,6 @@
 import SwiftUI
 import Charts
 
-extension CanvasExpenseCategory {
-    var color: Color {
-        switch self {
-        case .food: .orange
-        case .groceries: .teal
-        case .transport: .blue
-        case .home: .purple
-        case .leisure: .pink
-        case .other: .gray
-        }
-    }
-}
-
 struct CuadraoSpendingChart: View {
     let expenses: [CanvasActivity]
     let currency: String
@@ -164,6 +151,7 @@ struct CuadraoSpendingChart: View {
     }
     private func categoryRow(_ category: CanvasExpenseCategory) -> some View {
         DisclosureGroup(isExpanded: Binding(get: { selectedCategory == category }, set: { selectedCategory = $0 ? category : nil })) {
+            LazyVStack(spacing: 0) {
             ForEach(entries.filter { $0.category == category }.sorted { $0.date > $1.date }) { entry in
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -174,9 +162,10 @@ struct CuadraoSpendingChart: View {
                     Text(money(entry.amount)).font(CuadraoTypography.rowAmount)
                 }.padding(.vertical, 8)
             }
+            }
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: category.symbol).foregroundStyle(category.color).frame(width: 24)
+                CuadraoExpenseCategoryIcon(category: category)
                 Text(category.title(spanish)).font(CuadraoTypography.supporting)
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 4) {

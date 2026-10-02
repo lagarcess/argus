@@ -11,7 +11,7 @@ struct CuadraoAccountCanvas: View {
     var body: some View {
         if let account = data.account(accountID) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 30) {
+                LazyVStack(alignment: .leading, spacing: 30) {
                     VStack(alignment: .leading, spacing: 18) {
                         CanvasAccountIcon(kind: account.kind, size: 30)
                             .frame(width: 58, height: 58)
@@ -39,9 +39,9 @@ struct CuadraoAccountCanvas: View {
                             .font(.system(size: 13, weight: .medium)).padding(.horizontal, 16).frame(minHeight: 44)
                             .overlay { Capsule().stroke(WelcomePalette.border, lineWidth: 1) }
                     }
-                    VStack(alignment: .leading, spacing: 16) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         Text(spanish ? "Movimientos" : "Activity").font(CuadraoTypography.section)
-                        let entries = data.activity.filter { $0.accountID == accountID }
+                        let entries = data.activity.filter { $0.accountID == accountID }.sorted { $0.date > $1.date }
                         if entries.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(spanish ? "Aún no hay movimientos." : "No activity yet.").font(.body)

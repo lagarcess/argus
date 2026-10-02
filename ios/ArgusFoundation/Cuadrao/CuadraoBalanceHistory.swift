@@ -34,12 +34,14 @@ enum CanvasBalanceHistory {
             observations.filter {
                 $0.accountID == account.id && $0.currency == account.currency && $0.kind == account.kind
                     && $0.share == account.share && $0.date < today
+            }.reduce(into: [Date: Decimal]()) { indexed, observation in
+                if indexed[observation.date] == nil { indexed[observation.date] = observation.balance }
             }
         }
-        let dates = Set(matched.flatMap { $0.map(\.date) }).sorted()
+        let dates = Set(matched.flatMap { $0.keys }).sorted()
         var result: [CanvasBalancePoint] = []
         for date in dates {
-            let values = matched.map { rows in rows.first { $0.date == date }?.balance }
+            let values = matched.map { $0[date] }
             guard values.allSatisfy({ $0 != nil }) else { continue }
             let total = zip(known, values).reduce(Decimal.zero) { $0 + contribution($1.1!, account: $1.0) }
             result.append(CanvasBalancePoint(date: date, balance: total))
@@ -65,33 +67,46 @@ enum CanvasBalanceHistory {
 
     /// Explicit example observations, separate from activity and never backfilled for created accounts.
     static func examples(accounts: [CanvasAccount], now: Date) -> [CanvasBalanceObservation] {
-        let days = [-29, -25, -21, -18, -14, -10, -7, -3]
-        let changes: [[Int]] = [
-            [-8200, -6100, -6900, -4200, -5400, -2900, -3400, -1200],
-            [800, 620, 440, 600, 300, 180, 420, 180],
-            [-5000, -5000, -5000, -2500, -2500, -2500, 0, 0],
-            [4200, 3600, 3100, 5500, 2900, 1900, 2700, 900],
-            [-2500, -2500, -2500, -2500, 0, 0, 0, 0]
-        ]
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: now)
+        let days = CanvasPreviewHistory.days(now: now).filter {
+            let weekday = calendar.component(.weekday, from: $0)
+            return weekday == 2 || weekday == 5 || calendar.component(.day, from: $0) == 1
+        }
         return accounts.enumerated().flatMap { index, account in
-            guard let balance = account.balance, index < changes.count else { return [CanvasBalanceObservation]() }
-            let older = (-9 ... -1).flatMap { month in
-                let anchor = calendar.date(byAdding: .month, value: month, to: today)!
-                let start = calendar.dateInterval(of: .month, for: anchor)!.start
-                return (0..<4).map { week in
-                    CanvasBalanceObservation(accountID: account.id, currency: account.currency, kind: account.kind,
-                        share: account.share, date: calendar.date(byAdding: .day, value: week * 7, to: start)!,
-                        balance: balance * Decimal(100 + month * 4 + week) / 100)
-                }
-            }
-            return older.filter { $0.date < calendar.date(byAdding: .day, value: -29, to: today)! } + zip(days, changes[index]).map { day, change in
-                CanvasBalanceObservation(accountID: account.id, currency: account.currency, kind: account.kind,
-                    share: account.share, date: calendar.date(byAdding: .day, value: day, to: today)!, balance: balance + Decimal(change))
+            guard let balance = account.balance else { return [CanvasBalanceObservation]() }
+            return days.enumerated().map { day, date in
+                let progress = Double(day) / Double(max(1, days.count - 1))
+                let month = calendar.component(.month, from: date)
+                let dayOfMonth = calendar.component(.day, from: date)
+                let seed = CanvasPreviewHistory.variation(date, salt: index)
+                let seasonal = [0, -4, -1, 3, -2, -7, -3, 2, 4, 1, -5, -8][month - 1]
+                let payCycle = account.kind == .checking ? (dayOfMonth < 6 || dayOfMonth > 25 ? 7 : -3) : 0
+                let percentage = Int(70 + progress * 30) + seasonal + payCycle + seed % 7 - 3
+                return CanvasBalanceObservation(accountID: account.id, currency: account.currency, kind: account.kind,
+                    share: account.share, date: date, balance: balance * Decimal(percentage) / 100)
             }
         }
     }
+}
+
+/// A shared preview window; each fixture chooses plausible events within it.
+enum CanvasPreviewHistory {
+    static func variation(_ date: Date, salt: Int) -> Int {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        var seed = UInt64(parts.year! * 10000 + parts.month! * 100 + parts.day! + salt * 7919)
+        seed = (seed ^ (seed >> 16)) &* 0x45d9f3b
+        seed = (seed ^ (seed >> 16)) &* 0x45d9f3b
+        return Int((seed ^ (seed >> 16)) % 10000)
+    }
+    static func days(now: Date) -> [Date] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let year = calendar.dateInterval(of: .year, for: today)!.start
+        let start = calendar.date(byAdding: .year, value: -1, to: year)!
+        let count = calendar.dateComponents([.day], from: start, to: today).day!
+        return (0..<count).map { calendar.date(byAdding: .day, value: $0, to: start)! }
+    }
+
 }
 
 /// Calendar periods own filtering, paging bounds and the balance comparison.
@@ -112,6 +127,13 @@ enum CanvasHistoryRange: String, CaseIterable, Identifiable {
         let calendar = Calendar.current
         let current = calendar.dateInterval(of: component, for: now)!.start
         return calendar.dateInterval(of: component, for: calendar.date(byAdding: component, value: min(offset, 0), to: current)!)!
+    }
+    func periodLabel(spanish: Bool, now: Date = .now, offset: Int = 0) -> String {
+        let period = interval(now: now, offset: offset)
+        let format = Date.FormatStyle.dateTime.locale(Locale(identifier: spanish ? "es_DO" : "en_US"))
+        if self == .year { return period.start.formatted(format.year()) }
+        let end = period.end.addingTimeInterval(-1)
+        return period.start.formatted(format.month(.abbreviated).day()) + " – " + end.formatted(format.month(.abbreviated).day())
     }
     func points(_ points: [CanvasBalancePoint], now: Date = .now, offset: Int = 0) -> [CanvasBalancePoint] {
         let window = interval(now: now, offset: offset)
