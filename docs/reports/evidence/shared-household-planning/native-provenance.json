@@ -86,7 +86,7 @@
     "supabase/migrations/20261002040000_shared_plan_responsibility_carry.sql": "b5b2fbf3d633c7803c033ec58f620e12745b321fc747954c8006201ed95af2c3",
     "supabase/migrations/20261002050000_shared_contributor_retention.sql": "1fac5b2bf6650ef5db5bd94466cd8bb0c4456ed8ef1f36024eb7e9d3016de092"
   },
-  "evidence_retention": "Final publication adds only documentation and safe evidence; all runtime, migrations, native code, strings, tests and runners remain byte-identical to the reviewed and natively tested41cd source. Recheck before terminal publication.",
+  "evidence_retention": "Captured product runtime, migration, localization and native inputs remain byte-identical to41cd. The final diff additionally repairs one Python concurrency test atd290; that verification delta has separate seven-case PostgreSQL evidence and clean affected review. Final publication revalidates the captured source fingerprints explicitly.",
   "native_cases": {
     "four_kinds": "Passed; native-main-summary.json",
     "response_loss": "Passed; native-recovery-summary.json",
@@ -95,10 +95,12 @@
   },
   "review": {
     "reviewer": "shared_plan_independent_review",
-    "latest_reviewed_commit": "41cd27ac93a0e00f39f8190aea0838aa1b59104f",
+    "latest_reviewed_commit": "d290207646956a60ad1b1eb62b4a49a20e91901a",
     "outcome": "Clean affected-only review; completed before terminal audit",
     "whole_diff_review": "5bd9417a671b6dbdabe2c558794c55d289410352",
-    "scope": "Fresh independent reviewer substitution permitted; only affected confirmed fixes reviewed afterward"
+    "scope": "Fresh independent reviewer substitution permitted; only affected confirmed fixes reviewed afterward",
+    "native_reviewed_commit": "41cd27ac93a0e00f39f8190aea0838aa1b59104f",
+    "latest_scope": "Test-only ordered allocation/recording CAS assertions; final delta clean"
   },
   "limitations": [
     "Physical-phone/internet, hosted enablement and production migration are not verified or authorized",
@@ -116,5 +118,13 @@
     "temporary_proxy": "59762 stopped",
     "device_scope": "Simulator only; design/phone/other demos preserved"
   },
-  "retained_journey": "Native household <kind> C6E10C; canonical readback independently verifies actual totals"
+  "retained_journey": "Native household <kind> C6E10C; canonical readback independently verifies actual totals",
+  "publication_revalidation": "All82 captured runtime/migration/native/test/runner fingerprints remain identical to41cd. Only tests/test_connected_goals_postgres.py is changed outside them; seven affected realPG cases and final independent review prove the test-only follow-up. Native evidence retained.",
+  "verification_delta": {
+    "source": "d290207646956a60ad1b1eb62b4a49a20e91901a",
+    "file": "tests/test_connected_goals_postgres.py",
+    "sha256": "a0f9e2789664ad85cf05c4fdc87f4e96b550af990bc3a336c82eed1ec244b50a",
+    "passed": 7,
+    "skipped": 0
+  }
 }

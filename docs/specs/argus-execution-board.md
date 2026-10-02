@@ -131,8 +131,8 @@ the existing [API contract](../API_CONTRACT.md#recording-consumer-handoff-for-in
 [PR #773](https://github.com/lagarcess/argus/pull/773) targets
 `codex/private-alpha-next`. Reviewed and natively tested implementation head:
 `41cd27ac93a0e00f39f8190aea0838aa1b59104f`; its financial source remains
-`942f1f009a5927816176d166f6c1357577e0ce51`. Subsequent publication adds only
-documentation and durable evidence. Source fingerprints explicitly revalidate
+`942f1f009a5927816176d166f6c1357577e0ce51`. Final follow-up adds only documentation, durable evidence and the bounded
+Goal concurrency-test repair at `d290207646956a60ad1b1eb62b4a49a20e91901a`. Source fingerprints explicitly revalidate
 the retained screenshots/recording at that publication; the terminal PR comment
 records its exact head and CI state. Original/current integration remains
 `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`; no reconciliation merge or
@@ -192,7 +192,18 @@ without resetting the authentication limiter. Partial test plans were archived
 through their canonical API. Their activity/history remain; no balances,
 accounts or datasets were reset.
 
-Source-head CI is green. Supabase's existing automation **ignored #773 at the
+Source-head CI is green. At documentation head `d140f3a1…`, PR CI passed but
+its parallel push guest matrix exposed a valid stale-account rejection omitted
+by the existing Goal allocation/recording concurrency test. The repair retains
+runtime CAS and adds strict allocation-first/expense-first expectations,
+coherent assigned/support pairs, cash80000 and exactly one expense20000.
+Seven affected real-Postgres cases passed with zero skips. A P2 ordered-case
+assertion gap from the affected reviewer was corrected; final delta review is
+clean at `d2902076…`. No production/native code, schema or demo data changed;
+all captured runtime fingerprints remain identical. The next publication runs
+its normal exact-head CI; no unchanged-head retry is used to hide the race.
+
+Supabase's existing automation **ignored #773 at the
 concurrent preview limit** and created no preview. No settings or existing
 previews changed. The local demo does not depend on hosted previews. Final
 publication CI and review-thread checks are recorded on the PR before READY.
