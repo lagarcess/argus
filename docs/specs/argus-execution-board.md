@@ -1687,7 +1687,7 @@ here when work starts. Close an entry only against its stated remaining gap.
 
 | ID / topic | Disposition and existing baseline | Remaining work and closure evidence | Existing responsibility |
 | --- | --- | --- | --- |
-| **C01 — Scan and itemized bills** | **Future design locked; implementation unassigned.** Photo attachment, drafts, equal/custom amount splits and partial repayment previews exist. No receipt extraction or item selection exists. | Native capture and the receipt-review/split flow below; retain item corrections, interrupted drafts and exact share totals in Spanish/English evidence. Real extraction, storage and posting require the intake contracts. | Intake D08 + Planning/Home D06; Household D07 for shared access |
+| **C01 — Scan and itemized bills** | **UI preview delivered (October 2, build 3415).** Native source adapters, durable local drafts, shared Chat/Plan review, editable items, equal/item splits and repeat-safe confirmation are implemented. Real extraction and connected posting remain unassigned. | Retain the verified local capture/review/split journey below. Physical camera capture and location permission acceptance remain to be exercised on the unlocked phone. Real extraction, shared storage and connected posting require the intake contracts. | Intake D08 + Planning/Home D06; Household D07 for shared access |
 | **C02 — Shared plans and invitations** | **UI baseline preserved; connection outstanding.** Para ti / En grupo, trip estimates, recorded expenses, own share versus group total, shared savings, local invitation/guest preview and sample QR exist. Short-lived groups are distinct from durable Spaces. | Resolve group membership/guest access, link expiry/revocation, permissions and canonical expense/contribution/repayment ownership before connecting. Estimates must stay separate from actuals; repayments must not imply a bank transfer. Verify two participants, partial repayments, correction/recovery and no duplicate personal spending. | Planning/Home D06 + Household D07 + Financial core D03/D04 |
 | **C03 — Forecasts and calculators** | **Preview built; canonical connection outstanding.** Spending-pace playground, low point, editable assumptions and goal/debt projections exist with illustrative data. | Reuse existing Argus forecast/calculation owners for Home, Plan and chat. Carry forward the Stake-style editable compound-interest assumptions and contribution/earnings curve as future UI work, with disclosed rate/cadence assumptions. Verify chart/readout agreement and actual versus projected values. Retain Apple Card-inspired explanations of upcoming payment and interest consequences as design input to the existing debt owner. A short contextual explanation may help; a blog/tips destination is not required. | Planning/Home D05/D06 + Conversation D09; domain series owners |
 | **C04 — Voice and chat continuity** | **Interaction preview built; runtime outstanding.** Immersive/minimized voice, swipe-down, voice-choice carousel, short-message hold/lock/cancel/review, native dictation coexistence, temporary mode and Recents gestures are already previewed. | Connect xAI live voice through the existing chat brain; inherit agentic app actions only under D14 activation. Reuse existing Argus dynamic greeting logic. Resolve audio/transcript retention, Temporary context, actual provider voices/selection, interruptions and background/locked-screen policy. Verify one session across surfaces, draft recovery, mute/end, real capture and truthful progress. | Conversation/voice D09/D13/D14 + Native continuity |
@@ -1700,46 +1700,65 @@ here when work starts. Close an entry only against its stated remaining gap.
 
 ### C01 — Native Scan and receipt split
 
+Signed **3415** is installed and version-verified on the founder's iPhone. Native
+simulator journeys, calculation checks and retained screenshots are recorded in the
+[receipt UI checkpoint](../reports/evidence/cuadrao-native-design/receipts-2026-10-02/README.md).
+The phone was locked during launch, so this is not physical camera/location
+acceptance. The unlocated keyboard invalid-frame warning remains in C10.
+
+The founder assigned the receipt UI pillar on October 2, 2026. Personal Chat,
+group Chat and Plan share one saved receipt draft and one review experience.
+Capture saves the source before review. The person can review now or leave and
+resume later through the existing Chat or group entry. A draft changes no balance,
+creates no payment request and sends no message.
+
 Preserve **Escanear / Scan**, with Foto / Photo and Archivo / File as independent
-entry points. The selected iOS capture component is Apple's native
-[VisionKit document scanner](https://developer.apple.com/documentation/visionkit/vndocumentcameraviewcontroller).
-Its page images feed the same interpretation/review path as uploaded photos;
-PDF conversion is optional. Capture does not itself extract trusted financial
-facts, approve a split or post an expense. The present chat Scan action is still
-a sample-attachment preview.
+sources. Apple's native [VisionKit document scanner](https://developer.apple.com/documentation/visionkit/vndocumentcameraviewcontroller)
+owns capture, cropping and page retakes. Cuadrao presents that scanner within its
+own entry and review journey. This does not reuse Apple Cash receipt intelligence.
+General Chat documents remain distinct from receipt intake.
 
-The future receipt flow is **Scan/photo → review receipt → Por igual / Por consumo
-→ select items → review each person's share**. Preserve capture-now/finish-later
-drafts and the existing external repayment-tracking direction. Implementation
-must account for editable receipt lines and quantities, shared items, visible
-unassigned items and rounding so participant shares reconcile to the receipt.
-Keep receipt tax/service charges visible and distinguish already-included amounts
-from an optional added tip, avoiding double counting. Confirm corrections and
-shares before recording; joining/selecting an item does not mark anyone paid.
+The assigned UI includes a compact merchant/category/date/total review, editable
+lines and quantities, payer and participants, **Por igual / Por consumo**, shared
+items and the final per-person review. Shares account for every cent. Included tax
+and service charges remain visible and appear once; an added tip is separate.
+Unassigned items block confirmation, not saving a draft. Confirmation is explicit
+and repeat-safe. Own share stays separate from the full group bill.
 
-**Currency is already locked, not new FX work:** choose DOP, USD or EUR when
-creating the plan/group; it cannot change after creation. Group expenses, splits
-and repayments inherit that currency. No mixed-currency reconciliation,
-conversion or silent rate lookup. Receipt extraction must not silently reinterpret
-a different printed currency as the group's currency; resolve that mismatch in
-review before posting, with the exact interaction selected in the assigned slice.
+**Currency remains fixed.** Group receipts inherit the currency chosen when the
+group was created. A personal receipt uses an explicit currency and compatible
+account selection. No conversion or silent reinterpretation of a printed currency.
+Real extraction must detect and resolve currency mismatch before connected posting.
 
-Reference checked October 1, 2026:
-[Apple's iOS 27 split-bill guide](https://support.apple.com/en-us/127565), published
-September 14, 2026. It shows receipt review/editing, equal or item-based division,
-shared quantities, tax/tip allocation and payment tracking through Apple Cash.
-Use these interactions as a benchmark; Apple Cash's US payment rail is not part
-of this UI-only preview. Do not assume Apple's receipt intelligence or Split Bill
-is a public API reusable by Cuadrao. The native scanner and a future vision/OCR
-provider are separate decisions. Extraction accuracy, supported receipt samples,
-retention/access and canonical posting must be settled by the intake owner.
+**Location is optional.** The preview offers an explicit current-location action
+in review and labels when the location was added. Permission denial never blocks
+saving. Original capture location, current location added during later review and
+merchant address are distinct facts.
+Future intake work must define source metadata retention, shared access and whether
+existing photo metadata is offered. Do not request background location or infer a
+merchant address from the phone's position.
 
-**Closure:** recording this gap closes the design-session disposition only.
-It does not close C01 delivery. A later assigned slice must retain evidence for
-capture/photo, corrections, equal/item/shared splits, included tax/service and tip,
-rounding, draft reopen, recipient/organizer views and external repayment status.
-No automatic collections, bank settlement or live sharing claim follows from
-this decision.
+**Direction has a shared visual meaning.** Te deben / You're owed uses Cuadrao green;
+Debes / You owe uses an accessible warm tone. Labels and direction symbols accompany
+color. Apply this rule to group totals, people and receipt confirmation. Existing
+external repayment tracking records money returned elsewhere, not a bank transfer.
+
+**Connected work remains assigned to D08, D06 and D07.** The preview prepares named
+sample receipts and supports manual review of imported media. Vision extraction,
+automatic categorization, confidence/correction policy, receipt retention and access,
+canonical personal/group posting, membership and cross-device continuity still need
+their existing intake and financial owners. The user-approved future experience
+prepares drafts regardless of whether review happens now or later. Confirming is the
+person's green light; capture and item assignment are never approval or payment.
+
+Research informs these interaction choices, not a capability claim:
+[GoPay receipt splitting](https://mobbin.com/flows/106a9eae-cfa6-4450-9ac4-2370d7ac9f45),
+[Grab group billing](https://mobbin.com/flows/adfca581-0157-4ae4-8e5e-4e8c3a70e340),
+[Craft native scanning](https://mobbin.com/flows/1f8ffe12-12f6-4d4c-8f26-a488b191f8a0),
+[Expensify receipt review](https://mobbin.com/flows/49a113d4-5959-4b6e-ae99-a4a0a0e917c3),
+[Splitwise item assignment](https://mobbin.com/flows/32960404-ae98-480b-bbd8-ac3792e4ae7c),
+and [Apple's receipt-splitting guide](https://support.apple.com/en-us/127565).
+Apple Cash's US payment rail is outside this preview.
 
 ### Cuadrao consistency pass and Home chart follow-up
 

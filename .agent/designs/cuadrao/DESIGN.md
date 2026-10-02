@@ -498,9 +498,9 @@ remains in the Argus guide.
 
 - The attachment action is **Escanear** in Spanish and **Scan** in English,
   with a document-scanner symbol. Photos and files remain independent entry points.
-- The future native scanner, interpretation/review boundary and receipt-splitting
-  disposition are owned by [roadmap C01](../../../docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
-  The current preview still attaches sample documents; capture is not connected.
+- Apple's native document scanner owns capture, page cropping and retakes. Cuadrao
+  owns entry, saved drafts and review around that native screen. Delivery and the
+  interpretation boundary belong to [roadmap C01](../../../docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
 - Recents uses title-first rows, separate Pinned/Recent sections, unread/current
   indicators, and one conversation object shared with Chat and Search. Do not repeat a sample subtitle on every row. Dates derive from the last
   message timestamp, shared with Search; metadata changes do not update recency.
@@ -514,6 +514,38 @@ remains in the Argus guide.
   Delete requires confirmation and retains recovery in Deleted. Actions on a row
   never also open it. Opening temporary-chat destinations keeps the existing discard
   confirmation. Archiving/deleting the active regular chat opens a fresh chat.
+
+### Receipt capture and review
+
+Capture saves a draft and opens a compact review. **Después / Later** lets the person
+leave immediately; leaving never confirms an expense.
+Return through the existing Chat or group entry. Do not add a top-level receipt
+inbox or automatically reopen review on launch.
+
+Personal Chat, group Chat and Plan open the same receipt identity. Generic files
+remain attachments unless the person chooses the receipt journey. Keep merchant,
+date, category and total readable before revealing editing controls. Use the shared
+money editor and category symbols. A keyboard appears only when editing requires it.
+
+A group receipt inherits the group's fixed currency. Confirm the payer and people,
+propose an equal split, and reveal item assignment under **Por consumo / By item**.
+Shared items retain one price and several people. Show how many items still need
+assignment. Included tax and service appear once; an added tip is separate.
+The final review shows each person's share before one explicit confirmation.
+
+Color explains direction. **Te deben / You're owed** uses the positive pine accent;
+**Debes / You owe** uses a legible warm clay accent. Settled amounts use a quiet
+neutral treatment. Always retain the direction label and symbol. Category colors
+continue to describe categories, not debt, and destructive red remains separate.
+
+Location is optional and attached only through an explicit choice. Label a capture
+pin as where the receipt was scanned, not as the merchant's address. Denied access
+never blocks a draft. A later review must not relabel the phone's current location
+as the original capture location.
+
+Prepared examples demonstrate the proposed automatic categorization and review.
+An imported image or file must not acquire invented merchant, amount or item data.
+Real extraction and connected posting remain roadmap work.
 
 References: [Apple document camera](https://developer.apple.com/documentation/visionkit/vndocumentcameraviewcontroller),
 [scan output](https://developer.apple.com/documentation/visionkit/vndocumentcamerascan),
