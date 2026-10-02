@@ -65,7 +65,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         kind = correcting?.kind ?? (origin.type == "credit_card" ? .cardPayment : origin.type == "other_debt" ? .debtPayment : origin.type == "investment" ? .transfer : .expense)
         timeZone = correcting?.timeZone ?? TimeZone.current.identifier
         if let correcting {
-            amount = AccountPresentation.amount(correcting.amount, locale: .current)
+            amount = correcting.amount.map { AccountPresentation.amount($0, locale: .current) } ?? ""
             principal = correcting.principalMinor.map { AccountPresentation.amount(AccountPresentation.decimal($0, digits: correcting.currencyFractionDigits), locale: .current) } ?? ""
             interest = correcting.interestMinor.map { AccountPresentation.amount(AccountPresentation.decimal($0, digits: correcting.currencyFractionDigits), locale: .current) } ?? ""
             fees = correcting.feesMinor.map { AccountPresentation.amount(AccountPresentation.decimal($0, digits: correcting.currencyFractionDigits), locale: .current) } ?? ""
@@ -112,6 +112,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     var canEdit: Bool { phase == .editing }
     var canConfirm: Bool { phase == .uncertain || (phase == .review && preview?.ready == true && reviewedCommand != nil) }
     var readyToReview: Bool {
+        (correcting?.originalAmountAvailable ?? true) && (returning?.originalAmountAvailable ?? true) &&
         !amount.isEmpty && (!needsLoanSplit || (!principal.isEmpty && !interest.isEmpty && !fees.isEmpty)) && note.unicodeScalars.count <= 200 &&
         (!isCorrection || !reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) &&
         (kind.isPaired ? sourceAccountId != nil && destinationAccountId != nil && sourceAccountId != destinationAccountId : accountId != nil)

@@ -23,8 +23,8 @@ class MoneyActivityResponse(BaseModel):
     activity_id: str
     revision: int
     kind: ActivityKind
-    amount_minor: int
-    amount: str
+    amount_minor: int | None
+    amount: str | None
     currency: str
     currency_fraction_digits: int
     occurred_at: datetime

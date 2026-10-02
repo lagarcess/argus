@@ -57,5 +57,9 @@ def disconnect_financial_connection(
 from argus.api.routers.financial_connections_gmail import (  # noqa: E402
     router as gmail_router,
 )
+from argus.api.routers.financial_connections_plaid import (  # noqa: E402
+    router as plaid_router,
+)
 
 router.include_router(gmail_router)
+router.include_router(plaid_router)

@@ -142,3 +142,25 @@ struct SessionFixture {
         try await controller.login(email: email, password: "synthetic-password", captchaToken: "synthetic-captcha")
     }
 }
+
+enum MoneyActivityWireFixture {
+    static let amountMinor: Int64 = 1250
+    static let amount = "12.50"
+    static func detail(source: UUID, destination: UUID, kind: FinancialActivityKind = .transfer, redacted: Bool) throws -> FinancialActivityDetail {
+        let sourceLeg: [String: Any] = ["record_id": UUID().uuidString, "record_revision": 1, "account_id": source.uuidString, "role": "source", "balance_movement_minor": -amountMinor, "coverage": []]
+        let destinationLeg: [String: Any] = ["record_id": UUID().uuidString, "record_revision": 1, "account_id": destination.uuidString, "role": "destination", "balance_movement_minor": kind == .debtPayment ? -1000 : amountMinor, "coverage": []]
+        let full: [String: Any] = [
+            "activity_id": UUID().uuidString, "revision": 1, "kind": kind.rawValue,
+            "amount_minor": redacted ? NSNull() : amountMinor, "amount": redacted ? NSNull() : amount,
+            "currency": "DOP", "currency_fraction_digits": 2, "occurred_at": "2026-10-01T12:00:00Z", "time_zone": "America/Santo_Domingo",
+            "note": redacted ? NSNull() : "Source owner note", "category_id": NSNull(), "source_id": NSNull(),
+            "purchase_activity_id": NSNull(), "purchase_revision": NSNull(), "reason": redacted ? NSNull() : "Source owner correction",
+            "recorded_at": "2026-10-01T12:00:00Z", "recorded_by": redacted ? NSNull() : UUID().uuidString,
+            "principal_minor": !redacted && kind == .debtPayment ? 1000 : NSNull(),
+            "interest_minor": !redacted && kind == .debtPayment ? 200 : NSNull(),
+            "fees_minor": !redacted && kind == .debtPayment ? 50 : NSNull(),
+            "legs": redacted ? [destinationLeg] : [sourceLeg, destinationLeg]
+        ]
+        return try JSONDecoder().decode(FinancialActivityDetail.self, from: JSONSerialization.data(withJSONObject: full))
+    }
+}

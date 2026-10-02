@@ -34,7 +34,12 @@ def load_owner(
     return [repository._load(connection, user_id, str(r[0])) for r in rows]
 
 
-def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
+def persist(
+    connection: Connection,
+    user_id: str,
+    result: MoneyPlan,
+    leg_owners: dict[str, str] | None = None,
+) -> None:
     primary = next(
         m.record.current
         for m in result.mutations.values()
@@ -51,6 +56,7 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
         (result.activity_id, result.revision, user_id),
     )
     for account_id, mutation in result.mutations.items():
+        record_owner = leg_owners[account_id] if leg_owners is not None else user_id
         record = mutation.record
         assert isinstance(record, ExpenseRecord)
         r = record.current
@@ -72,20 +78,33 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
                 "reversal_of_revision",
             )
         }
+        reason = r.reason
+        if record_owner != user_id and r.role == "destination":
+            for field in ("note", "category_id", "source_id", "interest_minor"):
+                details[field] = None
+            reason = None
+        if r.reversal_of_activity_id:
+            original = connection.execute(
+                "select user_id from public.financial_activity_groups where id=%s",
+                (r.reversal_of_activity_id,),
+            ).fetchone()
+            if original is None:
+                raise AccountNotFound()
+            details["reversal_of_owner_id"] = str(original[0])
         connection.execute(
             "insert into public.financial_records(id,account_id,user_id,record_kind,current_revision,created_at) values(%s,%s,%s,%s,%s,%s) on conflict(id) do update set current_revision=excluded.current_revision",
-            (record.id, account_id, user_id, r.kind, r.revision, r.recorded_at),
+            (record.id, account_id, record_owner, r.kind, r.revision, r.recorded_at),
         )
         connection.execute(
             "insert into public.financial_record_revisions(record_id,user_id,revision,amount_minor,as_of,as_of_zone,reason,recorded_by,recorded_at,details) values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 record.id,
-                user_id,
+                record_owner,
                 r.revision,
                 r.movement_minor,
                 r.occurred_at,
                 r.time_zone,
-                r.reason,
+                reason,
                 r.recorded_by,
                 r.recorded_at,
                 Jsonb(details),
@@ -93,7 +112,7 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
         )
         if r.active:
             connection.execute(
-                "insert into public.financial_activity_memberships(activity_id,user_id,activity_revision,record_id,record_revision,role) values(%s,%s,%s,%s,%s,%s)",
+                "insert into public.financial_activity_memberships(activity_id,user_id,activity_revision,record_id,record_revision,role,record_owner_id) values(%s,%s,%s,%s,%s,%s,%s)",
                 (
                     result.activity_id,
                     user_id,
@@ -101,6 +120,7 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
                     record.id,
                     r.revision,
                     r.role,
+                    record_owner,
                 ),
             )
         for link in mutation.coverage:
@@ -108,7 +128,7 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
                 "insert into public.financial_observation_coverage(account_id,user_id,observation_id,observation_revision,activity_id,activity_revision,included) values(%s,%s,%s,%s,%s,%s,%s)",
                 (
                     account_id,
-                    user_id,
+                    record_owner,
                     link.observation_id,
                     link.observation_revision,
                     link.activity_id,
@@ -119,7 +139,7 @@ def persist(connection: Connection, user_id: str, result: MoneyPlan) -> None:
     for aid in result.affected:
         connection.execute(
             "update public.financial_accounts set version=version+1 where id=%s and user_id=%s",
-            (aid, user_id),
+            (aid, leg_owners[aid] if leg_owners is not None else user_id),
         )
 
 
@@ -134,7 +154,10 @@ def transact_postgres(
 ) -> tuple[list[StoredAccount], str, int, tuple[str, ...], bool]:
     with repository._pool.connection() as connection:
         with connection.transaction():
-            owner_lock(connection, user_id)
+            from .canonical_groups import VisibleAccounts, load, owner_closure
+
+            for owner in owner_closure(connection, {user_id}):
+                owner_lock(connection, owner)
             if not connection.execute(
                 "select 1 from auth.users where id=%s and coalesce(is_anonymous,false)=false",
                 (user_id,),
@@ -161,14 +184,24 @@ def transact_postgres(
                     tuple(str(a) for a in receipt[3]),
                     True,
                 )
-            initial = planner(load_owner(repository, connection, user_id))
+            initial = planner(
+                VisibleAccounts(
+                    load_owner(repository, connection, user_id),
+                    load(repository, connection, {user_id}),
+                )
+            )
             for aid in initial.affected:
                 if not connection.execute(
                     "select id from public.financial_accounts where id=%s and user_id=%s for update",
                     (aid, user_id),
                 ).fetchone():
                     raise AccountNotFound()
-            result = planner(load_owner(repository, connection, user_id))
+            result = planner(
+                VisibleAccounts(
+                    load_owner(repository, connection, user_id),
+                    load(repository, connection, {user_id}),
+                )
+            )
             if result.affected != initial.affected:
                 raise RuntimeError("Owner lock did not preserve activity membership")
             persist(connection, user_id, result)

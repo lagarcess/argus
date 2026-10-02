@@ -28,6 +28,9 @@
         "ARGUS_FINANCIAL_ACCOUNTS_ENABLED": "false",
         "ARGUS_HOUSEHOLDS_ENABLED": "false",
         "ARGUS_INGESTION_ENABLED": "false",
+        "PLAID_ENV": "sandbox",
+        "PLAID_CREDENTIALS_INJECTED": "false",
+        "PLAID_COUNTRY_CODES": "US",
         "ARGUS_IN_PLACE_CARD_EDITS_ENABLED": "true",
         "ARGUS_MEMORY_EMBEDDING_MODEL": "pplx-embed-v1-0.6b",
         "ARGUS_MEMORY_EMBEDDING_DIMENSIONS": "1024",
@@ -87,7 +90,10 @@
         "ARGUS_INGESTION_SECRET_KEY",
         "GOOGLE_OAUTH_CLIENT_ID",
         "GOOGLE_OAUTH_CLIENT_SECRET",
-        "GOOGLE_OAUTH_REDIRECT_URI"
+        "GOOGLE_OAUTH_REDIRECT_URI",
+        "PLAID_CLIENT_ID",
+        "PLAID_SECRET",
+        "PLAID_WEBHOOK_URL"
       ]
     },
     "web": {

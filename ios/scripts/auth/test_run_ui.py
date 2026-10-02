@@ -15,8 +15,9 @@ import pytest
 @pytest.mark.parametrize("enabled", [False, True])
 @pytest.mark.parametrize("api_port", [58500, 59300])
 @pytest.mark.parametrize("user_index", [0, 1])
+@pytest.mark.parametrize("user_count", [2, 3])
 def test_response_loss_is_explicit_runner_opt_in(
-    tmp_path, monkeypatch, enabled, api_port, user_index
+    tmp_path, monkeypatch, enabled, api_port, user_index, user_count
 ):
     script = tmp_path / "ios/scripts/auth/run-ui.py"
     script.parent.mkdir(parents=True)
@@ -32,7 +33,8 @@ def test_response_loss_is_explicit_runner_opt_in(
                 "users": [
                     {"email": "a@example.invalid", "password": "synthetic-a"},
                     {"email": "b@example.invalid", "password": "synthetic-b"},
-                ],
+                    {"email": "c@example.invalid", "password": "synthetic-c"},
+                ][:user_count],
             }
         )
     )
@@ -96,3 +98,12 @@ def test_response_loss_is_explicit_runner_opt_in(
     assert observed[0].get("ARGUS_TEST_SEARCH_QUERY") == (
         "Retained goal" if enabled else None
     )
+
+    assert observed[0].get("ARGUS_TEST_EMAIL_C") == (
+        "c@example.invalid" if user_count == 3 else None
+    )
+    assert observed[0].get("ARGUS_TEST_PASSWORD_C") == (
+        "synthetic-c" if user_count == 3 else None
+    )
+    assert not list((tmp_path / "ios/.build").rglob("ios-auth-*.xctestrun"))
+    assert not work.joinpath("captcha-mode").exists()

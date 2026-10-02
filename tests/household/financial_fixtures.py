@@ -51,6 +51,9 @@ def lane():
                     "select id from households where created_by=any(%s::uuid[])", (users,)
                 ).fetchall()
             ]
+            from tests.household.shared_cleanup import cleanup
+
+            cleanup(c, users, hids)
             c.execute(
                 "delete from household_command_receipts where actor_id=any(%s::uuid[])",
                 (users,),

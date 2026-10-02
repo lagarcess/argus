@@ -217,6 +217,10 @@ enum AccountPresentation {
         parser.formatOptions = [.withInternetDateTime]
         return parser.date(from: exact)
     }
+    static func amount(_ exact: String?, locale: Locale) -> String {
+        guard let exact else { return NSLocalizedString("accounts.unknown", comment: "") }
+        return amount(exact, locale: locale)
+    }
     static func amount(_ exact: String, locale: Locale) -> String {
         let pieces = exact.split(separator: ".", omittingEmptySubsequences: false)
         var whole = String(pieces[0]); let negative = whole.hasPrefix("-")

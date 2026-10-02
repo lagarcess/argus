@@ -7460,8 +7460,270 @@ owns calculations and owner-qualified rows;
 `recorded_by` is the actual authenticated actor. Receipt identity includes actor,
 household and membership incarnation. Native changes of identity, membership,
 permission generation or scope discard protected reads; denied reads return to
-Personal, preserving uncertain command recovery. Household Plan/Argus remain
-explicitly unsupported in this bounded native lane.
+Personal, preserving uncertain command recovery. The landed account-sharing
+package did not expose Household Plan or Argus. The worker extension below
+adds shared Plan; Household Argus remains outside its scope.
+
+## Shared Household planning contract sketch
+
+**Status:** Worker implementation contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026, published in [PR #773](https://github.com/lagarcess/argus/pull/773). The connected four-kind native journey, committed-response-loss recovery, three identities and disabled-feature checks passed against real isolated local Auth/API/Postgres at source `41cd27ac`; independent affected review is clean. Publication CI gates remain on the PR. This is local verification, not hosted enablement or physical-iPhone delivery. The manifest owns the exact verification state.
+
+The canonical Recording resolver owns complete original transaction revisions
+before disclosure. The scoped shared adapter composes independent plan consent
+with original account/activity authority. Household exposure remains server
+default-off; the isolated synthetic local stack alone enables it for acceptance.
+
+### Canonical definitions and consent
+
+A shared plan references one existing owner-qualified budget, bill expectation,
+savings goal, or debt plan. It retains that definition's ID, owner, version,
+currency, archive state, and recurrence. Sharing does not copy the definition,
+create another ledger, transfer ownership, or grant access to funding accounts.
+Creation in Household creates the canonical definition and its sharing binding
+atomically. Sharing an existing Personal definition binds that same record.
+
+The `PlanRef` is `{kind:"budget"|"bill"|"goal"|"debt",id:uuid}`.
+The server resolves its original owner. Clients cannot supply another owner's
+identity to impersonate that owner. One canonical definition has at most one
+active Household binding. The binding is authorization metadata, not another
+editable financial definition.
+
+Named recipients use their current `membership_id`. The plan owner alone
+chooses or replaces recipients. A recipient's sole stored permission is `view`
+or `edit`; the owner's edit and sharing powers derive from ownership. Account
+grants never grant plan editing. A plan editor never gains account editing,
+private activity correction, ownership, membership administration, or resharing.
+A named view-only participant may record/link and correct their own
+contributions. This grants neither definition editing nor another participant's
+contribution or private funding account access. The server enforces these
+separate powers; original activity/account authorization remains mandatory.
+
+Responsibilities contain `{membership_id,amount:decimal-string|null}` and
+exactly one scope: `period` (YYYY-MM), `occurrence_id`, `schedule_id`, or
+`agreed_date` (YYYY-MM-DD). Amounts
+are explicit, may be unequal, and describe intentions only. Null is unassigned,
+not zero. A bill or debt responsibility belongs to a stable occurrence. A goal
+responsibility belongs to its contribution schedule or explicit agreed date. A
+budget responsibility belongs to its calendar month. Responsibilities do not
+force equal shares or change the canonical amount. Existing domain rules still
+validate actual partial and extra payments. A budget limit remains a spending
+cap, not an expected cash movement. Responsibility changes use the plan version
+and preserve linked occurrence snapshots and safe schedule cutovers.
+
+### Safe shared projection
+
+The response is a dedicated discriminated `SharedPlan`, never a
+Personal `GoalProgress`, debt progress, Home response, or Plan receipt with
+fields removed afterward:
+
+```text
+{ref:PlanRef,version,household_id,membership_id,authorization_version,
+ owner:{membership_id,display_name},permission:"view"|"edit",is_owner,
+ definition:<SharedBudget|SharedBill|SharedGoal|SharedDebt>,
+ participants:[{membership_id,display_name,is_self,permission}],
+ responsibilities:[{person,amount_minor,period?,occurrence_id?,schedule_id?,agreed_date?}],
+ occurrences:[SharedOccurrence],contributions:[SharedContribution],
+ progress:<kind-specific shared progress>,archived,read_only,archive_reason,can_restore}
+```
+
+Shared definitions expose only deliberately shared name, currency/exponent,
+limit or target or agreed payment, dates, categories when relevant, and
+schedule. Account references appear only when the caller has a live independent
+account grant. Private funding setup is absent. A debt definition does not
+implicitly share the debt account balance, terms, or payoff model. Those facts
+require their own explicit account visibility. Missing backing or debt facts
+produce unknown progress, not zero or a reconstructed Personal dashboard.
+
+Every definition includes `earliest_effective_date` (YYYY-MM-DD), computed by
+the canonical scheduling owner. Scheduled edit forms use this cutoff for their
+apply-from date and may choose a later date. Recorded occurrences remain
+preserved; clients never infer a cutoff from visible contributions. An existing
+goal schedule may edit its separate `planned_contribution_amount` alongside
+its schedule. This changes intentions only and grants no private funding setup.
+
+`SharedContribution` is `{id,person:{membership_id,display_name},amount_minor,
+applied_minor,currency,currency_fraction_digits,date,status,purpose,occurrence_id,
+can_correct,can_release,original:null|AuthorizedOriginal}`.
+Its full amount derives from the current canonical activity; `applied_minor`
+separately reports the canonical value counted by this purpose. It is not a
+second editable total. Unknown current/support facts remain null. `AuthorizedOriginal`
+contains the typed activity destination only when the caller can currently
+inspect that original. Other callers receive null, not an activity ID or a
+private account ID. Source, destination, note, category detail, coverage,
+revisions, original history, pools, private goal IDs, and private totals are
+absent from this public contribution projection.
+
+Shared goal credit uses only explicitly consented canonical claims. A fully
+supported claim discloses its agreed current amount. Unsupported backing
+produces null support and `needs_review`; it never discloses a partial value
+such as `min(private_balance,claim)`, a shortfall amount, or affected private
+goals. A reached state requires all counted claims to have resolved support.
+Private allocations that were not shared never enter shared totals. This
+public rule does not change Personal's existing partial-support projection.
+
+Goal claim amounts retain the existing destination ownership-share rounding.
+The full recorded transfer and its supported allocation are distinct facts.
+Other plan purposes retain their existing canonical full-activity or explicit
+principal/cost treatment; a shared projection cannot choose another amount from
+a partial visible leg.
+
+Shared budgets derive actual spending through Recording's existing spending
+reducer using explicitly shared account scope and consented spending claims.
+An activity reached by both paths counts once. Expenses, received-period
+refunds, and explicit loan interest/fees retain their canonical rules. Shared
+bill and debt progress derive linked current actuals, with partial payments
+and residual obligations exposed separately from responsibility intentions.
+Transfers never become spending, income, bill fulfillment, or debt principal
+payment merely because they are contributions.
+
+### Routes and commands
+
+All routes reuse registered-only `ARGUS_HOUSEHOLDS_ENABLED`, server discovery,
+`Cache-Control: no-store`, and live membership checks. They are additive under
+`/api/v1/households/{household_id}/plan`:
+
+| Route | Request and result |
+| --- | --- |
+| `GET /` | One authorized snapshot for Household Home, Plan, and Search detail, with scope identity, shared definitions, occurrences, and currency-separated progress. No Personal dashboard totals. |
+| `GET /options` | Actor-private eligible Money options, live named members and existing owned definitions; `owned_account_ids` distinguishes canonical definition setup from separate account edit grants. |
+| `GET /{kind}/{id}` | One current `SharedPlan`; missing, private, and unauthorized IDs all return the same 404. |
+| `POST /{kind}` | Scoped command with the canonical kind-specific create fields and explicit recipients/responsibilities. Canonical definition and consent commit together. |
+| `POST /{kind}/{id}/share` | Owner-only explicit binding of an existing canonical definition. Explicit sharing retains the canonical definition and previews named recipients/rights; only consented definition history becomes readable. |
+| `PATCH /{kind}/{id}` | `expected_plan_version` plus allowed definition or responsibility edits. Canonical CAS; archive/restore preserves activity and claims. |
+| `PUT /{kind}/{id}/participants` | Owner-only named recipient replacement. Empty recipients withdraws sharing. Permission and responsibility are distinct fields. |
+| `GET /{kind}/{id}/contributions/candidates` | Only the caller's authorized current activity candidates, subject to canonical claim conflicts. Private candidates are visible only to that caller. |
+| `POST /{kind}/{id}/contributions/link` | Current plan version, original activity ID/revision, explicit purpose and optional occurrence. Links canonical activity without posting money. |
+| `POST /{kind}/{id}/contributions/preview` | Current plan version, explicit purpose/occurrence, and canonical `MoneyRequest`. Only the recording actor receives its private Money review. |
+| `POST /{kind}/{id}/contributions` | The exact reviewed Money request and token. Activity, claim, scope receipt, and plan CAS commit atomically. |
+| `POST /{kind}/{id}/contributions/{claim_id}/release` | Current plan version. Stops the explicit attribution without deleting or reversing original money. |
+| `GET /{kind}/{id}/history` | Definition history within the caller's consent bounds, using the same safe projection. Private pre-sharing revisions are excluded. |
+| `POST /{kind}/{id}/contributions/{claim_id}/preview` and `PATCH /{kind}/{id}/contributions/{claim_id}` | Own-contribution correction through the same original Money review/token, revision and account versions; view permission alone never authorizes another person's activity. |
+| `PUT /{kind}/{id}/allocations` | Explicit own known savings allocation, account version and amount; uses the same canonical Personal/shared account pool and never posts Money activity. |
+
+Every scoped write includes `{membership_id,expected_authorization_version,
+expected_plan_version?}` and requires `Idempotency-Key`. Contribution purpose
+is explicit. `funding` links a real transfer but fulfills no expense or debt;
+`spending`, `bill_payment`, `goal_saving`, and `debt_payment` require the matching
+canonical activity kind and direction. A goal transfer can also fulfill its own
+scheduled occurrence through the same claim, never another credit.
+
+Mutation receipts retain command hash and canonical result identities, never a
+full Personal result or reusable financial snapshot. Replay rechecks live
+membership, binding, permission, and every original dependency before returning
+the current safe projection. A committed exact retry may precede stale-version
+rejection after those checks. Revocation, departure, or feature unavailability
+cannot turn an old receipt into access. New writes require current versions.
+An ordinary archived plan may restore only with `can_restore`; owner-departure
+archives never restore through remaining recipients. Released unscheduled
+extras may be reassigned under canonical active-claim uniqueness while released
+history remains retained; occurrence-bound claims preserve existing lifecycle.
+Corrections require the original activity authorization, its revision CAS, and
+all affected account versions. Existing correction controls retain the actor
+and append-only revision history. Current originals determine progress; accepted
+amounts are provenance only.
+
+### Canonical extension required for private-source posting
+
+Linking a caller-owned same-owner transfer already has a valid Recording fact.
+Recording a transfer from B's private account to A's authorized shared account
+requires the additive multi-owner Recording extension described in
+[DATA_MODEL.md](DATA_MODEL.md#shared-household-planning-storage-sketch).
+One logical transfer posts source and destination legs under their actual
+owners. It uses the existing Money planner, explicit preview/coverage, sorted
+owner locks, sorted account locks, and atomic revision/claim persistence.
+The actor must own or hold a live edit grant for every affected account. Plan
+permission alone is insufficient. A contribution link may disclose only the
+consented amount while its source stays private.
+
+Household Search adds typed `budget`, `bill`, `goal`, and `debt` destinations.
+Account IDs are nullable for plan hits. Query/cursor identity binds actor,
+household, membership incarnation, authorization version, and the authorized
+visible snapshot. Private funding values never participate in matching, count,
+ordering, summaries, or cursor content. Detail reopen rechecks current access.
+Native protected reads and navigation origins bind the same scope plus the
+authenticated session generation. Scope changes clear protected reads. Exact
+pending command bytes remain actor-partitioned for explicit recovery and never
+auto-submit under another membership or after access loss.
+
+### Founder-approved permissions and departure
+
+Approved October 1, 2026. The existing detail's People & permissions controls
+use named recipients, view by default, explicit edit, and unequal optional
+planned amounts. A participant reviews the person, amount, currency, date and
+status they disclose when recording/linking their own contribution. Their
+private source account, balance, notes and history stay private. View-only
+participation allows their own contribution commands and correction through
+original authorized activity; it does not permit plan editing or another
+participant's contribution commands.
+
+Before an owner leaves, the native flow explains that their shared plans become
+archived and read-only for remaining authorized members. Those members retain
+previously shared history and linked transactions through the safe projection.
+Archived plans contribute no future forecast movement. Departure never deletes
+financial activity, exposes private funding, or transfers ownership. The owner
+retains their original records. Remaining members still need live membership
+and their existing explicit plan consent; removal or revocation ends access.
+Rejoining creates no automatic consent or ownership transfer.
+
+A contributing member's departure also ends access to that person's future
+private financial changes, even when another member owns the active plan. Pin
+the last authorized original and related activity revisions for previously
+shared history; later Personal corrections must not alter another person's
+disclosed history. Remaining current members' contributions continue to update.
+Historical expenses and payments do not disappear or reverse on departure.
+Retained savings assignments do not establish current backing after consent
+ends: current supported credit is unknown and `needs_review`, while last
+authorized amounts remain history. No private withdrawal, correction or pool
+shortfall may be inferred from later changes. New membership and consent cannot
+overwrite the old authorized history.
+
+Allocation/schema/RLS source, migration/backfill code and synthetic tests on a
+new isolated disposable local database are expressly authorized. Remove legacy
+JSON allocations only after complete validated backfill and migration of all
+readers/writers to the canonical allocation owner. No fallback may hide an
+incomplete cutover. Production, shared hosted databases and existing demos are
+not migration targets. The implementation must prove that boundary and preserve
+Personal behavior.
+
+### Recording consumer handoff for ingestion, October 1
+
+The ingestion owner consumes these contracts from its own branch; this lane
+does not edit ingestion. Migration versions `20261002120000`–`20261002120300`
+are reserved for ingestion and unused here. The older #772 migration version
+`20261001190000` collided with this lane's allocation cutover. Its owner
+renumbered all four ingestion migrations into this reserved range at verified
+#772 head `5608a83ef7a28c3359195e947acc12c428cbe4f0`; no collision remains.
+
+- `MoneyService.preview`, `write`, `detail` and `history` keep their existing
+  keyword signatures, including optional `activity_id` and the write's
+  `idempotency_key`. Personal writes remain same-owner; plan participation
+  grants no account editing or automatic posting authority.
+- `MoneyActivityResponse.amount_minor` and `amount` may be null for an
+  authorized destination-only view of a cross-owner transaction. Private
+  primary notes, reason, source/category, authors and cost breakdown remain
+  redacted; only authorized legs are disclosed. Null is unknown, never zero.
+  Do not reconstruct the full transaction from one visible leg.
+- `PostgresRepository.list_accounts`, `money_reads.activity` and
+  `current_activities` retain their signatures. Current-group resolution
+  precedes visibility. Returned accounts remain list-compatible; `.canonical`
+  and `_canonical_*`, `_shared_links`, `_pool_external` are internal protected
+  facts and must never be serialized to an import candidate or client.
+- `money_postgres.persist` adds optional `leg_owners` keyed by account ID.
+  Its default retains same-owner posting. Only the authorized Household Money
+  adapter uses cross-owner legs; ingestion continues through Recording rather
+  than writing legs or memberships directly. Canonical `Membership` adds
+  optional `record_owner_id`; `ResolvedGroups` retains original group owners.
+- Keep exact reviewed request bytes, idempotency key, actor and account CAS
+  across retries. Committed exact retries return the original outcome; changed
+  content conflicts. Household adapters additionally bind membership and
+  recheck live account/plan authority before replay; leaving, removal or
+  revocation never resurrects access through a receipt.
+  Shared-plan history pins ended contributors at their last authorized facts;
+  this does not change ingestion's owner-authorized current activity reads.
+- Goal allocation load/persist signatures remain unchanged and use the
+  normalized relation, with stable consent IDs. Shared and Personal savings
+  consume the same `pool_assignments` / `pool_facts` owner. Import intake does
+  not create another allocation, spending total or financial ledger.
 
 ## Connected financial sources (default-off)
 
@@ -7591,3 +7853,74 @@ sealing key is set (without it revocation reports `failed`).
 Not end-to-end import: every Gmail draft is `unclassified` until the person
 fills it in, and drafts reach review only once reconciliation provides the
 candidate sink; without it sync answers `no_sink`.
+
+### Plaid connector (default-off)
+
+Mounted under `/api/v1/financial-connections/plaid`. Available only while the
+connected-sources surface above is on, `ARGUS_INGESTION_SECRET_KEY` is set and
+Plaid is configured (`PLAID_CLIENT_ID`/`PLAID_SECRET`, `PLAID_ENV`
+`sandbox|production`); otherwise every route, including the webhook, answers
+404 `financial_connections_unavailable`. User routes are registered-only like
+the routes above. Access tokens, cursors and provider payloads are never
+returned or logged; the only Plaid value returned is a Link token. Evidence and
+verification levels:
+[ingestion-plaid evidence](reports/evidence/ingestion-plaid/README.md).
+
+- POST `/plaid/link-token` with optional `{language: en|es}` returns
+  `{link_token, expiration}` for Link with `products=["transactions"]`, the
+  configured `PLAID_COUNTRY_CODES` and an opaque per-person `client_user_id`.
+- POST `/plaid/exchange` `{public_token}` (`public-...`) exchanges server-side,
+  seals the access token, labels the connection with the institution name and
+  returns 201 `{connection, created: true}`; the first sync runs after the
+  response. A retried exchange or a re-link of an Item the caller already has
+  returns 200 with the existing connection and `created: false`. An Item
+  connected by someone else (checked first and enforced by the global live
+  `(source, external_ref)` index under races) answers 409
+  `plaid_item_unavailable` and is left in place. Any other failure after the
+  exchange removes the new Item at Plaid before the error is returned.
+- POST `/plaid/{id}/sync` runs one bounded sync and returns
+  `{connection, sync: {status, added, modified, removed, error_code}}`.
+  `status` is `synced|not_ready|busy|no_sink|failed|sink_failed|superseded`;
+  `busy` means another sync holds the lease; `no_sink`/`sink_failed` mean
+  nothing was recorded (including candidates the sink reports as `ignored`)
+  and the cursor did not move; `superseded` means the lease was lost (for
+  example a webhook recorded `needs_reauth`) or another writer moved the
+  cursor, so this run changed nothing. Only a complete update is handed over;
+  if it exceeds 200 pages or 8 minutes the sync fails with
+  `plaid_sync_incomplete`, keeps the status and cursor, and hands nothing
+  over. A disconnected connection answers 409
+  `financial_connection_disconnected`.
+- POST `/plaid/{id}/link-token` creates a Link update-mode token for a
+  connection in `needs_reauth` or `error`, or one carrying an
+  `attention_code` (the Item is named server-side); otherwise 409
+  `financial_connection_not_reauthorizable`.
+- POST `/plaid/{id}/reconnected` re-checks the Item after update mode. A
+  healthy Item returns the connection `active` with its cursor and
+  `last_success_at` kept, clears `attention_code`/`attention_at` and resumes
+  syncing; a still-broken Item keeps its status and actionable
+  `last_error_code`.
+- POST `/plaid/webhook` takes no user session. It accepts only a valid
+  `Plaid-Verification` JWT (ES256, key from `/webhook_verification_key/get`,
+  `iat` within 5 minutes, `request_body_sha256` equal to the raw body hash) and
+  returns 200 `{received: true}`; anything else answers 400
+  `plaid_webhook_rejected` with no reason. When the key cannot be fetched
+  now (Plaid unreachable, 5xx, 429 / `RATE_LIMIT_EXCEEDED`, or the process's
+  key-fetch budget of 10 per minute is spent) it answers 503
+  `plaid_webhook_unverifiable` so Plaid redelivers. Stale or body-mismatched
+  tokens are refused before any key fetch; unknown kids are remembered for 5
+  minutes and keys are cached for 10 minutes. Transactions updates sync the
+  Item's live connections after the response; Item errors such as
+  `ITEM_LOGIN_REQUIRED` set `needs_reauth`, `USER_PERMISSION_REVOKED` sets
+  `error`, and `LOGIN_REPAIRED` re-checks and resumes. `PENDING_EXPIRATION`
+  and `PENDING_DISCONNECT` keep the connection `active` and set
+  `attention_code` (`plaid_pending_expiration`, `plaid_pending_disconnect`),
+  which successful syncs keep and only update mode or disconnect clears.
+  Unknown Items and other environments are acknowledged and ignored.
+
+`last_error_code` for Plaid failures is `plaid_<lowercased Plaid error code>`
+(for example `plaid_item_login_required`); transient provider failures keep
+the connection's status. Plaid errors from Link routes answer 422
+`plaid_request_invalid` or 502 `plaid_unavailable` with
+`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
+transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
+Item Plaid no longer knows counts as revoked.

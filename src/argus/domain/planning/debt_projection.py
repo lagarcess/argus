@@ -6,7 +6,7 @@ from typing import Any
 
 from argus.domain.finance import tvm
 from argus.domain.finance.outcomes import NoSolution
-from argus.domain.planning import claims, debt_model, goal_projection
+from argus.domain.planning import claims, debt_model, goal_projection, shared_claims
 from argus.domain.planning.recurrence import dates
 from argus.domain.planning.schemas import Schedule
 from argus.domain.recording.currency import parse_minor_units
@@ -58,6 +58,10 @@ def occurrence(
     ]
     invalid = any(p["status"] == "needs_review" for p in linked)
     paid = sum(p["net_paid_minor"] for p in linked if p["net_paid_minor"] is not None)
+    shared = shared_claims.for_occurrence(state, item["id"])
+    if shared is not None:
+        invalid = invalid or shared["amount"] is None
+        paid += shared["amount"] or 0
     remaining = max(0, item["amount_minor"] - paid)
     due = date.fromisoformat(item["due_date"])
     return item | {
