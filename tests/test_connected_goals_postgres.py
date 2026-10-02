@@ -113,6 +113,15 @@ def test_recording_and_allocation_share_owner_serialization(scene, first):
         results = list(map(operation, operations))
     outcomes = dict(zip(operations, results, strict=True))
     assert isinstance(outcomes["record"], dict)
+    if first == "allocate":
+        assert isinstance(outcomes["allocate"], dict)
+    elif first == "record":
+        assert outcomes["allocate"] == "goal_backing_shortfall"
+    else:
+        assert isinstance(outcomes["allocate"], dict) or outcomes["allocate"] in {
+            "stale_version",
+            "goal_backing_shortfall",
+        }
     actual = service.get(scene[1], g["id"])
     expected = (
         ("90000", "80000") if isinstance(outcomes["allocate"], dict) else ("0", "0")
