@@ -191,6 +191,7 @@ struct CuadraoProfileEditor: View {
     @State private var preferred: String
     @State private var avatar: CanvasProfileAvatarStyle
     @State private var photoLoading = false
+    @State private var cropRequest: CanvasAvatarCropRequest?
 
     init(profile: Binding<CanvasProfileDraft>, spanish: Bool) {
         _profile = profile; self.spanish = spanish
@@ -211,7 +212,7 @@ struct CuadraoProfileEditor: View {
                 HStack { Spacer(); CanvasProfileAvatar(name: name, style: avatar); Spacer() }
                     .padding(.vertical, 12).listRowBackground(Color.clear)
             }
-            CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar, loading: $photoLoading)
+            CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar, loading: $photoLoading, cropRequest: $cropRequest)
             Section {
                 field(spanish ? "Nombre" : "Name", text: $name, id: "cuadrao.profile.name")
                     .textContentType(.name)
@@ -234,6 +235,9 @@ struct CuadraoProfileEditor: View {
                     .font(.footnote).foregroundStyle(.secondary).listRowBackground(Color.clear)
             }
         }.scrollContentBackground(.hidden).background(WelcomePalette.background)
+            .sheet(item: $cropRequest) { request in
+                CanvasAvatarCropSheet(request: request, spanish: spanish) { avatar = .photo($0) }
+            }
             .navigationTitle(spanish ? "Editar perfil" : "Edit profile").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

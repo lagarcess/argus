@@ -37,10 +37,10 @@ struct CuadraoProfileAvatarPicker: View {
     let spanish: Bool
     @Binding var avatar: CanvasProfileAvatarStyle
     @Binding var loading: Bool
+    @Binding var cropRequest: CanvasAvatarCropRequest?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var generation = UUID()
     @State private var loadFailed = false
-    @State private var cropRequest: CanvasAvatarCropRequest?
 
     private var hasPhoto: Bool {
         if case .photo = avatar { return true }
@@ -92,9 +92,6 @@ struct CuadraoProfileAvatarPicker: View {
                     guard !Task.isCancelled, generation == request else { return }
                     loading = false; loadFailed = true; self.selectedPhoto = nil
                 }
-            }
-            .sheet(item: $cropRequest) { request in
-                CanvasAvatarCropSheet(request: request, spanish: spanish) { avatar = .photo($0) }
             }
             .onDisappear { generation = UUID(); selectedPhoto = nil; loading = false }
     }
