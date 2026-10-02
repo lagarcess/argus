@@ -186,7 +186,8 @@ def test_message_capture_is_accepted_as_inert_text(client, sink):
 
 def test_without_a_sink_nothing_is_saved_and_the_answer_is_retryable(client, identities):
     token = enroll(client)["device_token"]
-    assert ingestion_hub().sink is None
+    # Reconciliation is the wired sink; an unavailable sink must still be safe.
+    ingestion_hub().sink = None
     response = client.post(EVENTS, json=tap(), headers=bearer(token))
     assert response.status_code == 503
     body = response.json()

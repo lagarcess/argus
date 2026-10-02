@@ -7757,6 +7757,77 @@ re-authorization or disconnect. Credentials, cursors and sync leases are never r
   Repeating the call returns the ended connection with `not_applicable` and `0`.
   Another person's or an unknown id answers 404 `financial_connection_not_found`.
 
+### Plaid connector (default-off)
+
+Mounted under `/api/v1/financial-connections/plaid`. Available only while the
+connected-sources surface above is on, `ARGUS_INGESTION_SECRET_KEY` is set and
+Plaid is configured (`PLAID_CLIENT_ID`/`PLAID_SECRET`, `PLAID_ENV`
+`sandbox|production`); otherwise every route, including the webhook, answers
+404 `financial_connections_unavailable`. User routes are registered-only like
+the routes above. Access tokens, cursors and provider payloads are never
+returned or logged; the only Plaid value returned is a Link token. Evidence and
+verification levels:
+[ingestion-plaid evidence](reports/evidence/ingestion-plaid/README.md).
+
+- POST `/plaid/link-token` with optional `{language: en|es}` returns
+  `{link_token, expiration}` for Link with `products=["transactions"]`, the
+  configured `PLAID_COUNTRY_CODES` and an opaque per-person `client_user_id`.
+- POST `/plaid/exchange` `{public_token}` (`public-...`) exchanges server-side,
+  seals the access token, labels the connection with the institution name and
+  returns 201 `{connection, created: true}`; the first sync runs after the
+  response. A retried exchange or a re-link of an Item the caller already has
+  returns 200 with the existing connection and `created: false`. An Item
+  connected by someone else (checked first and enforced by the global live
+  `(source, external_ref)` index under races) answers 409
+  `plaid_item_unavailable` and is left in place. Any other failure after the
+  exchange removes the new Item at Plaid before the error is returned.
+- POST `/plaid/{id}/sync` runs one bounded sync and returns
+  `{connection, sync: {status, added, modified, removed, error_code}}`.
+  `status` is `synced|not_ready|busy|no_sink|failed|sink_failed|superseded`;
+  `busy` means another sync holds the lease; `no_sink`/`sink_failed` mean
+  nothing was recorded (including candidates the sink reports as `ignored`)
+  and the cursor did not move; `superseded` means the lease was lost (for
+  example a webhook recorded `needs_reauth`) or another writer moved the
+  cursor, so this run changed nothing. Only a complete update is handed over;
+  if it exceeds 200 pages or 8 minutes the sync fails with
+  `plaid_sync_incomplete`, keeps the status and cursor, and hands nothing
+  over. A disconnected connection answers 409
+  `financial_connection_disconnected`.
+- POST `/plaid/{id}/link-token` creates a Link update-mode token for a
+  connection in `needs_reauth` or `error`, or one carrying an
+  `attention_code` (the Item is named server-side); otherwise 409
+  `financial_connection_not_reauthorizable`.
+- POST `/plaid/{id}/reconnected` re-checks the Item after update mode. A
+  healthy Item returns the connection `active` with its cursor and
+  `last_success_at` kept, clears `attention_code`/`attention_at` and resumes
+  syncing; a still-broken Item keeps its status and actionable
+  `last_error_code`.
+- POST `/plaid/webhook` takes no user session. It accepts only a valid
+  `Plaid-Verification` JWT (ES256, key from `/webhook_verification_key/get`,
+  `iat` within 5 minutes, `request_body_sha256` equal to the raw body hash) and
+  returns 200 `{received: true}`; anything else answers 400
+  `plaid_webhook_rejected` with no reason. When the key cannot be fetched
+  now (Plaid unreachable, 5xx, 429 / `RATE_LIMIT_EXCEEDED`, or the process's
+  key-fetch budget of 10 per minute is spent) it answers 503
+  `plaid_webhook_unverifiable` so Plaid redelivers. Stale or body-mismatched
+  tokens are refused before any key fetch; unknown kids are remembered for 5
+  minutes and keys are cached for 10 minutes. Transactions updates sync the
+  Item's live connections after the response; Item errors such as
+  `ITEM_LOGIN_REQUIRED` set `needs_reauth`, `USER_PERMISSION_REVOKED` sets
+  `error`, and `LOGIN_REPAIRED` re-checks and resumes. `PENDING_EXPIRATION`
+  and `PENDING_DISCONNECT` keep the connection `active` and set
+  `attention_code` (`plaid_pending_expiration`, `plaid_pending_disconnect`),
+  which successful syncs keep and only update mode or disconnect clears.
+  Unknown Items and other environments are acknowledged and ignored.
+
+`last_error_code` for Plaid failures is `plaid_<lowercased Plaid error code>`
+(for example `plaid_item_login_required`); transient provider failures keep
+the connection's status. Plaid errors from Link routes answer 422
+`plaid_request_invalid` or 502 `plaid_unavailable` with
+`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
+transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
+Item Plaid no longer knows counts as revoked.
+
 ### Gmail connector (default-off)
 
 Mounted under `/api/v1/financial-connections/gmail`. Available only while the
@@ -7854,77 +7925,6 @@ Not end-to-end import: every Gmail draft is `unclassified` until the person
 fills it in, and drafts reach review only once reconciliation provides the
 candidate sink; without it sync answers `no_sink`.
 
-### Plaid connector (default-off)
-
-Mounted under `/api/v1/financial-connections/plaid`. Available only while the
-connected-sources surface above is on, `ARGUS_INGESTION_SECRET_KEY` is set and
-Plaid is configured (`PLAID_CLIENT_ID`/`PLAID_SECRET`, `PLAID_ENV`
-`sandbox|production`); otherwise every route, including the webhook, answers
-404 `financial_connections_unavailable`. User routes are registered-only like
-the routes above. Access tokens, cursors and provider payloads are never
-returned or logged; the only Plaid value returned is a Link token. Evidence and
-verification levels:
-[ingestion-plaid evidence](reports/evidence/ingestion-plaid/README.md).
-
-- POST `/plaid/link-token` with optional `{language: en|es}` returns
-  `{link_token, expiration}` for Link with `products=["transactions"]`, the
-  configured `PLAID_COUNTRY_CODES` and an opaque per-person `client_user_id`.
-- POST `/plaid/exchange` `{public_token}` (`public-...`) exchanges server-side,
-  seals the access token, labels the connection with the institution name and
-  returns 201 `{connection, created: true}`; the first sync runs after the
-  response. A retried exchange or a re-link of an Item the caller already has
-  returns 200 with the existing connection and `created: false`. An Item
-  connected by someone else (checked first and enforced by the global live
-  `(source, external_ref)` index under races) answers 409
-  `plaid_item_unavailable` and is left in place. Any other failure after the
-  exchange removes the new Item at Plaid before the error is returned.
-- POST `/plaid/{id}/sync` runs one bounded sync and returns
-  `{connection, sync: {status, added, modified, removed, error_code}}`.
-  `status` is `synced|not_ready|busy|no_sink|failed|sink_failed|superseded`;
-  `busy` means another sync holds the lease; `no_sink`/`sink_failed` mean
-  nothing was recorded (including candidates the sink reports as `ignored`)
-  and the cursor did not move; `superseded` means the lease was lost (for
-  example a webhook recorded `needs_reauth`) or another writer moved the
-  cursor, so this run changed nothing. Only a complete update is handed over;
-  if it exceeds 200 pages or 8 minutes the sync fails with
-  `plaid_sync_incomplete`, keeps the status and cursor, and hands nothing
-  over. A disconnected connection answers 409
-  `financial_connection_disconnected`.
-- POST `/plaid/{id}/link-token` creates a Link update-mode token for a
-  connection in `needs_reauth` or `error`, or one carrying an
-  `attention_code` (the Item is named server-side); otherwise 409
-  `financial_connection_not_reauthorizable`.
-- POST `/plaid/{id}/reconnected` re-checks the Item after update mode. A
-  healthy Item returns the connection `active` with its cursor and
-  `last_success_at` kept, clears `attention_code`/`attention_at` and resumes
-  syncing; a still-broken Item keeps its status and actionable
-  `last_error_code`.
-- POST `/plaid/webhook` takes no user session. It accepts only a valid
-  `Plaid-Verification` JWT (ES256, key from `/webhook_verification_key/get`,
-  `iat` within 5 minutes, `request_body_sha256` equal to the raw body hash) and
-  returns 200 `{received: true}`; anything else answers 400
-  `plaid_webhook_rejected` with no reason. When the key cannot be fetched
-  now (Plaid unreachable, 5xx, 429 / `RATE_LIMIT_EXCEEDED`, or the process's
-  key-fetch budget of 10 per minute is spent) it answers 503
-  `plaid_webhook_unverifiable` so Plaid redelivers. Stale or body-mismatched
-  tokens are refused before any key fetch; unknown kids are remembered for 5
-  minutes and keys are cached for 10 minutes. Transactions updates sync the
-  Item's live connections after the response; Item errors such as
-  `ITEM_LOGIN_REQUIRED` set `needs_reauth`, `USER_PERMISSION_REVOKED` sets
-  `error`, and `LOGIN_REPAIRED` re-checks and resumes. `PENDING_EXPIRATION`
-  and `PENDING_DISCONNECT` keep the connection `active` and set
-  `attention_code` (`plaid_pending_expiration`, `plaid_pending_disconnect`),
-  which successful syncs keep and only update mode or disconnect clears.
-  Unknown Items and other environments are acknowledged and ignored.
-
-`last_error_code` for Plaid failures is `plaid_<lowercased Plaid error code>`
-(for example `plaid_item_login_required`); transient provider failures keep
-the connection's status. Plaid errors from Link routes answer 422
-`plaid_request_invalid` or 502 `plaid_unavailable` with
-`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
-transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
-Item Plaid no longer knows counts as revoked.
-
 ### Apple Shortcuts connector (default-off)
 
 Available whenever the connected-sources surface above is on; it stores no
@@ -7988,6 +7988,135 @@ single value is possible, and `currency` only when the text names one
 Otherwise the field stays empty and is listed as uncertain. `card` becomes the
 account hint name and `card_last4` its mask; nothing else is inferred. A
 `message_capture` becomes `unclassified` evidence: inert text (`excerpt`,
+`sender` as description) with `kind` and every money field unresolved. An
+explicit `currency` settles only a bare `$` or an unmarked amount; any other
+marker it cannot vouch for (`R$`, `€` with `DOP`, `¥`) leaves currency
+unresolved. A sign or parentheses on the amount adds `direction` to the
+uncertain fields, and more than 18 digits leaves the amount unresolved.
+
+## Import review queue (default-off)
+
+Same gate as connected sources: `ARGUS_INGESTION_ENABLED` inside
+`ARGUS_FINANCIAL_ACCOUNTS_ENABLED`, flag before authentication, registered
+only. Reconciliation is the single sink for every connector, so this is the
+one place imports are reviewed. Nothing here writes activity except `accept`
+and `accept-batch`, which record through the existing money service
+(`MoneyService.preview`/`write`, the same rules, receipts and coverage
+questions as `/financial-activities`).
+
+Event shape: `{id,state,evidence,version,attention,attention_detail,
+possible_duplicates,existing_activity_matches,recorded_duplicates,activity_id,
+facts,resolution,unresolved,account_shared_with_household,observations,
+created_at,updated_at}`.
+
+- `state`: `open|accepting|accepted|dismissed`. Open drafts affect no balance,
+  budget, goal, Home or search.
+- `facts`: `{amount,currency,direction,occurred_on,account_id,kind}`; for an
+  accepted event the recorded activity's facts first (they outlive redacted
+  evidence), then the person's resolution, then the most authoritative live observation
+  (posted before pending; statement, Plaid, Gmail, Shortcuts). `kind` may be a
+  proposal from the source's hint or direction; the person confirms it in
+  preview. Amounts are positive decimal strings; currency is never guessed.
+- `unresolved`: fields that must be supplied before preview
+  (`amount|currency|occurred_on|account_id|kind`, the other leg of a
+  two-account kind, and anything the source marked uncertain). For a
+  two-account kind the observed account is the destination when the money
+  arrived in it (`direction=inflow`, such as a card payment seen on the
+  card), so `source_account_id` is asked for; otherwise it is the source and
+  `destination_account_id` is asked for.
+- `attention`: `source_changed` (a source revised an accepted event's
+  amount, currency or date beyond the window, and not back to what was
+  recorded; a person's correction at review never counts; detail carries
+  `before`/`after`), `source_removed`, `possible_duplicate`,
+  `ambiguous_match` (several events matched equally; none was linked).
+  `possible_duplicates` is symmetric: both events carry the warning until the
+  person merges them or acknowledges that they differ.
+- `existing_activity_matches`: recorded activity on the same account with the
+  same amount and currency within five days that no import points to yet
+  (linkable). `recorded_duplicates`: other import events whose recorded
+  activity matches the same way (merge into them instead of recording again).
+- `account_shared_with_household`: whether the resolved account is explicitly
+  shared, shown before confirming; importing never creates a grant.
+- `observations[]`: each source's own view (`source,connection_id,external_id,
+  evidence,status,live,revisions,observed_at,occurred_on,posted_on,due_on,
+  amount,currency,direction,merchant,description,excerpt,balance_scope,
+  institution,account_name,account_mask,attachments,redacted`). Text is inert
+  provider content. `live=false` means removed or superseded (pending replaced
+  by posted). `redacted=true` keeps only provenance after a disconnect.
+
+Routes under `/api/v1/financial-imports`:
+
+- GET `?state=open|accepted|dismissed` returns `{items}` (default `open`,
+  which includes `accepting`).
+- GET `/{id}` returns one event.
+- PATCH `/{id}` `{version,changes}` sets the person's resolution. Allowed keys:
+  `kind,account_id,source_account_id,destination_account_id,amount,currency,
+  occurred_on,direction,category_id,source_id,purchase_activity_id,note,
+  time_zone`; `null`
+  clears one. Setting `account_id` remembers the mapping for that source's
+  account hint, so later imports from it resolve automatically. Re-checks
+  possible duplicates only when a matching fact changes (amount, currency,
+  date, account, direction, mask), so a note or category edit keeps the
+  person's earlier answer.
+- POST `/{id}/merge` `{version,into_event_id,into_version}`: the person says
+  two events are the same purchase; both versions are checked. Refused when
+  one source reported both (`import_merge_same_source`), both are already
+  recorded (`import_merge_two_records`) or either is dismissed
+  (`import_dismissed`). An accepted event survives and takes over the other's
+  open duplicate questions.
+- POST `/{id}/dismiss|reopen|acknowledge` `{version}`. Dismissing, by the
+  person or because every source withdrew it, also clears the event from its
+  partners' possible duplicates. `acknowledge` clears a
+  source warning after the person checked the record, or records that a
+  possible duplicate is a different purchase (cleared on both events).
+- POST `/{id}/link-activity` `{version,activity_id}`: the purchase is already
+  recorded (manual, voice, earlier import). One import per activity
+  (`activity_already_linked`); refused with `import_accept_in_progress` while
+  another import is being recorded.
+- POST `/{id}/preview` `{overrides?}` returns `{event,preview}` where `preview`
+  is the money service preview (`reviewed_request`, `preview_token`, affected
+  accounts and coverage questions). Refused for `import_unresolved`,
+  `import_currency_mismatch` (no conversion), `activity_invalid` (overrides
+  that do not form a valid activity), `import_not_activity` (balances,
+  due-date and statement notices are evidence, not money that moved).
+- POST `/{id}/accept` `{version,request}` with `Idempotency-Key` (at most 80
+  characters) records the reviewed request. The event is claimed first and the
+  claim stores the reviewed request: a retry with the same key replays the
+  claimed request and its activity (whatever the retry's body says); another key first completes an interrupted claim by
+  replaying its stored request under its own key, then answers 409
+  `import_already_accepted`. Only refusals the money service raises before
+  writing release the claim, as does a stored claim that no longer
+  validates. Warnings raised while an acceptance was in flight (a source
+  withdrew or changed it) stay on the accepted event.
+- POST `/accept-batch` `{items:[{event_id,version}]}` (at most 100) with
+  `Idempotency-Key` (at most 40 characters) records each item that has no open
+  question and returns `{items:[{event_id,outcome,activity_id?,replayed?,code?}]}`.
+  `needs_review` codes: `stale_version`, `import_unresolved`,
+  `import_possible_duplicate` (any duplicate warning or matching record),
+  `balance_coverage_required`, the preview refusals above, and any money
+  service refusal (its own code) for that item alone. Retrying the same batch
+  key replays recorded items.
+
+Problems: 404 `financial_import_not_found`; 409 `stale_version` and the
+conflicts above; 422 validation codes (`activity_invalid`, `kind_invalid`,
+`category_unknown`, `source_unknown`, `time_zone_unknown`, `*_id_invalid`);
+recording errors use the existing financial-accounts problems. Evidence a
+connector submits after its connection ended is ignored (`SubmitResult.ignored`),
+so an in-flight sync cannot recreate drafts a disconnect removed. A source
+revision that changes an open event's matching facts re-checks its possible
+duplicates on both sides, as a new observation would. A disconnect that
+removes one source from an event other sources still back gives that event a
+new version (an earlier `version` is stale) and re-checks its duplicates.
+`context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
+transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
+Item Plaid no longer knows counts as revoked.
+allowlist, whether or not revocation succeeded. While the sealing key is set
+but the Google OAuth client is not, the routes answer 404 yet a revoke-only
+adapter still revokes and forgets on disconnect.
+
+Not end-to-end import: every Gmail draft is `unclassified` until the person
+fills it in, and drafts reach review only once reconciliation provides the
+candidate sink; without it sync answers `no_sink`.
 `sender` as description) with `kind` and every money field unresolved. An
 explicit `currency` settles only a bare `$` or an unmarked amount; any other
 marker it cannot vouch for (`R$`, `€` with `DOP`, `¥`) leaves currency
