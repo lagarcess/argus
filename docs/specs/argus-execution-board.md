@@ -1743,6 +1743,21 @@ this decision.
 
 ### Cuadrao consistency pass and Home chart follow-up
 
+**Expanded insights storytelling — founder locked October 1, implementation pending:**
+the [Cuadrao design guide](../../.agent/designs/cuadrao/DESIGN.md#locked-home-and-expanded-insights-direction--october-1-2026)
+owns the approved title hierarchy, empty/partial-history states, calendar-week
+month buckets and chart → categories → highlights composition. This documentation
+checkpoint does not claim a new UI build or phone installation. The UI follow-up
+must verify empty current periods, sparse first-day activity, comparable elapsed
+periods, missing comparison history, category drill-through, bounded swipes,
+Spanish/English, dark mode and large text. Preserve quiet compact Home.
+
+Connected highlights remain with Planning/Home and the financial-record/history
+owner: supply coverage-aware period comparisons and traceable supporting records
+from the canonical spending/position owners. Never infer complete coverage from
+an earliest transaction or derive expenses from balance changes. These requirements
+extend the connected disposition below, not a separate insight service or roadmap.
+
 **Home activity refinement — October 1:** the UI preview now removes the greeting
 date and space-plus background, uses accepted household avatars above the amount,
 and adds Balance / Activity to expanded insights. Compact period and chart controls

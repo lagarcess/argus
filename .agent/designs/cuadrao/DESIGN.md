@@ -219,8 +219,10 @@ removing preview disclosures does not authorize invented financial facts.
 
 **Expanded insights:** a single row above the amount places the selected period on
 the left and the native Balance / Actividad choice on the right. Week/month show
-the first and last calendar dates; year shows the year. Larger text can wrap this
-row without truncating either choice.
+the first and last calendar dates; year shows the year. The period is a local
+headline: use `CuadraoTypography.feature` (native title serif) and ink, not the
+secondary supporting style. Larger text can wrap this row without shrinking the
+title or truncating either choice.
 Balance remains recorded net position. Activity uses expenses from the same local
 activity owner as the transaction list, filtered by space and currency. Transfers,
 income and changing balances do not become spending. Historical fixtures stay in
@@ -239,18 +241,54 @@ allocation uses matching recorded account snapshots and identifies their date;
 never relabel current assets as a past allocation. Missing observations remain
 unknown. The current snapshot says Activos · Hoy / Assets · Today.
 
-**Activity:** vertical bars stack expenses by category. Week and month use daily
-buckets; year uses months. Colors match category rows, which disclose the same
+**Activity:** vertical bars stack expenses by category. Week uses daily buckets;
+month uses calendar-week buckets clipped to the month, labeled with their day
+spans; year uses months. Respect the locale calendar when forming week boundaries.
+Only recorded dates contribute; future buckets remain unfilled. Colors match category rows, which disclose the same
 expense records. The distribution icon shows the selected period's category shares.
 `CuadraoExpenseCategoryStyle` owns category colors and vector choices. Reuse
 WelcomePalette's Plan accents (pine, clay, sunshine, bloom and overlap); do not
 introduce the default neon chart palette. Category icons match Home's 24-point,
 1.7-point rounded vector family and 42-point soft tile. Reuse approved Home paths
 where their meaning fits; keep new outline vectors in the same asset catalog.
-One short insight explains either the largest category or a comparison; a running
-period compares the same elapsed span of the previous period. Totals remain actual
-recorded expenses, never projected spend or savings. Empty periods retain navigation
-and axes. Unknown categories are Otros / Other, never guessed from merchant text.
+Totals remain actual recorded expenses, never projected spend or savings. Unknown
+categories are Otros / Other, never guessed from merchant text.
+
+**Chart storytelling and empty states — founder locked October 1:** expanded
+Activity follows chart and takeaway → category breakdown → highlights. Place one
+short factual takeaway near the hero amount. Below the categories, show at most
+two useful highlights, each with a plain-language explanation, a matching category
+icon/color where relevant, and supporting comparison bars or a small trend chart.
+Reuse the shared typography, category artwork and palette; no competing icon family.
+A highlight opens the supporting records or category detail in the same context.
+Show Ver todos / See all only when additional supported highlights exist.
+
+Choose meaningful evidence: a category change, a large transaction explaining a
+spike, or a sustained trend with sufficient history. Label both comparison periods
+and use a common visual scale. For a running period, compare only the equivalent
+elapsed portion of the previous period with adequate recorded coverage; a partial
+month must not be compared with an entire completed month. Do not force a trend
+from sparse history or color an increase as a moral failure. Balance explanations
+must derive from recorded positions/contributors, never infer spending or returns
+from balance changes. Home itself keeps its quiet hierarchy.
+
+Distinguish three states:
+- No expenses recorded in a covered period: retain axes and bounded period swipes,
+  with one calm localized message such as “Aún no hay gastos registrados en octubre” /
+  “No expenses recorded in October yet.” Do not praise this as savings or “Un respiro.”
+- A period that has just begun: show its actual spending and empty future buckets.
+  Offer a comparison only when coverage supports it; do not manufacture highlights
+  to fill the screen.
+- Missing or incomplete history: distinguish unavailable values from recorded zero
+  and omit unsupported comparisons. The first expense date alone does not establish
+  complete history coverage.
+
+Reference basis: the founder-provided Wallet screenshots show highlights below
+categories, explanatory comparisons and category icons. The Mobbin search returned
+[Wallet period/category breakdown](https://mobbin.com/screens/82a32fee-bf5f-4c39-b4b8-0e002de68d4c)
+and [Health explicit no-data states](https://mobbin.com/screens/e60672f4-262f-478f-9326-6a6a2262f43f),
+not those exact Wallet highlight screens. This adapts their hierarchy to Cuadrao;
+it does not adopt Wallet's typography or duplicate its entire card stack.
 
 **Distribución: decomposable bar, category rows, account detail.** The bar shows the
 whole positive asset distribution. Selecting a category emphasizes its segment;
