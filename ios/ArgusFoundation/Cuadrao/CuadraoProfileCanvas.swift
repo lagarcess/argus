@@ -86,7 +86,7 @@ struct CuadraoProfileCanvas: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    identity.padding(.bottom, 8)
+                    identity.padding(.bottom, 4)
                     group("App", routes: [.preferences, .personalization, .notifications])
                     group(spanish ? "Cuenta" : "Account", routes: [.security, .privacy, .usage])
                     group(spanish ? "Soporte" : "Support", routes: [.help])
@@ -94,7 +94,7 @@ struct CuadraoProfileCanvas: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .accessibilityIdentifier("cuadrao.profile.signout")
-                }.padding(.horizontal, 24).padding(.top, 32).padding(.bottom, bottomSpace + 24)
+                }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, bottomSpace + 24)
             }
             .background(WelcomePalette.background).toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: CanvasProfileRoute.self) { route in
@@ -115,9 +115,9 @@ struct CuadraoProfileCanvas: View {
 
     private var identity: some View {
         Button { editor = .personal } label: {
-            let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 18)) : AnyLayout(HStackLayout(spacing: 18))
+            let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 18)) : AnyLayout(HStackLayout(spacing: 20))
             layout {
-                CanvasProfileAvatar(name: profile.name, style: profile.avatar)
+                CanvasProfileAvatar(name: profile.name, style: profile.avatar, size: 76)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(profile.name).font(.system(.title2, design: .default, weight: .semibold))
                         .foregroundStyle(.primary)

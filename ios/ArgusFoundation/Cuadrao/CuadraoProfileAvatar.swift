@@ -1,35 +1,34 @@
 import SwiftUI
 import PhotosUI
-import ImageIO
-import UniformTypeIdentifiers
 
 enum CanvasProfileAvatarStyle: Equatable {
     case initial
     case theme(CanvasPlanLook)
-    case photo(Data)
+    case photo(CanvasAvatarPhoto)
 }
 
 struct CanvasProfileAvatar: View {
     let name: String
     let style: CanvasProfileAvatarStyle
+    var size: CGFloat = 64
 
     var body: some View {
         Group {
             switch style {
             case .initial:
                 Text(String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased())
-                    .frame(width: 64, height: 64)
+                    .frame(width: size, height: size)
                     .foregroundStyle(WelcomePalette.pine).background(WelcomePalette.sage)
             case .theme(let theme):
-                Image(systemName: theme.symbol).frame(width: 64, height: 64)
+                Image(systemName: theme.symbol).frame(width: size, height: size)
                     .foregroundStyle(theme.color).background(theme.color.opacity(0.12))
-            case .photo(let data):
-                if let image = UIImage(data: data) {
-                    Image(uiImage: image).resizable().scaledToFill().frame(width: 64, height: 64)
+            case .photo(let photo):
+                if let image = UIImage(data: photo.thumbnail) {
+                    Image(uiImage: image).resizable().scaledToFill().frame(width: size, height: size)
                 }
             }
         }.font(.system(.title, design: .rounded, weight: .medium))
-            .frame(width: 64, height: 64).clipShape(Circle()).accessibilityHidden(true)
+            .frame(width: size, height: size).clipShape(Circle()).accessibilityHidden(true)
     }
 }
 
@@ -41,6 +40,7 @@ struct CuadraoProfileAvatarPicker: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var generation = UUID()
     @State private var loadFailed = false
+    @State private var cropRequest: CanvasAvatarCropRequest?
 
     private var hasPhoto: Bool {
         if case .photo = avatar { return true }
@@ -57,7 +57,10 @@ struct CuadraoProfileAvatarPicker: View {
                 ProgressView(spanish ? "Preparando foto" : "Preparing photo")
                     .accessibilityIdentifier("cuadrao.profile.photo.loading")
             }
-            if hasPhoto {
+            if case .photo(let photo) = avatar {
+                Button(spanish ? "Ajustar foto" : "Reposition photo") {
+                    cropRequest = CanvasAvatarCropRequest(source: photo.source, crop: photo.crop)
+                }.accessibilityIdentifier("cuadrao.profile.photo.edit")
                 Button(spanish ? "Quitar foto" : "Remove photo", role: .destructive) { select(.initial) }
                     .accessibilityIdentifier("cuadrao.profile.photo.remove")
             }
@@ -79,21 +82,21 @@ struct CuadraoProfileAvatarPicker: View {
                 let request = UUID()
                 generation = request; loading = true; loadFailed = false
                 do {
-                    guard let data = try await selectedPhoto.loadTransferable(type: Data.self) else {
-                        throw AvatarPhotoError.unreadable
+                    guard let source = try await selectedPhoto.loadTransferable(type: CanvasAvatarSource.self) else {
+                        throw CanvasAvatarPhotoError.unreadable
                     }
-                    let thumbnail = try await Task.detached(priority: .userInitiated) {
-                        try avatarThumbnail(data)
-                    }.value
                     guard !Task.isCancelled, generation == request else { return }
-                    avatar = .photo(thumbnail)
-                    loading = false
+                    cropRequest = CanvasAvatarCropRequest(source: source, crop: source.centeredCrop)
+                    loading = false; self.selectedPhoto = nil
                 } catch {
                     guard !Task.isCancelled, generation == request else { return }
-                    loading = false; loadFailed = true
+                    loading = false; loadFailed = true; self.selectedPhoto = nil
                 }
             }
-            .onDisappear { generation = UUID(); loading = false }
+            .sheet(item: $cropRequest) { request in
+                CanvasAvatarCropSheet(request: request, spanish: spanish) { avatar = .photo($0) }
+            }
+            .onDisappear { generation = UUID(); selectedPhoto = nil; loading = false }
     }
 
     private func select(_ style: CanvasProfileAvatarStyle) {
@@ -119,23 +122,4 @@ struct CuadraoProfileAvatarPicker: View {
             .accessibilityAddTraits(avatar == style ? .isSelected : [])
             .accessibilityIdentifier("cuadrao.profile.avatar.\(theme?.rawValue ?? "initial")")
     }
-}
-
-private enum AvatarPhotoError: Error { case unreadable }
-
-private nonisolated func avatarThumbnail(_ data: Data) throws -> Data {
-    guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
-          let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 512,
-            kCGImageSourceShouldCacheImmediately: true
-          ] as CFDictionary) else { throw AvatarPhotoError.unreadable }
-    guard let output = CFDataCreateMutable(kCFAllocatorDefault, 0),
-          let destination = CGImageDestinationCreateWithData(output, UTType.jpeg.identifier as CFString, 1, nil) else {
-        throw AvatarPhotoError.unreadable
-    }
-    CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.86] as CFDictionary)
-    guard CGImageDestinationFinalize(destination) else { throw AvatarPhotoError.unreadable }
-    return output as Data
 }

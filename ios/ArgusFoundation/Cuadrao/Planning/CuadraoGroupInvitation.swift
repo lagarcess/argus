@@ -1,5 +1,4 @@
 import SwiftUI
-import CoreImage.CIFilterBuiltins
 import PhotosUI
 
 struct CuadraoGroupInvitation: View {
@@ -52,7 +51,7 @@ struct CuadraoGroupInvitation: View {
                         ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cerrar" : "Close") { dismiss() } }
                         if guest { ToolbarItem(placement: .topBarTrailing) { Button(spanish ? "Editar" : "Edit") { guest = false } } }
                     }
-                    .sheet(isPresented: $code) { codeCard(group) }
+                    .sheet(isPresented: $code) { CuadraoGroupCodeCard(group: group, look: look, cover: cover, spanish: spanish) }
                     .onAppear { look = group.look; cover = group.cover; joined = group.activeMembers.contains { $0.name == "Mar" } }
                     .onChange(of: look) { _, value in var updated = group; updated.look = value; store.save(updated) }
                     .onChange(of: cover) { _, value in var updated = store.group(groupID) ?? group; updated.cover = value; store.save(updated) }
@@ -82,29 +81,5 @@ struct CuadraoGroupInvitation: View {
                 Text(spanish ? "Los montos se revisan dentro del grupo." : "Review amounts inside the group.").font(.caption).foregroundStyle(.secondary)
             }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
         }.background(look.color.opacity(0.065), in: RoundedRectangle(cornerRadius: 30)).clipShape(RoundedRectangle(cornerRadius: 30))
-    }
-    private func codeCard(_ group: PlanGroup) -> some View {
-        VStack(spacing: 24) {
-            Text(group.name).font(CuadraoTypography.feature).multilineTextAlignment(.center)
-            PlanAvatarStack(members: group.activeMembers)
-            if let image = Self.qr("Cuadrao design preview | \(group.id.uuidString)") {
-                Image(uiImage: image).interpolation(.none).resizable().scaledToFit().frame(maxWidth: 245)
-                    .padding(24).background(.white, in: RoundedRectangle(cornerRadius: 28))
-            }
-            Text(spanish ? "Juntos, cuadra mejor." : "Better, together.").font(.system(.title3, design: .serif))
-            Text(spanish ? "Código de muestra. No permite unirse a un grupo real." : "Sample code. It doesn't join a real group.")
-                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Button(spanish ? "Listo" : "Done") { code = false }.frame(minHeight: 44)
-        }.padding(32).frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(LinearGradient(colors: [look.color.opacity(0.06), look.color.opacity(0.25)], startPoint: .topLeading, endPoint: .bottomTrailing))
-            .presentationDragIndicator(.visible)
-    }
-    private static func qr(_ text: String) -> UIImage? {
-        let filter = CIFilter.qrCodeGenerator(); filter.message = Data(text.utf8); filter.correctionLevel = "M"
-        guard let raw = filter.outputImage else { return nil }
-        let tint = CIFilter.falseColor(); tint.inputImage = raw
-        tint.color0 = CIColor(red: 0.16, green: 0.29, blue: 0.25); tint.color1 = CIColor.white
-        guard let output = tint.outputImage, let cg = CIContext().createCGImage(output.transformed(by: CGAffineTransform(scaleX: 8, y: 8)), from: output.extent.applying(CGAffineTransform(scaleX: 8, y: 8))) else { return nil }
-        return UIImage(cgImage: cg)
     }
 }

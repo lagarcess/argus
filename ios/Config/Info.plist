@@ -32,5 +32,6 @@
     <key>ARGUS_SUPABASE_ANON_KEY</key><string>$(ARGUS_SUPABASE_ANON_KEY)</string>
     <key>ARGUS_WEB_URL</key><string>$(ARGUS_WEB_URL)</string>
     <key>ARGUS_CAPTCHA_URL</key><string>$(ARGUS_CAPTCHA_URL)</string>
+    <key>NSPhotoLibraryAddUsageDescription</key><string>Save a sample group card to Photos when you choose Save Image.</string>
     <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>
