@@ -8016,6 +8016,16 @@ without it remains saved. Existing registered-owner/accounts/ingestion/document
 feature gates remain. The model stays `ARGUS_VISION_MODEL`; no fallback or retry
 is implied by capture or recovery.
 
+`ARGUS_DOCUMENT_EXTRACTION_ENABLED` is the document gate, default off. It
+accepts the same true values as the other default-off surfaces (`1`, `true`,
+`yes`, `on`). Unset, `false`, `0`, `no`, `off`, a blank value, or an
+unrecognized value leaves the document surface off. A document setting that
+cannot be read, including a non-integer max-bytes value, also leaves it off.
+While the document surface is off, every `/api/v1/financial-documents` route
+answers 404 `financial_connections_unavailable` and no extraction runs. Plaid,
+Gmail, Shortcuts, disconnect, and `GET /api/v1/financial-connections` keep
+their own gates.
+
 Capture responds with `{connection_id,status,replayed,candidate_count}`. `status`
 is preparation state (`saved|queued|preparing|review_ready|needs_attention`), never
 an approval flag. Approval remains owned by reconciliation events on that connection.

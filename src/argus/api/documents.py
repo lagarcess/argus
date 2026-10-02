@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fastapi import Depends, Request
+from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import problem
@@ -15,7 +16,7 @@ from argus.api.ingestion import (
     unavailable_problem,
 )
 from argus.api.rate_limits import SlidingWindowLimiter
-from argus.domain.ingestion.documents.config import DocumentExtractionSettings
+from argus.domain.ingestion.documents.config import load_document_extraction_settings
 from argus.domain.ingestion.documents.extractor import DocumentExtractor
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
@@ -41,6 +42,17 @@ def start_documents(app: object, hub: IngestionHub | None) -> None:
     if hub is None:
         configure_documents(None)
         return
+    try:
+        _start_documents(app, hub)
+    except Exception as exc:
+        logger.warning(
+            "Document surface failed to start; other connectors stay available",
+            failure_mode=type(exc).__name__,
+        )
+        configure_documents(None)
+
+
+def _start_documents(app: object, hub: IngestionHub) -> None:
     pool = getattr(getattr(app, "state", None), "financial_accounts_pool", None)
     if api_state.PERSISTENCE_MODE == "supabase":
         if pool is None:
@@ -62,7 +74,7 @@ def require_document_surface(
 ) -> DocumentsService:
     service = documents_service()
     if (
-        not DocumentExtractionSettings().enabled
+        not load_document_extraction_settings().enabled
         or service is None
         or service.hub is not hub
     ):

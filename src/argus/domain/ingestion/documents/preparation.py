@@ -18,7 +18,10 @@ from pathlib import Path
 import psutil
 from PIL import Image, ImageOps
 
-from argus.domain.ingestion.documents.config import DocumentExtractionSettings
+from argus.domain.ingestion.documents.config import (
+    DocumentExtractionSettings,
+    load_document_extraction_settings,
+)
 from argus.domain.ingestion.documents.models import DocumentExtractionError
 
 MAX_PIXELS = 20_000_000
@@ -119,7 +122,7 @@ def prepare_document(
     media_type: str,
     settings: DocumentExtractionSettings | None = None,
 ) -> PreparedDocument:
-    settings = settings or DocumentExtractionSettings()
+    settings = settings if settings is not None else load_document_extraction_settings()
     if not content:
         raise DocumentExtractionError("empty_document")
     if len(content) > settings.max_bytes:
@@ -183,7 +186,7 @@ def validate_source(content: bytes, media_type: str) -> None:
     """Validate bounded capture without requiring extraction tools or credentials."""
     if not content:
         raise DocumentExtractionError("document_empty")
-    if len(content) > DocumentExtractionSettings().max_bytes:
+    if len(content) > load_document_extraction_settings().max_bytes:
         raise DocumentExtractionError("document_too_large")
     if media_type in ("image/jpeg", "image/png"):
         _image(content, media_type)

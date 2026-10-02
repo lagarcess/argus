@@ -19,7 +19,10 @@ from argus.domain.ingestion.contract import (
     ImportCandidate,
     SourceRef,
 )
-from argus.domain.ingestion.documents.config import DocumentExtractionSettings
+from argus.domain.ingestion.documents.config import (
+    DocumentExtractionSettings,
+    load_document_extraction_settings,
+)
 from argus.domain.ingestion.documents.models import (
     DocumentExtractionError,
     ExtractionBatch,
@@ -202,7 +205,9 @@ def candidates_from_result(
 
 class DocumentExtractor:
     def __init__(self, settings: DocumentExtractionSettings | None = None) -> None:
-        self.settings = settings or DocumentExtractionSettings()
+        self.settings = (
+            settings if settings is not None else load_document_extraction_settings()
+        )
 
     async def extract(
         self,

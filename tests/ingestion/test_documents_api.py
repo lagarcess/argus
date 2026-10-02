@@ -151,6 +151,84 @@ def test_document_flag_hides_route_before_auth(client, monkeypatch):
     assert client.post(DOCUMENTS, content=b"x").status_code == 404
 
 
+@pytest.mark.parametrize(
+    ("raw", "enabled"),
+    [
+        (None, False),
+        ("", False),
+        ("false", False),
+        ("0", False),
+        ("no", False),
+        ("off", False),
+        ("garbage", False),
+        ("true", True),
+        ("TRUE", True),
+        ("1", True),
+        ("yes", True),
+        ("on", True),
+    ],
+)
+def test_document_extraction_flag_uses_the_shared_true_values(monkeypatch, raw, enabled):
+    from argus.domain.ingestion.documents.config import DocumentExtractionSettings
+
+    if raw is None:
+        monkeypatch.delenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", raising=False)
+    else:
+        monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", raw)
+    assert DocumentExtractionSettings().enabled is enabled
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"ARGUS_DOCUMENT_EXTRACTION_ENABLED": ""},
+        {"ARGUS_DOCUMENT_EXTRACTION_ENABLED": "garbage"},
+        {
+            "ARGUS_DOCUMENT_EXTRACTION_ENABLED": "true",
+            "ARGUS_DOCUMENT_EXTRACTION_MAX_BYTES": "not-an-integer",
+        },
+    ],
+)
+def test_bad_document_settings_fail_closed_without_darkening_connectors(
+    surface_env, gateway, monkeypatch, overrides
+):
+    from unittest.mock import patch
+
+    from argus.api import state as api_state
+    from argus.api.ingestion import ingestion_hub
+    from argus.api.main import app
+    from fastapi.testclient import TestClient
+    from loguru import logger
+
+    monkeypatch.setenv("ARGUS_INGESTION_ENABLED", "true")
+    for name, value in overrides.items():
+        monkeypatch.setenv(name, value)
+    lines: list[str] = []
+    sink = logger.add(lambda message: lines.append(str(message)), level="WARNING")
+    try:
+        with (
+            patch.object(api_state, "supabase_gateway", gateway),
+            patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+            TestClient(app) as client,
+        ):
+            listed = client.get("/api/v1/financial-connections", headers=bearer(ALICE))
+            missing = client.post(
+                f"/api/v1/financial-connections/{uuid4()}/disconnect",
+                headers=bearer(ALICE),
+            )
+            documents = client.post(DOCUMENTS, content=b"%PDF-1.4")
+            assert ingestion_hub() is not None
+    finally:
+        logger.remove(sink)
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["items"] == []
+    assert missing.status_code == 404
+    assert missing.json()["code"] == "financial_connection_not_found"
+    assert documents.status_code == 404
+    assert documents.json()["code"] == "financial_connections_unavailable"
+    assert any("document surface stays off" in line for line in lines)
+
+
 def test_upload_size_is_bounded_before_extraction(client, extraction):
     from argus.domain.ingestion.gmail.attachments import MAX_ATTACHMENT_BYTES
 
