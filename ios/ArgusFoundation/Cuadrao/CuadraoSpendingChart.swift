@@ -156,6 +156,7 @@ struct CuadraoSpendingChart: View {
                 identifier: "home-spending-segment-")
             if selectedCategory != nil {
                 Button(spanish ? "Todo" : "All") { selectedCategory = nil }.frame(minHeight: 44)
+                    .accessibilityIdentifier("home-spending-all")
             }
             HStack {
                 Text(interval.start, format: .dateTime.day().month(.abbreviated).year())
@@ -163,7 +164,7 @@ struct CuadraoSpendingChart: View {
                 Text(interval.end.addingTimeInterval(-1), format: .dateTime.day().month(.abbreviated).year())
             }.font(CuadraoTypography.caption).foregroundStyle(.secondary)
         }.padding(.vertical, 20)
-            .overlay { CuadraoChartTouchSurface(inspect: { _ in }) }
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("home-spending-distribution")
     }
     private func categoryRow(_ category: CanvasExpenseCategory) -> some View {

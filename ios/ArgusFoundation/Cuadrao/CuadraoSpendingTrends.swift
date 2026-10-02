@@ -74,7 +74,7 @@ struct CuadraoSpendingTrendCard: View {
         }.chartXScale(domain: insight.interval.start...insight.interval.end).chartYAxis(.hidden)
             .chartXAxis { AxisMarks(values: .stride(by: .month, count: insight.months.count == 12 ? 3 : 1)) { value in
                 AxisValueLabel {
-                    if let date = value.as(Date.self) { Text(date, format: .dateTime.month(.abbreviated).locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) }
+                    if let date = value.as(Date.self) { Text(date.formatted(.dateTime.month(.abbreviated).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))) }
                 }
             } }.frame(height: 160).allowsHitTesting(false)
     }
@@ -90,7 +90,7 @@ private struct CuadraoSpendingTrendEvidence: View {
             LazyVStack(alignment: .leading, spacing: 24) {
                 ForEach(insight.months.reversed()) { month in
                     VStack(alignment: .leading, spacing: 12) {
-                        Text(month.interval.start, format: .dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
+                        Text(month.interval.start.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))))
                             .font(CuadraoTypography.feature)
                         Text(currency + " " + CanvasMoney.format(month.amount, currency: currency)).font(CuadraoTypography.secondaryAmount)
                         let records = CanvasSpendingHistory.entries(story.expenses, in: month.interval).filter { insight.category == nil || $0.category == insight.category }
@@ -99,7 +99,7 @@ private struct CuadraoSpendingTrendEvidence: View {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(entry.title)
-                                    Text(entry.date, format: .dateTime.day().month(.abbreviated)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                                    Text(entry.date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))).font(CuadraoTypography.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 Text(CanvasMoney.format(entry.amount, currency: currency)).font(CuadraoTypography.rowAmount)

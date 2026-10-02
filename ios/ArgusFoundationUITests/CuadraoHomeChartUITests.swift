@@ -140,6 +140,10 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertEqual(chart.value as? String, "-1", "Inspecting a weekly bucket must not page the month")
         app.buttons["home-view-distribution"].tap()
         XCTAssertEqual(app.staticTexts["home-spending-total"].label.isEmpty, false)
+        app.buttons["home-spending-segment-home"].tap()
+        XCTAssertTrue(app.buttons["home-spending-all"].waitForExistence(timeout: 2))
+        app.buttons["home-spending-all"].tap()
+        XCTAssertFalse(app.buttons["home-spending-all"].exists)
         shot(app, "activity-distribution-es")
         app.buttons["home-view-history"].tap()
         XCTAssertEqual(chart.value as? String, "-1")
@@ -215,14 +219,14 @@ final class CuadraoHomeChartUITests: XCTestCase {
         let chart = app.otherElements.matching(identifier: "home-balance-chart").firstMatch
         XCTAssertTrue(chart.waitForExistence(timeout: 3))
         let period = chart.value as? String
-        let amount = app.staticTexts["home-chart-amount"].label
+        let amount = app.scrollViews["home-insights-content"].staticTexts["home-chart-amount"].label
         app.buttons["home-view-distribution"].tap()
         XCTAssertEqual(app.staticTexts["home-distribution-total"].label, amount)
         app.buttons["home-view-history"].tap()
         let start = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
         start.press(forDuration: 0.01, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.5)), withVelocity: .slow, thenHoldForDuration: 0.3)
         XCTAssertEqual(chart.value as? String, period, "A cancelled short drag retains its page")
-        start.press(forDuration: 0.01, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)), withVelocity: .slow, thenHoldForDuration: 0.1)
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).press(forDuration: 0.01, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)), withVelocity: .slow, thenHoldForDuration: 0.1)
         XCTAssertNotEqual(chart.value as? String, period)
         let prior = chart.value as? String
         chart.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).press(forDuration: 0.35, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)))

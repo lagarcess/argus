@@ -10,13 +10,18 @@ struct CuadraoSpendingHighlights: View {
         let average = insights.first { $0.kind == .average && $0.category == nil }
         return [trend, average].compactMap { $0 }
     }
+    private var hasMore: Bool {
+        let available = insights.count + (story.changedCategory == nil ? 0 : 1) + (story.largestExpense == nil ? 0 : 1)
+        let shown = featured.count + (featured.count < 2 && story.changedCategory != nil ? 1 : 0)
+        return available > shown
+    }
     var body: some View {
         if !insights.isEmpty || story.changedCategory != nil {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text(spanish ? "Lo que destaca" : "Highlights").font(CuadraoTypography.section)
                     Spacer()
-                    if insights.count + (story.changedCategory == nil ? 0 : 1) > 2 {
+                    if hasMore {
                         NavigationLink(spanish ? "Ver todos" : "See all") { allHighlights }
                             .font(CuadraoTypography.supporting).frame(minHeight: 44)
                             .accessibilityIdentifier("home-highlights-all")

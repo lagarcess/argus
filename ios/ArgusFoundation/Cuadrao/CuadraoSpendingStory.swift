@@ -70,7 +70,6 @@ struct CanvasSpendingInsight: Identifiable {
 }
 
 extension CanvasSpendingStory {
-    /// Complete covered months end at the viewed period, never at a later page.
     func completedMonths(count: Int, category: CanvasExpenseCategory? = nil) -> [CanvasSpendingMonth]? {
         guard count == 6 || count == 12 else { return nil }
         let calendar = Calendar.current
@@ -99,7 +98,6 @@ extension CanvasSpendingStory {
             }
             if let months = completedMonths(count: 12, category: category) {
                 let insight = CanvasSpendingInsight(kind: .trend, category: category, months: months)
-                // A sustained pattern needs activity across both windows, not one isolated purchase.
                 if months.prefix(9).filter({ $0.amount > 0 }).count >= 6,
                    months.suffix(3).allSatisfy({ $0.amount > 0 }), insight.difference != 0 {
                     trends.append(insight)
