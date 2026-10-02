@@ -1743,6 +1743,21 @@ this decision.
 
 ### Cuadrao consistency pass and Home chart follow-up
 
+**Approved consistency polish — UI verified October 2, 2026:** source `629b8d070`
+completes the dated Balance opening/closing and per-account change breakdown,
+shared first-use/empty/unavailable chart artwork, a loading gallery specimen,
+“Lo que viene” Plan heading, shared money typography and reference gallery states.
+Historical snapshots and the hero share account participation rules, including
+cleared balances. The consolidated [Cuadrao design guide](../../.agent/designs/cuadrao/DESIGN.md)
+owns native conventions; Argus web styling remains unchanged. Future connected
+history, coverage and valuation work stays with the existing owners below.
+76 deterministic checks and the eight final native journeys passed; retained
+first-use/empty-state verification and the clean final review are recorded in
+[acceptance evidence](../reports/evidence/cuadrao-native-design/consistency-polish/README.md).
+Signed preview build **3411** is installed and opened on the founder’s iPhone.
+This closes the approved UI polish, not connected financial functionality.
+
+
 **Historical insights revision — UI verified October 1, 2026:** source `86aa3e8d`
 implements the revised insight and gesture direction. The
 completed-month spending averages and sustained category comparisons now derive

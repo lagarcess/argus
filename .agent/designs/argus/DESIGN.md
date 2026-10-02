@@ -709,50 +709,13 @@ No additional visual exploration is required by this freeze; later changes
 need an explicit request and a new dated checkpoint.
 
 
-### Cuadrao native Accounts decisions · September 30, 2026
+<a id="cuadrao-native-accounts-decisions--september-30-2026"></a>
+<a id="cuadrao-native-capture-and-recents-decisions--october-1-2026"></a>
+### Cuadrao native design ownership
 
-The founder-approved [Cuadrao Accounts lock](../../../docs/specs/cuadrao-accounts-design-lock.md)
-owns the native design iteration's Accounts-in-Home, management, entry and
-navigation decisions. For that canvas it supersedes this document's older
-three-row Home preview and separate Accounts-tab assumptions. Existing connected
-financial contracts and reconciliation behavior remain unchanged.
-
-
-### Cuadrao native capture and Recents decisions · October 1, 2026
-
-Founder-approved design checkpoint; this supersedes the receipt-specific
-attachment label in the native canvas.
-
-- The attachment action is **Escanear** in Spanish and **Scan** in English,
-  with a document-scanner symbol. Photos and files remain independent entry points.
-- The future native scanner, interpretation/review boundary and receipt-splitting
-  disposition are owned by [roadmap C01](../../../docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
-  The current preview still attaches sample documents; capture is not connected.
-- Recents uses title-first rows, separate Pinned/Recent sections, unread/current
-  indicators, and one conversation object shared with Chat and Search. Do not repeat a sample subtitle on every row. Dates derive from the last
-  message timestamp, shared with Search; metadata changes do not update recency.
-  Render Hoy/Ayer or Today/Yesterday, then a localized short date (including the
-  year for older years). Unknown dates remain absent. Preview fixtures have explicit
-  sample message dates; these are not backend history.
-- Swipe right pins/unpins; swipe left archives or restores. Rows show quiet dates at the trailing edge, with no visible ellipsis.
-  Touch-and-hold and VoiceOver actions expose the same contextual commands.
-  Pin uses amber, archive uses slate, restore uses Cuadrao green; delete retains
-  its destructive red treatment in the menu, not a new swipe action. Mark read/unread comes first, followed by pin, rename, archive and delete.
-  Delete requires confirmation and retains recovery in Deleted. Actions on a row
-  never also open it. Opening temporary-chat destinations keeps the existing discard
-  confirmation. Archiving/deleting the active regular chat opens a fresh chat.
-
-References: [Apple document camera](https://developer.apple.com/documentation/visionkit/vndocumentcameraviewcontroller),
-[scan output](https://developer.apple.com/documentation/visionkit/vndocumentcamerascan),
-[Apple gestures](https://developer.apple.com/design/human-interface-guidelines/gestures),
-[Claude title-first history](https://mobbin.com/screens/9059f305-c9bb-44b9-b0fe-efe19e50a428),
-[Messages contextual swipe controls](https://mobbin.com/screens/1ad68688-b638-4f85-b754-7ef96f6d45e5).
-The exact gesture mapping above is Cuadrao's adaptation, not a claim that these
-reference apps use the same mapping.
-
-
-October 1 refinement: the founder replaced the visible Recents ellipsis with
-last-message dates. Swipe colors adapt [Fiverr's amber star](https://mobbin.com/screens/d6624e4d-927d-46b3-a3f1-d763ef7dd04a)
-and [Telegram's gray archive](https://mobbin.com/screens/7b4ae82f-5122-4626-82c9-a6ef11bea8dc).
-The row's shared contextual actions are exposed through Apple's
-[accessibility actions](https://developer.apple.com/documentation/swiftui/accessible-controls).
+Current native Accounts, capture, Recents, typography and chart conventions live in
+[Cuadrao's guide](../cuadrao/DESIGN.md). That guide owns the native iteration; the
+production web rules above remain unchanged. The
+[September 30 Accounts study](../../../docs/specs/cuadrao-accounts-design-lock.md)
+retains historical rationale. Delivery and unfinished work stay in the
+[main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-design-dispositions).

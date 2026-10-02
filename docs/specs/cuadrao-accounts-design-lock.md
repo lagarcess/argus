@@ -1,6 +1,9 @@
 # Cuadrao native design: approved interaction decisions
 
-Status: founder-approved design direction, locked September 30, 2026.
+Status: historical founder-approved study, locked September 30, 2026.
+Current native rules live in [Cuadrao DESIGN.md](../../.agent/designs/cuadrao/DESIGN.md).
+Its later shared gestures and Home shortcuts supersede the hold-menu, header ellipsis
+and reorder-tray entries below. This study preserves provenance, not current delivery status.
 Applies to the Cuadrao native design canvas. This is not a financial API contract,
 a shipped-capability claim, or authorization to replace the connected client.
 
