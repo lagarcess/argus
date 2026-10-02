@@ -2921,7 +2921,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncResponse'
+                $ref: '#/components/schemas/argus__api__routers__financial_connections_gmail__SyncResponse'
         '422':
           description: Validation Error
           content:
@@ -3121,7 +3121,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SyncResponse'
+                $ref: '#/components/schemas/argus__api__routers__financial_connections_plaid__SyncResponse'
         '422':
           description: Validation Error
           content:
@@ -16225,6 +16225,30 @@ components:
       - expected_version
       - account_ids
       - time_zone
+    SenderResponse:
+      properties:
+        sender:
+          type: string
+        kind:
+          type: string
+          enum:
+          - address
+          - domain
+        created_at:
+          type: string
+          format: date-time
+        backfilled_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - sender
+      - kind
+      - created_at
+      - backfilled_at
     SendersRequest:
       properties:
         senders:
@@ -16750,6 +16774,13 @@ components:
       type: object
       required:
       - prompts
+    SuccessResponse:
+      properties:
+        success:
+          type: boolean
+      type: object
+      required:
+      - success
     SuggestionResponse:
       properties:
         sender:
@@ -16777,80 +16808,6 @@ components:
       type: object
       required:
       - suggestions
-    SuccessResponse:
-      properties:
-        success:
-          type: boolean
-      type: object
-      required:
-      - success
-    SyncResponse:
-      properties:
-        connection:
-          $ref: '#/components/schemas/FinancialConnectionResponse'
-        sync:
-          $ref: '#/components/schemas/SyncSummary'
-      additionalProperties: false
-      type: object
-      required:
-      - connection
-      - sync
-    SyncSummary:
-      properties:
-        status:
-          type: string
-          enum:
-          - synced
-          - not_ready
-          - busy
-          - no_sink
-          - no_senders
-          - failed
-          - sink_failed
-          - superseded
-        mode:
-          anyOf:
-          - type: string
-            enum:
-            - initial
-            - incremental
-            - recovery
-          - type: 'null'
-        messages:
-          type: integer
-        candidates:
-          type: integer
-        ignored:
-          type: integer
-        skipped:
-          additionalProperties:
-            type: integer
-          type: object
-        attachments:
-          type: integer
-        attachments_skipped:
-          additionalProperties:
-            type: integer
-          type: object
-        more_pending:
-          type: boolean
-        scan_truncated:
-          type: boolean
-        added:
-          type: integer
-        modified:
-          type: integer
-        removed:
-          type: integer
-        error_code:
-          anyOf:
-          - type: string
-          - type: 'null'
-      additionalProperties: false
-      type: object
-      required:
-      - status
-      - error_code
     ToolResultRecomputeRequest:
       properties:
         message_id:
@@ -17139,6 +17096,116 @@ components:
       type: object
       required:
       - received
+    argus__api__routers__financial_connections_gmail__SyncResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        sync:
+          $ref: '#/components/schemas/argus__api__routers__financial_connections_gmail__SyncSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - sync
+    argus__api__routers__financial_connections_gmail__SyncSummary:
+      properties:
+        status:
+          type: string
+          enum:
+          - synced
+          - busy
+          - no_sink
+          - no_senders
+          - failed
+          - sink_failed
+          - superseded
+        mode:
+          anyOf:
+          - type: string
+            enum:
+            - initial
+            - incremental
+            - recovery
+          - type: 'null'
+        messages:
+          type: integer
+        candidates:
+          type: integer
+        ignored:
+          type: integer
+        skipped:
+          additionalProperties:
+            type: integer
+          type: object
+        attachments:
+          type: integer
+        attachments_skipped:
+          additionalProperties:
+            type: integer
+          type: object
+        more_pending:
+          type: boolean
+        scan_truncated:
+          type: boolean
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - mode
+      - messages
+      - candidates
+      - ignored
+      - skipped
+      - attachments
+      - attachments_skipped
+      - more_pending
+      - scan_truncated
+      - error_code
+    argus__api__routers__financial_connections_plaid__SyncResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        sync:
+          $ref: '#/components/schemas/argus__api__routers__financial_connections_plaid__SyncSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - sync
+    argus__api__routers__financial_connections_plaid__SyncSummary:
+      properties:
+        status:
+          type: string
+          enum:
+          - synced
+          - not_ready
+          - busy
+          - no_sink
+          - failed
+          - sink_failed
+          - superseded
+        added:
+          type: integer
+        modified:
+          type: integer
+        removed:
+          type: integer
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - added
+      - modified
+      - removed
+      - error_code
     argus__domain__financial_search__SearchPage:
       properties:
         items:
