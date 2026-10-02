@@ -38,7 +38,7 @@ struct CanvasAvatarCropSheet: View {
                         Text(spanish ? "Ampliación" : "Zoom").font(.subheadline)
                         Slider(value: Binding(get: { zoom }, set: { value in
                             let side = CGFloat(min(source.width, source.height)) / value
-                            crop = source.clamped(CGRect(x: crop.midX - side / 2, y: crop.midY - side / 2, width: side, height: side))
+                            crop = source.geometry.clamped(CGRect(x: crop.midX - side / 2, y: crop.midY - side / 2, width: side, height: side))
                         }), in: 1...4)
                         .accessibilityLabel(spanish ? "Ampliación" : "Zoom")
                         .accessibilityValue(String(format: "%.1fx", zoom))
@@ -49,7 +49,7 @@ struct CanvasAvatarCropSheet: View {
                             move("up", symbol: "arrow.up", title: spanish ? "Mover arriba" : "Move up", dx: 0, dy: -1)
                             move("down", symbol: "arrow.down", title: spanish ? "Mover abajo" : "Move down", dx: 0, dy: 1)
                         }.frame(maxWidth: .infinity)
-                        Button(spanish ? "Restablecer" : "Reset") { crop = source.centeredCrop }
+                        Button(spanish ? "Restablecer" : "Reset") { crop = source.geometry.centered }
                             .frame(maxWidth: .infinity, minHeight: 44).accessibilityIdentifier("cuadrao.profile.crop.reset")
                     }
                     if failed {
@@ -75,7 +75,7 @@ struct CanvasAvatarCropSheet: View {
     }
 
     private func move(_ id: String, symbol: String, title: String, dx: CGFloat, dy: CGFloat) -> some View {
-        let next = source.clamped(crop.offsetBy(dx: dx * crop.width * 0.1, dy: dy * crop.height * 0.1))
+        let next = source.geometry.clamped(crop.offsetBy(dx: dx * crop.width * 0.1, dy: dy * crop.height * 0.1))
         return Button { crop = next } label: { Image(systemName: symbol).frame(maxWidth: .infinity, minHeight: 44) }
             .accessibilityLabel(title).disabled(next == crop)
             .accessibilityIdentifier("cuadrao.profile.crop.\(id)")
@@ -120,7 +120,7 @@ private final class AvatarCropScrollView: UIScrollView, UIScrollViewDelegate {
     var changed: ((CGRect) -> Void)?
 
     init(source: CanvasAvatarSource) {
-        self.source = source; requested = source.centeredCrop
+        self.source = source; requested = source.geometry.centered
         photo = UIImageView(image: UIImage(data: source.jpeg))
         super.init(frame: .zero)
         photo.frame = CGRect(origin: .zero, size: source.size)
@@ -154,7 +154,7 @@ private final class AvatarCropScrollView: UIScrollView, UIScrollViewDelegate {
     func scrollViewDidZoom(_ scrollView: UIScrollView) { reportCrop() }
     private func reportCrop() {
         guard !applying, bounds.width > 0 else { return }
-        requested = source.clamped(CGRect(x: contentOffset.x / zoomScale, y: contentOffset.y / zoomScale,
+        requested = source.geometry.clamped(CGRect(x: contentOffset.x / zoomScale, y: contentOffset.y / zoomScale,
                                           width: bounds.width / zoomScale, height: bounds.width / zoomScale))
         changed?(requested)
     }

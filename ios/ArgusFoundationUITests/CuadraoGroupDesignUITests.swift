@@ -55,6 +55,42 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         app.buttons["group-repayment-save"].tap()
         XCTAssertFalse(app.textFields["group-repayment-amount"].exists)
     }
+    func testSampleCardNativeSharing() {
+        continueAfterFailure = false
+        let app = openGroups()
+        openSampleCode(app)
+        XCTAssertTrue(app.images["group-code-qr"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["group-code-disclosure"].label.contains("No permite unirse"))
+        shot(app, "group-code-artwork-es")
+        let share = app.buttons["group-code-share"]
+        reveal(app, share); share.tap()
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 5))
+        shot(app, "group-code-native-share")
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.buttons["group-code-done"].waitForExistence(timeout: 3))
+        app.buttons["group-code-done"].tap()
+        XCTAssertTrue(app.buttons["group-invite-code"].waitForExistence(timeout: 3))
+    }
+
+    func testSampleCardAtLargeTextEnglish() {
+        continueAfterFailure = false
+        let app = openGroups(english: true, extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        openSampleCode(app)
+        reveal(app, app.staticTexts["group-code-disclosure"])
+        XCTAssertTrue(app.staticTexts["group-code-disclosure"].label.contains("doesn't join a real group"))
+        shot(app, "group-code-large-en-disclosure")
+        reveal(app, app.buttons["group-code-share"])
+        XCTAssertTrue(app.buttons["group-code-share"].isHittable)
+        XCTAssertTrue(app.buttons["group-code-done"].isHittable)
+    }
+
+    private func openSampleCode(_ app: XCUIApplication) {
+        reveal(app, app.buttons["group-card-trip"]); app.buttons["group-card-trip"].tap()
+        app.buttons["group-people-open"].tap()
+        app.buttons["group-invite"].tap()
+        reveal(app, app.buttons["group-invite-code"]); app.buttons["group-invite-code"].tap()
+    }
+
     func testGroupCreationSavingsEnglishDark() {
         continueAfterFailure = false
         let app = openGroups(english: true, dark: true)
@@ -104,9 +140,9 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         reveal(app, app.buttons["group-card-trip"]); app.buttons["group-card-trip"].tap()
         shot(app, "plan-group-large-en")
     }
-    private func openGroups(english: Bool = false, dark: Bool = false) -> XCUIApplication {
+    private func openGroups(english: Bool = false, dark: Bool = false, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", dark ? "dark" : "light"] + (english ? ["--design-english"] : [])
+        app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", dark ? "dark" : "light"] + (english ? ["--design-english"] : []) + extra
         app.launch(); app.buttons["cuadrao-tab-1"].tap()
         app.segmentedControls["plan-audience"].buttons[english ? "Together" : "En grupo"].tap()
         return app

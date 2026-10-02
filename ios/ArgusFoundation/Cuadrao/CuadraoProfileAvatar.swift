@@ -86,7 +86,7 @@ struct CuadraoProfileAvatarPicker: View {
                         throw CanvasAvatarPhotoError.unreadable
                     }
                     guard !Task.isCancelled, generation == request else { return }
-                    cropRequest = CanvasAvatarCropRequest(source: source, crop: source.centeredCrop)
+                    cropRequest = CanvasAvatarCropRequest(source: source, crop: source.geometry.centered)
                     loading = false; self.selectedPhoto = nil
                 } catch {
                     guard !Task.isCancelled, generation == request else { return }

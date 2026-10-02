@@ -68,6 +68,56 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         XCTAssertTrue(app.buttons["cuadrao.profile.avatar.initial"].isSelected)
     }
 
+    func testPhotoCropCancelPanZoomAndReedit() {
+        let app = launch()
+        app.buttons["cuadrao-tab-4"].tap()
+        app.buttons["cuadrao.profile.identity"].tap()
+        pickPhoto(app, accept: false)
+        app.buttons["cuadrao.profile.crop.cancel"].tap()
+        XCTAssertFalse(app.buttons["cuadrao.profile.photo.remove"].exists)
+        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.initial"].isSelected)
+        pickPhoto(app)
+        app.buttons["cuadrao.profile.save"].tap()
+        app.buttons["cuadrao.profile.identity"].tap()
+        app.buttons["cuadrao.profile.photo.edit"].tap()
+        let viewport = app.scrollViews["cuadrao.profile.crop.viewport"]
+        XCTAssertTrue(viewport.waitForExistence(timeout: 3))
+        let centered = viewport.value as? String
+        XCTAssertNotNil(centered)
+        let zoom = app.sliders["cuadrao.profile.crop.zoom"]
+        reveal(app, zoom); zoom.adjust(toNormalizedSliderPosition: 0.45)
+        let right = app.buttons["cuadrao.profile.crop.right"]
+        reveal(app, right); right.tap()
+        reveal(app, viewport)
+        viewport.pinch(withScale: 1.2, velocity: 1)
+        let start = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.55, dy: 0.5))
+        let end = viewport.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.65))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        XCTAssertNotEqual(viewport.value as? String, centered)
+        let moved = viewport.value as? String
+        XCTAssertNotNil(moved)
+        shot(app, "profile-native-crop-pan-zoom")
+        app.buttons["cuadrao.profile.crop.use"].tap()
+        XCTAssertTrue(app.buttons["cuadrao.profile.photo.edit"].waitForExistence(timeout: 5))
+        app.buttons["cuadrao.profile.photo.edit"].tap()
+        XCTAssertTrue(viewport.waitForExistence(timeout: 3))
+        XCTAssertEqual(viewport.value as? String, moved)
+        let reset = app.buttons["cuadrao.profile.crop.reset"]
+        reveal(app, reset); reset.tap()
+        XCTAssertEqual(viewport.value as? String, centered)
+        shot(app, "profile-crop-reedit-full-source")
+        app.buttons["cuadrao.profile.crop.cancel"].tap()
+        app.buttons["cuadrao.profile.photo.edit"].tap()
+        XCTAssertTrue(viewport.waitForExistence(timeout: 3))
+        XCTAssertEqual(viewport.value as? String, moved)
+        app.buttons["cuadrao.profile.crop.cancel"].tap()
+        app.buttons["cuadrao.profile.cancel"].tap()
+        app.buttons["cuadrao.profile.identity"].tap()
+        app.buttons["cuadrao.profile.photo.edit"].tap()
+        XCTAssertTrue(viewport.waitForExistence(timeout: 3))
+        XCTAssertEqual(viewport.value as? String, centered)
+    }
+
     private func verifyNavigation(extra: [String]) {
         let app = launch(extra: extra)
         app.buttons["cuadrao-tab-4"].tap()
@@ -114,12 +164,18 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         app.buttons[title].tap()
     }
 
-    private func pickPhoto(_ app: XCUIApplication) {
+    private func pickPhoto(_ app: XCUIApplication, accept: Bool = true) {
         let choose = app.buttons["cuadrao.profile.photo.choose"]
         reveal(app, choose); choose.tap()
         let photo = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
         XCTAssertTrue(photo.waitForExistence(timeout: 5), "Seed the simulator Photos library before this journey")
         photo.tap()
+        let use = app.buttons["cuadrao.profile.crop.use"]
+        XCTAssertTrue(use.waitForExistence(timeout: 10))
+        if accept {
+            use.tap()
+            XCTAssertTrue(app.buttons["cuadrao.profile.photo.remove"].waitForExistence(timeout: 5))
+        }
     }
 
     private func launch(extra: [String] = []) -> XCUIApplication {

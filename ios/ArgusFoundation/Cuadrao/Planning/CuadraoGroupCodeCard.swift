@@ -78,10 +78,14 @@ struct CuadraoGroupCodeCard: View {
         let filter = CIFilter.qrCodeGenerator()
         filter.message = Data(text.utf8); filter.correctionLevel = "M"
         guard let raw = filter.outputImage else { return nil }
+        let tint = CIFilter.falseColor()
+        tint.inputImage = raw
+        tint.color0 = CIColor(red: 0.16, green: 0.29, blue: 0.25); tint.color1 = .white
+        guard let tinted = tint.outputImage else { return nil }
         let scale: CGFloat = 8
         let expanded = raw.extent.insetBy(dx: -4, dy: -4)
         let white = CIImage(color: .white).cropped(to: expanded)
-        let output = raw.composited(over: white).transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let output = tinted.composited(over: white).transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         guard let pixels = CIContext().createCGImage(output, from: expanded.applying(CGAffineTransform(scaleX: scale, y: scale))) else { return nil }
         return UIImage(cgImage: pixels)
     }
