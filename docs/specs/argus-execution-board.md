@@ -1743,14 +1743,20 @@ this decision.
 
 ### Cuadrao consistency pass and Home chart follow-up
 
-**Expanded insights storytelling — founder locked October 1, implementation pending:**
-the [Cuadrao design guide](../../.agent/designs/cuadrao/DESIGN.md#locked-home-and-expanded-insights-direction--october-1-2026)
-owns the approved title hierarchy, empty/partial-history states, calendar-week
-month buckets and chart → categories → highlights composition. This documentation
-checkpoint does not claim a new UI build or phone installation. The UI follow-up
-must verify empty current periods, sparse first-day activity, comparable elapsed
-periods, missing comparison history, category drill-through, bounded swipes,
-Spanish/English, dark mode and large text. Preserve quiet compact Home.
+**Expanded insights storytelling — UI implemented October 1:** source `e1b2a4d7`
+implements the [locked design](../../.agent/designs/cuadrao/DESIGN.md#locked-home-and-expanded-insights-direction--october-1-2026):
+Title-sized period headings, explicit empty/incomplete-history states, calendar-week
+month buckets, a factual chart takeaway and up to two highlights below categories.
+Category-change and largest-expense cards open their supporting local records and
+preserve the selected period on return. A shared native gesture surface rejects
+vertical chart/distribution pans before recognition, preserving page scrolling.
+Comparison eligibility derives from an explicit preview history window, never the
+first transaction date; unequal elapsed month lengths suppress the comparison.
+47 deterministic checks and the affected native journeys pass; empty months,
+missing coverage, bounded paging, inspection, highlight records, distribution
+scrolling and large English text were exercised. Compact Home stays quiet.
+[Evidence and phone handoff](../reports/evidence/cuadrao-native-design/home-activity/README.md#spending-highlights-follow-up)
+record source revalidation and screenshots. This is UI-only preview delivery.
 
 Connected highlights remain with Planning/Home and the financial-record/history
 owner: supply coverage-aware period comparisons and traceable supporting records

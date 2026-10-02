@@ -54,3 +54,46 @@ coverage and financial history remain in the main execution board, not this evid
 and [Apple spending activity](https://support.apple.com/en-ca/102329) informed the
 expense breakdown. Airbnb wishlist searches did not expose a better avatar pattern;
 we retained Cuadrao's existing avatar stack rather than claiming a researched clone.
+
+
+## Spending highlights follow-up
+
+Source checkpoint `e1b2a4d7` implements title-sized period headings, clipped weekly
+month buckets, explicit empty/unknown coverage, explanatory takeaways, category
+comparisons and largest-expense highlights. Both cards open their supporting records;
+return preserves the selected period. Activity charts and distribution use one native
+direction-aware touch surface so vertical scrolling remains available while tap/hold
+inspection and horizontal period paging retain their meanings.
+
+47 deterministic checks pass, including exact monthly bucket reconciliation,
+first-day elapsed-hour comparisons, absent/partial coverage, empty periods and the
+31st-day versus shorter-month boundary. Modularity and whitespace checks pass.
+
+Native acceptance:
+- Retained Home/account/balance checks passed in the nine-case initial batch;
+  three new highlight cases exposed chart/scroll issues and were repaired.
+- Final four affected journeys passed in
+  `test_sim_2026-10-02T02-31-13-251Z_pid473_b6f6c753.xcresult` (95.9s):
+  Activity periods/inspection, empty and unknown months, highlight records/return,
+  and dark large-English highlights.
+- After applying the same gesture owner to Activity distribution, the affected
+  records/return/distribution journey passed in
+  `test_sim_2026-10-02T02-33-13-987Z_pid473_53347c5f.xcresult` (45.9s).
+  The other three journeys retain their evidence; their behavior did not change.
+- Source was committed unchanged from those passing build inputs. Screenshots were
+  visually inspected and revalidated against `e1b2a4d7`; this evidence-only update
+  does not change app source. Earlier failed batches are superseded by these checks.
+
+Retained screenshots: [period and chart](story-month-title-es.png),
+[empty month](story-empty-month-es.png), [unknown history](story-unknown-month-es.png),
+[category highlight](story-category-highlight-es.png),
+[largest expense](story-largest-highlight-es.png),
+[supporting records](story-supporting-records-es.png),
+[distribution highlights](story-distribution-highlights-es.png), and
+[large English](story-highlight-dark-large-en.png).
+
+Connected coverage, category identity and source-record contracts remain in the
+main execution board. No provider, financial API or production release changed.
+
+Signed preview build **3409** was installed on Sr.Garces i15, installation sequence
+2136, and launched successfully. App source matches `e1b2a4d7`.
