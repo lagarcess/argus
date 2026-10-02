@@ -520,9 +520,10 @@ design-branch work or another delivery lane.
   (`tests/household/conftest.py`). No durable real Auth/Postgres/RLS evidence is
   cited here.
 - Remaining MVEE Household work after this membership land was completed for the
-  bounded native consent/activity package by [PR #766](#pr-766-integration-landing).
-  Shared plans/contributions, external invitation delivery, physical-phone
-  proof, and hosted enablement remain outside. Detail:
+  bounded native consent/activity package by [PR #766](#pr-766-integration-landing)
+  and for shared Plan consumers by [PR #773](#pr-773-integration-landing).
+  External invitation delivery, physical-phone proof, and hosted enablement
+  remain outside. Detail:
   [landing report](../reports/2026-10-01-pr-763-integration-landing.md).
 
 ## Connected Spaces and Household lane
