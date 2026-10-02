@@ -16,6 +16,7 @@ from argus.api.financial_accounts import (
 )
 from argus.api.routers.financial_activities import router as money_router
 from argus.api.routers.financial_assets import router as asset_router
+from argus.api.routers.financial_connections import router as connections_router
 from argus.api.routers.financial_debts import router as debt_router
 from argus.api.routers.financial_loop import router as loop_router
 from argus.api.routers.financial_plan import router as plan_router
@@ -156,3 +157,5 @@ router.include_router(plan_router)
 router.include_router(debt_router)
 
 router.include_router(search_router)
+
+router.include_router(connections_router)
