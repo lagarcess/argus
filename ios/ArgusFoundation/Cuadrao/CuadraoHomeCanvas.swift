@@ -39,6 +39,15 @@ struct CuadraoHomeCanvas: View {
                         VStack(alignment: .leading, spacing: 18) {
                             header
                             CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
+                            if data.selectedSpace.kind == .household {
+                                Button { sheet = .household } label: {
+                                    PlanAvatarStack(members: data.acceptedHouseholdMembers(spanish: spanish))
+                                        .frame(minHeight: 44)
+                                }.buttonStyle(.plain)
+                                    .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")
+                                    .accessibilityValue(String(data.acceptedHouseholdMembers(spanish: spanish).count))
+                                    .accessibilityIdentifier("home-household-members")
+                            }
                         }
                         ForEach(CuadraoHomeSection.decode(homeOrder)) { section in
                             homeSection(section)
@@ -165,9 +174,6 @@ struct CuadraoHomeCanvas: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 5) {
-                Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)
-                    .locale(Locale(identifier: spanish ? "es_DO" : "en_US"))))
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 Text((spanish ? "Hola" : "Hello") + (profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     ? "" : ", " + profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines)))
                     .font(.title2.weight(.semibold)).accessibilityIdentifier("home-greeting")
@@ -196,12 +202,6 @@ struct CuadraoHomeCanvas: View {
 
     private var accounts: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if data.selectedSpace.kind == .household && !data.active.isEmpty {
-                Button { sheet = .household } label: {
-                    Label(spanish ? "Personas" : "People", systemImage: "person.2")
-                        .font(.subheadline).frame(minHeight: 44)
-                }
-            }
             if !data.active.isEmpty || !data.archived.isEmpty {
                 HStack(spacing: 0) {
                     Button { sheet = .account(.manageAccounts(editing: false)) } label: {

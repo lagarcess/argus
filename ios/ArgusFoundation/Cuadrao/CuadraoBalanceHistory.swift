@@ -48,6 +48,17 @@ enum CanvasBalanceHistory {
         return result
     }
 
+    static func snapshot(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], at date: Date) -> [CanvasAccount] {
+        accounts.map { account in
+            var copy = account
+            copy.balance = observations.first {
+                $0.accountID == account.id && $0.currency == account.currency && $0.kind == account.kind
+                    && $0.share == account.share && $0.date == date
+            }?.balance
+            return copy
+        }
+    }
+
     static func contribution(_ balance: Decimal, account: CanvasAccount) -> Decimal {
         balance * (account.kind.isDebt ? -1 : 1) * Decimal(account.kind.isAsset ? account.share : 100) / 100
     }

@@ -195,8 +195,12 @@ and scope-preserving navigation remain in the main roadmap.
 
 Home uses a compact, static native-system greeting: Hola / Hello plus Profile's
 preferred name, or just the greeting if missing. The shared preview profile state
-lives in `CuadraoHomeCanvas`; Profile edits and Home read the same value. A localized
-date sits above it. Space switching changes the financial scope, not the welcome.
+lives in `CuadraoHomeCanvas`; Profile edits and Home read the same value. No date
+competes with the greeting. Space switching changes financial scope, not the welcome.
+The space creation shortcut uses the shared plain plus. In Household, the existing
+avatar stack sits left-aligned between spaces and the amount. It includes the owner
+and accepted members only; pending invitations never count as members. Tapping it
+opens People. The current preview roster supports the owner and one companion.
 The greeting's context menu retains the preview gallery/reset tools.
 
 ### Locked Home and expanded insights direction — October 1, 2026
@@ -213,32 +217,32 @@ Do not show Evolución / Distribución controls, insight paragraphs or test/samp
 copy on Home. Genuine unknown/partial values remain distinguishable from zero;
 removing preview disclosures does not authorize invented financial facts.
 
-**Expanded insights:** opening the chart creates the immersive detail surface.
-Evolución / Distribución live here. Evolución uses Semana / Mes / Año (Week / Month /
-Year), starts at the latest period, and allows swipe right to go back and swipe
-left toward the present, stopping at today. Its one short takeaway explains an
-observed change with a clear basis. Spending comparisons require equivalent elapsed
-periods; a balance change must not be described as earnings, spending or investment
-return. Inspection and period paging must coexist with vertical scrolling and
-accessible alternatives. The metric remains recorded net position unless separately
-changed; Apple spending visuals do not redefine that metric.
+**Expanded insights:** Balance / Actividad is a native choice above the amount.
+Balance remains recorded net position. Activity uses expenses from the same local
+activity owner as the transaction list, filtered by space and currency. Transfers,
+income and changing balances do not become spending. Historical fixtures stay in
+preview code; connected delivery is still roadmap work.
 
-**Locked control refinement:** place the compact line-chart / stacked-bar icon
-switch beside the hero amount, with clear selected state and localized accessible
-names. Above the history chart, size Semana / Mes / Año to localized labels instead
-of stretching the selector across the screen. Preserve 44-point touch targets and
-allow layout to adapt for larger text rather than truncating labels or money.
-Show a subtle neighboring-period edge only when that period exists, with explicit
-previous/next controls beside the period title as an accessible alternative. Stop
-at the oldest available period and the present; do not tease unavailable pages.
-Keep chart inspection distinct from paging and preserve vertical scrolling.
+**Controls:** Semana / Mes / Año and the chart / distribution icons share one compact
+row. Adapt to localized labels and larger text, preserving 44-point targets. No
+redundant period heading, previous/next chevrons or Back to today button in detail.
+Dates live on the chart axis. Swipe right for older periods, left toward the present;
+stop at the oldest available period and today. Neighboring edges hint at available
+pages. VoiceOver custom Previous/Next period actions provide the same navigation.
+Long-press inspection must not page; vertical scrolling remains available.
 
-Period selection and historical paging apply only to Evolución. Distribución shows
-current positive assets, labeled Activos · Hoy / Assets · Today: remove period controls and date paging there and make its current
-scope clear. Switching views preserves Evolución's chosen period for the return,
-but never applies that past date to today's distribution or leaves a stale date
-label attached to it. Do not imply historical allocation support. These controls
-belong only in expanded insights; the compact Home entry remains quiet.
+Switching chart/distribution preserves the selected period. For Balance, historical
+allocation uses matching recorded account snapshots and identifies their date;
+never relabel current assets as a past allocation. Missing observations remain
+unknown. The current snapshot says Activos · Hoy / Assets · Today.
+
+**Activity:** vertical bars stack expenses by category. Week and month use daily
+buckets; year uses months. Colors match category rows, which disclose the same
+expense records. The distribution icon shows the selected period's category shares.
+One short insight explains either the largest category or a comparison; a running
+period compares the same elapsed span of the previous period. Totals remain actual
+recorded expenses, never projected spend or savings. Empty periods retain navigation
+and axes. Unknown categories are Otros / Other, never guessed from merchant text.
 
 **Distribución: decomposable bar, category rows, account detail.** The bar shows the
 whole positive asset distribution. Selecting a category emphasizes its segment;

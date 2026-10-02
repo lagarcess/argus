@@ -24,32 +24,30 @@ final class CuadraoHomeChartUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch()
         app.buttons["home-history-expand"].tap()
-        let period = app.staticTexts["home-history-period"]
+        let period = app.otherElements.matching(identifier: "home-balance-chart").firstMatch
         XCTAssertTrue(period.waitForExistence(timeout: 3))
-        let current = period.label
+        let current = period.value as? String
         let chart = app.otherElements.matching(identifier: "home-balance-chart").firstMatch
         chart.swipeRight(velocity: .fast)
-        XCTAssertNotEqual(period.label, current)
-        let previous = period.label
+        XCTAssertNotEqual(period.value as? String, current)
+        let previous = period.value as? String
         chart.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).press(forDuration: 0.35, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)))
-        XCTAssertEqual(period.label, previous, "Inspection must not page the calendar")
+        XCTAssertEqual(period.value as? String, previous, "Inspection must not page the calendar")
         shot(app, "history-previous-inspect-es")
         app.buttons["home-view-distribution"].tap()
-        XCTAssertFalse(app.buttons["home-period-year"].exists)
-        XCTAssertFalse(period.exists)
-        XCTAssertTrue(app.staticTexts["Activos · Hoy"].exists)
+        XCTAssertTrue(app.buttons["home-period-year"].exists)
+        XCTAssertFalse(app.buttons["home-period-previous"].exists)
         app.buttons["home-view-history"].tap()
-        XCTAssertEqual(period.label, previous, "Returning restores the history period")
+        XCTAssertEqual(period.value as? String, previous, "Returning restores the history period")
         chart.swipeLeft(velocity: .fast)
-        XCTAssertEqual(period.label, current)
+        XCTAssertEqual(period.value as? String, current)
         chart.swipeLeft(velocity: .fast)
-        XCTAssertEqual(period.label, current, "No future periods")
-        XCTAssertFalse(app.buttons["home-period-next"].isEnabled)
+        XCTAssertEqual(period.value as? String, current, "No future periods")
+        XCTAssertFalse(app.buttons["home-period-next"].exists)
         app.buttons["home-period-year"].tap()
-        app.buttons["home-period-previous"].tap()
-        XCTAssertFalse(app.buttons["home-period-previous"].isEnabled, "Stop at oldest available year")
-        app.buttons["home-period-next"].tap()
-        XCTAssertFalse(app.buttons["home-period-next"].isEnabled)
+        chart.swipeRight(velocity: .fast)
+        chart.swipeLeft(velocity: .fast)
+        XCTAssertFalse(app.buttons["home-period-next"].exists)
         shot(app, "history-year-es")
         app.buttons["home-view-distribution"].tap()
         XCTAssertTrue(app.buttons["home-distribution-segment-savings"].waitForExistence(timeout: 3))
@@ -122,6 +120,47 @@ final class CuadraoHomeChartUITests: XCTestCase {
         shot(app, "distribution-account-return-es")
         app.buttons["home-history-done"].tap()
         XCTAssertTrue(app.staticTexts["home-greeting"].exists)
+    }
+    func testExpenseActivityPeriodsAndBreakdown() {
+        continueAfterFailure = false
+        let app = launch()
+        app.buttons["home-history-expand"].tap()
+        app.buttons["home-insight-metric"].tap()
+        app.buttons["Actividad"].tap()
+        let chart = app.otherElements.matching(identifier: "home-spending-chart").firstMatch
+        XCTAssertTrue(chart.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["home-period-previous"].exists)
+        XCTAssertFalse(app.buttons["home-chart-today"].exists)
+        let current = app.staticTexts["home-spending-total"].label
+        chart.swipeRight(velocity: .fast)
+        XCTAssertEqual(chart.value as? String, "-1")
+        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, current)
+        shot(app, "activity-month-es")
+        app.buttons["home-view-distribution"].tap()
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label.isEmpty, false)
+        shot(app, "activity-distribution-es")
+        app.buttons["home-view-history"].tap()
+        XCTAssertEqual(chart.value as? String, "-1")
+        chart.swipeLeft(velocity: .fast)
+        chart.swipeLeft(velocity: .fast)
+        XCTAssertEqual(chart.value as? String, "0")
+        app.buttons["home-period-week"].tap()
+        shot(app, "activity-week-es")
+        app.buttons["home-period-year"].tap()
+        XCTAssertEqual(chart.value as? String, "0")
+        shot(app, "activity-year-es")
+    }
+    func testExpenseLargeEnglish() {
+        continueAfterFailure = false
+        let app = launch(english: true)
+        app.buttons["home-history-expand"].tap()
+        app.buttons["home-insight-metric"].tap()
+        app.buttons["Activity"].tap()
+        app.buttons["home-period-year"].tap()
+        XCTAssertTrue(app.staticTexts["home-spending-total"].exists)
+        shot(app, "activity-dark-large-en")
+        app.scrollViews["home-insights-content"].swipeUp()
+        shot(app, "activity-dark-large-axis-en")
     }
     private func launch(english: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()

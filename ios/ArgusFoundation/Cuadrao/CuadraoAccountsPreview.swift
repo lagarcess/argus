@@ -45,6 +45,7 @@ struct CanvasActivity: Identifiable {
     let amount: Decimal
     let date: Date
     let income: Bool
+    var category: CanvasExpenseCategory = .other
 }
 
 @Observable final class CuadraoAccountsPreview {
@@ -105,14 +106,15 @@ struct CanvasActivity: Identifiable {
         activity = []
         if let first = accounts.first, let cash = accounts.last(where: { $0.kind == .cash }) {
             activity = [
-                CanvasActivity(accountID: first.id, title: spanish ? "Almuerzo" : "Lunch", amount: 650, date: .now, income: false),
-                CanvasActivity(accountID: cash.id, title: spanish ? "Café" : "Coffee", amount: 180, date: .now, income: false)
+                CanvasActivity(accountID: first.id, title: spanish ? "Almuerzo" : "Lunch", amount: 650, date: .now, income: false, category: .food),
+                CanvasActivity(accountID: cash.id, title: spanish ? "Café" : "Coffee", amount: 180, date: .now, income: false, category: .food)
             ]
         }
         if let shared = accounts.first(where: { $0.sharedWithHousehold }) {
             activity.append(CanvasActivity(accountID: shared.id, title: spanish ? "Supermercado" : "Groceries",
-                amount: 2450, date: .now, income: false))
+                amount: 2450, date: .now, income: false, category: .groceries))
         }
+        activity += CanvasSpendingHistory.examples(accounts: accounts, spanish: spanish, now: .now)
         accounts = CuadraoCollectionOrder.applying(order, to: accounts)
     }
 }

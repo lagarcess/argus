@@ -5,7 +5,9 @@ struct CuadraoHomeDistribution: View {
     let accounts: [CanvasAccount]
     let currency: String
     let spanish: Bool
-    var viewChoice: CuadraoChartViewChoice?
+    var controls: CuadraoInsightControls?
+    var historical = false
+    var asOf: Date?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedKind: CanvasAccountKind?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -33,21 +35,20 @@ struct CuadraoHomeDistribution: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(spanish ? "Activos · Hoy" : "Assets · Today")
+                Text(asOf.map { (spanish ? "Activos · " : "Assets · ") + $0.formatted(.dateTime.day().month(.abbreviated).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) } ?? (historical ? (spanish ? "Sin balances en este período" : "No balances in this period") : (spanish ? "Activos · Hoy" : "Assets · Today")))
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                     Text(known.isEmpty ? "—" : CanvasMoney.format(total, currency: currency))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-distribution-total")
-                    if !typeSize.isAccessibilitySize, let viewChoice { Spacer(minLength: 8); viewChoice }
                 }
-                if typeSize.isAccessibilitySize, let viewChoice { viewChoice }
                 if accounts.count != known.count {
                     Text(spanish ? "Faltan balances por registrar" : "Some balances are missing")
                         .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 }
             }
+            if let controls { controls }
             if !positive.isEmpty {
                 distributionBar
                 HStack(spacing: 8) {

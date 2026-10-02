@@ -1743,6 +1743,24 @@ this decision.
 
 ### Cuadrao consistency pass and Home chart follow-up
 
+**Home activity refinement — October 1:** the UI preview now removes the greeting
+date and space-plus background, uses accepted household avatars above the amount,
+and adds Balance / Activity to expanded insights. Compact period and chart controls
+share a row; date headings, visible paging chevrons and Back to today are removed.
+Swipes and VoiceOver period actions remain bounded. Expenses derive from the local
+activity list with typed categories, one currency and one space; category bars,
+period distribution and expandable rows share those records. Historical assets use
+matching recorded snapshots, not current amounts relabeled as past values.
+
+**Connected disposition:** the financial-record/history owner must supply durable
+expense category identity, original currency, coverage/provenance and dated account
+snapshots before this preview becomes live insights. Exclude transfers/income,
+retain archived-account spending, and compare equivalent elapsed periods only when
+coverage supports the comparison. Household identity must derive avatars/counts from
+accepted membership, with photos optional and invitation states excluded. These are
+part of existing Financial Core / Household delivery, not a new parallel roadmap.
+
+
 Founder assigned the four-point native UI pass on October 1: a living
 [Cuadrao guide](../../.agent/designs/cuadrao/DESIGN.md), shared typography roles,
 one Accounts/Plan money editor with empty creation amounts, and a native reference

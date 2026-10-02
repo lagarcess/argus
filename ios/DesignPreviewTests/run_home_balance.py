@@ -11,5 +11,5 @@ with tempfile.TemporaryDirectory(prefix="cuadrao-home-checks-") as folder:
     (folder / "Household.swift").write_text('enum CanvasHouseholdState { case alone, joined(String) }')
     subprocess.run(["xcrun", "swiftc", "-module-cache-path", "/private/tmp/cuadrao-native-design-build/ModuleCache.noindex",
         str(folder / "Accounts.swift"), str(folder / "Household.swift"), str(canvas / "CuadraoSpacesPreview.swift"),
-        str(canvas / "CuadraoBalanceHistory.swift"), str(Path(__file__).with_name("HomeBalanceChecks.swift")), "-o", str(folder / "checks")], check=True)
+        str(canvas / "CuadraoCollectionOrder.swift"), str(canvas / "CuadraoSpendingHistory.swift"), str(canvas / "CuadraoBalanceHistory.swift"), str(Path(__file__).with_name("HomeBalanceChecks.swift")), "-o", str(folder / "checks")], check=True)
     subprocess.run([str(folder / "checks")], check=True)

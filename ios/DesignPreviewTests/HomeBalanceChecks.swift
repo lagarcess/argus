@@ -47,6 +47,28 @@ import Foundation
         check(CanvasBalanceHistory.points(accounts: [cash], observations: fixture, now: now).last?.balance == -500, "Negative current balance retained")
         let flat = CanvasBalanceHistory.points(accounts: [newcomer], observations: [], now: now)
         check(flat.count == 1 && flat[0].balance == 100, "Single observation does not pretend to be a trend")
+        let day = Calendar.current.startOfDay(for: now)
+        let earlierDay = Calendar.current.date(byAdding: .day, value: -1, to: day)!
+        let dollars = CanvasAccount(name: "USD", kind: .cash, currency: "USD", balance: 40)
+        let rows = [
+            CanvasActivity(accountID: cash.id, title: "Food", amount: 30, date: earlierDay, income: false, category: .food),
+            CanvasActivity(accountID: cash.id, title: "Home", amount: 70, date: earlierDay, income: false, category: .home),
+            CanvasActivity(accountID: cash.id, title: "Income", amount: 200, date: earlierDay, income: true),
+            CanvasActivity(accountID: dollars.id, title: "Other currency", amount: 99, date: earlierDay, income: false),
+            CanvasActivity(accountID: cash.id, title: "Future", amount: 88, date: now.addingTimeInterval(86400), income: false)
+        ]
+        let expenses = CanvasSpendingHistory.expenses(rows, accounts: [cash, dollars], currency: "DOP", now: now)
+        check(expenses.count == 2 && CanvasSpendingHistory.total(expenses) == 100, "Only expenses in selected currency through now")
+        check(CanvasSpendingHistory.expenses(rows, accounts: [dollars], currency: "DOP", now: now).isEmpty, "Other spaces excluded")
+        let buckets = CanvasSpendingHistory.buckets(expenses, range: .month)
+        check(buckets.count == 2 && Set(buckets.map(\.date)).count == 1, "Shared day stacks by category")
+        check(buckets.reduce(Decimal.zero) { $0 + $1.amount } == 100, "Category stacks reconcile with expense total")
+        check(CanvasSpendingHistory.entries(expenses, in: DateInterval(start: earlierDay, end: day)).count == 2, "Previous period owns boundary entries")
+        check(CanvasSpendingHistory.entries(expenses, in: DateInterval(start: day, end: day.addingTimeInterval(86400))).isEmpty, "Current period does not repeat previous entries")
+        let comparison = CanvasSpendingHistory.comparisonInterval(range: .month, offset: 0, now: now)
+        check(comparison.end <= CanvasHistoryRange.month.interval(now: now, offset: -1).end, "Comparable elapsed period is bounded")
+        let snapshot = CanvasBalanceHistory.snapshot(accounts: [asset], observations: fixture, at: fixture.first!.date)
+        check(snapshot.first?.balance == fixture.first(where: { $0.accountID == asset.id })?.balance, "Historical allocation uses its own dated observation")
         print("Passed \(checks) Home balance projection checks")
     }
 }

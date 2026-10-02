@@ -11,7 +11,7 @@ struct CuadraoHomeBalanceChart: View {
     let chooseCurrency: (String) -> Void
     var expanded = false
     var expand: () -> Void = {}
-    var viewChoice: CuadraoChartViewChoice?
+    var controls: CuadraoInsightControls?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var compactRange: CanvasHomeRange = .month
     @Binding var range: CanvasHistoryRange
@@ -19,11 +19,11 @@ struct CuadraoHomeBalanceChart: View {
     @State private var selectedDate: Date?
     init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], currency: String,
          currencies: [String], spanish: Bool, shared: Bool, chooseCurrency: @escaping (String) -> Void,
-         expanded: Bool = false, expand: @escaping () -> Void = {}, viewChoice: CuadraoChartViewChoice? = nil,
+         expanded: Bool = false, expand: @escaping () -> Void = {}, controls: CuadraoInsightControls? = nil,
          range: Binding<CanvasHistoryRange> = .constant(.month), periodOffset: Binding<Int> = .constant(0)) {
         self.accounts = accounts; self.observations = observations; self.currency = currency
         self.currencies = currencies; self.spanish = spanish; self.shared = shared; self.chooseCurrency = chooseCurrency
-        self.expanded = expanded; self.expand = expand; self.viewChoice = viewChoice
+        self.expanded = expanded; self.expand = expand; self.controls = controls
         _range = range; _periodOffset = periodOffset
     }
     private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now) }
@@ -55,25 +55,16 @@ struct CuadraoHomeBalanceChart: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             amountRow
-            if expanded && typeSize.isAccessibilitySize, let viewChoice { viewChoice }
             Text((expanded ? nil : selected.map { dateLabel($0.date) }) ?? (partial
                 ? (spanish ? "Balance parcial" : "Partial balance")
                 : (spanish ? "Balance neto" : "Net balance")))
                 .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("home-chart-date")
             if expanded, let point = shown {
-                if selected != nil {
-                    Text(dateLabel(point.date)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                }
                 Text(takeaway(point)).font(CuadraoTypography.supporting)
                     .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("home-chart-takeaway")
             }
-            if expanded {
-                CuadraoHistoryPeriodChoice(range: $range, spanish: spanish)
-                    .padding(.top, 8)
-                    .onChange(of: range) { _, _ in periodOffset = 0; selectedDate = nil }
-                periodHeading
-            }
+            if let controls { controls.padding(.vertical, 8) }
             if !points.isEmpty {
                 periodCanvas
                 HStack {
@@ -90,6 +81,8 @@ struct CuadraoHomeBalanceChart: View {
                     .frame(maxWidth: .infinity, minHeight: expanded ? 270 : 125)
                     .contentShape(Rectangle()).gesture(periodSwipe)
                     .accessibilityIdentifier("home-chart-empty")
+                    .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
+                    .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
             }
             if !expanded && availableRanges.count > 1 {
                 HStack(spacing: 2) {
@@ -106,7 +99,9 @@ struct CuadraoHomeBalanceChart: View {
                     }
                 }
             }
-        }.onAppear { periodOffset = max(range.oldestOffset(history), min(0, periodOffset)) }
+        }.onChange(of: range) { _, _ in selectedDate = nil }
+            .onChange(of: periodOffset) { _, _ in selectedDate = nil }
+            .onAppear { periodOffset = max(range.oldestOffset(history), min(0, periodOffset)) }
             .sensoryFeedback(.selection, trigger: selected?.date)
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
@@ -121,9 +116,6 @@ struct CuadraoHomeBalanceChart: View {
                 Text(shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—")
                     .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                     .accessibilityIdentifier("home-chart-amount")
-                if expanded && !typeSize.isAccessibilitySize, let viewChoice {
-                    Spacer(minLength: 8); viewChoice
-                }
                 if !expanded {
                     Spacer(minLength: 0)
                     Button(action: expand) {
@@ -161,32 +153,6 @@ struct CuadraoHomeBalanceChart: View {
             let end = Calendar.current.date(byAdding: .day, value: -1, to: interval.end)!
             return dateLabel(interval.start) + " – " + dateLabel(end)
         }
-    }
-    private var periodHeading: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 4) {
-                Text(periodTitle).font(CuadraoTypography.supporting).fontWeight(.medium)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityIdentifier("home-history-period")
-                periodButton(-1)
-                periodButton(1)
-            }
-            if periodOffset < 0 || selectedDate != nil {
-                Button(spanish ? "Volver a hoy" : "Back to today") { periodOffset = 0; selectedDate = nil }
-                    .font(CuadraoTypography.caption).frame(minHeight: 44).accessibilityIdentifier("home-chart-today")
-            }
-        }.frame(minHeight: 44).contentShape(Rectangle()).gesture(periodSwipe)
-            .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
-            .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
-    }
-    private func periodButton(_ direction: Int) -> some View {
-        Button { movePeriod(direction) } label: {
-            Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
-                .font(.subheadline.weight(.medium)).frame(width: 44, height: 44)
-        }.buttonStyle(.plain)
-            .disabled(direction < 0 ? periodOffset <= range.oldestOffset(history) : periodOffset >= 0)
-            .accessibilityLabel(direction < 0 ? (spanish ? "Período anterior" : "Previous period") : (spanish ? "Período siguiente" : "Next period"))
-            .accessibilityIdentifier(direction < 0 ? "home-period-previous" : "home-period-next")
     }
     private var periodSwipe: some Gesture {
         DragGesture(minimumDistance: 25).onEnded { value in
@@ -253,8 +219,13 @@ struct CuadraoHomeBalanceChart: View {
                     .simultaneously(with: SpatialTapGesture().onEnded { proxy.selectXValue(at: $0.location.x) })
             }
             .frame(height: expanded ? 270 : 125).accessibilityIdentifier("home-balance-chart")
+            .accessibilityValue(periodTitle)
+            .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
+            .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
     }
     private func dateLabel(_ date: Date) -> String {
-        date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
+        date.formatted(expanded
+            ? .dateTime.day().month(.abbreviated).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))
+            : .dateTime.day().month(.abbreviated).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
     }
 }
