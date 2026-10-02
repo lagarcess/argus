@@ -99,9 +99,14 @@ final class CuadraoSupportUITests: XCTestCase {
         app.buttons["cuadrao.updates.preferences"].tap()
         XCTAssertTrue(app.navigationBars["Notificaciones"].waitForExistence(timeout: 3))
         let quiet = app.switches["Horario de descanso"]
-        reveal(app, quiet); quiet.tap()
-        XCTAssertTrue(app.datePickers["cuadrao.quiet.start"].exists)
-        XCTAssertTrue(app.datePickers["cuadrao.quiet.end"].exists)
+        reveal(app, quiet)
+        quiet.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "1"), object: quiet)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 3), .completed)
+        let start = app.descendants(matching: .any).matching(identifier: "cuadrao.quiet.start").firstMatch
+        let end = app.descendants(matching: .any).matching(identifier: "cuadrao.quiet.end").firstMatch
+        reveal(app, start); XCTAssertTrue(start.isHittable)
+        reveal(app, end); XCTAssertTrue(end.isHittable)
         shot(app, "notification-quiet-hours-es")
         app.navigationBars.buttons.firstMatch.tap()
         app.buttons["cuadrao.updates.done"].tap()
@@ -166,6 +171,7 @@ final class CuadraoSupportUITests: XCTestCase {
         XCTAssertTrue(element.isHittable)
     }
     private func shot(_ app: XCUIApplication, _ name: String) {
+        Thread.sleep(forTimeInterval: 0.6)
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
