@@ -117,3 +117,6 @@ async def test_serial_benchmark_stops_without_retry(
     assert report.get("stop_reason") == reason
     assert report["complete"] == (reason is None)
     assert saves
+    if cost is None:
+        assert report["actual_cost_usd"] is None
+        assert report["known_cost_usd"] == "0"

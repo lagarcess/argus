@@ -51,16 +51,31 @@ again passed 632 tests. All delegated work is complete.
 
 ## Unverified and pending
 
-No paid provider call has run. Extraction accuracy, live latency and actual
-provider cost are **not measured**. The founder approved six documents, one attempt each, with a US$2 cap, using
+The founder approved six documents, one attempt each, with a US$2 cap, using
 the existing development key. The selected model is
-`deepseek/deepseek-v4-flash-vision-exp`. OpenRouter credentials are present locally;
-their values are never printed or committed. The benchmark additionally
-now uses the existing development key and a run-local reservation. Each actual
-POST reserves a full uncached context window plus the canonical output limit,
-pins a verified endpoint and sets provider price ceilings. Separate request
-and image fees are prohibited. A second attempt is blocked before HTTP;
-unknown cost stops the run. No key or account limits are changed.
+`deepseek/deepseek-v4-flash-vision-exp`.
+
+The live run at `51469c10` attempted `cord-test-0` once and stopped because the
+shared provider path returned `extraction_provider_failed` with a `ValueError`
+receipt and no token/cost receipt. Total elapsed time was 811 ms; the route
+receipt recorded 799 ms. Five documents were not sent and no retry ran.
+This is a failed live validation, not extraction accuracy evidence.
+The precise cause cannot be classified as provider configuration or application
+response handling from the retained receipt alone. The development key was
+accepted by the read-only key endpoint and had remaining allowance.
+
+Actual cost is unknown, not zero. The conservative $0.2338345856 reservation
+for the attempted request remains consumed. The subsequent key-wide daily
+usage reading was zero, but it is not request-specific proof of zero charge.
+The [live report](live-benchmark-2026-10-02.json) retains fixture hashes, exact
+code head, public endpoint metadata, budget reservation and failure outcome.
+No private document text or credentials are included.
+
+The runner uses the existing development key and a run-local reservation.
+Each actual POST reserves a full uncached context window plus the canonical
+output limit, pins a verified endpoint and sets provider price ceilings.
+Separate request and image fees are prohibited. A second attempt is blocked
+before HTTP; unknown cost stops the run. No key or account limits are changed.
 
 The benchmark's offline mode validates hashes and recorded pair review. The
 fixture tests separately check original annotation/image pairs and PDF table

@@ -184,6 +184,8 @@ async def run_live(samples, directory, extractor, budget, report, save):
             cost, usage = receipt_cost(metadata)
         except ValueError:
             report["stop_reason"] = "unknown_cost_or_multiple_attempts"
+            report["actual_cost_usd"] = None
+            report["known_cost_usd"] = str(spent)
             save(report)
             break
         result["usage"] = usage
