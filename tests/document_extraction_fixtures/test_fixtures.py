@@ -101,9 +101,14 @@ def test_synthetic_regeneration_matches_committed_documents(tmp_path):
     subprocess.run([sys.executable, str(script), "--output", str(tmp_path)], check=True)
     for sample in SAMPLES:
         if sample["synthetic"]:
-            assert (tmp_path / sample["file"]).read_bytes() == (
-                ROOT / sample["file"]
-            ).read_bytes()
+            generated, committed = tmp_path / sample["file"], ROOT / sample["file"]
+            if generated.suffix == ".png":
+                with Image.open(generated) as actual, Image.open(committed) as expected:
+                    assert actual.size == expected.size
+                    assert actual.mode == expected.mode
+                    assert actual.tobytes() == expected.tobytes()
+            else:
+                assert generated.read_bytes() == committed.read_bytes()
 
 
 def test_unreadable_document_contains_no_visible_transaction_pixels():

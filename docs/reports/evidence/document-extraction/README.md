@@ -1,10 +1,13 @@
 # Document extraction verification checkpoint
 
 Implementation head: `45a1f2eb8745a8cbd9c8ddd6a683748dfc3d8202`.
-Starting and freshly fetched integration:
-`5d403d7bf97d8154b89d88613bdb706c3a35fbb1`. Integration has not advanced;
-no reconciliation merge or overlap invalidates evidence. The modularity check
-therefore covered the would-be merged tree.
+Starting integration: `5d403d7bf97d8154b89d88613bdb706c3a35fbb1`.
+Current integration: `5edd5a82bd5affaffea4365168fcc8aea35b19fa`.
+Its intervening PR #775 changes only native design, Swift previews/tests and
+design evidence. There is no shared runtime owner, API/data contract, UI state
+owner, migration, environment variable or affected test with this extraction
+lane. Existing acceptance evidence is retained; the final PR audit records the
+one-way reconciliation merge and exact-head CI.
 
 ## Verified offline
 
@@ -39,7 +42,12 @@ P2 issue: macOS rejected an unconditional address-space limit before PDF tools
 could run. The fix uses Linux address-space limits and process RSS monitoring,
 with CPU, file and elapsed-time limits. The reviewer reran both failing tests
 and the canonical vision-tier migration test. Its final delta review reported
-no remaining P1/P2 findings. All delegated work is complete.
+no remaining P1/P2 findings. A subsequent Linux CI run found only a fixture rendering mismatch (9,954 other
+backend tests passed). Synthetic PNGs now use embedded bitmap glyphs and
+regeneration checks exact decoded pixels rather than compression bytes. Both
+image/label pairs were visually rechecked and hashes refreshed. Independent
+delta review was clean, with 30 focused tests passing. The full focused suite
+again passed 632 tests. All delegated work is complete.
 
 ## Unverified and pending
 
@@ -55,11 +63,13 @@ The benchmark's offline mode validates hashes and recorded pair review. The
 fixture tests separately check original annotation/image pairs and PDF table
 arithmetic. Expected labels never enter production extraction inputs.
 
-PostgreSQL execution is pending CI's disposable Supabase matrix. Poppler exists
+The push CI disposable Supabase matrix passed, including the two new PostgreSQL
+tests. Final-head CI is recorded on the PR. Poppler exists
 locally and CI installs it explicitly; hosted Poppler availability is not proven.
 Deployment requires applying the two migrations and provisioning PDF tools,
 Pillow, a vision model and registered provider credentials. The feature defaults
-off. No hosted migration, deployment or merge was performed.
+off. No manual hosted migration, deployment or merge was performed. The repository's
+automatic Supabase PR preview ran successfully.
 
 Native design, existing demos and other connectors were not modified. There is
 no Dominican-bank compatibility claim. This checkpoint is not a READY claim.

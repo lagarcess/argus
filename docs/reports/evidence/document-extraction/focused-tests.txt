@@ -49,4 +49,4 @@ tests/test_openapi_compatibility.py .......................              [ 99%]
 tests/test_route_receipt_tiers_migration.py .                            [ 99%]
 tests/test_document_extractions_postgres.py ss                           [100%]
 
-======================= 632 passed, 2 skipped in 12.17s ========================
+======================= 632 passed, 2 skipped in 12.73s ========================

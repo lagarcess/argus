@@ -63,9 +63,16 @@ def generate(output: Path) -> None:
         else:
             image = Image.new("RGB", (1100, 700), (244, 241, 233))
             draw = ImageDraw.Draw(image)
-            font = ImageFont.load_default(size=26)
+            # Embedded bitmap glyphs avoid host FreeType rasterization differences.
+            font = ImageFont.load_default_imagefont()
             for index, line in enumerate(sample["pages"][0]):
-                draw.text((35, 35 + index * 65), line, fill=(40, 40, 40), font=font)
+                bounds = font.getbbox(line)
+                glyphs = Image.new("L", (bounds[2], bounds[3]))
+                ImageDraw.Draw(glyphs).text((0, 0), line, fill=255, font=font)
+                glyphs = glyphs.resize(
+                    (glyphs.width * 3, glyphs.height * 3), Image.Resampling.NEAREST
+                )
+                image.paste((40, 40, 40), (35, 35 + index * 65), glyphs)
             if sample["id"] == "unreadable":
                 draw.rectangle((30, 155, 1060, 640), fill=(80, 80, 80))
             image.save(path)

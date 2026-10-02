@@ -21,15 +21,15 @@
     },
     {
       "id": "receipt-dop",
-      "sha256": "f64c1d169c98236701988ff6a29349f214fac5cb3d0a14ead80fcd36626934a6"
+      "sha256": "009f3082c0052c66be647a12a9c0967470c041fb648733cf45ba077740da25c3"
     },
     {
       "id": "unreadable",
-      "sha256": "f3169d630675697d6d03eaf1a52adc105bc406bfc73e76a93afaf7d30b637394"
+      "sha256": "b822720e186af2390eea6b1c221536267b7c3ee96b2239e16719020759b59307"
     }
   ],
-  "manifest_sha256": "84346ca20162127e8a1664a55517c9ff31b8817cec8d5b18a3d8e99b050e61d2",
-  "git_head": "45a1f2eb8745a8cbd9c8ddd6a683748dfc3d8202",
+  "manifest_sha256": "73679ad70285f8723e65b8df2edf66105a84aac4cdea6105c05d39269aca371c",
+  "git_head": "cb99ea9d78ba6741f680afeb3794cb1035e08811",
   "model": "",
   "actual_cost_usd": "0",
   "complete": true,
