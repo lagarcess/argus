@@ -131,6 +131,9 @@ struct CanvasActivity: Identifiable {
                 let month = Calendar.current.dateInterval(of: .month, for: Date.now)!
                 activity.removeAll { $0.date >= month.start }
             }
+            if ProcessInfo.processInfo.arguments.contains("--insights-first-use") {
+                activity = []; expenseCoverageStarts = [:]; balanceObservations = []
+            }
             if ProcessInfo.processInfo.arguments.contains("--insights-no-coverage") { expenseCoverageStarts = [:] }
             accounts = CuadraoCollectionOrder.applying(order, to: accounts)
         }
@@ -177,7 +180,7 @@ struct CanvasAccountRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 5) {
                 Text(account.balance.map { CanvasMoney.format($0, currency: account.currency) } ?? "—")
-                    .font(.subheadline.weight(.medium)).monospacedDigit()
+                    .font(CuadraoTypography.rowAmount)
                 Text(account.currency + (account.kind.isDebt ? (spanish ? " · pendiente" : " · owed") : ""))
                     .font(.caption).foregroundStyle(.secondary)
             }

@@ -708,6 +708,7 @@ need an explicit request and a new dated checkpoint.
 
 Native Cuadrao appearance and interaction decisions for the design-preview Home
 path live in [`.agent/designs/cuadrao/DESIGN.md`](../cuadrao/DESIGN.md), including
-the October 1, 2026 Home activity / historical-insights lock from checkpoint
-`5ae634279e358a6bd130b12f59c6a067f77c2c25`. Connected Cuadrao continues to own
+the October 2, 2026 balance-change / visual-state polish from checkpoint
+`8cf52a18acaad9d3805311f424e37d2e124af515` (after Home activity insights
+`5ae634279e358a6bd130b12f59c6a067f77c2c25`). Connected Cuadrao continues to own
 runtime financial truth; the living guide does not invent backend owners.

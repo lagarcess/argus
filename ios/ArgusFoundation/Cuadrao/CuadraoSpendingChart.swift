@@ -9,6 +9,7 @@ struct CuadraoSpendingChart: View {
     let distribution: Bool
     let range: CanvasHistoryRange
     @Binding var periodOffset: Int
+    var record: (() -> Void)?
     var controls: CuadraoInsightControls?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedPosition: String?
@@ -57,11 +58,15 @@ struct CuadraoSpendingChart: View {
                 }
                 Text(selectedSlot.map { range == .year ? $0.start.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) : story.periodText($0, spanish: spanish) } ?? (spanish ? "Gastos registrados" : "Recorded spending"))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("home-spending-insight")
+                if story.state == .populated {
+                    Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("home-spending-insight")
+                }
             }
             if let controls { controls }
-            if distribution { allocation } else { chart }
+            if story.state == .populated {
+                if distribution { allocation } else { chart }
+            } else { emptyState }
             ForEach(categories) { category in categoryRow(category) }
             CuadraoSpendingHighlights(story: story, currency: currency, spanish: spanish)
         }.onChange(of: range) { _, _ in clearSelection() }
@@ -69,6 +74,35 @@ struct CuadraoSpendingChart: View {
             .onChange(of: distribution) { _, _ in clearSelection() }
             .sensoryFeedback(.selection, trigger: selectedSlot?.start)
             .sensoryFeedback(.selection, trigger: periodOffset)
+    }
+    private var emptyState: some View {
+        CuadraoChartState(title: emptyTitle, detail: emptyDetail,
+            actionTitle: story.state == .firstUse && record != nil ? (spanish ? "Registrar un gasto" : "Record an expense") : nil,
+            action: story.state == .firstUse ? record : nil)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("home-spending-chart")
+            .accessibilityValue(String(periodOffset))
+    }
+    private var emptyTitle: String {
+        switch story.state {
+        case .firstUse: return spanish ? "Tu historia empieza aquí" : "Your story starts here"
+        case .unavailable: return spanish ? "Falta una parte de la historia" : "Part of the story is missing"
+        case .emptyPeriod:
+            if periodOffset == 0 && range == .month {
+                let month = interval.start.formatted(.dateTime.month(.wide).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
+                return spanish ? "\(month.prefix(1).uppercased() + month.dropFirst()) empieza aquí" : "\(month) starts here"
+            }
+            return spanish ? "Un período sin gastos" : "A period without spending"
+        case .populated: return ""
+        }
+    }
+    private var emptyDetail: String {
+        switch story.state {
+        case .firstUse: return spanish ? "Registra tu primer gasto para empezar a ver tu ritmo." : "Record your first expense to start seeing your rhythm."
+        case .unavailable: return spanish ? "El historial de este período está incompleto. No lo contamos como cero." : "This period's history is incomplete. We don't count it as zero."
+        case .emptyPeriod: return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet."
+        case .populated: return ""
+        }
     }
     private var chart: some View {
         Chart {
@@ -96,27 +130,17 @@ struct CuadraoSpendingChart: View {
             .chartXAxisLabel(position: .bottom, alignment: .leading) {
                 Text(axisContext).font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
-            .chartYAxis {
-                if entries.isEmpty { AxisMarks(position: .trailing, values: [0]) }
-                else { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
-            }
+            .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
             .chartOverlay { proxy in
                 GeometryReader { geometry in
                     CuadraoChartTouchSurface(inspect: { inspect($0, proxy: proxy, geometry: geometry) })
                 }
             }
-            .frame(height: entries.isEmpty ? 170 : 270).padding(14)
-            .overlay {
-                if entries.isEmpty {
-                    Image(systemName: "chart.bar.xaxis")
-                        .font(.system(size: 32, weight: .light)).foregroundStyle(WelcomePalette.pine.opacity(0.5))
-                        .allowsHitTesting(false).accessibilityHidden(true)
-                }
-            }
+            .frame(height: 270).padding(14)
             .background(WelcomePalette.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 22))
             .accessibilityIdentifier("home-spending-chart")
             .accessibilityValue(String(periodOffset))
-            .accessibilityLabel(entries.isEmpty ? insight : (spanish ? "Gastos por período" : "Spending by period"))
+            .accessibilityLabel(spanish ? "Gastos por período" : "Spending by period")
     }
     private func inspect(_ location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
         guard let frame = proxy.plotFrame else { return }
