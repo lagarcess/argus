@@ -703,3 +703,11 @@ Recents, account activity and global Search retain the shared quiet search
 language. Empty Chats and no matching results offer an explicit New chat action.
 No additional visual exploration is required by this freeze; later changes
 need an explicit request and a new dated checkpoint.
+
+## Cuadrao native living guide
+
+Native Cuadrao appearance and interaction decisions for the design-preview Home
+path live in [`.agent/designs/cuadrao/DESIGN.md`](../cuadrao/DESIGN.md), including
+the October 1, 2026 Home activity / historical-insights lock from checkpoint
+`5ae634279e358a6bd130b12f59c6a067f77c2c25`. Connected Cuadrao continues to own
+runtime financial truth; the living guide does not invent backend owners.

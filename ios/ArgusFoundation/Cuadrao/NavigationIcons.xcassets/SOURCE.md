@@ -17,3 +17,9 @@ September 30 reference screenshots (6a08c79f-7ece-4dcb-b26a-6fff301bb702 and
 1dcbf13e-b888-4d3c-b17b-f656524e2a25). Rounded outline strokes preserve the
 reference shapes; background and gray pixels are not part of the template assets.
 These redraws are not claimed to be original vendor SVGs.
+
+`CuadraoCategory-food`, `CuadraoCategory-groceries` and `CuadraoCategory-leisure`
+are original simple outline vectors added for Activity on October 1, 2026. They
+match Home's 24-point viewBox, 1.7-point round strokes and template rendering.
+They are not claimed to be copied vendor assets. Home/transport/other categories
+reuse the approved property/vehicle/asset paths directly, not a second redraw.
