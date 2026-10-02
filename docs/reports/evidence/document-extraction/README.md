@@ -305,3 +305,69 @@ in the evidence or regression. Current integration remains
 `8e06e892a8cc035fe0c6cb0223fae27cd050b2c3`. The later evidence and rejection
 regression do not change the executed runtime. No further paid call, merge, manual deployment or feature enablement was
 performed. Live end-to-end acceptance remains blocked.
+
+## Durable capture foundation, October 2
+
+The founder clarified CAPTURE → SAVE → PREPARE → REVIEW → APPROVE. The current
+[API contract](../../../API_CONTRACT.md#document-capture-preparation-and-review),
+[data model](../../../DATA_MODEL.md#import-reconciliation),
+[MVEE](../../../specs/argus-minimum-viable-ecosystem-experience.md#4-information-ingestion-one-destination-several-entry-methods)
+and [main execution board](../../../specs/argus-execution-board.md#shared-document-draft-foundation-pr-776)
+now own that direction. Earlier transient-file and whole-batch-rejection reports
+above remain historical evidence, not current requirements.
+
+Runtime checkpoint `e5d97f6b` saves supported source bytes and a durable draft in
+the existing document table before background preparation. The statement connection
+is the shared draft ID. Capture succeeds without provider consent or an available
+extractor. Explicit preparation consent remains necessary for a model request.
+Interrupted provider work needs attention instead of automatic retry; saved
+candidate delivery replays without another model request. Draft/source reads are
+owner-only and uncached, and disconnect deletes retained source without deleting
+accepted activity. The additive migration has not been applied to hosted storage.
+
+Preparation retains observations, receipt itemization and review issues separately
+from canonical candidates. The [offline replay](durable-draft-offline-2026-10-02.json)
+uses the typed observations captured during the authorized Luna request. All five
+remain available. Four project into canonical evidence, including both exact
+transactions and the compatible period/closing balance. The remaining balance keeps
+its original null scope with a `balance_scope` review issue. No scope was inferred
+from fixture order, amount or text; no transaction was missing or invented.
+Opening and running scopes are separately tested as preserved review-only evidence.
+
+The preparation schema now carries receipt details and category suggestions.
+Multiple purchase observations or contradictions in total/date/currency remain
+issues instead of duplicate expense candidates. Destination, payer, participants,
+equal/item method and shared-item assignments remain editable proposals on the
+same draft. An initial Plan hint can be saved atomically with capture, and edits
+use version checks. These references grant no access, sharing or authority to
+change a plan's currency. Full Plan authorization/currency review, group approval,
+Chat actions and native presentation remain integration work. The expanded schema
+has not been measured live; no new provider request was authorized or made.
+
+Verification at this checkpoint:
+
+- 662 focused ingestion/OpenRouter tests passed, including capture failure,
+  source reopen, projection, receipt ambiguity, duplicate/recovery, owner isolation,
+  and HTTP review/preview/accept with idempotent MoneyService confirmation.
+- 272 mocked eval checks and 23 OpenAPI compatibility checks passed.
+- Three real PostgreSQL tests skipped locally because no disposable database was
+  configured and Docker was unavailable. They cover fresh-pool persistence, owner
+  isolation, version checks, legacy source fill and disconnect fencing in CI.
+  In-memory reopen tests alone are not evidence of process-independent persistence.
+- Ruff, modularity, diff checks and changed-document links passed.
+- Independent final review was clean after bounding participant references. Four
+  regression cases failed before that fix and passed afterward. The comment review
+  removed one inaccurate statement; no unresolved findings remain in these reviews.
+
+Original base remains `5d403d7bf97d8154b89d88613bdb706c3a35fbb1`; refreshed
+integration remains `8e06e892a8cc035fe0c6cb0223fae27cd050b2c3`, already reconciled
+by `d83822c652990944a6db7fac6d2c1ceafed50e3a`. No new integration overlap or merge
+was introduced. Earlier live provider results remain evidence for their recorded
+code only; current draft behavior is supported by offline checks. Current-head CI
+is tracked in PR #776. This is a backend checkpoint, not a READY/enablement claim.
+
+New paid cost is **$0**. Consumed cumulative reservations remain
+**$2.9205875136** of $6, leaving **$3.0794124864**. Cumulative known actual subtotal
+remains **$0.00601217036**; the full actual total remains unknown. The model still
+resolves to `openai/gpt-6-luna`. No merge, manual deployment, hosted configuration
+change, privacy relaxation or feature enablement was performed.
