@@ -39,7 +39,7 @@ def earliest(item: dict[str, Any], state: dict[str, Any], today: date) -> date:
             today,
             *[
                 date.fromisoformat(link["snapshot"]["due_date"]) + timedelta(days=1)
-                for key, link in state["links"].items()
+                for key, link in claims.protected_links(state).items()
                 if link.get("goal_id") == item["id"] and claims.occurrence_id(key, link)
             ],
         ]
@@ -109,6 +109,8 @@ def edit(
     accounts: list[StoredAccount],
     state: dict[str, Any],
     today: date,
+    *,
+    contribution_amount: str | None = None,
 ) -> None:
     if body.expected_version != item["version"]:
         raise StaleVersion()
@@ -122,7 +124,10 @@ def edit(
         item["target_date"] = body.model_dump(mode="json")["target_date"]
     if body.archived is not None:
         item["archived"] = body.archived
-    if body.model_fields_set & {"destination_account_id", "contribution_plan"}:
+    if contribution_amount is not None or body.model_fields_set & {
+        "destination_account_id",
+        "contribution_plan",
+    }:
         cutover = body.effective_date or earliest(item, state, today)
         if cutover < earliest(item, state, today):
             raise model.UnsafeCutover(earliest(item, state, today))
@@ -137,6 +142,13 @@ def edit(
                 if body.contribution_plan
                 else None
             )
+        if contribution_amount is not None:
+            if plan is None:
+                model.fail(
+                    "goal_setup_required",
+                    "Configure the original contribution plan first.",
+                )
+            plan = plan | {"amount": contribution_amount}
         setup(item, accounts, plan)
         if plan:
             schedule = Schedule.model_validate(plan["schedule"])
@@ -214,7 +226,7 @@ def occurrences(state: dict[str, Any], until: date) -> dict[str, dict[str, Any]]
                     "destination_account_id": part["destination_account_id"],
                     "due_date": due.isoformat(),
                 }
-    for key, link in state["links"].items():
+    for key, link in claims.protected_links(state).items():
         oid = claims.occurrence_id(key, link)
         if link.get("goal_id") and oid:
             result[oid] = link["snapshot"] | {

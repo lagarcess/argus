@@ -160,13 +160,13 @@ final class FinancialLoopModel: ObservableObject {
     }
 
     func correct(_ activity: FinancialActivityDetail) {
-        guard let id = activity.legs.first?.accountId,
+        guard activity.originalAmountAvailable, let id = activity.legs.first?.accountId,
               let account = accounts.accounts.first(where: { $0.id == id }) else { return }
         record(account, correcting: activity)
     }
 
     func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil) {
-        guard let identity, pendingConfirmation == nil else { return }
+        guard let identity, pendingConfirmation == nil, correctingAmountAvailable(activity), correctingAmountAvailable(returning) else { return }
         let ticket = generation
         activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, goal: goal, goalOccurrenceId: goalOccurrenceId, debt: debt, debtOccurrenceId: debtOccurrenceId, returning: returning, controller: controller,
             journal: journal, identity: identity, started: { [weak self] write in
@@ -184,9 +184,10 @@ final class FinancialLoopModel: ObservableObject {
     }
 
     func returnPayment(_ activity: FinancialActivityDetail) {
-        guard let source = activity.legs.first(where: { $0.role == "source" })?.accountId, let account = accounts.accounts.first(where: { $0.id == source }) else { return }
+        guard activity.originalAmountAvailable, let source = activity.legs.first(where: { $0.role == "source" })?.accountId, let account = accounts.accounts.first(where: { $0.id == source }) else { return }
         record(account, returning: activity)
     }
+    private func correctingAmountAvailable(_ activity: FinancialActivityDetail?) -> Bool { activity?.originalAmountAvailable ?? true }
 
     func retryPending() async {
         guard let identity, let write = pendingConfirmation, !recovering else { return }

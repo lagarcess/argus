@@ -15,35 +15,16 @@ def contributions(
     state: dict[str, Any], accounts: list[StoredAccount]
 ) -> dict[str, list[dict[str, Any]]]:
     actual = {a["activity_id"]: a for a in current_activities(accounts)}
-    by_id = {a.account.id: a.account for a in accounts}
     result: dict[str, list[dict[str, Any]]] = {gid: [] for gid in state["goals"]}
     for cid, link in state["links"].items():
         if not link.get("goal_id"):
             continue
         accepted = link["attribution"]
         entry = actual.get(link["activity_id"])
-        destination = by_id.get(accepted["destination_account_id"])
-        source = by_id.get(accepted["source_account_id"])
-        valid = bool(
-            entry
-            and destination
-            and source
-            and destination.type in CASH_TYPES
-            and source.type in CASH_TYPES
-            and destination.currency == accepted["currency"]
-            and source.currency == accepted["currency"]
-            and goal_model.transfer_matches(
-                entry,
-                accepted["source_account_id"],
-                accepted["destination_account_id"],
-                accepted["currency"],
-            )
+        amount = contribution_minor(
+            entry, accepted, state.get("_canonical_records", accounts)
         )
-        amount = (
-            personal_share(entry["amount_minor"], destination.ownership_share_bps)
-            if valid
-            else None
-        )
+        valid = amount is not None
         counting = accepted["counting"]
         result[link["goal_id"]].append(
             {
@@ -73,9 +54,9 @@ def contributions(
     return result
 
 
-def project(
-    state: dict[str, Any], accounts: list[StoredAccount], today: date, end: date
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def pool_assignments(
+    state: dict[str, Any], accounts: list[StoredAccount]
+) -> tuple[dict, dict, dict]:
     linked = contributions(state, accounts)
     amounts: dict[str, dict[str, int]] = {}
     unresolved: dict[str, list[str]] = {}
@@ -93,6 +74,82 @@ def project(
                 amounts[gid][aid] = amounts[gid].get(aid, 0) + int(
                     link["current_personal_minor"]
                 )
+    for entry in state.get("_pool_external", []):
+        gid = entry["goal_id"]
+        values = amounts.setdefault(gid, {})
+        if "attribution" in entry:
+            accepted = entry["attribution"]
+            aid = accepted["destination_account_id"]
+            canonical = getattr(accounts, "canonical", None)
+            if canonical is not None:
+                from argus.domain.recording.money_reads import render_activity
+
+                revision = canonical.current.get(entry["activity_id"])
+                actual = (
+                    render_activity(
+                        entry["activity_id"],
+                        canonical.history[entry["activity_id"]],
+                        revision,
+                    )
+                    if revision is not None
+                    else None
+                )
+            else:
+                actual = state.get("_canonical_activities", {}).get(entry["activity_id"])
+            value = contribution_minor(
+                actual, accepted, state.get("_canonical_records", accounts)
+            )
+            if value is None:
+                unresolved.setdefault(gid, []).append("contribution_unavailable")
+            else:
+                values[aid] = values.get(aid, 0) + value
+        else:
+            aid = entry["account_id"]
+            values[aid] = values.get(aid, 0) + entry["amount"]
+    return amounts, unresolved, linked
+
+
+def contribution_minor(
+    actual: dict | None, accepted: dict, accounts: list[StoredAccount]
+) -> int | None:
+    by_id = {s.account.id: s.account for s in accounts}
+    source = by_id.get(accepted["source_account_id"])
+    destination = by_id.get(accepted["destination_account_id"])
+    if (
+        not actual
+        or not source
+        or not destination
+        or any(
+            a.type not in CASH_TYPES or a.currency != accepted["currency"]
+            for a in (source, destination)
+        )
+        or not goal_model.transfer_matches(
+            actual, source.id, destination.id, accepted["currency"]
+        )
+    ):
+        return None
+    return personal_share(actual["amount_minor"], destination.ownership_share_bps)
+
+
+def scheduled_minor(row: dict, accounts: list[StoredAccount]) -> int | None:
+    by_id = {s.account.id: s.account for s in accounts}
+    source = by_id.get(row["source_account_id"])
+    destination = by_id.get(row["destination_account_id"])
+    if (
+        not source
+        or not destination
+        or any(
+            account.type not in CASH_TYPES or account.currency != row["currency"]
+            for account in (source, destination)
+        )
+    ):
+        return None
+    return personal_share(row["amount_minor"], destination.ownership_share_bps)
+
+
+def pool_facts(
+    state: dict[str, Any], accounts: list[StoredAccount], amounts: dict
+) -> dict:
     pools = {}
     for stored in accounts:
         account = stored.account
@@ -129,12 +186,22 @@ def project(
             else "shortfall"
             if total > backing
             else "backed",
-            "affected_goal_ids": claimants,
-            "affected_goal_names": [state["goals"][gid]["name"] for gid in claimants],
+            "affected_goal_ids": [gid for gid in claimants if gid in state["goals"]],
+            "affected_goal_names": [
+                state["goals"][gid]["name"] for gid in claimants if gid in state["goals"]
+            ],
+            "_claimant_count": len(claimants),
         }
+    return pools
+
+
+def project(
+    state: dict[str, Any], accounts: list[StoredAccount], today: date, end: date
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    amounts, unresolved, linked = pool_assignments(state, accounts)
+    pools = pool_facts(state, accounts, amounts)
     upcoming = goal_model.occurrences(state, end)
     results = []
-    by_id = {a.account.id: a.account for a in accounts}
     for gid, item in state["goals"].items():
         reasons = list(unresolved[gid])
         support, independent = 0, 0
@@ -147,12 +214,12 @@ def project(
                 reasons.append("account_changed")
                 resolved = False
                 continue
-            components.append(pool)
+            components.append({k: v for k, v in pool.items() if not k.startswith("_")})
             component_support = (
                 assigned
                 if pool["state"] == "backed"
                 else min(assigned, int(pool["backing_minor"]))
-                if pool["state"] == "shortfall" and len(pool["affected_goal_ids"]) == 1
+                if pool["state"] == "shortfall" and pool["_claimant_count"] == 1
                 else None
             )
             allocation_components.append(
@@ -171,7 +238,7 @@ def project(
                 independent += assigned
             elif pool["state"] == "shortfall":
                 reasons.append("pool_shortfall")
-                if len(pool["affected_goal_ids"]) == 1:
+                if pool["_claimant_count"] == 1:
                     support += min(assigned, int(pool["backing_minor"]))
                 else:
                     resolved = False
@@ -183,21 +250,17 @@ def project(
         for oid, row in upcoming.items():
             if row["goal_id"] != gid or claims.for_occurrence(state, oid):
                 continue
-            destination = by_id.get(row["destination_account_id"])
-            source = by_id.get(row["source_account_id"])
-            if (
-                not destination
-                or not source
-                or any(
-                    a.type not in CASH_TYPES or a.currency != item["currency"]
-                    for a in (source, destination)
-                )
-            ):
+            expected = scheduled_minor(row, accounts)
+            if expected is None:
                 planned_valid = False
                 continue
-            planned += personal_share(
-                row["amount_minor"], destination.ownership_share_bps
-            )
+            from . import shared_claims
+
+            shared = shared_claims.for_occurrence(state, oid, accounts)
+            if shared is not None and shared["amount"] is None:
+                planned_valid = False
+            else:
+                planned += max(0, expected - (shared["amount"] if shared else 0))
         actual = support if resolved else None
         results.append(
             {
@@ -227,4 +290,7 @@ def project(
             }
         )
     results.sort(key=lambda result: (result["goal"]["name"], result["goal"]["id"]))
-    return results, list(pools.values())
+    return results, [
+        {k: v for k, v in pool.items() if not k.startswith("_")}
+        for pool in pools.values()
+    ]

@@ -13,6 +13,7 @@ from argus.domain.recording.money_responses import (
 from argus.domain.recording.money_schemas import MoneyRequest
 from argus.domain.recording.schemas import FinancialAccountResponse
 
+from .planning_schemas import PlanRef, SharedPlan
 from .schemas import VersionRequest
 
 
@@ -70,6 +71,7 @@ class Snapshot(BaseModel):
     accounts: list[SharedAccount]
     activities: list[SharedActivity]
     positions: list[Position]
+    plans: list[SharedPlan] = []
 
 
 class SharedDetail(BaseModel):
@@ -83,10 +85,11 @@ class ActivityHistory(BaseModel):
 
 class SearchHit(BaseModel):
     id: str
-    kind: Literal["account", "activity"]
+    kind: Literal["account", "activity", "plan"]
     title: str
-    account_id: str
+    account_id: str | None
     activity_id: str | None = None
+    plan_ref: PlanRef | None = None
 
 
 class SearchPage(BaseModel):

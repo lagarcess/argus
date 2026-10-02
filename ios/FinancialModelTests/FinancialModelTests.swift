@@ -5,6 +5,23 @@ import XCTest
 
 @MainActor
 final class FinancialModelTests: XCTestCase {
+    func testRedactedOriginalHasUnknownDisplayAndCannotOpenCorrectionOrReturn() async throws {
+        let fixture = try PresentationFixture(); let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity); await accounts.load()
+        let account = try XCTUnwrap(accounts.accounts.first)
+        let redacted = try MoneyActivityWireFixture.detail(source: UUID(), destination: account.id, redacted: true)
+        XCTAssertEqual(AccountPresentation.amount(redacted.amount, locale: Locale(identifier: "es_419")), NSLocalizedString("accounts.unknown", comment: ""))
+        loop.correct(redacted); XCTAssertNil(loop.activityEditor)
+        loop.returnPayment(redacted); XCTAssertNil(loop.activityEditor)
+        loop.record(account, correcting: redacted); XCTAssertNil(loop.activityEditor)
+        let full = try MoneyActivityWireFixture.detail(source: account.id, destination: UUID(), redacted: false)
+        loop.correct(full)
+        let editor = try XCTUnwrap(loop.activityEditor)
+        XCTAssertEqual(editor.amount, AccountPresentation.amount(MoneyActivityWireFixture.amount, locale: .current))
+        XCTAssertEqual(editor.sourceAccountId, account.id)
+    }
     func testDetail401RetiresSessionAndClosesAccountIdentity() async throws {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()

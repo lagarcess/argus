@@ -61,6 +61,9 @@ def scene(request):
     yield service, user, account.account.id
     if pool:
         with pool.connection() as connection:
+            from tests.household.shared_cleanup import cleanup
+
+            cleanup(connection, [user])
             connection.execute("delete from auth.users where id=%s", (user,))
         pool.close()
 
