@@ -13,6 +13,7 @@ struct CuadraoHomeCanvas: View {
         reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
         empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
     @State private var profile = CanvasProfileDraft()
+    @State private var profilePath: [CanvasProfileRoute] = []
     @State private var updateReadIDs: Set<CanvasUpdate> = []
     @State private var searchChatOrigin = false
     @State private var chatEditing = false
@@ -25,6 +26,7 @@ struct CuadraoHomeCanvas: View {
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
     @State private var accountPath: [UUID] = []
     @State private var archivedID: UUID?
+    private let navigationBarHeight: CGFloat = 72
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
@@ -85,7 +87,8 @@ struct CuadraoHomeCanvas: View {
             if selectedTab != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
                 CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
             }
-            if (accountPath.isEmpty || selectedTab != .home) && !(selectedTab == .assistant && chatEditing) {
+            if (accountPath.isEmpty || selectedTab != .home) &&
+                (profilePath.isEmpty || selectedTab != .profile) && !(selectedTab == .assistant && chatEditing) {
             ZStack {
                 if chat.voiceMessage.state != .recording {
                     CuadraoNavigationBar(selection: tabSelection,
@@ -95,7 +98,7 @@ struct CuadraoHomeCanvas: View {
                         .padding(.bottom, 8)
                         .transition(.opacity)
                 }
-            }.frame(height: 72)
+            }.frame(height: navigationBarHeight)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chat.voiceMessage.state == .recording)
             }
             }
@@ -314,8 +317,8 @@ struct CuadraoHomeCanvas: View {
                     }
                 }
         } else if tab == .profile {
-            CuadraoProfileCanvas(spanish: spanish, includeExamples: populated, profile: $profile)
-                .safeAreaPadding(.bottom, chat.voice.active ? 144 : 80)
+            CuadraoProfileCanvas(spanish: spanish, includeExamples: populated, profile: $profile,
+                path: $profilePath, bottomSpace: navigationBarHeight + 8 + (chat.voice.active ? 64 : 0))
         } else if tab == .plan && voiceProposal == nil {
             CuadraoPlanCanvas(store: plans, accounts: data, spanish: spanish,
                 bottomSpace: chat.voice.active ? 160 : 90)
