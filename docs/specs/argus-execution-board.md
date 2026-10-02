@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
-**Updated:** October 1, 2026.
-**Execution state:** Tip lineage includes [PR #766](https://github.com/lagarcess/argus/pull/766) Household native consent + canonical financial activity (product squash `079ec8d819f8e2513cc624bfa7a4eb9ca60c7627` from Exact head `04831ccb12a46b89a3cd5f5391139d3589321815` onto tip `09ce4e0a…`), [PR #760](https://github.com/lagarcess/argus/pull/760) Connected Cuadrao auth/Home (product squash `819870e6…`; docs landing `#765`), and [PR #763](https://github.com/lagarcess/argus/pull/763) default-off Household membership API (`fbcc399b…`; docs landing `#764`). Household remains server-default-off. Physical iPhone/internet delivery and hosted enablement remain pending. Design checkpoints remain founder-named only. Chat/voice stack remains parked. All landed personal financial journeys and their demonstrations remain preserved. No deployment, hosted enablement, paid providers, signing or `main` promotion is authorized by these landings.
+**Updated:** October 2, 2026.
+**Execution state:** Tip lineage includes [PR #773](https://github.com/lagarcess/argus/pull/773) shared Household planning (product squash `f28b56421caf71d6610caf1cce891e1848e0ace1` from Exact head `dee829f8a3a7f83fb25cd81aaf3fa6deac8bfe45` onto tip `15e579315…`), [PR #766](https://github.com/lagarcess/argus/pull/766) Household native consent + canonical financial activity (product squash `079ec8d8…`; docs landing `#767`), [PR #760](https://github.com/lagarcess/argus/pull/760) Connected Cuadrao auth/Home (product squash `819870e6…`; docs landing `#765`), and [PR #763](https://github.com/lagarcess/argus/pull/763) default-off Household membership API (`fbcc399b…`; docs landing `#764`). Household remains server-default-off. Physical iPhone/internet delivery and hosted enablement remain pending. Design checkpoints remain founder-named only. Chat/voice stack remains parked. All landed personal financial journeys and their demonstrations remain preserved. No deployment, hosted enablement, paid providers, signing or `main` promotion is authorized by these landings.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -12,7 +12,12 @@ Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
 ## Connected shared Household planning lane
 
-**Assigned 2026-10-01; connected local acceptance complete; independent review clean.** Full original integration base:
+**Landed 2026-10-02 via [PR #773](https://github.com/lagarcess/argus/pull/773)** (Exact head
+`dee829f8a3a7f83fb25cd81aaf3fa6deac8bfe45`; product squash
+`f28b56421caf71d6610caf1cce891e1848e0ace1` onto tip `15e579315…`). See
+[PR #773 integration landing](#pr-773-integration-landing).
+
+**Assigned 2026-10-01; connected local acceptance complete; independent review clean; merge complete.** Full original integration base:
 `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`, freshly fetched and verified to
 include #763/#764, #760/#765 and #766/#767. Worker:
 `codex/shared-household-planning`, isolated managed worktree. Preserve the landed
@@ -217,14 +222,15 @@ shows own correction, authorized bill edit, Search return and Spanish reopen.
 use only 59750–59755, the new bundle/cache and retained synthetic users/data.
 
 **Remaining limits:** no physical-iPhone/internet verification, deployment,
-hosted migration/enablement or external invitation delivery. The lane remains
-unmerged. One non-blocking invalid-frame runtime warning is retained in the
-native result; the established root/design is unchanged. Other MVEE journeys,
-including imports, Updates and conversation/voice, keep their existing owners
-and scope in this manifest. Completed writers/reviewer are stopped. The demo API,
-Auth/Postgres and CAPTCHA bridge remain available; temporary fault/recording
-helpers are stopped. Existing demos, design simulator/cache and phone services
-are preserved.
+hosted migration/enablement or external invitation delivery. The product squash
+is landed on integration; additive migrations are not production-applied. One
+non-blocking invalid-frame runtime warning is retained in the native result; the
+established root/design is unchanged. Other MVEE journeys, including imports,
+Updates and conversation/voice, keep their existing owners and scope in this
+manifest. Completed writers/reviewer are stopped. The demo API, Auth/Postgres
+and CAPTCHA bridge remain available; temporary fault/recording helpers are
+stopped. Existing demos, design simulator/cache and phone services are
+preserved.
 
 ### Outcome, owners and execution
 
@@ -417,6 +423,41 @@ this lane's four shared-plan journeys, recording and assembled acceptance remain
 undelivered and required. The next writer resumes the existing branch and fixed
 design snapshot, not a new roadmap or a replacement environment.
 
+## PR #773 integration landing
+
+Founder-confirmed squash merge of the verified shared Household planning head;
+integration landing completes the register under standing Project authority.
+This grant does not authorize deployment, hosted configuration changes, paid
+providers, phone-environment actions, design-checkpoint adoption, Preview
+repair, ingestion edits (#768–#772), chat/voice stack work or another delivery
+lane.
+
+- [PR #773](https://github.com/lagarcess/argus/pull/773) squash-merged at
+  **October 2, 2026, 00:47:28 UTC** as
+  `f28b56421caf71d6610caf1cce891e1848e0ace1`, from verified Exact head
+  `dee829f8a3a7f83fb25cd81aaf3fa6deac8bfe45` onto tip
+  `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`. Integration was already the
+  worker merge-base; no reconciliation merge and no intervening semantic
+  overlap. Squash tree matches worker tree `2f55d72b…`.
+- Pre-merge Exact head: PR CI / push CI / local smoke SUCCESS; Supabase Preview
+  SKIPPED at concurrent-branch limit (not a sole gate); Codex P1 contributor
+  freeze fixed and resolved; **0** unresolved review threads; modularity budget
+  clean.
+- `ARGUS_HOUSEHOLDS_ENABLED` remains default-off in `.env.example`,
+  `render.yaml`, and `.github/argus-env.sh`. Additive migrations
+  `20261001190000` and `20261002000000`–`20261002050000` are not applied to
+  production and do not claim ingestion reserved
+  `20261002120000`–`20261002120300`.
+- Accepted proof retains the assembled native/API/Postgres packet under
+  [shared-household-planning evidence](../reports/evidence/shared-household-planning/),
+  including four-kind journey, response-loss recovery, three-user isolation and
+  disabled-Household Personal surfaces. Retained demo ports `59750`–`59755`
+  preserved.
+- Remaining outside this land: physical iPhone/internet delivery; external
+  invitation delivery; hosted enablement; Preview repair; design checkpoint
+  `aba489b0…` adoption. Detail:
+  [landing report](../reports/2026-10-02-pr-773-integration-landing.md).
+
 ## PR #766 integration landing
 
 Founder-confirmed squash merge of the verified Household native head;
@@ -447,9 +488,10 @@ stack work or another delivery lane.
   sign-in rate limit and is **not** claimed passing; same-fixture continuation
   and focused gates are.
 - Remaining outside this land: physical iPhone/internet delivery; external
-  invitation delivery; shared Plan/budgets/goals/debt; Business/Custom;
-  hosted enablement; design-checkpoint adoption; Accounts tab; Apple on the
-  connected path. Detail:
+  invitation delivery; Business/Custom; hosted enablement; design-checkpoint
+  adoption; Accounts tab; Apple on the connected path. Shared
+  Plan/budgets/goals/debt later landed via [PR #773](#pr-773-integration-landing).
+  Detail:
   [landing report](../reports/2026-10-01-pr-766-integration-landing.md).
 
 ## PR #763 integration landing
@@ -497,11 +539,12 @@ policy. `ARGUS_HOUSEHOLDS_ENABLED` stays server-default-off. Durable evidence:
 Restart recipe: [ios/HOUSEHOLD_SETUP.md](../../ios/HOUSEHOLD_SETUP.md).
 
 **Remaining outside the landed package:** physical iPhone/internet delivery;
-external invitation delivery; shared Plan/budgets/goals/debt; Business/Custom
-lifecycle; hosted migration/enablement; Accounts tab; Apple on the connected
-path; design-checkpoint adoption (`1dcd12a5` / `1b2005fd9` parked). Existing
-#760 shared-shell / Personal Search dark contrast polish remains recorded, not
-claimed fixed here.
+external invitation delivery; Business/Custom lifecycle; hosted
+migration/enablement; Accounts tab; Apple on the connected path;
+design-checkpoint adoption (`1dcd12a5` / `1b2005fd9` parked). Shared
+Plan/budgets/goals/debt consumers landed via
+[PR #773](#pr-773-integration-landing). Existing #760 shared-shell / Personal
+Search dark contrast polish remains recorded, not claimed fixed here.
 
 Worker branch `codex/connected-household-native` and its isolated checkout are
 closed for active delivery after this landing. Earlier competing membership
@@ -2702,9 +2745,9 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants are locally verified in #773 pending merge; physical-phone proof remains pending | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants landed locally verified in #773 (`f28b5642…`); physical-phone proof remains pending | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762 | Assigned Household context adapter in the active lane above; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof for this lane; later private lifecycle/move evidence remains required |
-| [Household][mvee-household], D07 | #763/#766 landed membership, invitations, explicit account consent and canonical activity with retained native/API/Postgres proof | #773 locally verifies shared budgets, bills, goals, debt commitments and private contributions; merge pending. External invitation delivery, other authorized consumers and physical-phone/hosted delivery remain required | Household captain; existing membership, financial and allocation owners | Approved rights/departure policy; canonical Recording/Plan; fixed `7f72dfd7` presentation | Two member identities plus unauthorized C; four-kind native journey, recovery, English/Spanish, real Postgres privacy/removal tests; phone/internet proof still pending |
+| [Household][mvee-household], D07 | #763/#766/#773 landed membership, invitations, explicit account consent, canonical activity and shared budgets/bills/goals/debt with retained native/API/Postgres proof | External invitation delivery, other authorized consumers and physical-phone/hosted delivery remain required | Household captain; existing membership, financial and allocation owners | Approved rights/departure policy; canonical Recording/Plan; fixed `7f72dfd7` presentation | Two member identities plus unauthorized C; four-kind native journey, recovery, English/Spanish, real Postgres privacy/removal tests; phone/internet proof still pending |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |
