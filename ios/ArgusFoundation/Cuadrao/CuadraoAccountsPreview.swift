@@ -45,11 +45,20 @@ struct CanvasActivity: Identifiable {
     let amount: Decimal
     let date: Date
     let income: Bool
+    var category: CanvasExpenseCategory = .other
 }
 
 @Observable final class CuadraoAccountsPreview {
     var accounts: [CanvasAccount] = []
     var activity: [CanvasActivity] = []
+    var balanceObservations: [CanvasBalanceObservation] = []
+    var expenseCoverageStarts: [UUID: Date] = [:]
+    func spendingCoverageStart(currency: String) -> Date? {
+        let ids = scopedAccounts.filter { $0.currency == currency }.map(\.id)
+        let starts = ids.compactMap { expenseCoverageStarts[$0] }
+        guard !ids.isEmpty, starts.count == ids.count else { return nil }
+        return starts.max()
+    }
     var spaces: [CanvasSpace] = []
     var household: CanvasHouseholdState = .alone
     var selectedSpaceID = CanvasSpace.personalID
@@ -65,12 +74,15 @@ struct CanvasActivity: Identifiable {
         guard let i = accounts.firstIndex(where: { $0.id == id }) else { return }
         accounts[i].archived = archived
     }
+    func reorder(_ ids: [UUID]) {
+        guard Set(ids) == Set(active.map(\.id)) else { return }
+        accounts = CuadraoCollectionOrder.applying(ids, to: accounts)
+        UserDefaults.standard.set(accounts.map { $0.id.uuidString }, forKey: "cuadrao.design.account-order")
+    }
     func move(from: IndexSet, to: Int) {
         var visible = active
         visible.move(fromOffsets: from, toOffset: to)
-        var iterator = visible.makeIterator()
-        let ids = Set(visible.map(\.id))
-        accounts = accounts.map { ids.contains($0.id) ? iterator.next()! : $0 }
+        reorder(visible.map(\.id))
     }
     func reset(populated: Bool, spanish: Bool) {
         household = populated ? .joined("Alex") : .alone
@@ -88,36 +100,41 @@ struct CanvasActivity: Identifiable {
             accounts.append(CanvasAccount(name: spanish ? "Fondo de la casa" : "Household fund",
                 kind: .savings, balance: 25000, spaceID: CanvasSpace.householdID, sharedWithHousehold: true))
         }
+        // Stable local fixture identities allow a viewer's order to survive relaunch.
+        for index in accounts.indices {
+            accounts[index].id = UUID(uuidString: String(format: "00000000-0000-4000-8000-%012d", index + 1))!
+        }
+        let orderKey = "cuadrao.design.account-order"
+        if ProcessInfo.processInfo.arguments.contains("--plan-reset") { UserDefaults.standard.removeObject(forKey: orderKey) }
+        let saved = (UserDefaults.standard.stringArray(forKey: orderKey) ?? []).compactMap(UUID.init(uuidString:))
+        let known = Set(accounts.map(\.id))
+        let order = saved.filter { known.contains($0) } + accounts.map(\.id).filter { !saved.contains($0) }
+        balanceObservations = populated ? CanvasBalanceHistory.examples(accounts: accounts, now: .now) : []
         activity = []
+        expenseCoverageStarts = [:]
         if let first = accounts.first, let cash = accounts.last(where: { $0.kind == .cash }) {
             activity = [
-                CanvasActivity(accountID: first.id, title: spanish ? "Almuerzo" : "Lunch", amount: 650, date: .now, income: false),
-                CanvasActivity(accountID: cash.id, title: spanish ? "Café" : "Coffee", amount: 180, date: .now, income: false)
+                CanvasActivity(accountID: first.id, title: spanish ? "Almuerzo" : "Lunch", amount: 650, date: .now, income: false, category: .food),
+                CanvasActivity(accountID: cash.id, title: spanish ? "Café" : "Coffee", amount: 180, date: .now, income: false, category: .food)
             ]
         }
         if let shared = accounts.first(where: { $0.sharedWithHousehold }) {
             activity.append(CanvasActivity(accountID: shared.id, title: spanish ? "Supermercado" : "Groceries",
-                amount: 2450, date: .now, income: false))
+                amount: 2450, date: .now, income: false, category: .groceries))
+        }
+        if populated {
+            activity += CanvasSpendingHistory.examples(accounts: accounts, spanish: spanish, now: .now)
+            // This preview explicitly owns a continuous recording window, including quiet days.
+            let start = CanvasPreviewHistory.days(now: .now).first ?? .now
+            expenseCoverageStarts = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, start) })
+            if ProcessInfo.processInfo.arguments.contains("--insights-empty-month") {
+                let month = Calendar.current.dateInterval(of: .month, for: Date.now)!
+                activity.removeAll { $0.date >= month.start }
+            }
+            if ProcessInfo.processInfo.arguments.contains("--insights-no-coverage") { expenseCoverageStarts = [:] }
+            accounts = CuadraoCollectionOrder.applying(order, to: accounts)
         }
     }
-}
-
-/// Formatting only; the preview does not connect to the financial ledger.
-enum CanvasMoney {
-    static let maximum = Decimal(string: "9999999.99")!
-    static func digits(_ currency: String) -> Int {
-        let formatter = NumberFormatter(); formatter.numberStyle = .currency
-        formatter.currencyCode = currency
-        return formatter.maximumFractionDigits
-    }
-    static func format(_ value: Decimal, currency: String) -> String {
-        let formatter = NumberFormatter(); formatter.locale = Locale(identifier: "en_US")
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = digits(currency)
-        formatter.maximumFractionDigits = digits(currency)
-        return formatter.string(from: NSDecimalNumber(decimal: value)) ?? "—"
-    }
-    static func raw(_ value: Decimal) -> String { NSDecimalNumber(decimal: value).stringValue }
 }
 
 struct CanvasAccountIcon: View {
