@@ -102,7 +102,9 @@ struct CuadraoHomeCanvas: View {
 
     private var header: some View {
         HStack {
-            CuadraoBrand()
+            Text(spanish ? "Hola" : "Hello")
+                .font(.title2.weight(.semibold))
+                .accessibilityIdentifier("home-greeting")
                 .contextMenu {
                     Button(spanish ? "Vista previa: primer uso" : "Preview: first use") {
                         populated = false; data.reset(populated: false, spanish: spanish); ordering = false
