@@ -71,8 +71,10 @@ struct CuadraoProfilePage: View {
             } header: { Text(spanish ? "Pantalla" : "Display") }
             Section {
                 LabeledContent(spanish ? "Región" : "Region", value: spanish ? "República Dominicana" : "Dominican Republic")
-                Picker(spanish ? "Moneda preferida" : "Preferred currency", selection: $profile.currency) {
-                    ForEach(["DOP", "USD", "EUR"], id: \.self) { Text($0).tag($0) }
+                LabeledContent(spanish ? "Moneda preferida" : "Preferred currency") {
+                    CuadraoChoiceMenu(title: spanish ? "Moneda preferida" : "Preferred currency",
+                        selection: $profile.currency, values: PlanCurrency.supported, valueTitle: { $0 })
+                        .accessibilityIdentifier("cuadrao.profile.currency")
                 }
             } header: { Text(spanish ? "Región y moneda" : "Region and currency") }
               footer: { Text(spanish ? "Elegir una moneda no convierte ni combina tus balances." : "Choosing a currency does not convert or combine your balances.") }
@@ -119,7 +121,12 @@ struct CuadraoProfilePage: View {
             } header: { Text(spanish ? "Sobre qué" : "Topics") }
             Section {
                 Toggle(spanish ? "Horario de descanso" : "Quiet hours", isOn: $profile.quietHours)
-                if profile.quietHours { LabeledContent(spanish ? "Horario de ejemplo" : "Example schedule", value: "22:00 – 08:00") }
+                if profile.quietHours {
+                    DatePicker(spanish ? "Desde" : "From", selection: $profile.quietStart, displayedComponents: .hourAndMinute)
+                        .accessibilityIdentifier("cuadrao.quiet.start")
+                    DatePicker(spanish ? "Hasta" : "Until", selection: $profile.quietEnd, displayedComponents: .hourAndMinute)
+                        .accessibilityIdentifier("cuadrao.quiet.end")
+                }
             }
         }
     }

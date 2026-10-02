@@ -5,6 +5,7 @@ struct CuadraoSearchCanvas: View {
     let data: CuadraoAccountsPreview
     let spanish: Bool
     let includeExamples: Bool
+    let plans: CuadraoPlanPreview
     let chat: CuadraoChatPreview
     let openChat: (CanvasChatThread) -> Void
     let actions: (CanvasAccountSheet) -> Void
@@ -18,7 +19,7 @@ struct CuadraoSearchCanvas: View {
 
     private typealias Kind = CanvasSearchKind
     private enum Scope: CaseIterable { case all, personal, household }
-    private enum Route: Hashable { case account(UUID), activity(UUID), reference(String) }
+    private enum Route: Hashable { case account(UUID), activity(UUID), plan(UUID), reference(String) }
 
     private var availableAccounts: [CanvasAccount] {
         data.accounts.filter { account in
@@ -38,13 +39,21 @@ struct CuadraoSearchCanvas: View {
     }
     private var references: [CanvasSearchReference] {
         guard includeExamples, scope != .household else { return [] }
-        return (CanvasSearchReference.examples(spanish).filter { $0.kind != .chats } + chat.references(spanish))
+        return (CanvasSearchReference.examples(spanish).filter { $0.kind == .files || $0.kind == .memory } + chat.references(spanish))
             .filter { matches($0.title + " " + $0.detail + " " + $0.content) }
+    }
+    private var matchingPlans: [CanvasPlan] {
+        plans.plans.filter { plan in
+            !data.spaces.contains { $0.id == plan.spaceID && $0.deleted }
+            && (scope == .all || (scope == .household ? plan.spaceID == CanvasSpace.householdID : plan.spaceID != CanvasSpace.householdID))
+            && matches(plan.name + " " + plan.kind.title(spanish) + " " + PlanFormat.space(plan.spaceID, accounts: data, spanish: spanish))
+        }
     }
     private var count: Int {
         (kind == .all || kind == .accounts ? accounts.count : 0)
         + (kind == .all || kind == .activity ? activity.count : 0)
         + references.filter { kind == .all || kind == $0.kind }.count
+        + (kind == .all || kind == .plans ? matchingPlans.count : 0)
     }
     private var filterCount: Int { (scope == .all ? 0 : 1) + (currency.isEmpty ? 0 : 1) }
 
@@ -53,19 +62,13 @@ struct CuadraoSearchCanvas: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if count == 0 {
-                        ContentUnavailableView {
-                            Label(spanish ? (query.isEmpty && filterCount == 0 ? "Todo empieza con una cuenta" : "Sin resultados")
-                                  : (query.isEmpty && filterCount == 0 ? "Start with an account" : "No results"), systemImage: "magnifyingglass")
-                        } description: {
-                            Text(spanish ? (data.accounts.isEmpty ? "Las cuentas y movimientos que añadas aparecerán aquí." : "Prueba otro nombre o cambia los filtros.")
-                                 : (data.accounts.isEmpty ? "Accounts and activity you add will appear here." : "Try another name or change the filters."))
-                        }.padding(.top, 36)
+                        emptyState.padding(.top, 36)
                     }
                     if (kind == .all || kind == .accounts) && !accounts.isEmpty {
                         heading(title(.accounts), count: accounts.count)
                         ForEach(accounts) { account in
                             NavigationLink(value: Route.account(account.id)) {
-                                resultRow(account.displayName(spanish), detail: subtitle(account))
+                                resultRow(account.displayName(spanish), detail: subtitle(account), accountKind: account.kind)
                             }.buttonStyle(.plain)
                             Divider().foregroundStyle(WelcomePalette.separator)
                         }
@@ -76,24 +79,36 @@ struct CuadraoSearchCanvas: View {
                             if let account = data.account(entry.accountID) {
                                 NavigationLink(value: Route.activity(entry.id)) {
                                     resultRow(entry.title, detail: account.displayName(spanish) + " · " + account.currency + " "
-                                        + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
+                                        + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
+                                        symbol: entry.income ? "arrow.down.left" : nil, category: entry.income ? nil : entry.category)
                                 }.buttonStyle(.plain)
                                 Divider().foregroundStyle(WelcomePalette.separator)
                             }
                         }
                     }
-                    ForEach([Kind.plans, .chats, .files, .memory], id: \.self) { section in
+                    if (kind == .all || kind == .plans) && !matchingPlans.isEmpty {
+                        heading(title(.plans), count: matchingPlans.count)
+                        ForEach(matchingPlans) { plan in
+                            NavigationLink(value: Route.plan(plan.id)) {
+                                resultRow(plan.name, detail: [plan.kind.title(spanish),
+                                    PlanFormat.space(plan.spaceID, accounts: data, spanish: spanish),
+                                    plan.archived ? (spanish ? "Archivado" : "Archived") : nil].compactMap { $0 }.joined(separator: " · "), symbol: plan.look.symbol)
+                            }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.search.plan.\(plan.id)")
+                            Divider()
+                        }
+                    }
+                    ForEach([Kind.chats, .files, .memory], id: \.self) { section in
                         let rows = references.filter { $0.kind == section }
                         if (kind == .all || kind == section) && !rows.isEmpty {
                             heading(title(section), count: rows.count)
                             ForEach(rows) { item in
                                 if item.kind == .chats, let thread = chat.threads.first(where: { $0.id == item.id }) {
                                     Button { focused = false; openChat(thread) } label: {
-                                        resultRow(item.title, detail: item.detail, date: thread.lastMessageDate)
+                                        resultRow(item.title, detail: item.detail, date: thread.lastMessageDate, symbol: "bubble.left")
                                     }.buttonStyle(.plain)
                                 } else {
                                     NavigationLink(value: Route.reference(item.id)) {
-                                        resultRow(item.title, detail: item.detail)
+                                        resultRow(item.title, detail: item.detail, symbol: item.kind == .memory ? "brain" : "doc")
                                     }.buttonStyle(.plain)
                                 }
                                 Divider()
@@ -117,6 +132,7 @@ struct CuadraoSearchCanvas: View {
                                         }
                                 }.buttonStyle(.plain)
                                     .accessibilityAddTraits(kind == value ? .isSelected : [])
+                                    .accessibilityIdentifier("cuadrao.search.kind.\(value)")
                             }
                         }
                     }
@@ -140,8 +156,10 @@ struct CuadraoSearchCanvas: View {
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish, actions: actions, record: record)
                 case .activity(let id):
                     activityDetail(id)
+                case .plan(let id):
+                    CuadraoPlanDetail(store: plans, accounts: data, planID: id, spanish: spanish)
                 case .reference(let id):
-                    if let item = CanvasSearchReference.examples(spanish).first(where: { $0.id == id }) {
+                    if let item = references.first(where: { $0.id == id }) {
                         CuadraoSearchReferenceDetail(item: item, spanish: spanish,
                             source: item.kind == .memory ? CanvasSearchReference.examples(spanish).first { $0.id == "chat-cd" } : nil)
                     }
@@ -149,6 +167,49 @@ struct CuadraoSearchCanvas: View {
             }
             .sheet(isPresented: $filters) { filterSheet }
         }.toolbar(.hidden, for: .tabBar)
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label(query.isEmpty && filterCount == 0 ? emptyTitle : (spanish ? "Sin resultados" : "No results"), systemImage: "magnifyingglass")
+        } description: {
+            Text(query.isEmpty && filterCount == 0 ? emptyDetail : (spanish ? "Prueba otro nombre o cambia los filtros." : "Try another name or change the filters."))
+        } actions: {
+            if !query.isEmpty {
+                Button(spanish ? "Borrar búsqueda" : "Clear search") { query = "" }
+                    .accessibilityIdentifier("cuadrao.search.clear")
+            }
+            if filterCount > 0 {
+                Button(spanish ? "Restablecer filtros" : "Reset filters") { scope = .all; currency = "" }
+                    .accessibilityIdentifier("cuadrao.search.reset")
+            }
+            if kind != .all {
+                Button(spanish ? "Buscar en todo" : "Search everything") { kind = .all }
+                    .accessibilityIdentifier("cuadrao.search.everything")
+            }
+        }.accessibilityIdentifier("cuadrao.search.empty")
+    }
+    private var emptyTitle: String {
+        switch kind {
+        case .all: spanish ? "Tu información, aquí" : "Your information, here"
+        case .accounts: spanish ? "Sin cuentas todavía" : "No accounts yet"
+        case .activity: spanish ? "Sin movimientos todavía" : "No activity yet"
+        case .plans: spanish ? "Sin planes todavía" : "No plans yet"
+        case .chats: spanish ? "Sin chats todavía" : "No chats yet"
+        case .files: spanish ? "Sin archivos todavía" : "No files yet"
+        case .memory: spanish ? "Sin recuerdos todavía" : "No memories yet"
+        }
+    }
+    private var emptyDetail: String {
+        switch kind {
+        case .all: spanish ? "Busca cuentas, movimientos, planes y conversaciones." : "Search accounts, activity, plans and conversations."
+        case .accounts: spanish ? "Añade una cuenta desde Inicio para encontrarla aquí." : "Add an account from Home to find it here."
+        case .activity: spanish ? "Los movimientos que registres en tus cuentas aparecerán aquí." : "Activity recorded in your accounts will appear here."
+        case .plans: spanish ? "Crea una meta, un presupuesto o un plan de deuda en Plan." : "Create a goal, budget or debt plan in Plan."
+        case .chats: spanish ? "Tus conversaciones guardadas aparecerán aquí." : "Your saved conversations will appear here."
+        case .files: spanish ? "Los archivos disponibles aparecerán aquí." : "Available files will appear here."
+        case .memory: spanish ? "El contexto que confirmes aparecerá aquí." : "Context you confirm will appear here."
+        }
     }
 
     private var searchField: some View {
@@ -167,7 +228,7 @@ struct CuadraoSearchCanvas: View {
                     Image(systemName: "slider.horizontal.3")
                     if filterCount > 0 { Text(String(filterCount)).font(.caption) }
                 }.frame(minWidth: 44, minHeight: 48)
-            }.accessibilityLabel(spanish ? "Filtros, \(filterCount) activos" : "Filters, \(filterCount) active")
+            }.accessibilityIdentifier("cuadrao.search.filters").accessibilityLabel(spanish ? "Filtros, \(filterCount) activos" : "Filters, \(filterCount) active")
         }.overlay(alignment: .bottom) { Rectangle().fill(WelcomePalette.separator).frame(height: 1) }
     }
 
@@ -202,7 +263,7 @@ struct CuadraoSearchCanvas: View {
                     LabeledContent(spanish ? "Tipo" : "Type", value: entry.income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
                     LabeledContent(spanish ? "Fecha" : "Date") { Text(entry.date, format: .dateTime.day().month(.wide).year()) }
                     NavigationLink(value: Route.account(account.id)) {
-                        resultRow(account.displayName(spanish), detail: subtitle(account))
+                        resultRow(account.displayName(spanish), detail: subtitle(account), accountKind: account.kind)
                     }.buttonStyle(.plain)
                 }.padding(24)
             }.background(WelcomePalette.background).navigationTitle(spanish ? "Movimiento" : "Activity")
@@ -215,12 +276,18 @@ struct CuadraoSearchCanvas: View {
 
     private func heading(_ title: String, count: Int) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title).font(.headline)
+            Text(title).font(CuadraoTypography.section)
             Text(String(count)).font(.caption).foregroundStyle(.secondary)
         }.padding(.top, 20).padding(.bottom, 10).accessibilityAddTraits(.isHeader)
     }
-    private func resultRow(_ title: String, detail: String, date: Date? = nil) -> some View {
+    private func resultRow(_ title: String, detail: String, date: Date? = nil, symbol: String? = nil, accountKind: CanvasAccountKind? = nil, category: CanvasExpenseCategory? = nil) -> some View {
         HStack(spacing: 16) {
+            if let accountKind { CanvasAccountIcon(kind: accountKind) }
+            else if let category { CuadraoExpenseCategoryIcon(category: category) }
+            else if let symbol {
+                Image(systemName: symbol).font(.body).foregroundStyle(WelcomePalette.pine)
+                    .frame(width: 42, height: 42).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 13)).accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).font(CuadraoTypography.action)
                 Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

@@ -13,6 +13,8 @@ struct CuadraoHomeCanvas: View {
         reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
         empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
     @State private var profile = CanvasProfileDraft()
+    @State private var updateReadIDs: Set<CanvasUpdate> = []
+    @State private var searchChatOrigin = false
     @State private var chatEditing = false
     @State private var voiceProposal: CanvasVoiceProposal?
     @State private var pendingTab: CuadraoTab?
@@ -131,6 +133,9 @@ struct CuadraoHomeCanvas: View {
         } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
         .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
+        .onChange(of: selectedTab) { _, tab in
+            if tab != .assistant { searchChatOrigin = false }
+        }
         .onChange(of: chat.current.id) { _, _ in voiceProposal = nil }
         .onChange(of: data.selectedSpaceID) { _, _ in
             archivedID = nil; accountPath = []; navigationScroll = CuadraoNavigationScroll()
@@ -171,6 +176,10 @@ struct CuadraoHomeCanvas: View {
         }
     }
 
+    private var unreadUpdates: Int {
+        CanvasUpdate.available(accounts: data, plans: plans).filter { !updateReadIDs.contains($0) }.count
+    }
+
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 5) {
@@ -195,8 +204,17 @@ struct CuadraoHomeCanvas: View {
             Spacer()
             Button { sheet = .updates } label: {
                 Image("CuadraoNotifications").frame(width: 44, height: 44)
+                    .overlay(alignment: .topTrailing) {
+                        if unreadUpdates > 0 {
+                            Text(String(unreadUpdates)).font(.caption2.weight(.medium))
+                                .foregroundStyle(WelcomePalette.onAccent).padding(4)
+                                .background(WelcomePalette.pine, in: Circle()).accessibilityHidden(true)
+                        }
+                    }
             }
             .accessibilityLabel(spanish ? "Novedades" : "Updates")
+            .accessibilityValue(spanish ? "\(unreadUpdates) sin leer" : "\(unreadUpdates) unread")
+            .accessibilityIdentifier("cuadrao.updates.open")
         }
     }
 
@@ -282,10 +300,19 @@ struct CuadraoHomeCanvas: View {
     @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
         if tab == .search {
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
-                chat: chat, openChat: { thread in chat.open(thread); selectedTab = .assistant },
+                plans: plans, chat: chat, openChat: { thread in chat.open(thread); searchChatOrigin = true; selectedTab = .assistant },
                 actions: { sheet = .account($0) }, record: { sheet = .account(.record($0)) })
         } else if tab == .assistant {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if searchChatOrigin {
+                        Button { tabSelection.wrappedValue = .search } label: {
+                            Label(spanish ? "Volver a Buscar" : "Back to Search", systemImage: "chevron.left")
+                                .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }.padding(.horizontal, 24).background(WelcomePalette.background)
+                            .accessibilityIdentifier("cuadrao.search.return")
+                    }
+                }
         } else if tab == .profile {
             CuadraoProfileCanvas(spanish: spanish, includeExamples: populated, profile: $profile)
                 .safeAreaPadding(.bottom, chat.voice.active ? 144 : 80)
@@ -317,18 +344,8 @@ struct CuadraoHomeCanvas: View {
                     sheet = nil; accountPath = []; archivedID = $0
                 })
         case .updates:
-            NavigationStack {
-                ContentUnavailableView {
-                    Label {
-                        Text(spanish ? "Novedades" : "Updates")
-                    } icon: {
-                        Image("CuadraoNotifications").resizable().scaledToFit().frame(width: 40, height: 40)
-                    }
-                } description: {
-                    Text(spanish ? "Este espacio se diseña después de Inicio." : "This space will be designed after Home.")
-                }
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { sheet = nil } } }
-            }
+            CuadraoUpdatesCanvas(accounts: data, plans: plans, spanish: spanish,
+                readIDs: $updateReadIDs, profile: $profile)
         }
     }
 }

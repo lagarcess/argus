@@ -5,6 +5,9 @@ struct CanvasProfileDraft {
     var name = "Alex Rivera"
     var preferredName = "Alex"
     var currency = "DOP"
+    var avatar: CanvasPlanLook?
+    var quietStart = Calendar.current.date(from: DateComponents(hour: 22)) ?? .now
+    var quietEnd = Calendar.current.date(from: DateComponents(hour: 8)) ?? .now
     var responseLength = 0
     var tone = 0
     var instructions = ""
@@ -73,6 +76,7 @@ struct CuadraoProfileCanvas: View {
     let spanish: Bool
     let includeExamples: Bool
     @Binding var profile: CanvasProfileDraft
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var signOut = false
     @State private var editor: CanvasProfileRoute?
 
@@ -81,9 +85,9 @@ struct CuadraoProfileCanvas: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     identity.padding(.bottom, 8)
-                    group([.preferences, .personalization, .notifications])
-                    group([.security, .privacy, .usage])
-                    group([.help])
+                    group("App", routes: [.preferences, .personalization, .notifications])
+                    group(spanish ? "Cuenta" : "Account", routes: [.security, .privacy, .usage])
+                    group(spanish ? "Soporte" : "Support", routes: [.help])
                     Button(spanish ? "Cerrar sesión" : "Sign out") { signOut = true }
                         .font(.subheadline).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -109,12 +113,14 @@ struct CuadraoProfileCanvas: View {
 
     private var identity: some View {
         Button { editor = .personal } label: {
-            HStack(spacing: 18) {
-                CanvasProfileAvatar(name: profile.name)
+            let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 18)) : AnyLayout(HStackLayout(spacing: 18))
+            layout {
+                CanvasProfileAvatar(name: profile.name, theme: profile.avatar)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(profile.name).font(.system(.title2, design: .default, weight: .semibold))
                         .foregroundStyle(.primary)
                     Text(profile.emailAddress).font(.subheadline).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(spanish ? "Editar perfil" : "Edit profile")
                         .font(.subheadline.weight(.medium)).foregroundStyle(WelcomePalette.pine)
                         .padding(.top, 4)
@@ -124,18 +130,21 @@ struct CuadraoProfileCanvas: View {
         }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.profile.identity")
     }
 
-    private func group(_ routes: [CanvasProfileRoute]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(routes, id: \.self) { route in
-                NavigationLink(value: route) {
-                    CanvasProfileRow(route: route, spanish: spanish)
-                }.buttonStyle(.plain)
-                if route != routes.last {
-                    Rectangle().fill(CanvasSettingsStyle.separator).frame(height: 0.5)
-                        .padding(.leading, 54).padding(.trailing, 18).accessibilityHidden(true)
+    private func group(_ title: String, routes: [CanvasProfileRoute]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary).accessibilityAddTraits(.isHeader)
+            VStack(spacing: 0) {
+                ForEach(routes, id: \.self) { route in
+                    NavigationLink(value: route) {
+                        CanvasProfileRow(route: route, spanish: spanish)
+                    }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.profile.\(route)")
+                    if route != routes.last {
+                        Rectangle().fill(CanvasSettingsStyle.separator).frame(height: 0.5)
+                            .padding(.leading, 54).padding(.trailing, 18).accessibilityHidden(true)
+                    }
                 }
-            }
-        }.background(CanvasSettingsStyle.surface, in: RoundedRectangle(cornerRadius: 22))
+            }.background(CanvasSettingsStyle.surface, in: RoundedRectangle(cornerRadius: 22))
+        }
     }
 }
 
@@ -145,13 +154,17 @@ extension CanvasProfileRoute: Identifiable {
 
 struct CanvasProfileAvatar: View {
     let name: String
+    var theme: CanvasPlanLook?
     var body: some View {
-        Text(String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased())
-            .font(.system(.title, design: .rounded, weight: .medium))
-            .frame(width: 64, height: 64)
-            .foregroundStyle(WelcomePalette.pine)
-            .background(WelcomePalette.sage, in: Circle())
-            .accessibilityHidden(true)
+        Group {
+            if let theme { Image(systemName: theme.symbol) }
+            else { Text(String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased()) }
+        }
+        .font(.system(.title, design: .rounded, weight: .medium))
+        .frame(width: 64, height: 64)
+        .foregroundStyle(theme?.color ?? WelcomePalette.pine)
+        .background((theme?.color ?? WelcomePalette.sage).opacity(theme == nil ? 1 : 0.12), in: Circle())
+        .accessibilityHidden(true)
     }
 }
 
@@ -190,25 +203,33 @@ struct CuadraoProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var preferred: String
+    @State private var avatar: CanvasPlanLook?
 
     init(profile: Binding<CanvasProfileDraft>, spanish: Bool) {
         _profile = profile; self.spanish = spanish
         _name = State(initialValue: profile.wrappedValue.name)
         _preferred = State(initialValue: profile.wrappedValue.preferredName)
+        _avatar = State(initialValue: profile.wrappedValue.avatar)
     }
     private var valid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && name.count <= 60 && preferred.count <= 40
     }
     private var changed: Bool {
         name.trimmingCharacters(in: .whitespacesAndNewlines) != profile.name ||
-        preferred.trimmingCharacters(in: .whitespacesAndNewlines) != profile.preferredName
+        preferred.trimmingCharacters(in: .whitespacesAndNewlines) != profile.preferredName || avatar != profile.avatar
     }
     var body: some View {
         Form {
             Section {
-                HStack { Spacer(); CanvasProfileAvatar(name: name); Spacer() }
+                HStack { Spacer(); CanvasProfileAvatar(name: name, theme: avatar); Spacer() }
                     .padding(.vertical, 12).listRowBackground(Color.clear)
             }
+            Section(spanish ? "Tu avatar" : "Your avatar") {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76))], spacing: 12) {
+                    avatarChoice(nil)
+                    ForEach(CanvasPlanLook.allCases) { avatarChoice($0) }
+                }.padding(.vertical, 8)
+            }.listRowBackground(CanvasSettingsStyle.surface)
             Section {
                 field(spanish ? "Nombre" : "Name", text: $name, id: "cuadrao.profile.name")
                     .textContentType(.name)
@@ -234,16 +255,33 @@ struct CuadraoProfileEditor: View {
             .navigationTitle(spanish ? "Editar perfil" : "Edit profile").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(spanish ? "Cancelar" : "Cancel") { dismiss() }
+                    Button(spanish ? "Cancelar" : "Cancel") { dismiss() }.accessibilityIdentifier("cuadrao.profile.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(spanish ? "Guardar" : "Save") {
                         profile.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
                         profile.preferredName = preferred.trimmingCharacters(in: .whitespacesAndNewlines)
+                        profile.avatar = avatar
                         dismiss()
                     }.disabled(!valid || !changed).accessibilityIdentifier("cuadrao.profile.save")
                 }
             }
+    }
+    private func avatarChoice(_ theme: CanvasPlanLook?) -> some View {
+        let title = theme?.title(spanish) ?? (spanish ? "Inicial" : "Initial")
+        return Button { avatar = theme } label: {
+            VStack(spacing: 6) {
+                CanvasProfileAvatar(name: name, theme: theme)
+                    .overlay(alignment: .bottomTrailing) {
+                        if avatar == theme {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(WelcomePalette.pine, WelcomePalette.background)
+                        }
+                    }
+                Text(title).font(.caption).foregroundStyle(.primary)
+            }.frame(minHeight: 88)
+        }.buttonStyle(.plain).accessibilityLabel(title)
+            .accessibilityAddTraits(avatar == theme ? .isSelected : [])
+            .accessibilityIdentifier("cuadrao.profile.avatar.\(theme?.rawValue ?? "initial")")
     }
     private func field(_ label: String, text: Binding<String>, id: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
