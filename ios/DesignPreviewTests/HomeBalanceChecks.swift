@@ -163,6 +163,13 @@ import Foundation
         let quietPast = CanvasBalancePeriod(accounts: scoped, observations: startingBalances, range: .month, offset: -1, now: november)
         check(quietPast.closing?.date == septemberEnd && quietPast.change == nil, "Empty past period retains a dated known position without artificial change")
         check(CanvasBalanceHistory.position(quietPast.closingAccounts) == quietPast.closing?.balance, "Empty historical allocation preserves the same known dated snapshot")
+        var clearedMortgage = mortgage
+        clearedMortgage.balance = nil
+        let historicalBalances = startingBalances + [observed(wallet, 900, octoberTenth), observed(mortgage, 170, octoberTenth), observed(owned, 900, octoberTenth)]
+        let clearedPeriod = CanvasBalancePeriod(accounts: [wallet, clearedMortgage, owned], observations: historicalBalances, range: .month, offset: -1, now: november)
+        check(clearedPeriod.changes.first { $0.id == mortgage.id }?.closing == nil, "Cleared current balance remains excluded despite old observations")
+        check(CanvasBalanceHistory.position(clearedPeriod.closingAccounts) == clearedPeriod.closing?.balance, "Historical allocation preserves aggregate participation after balance clearing")
+        check(clearedPeriod.changes.compactMap(\.change).reduce(0, +) == clearedPeriod.change, "Historical changes reconcile after clearing an observed account")
         let unknowable = CanvasBalancePeriod(accounts: [unknown], observations: [], range: .month, offset: 0, now: october)
         check(unknowable.closing == nil && unknowable.change == nil, "Unknown balance never becomes zero")
         check(emptyStory.state == .emptyPeriod && unknownStory.state == .populated, "Known empty and partial populated spending use distinct states")

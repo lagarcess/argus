@@ -4,6 +4,7 @@ struct CuadraoBalanceBreakdown: View {
     let period: CanvasBalancePeriod
     let currency: String
     let spanish: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
     private func money(_ value: Decimal) -> String { CanvasMoney.format(value, currency: currency) }
     private func signed(_ value: Decimal) -> String { (value > 0 ? "+" : "") + money(value) }
     private func date(_ value: Date) -> String {
@@ -32,9 +33,19 @@ struct CuadraoBalanceBreakdown: View {
             VStack(spacing: 0) {
                 ForEach(period.changes) { row in
                     NavigationLink(value: row.id) {
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: 12) { accountLabel(row); Spacer(minLength: 8); accountValue(row) }
-                            VStack(alignment: .leading, spacing: 8) { accountLabel(row); accountValue(row) }
+                        HStack(spacing: 12) {
+                            if typeSize.isAccessibilitySize {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    accountLabel(row)
+                                    accountValue(row, alignment: .leading)
+                                }
+                                Spacer(minLength: 0)
+                            } else {
+                                accountLabel(row)
+                                Spacer(minLength: 8)
+                                accountValue(row, alignment: .trailing)
+                            }
+                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("home-balance-change-" + row.id.uuidString)
                 }
@@ -66,9 +77,8 @@ struct CuadraoBalanceBreakdown: View {
             Text(row.account.displayName(spanish)).font(CuadraoTypography.supporting)
         }
     }
-    private func accountValue(_ row: CanvasBalanceChange) -> some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .trailing, spacing: 4) {
+    private func accountValue(_ row: CanvasBalanceChange, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 4) {
                 Text(row.change.map(signed) ?? row.closing.map(money) ?? "—").font(CuadraoTypography.rowAmount)
                 if let change = row.change {
                     Text(change == 0 ? (spanish ? "Sin cambio" : "Unchanged") : change > 0 ? (spanish ? "Suma al balance" : "Adds to balance") : (spanish ? "Resta al balance" : "Reduces balance"))
@@ -76,8 +86,6 @@ struct CuadraoBalanceBreakdown: View {
                 } else if row.closing == nil {
                     Text(spanish ? "Sin balance" : "No balance").font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 }
-            }
-            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
         }
     }
 }
