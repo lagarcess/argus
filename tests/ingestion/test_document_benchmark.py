@@ -53,6 +53,17 @@ def test_multiset_scoring_detects_duplicates_wrong_direction_and_balance_leak():
     assert score["balance_candidates"] == 1
 
 
+@pytest.mark.parametrize("copies,expected_leaks", [(1, 0), (2, 1)])
+def test_expected_transaction_can_equal_balance(copies, expected_leaks):
+    sample = dict(
+        expected_rows=[dict(amount="10", currency="DOP", date=None, kind="expense")],
+        excluded_balances=dict(opening="10", currency="DOP"),
+    )
+    score = row_score(sample, (candidate(),) * copies)
+    assert score["exact_matches"] == 1
+    assert score["balances_as_transactions"] == expected_leaks
+
+
 @pytest.mark.parametrize(
     "receipts",
     [

@@ -134,3 +134,49 @@ passed 639 tests after the schema regression was added. Public endpoint metadata
 of $0.2338345856 per request, or $1.4030075136 for six requests. Price ceilings
 are enforced by [OpenRouter provider routing](https://openrouter.ai/docs/guides/routing/provider-selection#max-price);
 endpoint metadata and actual cost remain part of the live report.
+
+
+## Qwen diagnostic preflight, October 2
+
+The development environment resolves `document_extraction` to
+`qwen/qwen3.7-plus` without a process model override. The founder authorized two
+synthetic diagnostic calls, one USD statement and one DOP receipt, with no retries
+and cumulative worst-case reservation below $2. **Neither call was dispatched.**
+
+The [preflight report](qwen-preflight-2026-10-02.json) retains the dated public
+[OpenRouter endpoint pricing](https://openrouter.ai/api/v1/models/qwen/qwen3.7-plus/endpoints).
+Previous reservations remain $1.4030075136, leaving $0.5969924864. Even the lowest
+tier's full-context reservation for two Qwen calls is $0.67072, bringing the
+cumulative amount to $2.0737275136. That calculation understates the full bound:
+Alibaba publishes higher rates above 256,000 prompt tokens and nonzero cache-write
+pricing. The existing guard rejects this pricing shape as `no_bounded_endpoint`.
+`max_tokens` bounds generated output, not input. No token estimate, fallback,
+key-limit change or weaker guard was substituted to force dispatch.
+
+The report separates scripted observations, canonical candidates, schema/candidate
+validation and field-level scoring. These are **offline checks with a scripted
+provider**, not Qwen extraction results. The actual outgoing synthetic JPEGs are
+retained as [statement](qwen-preflight-statement-usd-p1.jpg) and
+[receipt](qwen-preflight-receipt-dop-p1.jpg). Both are visually readable. The request
+contains a 1600×1131 statement page and an 1100×700 receipt image; PDF text is
+supplemental. The request retains strict schema output, no automatic fallback,
+no reasoning retry, and the existing privacy restrictions.
+
+Scripted transactions retain exact amounts, dates and directions after mapping.
+Lowercase currency becomes the canonical uppercase code. The USD statement has
+$40.25 outflow on September 7 and $100 inflow on September 8. Its $100 opening
+and $159.75 closing balances remain balance candidates. The DOP receipt has one
+DOP 250.50 outflow on September 10, not separate purchases for items or tender.
+
+This inspection exposed a scorer false positive: the valid $100 income matched
+the opening balance's amount. The scorer now subtracts exact expected transaction
+matches before counting balance-valued surplus transactions. Two regression cases
+failed before the one-line correction and pass afterward; duplicate surplus rows
+remain detected. All 80 focused document tests and Ruff pass. This does not explain
+or erase the earlier live zero-transaction results.
+
+New paid cost is $0. No Qwen extraction latency or live quality result exists.
+The original six-attempt results and their unknown cost portions remain unchanged.
+Live acceptance is still incomplete. No new vendor, extraction pipeline, prompt,
+model fallback, feature enablement, hosted configuration, merge or manual deployment
+was introduced by this continuation.

@@ -94,7 +94,7 @@ def row_score(sample: dict, candidates: tuple) -> dict:
         "balance_candidates": sum(row.evidence == "balance" for row in candidates),
         "balances_as_transactions": sum(
             row[0] in balance_values and row[1] == balances.get("currency")
-            for row in actual
+            for row in (got - wanted).elements()
         ),
     }
 
