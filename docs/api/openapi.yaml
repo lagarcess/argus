@@ -3136,6 +3136,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/shortcuts/devices:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceEnrollmentRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceEnrollmentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-connections/{connection_id}/disconnect:
     post:
       tags:
@@ -6212,6 +6244,197 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/ingestion/shortcuts/events:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: 'Device-token only. Re-sending the same event returns the same receipt.
+
+
+        A receipt is returned only for a held capture; anything else is an error,
+
+        so a recipe that checks for ``receipt_id`` never mistakes it for saved.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                event_id:
+                  anyOf:
+                  - type: string
+                    maxLength: 100
+                    minLength: 1
+                  - type: 'null'
+                kind:
+                  type: string
+                  enum:
+                  - transaction
+                  - message_capture
+                source_app:
+                  type: string
+                  enum:
+                  - wallet
+                  - messages
+                  - notifications
+                captured_at:
+                  type: string
+                  format: date-time
+                amount:
+                  anyOf:
+                  - type: string
+                    maxLength: 64
+                  - type: 'null'
+                currency:
+                  anyOf:
+                  - type: string
+                    pattern: ^[A-Za-z]{3}$
+                  - type: 'null'
+                merchant:
+                  anyOf:
+                  - type: string
+                    maxLength: 200
+                  - type: 'null'
+                card:
+                  anyOf:
+                  - type: string
+                    maxLength: 120
+                  - type: 'null'
+                card_last4:
+                  anyOf:
+                  - type: string
+                    pattern: ^[0-9]{4}$
+                  - type: 'null'
+                sender:
+                  anyOf:
+                  - type: string
+                    maxLength: 120
+                  - type: 'null'
+                text:
+                  anyOf:
+                  - type: string
+                    maxLength: 1000
+                  - type: 'null'
+              additionalProperties: false
+              type: object
+              required:
+              - kind
+              - source_app
+              - captured_at
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventReceipt'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/ingestion/shortcuts/events/batch:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: Pending captures saved while offline; idempotent per event.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                events:
+                  items:
+                    properties:
+                      event_id:
+                        anyOf:
+                        - type: string
+                          maxLength: 100
+                          minLength: 1
+                        - type: 'null'
+                      kind:
+                        type: string
+                        enum:
+                        - transaction
+                        - message_capture
+                      source_app:
+                        type: string
+                        enum:
+                        - wallet
+                        - messages
+                        - notifications
+                      captured_at:
+                        type: string
+                        format: date-time
+                      amount:
+                        anyOf:
+                        - type: string
+                          maxLength: 64
+                        - type: 'null'
+                      currency:
+                        anyOf:
+                        - type: string
+                          pattern: ^[A-Za-z]{3}$
+                        - type: 'null'
+                      merchant:
+                        anyOf:
+                        - type: string
+                          maxLength: 200
+                        - type: 'null'
+                      card:
+                        anyOf:
+                        - type: string
+                          maxLength: 120
+                        - type: 'null'
+                      card_last4:
+                        anyOf:
+                        - type: string
+                          pattern: ^[0-9]{4}$
+                        - type: 'null'
+                      sender:
+                        anyOf:
+                        - type: string
+                          maxLength: 120
+                        - type: 'null'
+                      text:
+                        anyOf:
+                        - type: string
+                          maxLength: 1000
+                        - type: 'null'
+                    additionalProperties: false
+                    type: object
+                    required:
+                    - kind
+                    - source_app
+                    - captured_at
+                  type: array
+                  maxItems: 200
+                  minItems: 1
+              additionalProperties: false
+              type: object
+              required:
+              - events
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchReceipt'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/market/session:
     get:
       tags:
@@ -8032,6 +8255,16 @@ components:
       type: object
       required:
       - state
+    BatchReceipt:
+      properties:
+        receipts:
+          items:
+            $ref: '#/components/schemas/EventReceipt'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - receipts
     BillInput:
       properties:
         kind:
@@ -10359,6 +10592,30 @@ components:
       required:
       - markets
       description: What a person's own records show interest in.
+    DeviceEnrollmentRequest:
+      properties:
+        device_name:
+          type: string
+          maxLength: 80
+          minLength: 1
+      additionalProperties: false
+      type: object
+      required:
+      - device_name
+    DeviceEnrollmentResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        device_token:
+          type: string
+        intake_url:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - device_token
+      - intake_url
     DisconnectResponse:
       properties:
         connection:
@@ -10528,6 +10785,26 @@ components:
           type: string
         context:
           type: object
+    EventReceipt:
+      properties:
+        receipt_id:
+          type: string
+        external_id:
+          type: string
+        outcome:
+          type: string
+          enum:
+          - recorded
+          - unchanged
+          - out_of_window
+          - rejected
+          - not_saved
+      additionalProperties: false
+      type: object
+      required:
+      - receipt_id
+      - external_id
+      - outcome
     EvidenceArtifact:
       properties:
         id:

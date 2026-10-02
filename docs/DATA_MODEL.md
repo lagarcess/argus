@@ -111,6 +111,7 @@ Default-off, registered-only (`ARGUS_INGESTION_ENABLED`):
 ```text
 financial_source_connections
 financial_source_gmail_senders
+financial_shortcut_device_tokens
 ```
 
 Optional or later:
@@ -3103,3 +3104,13 @@ Proven by `tests/test_ingestion_gmail_postgres.py`.
 The cursor for a Gmail connection is the mailbox `historyId` in
 `financial_source_connections.sync_cursor`; the sealed credential is the
 Google refresh token. Access tokens are never stored.
+
+`financial_shortcut_device_tokens` holds one row per Shortcuts connection:
+`connection_id` (primary key, cascades from `financial_source_connections`),
+`user_id`, `token_sha256` (32-byte SHA-256 digest of the device token; the
+token itself is never stored) and `created_at`. Disconnect deletes the row, and
+intake also requires the connection to be live. Enrollment counts a person's
+live device digests and inserts the new one in a single transaction under a
+per-person advisory lock, so the five-device limit holds under concurrency. Row level security is enabled
+with no policies and every client grant revoked, so no client role can read or
+write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.

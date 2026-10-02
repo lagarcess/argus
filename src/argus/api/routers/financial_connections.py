@@ -63,3 +63,8 @@ from argus.api.routers.financial_connections_plaid import (  # noqa: E402
 
 router.include_router(gmail_router)
 router.include_router(plaid_router)
+from argus.api.routers.ingestion_shortcuts import (  # noqa: E402
+    devices_router as shortcuts_devices_router,
+)
+
+router.include_router(shortcuts_devices_router)

@@ -7924,3 +7924,72 @@ the connection's status. Plaid errors from Link routes answer 422
 `context.plaid_error_code`. Disconnect calls Plaid `/item/remove`, retrying
 transient failures (unreachable, 429, 5xx) up to 3 attempts with backoff; an
 Item Plaid no longer knows counts as revoked.
+
+### Apple Shortcuts connector (default-off)
+
+Available whenever the connected-sources surface above is on; it stores no
+provider credential, so it does not need `ARGUS_INGESTION_SECRET_KEY`. While
+the surface is off both routes below, including intake, answer 404
+`financial_connections_unavailable`. Capabilities, setup and verification
+levels: [ingestion-shortcuts evidence](reports/evidence/ingestion-shortcuts/README.md).
+
+- POST `/api/v1/financial-connections/shortcuts/devices` `{device_name}`
+  (1-80 characters; registered-only like the routes above) creates a
+  `shortcuts` connection labeled with the device name and returns 201
+  `{connection, device_token, intake_url}`. `device_token`
+  (`sct1.<device id>.<secret>`, 256-bit secret) is returned only here; the
+  server keeps its SHA-256 digest and can never show it again. At most five
+  live devices per person; a sixth answers 409 `shortcuts_device_limit`, also
+  under concurrent enrollment (counted and stored under one per-person lock).
+  Disconnecting the connection through the shared disconnect route deletes the
+  digest (`provider_revocation: revoked`) and the token stops working.
+- POST `/api/v1/ingestion/shortcuts/events` takes no user session: only
+  `Authorization: Bearer <device_token>`. A missing, malformed, unknown,
+  forged or disconnected token answers the same 401
+  `shortcuts_device_unauthorized` with `WWW-Authenticate: Bearer`, also when
+  the device is disconnected while its capture is in flight. Body (at most
+  4 KiB, unknown fields refused; empty strings count as missing):
+  `{event_id?, kind, source_app, captured_at, amount?, currency?, merchant?,
+  card?, card_last4?, sender?, text?}`. `kind` is `transaction` (only with
+  `source_app: wallet`; no `sender`/`text`) or `message_capture` (with
+  `source_app: messages|notifications`; `text` required; no money fields).
+  `captured_at` carries a time zone and must be within 10 minutes ahead and
+  30 days behind the server clock (else 422 `shortcuts_event_out_of_window`).
+  Returns `{receipt_id, external_id, outcome}` only when the capture is held:
+  `outcome` is `recorded|unchanged`. Re-sending the same `event_id` (or,
+  without one, the same content captured in the same second) returns the same
+  `receipt_id` and `external_id` with `unchanged`. A malformed body answers
+  422 `shortcuts_event_invalid` with `context.fields`; content the evidence
+  contract refuses, 422 `shortcuts_event_invalid`; over the cap, 413
+  `shortcuts_event_too_large`. If the sink fails or does not hold the capture,
+  503 `shortcuts_events_not_saved` (`context.retryable: true`,
+  `Retry-After`); sending it again is safe. Until the reconciliation sink
+  exists every valid request answers 503 `shortcuts_intake_unavailable`
+  (`context.retryable: true`, `Retry-After`) and nothing is saved.
+- POST `/api/v1/ingestion/shortcuts/events/batch` `{events: [...]}` (1-200
+  events, at most 256 KiB) sends captures saved while offline. Same
+  authentication and rules, but every event gets a receipt in request order,
+  `{receipts}`, with `outcome` `recorded|unchanged` (held), `out_of_window`
+  or `rejected` (never saved; sending again does not help) or `not_saved`
+  (send again). One malformed event refuses the whole batch with 422 before
+  anything is saved. A sink failure part-way answers 503
+  `shortcuts_events_not_saved`: earlier events may already be held, and the
+  retry records only what is missing.
+- Limits (process-local; each API process counts separately and a restart
+  forgets): 30 failed device tokens per client address per 10 minutes,
+  checked before authentication; per device 20 requests a minute, 300
+  requests a day and 500 events a day (a batch spends one per event). Past any
+  of them: 429 `too_many_requests` with `Retry-After`.
+
+A Wallet `transaction` becomes `transaction` evidence with `status: unknown`
+and `direction: unknown`; `amount` is read from the formatted text only when a
+single value is possible, and `currency` only when the text names one
+(`RD$`, `US$`, `€`, an ISO code) or an explicit `currency` settles a bare `$`.
+Otherwise the field stays empty and is listed as uncertain. `card` becomes the
+account hint name and `card_last4` its mask; nothing else is inferred. A
+`message_capture` becomes `unclassified` evidence: inert text (`excerpt`,
+`sender` as description) with `kind` and every money field unresolved. An
+explicit `currency` settles only a bare `$` or an unmarked amount; any other
+marker it cannot vouch for (`R$`, `€` with `DOP`, `¥`) leaves currency
+unresolved. A sign or parentheses on the amount adds `direction` to the
+uncertain fields, and more than 18 digits leaves the amount unresolved.
