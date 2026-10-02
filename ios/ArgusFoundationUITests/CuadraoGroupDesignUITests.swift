@@ -94,8 +94,9 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let allow = springboard.alerts.buttons["Allow Adding Photos"]
+        let allow = springboard.alerts.buttons["Allow"]
         if allow.waitForExistence(timeout: 3) { allow.tap() }
+        XCTAssertFalse(springboard.alerts.firstMatch.exists)
         XCTAssertTrue(app.buttons["group-code-done"].waitForExistence(timeout: 5))
         shot(app, "group-code-after-save-image")
     }
