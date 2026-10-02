@@ -12,7 +12,7 @@ The five lanes below are the founder's delivery order. They may be built in para
 
 The MVEE, the [decision log](../argus-decision-log.md), the [Household permission policy](household-permission-policy.md), the API contract, and the data model already lock behavior cited below. A product-lead hypothesis is not a decision. Each one is marked **already specified**, **consistent but unspecified**, or **conflicting**.
 
-Unknowns stay unknown. PR #778 was requested from GitHub for `lagarcess/argus` and returned 404. There is no landed or open PR #778 in this repository to read. The instruction that Search must use the document API, and must not read storage internals, still stands as a constraint on this handoff.
+Unknowns stay unknown. [Issue #778](https://github.com/lagarcess/argus/issues/778) plans to move retained document source bytes out of Postgres bytea and into a private Supabase Storage bucket before documents are enabled. Search uses the document API and never storage internals, so that move does not affect Search.
 
 ## Product-lead hypotheses
 
@@ -313,7 +313,7 @@ Reuse `financial_search.search` for financial rows and the document service's li
 - Native `FinancialSearchModel.open` has no document or conversation destination. The assistant tab is `ChatSampleView`.
 - Canvas file results are examples in `CuadraoSearchReferences.swift`, not drafts.
 - Household search does not include documents or chats. MVEE says those stay private unless explicitly shared. No document-sharing grant exists. Search must omit private documents from household results. Do not invent a share flag.
-- PR #778 is not in this repository. There is no storage adapter to call.
+- [Issue #778](https://github.com/lagarcess/argus/issues/778) plans to move retained document source bytes out of Postgres bytea and into a private Supabase Storage bucket before documents are enabled. Search uses the document API and never storage internals, so that move does not affect Search.
 
 ### Allowed files
 
@@ -371,7 +371,7 @@ Postgres. Create Business and Custom, relaunch, and see the same names. Move a s
 | Home | Reading the current `financial-home` response and listing the series gap | Founder decision 3, then the series. View binding also waits on the design-branch collision for `ConnectedCuadraoHome.swift` |
 | Household | Share sheet, accept, leave, remove, and the unregistered-URL fix once decision 2 chooses a URL | Email until decision 1. A link that opens the app until decision 2 |
 | Updates | Inbox table and read state, draft-ready rows from `review_ready`, invitation rows after preview or accept | Bill trigger until decision 4. Push and email until decision 5. Navigation to a document or conversation until those destinations exist |
-| Search | Document and conversation hits through the existing APIs, behind the document flag for documents | Nothing in the founder list. Do not wait for PR #778 |
+| Search | Document and conversation hits through the existing APIs, behind the document flag for documents | Nothing in the founder list. Issue #778 moves retained source bytes to a private Supabase Storage bucket before documents are enabled. Search does not wait on it, because Search uses the document API and never storage internals |
 | Spaces | Space rows, standalone moves, blocked linked moves | Nothing in the founder list. Home and Search display of the new space lands with those lanes, after this one |
 
 No lane is dispatched by this document.
