@@ -10,8 +10,9 @@ from argus.domain.planning.goal_schemas import (
     ContributionRecord,
     ContributionRelease,
 )
-from argus.domain.recording.errors import RecordingInputError
+from argus.domain.recording.errors import RecordingInputError, StaleVersion
 from argus.domain.recording.money_schemas import MoneyRequest
+from argus.domain.recording.schemas import account_response
 from argus.domain.recording.service import FinancialAccountService
 
 from tests import test_financial_accounts_postgres as shared
@@ -82,7 +83,12 @@ def test_same_allocation_receipt_replays_concurrently_before_cas(scene):
     assert service.get(scene[1], g["id"])["supported_minor"] == "50000"
 
 
-def test_recording_and_allocation_share_owner_serialization(scene):
+@pytest.mark.parametrize(
+    "first",
+    [None, "allocate", "record"],
+    ids=["concurrent", "allocation_first", "expense_first"],
+)
+def test_recording_and_allocation_share_owner_serialization(scene, first):
     service, aid, g = setup_goal(scene)
 
     def operation(kind):
@@ -92,14 +98,29 @@ def test_recording_and_allocation_share_owner_serialization(scene):
                 if kind == "allocate"
                 else save(scene, kind="expense", account_id=aid, amount="200")
             )
+        except StaleVersion:
+            assert kind == "allocate"
+            return "stale_version"
         except RecordingInputError as error:
+            assert kind == "allocate" and error.code == "goal_backing_shortfall"
             return error.code
 
-    with ThreadPoolExecutor(max_workers=2) as workers:
-        list(workers.map(operation, ["allocate", "record"]))
+    operations = ["record", "allocate"] if first == "record" else ["allocate", "record"]
+    if first is None:
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(operation, operations))
+    else:
+        results = list(map(operation, operations))
+    outcomes = dict(zip(operations, results, strict=True))
+    assert isinstance(outcomes["record"], dict)
     actual = service.get(scene[1], g["id"])
-    assert actual["supported_minor"] in {"0", "80000"}
-    assert actual["assigned_minor"] in {"0", "90000"}
+    expected = (
+        ("90000", "80000") if isinstance(outcomes["allocate"], dict) else ("0", "0")
+    )
+    assert (actual["assigned_minor"], actual["supported_minor"]) == expected
+    stored = scene[0].get(user_id=scene[1], account_id=aid)
+    assert account_response(stored).balance.amount_minor == 80000
+    assert len(stored.expenses) == 1 and stored.expenses[0].current.amount_minor == 20000
 
 
 def confirmed(scene, service, g, source, aid):
