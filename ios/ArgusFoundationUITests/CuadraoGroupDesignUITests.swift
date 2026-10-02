@@ -90,7 +90,7 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         openSampleCode(app)
         reveal(app, app.buttons["group-code-share"])
         app.buttons["group-code-share"].tap()
-        let save = app.buttons["Save Image"]
+        let save = app.cells.matching(NSPredicate(format: "label == %@", "Save Image")).firstMatch
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         save.tap()
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
