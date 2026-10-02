@@ -180,3 +180,55 @@ The original six-attempt results and their unknown cost portions remain unchange
 Live acceptance is still incomplete. No new vendor, extraction pipeline, prompt,
 model fallback, feature enablement, hosted configuration, merge or manual deployment
 was introduced by this continuation.
+
+
+## Qwen live diagnostic under the $6 ceiling
+
+The founder approved a cumulative $6 reservation ceiling for the same two
+synthetic diagnostics, one attempt each. The budget parser now reads all published
+pricing tiers and reserves the highest prompt/cache input rate. The prompt routing
+ceiling remains the highest published prompt price, separately from the larger
+cache-write reservation. Malformed tiers and unknown nonzero charges still fail
+closed. Thirty budget tests pass, including the third-attempt rejection. The
+pricing and diagnostic instrumentation received independent review before dispatch.
+
+The [live report](qwen-live-2026-10-02.json) identifies code head
+`f8ad929008bc6f3d2ed833cd23bba488d142f6de`, the endpoint snapshot, exact request
+image hash, schema hash, safe response diagnostics and consumed reservations.
+The [runner](qwen-diagnostic-runner.py) matches the SHA-256 in that report.
+Offline instrumentation checks exercised success, scoring failure and HTTP failure
+before the paid run. They made no network requests.
+
+Only the USD statement was dispatched. It failed with HTTP 404 after **815 ms**
+including preparation. The captured error code is 404 and the error terms include
+`privacy` and `no endpoints`. No model observations were returned, so schema
+validation, candidate mapping and extraction accuracy could not be measured.
+Empty observation arrays in the report represent absence of a model result, not
+an extracted statement with zero transactions. The DOP receipt was not sent.
+No retry, fallback, extra fixture or relaxed privacy request followed.
+
+The existing request requires `zdr=true` and `data_collection=deny`. A subsequent
+free read of the [public ZDR endpoint list](https://openrouter.ai/api/v1/endpoints/zdr)
+returned no endpoint for `qwen/qwen3.7-plus`; the [safe readback](qwen-zdr-2026-10-02.json)
+records the time and result. The selected model therefore has no listed route
+compatible with the request's ZDR requirement at this checkpoint. This is a
+provider/privacy compatibility blocker, not a missing key or demonstrated
+candidate-normalization defect. Privacy settings remain unchanged.
+
+| Measure | USD |
+| --- | ---: |
+| Approved cumulative ceiling | 6 |
+| Previous six reservations | 1.4030075136 |
+| Per-Qwen-call reservation, including highest cache-write rate | 1.24608 |
+| Planned cumulative reservation for both calls | 3.8951675136 |
+| Consumed cumulative reservation after one failed call | 2.6490875136 |
+| New known actual cost subtotal | 0 |
+| New actual cost | Unknown; no usage receipt |
+| Cumulative known actual cost subtotal | 0.00489199536 |
+| Cumulative actual cost | Unknown; four requests lack cost receipts |
+
+The failed request retains its reservation. No charge is inferred from its HTTP
+status, and an unknown invoice is not reported as zero cost. Remaining authorization
+does not permit proceeding after this failure; another paid attempt needs approval.
+No financial records were written. No PR merge, deployment, hosted setting change
+or feature enablement was performed.
