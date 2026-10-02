@@ -1743,6 +1743,24 @@ this decision.
 
 ### Cuadrao consistency pass and Home chart follow-up
 
+**Support surfaces — UI verified October 2, 2026:** the founder requested a bounded
+UI-only pass over Search, Profile, Settings and Updates after build 3411.
+This explicitly reopens the previously paused Profile polish. Preserve the shared
+identity, existing preference owners and App/Account/Support grouping. Search
+must preserve its origin and use actual preview plans. Updates must link its
+small contextual inbox to existing record owners, with read state and preferences.
+No push delivery, account mutations, photo upload, backend or provider work is
+assigned. Connected Search/Profile/Updates work retains its existing roadmap owner.
+Source `34e23142` closes this UI pass. Five new native journeys passed across
+focused final runs, plus the existing Search/date regression. The final scoped
+review is clean. Signed build **3412** is installed and its version verified on
+the founder’s iPhone; automatic launch was blocked by the locked device.
+[Acceptance evidence](../reports/evidence/cuadrao-native-design/support-surfaces/README.md)
+records the tested scope. Profile drafts and inbox read state remain session-local;
+connected identity, durable read state, photo upload and push delivery remain
+future work under the existing Search/Profile/Updates owner.
+
+
 **Approved consistency polish — UI verified October 2, 2026:** source `629b8d070`
 completes the dated Balance opening/closing and per-account change breakdown,
 shared first-use/empty/unavailable chart artwork, a loading gallery specimen,
@@ -1945,7 +1963,9 @@ must not silently reorder another member's view or alter shared financial record
 Physical touch/VoiceOver acceptance and older-runtime behavior remain device
 acceptance work; simulator and state evidence describe their exact tested scope.
 
-**Future surface-connectivity pass — founder requested, not yet executed:** audit
+**Future surface-connectivity pass — broader audit remains open:** the October 2
+support pass closes preview Search-to-plan, Search-to-chat return and
+Updates-to-account/plan round trips. Audit
 Home, Plan, Accounts, Chat and Search for meaningful row/action destinations,
 return paths, preserved space/currency/selection/scroll/draft context, and stale or
 unavailable records. Reuse existing destination and state owners. Include chart

@@ -25,7 +25,7 @@ value, make a row hard to scan or imply that a prediction is certain.
 | Home | Welcome: Hola / Hello plus preferred name | Compact native system greeting |
 | Chat | Invite conversation | Expressive serif landing text; preserve typed opening behavior |
 | Plan | Look ahead: Lo que viene / What's ahead | One serif heading with the primary plus; no repeated subtitle |
-| Profile and Settings | Identify the destination | Clear native titles; preserve the paused Profile layout |
+| Profile and Settings | Identify the destination | Personal identity, quiet grouped destinations and clear native titles |
 | Expanded insights | Identify the selected period | Serif feature title; controls stay anchored while period evidence pages |
 
 Tab identity does not require a second literal surface title. Keep heading/action
@@ -535,9 +535,31 @@ The row's shared contextual actions are exposed through Apple's
 Search retains its Accounts, Activity, Plans, Chats, Files and Memory perspectives.
 Financial currency filters do not filter nonfinancial content. Household excludes
 private chats, source files and memory; a preview filter is not authorization.
-Preserve Profile's approved identity, grouped destinations, artwork and appearance
-choice while its broader redesign remains paused. Settings remain literal native
-headings rather than expressive landing copy.
+The October 2 support-surface assignment reopens Profile polish within the existing
+identity and App, Account, Support groups. Settings keep literal native headings.
+Avatar themes use the existing palette and icon family; profile editing keeps
+Save and Cancel, and Home reads the same preferred-name value. Appearance retains
+its existing preference owner. Upload, public identity and connected account
+operations remain separate work.
+
+Search opens account and plan results in its own navigation stack. Chat handoff
+has an explicit return to Search and preserves the current query and filters.
+An empty perspective describes that content type. A no-match state preserves the
+query and offers a clear way to remove it or reset the active filters.
+
+Updates is a quiet inbox with read/unread state, source-linked rows and direct
+access to notification preferences. Opening a detail keeps Back anchored to the
+inbox. A contextual suggestion is not a new financial event; do not invent an
+event date, threshold crossing or milestone from a current value. Ordinary
+transactions and chat messages do not each earn an inbox notification. The bell
+and list derive unread state from the same visible items. Delivery preferences
+control future delivery channels; disabling them does not erase the inbox.
+The current preview keeps read state and edited profile fields for the session.
+Connected identity and durable inbox state belong to the main roadmap.
+
+Empty inbox and no-match states use small Cuadrao artwork and one useful recovery
+action where available. Reserve chart silhouettes for financial chart states.
+Do not add permanent loading motion or test disclosures to these screens.
 
 ## 12. Localization and accessibility
 
