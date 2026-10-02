@@ -109,14 +109,15 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
 
     private func chooseKind(_ app: XCUIApplication, _ title: String) {
         let choice = app.buttons["cuadrao.feedback.kind"]
-        reveal(app, choice); choice.tap()
+        reveal(app, choice)
+        choice.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
         app.buttons[title].tap()
     }
 
     private func pickPhoto(_ app: XCUIApplication) {
         let choose = app.buttons["cuadrao.profile.photo.choose"]
         reveal(app, choose); choose.tap()
-        let photo = app.images.matching(NSPredicate(format: "label CONTAINS[c] %@", "Photo")).firstMatch
+        let photo = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
         XCTAssertTrue(photo.waitForExistence(timeout: 5), "Seed the simulator Photos library before this journey")
         photo.tap()
     }
