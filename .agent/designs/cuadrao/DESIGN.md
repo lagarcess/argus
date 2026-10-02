@@ -217,12 +217,13 @@ Do not show Evolución / Distribución controls, insight paragraphs or test/samp
 copy on Home. Genuine unknown/partial values remain distinguishable from zero;
 removing preview disclosures does not authorize invented financial facts.
 
-**Expanded insights:** a single row above the amount places the selected period on
-the left and the native Balance / Actividad choice on the right. Week/month show
-the first and last calendar dates; year shows the year. The period is a local
-headline: use `CuadraoTypography.feature` (native title serif) and ink, not the
-secondary supporting style. Larger text can wrap this row without shrinking the
-title or truncating either choice.
+**Expanded insights:** the native Balance / Actividad choice is right-aligned in
+the anchored header, above the compact period/chart controls. Each moving page
+starts with a left-aligned period headline above its amount. Week/month show the
+first and last calendar dates; year shows the year. Use
+`CuadraoTypography.feature` (native title serif) and ink, not the secondary
+supporting style. Larger text can wrap without shrinking the title or truncating
+choices. Keeping controls anchored lets the period and its evidence move together.
 Balance remains recorded net position. Activity uses expenses from the same local
 activity owner as the transaction list, filtered by space and currency. Transfers,
 income and changing balances do not become spending. Historical fixtures stay in
