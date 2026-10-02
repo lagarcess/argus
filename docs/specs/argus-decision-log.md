@@ -29,7 +29,7 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-27 | Lock copy-link household invitations, user-shared WhatsApp links, do-blitz as the short-link integration direction, and Resend email delivery; no incentives. Detailed owner: [MVEE invitation delivery](argus-minimum-viable-ecosystem-experience.md#invitation-delivery-founder-locked-september-27-2026). Contact discovery and implementation contracts are not implied. Narrowed on 2026-10-02: do-blitz no longer handles invite links; see [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
 | 2026-09-28, clarified 2026-09-29 | Revenue, pricing, paywalls and billing remain deferred; existing usage and cost safeguards remain. The current user-trial boundary permits founder dogfooding and physical-phone demonstrations. Detailed owner: [documentation authority — founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral). | Lucas |
 | 2026-09-29 | The [private iPhone delivery and execution lock](#september-29-2026-private-iphone-delivery-and-execution-lock) owns the current delivery decision and supersedes the batch instructions below. | Lucas |
-| 2026-10-01 | Lock Household permission policy: creator administers invitations/membership and may transfer administration or close before departure; members see the member list and may leave; shared accounts start view-only with editing only via explicit grant; edit grants do not confer ownership, membership administration or resharing; leave/removal revokes membership and that member's account grants while owners retain records/history; invitations are revocable, single-use, seven-day links with safe same-recipient acceptance retries; create ≠ invite ≠ share account and acceptance is membership only. MVEE consent and financial-meaning boundaries remain. Owners: [execution board Household lane](argus-execution-board.md#connected-spaces-and-household-lane), [MVEE section 12](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), [lane contract](lanes/household-permission-policy.md). | Lucas (Project orchestrator recorded) |
+| 2026-10-01 | Lock Household permission policy: creator administers invitations/membership and may transfer administration or close before departure; members see the member list and may leave; shared accounts start view-only with editing only via explicit grant; edit grants do not confer ownership, membership administration or resharing; leave/removal revokes membership and that member's account grants while owners retain records/history; invitations are revocable, single-use, seven-day links with safe same-recipient acceptance retries; create ≠ invite ≠ share account and acceptance is membership only. MVEE consent and financial-meaning boundaries remain. Owners: [execution board Household lane](argus-execution-board.md#connected-spaces-and-household-lane), [MVEE section 12](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), [lane contract](lanes/household-permission-policy.md). Narrowed on 2026-10-02: rule 5's departure behavior now follows the [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas (Project orchestrator recorded) |
 | 2026-10-02 | Lock the invitation, TestFlight beta-gate, Home comparison, Updates, plan-export and account-move rules for the five Cuadrao lanes. Detailed record: [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
 
 ## Superseded coordination instructions (historical only)
@@ -161,15 +161,19 @@ accepted technical contract or a new implementation/deployment grant.
 The founder approved these in the Docs Alignment room while scoping the five
 lanes (Home data, Household invitations, Updates, Search, Spaces). Product
 Lead (Iris) drafted the recommendations and the founder said yes; Head of
-Engineering (Yelena) recorded them for the lane handoff. These are decisions,
-not claims that anything is built. The lane handoff links here instead of
-restating them.
+Engineering (Yelena) recorded them for the lane handoff. Two details were
+approved by the founder's reaction rather than a written yes; each is marked
+below with its time. These are decisions, not claims that anything is built.
+Delivery order and review steps are the Head of Engineering's plan in the lane
+handoff, not founder locks. The lane handoff links here instead of restating
+them.
 
 ### Invitations
 
-- An invitation produces a share link, an invite code and a QR code. Email
-  invitations are part of the design but stay switched off until the founder
-  connects the email service.
+- An invitation produces a share link, an invite code and a QR code.
+  Household email invitations are out of scope for this pass. A Resend adapter
+  already exists, sending from the get-argus.com address; what is missing is a
+  Cuadrao sending domain.
 - The invite link is a universal link on cuadrao.ai that opens the app. The
   current `argus-household://` scheme and the design branch's placeholder
   domain are not the target.
@@ -177,22 +181,29 @@ restating them.
   because a redirect through a shortener usually opens Safari instead of the
   app. do-blitz stays an option for marketing and ad links later. This narrows
   the September 27 invitation-delivery lock; its Resend and WhatsApp parts are
-  unchanged.
+  unchanged. (Founder approval by reaction, 5:58 PM CT.)
 - Each code works once and records who sent it, so the who-invited-whom
   record exists. This builds on the October 1 single-use, seven-day rule.
 - When an account is deleted, an anonymous record that an invite was sent and
   accepted is kept, with no name or identifier. Deleting an account still
-  removes the person. (Detail added by Iris right after the founder's lock and
-  carried into the handoff; the founder did not object.)
+  removes the person. (Iris's detail, approved by the founder's reaction at
+  5:33 PM CT.)
 - The inviter gets an "invitation accepted" entry in Updates. There is no
   "invitation received" entry, because the invitee already has the link or
   code and an invitation has no named recipient before acceptance.
 
 ### TestFlight beta gate
 
+This gate and the three network numbers are the founder's October 2 lift of
+the [founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral) (no broad
+user trials, no new growth analytics), scoped to invites only.
+
 - The cuadrao.ai landing page collects a waitlist, and the founder rolls access
   out personally. He onboards the first users himself.
-- Each person starts with 3 invites; the founder can add more.
+- Each user starts with 3 invites; the founder can add more. Still open: how
+  this per-user quota fits October 1 rule 1, where only the household creator
+  administers invitations. Are beta invites and household invites separate
+  kinds?
 - A TestFlight public link only installs the app. The in-app invite code is the
   real gate. Anyone without a code is sent to the cuadrao.ai waitlist.
 - Three network numbers are tracked from the start: invites sent per user, the
@@ -226,10 +237,11 @@ restating them.
 ### Leaving a household and moving accounts
 
 - When a member leaves, the accounts they own go with them and the household
-  loses access right away. The household keeps that account's history up to
-  the move date, greyed out and read-only, with the state at the move recorded.
-  Shared plans that relied on it are archived read-only for the remaining
-  members.
+  loses access right away. Members who had a grant at the cut-off keep that
+  account's history up to the move date, greyed out and read-only, with the
+  state at the move recorded. Shared plans that relied on it are archived
+  read-only for the remaining members. This narrows October 1 rule 5 (leave or
+  removal revokes the member's grants and owners retain history).
 - Moving an account between Spaces never rewrites past balances or
   settlements. A move is recorded as an event, replaying it changes nothing, and
   access rules block creating, editing or deleting the locked history. Home is
@@ -237,7 +249,7 @@ restating them.
 
 ### Outside services
 
-- Email, the universal link and push are each built behind a switch with a
-  stand-in and stay off until the founder connects the real service. Turning one
-  on later is configuration only. The domain, keys and links the founder will
+- Email, the universal link and push are not built yet. Each will be built
+  behind a default-off flag with a fake and stay off until the founder connects
+  the real service, so turning one on later is configuration only. The domain, keys and links the founder will
   supply are not recorded here.
