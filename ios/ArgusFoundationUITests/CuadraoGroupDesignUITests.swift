@@ -74,7 +74,7 @@ final class CuadraoGroupDesignUITests: XCTestCase {
 
     func testSampleCardAtLargeTextEnglish() {
         continueAfterFailure = false
-        let app = openGroups(english: true, extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        let app = openGroups(english: true, dark: true, extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
         openSampleCode(app)
         reveal(app, app.staticTexts["group-code-disclosure"])
         XCTAssertTrue(app.staticTexts["group-code-disclosure"].label.contains("doesn't join a real group"))
@@ -82,6 +82,22 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         reveal(app, app.buttons["group-code-share"])
         XCTAssertTrue(app.buttons["group-code-share"].isHittable)
         XCTAssertTrue(app.buttons["group-code-done"].isHittable)
+    }
+
+    func testSampleCardSaveImage() {
+        continueAfterFailure = false
+        let app = openGroups(english: true)
+        openSampleCode(app)
+        reveal(app, app.buttons["group-code-share"])
+        app.buttons["group-code-share"].tap()
+        let save = app.buttons["Save Image"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        save.tap()
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let allow = springboard.alerts.buttons["Allow Adding Photos"]
+        if allow.waitForExistence(timeout: 3) { allow.tap() }
+        XCTAssertTrue(app.buttons["group-code-done"].waitForExistence(timeout: 5))
+        shot(app, "group-code-after-save-image")
     }
 
     private func openSampleCode(_ app: XCUIApplication) {
