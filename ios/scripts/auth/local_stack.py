@@ -184,7 +184,11 @@ def status() -> dict:
     return result
 
 
-def seed() -> None:
+def seed(*, user_count: int = 2) -> None:
+    if user_count not in (2, 3):
+        raise ValueError(
+            "Synthetic fixtures support two members and an optional third identity"
+        )
     cfg = status()
     path = ALLOCATION.work / "client.json"
     if path.exists():
@@ -192,7 +196,7 @@ def seed() -> None:
             "Synthetic client fixture already exists; reuse, do not mint accounts repeatedly."
         )
     users = []
-    for label in ("a", "b"):
+    for label in ("a", "b", "c")[:user_count]:
         email = f"ios-{label}-{secrets.token_hex(5)}@example.test"
         password = secrets.token_urlsafe(24)
         data = json.dumps(
@@ -243,7 +247,7 @@ def seed() -> None:
         + "\n"
     )
     print(
-        "Created two synthetic users and ignored client fixture/config. No secrets printed."
+        f"Created {user_count} synthetic users and ignored client fixture/config. No secrets printed."
     )
 
 
@@ -365,6 +369,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--port-base", type=int, default=58400)
     parser.add_argument(
+        "--user-count",
+        type=int,
+        choices=[2, 3],
+        default=2,
+        help="Number of synthetic identities created by seed (default two)",
+    )
+    parser.add_argument(
         "--api-port",
         type=int,
         help="Local API listen port; reuse the verified allocation Auth and database",
@@ -397,7 +408,7 @@ if __name__ == "__main__":
             )
         print("Lane Supabase started. Detailed output is ignored local evidence.")
     elif args.action == "seed":
-        seed()
+        seed(user_count=args.user_count)
     elif args.action == "api":
         if not args.python or not Path(args.python).is_absolute():
             raise SystemExit("--python must be an absolute interpreter path")

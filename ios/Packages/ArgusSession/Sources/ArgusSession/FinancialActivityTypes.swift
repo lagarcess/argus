@@ -156,8 +156,8 @@ public struct FinancialActivityDetail: Codable, Equatable, Sendable, Identifiabl
     public let activityId: UUID
     public let revision: Int
     public let kind: FinancialActivityKind
-    public let amountMinor: Int64
-    public let amount: String
+    public let amountMinor: Int64?
+    public let amount: String?
     public let currency: String
     public let currencyFractionDigits: Int
     public let occurredAt: String
@@ -180,6 +180,9 @@ public struct FinancialActivityDetail: Codable, Equatable, Sendable, Identifiabl
     public let refundedMinor: Int64?
     public let refundableMinor: Int64?
     public var id: UUID { activityId }
+    /// A destination-only projection has visible account legs but no authority
+    /// to disclose or change the original source amount.
+    public var originalAmountAvailable: Bool { amountMinor != nil && amount != nil }
     enum CodingKeys: String, CodingKey {
         case revision, kind, amount, currency, note, reason, legs
         case activityId = "activity_id", amountMinor = "amount_minor"
