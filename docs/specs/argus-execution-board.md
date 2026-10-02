@@ -10,6 +10,18 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
+## Five-lane delivery handoff
+
+Draft scoping only, 2 October 2026. Integration tip `d9a7acfc` includes landed
+PR #773 `f28b5642` and PR #776. The
+[five-lane handoff](lanes/mvee-five-lane-handoff.md) maps Home real data,
+Household invitation delivery, Updates, Search coverage, and Spaces onto the
+current backend and native app. It records which product-lead hypotheses are
+already specified, consistent but unspecified, or conflicting. It does not
+dispatch a worker, authorize a merge, or rewrite the historical landing records
+below. Sentences in the #773 section that still say that lane is unmerged
+predate the squash on this tip.
+
 ## Shared document draft foundation, PR #776
 
 **Founder clarification, October 2, 2026; backend checkpoint under review.**
@@ -2710,6 +2722,11 @@ Check concise copy, icons, locked navigation and native interaction quality
 before repeating a pattern across screens.
 
 ## Work map
+
+The [five-lane handoff](lanes/mvee-five-lane-handoff.md) is the current scoping
+map for Home series data, Household invitation delivery, Updates, Search
+documents and conversations, and private Spaces. The table below remains the
+coverage index.
 
 ### Complete MVEE coverage
 
