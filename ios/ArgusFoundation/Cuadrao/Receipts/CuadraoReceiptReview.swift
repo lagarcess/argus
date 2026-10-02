@@ -48,9 +48,9 @@ private struct ReceiptEditor: View {
                     if draft.lines.isEmpty && posted == nil {
                         Text(es ? "Total por revisar" : "Total to review").font(CuadraoTypography.secondaryAmount)
                             .accessibilityIdentifier("receipt-total")
-                    } else {
+                    } else if let currency = draft.currency {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(draft.currency).font(.caption).foregroundStyle(.secondary)
+                            Text(currency).font(.caption).foregroundStyle(.secondary)
                             Text(money(posted?.cents ?? draft.total)).font(CuadraoTypography.amount)
                                 .lineLimit(1).minimumScaleFactor(0.65)
                         }.accessibilityIdentifier("receipt-total")
@@ -68,54 +68,69 @@ private struct ReceiptEditor: View {
                         Picker(es ? "Categoría" : "Category", selection: $draft.category) {
                             ForEach(CanvasExpenseCategory.allCases) { Text($0.title(es)).tag($0.rawValue) }
                         }
-                        Label(draft.currency, systemImage: "lock").font(.caption).foregroundStyle(.secondary)
+                        if let currency = draft.currency { Label(currency, systemImage: "lock").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
             }
-            Section(es ? "Artículos" : "Items") {
-                if draft.lines.isEmpty {
-                    Text(es ? "Añade los artículos del recibo." : "Add the receipt's items.").font(.subheadline).foregroundStyle(.secondary)
+            if draft.currency == nil {
+                Section {
+                    Menu {
+                        ForEach(PlanCurrency.supported, id: \.self) { currency in
+                            Button(currency) { chooseCurrency(currency) }
+                        }
+                    } label: {
+                        Label(es ? "Elegir moneda" : "Choose currency", systemImage: "chevron.up.chevron.down")
+                    }.accessibilityIdentifier("receipt-currency")
+                    Text(es ? "El recibo ya está guardado. Elige su moneda para revisar los montos; después quedará fija." : "Your receipt is saved. Choose its currency to review amounts; it stays fixed afterward.")
+                        .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 }
-                ForEach(draft.lines) { line in
-                    Button { if draft.prepared { editingLine = line } } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(line.name).foregroundStyle(WelcomePalette.ink)
-                                Text("\(line.quantity) × \(money(line.unitCents))").font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(money(line.cents)).font(CuadraoTypography.rowAmount).foregroundStyle(WelcomePalette.ink)
-                            if draft.prepared { Image(systemName: "chevron.right").font(.caption2) }
-                        }.frame(minHeight: 44).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityIdentifier("receipt-line-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)")
-                }
-                if draft.prepared {
-                    Button(es ? "Añadir artículo" : "Add item", systemImage: "plus") { editingLine = ReceiptLine(name: "", unitCents: 0) }
-                        .disabled(draft.lines.count >= 100).accessibilityIdentifier("receipt-add-item")
-                }
-                totalRow(es ? "Subtotal" : "Subtotal", draft.subtotal)
-                DisclosureGroup(es ? "Impuestos y propina" : "Tax and tip", isExpanded: $charges) {
+            }
+            if let currency = draft.currency {
+                Section(es ? "Artículos" : "Items") {
+                    if draft.lines.isEmpty {
+                        Text(es ? "Añade los artículos del recibo." : "Add the receipt's items.").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    ForEach(draft.lines) { line in
+                        Button { if draft.prepared { editingLine = line } } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(line.name).foregroundStyle(WelcomePalette.ink)
+                                    Text("\(line.quantity) × \(money(line.unitCents))").font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Text(money(line.cents)).font(CuadraoTypography.rowAmount).foregroundStyle(WelcomePalette.ink)
+                                if draft.prepared { Image(systemName: "chevron.right").font(.caption2) }
+                            }.frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("receipt-line-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)")
+                    }
                     if draft.prepared {
-                        centInput(es ? "Impuesto del recibo" : "Receipt tax", key: \.taxCents, id: "receipt-tax")
-                        centInput(es ? "Servicio del recibo" : "Receipt service charge", key: \.serviceCents, id: "receipt-service")
-                        centInput(es ? "Propina adicional" : "Extra tip", key: \.addedTipCents, id: "receipt-tip")
-                    } else {
-                        totalRow(es ? "Impuesto" : "Tax", draft.taxCents)
-                        totalRow(es ? "Servicio" : "Service", draft.serviceCents)
-                        totalRow(es ? "Propina adicional" : "Extra tip", draft.addedTipCents)
+                        Button(es ? "Añadir artículo" : "Add item", systemImage: "plus") { editingLine = ReceiptLine(name: "", unitCents: 0) }
+                            .disabled(draft.lines.count >= 100).accessibilityIdentifier("receipt-add-item")
                     }
-                    Text(es ? "El impuesto y el servicio ya forman parte del total del recibo. Solo la propina adicional se suma después." : "Tax and service are already part of the receipt total. Only the extra tip is added afterward.").font(.caption).foregroundStyle(.secondary)
+                    totalRow(es ? "Subtotal" : "Subtotal", draft.subtotal)
+                    DisclosureGroup(es ? "Impuestos y propina" : "Tax and tip", isExpanded: $charges) {
+                        if draft.prepared {
+                            centInput(es ? "Impuesto del recibo" : "Receipt tax", key: \.taxCents, id: "receipt-tax")
+                            centInput(es ? "Servicio del recibo" : "Receipt service charge", key: \.serviceCents, id: "receipt-service")
+                            centInput(es ? "Propina adicional" : "Extra tip", key: \.addedTipCents, id: "receipt-tip")
+                        } else {
+                            totalRow(es ? "Impuesto" : "Tax", draft.taxCents)
+                            totalRow(es ? "Servicio" : "Service", draft.serviceCents)
+                            totalRow(es ? "Propina adicional" : "Extra tip", draft.addedTipCents)
+                        }
+                        Text(es ? "El impuesto y el servicio ya forman parte del total del recibo. Solo la propina adicional se suma después." : "Tax and service are already part of the receipt total. Only the extra tip is added afterward.").font(.caption).foregroundStyle(.secondary)
+                    }
+                    totalRow(es ? "Total del recibo" : "Receipt total", draft.receiptTotal)
+                    if draft.addedTipCents > 0 { totalRow(es ? "Con propina adicional" : "Including extra tip", draft.total) }
                 }
-                totalRow(es ? "Total del recibo" : "Receipt total", draft.receiptTotal)
-                if draft.addedTipCents > 0 { totalRow(es ? "Con propina adicional" : "Including extra tip", draft.total) }
-            }
-            if draft.prepared { destination }
-            else if case .personal(let accountID) = draft.destination, let accountID, let account = workspace.accounts.account(accountID) {
-                Section(es ? "Guardado en" : "Saved to") {
-                    Label(account.displayName(es) + " · " + draft.currency, systemImage: "creditcard")
+                if draft.prepared { destination }
+                else if case .personal(let accountID) = draft.destination, let accountID, let account = workspace.accounts.account(accountID) {
+                    Section(es ? "Guardado en" : "Saved to") {
+                        Label(account.displayName(es) + " · " + currency, systemImage: "creditcard")
+                    }
                 }
+                if let group { splitSection(group) }
             }
-            if let group { splitSection(group) }
             Section {
                 if let pin = draft.captureLocation {
                     Map(initialPosition: .region(MKCoordinateRegion(center: .init(latitude: pin.latitude, longitude: pin.longitude), span: .init(latitudeDelta: 0.01, longitudeDelta: 0.01)))) {
@@ -144,15 +159,17 @@ private struct ReceiptEditor: View {
             .navigationTitle(es ? "Revisar recibo" : "Review receipt").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showSource) { ReceiptSourceViewer(draft: draft, store: workspace.receipts, spanish: es) }
             .sheet(item: $editingLine) { line in
-                ReceiptLineEditor(line: line, currency: draft.currency, spanish: es, existing: draft.lines.contains { $0.id == line.id }) { revised in
-                    if let revised {
-                        if let index = draft.lines.firstIndex(where: { $0.id == revised.id }) { draft.lines[index] = revised }
-                        else { draft.lines.append(revised) }
-                    } else { draft.lines.removeAll { $0.id == line.id } }
+                if let currency = draft.currency {
+                    ReceiptLineEditor(line: line, currency: currency, spanish: es, existing: draft.lines.contains { $0.id == line.id }) { revised in
+                        if let revised {
+                            if let index = draft.lines.firstIndex(where: { $0.id == revised.id }) { draft.lines[index] = revised }
+                            else { draft.lines.append(revised) }
+                        } else { draft.lines.removeAll { $0.id == line.id } }
+                    }
                 }
             }
             .onChange(of: draft) { old, value in
-                guard old.prepared, value.prepared else { return }
+                guard old.prepared, value.prepared, value != workspace.receipts.receipt(value.id) else { return }
                 do { try workspace.receipts.update(value); error = "" } catch { show(error) }
             }
             .onChange(of: location.value) { _, value in if let value, draft.prepared { draft.captureLocation = value } }
@@ -190,10 +207,18 @@ private struct ReceiptEditor: View {
                 }.accessibilityIdentifier("receipt-account")
                 if compatibleAccounts.isEmpty { Text(es ? "No hay cuentas personales de esta moneda." : "There are no personal accounts in this currency.").font(.caption).foregroundStyle(.secondary) }
             }
-            Text(draft.currency).font(.caption).foregroundStyle(.secondary)
+            if let currency = draft.currency { Text(currency).font(.caption).foregroundStyle(.secondary) }
         }
     }
+    private func chooseCurrency(_ currency: String) {
+        do {
+            try workspace.receipts.setCurrency(currency, for: draft.id)
+            if let saved = workspace.receipts.receipt(draft.id) { draft = saved }
+            error = ""
+        } catch { show(error) }
+    }
     private func chooseDestination(_ value: String) {
+        guard draft.currency != nil else { return }
         if let id = UUID(uuidString: value), let group = workspace.groups.group(id) {
             draft.destination = .group(id); draft.payer = group.me; draft.participants = Set(group.activeMembers.map(\.id))
             for index in draft.lines.indices { draft.lines[index].members = [] }
@@ -250,7 +275,7 @@ private struct ReceiptEditor: View {
                 totalRow(es ? "Tu parte" : "Your share", shares[group.me] ?? 0)
                 let payer = posted?.payer ?? draft.payer
                 let net = (payer == group.me ? (posted?.cents ?? draft.total) : 0) - (shares[group.me] ?? 0)
-                CuadraoOwedRow(cents: net, currency: draft.currency, spanish: es)
+                if let currency = draft.currency { CuadraoOwedRow(cents: net, currency: currency, spanish: es) }
             }
         }
     }
@@ -290,7 +315,10 @@ private struct ReceiptEditor: View {
     private func show(_ failure: Error) {
         error = (failure as? ReceiptError)?.message(es) ?? (es ? "No se pudo guardar. Tus cambios aún no están confirmados. Inténtalo de nuevo." : "Could not save. Your changes are not confirmed. Try again.")
     }
-    private func money(_ cents: Int) -> String { CanvasMoney.format(Decimal(cents) / 100, currency: draft.currency) }
+    private func money(_ cents: Int) -> String {
+        guard let currency = draft.currency else { return "" }
+        return CanvasMoney.format(Decimal(cents) / 100, currency: currency)
+    }
     private func totalRow(_ title: String, _ cents: Int) -> some View {
         HStack { Text(title).font(CuadraoTypography.supporting); Spacer(); Text(money(cents)).font(CuadraoTypography.rowAmount) }
     }
@@ -298,9 +326,11 @@ private struct ReceiptEditor: View {
         VStack(alignment: .leading) {
             HStack {
                 Text(title).font(CuadraoTypography.supporting)
+                if let currency = draft.currency {
                 CanvasMoneyValueInput(value: Binding(get: { Double(draft[keyPath: key]) / 100 }, set: { draft[keyPath: key] = Int(($0 * 100).rounded()) }),
-                                      error: $amountErrors.message(for: id), currency: draft.currency, spanish: es,
+                                      error: $amountErrors.message(for: id), currency: currency, spanish: es,
                                       identifier: id, title: title, size: .row, alignment: .right).frame(minHeight: 44)
+                }
             }
             if let error = amountErrors[id], !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
         }

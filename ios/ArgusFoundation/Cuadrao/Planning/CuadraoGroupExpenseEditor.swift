@@ -3,7 +3,7 @@ import PhotosUI
 
 struct CuadraoGroupExpenseEditor: View {
     @Environment(\.receiptWorkspace) private var receiptWorkspace
-    @State private var captureReceipt = false
+    @State private var captureReceipt: ReceiptSourceChoice?
     let store: CuadraoGroupPreview
     let groupID: UUID
     var initial: PlanSharedExpense?
@@ -46,7 +46,7 @@ struct CuadraoGroupExpenseEditor: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         if initial == nil && group.kind == .trip && receiptWorkspace != nil {
-                            Button { captureReceipt = true } label: {
+                            Menu { ReceiptSourceActions(spanish: spanish) { captureReceipt = $0 } } label: {
                                 Label(spanish ? "Usar un recibo" : "Use a receipt", systemImage: "receipt").frame(minHeight: 44)
                             }.accessibilityIdentifier("group-expense-receipt")
                         }
@@ -133,9 +133,9 @@ struct CuadraoGroupExpenseEditor: View {
                     }
             }
         }.presentationDragIndicator(.visible).interactiveDismissDisabled()
-            .sheet(isPresented: $captureReceipt) {
+            .sheet(item: $captureReceipt) { source in
                 if let workspace = receiptWorkspace {
-                    CuadraoReceiptFlow(route: .capture(ReceiptOrigin(groupID: groupID, threadID: nil)), workspace: workspace, spanish: spanish)
+                    CuadraoReceiptFlow(route: .capture(ReceiptOrigin(groupID: groupID, threadID: nil), source), workspace: workspace, spanish: spanish)
                 }
             }
             .task(id: photo) {

@@ -69,6 +69,30 @@ import Foundation
         try freshStore.reconcile(groups: loadedGroups, accounts: freshAccounts)
         check(freshAccounts.activity.filter { $0.id == personal }.count == 1, "Relaunch projects one personal activity")
         check(!freshAccounts.activity.contains { $0.id == id }, "Group total is not duplicated into personal activity")
+        let unresolved = try store.capture(files: [(source, "later.jpg", false)], currency: nil,
+            origin: .init(groupID: nil, threadID: nil), group: nil, example: false, spanish: false)
+        let unresolvedDraft = store.receipt(unresolved)!
+        check(unresolvedDraft.currency == nil && unresolvedDraft.total == 0, "Imported personal draft has no invented currency or amount")
+        check(CuadraoReceiptStore(directory: store.directory).receipt(unresolved) == unresolvedDraft, "Unknown currency and source survive Later and relaunch")
+        rejects("Unknown currency cannot confirm") { try store.confirm(unresolved, groups: groups, accounts: accounts) }
+        var unresolvedEdit = unresolvedDraft
+        unresolvedEdit.lines = [.init(name: "Not yet", unitCents: 100)]
+        rejects("Money editing requires currency") { try store.update(unresolvedEdit) }
+        unresolvedEdit = unresolvedDraft; unresolvedEdit.destination = .group(group.id)
+        rejects("Group choice requires currency") { try store.update(unresolvedEdit) }
+        rejects("Unsupported currency cannot lock") { try store.setCurrency("ZZZ", for: unresolved) }
+        try store.setCurrency("USD", for: unresolved)
+        check(CuadraoReceiptStore(directory: store.directory).receipt(unresolved)?.currency == "USD", "Chosen currency is durable")
+        rejects("Known currency cannot change") { try store.setCurrency("DOP", for: unresolved) }
+        rejects("Group currency cannot change") { try store.setCurrency("USD", for: id) }
+        let knownData = try JSONEncoder().encode(personalDraft)
+        let knownObject = try JSONSerialization.jsonObject(with: knownData) as! [String: Any]
+        check(knownObject["currency"] as? String == "DOP", "Known currency keeps the old string representation")
+        let decodedKnown = try JSONDecoder().decode(ReceiptDraft.self, from: knownData)
+        check(decodedKnown.currency == personalDraft.currency, "Existing known-currency records decode unchanged")
+        rejects("Missing group cannot silently become personal") {
+            _ = try store.capture(files: [(source, "missing.jpg", false)], currency: nil, origin: origin, group: nil, example: false, spanish: false)
+        }
         let imported = try store.capture(files: [(source, "actual.pdf", true)], currency: "USD", origin: .init(groupID: nil, threadID: nil), group: nil, example: false, spanish: false)
         check(store.receipt(imported)!.lines.isEmpty && store.receipt(imported)!.total == 0, "Arbitrary imports never receive fictional extraction")
         var incompatible = store.receipt(imported)!
@@ -90,6 +114,14 @@ import Foundation
             _ = try failing.capture(files: [(source, "failure.jpg", false)], currency: "DOP", origin: origin, group: group, example: true, spanish: false)
         }
         check(failing.receipts.isEmpty, "Failed capture leaves no indexed draft")
+        let failedIndex = folder.appendingPathComponent("failed-index")
+        let failedStore = CuadraoReceiptStore(directory: failedIndex)
+        try FileManager.default.createDirectory(at: failedIndex.appendingPathComponent("receipts.json"), withIntermediateDirectories: true)
+        rejects("Failed index save cannot publish source") {
+            _ = try failedStore.capture(files: [(source, "orphan.jpg", false)], currency: nil, origin: .init(groupID: nil, threadID: nil), group: nil, example: false, spanish: false)
+        }
+        let remainingFiles = try FileManager.default.contentsOfDirectory(atPath: failedIndex.path)
+        check(remainingFiles == ["receipts.json"], "Failed save removes only newly written source files")
         let corruptDirectory = folder.appendingPathComponent("corrupt")
         try FileManager.default.createDirectory(at: corruptDirectory, withIntermediateDirectories: true)
         let corruptIndex = corruptDirectory.appendingPathComponent("receipts.json")

@@ -134,7 +134,7 @@ struct ReceiptCard: View {
                     Text(draft.prepared ? (spanish ? "Por revisar · solo tú" : "Ready to review · only you") : (spanish ? "Confirmado" : "Confirmed")).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if draft.total > 0 { Text(CanvasMoney.format(Decimal(draft.total) / 100, currency: draft.currency)).font(CuadraoTypography.rowAmount) }
+                if draft.total > 0, let currency = draft.currency { Text(CanvasMoney.format(Decimal(draft.total) / 100, currency: currency)).font(CuadraoTypography.rowAmount) }
                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
             }.foregroundStyle(WelcomePalette.ink).padding(12).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 18))
         }.buttonStyle(.plain).accessibilityIdentifier("receipt-card-\(draft.id)")
@@ -147,6 +147,17 @@ struct ReceiptSavedList: View {
     let spanish: Bool
     var body: some View {
         List {
+            Menu {
+                ReceiptSourceActions(spanish: spanish) { workspace.capture(ReceiptOrigin(groupID: groupID, threadID: nil), $0) }
+            } label: {
+                Label(spanish ? "Añadir recibo" : "Add receipt", systemImage: "plus")
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }.buttonStyle(.borderless).accessibilityIdentifier("saved-add-receipt")
+            if !workspace.receipts.loadFailed && !workspace.receipts.receipts.contains(where: { $0.groupID == groupID }) {
+                ContentUnavailableView(spanish ? "Sin recibos todavía" : "No receipts yet", systemImage: "receipt",
+                    description: Text(spanish ? "Guarda uno ahora y revísalo después." : "Save one now and review it later."))
+            }
             ForEach(workspace.receipts.receipts.filter { $0.groupID == groupID }.sorted { $0.updatedAt > $1.updatedAt }) { draft in
                 ReceiptCard(draft: draft, spanish: spanish) { workspace.open(draft.id) }.listRowSeparator(.hidden)
             }

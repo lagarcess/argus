@@ -320,7 +320,7 @@ struct CuadraoHomeCanvas: View {
 
     private var receiptWorkspace: ReceiptWorkspace {
         ReceiptWorkspace(receipts: receipts, groups: groups, accounts: data, chat: chat,
-                         capture: { receiptRoute = .capture($0) }, open: { receiptRoute = .review($0) },
+                         capture: { receiptRoute = .capture($0, $1) }, open: { receiptRoute = .review($0) },
                          groupChat: { id in chat.openGroup(id, name: groups.group(id)?.name ?? ""); selectedTab = .assistant })
     }
 

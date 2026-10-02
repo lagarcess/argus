@@ -3,7 +3,7 @@ import SwiftUI
 struct CuadraoChatCanvas: View {
     @Environment(\.receiptWorkspace) private var receiptWorkspace
     @State private var savedReceipts = false
-    @State private var pendingReceipt: UUID?
+    @State private var pendingReceipt: ReceiptRoute?
     @State private var temporaryReceipt = false
     let store: CuadraoChatPreview
     let spanish: Bool
@@ -57,19 +57,29 @@ struct CuadraoChatCanvas: View {
                 .tint(WelcomePalette.pine)
         }
         .sheet(isPresented: $savedReceipts, onDismiss: {
-            if let id = pendingReceipt { pendingReceipt = nil; receiptWorkspace?.open(id) }
+            if let pendingReceipt {
+                self.pendingReceipt = nil
+                switch pendingReceipt {
+                case .review(let id): receiptWorkspace?.open(id)
+                case .capture(let origin, let source): receiptWorkspace?.capture(origin, source)
+                }
+            }
         }) {
             if let workspace = receiptWorkspace {
                 NavigationStack {
                     ReceiptSavedList(workspace: ReceiptWorkspace(receipts: workspace.receipts, groups: workspace.groups,
-                        accounts: workspace.accounts, chat: workspace.chat, capture: workspace.capture,
-                        open: { id in savedReceipts = false; pendingReceipt = id }, groupChat: workspace.groupChat), groupID: store.current.groupID, spanish: es)
+                        accounts: workspace.accounts, chat: workspace.chat,
+                        capture: { origin, source in
+                            pendingReceipt = .capture(ReceiptOrigin(groupID: origin.groupID, threadID: store.current.id), source)
+                            savedReceipts = false
+                        },
+                        open: { id in savedReceipts = false; pendingReceipt = .review(id) }, groupChat: workspace.groupChat), groupID: store.current.groupID, spanish: es)
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button(es ? "Listo" : "Done") { savedReceipts = false } } }
                 }
             }
         }
         .confirmationDialog(es ? "Guardar fuera del chat temporal" : "Save outside temporary chat", isPresented: $temporaryReceipt, titleVisibility: .visible) {
-            Button(es ? "Guardar recibo" : "Save receipt") { receiptWorkspace?.capture(ReceiptOrigin(groupID: nil, threadID: nil)) }
+            Button(es ? "Guardar recibo" : "Save receipt") { receiptWorkspace?.capture(ReceiptOrigin(groupID: nil, threadID: nil), .scan) }
         } message: { Text(es ? "El recibo se guardará en este dispositivo aunque cierres este chat temporal." : "The receipt will stay on this device even after this temporary chat closes.") }
         .confirmationDialog(es ? "¿Terminar el chat temporal?" : "End temporary chat?", isPresented: $ending, titleVisibility: .visible) {
             Button(es ? "Terminar y crear chat" : "End and create chat", role: .destructive) { store.leaveTemporary(for: .newRegular) }
@@ -304,8 +314,7 @@ struct CuadraoChatCanvas: View {
                 }
                 if tray && voiceMessage.state != .recording {
                     Divider()
-                    if let workspace = receiptWorkspace, !store.temporary,
-                       workspace.receipts.receipts.contains(where: { $0.groupID == store.current.groupID }) || workspace.receipts.loadFailed {
+                    if receiptWorkspace != nil, !store.temporary {
                         Button { tray = false; savedReceipts = true } label: {
                             Label(es ? "Recibos guardados" : "Saved receipts", systemImage: "receipt").frame(minHeight: 44)
                         }.accessibilityIdentifier("chat-saved-receipts")
@@ -345,7 +354,7 @@ struct CuadraoChatCanvas: View {
             tray = false
             if symbol == "doc.viewfinder", let workspace = receiptWorkspace {
                 if store.temporary { temporaryReceipt = true }
-                else { workspace.capture(ReceiptOrigin(groupID: store.current.groupID, threadID: store.retainReceiptOrigin())) }
+                else { workspace.capture(ReceiptOrigin(groupID: store.current.groupID, threadID: store.current.id), .scan) }
             } else { sheet = .attachment(symbol) }
         } label: {
             VStack(spacing: 9) { Image(systemName: symbol).font(.title3); Text(title).font(.caption) }

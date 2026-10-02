@@ -87,10 +87,6 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
         for thread in threads { thread.receiptIDs.removeAll { $0 == id } }
         current.receiptIDs.removeAll { $0 == id }
     }
-    func retainReceiptOrigin() -> String {
-        if !temporary && !threads.contains(where: { $0.id == current.id }) { threads.append(current) }
-        return current.id
-    }
     func openGroup(_ id: UUID, name: String) {
         if temporary { endTemporary() }
         if let existing = threads.first(where: { $0.groupID == id }) { open(existing) }

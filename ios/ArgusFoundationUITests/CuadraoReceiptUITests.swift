@@ -62,7 +62,9 @@ final class CuadraoReceiptUITests: XCTestCase {
     func testPersonalChatReceiptSavedAndConfirmedEnglishDark() {
         let app = launch(english: true, dark: true)
         tap(app, "cuadrao-tab-2")
-        scanFromChat(app, english: true)
+        tap(app, "chat-attach")
+        tap(app, "chat-saved-receipts")
+        tap(app, "saved-add-receipt")
         tap(app, "receipt-sample")
         tap(app, "receipt-later")
         XCTAssertTrue(receiptCard(app).waitForExistence(timeout: 5))
@@ -91,7 +93,9 @@ final class CuadraoReceiptUITests: XCTestCase {
         openGroup(app, english: true)
         tap(app, "group-options")
         tap(app, "group-open-chat")
-        scanFromChat(app, english: true)
+        tap(app, "chat-attach")
+        tap(app, "chat-saved-receipts")
+        tap(app, "saved-add-receipt")
         tap(app, "receipt-sample")
         tap(app, "receipt-source")
         XCTAssertTrue(app.navigationBars["Original receipt"].waitForExistence(timeout: 3))
@@ -138,21 +142,97 @@ final class CuadraoReceiptUITests: XCTestCase {
     func testPhotoImportKeepsOriginalWithoutInventedItems() {
         let app = launch(english: true)
         tap(app, "cuadrao-tab-2")
-        scanFromChat(app, english: true)
-        tap(app, "Photos")
+        tap(app, "chat-attach")
+        tap(app, "chat-saved-receipts")
+        tap(app, "saved-add-receipt")
+        shot(app, "receipt-source-menu-en")
+        tap(app, "receipt-photos")
         let photo = app.images.matching(NSPredicate(format: "label BEGINSWITH %@", "Photo,")).firstMatch
         XCTAssertTrue(photo.waitForExistence(timeout: 5), "Seed the task simulator with a fictional receipt photo before running this journey.")
         photo.tap()
         XCTAssertTrue(app.staticTexts["Total to review"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["receipt-line-0"].exists)
+        XCTAssertTrue(app.buttons["receipt-currency"].exists)
+        XCTAssertFalse(app.buttons["receipt-add-item"].exists)
+        XCTAssertFalse(app.buttons["receipt-account"].exists)
+        shot(app, "receipt-saved-currency-later-en")
         tap(app, "receipt-source")
         XCTAssertTrue(app.navigationBars["Original receipt"].waitForExistence(timeout: 3))
         shot(app, "receipt-import-original-en")
         app.buttons["Done"].tap()
         tap(app, "receipt-later")
+        app.terminate()
+        app.launchArguments.removeAll { ["--plan-reset", "--receipt-reset"].contains($0) }
+        app.launch()
+        tap(app, "cuadrao-tab-2")
+        tap(app, "chat-attach")
+        tap(app, "chat-saved-receipts")
         receiptCard(app).tap()
         XCTAssertTrue(app.staticTexts["Total to review"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["receipt-currency"].exists)
+        tap(app, "receipt-currency")
+        tap(app, "USD")
+        XCTAssertFalse(app.buttons["receipt-currency"].exists)
+        XCTAssertTrue(app.buttons["receipt-add-item"].exists)
         shot(app, "receipt-import-draft-en")
+    }
+
+    func testGroupPhotoImportInheritsFixedCurrency() {
+        let app = launch(english: true)
+        openGroup(app, english: true)
+        tap(app, "group-add-receipt")
+        tap(app, "receipt-photos")
+        let photo = app.images.matching(NSPredicate(format: "label BEGINSWITH %@", "Photo,")).firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 5))
+        photo.tap()
+        XCTAssertTrue(app.staticTexts["Total to review"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["receipt-currency"].exists)
+        XCTAssertTrue(app.buttons["receipt-add-item"].exists)
+        tap(app, "receipt-later")
+        XCTAssertTrue(receiptCard(app).waitForExistence(timeout: 5))
+    }
+
+    func testDirectGroupPickersCancelWithoutDraft() {
+        let app = launch(english: true)
+        openGroup(app, english: true)
+        for source in ["receipt-photos", "receipt-file"] {
+            tap(app, "group-add-receipt")
+            tap(app, source)
+            let cancel = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "Cancel", "receipt-later")).firstMatch
+            XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["receipt-currency"].exists)
+            cancel.tap()
+            XCTAssertTrue(app.buttons["group-add-receipt"].waitForExistence(timeout: 5))
+            XCTAssertFalse(receiptCard(app).exists)
+        }
+    }
+
+    func testScannerUnavailableOffersSourcesWithoutLanding() {
+        let app = launch(english: true)
+        tap(app, "cuadrao-tab-2")
+        scanFromChat(app, english: true)
+        XCTAssertTrue(app.staticTexts["receipt-error"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["receipt-photos"].exists)
+        XCTAssertTrue(app.buttons["receipt-file"].exists)
+        XCTAssertFalse(app.buttons["receipt-currency"].exists)
+        XCTAssertFalse(app.staticTexts["Save it now.\nSplit it later."].exists)
+        tap(app, "receipt-later")
+        XCTAssertTrue(app.buttons["chat-attach"].waitForExistence(timeout: 5))
+        XCTAssertFalse(receiptCard(app).exists)
+    }
+
+    func testGenericChatAttachmentsStayOutsideReceiptFlow() {
+        let app = launch(english: true)
+        tap(app, "cuadrao-tab-2")
+        for source in ["Photo", "File"] {
+            tap(app, "chat-attach")
+            tap(app, source)
+            XCTAssertTrue(app.navigationBars["Add to message"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.buttons["receipt-source"].exists)
+            tap(app, "Attach example")
+            XCTAssertTrue(app.buttons["chat-attach"].waitForExistence(timeout: 5))
+            XCTAssertFalse(receiptCard(app).exists)
+        }
     }
 
     private func launch(english: Bool = false, dark: Bool = false) -> XCUIApplication {

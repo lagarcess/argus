@@ -40,7 +40,7 @@ enum ReceiptSplit: String, Codable { case equal, items }
 
 struct ReceiptDraft: Identifiable, Codable, Equatable {
     var id = UUID()
-    let currency: String
+    var currency: String?
     let origin: ReceiptOrigin
     let source: [ReceiptSource]
     let example: Bool
@@ -67,6 +67,7 @@ struct ReceiptDraft: Identifiable, Codable, Equatable {
     var unassigned: Int { split == .items ? lines.filter { $0.members.intersection(participants).isEmpty }.count : 0 }
 
     func validate() throws {
+        guard let currency, PlanCurrency.supported.contains(currency) else { throw ReceiptError.currency }
         guard !merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !lines.isEmpty, lines.count <= 100,
               lines.allSatisfy({ !$0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (1...999).contains($0.quantity) && (0...CanvasMoney.maximumCents).contains($0.unitCents) }),
@@ -108,9 +109,10 @@ struct ReceiptDraft: Identifiable, Codable, Equatable {
 }
 
 enum ReceiptError: Error {
-    case incomplete, participants, unassigned, destination, source, confirmed, missing
+    case incomplete, participants, unassigned, destination, source, confirmed, missing, currency
     func message(_ es: Bool) -> String {
         switch self {
+        case .currency: es ? "Elige la moneda del recibo antes de revisar los montos. Después quedará fija." : "Choose the receipt currency before reviewing amounts. It will stay fixed afterward."
         case .incomplete: es ? "Revisa el comercio, los artículos y los montos. El total debe ser mayor que cero." : "Check the merchant, items and amounts. The total must be greater than zero."
         case .participants: es ? "Elige al menos una persona del grupo." : "Choose at least one group member."
         case .unassigned: es ? "Asigna todos los artículos a quienes los compartieron." : "Assign every item to the people who shared it."

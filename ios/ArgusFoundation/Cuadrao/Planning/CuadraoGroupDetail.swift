@@ -132,7 +132,9 @@ struct CuadraoGroupDetail: View {
     private func expenses(_ group: PlanGroup) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             if group.kind == .trip, let workspace = receiptWorkspace {
-                Button { workspace.capture(ReceiptOrigin(groupID: group.id, threadID: nil)) } label: {
+                Menu {
+                    ReceiptSourceActions(spanish: spanish) { workspace.capture(ReceiptOrigin(groupID: group.id, threadID: nil), $0) }
+                } label: {
                     Label(spanish ? "Añadir recibo" : "Add receipt", systemImage: "receipt").frame(minHeight: 44)
                 }.accessibilityIdentifier("group-add-receipt")
                 ForEach(workspace.receipts.receipts.filter { $0.groupID == group.id && $0.prepared }) { draft in

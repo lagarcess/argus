@@ -18,12 +18,18 @@ import Observation
     }
     func receipt(_ id: UUID) -> ReceiptDraft? { receipts.first { $0.id == id } }
     func url(_ source: ReceiptSource) -> URL { directory.appendingPathComponent(source.filename) }
-    func capture(files: [(data: Data, name: String, pdf: Bool)], currency: String, origin: ReceiptOrigin,
+    func capture(files: [(data: Data, name: String, pdf: Bool)], currency: String?, origin: ReceiptOrigin,
                  group: PlanGroup?, example: Bool, spanish: Bool, id: UUID = UUID()) throws -> UUID {
         guard !loadFailed, !files.isEmpty, files.count <= 10,
               files.allSatisfy({ !$0.data.isEmpty }), files.reduce(0, { $0 + $1.data.count }) <= 20_000_000 else { throw ReceiptError.source }
+        guard origin.groupID == group?.id else { throw ReceiptError.destination }
+        if let currency, !PlanCurrency.supported.contains(currency) { throw ReceiptError.currency }
         if receipt(id) != nil { return id }
         var sources: [ReceiptSource] = []
+        var indexed = false
+        defer {
+            if !indexed { for source in sources { try? FileManager.default.removeItem(at: url(source)) } }
+        }
         for (offset, file) in files.enumerated() {
             let source = ReceiptSource(filename: "\(id.uuidString)-\(offset).\(file.pdf ? "pdf" : "jpg")", name: file.name, pdf: file.pdf)
             try file.data.write(to: url(source), options: .atomic)
@@ -38,6 +44,7 @@ import Observation
             draft.taxCents = sample.taxCents; draft.serviceCents = sample.serviceCents
         }
         try persist(receipts + [draft])
+        indexed = true
         return id
     }
     func update(_ draft: ReceiptDraft) throws {
@@ -45,8 +52,21 @@ import Observation
         guard old.prepared else { throw ReceiptError.confirmed }
         guard draft.currency == old.currency, draft.source == old.source, draft.origin == old.origin,
               draft.lifecycle == old.lifecycle else { throw ReceiptError.destination }
+        if old.currency == nil {
+            guard draft.destination == old.destination, draft.lines == old.lines,
+                  draft.taxCents == old.taxCents, draft.serviceCents == old.serviceCents,
+                  draft.addedTipCents == old.addedTipCents else { throw ReceiptError.currency }
+        }
         var revised = draft; revised.updatedAt = .now
         try persist(receipts.map { $0.id == revised.id ? revised : $0 })
+    }
+    func setCurrency(_ currency: String, for id: UUID) throws {
+        guard var draft = receipt(id) else { throw ReceiptError.missing }
+        guard draft.prepared, draft.currency == nil, draft.origin.groupID == nil,
+              case .personal = draft.destination, PlanCurrency.supported.contains(currency) else { throw ReceiptError.currency }
+        draft.currency = currency
+        draft.updatedAt = .now
+        try persist(receipts.map { $0.id == id ? draft : $0 })
     }
     func discard(_ id: UUID, groups: CuadraoGroupPreview) throws {
         guard let draft = receipt(id) else { return }
