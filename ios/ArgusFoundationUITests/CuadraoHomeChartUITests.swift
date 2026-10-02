@@ -143,7 +143,7 @@ final class CuadraoHomeChartUITests: XCTestCase {
         app.buttons["home-spending-segment-home"].tap()
         XCTAssertTrue(app.buttons["home-spending-all"].waitForExistence(timeout: 2))
         app.buttons["home-spending-all"].tap()
-        XCTAssertFalse(app.buttons["home-spending-all"].exists)
+        XCTAssertTrue(app.buttons["home-spending-all"].exists)
         shot(app, "activity-distribution-es")
         app.buttons["home-view-history"].tap()
         XCTAssertEqual(chart.value as? String, "-1")
@@ -210,6 +210,7 @@ final class CuadraoHomeChartUITests: XCTestCase {
         let segment = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-spending-segment-")).firstMatch
         XCTAssertTrue(segment.waitForExistence(timeout: 3))
         segment.tap()
+        XCTAssertTrue(app.buttons["home-spending-all"].waitForExistence(timeout: 2))
         shot(app, "story-distribution-decomposition-es")
     }
     func testInteractivePagingAndBalanceMeaning() {

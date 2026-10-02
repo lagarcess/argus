@@ -154,15 +154,17 @@ struct CuadraoSpendingChart: View {
                 CuadraoAllocationSegment(id: $0.rawValue, title: $0.title(spanish), fraction: fraction(categoryTotal($0)), color: $0.color)
             }, selection: Binding(get: { selectedCategory?.rawValue }, set: { selectedCategory = $0.flatMap(CanvasExpenseCategory.init(rawValue:)) }),
                 identifier: "home-spending-segment-")
-            if selectedCategory != nil {
-                Button(spanish ? "Todo" : "All") { selectedCategory = nil }.frame(minHeight: 44)
+            HStack(spacing: 8) {
+                Button(spanish ? "Todo" : "All") { selectedCategory = nil }
+                    .frame(minHeight: 44).buttonStyle(.plain)
+                    .foregroundStyle(selectedCategory == nil ? WelcomePalette.ink : .secondary)
                     .accessibilityIdentifier("home-spending-all")
-            }
-            HStack {
-                Text(interval.start, format: .dateTime.day().month(.abbreviated).year())
+                if let selectedCategory {
+                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
+                    Text(selectedCategory.title(spanish)).foregroundStyle(selectedCategory.color)
+                }
                 Spacer()
-                Text(interval.end.addingTimeInterval(-1), format: .dateTime.day().month(.abbreviated).year())
-            }.font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            }.font(CuadraoTypography.supporting)
         }.padding(.vertical, 20)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("home-spending-distribution")
@@ -174,7 +176,7 @@ struct CuadraoSpendingChart: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.title).font(CuadraoTypography.supporting)
-                        Text(entry.date, format: .dateTime.day().month(.abbreviated)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                        Text(entry.date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))).font(CuadraoTypography.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     Text(money(entry.amount)).font(CuadraoTypography.rowAmount)
