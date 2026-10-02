@@ -537,10 +537,23 @@ Financial currency filters do not filter nonfinancial content. Household exclude
 private chats, source files and memory; a preview filter is not authorization.
 The October 2 support-surface assignment reopens Profile polish within the existing
 identity and App, Account, Support groups. Settings keep literal native headings.
-Avatar themes use the existing palette and icon family; profile editing keeps
-Save and Cancel, and Home reads the same preferred-name value. Appearance retains
-its existing preference owner. Upload, public identity and connected account
-operations remain separate work.
+Avatar themes use the existing palette and icon family. A personal photo uses
+Apple's image picker, a circular preview, replacement/removal and the same editor
+Save/Cancel boundary. One avatar value owns the active initial, theme or photo;
+loading a photo cannot replace a newer choice. The preview retains only a small
+re-encoded image, without source metadata, for the session. Home reads the same
+preferred-name value. Appearance retains its existing preference owner. Server
+upload, public identity and connected account operations remain separate work.
+
+Profile keeps the main navigation on its landing page, with clearance inside the
+scrolling content so Sign out stays above it. Pushed Settings pages hide the main
+navigation and return through native Back. The navigation path owns this state.
+
+Generic feedback borrows Argus's comment, problem and idea categories. Only a
+problem opens the title, reproduction steps and expected/actual outcome fields.
+Switching categories preserves each draft; Save draft accepts unfinished text.
+Conversation-specific ratings and context consent belong to contextual feedback,
+not the Settings entry. Submission and durable intake remain roadmap work.
 
 Search opens account and plan results in its own navigation stack. Chat handoff
 has an explicit return to Search and preserves the current query and filters.
