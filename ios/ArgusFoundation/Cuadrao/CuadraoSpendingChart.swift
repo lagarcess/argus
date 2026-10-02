@@ -3,6 +3,7 @@ import Charts
 
 struct CuadraoSpendingChart: View {
     let expenses: [CanvasActivity]
+    let coverageStart: Date?
     let currency: String
     let spanish: Bool
     let distribution: Bool
@@ -10,17 +11,22 @@ struct CuadraoSpendingChart: View {
     @Binding var periodOffset: Int
     let controls: CuadraoInsightControls
     @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var selectedDate: Date?
+    @State private var selectedPosition: String?
     @State private var selectedCategory: CanvasExpenseCategory?
-    private var interval: DateInterval { range.interval(offset: periodOffset) }
-    private var entries: [CanvasActivity] { CanvasSpendingHistory.entries(expenses, in: interval) }
-    private var total: Decimal { CanvasSpendingHistory.total(entries) }
+    private var story: CanvasSpendingStory { CanvasSpendingStory(expenses: expenses, range: range, offset: periodOffset, coverageStart: coverageStart) }
+    private var interval: DateInterval { story.interval }
+    private var entries: [CanvasActivity] { story.entries }
+    private var total: Decimal { story.total }
+    private var slots: [DateInterval] { CanvasSpendingHistory.slots(in: interval, range: range) }
+    private var selectedSlot: DateInterval? {
+        guard let selectedPosition, let index = slots.firstIndex(where: { tick($0) == selectedPosition }), slots[index].start <= story.now else { return nil }
+        return slots[index]
+    }
     private var buckets: [CanvasSpendingBucket] { CanvasSpendingHistory.buckets(entries, range: range) }
     private var categories: [CanvasExpenseCategory] { CanvasExpenseCategory.allCases.filter { categoryTotal($0) > 0 } }
     private var oldest: Int { CanvasSpendingHistory.oldestOffset(expenses, range: range) }
-    private var unit: Calendar.Component { range == .year ? .month : .day }
     private var inspected: [CanvasActivity]? {
-        guard let selectedDate, let span = Calendar.current.dateInterval(of: unit, for: selectedDate) else { return nil }
+        guard let span = selectedSlot else { return nil }
         return CanvasSpendingHistory.entries(entries, in: span)
     }
     private func categoryTotal(_ category: CanvasExpenseCategory) -> Decimal {
@@ -28,12 +34,13 @@ struct CuadraoSpendingChart: View {
     }
     private func money(_ amount: Decimal) -> String { CanvasMoney.format(amount, currency: currency) }
     private var insight: String {
-        guard total > 0 else { return spanish ? "Un respiro: no hay gastos registrados aquí." : "A little breathing room: no expenses recorded here." }
-        let comparison = CanvasSpendingHistory.comparisonInterval(range: range, offset: periodOffset)
-        let prior = CanvasSpendingHistory.total(CanvasSpendingHistory.entries(expenses, in: comparison))
-        if prior > 0, let first = expenses.first, first.date <= comparison.start {
+        guard story.covered else {
+            return spanish ? "Este período tiene un historial incompleto." : "This period has incomplete history."
+        }
+        guard total > 0 else { return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet." }
+        if let prior = story.previousTotal {
             let difference = total - prior
-            if difference == 0 { return spanish ? "Vas al mismo ritmo que en el período anterior." : "You're keeping pace with the previous period." }
+            if difference == 0 { return spanish ? "Has registrado el mismo gasto que en el período anterior." : "Your recorded spending matches the previous period." }
             let reference = periodOffset == 0 ? (spanish ? "al mismo punto del período anterior" : "at this point in the previous period") : (spanish ? "en el período anterior" : "in the previous period")
             return spanish ? "Llevas \(currency) \(money(abs(difference))) \(difference > 0 ? "más" : "menos") que \(reference)." : "You've spent \(currency) \(money(abs(difference))) \(difference > 0 ? "more" : "less") than \(reference)."
         }
@@ -45,71 +52,81 @@ struct CuadraoSpendingChart: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text(money(inspected.map(CanvasSpendingHistory.total) ?? total))
+                    Text(entries.isEmpty && !story.covered ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-spending-total")
                 }
-                Text(selectedDate.map { $0.formatted(.dateTime.day().month(.abbreviated).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) } ?? (spanish ? "Gastos registrados" : "Recorded spending"))
+                Text(selectedSlot.map { range == .year ? $0.start.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) : story.periodText($0, spanish: spanish) } ?? (spanish ? "Gastos registrados" : "Recorded spending"))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("home-spending-insight")
             }
             controls
             if distribution { allocation } else { chart }
-            if entries.isEmpty {
-                Text(spanish ? "Cada movimiento que registres suma a tu historia." : "Every expense you record adds to your story.")
-                    .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-            }
             ForEach(categories) { category in categoryRow(category) }
+            CuadraoSpendingHighlights(story: story, currency: currency, spanish: spanish)
         }.onChange(of: range) { _, _ in clearSelection() }
             .onChange(of: periodOffset) { _, _ in clearSelection() }
             .onChange(of: distribution) { _, _ in clearSelection() }
-            .sensoryFeedback(.selection, trigger: selectedDate)
+            .sensoryFeedback(.selection, trigger: selectedSlot?.start)
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
     private var chart: some View {
         Chart {
             ForEach(buckets) { bucket in
-                BarMark(x: .value("Date", bucket.date, unit: unit), y: .value("Spending", bucket.value))
+                BarMark(x: .value("Period", tick(CanvasSpendingHistory.bucketInterval(containing: bucket.date, range: range))), y: .value("Spending", bucket.value), width: .ratio(0.65))
                     .foregroundStyle(by: .value("Category", bucket.category.title(spanish)))
                     .accessibilityLabel(bucket.date.formatted(date: .abbreviated, time: .omitted) + ", " + bucket.category.title(spanish))
                     .accessibilityValue(currency + " " + money(bucket.amount))
             }
-            if let selectedDate {
-                RuleMark(x: .value("Date", selectedDate)).foregroundStyle(WelcomePalette.ink.opacity(0.25))
+            if let selectedSlot {
+                RuleMark(x: .value("Period", tick(selectedSlot))).foregroundStyle(WelcomePalette.ink.opacity(0.25))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 4])).accessibilityHidden(true)
             }
         }.chartForegroundStyleScale(domain: CanvasExpenseCategory.allCases.map { $0.title(spanish) }, range: CanvasExpenseCategory.allCases.map(\.color))
-            .chartLegend(.hidden).chartXScale(domain: interval.start...interval.end)
+            .chartLegend(.hidden).chartXScale(domain: slots.map(tick))
             .chartYScale(domain: 0...max(1, peak * 1.15))
             .chartXAxis {
-                AxisMarks(values: .stride(by: unit, count: range == .month ? 7 : range == .year ? (typeSize.isAccessibilitySize ? 3 : 2) : 1)) { value in
+                AxisMarks(values: axisPositions) { value in
                     AxisTick()
                     AxisValueLabel {
-                        if let date = value.as(Date.self) { Text(tick(date)).font(.caption2).fixedSize(horizontal: true, vertical: true) }
+                        if let position = value.as(String.self) { Text(position).font(.caption2).fixedSize(horizontal: true, vertical: true) }
                     }
                 }
             }
             .chartXAxisLabel(position: .bottom, alignment: .leading) {
                 Text(axisContext).font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
-            .chartYAxis { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
-            .chartXSelection(value: $selectedDate)
-            .chartGesture { proxy in
-                LongPressGesture(minimumDuration: 0.2).sequenced(before: DragGesture(minimumDistance: 0))
-                    .onChanged { value in
-                        if case .second(true, let drag?) = value { proxy.selectXValue(at: drag.location.x) }
-                    }.exclusively(before: swipe)
-                    .simultaneously(with: SpatialTapGesture().onEnded { proxy.selectXValue(at: $0.location.x) })
+            .chartYAxis {
+                if entries.isEmpty { AxisMarks(position: .trailing, values: [0]) }
+                else { AxisMarks(position: .trailing, values: .automatic(desiredCount: 3)) }
             }
-            .frame(height: 270).padding(14)
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    CuadraoChartTouchSurface(inspect: { inspect($0, proxy: proxy, geometry: geometry) }, page: move)
+                }
+            }
+            .frame(height: entries.isEmpty ? 170 : 270).padding(14)
+            .overlay {
+                if entries.isEmpty {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.system(size: 32, weight: .light)).foregroundStyle(WelcomePalette.pine.opacity(0.5))
+                        .allowsHitTesting(false).accessibilityHidden(true)
+                }
+            }
             .background(WelcomePalette.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 22))
             .overlay(alignment: .leading) { if periodOffset > oldest { edge.offset(x: -192) } }
             .overlay(alignment: .trailing) { if periodOffset < 0 { edge.offset(x: 192) } }
             .accessibilityIdentifier("home-spending-chart")
             .accessibilityValue(String(periodOffset))
+            .accessibilityLabel(entries.isEmpty ? insight : (spanish ? "Gastos por período" : "Spending by period"))
             .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { move(-1) }
             .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { move(1) }
+    }
+    private func inspect(_ location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
+        guard let frame = proxy.plotFrame else { return }
+        let plot = geometry[frame]
+        selectedPosition = proxy.value(atX: min(max(0, location.x - plot.minX), plot.width), as: String.self)
     }
     private var peak: Double {
         Dictionary(grouping: buckets, by: \.date).values.map { $0.reduce(0) { $0 + $1.value } }.max() ?? 0
@@ -121,17 +138,25 @@ struct CuadraoSpendingChart: View {
         let end = interval.end.addingTimeInterval(-1).formatted(format.month(.abbreviated).year())
         return start == end ? start : start + " – " + end
     }
-    private func tick(_ date: Date) -> String {
+    private var axisPositions: [String] {
+        let step = range == .year ? (typeSize.isAccessibilitySize ? 3 : 2) : (range == .month && typeSize.isAccessibilitySize ? 2 : 1)
+        return stride(from: 0, to: slots.count, by: step).map { tick(slots[$0]) }
+    }
+    private func tick(_ span: DateInterval) -> String {
         let format = Date.FormatStyle.dateTime.locale(Locale(identifier: spanish ? "es_DO" : "en_US"))
         switch range {
-        case .week: return date.formatted(format.weekday(.narrow)) + "\n" + date.formatted(format.day())
-        case .month: return date.formatted(format.day())
-        case .year: return date.formatted(format.month(.abbreviated))
+        case .week: return span.start.formatted(format.weekday(.narrow)) + "\n" + span.start.formatted(format.day())
+        case .month:
+            let first = span.start.formatted(format.day())
+            let last = span.end.addingTimeInterval(-1).formatted(format.day())
+            return first == last ? first : first + "–" + last
+        case .year: return span.start.formatted(format.month(.abbreviated))
         }
     }
     private var allocation: some View {
         VStack(alignment: .leading, spacing: 12) {
             GeometryReader { proxy in
+                RoundedRectangle(cornerRadius: 12).fill(WelcomePalette.ink.opacity(0.06))
                 HStack(spacing: 0) {
                     ForEach(categories) { category in
                         Rectangle().fill(category.color)
@@ -144,7 +169,8 @@ struct CuadraoSpendingChart: View {
                 Spacer()
                 Text(interval.end.addingTimeInterval(-1), format: .dateTime.day().month(.abbreviated).year())
             }.font(CuadraoTypography.caption).foregroundStyle(.secondary)
-        }.padding(.vertical, 20).contentShape(Rectangle()).gesture(swipe)
+        }.padding(.vertical, 20)
+            .overlay { CuadraoChartTouchSurface(inspect: { _ in }, page: move) }
             .accessibilityIdentifier("home-spending-distribution")
             .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { move(-1) }
             .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { move(1) }
@@ -178,15 +204,9 @@ struct CuadraoSpendingChart: View {
     }
     private func fraction(_ value: Decimal) -> Double { total > 0 ? NSDecimalNumber(decimal: value / total).doubleValue : 0 }
     private var edge: some View {
-        RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface).frame(width: 180, height: 260)
+        RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface).frame(width: 180, height: entries.isEmpty ? 160 : 260)
             .allowsHitTesting(false).accessibilityHidden(true)
     }
-    private var swipe: some Gesture {
-        DragGesture(minimumDistance: 25).onEnded { value in
-            guard abs(value.translation.width) > abs(value.translation.height) * 1.4 else { return }
-            move(value.translation.width > 0 ? -1 : 1)
-        }
-    }
     private func move(_ direction: Int) { periodOffset = min(0, max(oldest, periodOffset + direction)) }
-    private func clearSelection() { selectedDate = nil; selectedCategory = nil }
+    private func clearSelection() { selectedPosition = nil; selectedCategory = nil }
 }

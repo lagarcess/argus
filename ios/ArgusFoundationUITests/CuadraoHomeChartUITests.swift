@@ -136,6 +136,8 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertEqual(chart.value as? String, "-1")
         XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, current)
         shot(app, "activity-month-es")
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).press(forDuration: 0.35, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)))
+        XCTAssertEqual(chart.value as? String, "-1", "Inspecting a weekly bucket must not page the month")
         app.buttons["home-view-distribution"].tap()
         XCTAssertEqual(app.staticTexts["home-spending-total"].label.isEmpty, false)
         shot(app, "activity-distribution-es")
@@ -167,9 +169,92 @@ final class CuadraoHomeChartUITests: XCTestCase {
         app.scrollViews["home-insights-content"].swipeUp()
         shot(app, "activity-dark-large-axis-en")
     }
-    private func launch(english: Bool = false) -> XCUIApplication {
+    func testSpendingHighlightsAndReturn() {
+        continueAfterFailure = false
+        let app = launch()
+        openActivity(app)
+        let chart = app.otherElements.matching(identifier: "home-spending-chart").firstMatch
+        chart.swipeRight(velocity: .fast)
+        shot(app, "story-month-title-es")
+        let content = app.scrollViews["home-insights-content"]
+        let highlight = app.buttons["home-highlight-comparison"]
+        for _ in 0..<6 {
+            if highlight.isHittable && highlight.frame.maxY < app.frame.maxY - 40 { break }
+            content.swipeUp()
+        }
+        shot(app, "story-category-highlight-es")
+        XCTAssertTrue(highlight.isHittable)
+        highlight.tap()
+        XCTAssertTrue(app.scrollViews["home-highlight-records"].waitForExistence(timeout: 3))
+        shot(app, "story-supporting-records-es")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(highlight.waitForExistence(timeout: 3))
+        let largest = app.buttons["home-highlight-largest"]
+        for _ in 0..<3 {
+            if largest.isHittable && largest.frame.maxY < app.frame.maxY - 40 { break }
+            content.swipeUp()
+        }
+        shot(app, "story-largest-highlight-es")
+        largest.tap()
+        XCTAssertTrue(app.scrollViews["home-highlight-records"].waitForExistence(timeout: 3))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        for _ in 0..<7 { content.swipeDown(velocity: .fast) }
+        XCTAssertEqual(chart.value as? String, "-1", "Record drill-through must preserve the selected period")
+        app.buttons["home-view-distribution"].tap()
+        let distribution = app.otherElements.matching(identifier: "home-spending-distribution").firstMatch
+        distribution.swipeLeft(velocity: .fast)
+        distribution.swipeRight(velocity: .fast)
+        for _ in 0..<6 {
+            if largest.isHittable && largest.frame.maxY < app.frame.maxY - 40 { break }
+            content.swipeUp()
+        }
+        XCTAssertTrue(largest.isHittable, "Distribution also allows vertical scrolling to highlights")
+        shot(app, "story-distribution-highlights-es")
+    }
+    func testSpendingEmptyAndUnavailable() {
+        continueAfterFailure = false
+        let app = launch(extra: ["--insights-empty-month"])
+        openActivity(app)
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        XCTAssertTrue(app.staticTexts["home-spending-insight"].label.contains("Aún no hay"))
+        XCTAssertTrue(app.otherElements.matching(identifier: "home-spending-chart").firstMatch.label.contains("Aún no hay"))
+        XCTAssertFalse(app.buttons["home-highlight-comparison"].exists)
+        XCTAssertFalse(app.buttons["home-highlight-largest"].exists)
+        shot(app, "story-empty-month-es")
+        app.otherElements.matching(identifier: "home-spending-chart").firstMatch.swipeRight(velocity: .fast)
+        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        app.terminate()
+        let unavailable = launch(extra: ["--insights-empty-month", "--insights-no-coverage"])
+        openActivity(unavailable)
+        XCTAssertEqual(unavailable.staticTexts["home-spending-total"].label, "—")
+        XCTAssertTrue(unavailable.staticTexts["home-spending-insight"].label.contains("incompleto"))
+        shot(unavailable, "story-unknown-month-es")
+    }
+    func testSpendingHighlightsLargeEnglish() {
+        continueAfterFailure = false
+        let app = launch(english: true)
+        openActivity(app, english: true)
+        let content = app.scrollViews["home-insights-content"]
+        let chart = app.otherElements.matching(identifier: "home-spending-chart").firstMatch
+        chart.swipeRight(velocity: .fast)
+        let highlight = app.buttons["home-highlight-comparison"]
+        for _ in 0..<9 {
+            if highlight.isHittable { break }
+            content.swipeUp()
+        }
+        shot(app, "story-highlight-dark-large-en")
+        XCTAssertTrue(highlight.isHittable)
+        highlight.tap()
+        XCTAssertTrue(app.scrollViews["home-highlight-records"].waitForExistence(timeout: 3))
+    }
+    private func openActivity(_ app: XCUIApplication, english: Bool = false) {
+        app.buttons["home-history-expand"].tap()
+        app.buttons["home-insight-metric"].tap()
+        app.buttons[english ? "Activity" : "Actividad"].tap()
+    }
+    private func launch(english: Bool = false, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", english ? "dark" : "light"]
+        app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", english ? "dark" : "light"] + extra
         if english { app.launchArguments += ["--design-english", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"] }
         app.launch()
         return app

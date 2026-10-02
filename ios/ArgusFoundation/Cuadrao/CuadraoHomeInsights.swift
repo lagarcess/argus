@@ -16,7 +16,7 @@ struct CuadraoHomeInsights: View {
     @Environment(\.dismiss) private var dismiss
     private var periodLabel: some View {
         Text(range.periodLabel(spanish: spanish, offset: periodOffset))
-            .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+            .font(CuadraoTypography.feature).foregroundStyle(WelcomePalette.ink)
             .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("home-insight-period")
     }
     private var metricChoice: some View {
@@ -58,7 +58,7 @@ struct CuadraoHomeInsights: View {
                         }
                     }
                     if activity {
-                        CuadraoSpendingChart(expenses: expenses, currency: currency, spanish: spanish,
+                        CuadraoSpendingChart(expenses: expenses, coverageStart: data.spendingCoverageStart(currency: currency), currency: currency, spanish: spanish,
                             distribution: distribution, range: range, periodOffset: $periodOffset, controls: controls)
                     } else if distribution {
                         CuadraoHomeDistribution(accounts: snapshot, currency: currency, spanish: spanish, controls: controls, historical: periodOffset < 0,

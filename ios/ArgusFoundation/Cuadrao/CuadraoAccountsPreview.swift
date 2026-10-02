@@ -52,6 +52,13 @@ struct CanvasActivity: Identifiable {
     var accounts: [CanvasAccount] = []
     var activity: [CanvasActivity] = []
     var balanceObservations: [CanvasBalanceObservation] = []
+    var expenseCoverageStarts: [UUID: Date] = [:]
+    func spendingCoverageStart(currency: String) -> Date? {
+        let ids = scopedAccounts.filter { $0.currency == currency }.map(\.id)
+        let starts = ids.compactMap { expenseCoverageStarts[$0] }
+        guard !ids.isEmpty, starts.count == ids.count else { return nil }
+        return starts.max()
+    }
     var spaces: [CanvasSpace] = []
     var household: CanvasHouseholdState = .alone
     var selectedSpaceID = CanvasSpace.personalID
@@ -115,6 +122,14 @@ struct CanvasActivity: Identifiable {
                 amount: 2450, date: .now, income: false, category: .groceries))
         }
         activity += CanvasSpendingHistory.examples(accounts: accounts, spanish: spanish, now: .now)
+        // This preview explicitly owns a continuous recording window, including quiet days.
+        let start = CanvasPreviewHistory.days(now: .now).first ?? .now
+        expenseCoverageStarts = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, start) })
+        if ProcessInfo.processInfo.arguments.contains("--insights-empty-month") {
+            let month = Calendar.current.dateInterval(of: .month, for: Date.now)!
+            activity.removeAll { $0.date >= month.start }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--insights-no-coverage") { expenseCoverageStarts = [:] }
         accounts = CuadraoCollectionOrder.applying(order, to: accounts)
     }
 }

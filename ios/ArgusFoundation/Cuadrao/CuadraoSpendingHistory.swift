@@ -35,14 +35,30 @@ enum CanvasSpendingHistory {
     }
     static func total(_ entries: [CanvasActivity]) -> Decimal { entries.reduce(0) { $0 + $1.amount } }
     static func buckets(_ entries: [CanvasActivity], range: CanvasHistoryRange) -> [CanvasSpendingBucket] {
-        let component: Calendar.Component = range == .year ? .month : .day
-        let grouped = Dictionary(grouping: entries) { Calendar.current.dateInterval(of: component, for: $0.date)!.start }
+        let grouped = Dictionary(grouping: entries) { bucketInterval(containing: $0.date, range: range).start }
         return grouped.keys.sorted().flatMap { date in
             CanvasExpenseCategory.allCases.compactMap { category in
                 let amount = total(grouped[date]!.filter { $0.category == category })
                 return amount > 0 ? CanvasSpendingBucket(date: date, category: category, amount: amount) : nil
             }
         }
+    }
+    static func bucketInterval(containing date: Date, range: CanvasHistoryRange, calendar: Calendar = .current) -> DateInterval {
+        let component: Calendar.Component = range == .year ? .month : range == .month ? .weekOfYear : .day
+        let bucket = calendar.dateInterval(of: component, for: date)!
+        guard range == .month else { return bucket }
+        let month = calendar.dateInterval(of: .month, for: date)!
+        return DateInterval(start: max(bucket.start, month.start), end: min(bucket.end, month.end))
+    }
+    static func slots(in interval: DateInterval, range: CanvasHistoryRange) -> [DateInterval] {
+        var result: [DateInterval] = []
+        var date = interval.start
+        while date < interval.end {
+            let span = bucketInterval(containing: date, range: range)
+            result.append(span)
+            date = span.end
+        }
+        return result
     }
     static func oldestOffset(_ expenses: [CanvasActivity], range: CanvasHistoryRange, now: Date = .now) -> Int {
         range.oldestOffset(expenses.map { CanvasBalancePoint(date: $0.date, balance: 0) }, now: now)

@@ -76,6 +76,37 @@ import Foundation
         check(comparison.end <= CanvasHistoryRange.month.interval(now: now, offset: -1).end, "Comparable elapsed period is bounded")
         let snapshot = CanvasBalanceHistory.snapshot(accounts: [asset], observations: fixture, at: fixture.first!.date)
         check(snapshot.first?.balance == fixture.first(where: { $0.accountID == asset.id })?.balance, "Historical allocation uses its own dated observation")
+        let calendar = Calendar.current
+        let month = CanvasHistoryRange.month.interval(now: now, offset: -1)
+        let slots = CanvasSpendingHistory.slots(in: month, range: .month)
+        check((4...6).contains(slots.count) && slots.first?.start == month.start && slots.last?.end == month.end, "Month has clipped calendar weeks covering exactly the month")
+        check(zip(slots, slots.dropFirst()).allSatisfy { $0.end == $1.start }, "Weekly buckets have no gaps or overlaps")
+        let monthRows = CanvasSpendingHistory.entries(sampleExpenses, in: month)
+        let monthlyBuckets = CanvasSpendingHistory.buckets(monthRows, range: .month)
+        check(monthlyBuckets.allSatisfy { bucket in slots.contains { $0.start == bucket.date } }, "Every expense maps into its own month week")
+        check(monthlyBuckets.reduce(Decimal.zero) { $0 + $1.amount } == CanvasSpendingHistory.total(monthRows), "Weekly grouping preserves the monthly total")
+        let start = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        let midday = calendar.date(from: DateComponents(year: 2026, month: 10, day: 1, hour: 12))!
+        let priorMorning = calendar.date(from: DateComponents(year: 2026, month: 9, day: 1, hour: 9))!
+        let priorEvening = calendar.date(from: DateComponents(year: 2026, month: 9, day: 1, hour: 18))!
+        let currentMorning = calendar.date(from: DateComponents(year: 2026, month: 10, day: 1, hour: 9))!
+        let storyRows = [
+            CanvasActivity(accountID: cash.id, title: "Prior morning", amount: 10, date: priorMorning, income: false, category: .food),
+            CanvasActivity(accountID: cash.id, title: "Prior evening", amount: 900, date: priorEvening, income: false, category: .food),
+            CanvasActivity(accountID: cash.id, title: "Current", amount: 30, date: currentMorning, income: false, category: .food)
+        ]
+        let story = CanvasSpendingStory(expenses: storyRows, range: .month, offset: 0, coverageStart: start, now: midday)
+        check(story.total == 30 && story.previousTotal == 10, "First day compares the same elapsed hours, excluding previous evening")
+        check(story.changedCategory == .food && story.largestExpense == nil, "One expense does not generate a redundant largest-expense highlight")
+        let unknownStory = CanvasSpendingStory(expenses: storyRows, range: .month, offset: 0, coverageStart: nil, now: midday)
+        check(!unknownStory.covered && unknownStory.previousTotal == nil && unknownStory.changedCategory == nil, "A recorded transaction never proves complete comparison coverage")
+        let emptyStory = CanvasSpendingStory(expenses: [], range: .month, offset: 0, coverageStart: start, now: midday)
+        check(emptyStory.covered && emptyStory.total == 0 && emptyStory.changedCategory == nil && emptyStory.largestExpense == nil, "Covered empty period has zero and no manufactured highlights")
+        let shortHistory = CanvasSpendingStory(expenses: storyRows, range: .month, offset: 0, coverageStart: currentMorning, now: midday)
+        check(!shortHistory.covered && shortHistory.previousTotal == nil, "Partial current coverage suppresses comparisons")
+        let monthEnd = calendar.date(from: DateComponents(year: 2026, month: 5, day: 31, hour: 12))!
+        let unequal = CanvasSpendingStory(expenses: [], range: .month, offset: 0, coverageStart: start, now: monthEnd)
+        check(unequal.comparison == nil, "A 31st day never compares against a shorter completed month")
         print("Passed \(checks) Home balance projection checks")
     }
 }
