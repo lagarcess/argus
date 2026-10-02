@@ -3120,6 +3120,21 @@ write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.
 
 ## Import reconciliation
 
+`financial_document_extractions` is a server-only delivery checkpoint keyed by
+statement connection, with owner, creation time and the validated canonical
+candidate batch plus bounded extraction metadata. It contains no raw document
+bytes or OCR text and grants no access to `anon` or `authenticated` roles.
+This checkpoint freezes extraction across delivery retries; reconciliation
+continues to own review state and MoneyService owns canonical activity.
+
+Saving locks the live owner connection, checks its lease holder and expiry,
+and inserts once. A stale worker cannot overwrite a saved extraction or save
+after disconnect. Disconnect removes checkpoints before the normal import
+cleanup; accepted activity remains under existing retention rules. Connection
+and user deletion cascade. Raw files must be re-uploaded after an interruption
+before a checkpoint exists. A document connection uses an owner-scoped file
+digest, so identical bytes uploaded by different people never share state.
+
 Default-off with `ARGUS_INGESTION_ENABLED`. Lane spec:
 [financial-ingestion-connectors](specs/lanes/financial-ingestion-connectors.md).
 None of these rows is a financial record or affects balances.

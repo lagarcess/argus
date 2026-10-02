@@ -3201,6 +3201,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-documents:
+    post:
+      tags:
+      - financial-accounts
+      - financial-documents
+      parameters:
+      - name: X-Document-Filename
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: X-Extraction-Consent
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+  /api/v1/financial-documents/{connection_id}/resume:
+    post:
+      tags:
+      - financial-accounts
+      - financial-documents
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-home:
     get:
       tags:
@@ -11113,6 +11201,24 @@ components:
       type: object
       required:
       - items
+    DocumentResponse:
+      properties:
+        connection_id:
+          type: string
+        status:
+          type: string
+          const: review_ready
+        replayed:
+          type: boolean
+        candidate_count:
+          type: integer
+      additionalProperties: false
+      type: object
+      required:
+      - connection_id
+      - status
+      - replayed
+      - candidate_count
     EditFinancialAccountRequest:
       properties:
         expected_version:

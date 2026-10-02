@@ -1,0 +1,170 @@
+from datetime import datetime, timezone
+
+import pytest
+from argus.domain.ingestion.documents.extractor import candidates_from_result
+from argus.domain.ingestion.documents.models import (
+    DocumentExtractionError,
+    ExtractionResult,
+)
+
+
+def result(**changes):
+    data = dict(
+        complete=True,
+        readable=True,
+        pages_read=[1],
+        observations=[
+            dict(
+                page=1,
+                row=1,
+                evidence="transaction",
+                amount="120.50",
+                currency="DOP",
+                direction="outflow",
+            ),
+            dict(
+                page=1,
+                row=2,
+                evidence="balance",
+                amount="900.00",
+                currency="USD",
+                balance_scope="current",
+            ),
+        ],
+    )
+    return ExtractionResult.model_validate(data | changes)
+
+
+def test_maps_balances_and_transactions_without_model_owned_identity():
+    items = candidates_from_result(
+        result(), "a" * 64, "owned-connection", datetime.now(timezone.utc), 1
+    )
+    assert items[0].source.connection_id == "owned-connection"
+    assert items[0].source.external_id == "a" * 64 + ":p1:r1"
+    assert items[0].direction == "outflow"
+    assert items[1].evidence == "balance"
+    assert items[1].direction == "unknown"
+    assert "occurred_on" in items[0].uncertain
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        dict(complete=False),
+        dict(readable=False),
+        dict(pages_read=[1, 2]),
+        dict(observations=[]),
+    ],
+)
+def test_incomplete_extraction_never_yields_partial_candidates(changes):
+    with pytest.raises(DocumentExtractionError):
+        candidates_from_result(
+            result(**changes), "a" * 64, "owner", datetime.now(timezone.utc), 1
+        )
+
+
+def test_model_cannot_choose_connection_or_owner():
+    from pydantic import ValidationError
+
+    body = result().model_dump(mode="json")
+    body["observations"][0]["source"] = {"connection_id": "someone-else"}
+    with pytest.raises(ValidationError):
+        ExtractionResult.model_validate(body)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "finish,valid", [("stop", True), ("length", True), ("stop", False)]
+)
+async def test_single_private_provider_attempt_preserves_usage(
+    monkeypatch, respx_mock, finish, valid
+):
+    import io
+    import json
+
+    import httpx
+    from argus.domain.ingestion.documents.config import DocumentExtractionSettings
+    from argus.domain.ingestion.documents.extractor import DocumentExtractor
+    from PIL import Image
+
+    monkeypatch.setenv("ARGUS_VISION_MODEL", "test/vision")
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-test-key")
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-test-key")
+    raw = io.BytesIO()
+    Image.new("RGB", (40, 40), "white").save(raw, format="PNG")
+    route = respx_mock.post("https://openrouter.ai/api/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "finish_reason": finish,
+                        "message": {
+                            "content": result().model_dump_json() if valid else "{invalid"
+                        },
+                    }
+                ],
+                "usage": {"cost": 0.002, "prompt_tokens": 31, "completion_tokens": 25},
+            },
+        )
+    )
+    extractor = DocumentExtractor(DocumentExtractionSettings(enabled=True))
+    if finish == "stop" and valid:
+        batch = await extractor.extract(
+            raw.getvalue(),
+            "private-name.png",
+            "image/png",
+            "owned",
+            datetime.now(timezone.utc),
+        )
+        metadata = batch.metadata
+        assert batch.candidates[0].source.connection_id == "owned"
+    else:
+        with pytest.raises(DocumentExtractionError) as error:
+            await extractor.extract(
+                raw.getvalue(),
+                "private-name.png",
+                "image/png",
+                "owned",
+                datetime.now(timezone.utc),
+            )
+        assert str(error.value) == "extraction_provider_failed"
+        metadata = error.value.metadata
+    assert route.call_count == 1
+    request = route.calls[0].request
+    payload = json.loads(request.content)
+    assert request.headers["authorization"] == "Bearer registered-test-key"
+    assert payload["provider"] == {
+        "require_parameters": True,
+        "data_collection": "deny",
+        "zdr": True,
+        "allow_fallbacks": False,
+    }
+    assert "reasoning" not in payload
+    assert payload["messages"][1]["content"][2]["type"] == "image_url"
+    assert metadata["route_receipts"][0]["usage_cost_usd"] == 0.002
+    assert "private-name" not in json.dumps(metadata)
+
+
+@pytest.mark.asyncio
+async def test_missing_vision_config_does_not_call_provider(monkeypatch, respx_mock):
+    from argus.domain.ingestion.documents.config import DocumentExtractionSettings
+    from argus.domain.ingestion.documents.extractor import DocumentExtractor
+
+    monkeypatch.delenv("ARGUS_VISION_MODEL", raising=False)
+    with pytest.raises(DocumentExtractionError, match="missing_vision_model"):
+        await DocumentExtractor(DocumentExtractionSettings(enabled=True)).extract(
+            b"content", "source.png", "image/png", "owned", datetime.now(timezone.utc)
+        )
+    assert not respx_mock.calls
+
+
+@pytest.mark.parametrize("amount", ["-12.00", "1e999999999", "NaN", "1,200.00"])
+def test_non_decimal_amount_cannot_reach_canonical_conversion(amount):
+    from pydantic import ValidationError
+
+    body = result().model_dump(mode="json")
+    body["observations"][0]["amount"] = amount
+    with pytest.raises(ValidationError):
+        ExtractionResult.model_validate(body)

@@ -142,6 +142,9 @@ jobs:
       - name: Install backend dependencies
         run: poetry install --with dev,workflows --no-interaction
 
+      - name: Install PDF extraction tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
       - name: Lint backend, tests, scripts, and workflows
         run: poetry run ruff check src tests workflows scripts
 

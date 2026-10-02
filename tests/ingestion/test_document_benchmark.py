@@ -1,0 +1,158 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+from types import SimpleNamespace
+
+import pytest
+from argus.domain.ingestion.contract import ImportCandidate, SourceRef
+
+from scripts.documents.benchmark import (
+    receipt_cost,
+    row_score,
+    run_live,
+    validate_key_cap,
+)
+
+
+def key_data(**changes):
+    return (
+        dict(limit=1, limit_remaining=1, limit_reset=None, include_byok_in_limit=True)
+        | changes
+    )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        dict(limit=None),
+        dict(limit_remaining=None),
+        dict(limit=2),
+        dict(limit_remaining=2),
+        dict(limit_reset="daily"),
+        dict(include_byok_in_limit=False),
+        dict(limit_remaining="NaN"),
+        dict(limit_remaining=0),
+    ],
+)
+def test_requires_provider_enforced_nonresetting_cap(changes):
+    with pytest.raises(ValueError):
+        validate_key_cap(key_data(**changes), Decimal("1"))
+
+
+def candidate(amount="10", direction="outflow", evidence="transaction"):
+    return ImportCandidate(
+        source=SourceRef(
+            source="statement",
+            connection_id="benchmark",
+            external_id="row",
+            observed_at=datetime.now(timezone.utc),
+        ),
+        amount=amount,
+        currency="DOP",
+        direction=direction,
+        evidence=evidence,
+        balance_scope="current" if evidence == "balance" else None,
+    )
+
+
+def test_multiset_scoring_detects_duplicates_wrong_direction_and_balance_leak():
+    sample = dict(
+        expected_rows=[dict(amount="10.00", currency="DOP", date=None, kind="expense")]
+        * 2,
+        excluded_balances=dict(opening="100", currency="DOP"),
+    )
+    score = row_score(
+        sample,
+        (
+            candidate(),
+            candidate(direction="inflow"),
+            candidate(amount="100"),
+            candidate(amount="100", evidence="balance"),
+        ),
+    )
+    assert score["exact_matches"] == 1
+    assert score["missing_or_mismatched"] == 1
+    assert score["invented_or_mismatched"] == 2
+    assert score["field_multiset_matches"]["amount"] == 2
+    assert score["field_multiset_matches"]["direction"] == 2
+    assert score["balances_as_transactions"] == 1
+    assert score["balance_candidates"] == 1
+
+
+@pytest.mark.parametrize(
+    "receipts",
+    [
+        [],
+        [{}],
+        [dict(usage_cost_usd=None)],
+        [dict(usage_cost_usd="NaN")],
+        [dict(usage_cost_usd=0.1)] * 2,
+    ],
+)
+def test_unknown_cost_or_multiple_dispatches_is_not_zero_cost(receipts):
+    with pytest.raises(ValueError):
+        receipt_cost(dict(route_receipts=receipts))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "cost,expected_calls,reason",
+    [
+        (None, 1, "unknown_cost_or_multiple_attempts"),
+        (1, 1, "spend_cap_reached"),
+        (0.1, 2, None),
+    ],
+)
+async def test_serial_benchmark_stops_without_retry(
+    tmp_path, cost, expected_calls, reason
+):
+    (tmp_path / "test.png").write_bytes(b"fixture")
+    sample = dict(
+        id="one",
+        file="test.png",
+        sha256="hash",
+        expected_rows=[],
+        expected_status="review_required",
+    )
+    calls = []
+
+    class Extractor:
+        async def extract(self, *args):
+            calls.append(args)
+            return SimpleNamespace(
+                candidates=(), metadata=dict(route_receipts=[dict(usage_cost_usd=cost)])
+            )
+
+    async def check():
+        return key_data()
+
+    report = dict(results=[])
+    saves = []
+    await run_live(
+        [sample, sample | {"id": "two"}],
+        tmp_path,
+        Extractor(),
+        Decimal("1"),
+        check,
+        report,
+        lambda value: saves.append(dict(value)),
+    )
+    assert len(calls) == expected_calls
+    assert report.get("stop_reason") == reason
+    assert report["complete"] == (reason is None)
+    assert saves
+
+
+@pytest.mark.asyncio
+async def test_uncapped_key_never_dispatches(tmp_path):
+    async def check():
+        return key_data(limit=None)
+
+    class Extractor:
+        async def extract(self, *args):
+            pytest.fail("uncapped key dispatched")
+
+    report = dict(results=[])
+    await run_live(
+        [{}], tmp_path, Extractor(), Decimal("1"), check, report, lambda _: None
+    )
+    assert report["stop_reason"] == "provider_cap_not_verified"

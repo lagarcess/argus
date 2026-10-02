@@ -4,7 +4,7 @@ import asyncio
 import json
 import os
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -421,7 +421,7 @@ def summarize_openrouter_route_receipts(
 async def invoke_openrouter_json_schema(
     *,
     task: OpenRouterTask,
-    messages: list[dict[str, str]],
+    messages: Sequence[Mapping[str, object]],
     schema_model: type[SchemaModelT],
     schema_name: str,
     model_name: str | None = None,
@@ -471,6 +471,7 @@ async def invoke_openrouter_json_schema(
             schema_name=schema_name,
             profile=profile,
         )
+        data: dict[str, object] = {}
         try:
             async with httpx.AsyncClient(timeout=permit.timeout_seconds) as client:
                 if (response := await asyncio.wait_for(
@@ -483,8 +484,15 @@ async def invoke_openrouter_json_schema(
                     timeout=permit.timeout_seconds,
                 )) is None:
                     return None
-            data = response.json()
+            body = response.json()
+            if not isinstance(body, dict):
+                raise ValueError("Invalid OpenRouter response")
+            data = body
             _raise_openrouter_payload_error(data)
+            if task == "document_extraction":
+                choices = data.get("choices")
+                if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict) or choices[0].get("finish_reason") != "stop":
+                    raise ValueError("Incomplete document response")
             content = _openrouter_message_content(data)
             if not content:
                 raise ValueError(
@@ -503,6 +511,8 @@ async def invoke_openrouter_json_schema(
                 latency_ms=_elapsed_ms(attempt_started_at),
                 outcome="failed",
                 failure_mode=type(exc).__name__,
+                token_usage=openrouter_token_usage_from_payload(data),
+                usage_cost_usd=openrouter_usage_cost_from_payload(data),
                 context_packet_ids=context_packet_ids,
             )
             if index + 1 < len(candidate_models):
@@ -534,7 +544,7 @@ async def invoke_openrouter_json_schema(
 async def invoke_openrouter_chat_completion(
     *,
     task: OpenRouterTask,
-    messages: list[dict[str, str]],
+    messages: Sequence[Mapping[str, object]],
     model_name: str | None = None,
     context_packet_ids: list[str] | None = None,
 ) -> str | None:
@@ -657,7 +667,7 @@ async def invoke_openrouter_chat_completion(
 def invoke_openrouter_json_schema_sync(
     *,
     task: OpenRouterTask,
-    messages: list[dict[str, str]],
+    messages: Sequence[Mapping[str, object]],
     schema_model: type[SchemaModelT],
     schema_name: str,
     model_name: str | None = None,
@@ -802,11 +812,14 @@ def _apply_reasoning_for_structured_artifact(
     payload: dict[str, object],
     profile: OpenRouterProfile,
 ) -> None:
+    if profile.task == "document_extraction":
+        payload["provider"] = {"require_parameters": True, "data_collection": "deny", "zdr": True, "allow_fallbacks": False}
+        return
     payload["reasoning"] = {"effort": profile.reasoning_effort}
 
 
 def _messages_with_stable_prefix_prompt_cache(
-    messages: list[dict[str, str]],
+    messages: Sequence[Mapping[str, object]],
     *,
     model: str,
     task: OpenRouterTask,
@@ -833,7 +846,7 @@ _SCHEMA_IN_PROMPT_INSTRUCTION = (
 def _json_schema_payload(
     *,
     model: str,
-    messages: list[dict[str, str]],
+    messages: Sequence[Mapping[str, object]],
     schema_model: type[SchemaModelT],
     schema_name: str,
     profile: OpenRouterProfile,

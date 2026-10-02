@@ -7996,6 +7996,45 @@ uncertain fields, and more than 18 digits leaves the amount unresolved.
 
 ## Import review queue (default-off)
 
+### Document upload into review
+
+`POST /api/v1/financial-documents` accepts a raw `application/pdf`, `image/jpeg`
+or `image/png` request body. `X-Extraction-Consent: true` confirms provider
+processing; `X-Document-Filename` is an optional display label. The registered
+owner and existing ingestion/accounts gates apply, with the additional default-off
+`ARGUS_DOCUMENT_EXTRACTION_ENABLED` gate checked before authentication.
+
+The body is streamed with a 10 MiB ceiling. Preparation rejects invalid files,
+encrypted PDFs, more than eight pages, oversized decoded images and incomplete
+extraction. Configured limits may be lower. Photos are decoded, oriented and
+stripped of metadata; PDFs use local Poppler text extraction and page rendering.
+Prepared content is sent to the explicitly configured `ARGUS_VISION_MODEL` through
+OpenRouter with data collection denied, zero data retention required and no
+automatic fallback or retry. Raw bytes and OCR text are transient.
+
+Response `{connection_id,status:"review_ready",replayed,candidate_count}` points
+to canonical statement candidates in the existing import queue. Upload never
+accepts an activity or maps a financial account. The person resolves, previews
+and accepts through the routes below. Balances remain informational evidence.
+
+Identical bytes for one owner reuse a document connection and frozen extraction.
+`POST /api/v1/financial-documents/{connection_id}/resume` replays an already
+saved extraction without a new provider request. Before that checkpoint, retry
+requires uploading the file again. Connection status exposes safe error codes;
+disconnect deletes the checkpoint and follows normal candidate retention.
+Another person's connection is unavailable even for identical uploaded bytes.
+
+Errors include 413 `document_too_large`, 415 `document_media_type_unsupported`,
+422 `document_extraction_consent_required` and preparation/extraction codes,
+404 `financial_document_not_found`, 409 `document_busy`, 410
+`document_disconnected`, and 503 for provider/configuration/delivery failures.
+Requests are limited to five per minute and thirty per day per owner per API
+process, including resumes. These in-process limits reset with the process;
+the registered provider key cap remains the operator's spending safeguard.
+
+No native presentation or demo adoption is implied. Fixture and benchmark
+provenance lives in `tests/document_extraction_fixtures/README.md`.
+
 Same gate as connected sources: `ARGUS_INGESTION_ENABLED` inside
 `ARGUS_FINANCIAL_ACCOUNTS_ENABLED`, flag before authentication, registered
 only. Reconciliation is the single sink for every connector, so this is the

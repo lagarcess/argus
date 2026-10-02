@@ -449,7 +449,7 @@ def test_json_schema_payload_omits_temperature_only_for_readout_tier(
     else:
         assert payload["temperature"] == profile.temperature
     if not model.startswith("anthropic/"):
-        assert payload["provider"] == {"require_parameters": True}
+        assert payload["provider"]["require_parameters"] is True
 
 
 def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:
