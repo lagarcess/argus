@@ -90,7 +90,8 @@ struct CuadraoFeedbackPage: View {
     private func field(_ title: String, text: Binding<String>, limit: Int, id: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.subheadline).foregroundStyle(.secondary)
-            TextField(title, text: text, axis: .vertical).lineLimit(2...6)
+            TextField("", text: text, axis: .vertical).lineLimit(2...6)
+                .accessibilityLabel(title)
                 .accessibilityIdentifier("cuadrao.feedback.\(id)")
                 .onChange(of: text.wrappedValue) { _, value in
                     if value.count > limit { text.wrappedValue = String(value.prefix(limit)) }
