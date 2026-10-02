@@ -515,6 +515,54 @@ remains in the Argus guide.
   never also open it. Opening temporary-chat destinations keeps the existing discard
   confirmation. Archiving/deleting the active regular chat opens a fresh chat.
 
+### Contextual conversation entry
+
+**Founder-locked October 2, 2026.** One **Preguntar a Cuadrao / Ask Cuadrao**
+action points the assistant at a selected record. Broader permitted app context
+remains available; selecting a record tells Cuadrao what the person means.
+
+1. Keep Home and collection rows quiet. Use existing record actions instead of
+   repeating a Chat button beside each item. Preserve assigned edit/archive/order
+   gestures.
+2. Make the action discoverable in record details. Reuse an existing action menu;
+   where none exists, use a quiet labelled action in the detail content rather
+   than adding an ellipsis solely to conceal it.
+3. Show the selected record in a removable composer chip. Chart context includes
+   its selected period and filters. This is a focus reference, not a separate
+   group messaging destination or a requirement for one conversation per plan.
+
+These are approved interaction rules. The current group callback still opens the
+existing preview thread; the shared composer chip is not yet implemented.
+The continuity decision and implementation gaps remain in
+[roadmap C04](../../../docs/specs/argus-execution-board.md#c04--contextual-conversation-handoff).
+
+Mobbin references inspected October 2:
+[Fabric item selection and Ask AI](https://mobbin.com/flows/a9096ee9-967b-4110-a738-d77acb704671)
+shows the chosen item in the composer;
+[Grok document question](https://mobbin.com/flows/1fdf3416-da7c-49f1-b9be-8f481dc6f586)
+shows a removable source attachment. These support explicit context, not a claim
+that either app implements Cuadrao's record permissions or continuity contracts.
+
+### Group people and receipt placement
+
+**Founder-approved October 2, 2026.** Personas / People contains member identity,
+shared-plan balances or contributions, invitations, and former participants.
+Receipt capture and saved receipt cards belong in Gastos / Expenses. Contextual
+Cuadrao entry belongs in the group's existing detail actions, not beside Add receipt
+or above the people list.
+
+Member removal is secondary and owner-only. A trailing swipe reveals Remove on
+iOS 27 without executing on full swipe. Older systems retain a native contextual
+action; VoiceOver exposes the same review. Preserve the existing removal review,
+outstanding-balance restriction, and history. Members are not reorderable cards.
+Keep the shared debt-direction labels, colors and symbols visible.
+
+[Bond's member actions](https://mobbin.com/screens/a6e69b41-ae6e-4e2e-b6b6-b0bb75f27e9c)
+keep removal out of the resting row;
+[X's removal row](https://mobbin.com/screens/873d27a4-ba4e-4922-8055-09d02debd295)
+shows a trailing swipe action. Cuadrao preserves its own confirmation and ownership
+rules rather than copying those apps' deletion semantics.
+
 ### Receipt capture and review
 
 Capture saves a draft and opens a compact review. **Después / Later** lets the person

@@ -1743,6 +1743,16 @@ Debes / You owe uses an accessible warm tone. Labels and direction symbols accom
 color. Apply this rule to group totals, people and receipt confirmation. Existing
 external repayment tracking records money returned elsewhere, not a bank transfer.
 
+**C01 capture correction retained:** source choice happens once, then native
+camera/Photos/Files acquisition. Avoid the repeated receipt landing form before
+capture. Save the source as a draft and allow review now or later; group currency
+already comes from its owner. Generic attachments must not automatically become
+receipts. This approved correction remains outstanding in the existing capture
+implementation and does not close with the People-only polish.
+[ZARA's Add receipt flow](https://mobbin.com/flows/5719cb3d-02c1-4d2a-924a-efb8bcebac86)
+shows direct camera entry, though it scans receipt QR codes rather than performing
+Cuadrao's document extraction.
+
 **Connected work remains assigned to D08, D06 and D07.** The preview prepares named
 sample receipts and supports manual review of imported media. Vision extraction,
 automatic categorization, confidence/correction policy, receipt retention and access,
@@ -1759,6 +1769,46 @@ Research informs these interaction choices, not a capability claim:
 [Splitwise item assignment](https://mobbin.com/flows/32960404-ae98-480b-bbd8-ac3792e4ae7c),
 and [Apple's receipt-splitting guide](https://support.apple.com/en-us/127565).
 Apple Cash's US payment rail is outside this preview.
+
+### C02 — People-screen polish checkpoint
+
+**October 2, signed build 3416:** Personas now keeps member identity, balances,
+invitations and former members together. Receipt controls/cards moved to Gastos;
+the existing Cuadrao callback moved into the group detail menu. Removal uses the
+approved secondary action and existing guarded review. Six native journeys passed;
+the two native swipe journeys passed again after removing empty swipe behavior
+from ineligible rows. [Evidence and delivery readback](../reports/evidence/cuadrao-native-design/receipts-2026-10-02/README.md#people-polish-and-contextual-entry-lock-build-3416)
+record source `60aebb2a8f180d1d2e142378ac753540cebe33c9`. Installation and version
+readback succeeded; launch was blocked by the locked phone. This is local UI
+acceptance, not connected membership or physical interaction acceptance.
+
+### C04 — Contextual conversation handoff
+
+**October 2 founder lock:** the first three contextual-entry rules are owned by
+[the Cuadrao guide](../../.agent/designs/cuadrao/DESIGN.md#contextual-conversation-entry).
+Keep lists quiet, use relevant detail actions, and show a removable selected-record
+chip in the composer. These are design decisions, not evidence that global app
+context or the shared chip is connected. The People polish only relocates the
+existing group-thread entry into its existing detail menu with explicit wording.
+
+**Continuity recommendation, still under discussion:** open contextual Cuadrao as
+a dismissible presentation over the originating detail. Preserve the source's
+selected tab, filters and scroll position. Preserve any unfinished chat message,
+send nothing automatically, and keep the main Chat entry predictable. Use the same
+conversation owner; do not build a second assistant or force a conversation per
+plan. Before implementation, settle how an existing draft receives new focus and
+how the presentation rejoins full Chat. Verify cancel/return and draft recovery
+on-device rather than inferring persistence from reference screenshots.
+
+Mobbin's [Fabric Ask AI flow](https://mobbin.com/flows/a9096ee9-967b-4110-a738-d77acb704671)
+shows selected-item context and a close control.
+[Craft's contextual assistant](https://mobbin.com/screens/9a1e6066-99e8-4b6d-8a95-de973748565e)
+keeps the document visible behind its assistant;
+[Binance's assistant sheet](https://mobbin.com/screens/18481718-9d6b-41a8-90e2-2ab93e351d35)
+provides another contained presentation reference. These images support the
+presentation recommendation; they do not prove draft persistence or exact return
+behavior. Implementation and connected context remain with D09/D10/D14 and the
+existing record owners. No provider or backend work is activated by this lock.
 
 ### Cuadrao consistency pass and Home chart follow-up
 

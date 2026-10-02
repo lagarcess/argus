@@ -78,3 +78,46 @@ picker journey was not exercised in this checkpoint.
 
 Approved interaction rules live in the Cuadrao design guide. Future connected work
 remains in roadmap C01 under D08/D06/D07, rather than a new competing backlog.
+
+## People polish and contextual-entry lock, build 3416
+
+App source: `60aebb2a8f180d1d2e142378ac753540cebe33c9`.
+Signed build **3416** installed on the same iPhone and version readback confirmed it.
+The phone was locked during launch, so physical interaction remains unverified.
+
+People now shows identities, money direction, invitations and former members.
+Receipt entry and saved receipt cards appear only under Expenses. The group's
+existing menu exposes **Preguntar a Cuadrao / Ask Cuadrao** using the existing
+callback. No shared context chip or new assistant presentation is implemented.
+Owner-only removal is a trailing swipe on iOS 27 and a context menu on older
+systems, plus a VoiceOver action. Full swipe cannot remove someone; the existing
+review preserves the outstanding-balance restriction and past records.
+
+Six native journeys passed in [the first run](people-polish-journeys.json).
+After screenshot review exposed an empty swipe on ineligible rows, the modifier
+was removed for those rows. The two affected owner/member journeys passed again
+at the final source in [the final run](people-polish-final-journeys.json).
+This includes blocked removal, cancel, a zero-balance guest's confirmed removal,
+non-owner restrictions, the legacy UI branch, receipt tab placement, saved-source
+relaunch, and the relocated Chat entry reopening the same receipt.
+The remaining four results are retained because the final delta only changes
+native People swipe eligibility. The retained receipt screenshot below was
+revalidated against that delta; its static owner layout is unchanged.
+
+- [Owner People screen, Spanish](people-polish-owner-es.png).
+- [Member People screen, English and dark](people-polish-member-en-dark.png).
+- [Outstanding balance blocks removal](people-polish-removal-review-es.png).
+- [People remains clear with a saved receipt](people-polish-receipt-hidden-es.png).
+- [Phone delivery readback](people-polish-device.json).
+
+The previous unchanged-code removal test reached its review but failed while
+looking for the invitation-preview control. The updated owner journey completed
+that invitation and removal sequence in both verification runs; no separate
+invitation-code fix was made or claimed. The existing receipt keyboard frame
+warning remains recorded under C10. VoiceOver actions were inspected in code;
+VoiceOver interaction and a physical legacy-OS run were not performed.
+
+Build, diff and modularity checks passed. Independent scoped review and its final
+swipe delta returned no findings; comment review required no deletions. Decisions
+and Mobbin references live in the existing Cuadrao guide; outstanding context-chip,
+return/draft continuity and direct-capture work remain in roadmap C01/C04.
