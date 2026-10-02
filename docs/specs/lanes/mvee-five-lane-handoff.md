@@ -18,13 +18,13 @@ Unknowns stay unknown. [Issue #778](https://github.com/lagarcess/argus/issues/77
 
 ### 1. Invitation delivery
 
-Share link, iOS share sheet, WhatsApp and SMS now. Email later as an optional second channel.
+An invite produces a share link, an invite code, and a QR code. Email is out of this pass.
 
-**Already specified** for the share sheet and for user-sent WhatsApp or Messages. The [MVEE invitation delivery lock](../argus-minimum-viable-ecosystem-experience.md#invitation-delivery-founder-locked-september-27-2026) selects Copy invite link. The person pastes it into WhatsApp, Messages, or another channel. Argus does not send a WhatsApp Business API message. The [30 September design lock](../cuadrao-accounts-design-lock.md) selects the system share sheet in its household invitation-link baseline and forbids a custom WhatsApp integration. The connected app already presents that sheet from `ShareLink` in `ios/ArgusFoundation/Household/HouseholdManagement.swift`, with the URL `argus-household://invite#` plus the one-time token.
+**Founder settled** on 2 October 2026. The share sheet and user-sent WhatsApp or Messages stay as already specified in the [MVEE invitation delivery lock](../argus-minimum-viable-ecosystem-experience.md#invitation-delivery-founder-locked-september-27-2026) and the [30 September design lock](../cuadrao-accounts-design-lock.md). Argus does not send a WhatsApp Business API message. The founder adds an invite code and a QR code beside the link. File cites are in lane 2. The share link is present on integration and on the design branch. The household invite code is not in either tree. The household QR is not in either tree.
 
-**Consistent but unspecified** for a link that opens the installed app. No `CFBundleURLSchemes` or associated domain is registered under `ios/`. The design canvas shares `https://cuadrao.invalid/invite/...` from `CuadraoHouseholdInvitation.swift`, and that host does not resolve. do-blitz is the selected shortener direction in the same MVEE section, and that section says the choice does not attest that do-blitz meets the security or deployment contract. No do-blitz or Resend client exists in `src/argus`.
+**Email is later work.** The founder states that Resend and the cuadrao domain exist and are not connected, and that connecting them comes later. This pass does not send invitation email. The MVEE still selects Resend for a later channel. That lock is deferred, not reversed. Do not build a Household mail sender in this lane.
 
-**Conflicting** for "email comes later." The same MVEE section selects Resend email as well as the copy link. Both methods refer to the same invitation lifecycle, and email contents contain no financial amounts or account details. The decision log entry of 27 September 2026 locks both. The permission policy only says live do-blitz and Resend are outside the landed membership slice. That is sequencing, not a reversal of the channel choice.
+**Consistent but unspecified** for a link that opens the installed app. No `CFBundleURLSchemes` or associated domain is registered under `ios/`. The design canvas shares `https://cuadrao.invalid/invite/...`, and that host does not resolve. The URL people share stays open. See decision 1.
 
 ### 2. Household visibility
 
@@ -70,7 +70,7 @@ Amounts may appear in the in-app inbox. They never appear in push notifications 
 
 Household owns permission rules. Other lanes call that owner. They do not store a second grant, a second membership, or a client-side allow list.
 
-Spaces owns what a move does to history, plans, Home, and Search. The rule to implement is the MVEE rule, not hypothesis 4's plan clause. History stays on the same account id and moves only by changing `space_id`. Budget and goal rows stay in the space where they were created. Their inclusion of the account's activity changes with `space_id`. Household grants are untouched by a space move. Home and Search read the same `space_id`. They do not keep a private copy of which space an account is in.
+Spaces owns what a move does to history, plans, Home, and Search. The rule to implement is the MVEE rule, not hypothesis 4's plan clause. The account id stays the same. Current assignment changes by `space_id`. Historical balances, corrections, and settlements are not rewritten and are not copied onto the destination. The move is an auditable event, idempotent, and recoverable. Budget and goal rows stay in the space where they were created. Their inclusion of the account's activity changes with `space_id`. Household grants are untouched by a space move. Home and Search read the same `space_id` and recompute from canonical history. They do not keep a private copy of which space an account is in, and they do not keep a copied series.
 
 Updates consumes events from the lane that owns the fact. It stores read state and a source link. It does not copy the amount, the draft, or the invitation token into the inbox row. Display text is read from the current source at open time, so a revoked grant, an approved draft, or a paid bill cannot leave a stale private fact in the inbox.
 
@@ -103,8 +103,10 @@ Personal financial search and conversation search stay separate HTTP APIs. `GET 
 | --- | --- |
 | Any lane writes a migration or edits OpenAPI, API types, or `Localizable.strings` | The captain assigns the migration version and is the only writer of those shared files for that landing. Latest migration on this tip is `supabase/migrations/20261003130000_financial_document_drafts.sql`. New files sort after it. Existing migrations are not edited. |
 | Home chart series | Founder choice on hypothesis 5's comparison clause. Do not encode either rule until that choice is recorded in the MVEE. |
-| Household email | Founder confirmation that Resend stays in this pass. The share sheet does not wait on that confirmation. |
-| A link that opens the app | Founder choice of app identity and URL. MVEE section 1.6 still lists app identity and distribution as undecided. |
+| Household email | Later work. The founder deferred it on 2 October 2026. Resend and the cuadrao domain are not connected to invitations. Do not build invitation email in this pass. |
+| A link that opens the app | Founder choice of app identity and URL. MVEE section 1.6 still lists app identity and distribution as undecided. Decision 1. |
+| How an invitee gets the TestFlight build | Open. A Cuadrao invite does not add anyone to TestFlight by itself. Decision 2. Product-lead proposal (b) in lane 2 is waiting and is not adopted. |
+| First TestFlight distribution | Schedule external beta review of the first build before that distribution. This is a release constraint, not a product choice. |
 | Updates trigger for "invitation received" | The schema has no recipient until `accepted_by` is set at acceptance. `household_invitations` stores `token_hash`, expiry, and the creator. A server inbox cannot address the invitee before they present the token. Updates may record a row for the signed-in user who previews or accepts. It must not store the token. A pre-accept inbox item for a named invitee is unsupported and is not to be invented. |
 | Updates bill timing | No lead time is specified. "Approaching" has no number of days in the MVEE or the Plan contract. The inbox store can be built. The bill trigger waits for that number. |
 | Spaces, linked accounts | Do not move them. The MVEE sketch blocks a linked account and explains why. Standalone moves may proceed under the history and plan rules above. |
@@ -116,13 +118,18 @@ Household permission rules, account departure, and the plan-stays-in-its-space r
 
 One integration captain lands one lane at a time onto `codex/private-alpha-next`. Parallel branches do not merge each other. The captain reconciles the current integration into the worker one way, then merges the worker through its PR.
 
-1. **Household delivery.** Permission and membership are already on integration. The remaining delivery slice should land before Updates writes invitation rows and before Search depends on a new invitation read.
-2. **Spaces.** Home and Search must read one `space_id` writer. Land the move before those readers change.
-3. **Search.** Document and conversation opens should exist before Updates navigates to them. The source-link kinds above are the destination list.
-4. **Home series.** Land after `space_id` writes exist, so a moved account's history is queried in the destination space.
-5. **Updates.** Land last. It only stores read state and links. Its producers are Household invitations, Plan bills, and document draft status.
+Account moves should not land second. The earlier second slot existed so Home and Search would read one `space_id` writer. That reason still holds for a space catalog. It does not hold for moving an existing account. A move that rewrites or copies balance history would reach integration before the Home reader exists to catch it. The founder warns that a move is hard reconciliation of balance history, settlements, and backfilling. That slice is the highest-risk part of Spaces.
 
-A lane that is blocked on a founder decision does not hold the others. Household can land the share sheet while email waits. Spaces can land standalone moves while linked moves stay blocked. Updates can land the inbox and the draft-ready row while bill timing and push channels wait.
+1. **Household delivery.** Permission and membership are already on integration. This pass adds the share link, invite code, and QR the founder described, and not email. Land it before Updates writes invitation rows.
+2. **Spaces catalog only.** Space rows, unique names, archive, and a new account choosing a space. No move of an existing account. This is the one `space_id` writer later readers use.
+3. **Search.** Document and conversation opens should exist before Updates navigates to them. Search does not move accounts. The source-link kinds above are the destination list.
+4. **Home series.** Derived from canonical history and filtered by the account's current space, after the catalog writer exists.
+5. **Account moves.** After that Home reader exists, with Codex review and the dedicated eval in lane 5. Idempotent, recoverable, and not a copy of history.
+6. **Updates.** Land last. It only stores read state and links. Its producers are Household invitations, Plan bills, and document draft status.
+
+If the captain will not split Spaces, land the whole Spaces lane after the Home series, in slot 4, and do not land it second.
+
+A lane that is blocked on a founder decision does not hold the others. Household does not wait on email. Spaces catalog can land while account moves wait on the Home reader. Linked account moves stay blocked. Updates can land the inbox and the draft-ready row while bill timing and push channels wait.
 
 ## Codex review
 
@@ -131,7 +138,7 @@ Codex review is not a merge gate. Request it only for work that changes durable 
 | Lane | Review |
 | --- | --- |
 | Household | Yes if delivery changes grant revocation, token storage, or RLS. No for a share sheet that only displays the token the create-invitation response already returns. |
-| Spaces | Yes. The first write to `space_id`, and any new space table, is migration and authorization work. |
+| Spaces | Yes. The space table is migration and authorization work. Account moves also require a dedicated eval before landing. The eval is specified in lane 5. |
 | Search | Yes if a query can return another owner's document or conversation. No for a read-only adapter that calls the existing document and conversation owners and adds no table. |
 | Home | Yes if the series is a new stored table. No if it is derived inside the existing financial-home read transaction from canonical activity and balance observations. |
 | Updates | Yes for the inbox table, its RLS, and any trigger that copies a private amount or a token. |
@@ -151,12 +158,14 @@ Codex review is not a merge gate. Request it only for work that changes durable 
 
 Only these still require the founder. Everything else in this file is either already locked or is a technical contract the lanes can implement.
 
-1. **Email in this pass.** Resend is already selected. Hypothesis 1 would defer it. Confirm that this Household lane sends Resend email as the second channel, or explicitly defer that lock in the MVEE. The share sheet does not depend on the answer.
-2. **URL that opens the app.** App identity is still open in MVEE section 1.6. The connected scheme is unregistered. The design host does not resolve. Choose the URL people share before anyone calls the link real delivery.
+1. **URL that opens the app.** App identity is still open in MVEE section 1.6. The connected scheme is unregistered. The design host does not resolve. Choose the URL people share before anyone calls the link real delivery.
+2. **How an invitee gets the TestFlight build.** A Cuadrao invite does not add anyone to TestFlight by itself. The distribution record in lane 2 says what the beta is. It does not choose the install path. Product-lead proposal (b) is waiting and is not adopted.
 3. **Spending comparison when the previous covered period has no expenses.** The canvas compares and can show a zero difference. Hypothesis 5 hides the comparison unless both periods have real data. Record the choice in the MVEE before the Home series is coded. Unknown balances stay unknown either way.
 4. **How many days before a due bill creates an inbox row.** Unspecified. Needed only for the bill trigger.
-5. **Push and email channels for Updates.** The amount ban is locked. Which channels exist, and whether push is opt-in, is the open row already on the execution board. The in-app inbox does not wait on it.
+5. **Push and email channels for Updates.** The amount ban is locked. Which channels exist, and whether push is opt-in, is the open row already on the execution board. The in-app inbox does not wait on it. Household invitation email is not this item. It is later work.
 6. **Joint-plan export and retention beyond the archived read-only departure package.** Already listed as open. Account custody on leave is not part of this question.
+
+Invitation email is not in this list. The founder deferred it. Product-lead proposals (a), (b), and (c) in lane 2 are waiting. They are not decisions.
 
 A named invitee on an invitation, before that person opens the link, is not a founder decision to resolve by adding a column in this pass. The current invitation has no recipient. Do not add one unless the founder explicitly expands invitation delivery.
 
@@ -205,9 +214,21 @@ Real Postgres. Relaunch the app and read the same points. An account with an unk
 
 ### Journey and completion
 
-A registered admin creates a household and shares one invitation through the system share sheet. The recipient, on their own sign-in, previews the link, accepts, and sees no accounts until an owner shares one. The owner shares a single account as view, then optionally grants edit. The recipient records only what the edit grant allows. The admin revokes the invitation before use, and that token dies. A member leaves, or the admin removes them. Access ends in that request: grants in both directions are revoked, the leaver's own accounts remain theirs, and a plan they had shared becomes the archived read-only projection already implemented. An expired link and a revoked link fail with the existing errors. The same acceptance retried with the same idempotency key does not create a second membership.
+A registered admin creates a household and shares one invitation as a link, an invite code, and a QR code. The recipient, on their own sign-in, previews the link or enters the code, accepts, and sees no accounts until an owner shares one. The owner shares a single account as view, then optionally grants edit. The recipient records only what the edit grant allows. The admin revokes the invitation before use, and that token dies. A member leaves, or the admin removes them. Access ends in that request: grants in both directions are revoked, the leaver's own accounts remain theirs, and a plan they had shared becomes the archived read-only projection already implemented. An expired link and a revoked link fail with the existing errors. The same acceptance retried with the same idempotency key does not create a second membership.
 
-Completion includes real invitation delivery of the share link, English and Spanish, relaunch, and a third registered user who receives 404s for the household. Email is complete only if the founder confirms decision 1. Until then, completion is the share sheet plus the existing accept, leave, and remove loop.
+Completion includes the share link, the invite code, and the QR, English and Spanish, relaunch, and a third registered user who receives 404s for the household. Invitation email is not part of completion. It is later work.
+
+### Distribution record
+
+The founder settled this for the TestFlight beta. The landing page runs a waitlist, and the founder onboards the first users himself. Those users can invite anyone. Each invitee also becomes a TestFlight tester through the invite. Invites carry a link plus a code so the network effect can be tracked.
+
+A Cuadrao invite does not add anyone to TestFlight by itself. How the invitee gets the build is decision 2. This handoff does not choose it. Product-lead proposal (b) below is one proposal and is not adopted.
+
+Schedule TestFlight external beta review of the first build before first distribution. That review is a release constraint. It is not a product choice.
+
+### Who invited whom
+
+Invitations do not record a referral graph. `household_invitations` stores `created_by` for the user who created the invite and `accepted_by` for the user who accepted it, in `supabase/migrations/20261001090000_household_membership.sql`. Both columns are `on delete set null`. The migration comment says acceptance may keep `accepted_at` after `accepted_by` clears. There is no row that keeps the inviter and the invitee after either auth user is deleted, and there is no chain from an invitee to the invites they later send except a join of those two columns while both ids still exist. `profiles` invite cohort, the pattern on `signed_in`, `session_started`, `landing_viewed`, and `first_answer_shown` in `src/argus/observability/analytics_events.py`, is a campaign code. It is not a person. That is a gap for the network-effect report.
 
 ### What exists
 
@@ -221,28 +242,50 @@ Landed on this tip:
 
 Routes already implemented: `POST /api/v1/households`, `POST /api/v1/households/{id}/invitations`, revoke, `POST /api/v1/household-invitations/preview`, `POST /api/v1/household-invitations/accept`, leave, remove member, transfer admin, close, account-grant create, patch, delete, and replace. Token plaintext is returned once. Replay returns `token: null`. TTL is seven days, `INVITE_TTL` in `src/argus/domain/household/repository.py`.
 
-Native share UI: `HouseholdManagement.swift` uses `ShareLink` and also shows the URL for copy. Tests in `ios/ArgusFoundationUITests/HouseholdUITests.swift` expect the `argus-household://invite#` prefix. Nothing handles that URL on open. The design canvas share sheet in `CuadraoHouseholdInvitation.swift` uses a fake host and in-memory accept. It is not the connected loop.
+Checked on integration at this tip and on `codex/cuadrao-design-scan-recents` at `8f521518`.
 
-Reuse the Household service, the command receipt, and the native journal. Do not add a second invitation table or a second token store.
+**Share link, present on both.** Integration: `ShareLink` in `ios/ArgusFoundation/Household/HouseholdManagement.swift` shares `argus-household://invite#` plus the one-time token, and the same view shows that URL as selectable text at `household.invite.link`. `ios/ArgusFoundationUITests/HouseholdUITests.swift` expects the `argus-household://invite#` prefix. Design branch: `CuadraoInvitationShareSheet` in `ios/ArgusFoundation/Cuadrao/CuadraoHouseholdInvitation.swift` shares `https://cuadrao.invalid/invite/...` through `UIActivityViewController`, presented from `ios/ArgusFoundation/Cuadrao/CuadraoHouseholdSheet.swift`. That host does not resolve, and the canvas comment says the sheet never exposes a real invitation. Nothing on either tree handles the URL on open.
+
+**Invite code, not there.** No household screen on integration or on the design branch shows an invite code. The design button labeled "View code card" is not a household code. It opens the plan-group sample below.
+
+**QR, not there for a household invite.** Integration has no `CIFilter.qrCodeGenerator` under `ios/`. The design branch has one QR, and it is a plan-group sample, not a household invitation. `ios/ArgusFoundation/Cuadrao/Planning/CuadraoGroupInvitation.swift` opens `CuadraoGroupCodeCard` from `group-invite-code`. `ios/ArgusFoundation/Cuadrao/Planning/CuadraoGroupCodeCard.swift` draws a QR whose payload is `Cuadrao design preview |` plus the in-memory group id. The card says the sample code does not join a real group. `ios/ArgusFoundationUITests/CuadraoGroupDesignUITests.swift` only exists on that branch and screenshots `group-code-qr`. Those files are not on integration. They do not create, store, or accept an invitation.
+
+Reuse the Household service, the command receipt, and the native journal. Do not add a second invitation table or a second token store. The code and the QR the founder settled are a presentation of the same invitation the create route already returns.
 
 ### Gaps
 
 - The shared URL does not open the app.
-- No Resend send, no do-blitz short link, no email template in this repo. Supabase still owns other email templates. A Household email must not become a fourteenth template living only in a dashboard. If email is confirmed, the sender lives in this repo next to the existing invitation, and the body contains no amounts.
+- The household invite code and the household QR are not implemented. The plan-group sample QR is not a substitute.
+- No durable who-invited-whom record, as written above. A report cannot keep the inviter after `created_by` or `accepted_by` is cleared.
+- Invitation email is later work. Do not add a Resend send, a do-blitz short link, or an invitation email template in this pass. Supabase still owns other email templates. A later Household email must not become another template living only in a dashboard, and its body contains no amounts.
 - Invitations name no recipient before accept. See the lock table.
 - Design "Personas" and the connected management screens are different files. This lane keeps the connected `Household/` module. It does not restyle it inside `Cuadrao/`.
+
+### Product Lead proposals waiting on the founder
+
+These are proposals. They are not decisions, and this handoff does not adopt them.
+
+**(a) Per-user invite quota.** For example 3 to start, with more granted manually. No quota column or counter exists on `household_invitations` or on the member row.
+
+**(b) The in-app invite code is the real gate.** A TestFlight public link only installs the app. Anyone without a code lands on the cuadrao.ai waitlist. This is the proposal for decision 2. A Cuadrao invite still does not enroll TestFlight by itself.
+
+**(c) Three network metrics from day one, on the who-invited-whom record.** That record is the gap above. None of the three is an existing analytics event. The closed PostHog registry in `src/argus/observability/analytics_events.py` is `first_answer_shown`, `signed_in`, `card_saved`, `goal_created`, `checklist_step_completed`, `reminders_opted_in`, `reminders_opted_out`, `session_started`, `installed_app_opened`, `landing_viewed`, and `receipt_shared`. The optional `cohort` string on `signed_in`, `session_started`, `landing_viewed`, and `first_answer_shown` is a campaign code, not an inviter.
+
+| Metric | Where it would come from |
+| --- | --- |
+| Invites sent per user | Gap. No analytics event and no PostHog capture. A count of `household_invitations` by `created_by` exists only while that user id remains. |
+| How many of those invites get accepted | Gap for PostHog. `accepted_at` on the same row is the SQL mark that an accept happened. `accepted_by` does not survive deletion of the acceptor, so the count of accepts is not a count of people once that column clears. |
+| How many invitees invite someone themselves | Gap. No event. The only join is `accepted_by` of one row to `created_by` of a later row, and both columns clear on user delete. Without the durable record, PostHog cannot answer this. |
 
 ### Allowed files
 
 `src/argus/domain/household/`, `src/argus/api/routers/households.py`, `src/argus/api/households.py`, `ios/ArgusFoundation/Household/`, `ios/Packages/ArgusSession/Sources/ArgusSession/Household.swift`, `tests/household/`, and the Household section of the API contract and OpenAPI when this lane is landing.
 
-A mail sender, if confirmed, is a new module called by `invite`. It is not a copy of the invitation rules.
-
-No-touch: grant semantics in `_end_membership` unless a Codex-reviewed bugfix, `CuadraoHousehold*.swift`, financial account ownership, Plan math.
+No-touch: grant semantics in `_end_membership` unless a Codex-reviewed bugfix, `CuadraoHousehold*.swift`, `CuadraoGroupInvitation.swift`, `CuadraoGroupCodeCard.swift`, financial account ownership, Plan math, Resend, and invitation email templates.
 
 ### Acceptance
 
-Two real users and a third who is denied, against Postgres. Create, share, preview, accept, share one account, edit grant, leave, remove, revoke, expire. Relaunch both clients. Retry a lost accept response and get one membership. Disable the flag and confirm `404 households_unavailable` before auth. English and Spanish on the share sheet, the preview, and the departure explanation. Email, if in scope, is received without an amount or an account name, and the link in it is the same invitation.
+Two real users and a third who is denied, against Postgres. Create, share the link, show the code and the QR for that same invitation, preview, accept by link and by code, share one account, edit grant, leave, remove, revoke, expire. Relaunch both clients. Retry a lost accept response and get one membership. Disable the flag and confirm `404 households_unavailable` before auth. English and Spanish on the share sheet, the code, the QR, the preview, and the departure explanation. No invitation email is sent. A referral report, if proposal (c) is later accepted, reads the durable who-invited-whom record and not PostHog cohort.
 
 ## Lane 3. Updates
 
@@ -335,6 +378,30 @@ Personal already exists for every account because `space_id` defaults to `person
 
 Production limits and purge windows stay unspecified. This lane ships one Business and one Custom space per user, archive, and restore. It does not ship a purge job or an unlimited entitlement.
 
+Moving an account between spaces is the highest-risk part of this lane. The founder warns that it means hard reconciliation of balance history, settlements, and backfilling. The catalog of spaces is not that risk. Account moves land after the Home series, with Codex review and the dedicated eval below. They do not land second.
+
+### Move invariants
+
+- Do not rewrite historical balances, opening balances, corrections, or settlements. Do not copy them onto the destination.
+- Record the move as an auditable event: account id, source space, destination space, actor, and time. The account id does not change. `space_id` is the current assignment only.
+- Home series and comparisons are recomputed from canonical history. They are not a snapshot copied onto the new space.
+- The move is idempotent and recoverable. A repeat of the same move does not apply twice. A failed move leaves one end state, source or destination, with history intact.
+
+### Reconciliation cases the lane must test
+
+- Opening balance and later corrections stay the same rows and revisions. The move does not write a new opening balance.
+- Recorded activity amounts and dates are unchanged. A month with no activity stays empty.
+- A settlement between two accounts, including a transfer or a payment, is not rewritten. Moving one account in a linked pair is blocked, and both histories stay put. The same block covers a cross-account refund, a loan link, and an unfinished document draft.
+- Backfill after the move: a correction or an activity dated before the move appends to canonical history. It does not create a destination copy and does not rewrite the pre-move revision.
+- Repeating the same move is a no-op: one event, one space assignment.
+- An interrupted move retries to the same end state. The account is still in the source space with no event, or in the destination space with one event. It is never in both, and history is never half-copied.
+- Home series and the comparison, read after the move, match a fresh computation from canonical history for the destination space. They do not match a copied snapshot.
+- Household grants, budget rows, and goal rows keep their ids. Budget inclusion follows the account's new space without relocating the budget.
+
+### Dedicated eval
+
+Codex review covers the space table and the move. The move also needs a dedicated eval before landing. The eval runs the cases above against Postgres and fails if any historical balance, correction, or settlement row changes, if the move event is missing or duplicated, or if the Home series differs from a fresh read of canonical history.
+
 ### What exists
 
 | Piece | Where |
@@ -348,7 +415,7 @@ Reuse the account id, the recording service, and the canvas rules for rename, ar
 ### Gaps
 
 - No space table, so a Business or Custom name has nowhere to live. `space_id` as free text cannot enforce unique names or archive. A space row owned by the user, with the account's `space_id` as a foreign key, is the missing owner. Personal is the default row, not a deletable one. This is a schema addition, not a second account store.
-- No move command, no link check, no budget-inclusion update.
+- No move command, no link check, no budget-inclusion update. The move, when it is built, follows the invariants above. It is not a rewrite of history.
 - Connected Home, Accounts, and Search do not send or display a space.
 - Household is a membership projection, not a `space_id`. Do not store household as `space_id`. The MVEE already separates share from private-space assignment.
 
@@ -362,16 +429,16 @@ No-touch: `CuadraoSpaces*.swift`, household grant SQL, document storage, the cha
 
 ### Acceptance
 
-Postgres. Create Business and Custom, relaunch, and see the same names. Move a standalone account, relaunch, and read the same activity on the same account id in the new space. The source budget no longer counts that account's new activity, and the budget id is unchanged. A linked transfer blocks the move and leaves every row in place. A household grant still resolves after the move. A second user cannot list the spaces. Delete is rejected while the space has an account. Personal delete and rename are rejected. English and Spanish for the move review and the blocked-link explanation. `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` off still 404s the new routes.
+Postgres. Create Business and Custom, relaunch, and see the same names. Move a standalone account, relaunch, and read the same activity on the same account id in the new space, with the same opening balance and the same correction revisions. The source budget no longer counts that account's new activity, and the budget id is unchanged. A linked transfer blocks the move and leaves every row in place. A household grant still resolves after the move. A second user cannot list the spaces. Delete is rejected while the space has an account. Personal delete and rename are rejected. English and Spanish for the move review and the blocked-link explanation. `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` off still 404s the new routes. The dedicated eval above is part of acceptance for the move, not a substitute for it.
 
 ## Blocks before a lane starts
 
 | Lane | Can start now | Blocked until |
 | --- | --- | --- |
 | Home | Reading the current `financial-home` response and listing the series gap | Founder decision 3, then the series. View binding also waits on the design-branch collision for `ConnectedCuadraoHome.swift` |
-| Household | Share sheet, accept, leave, remove, and the unregistered-URL fix once decision 2 chooses a URL | Email until decision 1. A link that opens the app until decision 2 |
+| Household | Share link, accept, leave, and remove. Code and QR present the same invitation. Email is later work and does not block | A link that opens the app until decision 1. How an invitee gets the TestFlight build until decision 2. Proposals (a), (b), and (c) wait and are not in this pass unless the founder adopts them |
 | Updates | Inbox table and read state, draft-ready rows from `review_ready`, invitation rows after preview or accept | Bill trigger until decision 4. Push and email until decision 5. Navigation to a document or conversation until those destinations exist |
 | Search | Document and conversation hits through the existing APIs, behind the document flag for documents | Nothing in the founder list. Issue #778 moves retained source bytes to a private Supabase Storage bucket before documents are enabled. Search does not wait on it, because Search uses the document API and never storage internals |
-| Spaces | Space rows, standalone moves, blocked linked moves | Nothing in the founder list. Home and Search display of the new space lands with those lanes, after this one |
+| Spaces | Space catalog only: rows, names, archive, new accounts choosing a space | Account moves until the Home series reader exists, then Codex review and the dedicated eval. Linked moves stay blocked. Home and Search display of the new space lands with those lanes |
 
 No lane is dispatched by this document.
