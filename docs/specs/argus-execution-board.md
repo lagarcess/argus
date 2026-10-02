@@ -1753,7 +1753,7 @@ owns native conventions; Argus web styling remains unchanged. Future connected
 history, coverage and valuation work stays with the existing owners below.
 76 deterministic checks and the eight final native journeys passed; retained
 first-use/empty-state verification and the clean final review are recorded in
-[acceptance evidence](../reports/evidence/cuadrao-native-design/consistency-polish/README.md).
+[acceptance evidence](../reports/evidence/cuadrao-native-design/consistency-polish/balance-states/README.md).
 Signed preview build **3411** is installed and opened on the founder’s iPhone.
 This closes the approved UI polish, not connected financial functionality.
 
