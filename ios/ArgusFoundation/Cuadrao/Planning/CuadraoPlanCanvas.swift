@@ -7,10 +7,7 @@ struct CuadraoPlanCanvas: View {
     var bottomSpace: CGFloat = 90
     @State private var path: [UUID] = []
     @State private var together = false
-    @State private var groups = CuadraoGroupPreview(
-        spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
-        reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
-        empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
+    let groups: CuadraoGroupPreview
     @State private var newGroup = false
     @State private var scope = "personal"
     @State private var selectedDay: Int?

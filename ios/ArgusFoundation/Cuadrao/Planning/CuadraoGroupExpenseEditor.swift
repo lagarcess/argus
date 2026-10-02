@@ -2,6 +2,8 @@ import SwiftUI
 import PhotosUI
 
 struct CuadraoGroupExpenseEditor: View {
+    @Environment(\.receiptWorkspace) private var receiptWorkspace
+    @State private var captureReceipt = false
     let store: CuadraoGroupPreview
     let groupID: UUID
     var initial: PlanSharedExpense?
@@ -43,6 +45,11 @@ struct CuadraoGroupExpenseEditor: View {
             if let group {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
+                        if initial == nil && group.kind == .trip && receiptWorkspace != nil {
+                            Button { captureReceipt = true } label: {
+                                Label(spanish ? "Usar un recibo" : "Use a receipt", systemImage: "receipt").frame(minHeight: 44)
+                            }.accessibilityIdentifier("group-expense-receipt")
+                        }
                         TextField(group.kind == .saving ? (spanish ? "¿Para qué aportas?" : "What are you saving for?") : (spanish ? "¿Qué pagaron?" : "What was it for?"), text: $title).font(CuadraoTypography.section).accessibilityIdentifier("group-expense-name")
                         PlanAmountInput(value: $amount, currency: .constant(group.currency), error: $amountErrors.message(for: "amount"),
                                         title: spanish ? "Monto" : "Amount", identifier: "group-expense-amount", spanish: spanish)
@@ -126,6 +133,11 @@ struct CuadraoGroupExpenseEditor: View {
                     }
             }
         }.presentationDragIndicator(.visible).interactiveDismissDisabled()
+            .sheet(isPresented: $captureReceipt) {
+                if let workspace = receiptWorkspace {
+                    CuadraoReceiptFlow(route: .capture(ReceiptOrigin(groupID: groupID, threadID: nil)), workspace: workspace, spanish: spanish)
+                }
+            }
             .task(id: photo) {
                 guard let photo else { return }; photoError = false
                 if let data = try? await photo.loadTransferable(type: Data.self), let image = UIImage(data: data) {

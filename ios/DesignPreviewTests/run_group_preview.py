@@ -12,6 +12,7 @@ with tempfile.TemporaryDirectory(prefix="cuadrao-group-checks-") as folder:
         str(root / "ios/ArgusFoundation/Cuadrao/CanvasMoney.swift"),
         str(root / "ios/ArgusFoundation/Cuadrao/Planning/CuadraoPlanPreview.swift"),
         str(root / "ios/ArgusFoundation/Cuadrao/Planning/CuadraoGroupPreview.swift"),
+        str(root / "ios/ArgusFoundation/Cuadrao/Receipts/CuadraoReceipt.swift"),
         str(Path(__file__).with_name("GroupPreviewChecks.swift")), "-o", str(binary)
     ], check=True)
     subprocess.run([str(binary)], check=True)

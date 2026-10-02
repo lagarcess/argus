@@ -15,6 +15,7 @@ struct PlanSharedExpense: Identifiable, Codable, Equatable {
     var shares: [UUID: Int]
     var draft = false
     var receipt: Data?
+    var receiptID: UUID?
     static func equal(_ cents: Int, among members: [UUID]) -> [UUID: Int] {
         guard cents >= 0, !members.isEmpty else { return [:] }
         return Dictionary(uniqueKeysWithValues: members.enumerated().map { ($0.element, cents / members.count + ($0.offset < cents % members.count ? 1 : 0)) })
@@ -108,11 +109,19 @@ extension PlanGroup {
     }
 
     private let defaults: UserDefaults?
+    private let storageURL: URL?
+    private(set) var loadFailed = false
     private let key = "cuadrao.design.groups.v1"
-    init(spanish: Bool, defaults: UserDefaults? = .standard, reset: Bool = false, empty: Bool = false) {
+    init(spanish: Bool, defaults: UserDefaults? = .standard, reset: Bool = false, empty: Bool = false, storageURL: URL? = nil) {
         self.defaults = defaults
-        if !reset, !empty, let data = defaults?.data(forKey: key), let saved = try? JSONDecoder().decode([PlanGroup].self, from: data) { groups = saved }
-        else { resetExamples(spanish: spanish, empty: empty) }
+        self.storageURL = storageURL ?? (defaults !== UserDefaults.standard ? nil : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("cuadrao-groups.json"))
+        if !reset, !empty, let storageURL = self.storageURL, FileManager.default.fileExists(atPath: storageURL.path) {
+            do { groups = try JSONDecoder().decode([PlanGroup].self, from: Data(contentsOf: storageURL)) }
+            catch { loadFailed = true }
+        } else if !reset, !empty, let data = defaults?.data(forKey: key), let saved = try? JSONDecoder().decode([PlanGroup].self, from: data) {
+            groups = saved
+            persist()
+        } else { resetExamples(spanish: spanish, empty: empty) }
     }
     func group(_ id: UUID) -> PlanGroup? { groups.first { $0.id == id } }
     func save(_ group: PlanGroup) {
@@ -135,7 +144,29 @@ extension PlanGroup {
         _ = saving.record(.init(title: es ? "Primer aporte" : "First contribution", cents: 1000000, payer: members[0].id, shares: [members[0].id: 1000000]))
         groups = empty ? [] : [trip, saving]; persist()
     }
-    private func persist() {
-        if let data = try? JSONEncoder().encode(groups) { defaults?.set(data, forKey: key) }
+    func confirmReceipt(_ draft: ReceiptDraft, groupID: UUID) throws {
+        guard var group = group(groupID), group.kind == .trip, group.currency == draft.currency else { throw ReceiptError.destination }
+        if let existing = group.expenses.first(where: { $0.id == draft.id }) {
+            guard existing.receiptID == draft.id, !existing.draft else { throw ReceiptError.destination }
+            return
+        }
+        guard let payer = draft.payer, group.activeMembers.contains(where: { $0.id == payer }) else { throw ReceiptError.destination }
+        let shares = try draft.shares(roster: group.activeMembers.map(\.id))
+        let expense = PlanSharedExpense(id: draft.id, title: draft.merchant, cents: draft.total,
+                                       payer: payer, shares: shares, receiptID: draft.id)
+        guard group.record(expense) else { throw ReceiptError.incomplete }
+        let updated = groups.map { $0.id == groupID ? group : $0 }
+        try write(updated)
+        groups = updated
     }
+    private func write(_ values: [PlanGroup]) throws {
+        guard !loadFailed else { throw ReceiptError.missing }
+        let data = try JSONEncoder().encode(values)
+        if let storageURL {
+            try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: storageURL, options: .atomic)
+        }
+        if storageURL == nil { defaults?.set(data, forKey: key) }
+    }
+    private func persist() { try? write(groups) }
 }

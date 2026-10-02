@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct CuadraoChatCanvas: View {
+    @Environment(\.receiptWorkspace) private var receiptWorkspace
+    @State private var savedReceipts = false
+    @State private var pendingReceipt: UUID?
+    @State private var temporaryReceipt = false
     let store: CuadraoChatPreview
     let spanish: Bool
     @Binding var editing: Bool
@@ -14,7 +18,7 @@ struct CuadraoChatCanvas: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var es: Bool { spanish }
-    private var active: Bool { !store.current.turns.isEmpty }
+    private var active: Bool { !store.current.turns.isEmpty || !store.current.receiptIDs.isEmpty }
     private var ready: Bool { !store.current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !store.current.attachments.isEmpty }
 
     private var holdOnComposer: Bool {
@@ -52,6 +56,21 @@ struct CuadraoChatCanvas: View {
             CuadraoChatSheet(destination: destination, store: store, spanish: es)
                 .tint(WelcomePalette.pine)
         }
+        .sheet(isPresented: $savedReceipts, onDismiss: {
+            if let id = pendingReceipt { pendingReceipt = nil; receiptWorkspace?.open(id) }
+        }) {
+            if let workspace = receiptWorkspace {
+                NavigationStack {
+                    ReceiptSavedList(workspace: ReceiptWorkspace(receipts: workspace.receipts, groups: workspace.groups,
+                        accounts: workspace.accounts, chat: workspace.chat, capture: workspace.capture,
+                        open: { id in savedReceipts = false; pendingReceipt = id }, groupChat: workspace.groupChat), groupID: store.current.groupID, spanish: es)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button(es ? "Listo" : "Done") { savedReceipts = false } } }
+                }
+            }
+        }
+        .confirmationDialog(es ? "Guardar fuera del chat temporal" : "Save outside temporary chat", isPresented: $temporaryReceipt, titleVisibility: .visible) {
+            Button(es ? "Guardar recibo" : "Save receipt") { receiptWorkspace?.capture(ReceiptOrigin(groupID: nil, threadID: nil)) }
+        } message: { Text(es ? "El recibo se guardará en este dispositivo aunque cierres este chat temporal." : "The receipt will stay on this device even after this temporary chat closes.") }
         .confirmationDialog(es ? "¿Terminar el chat temporal?" : "End temporary chat?", isPresented: $ending, titleVisibility: .visible) {
             Button(es ? "Terminar y crear chat" : "End and create chat", role: .destructive) { store.leaveTemporary(for: .newRegular) }
             Button(es ? "Seguir aquí" : "Stay here", role: .cancel) {}
@@ -135,7 +154,7 @@ struct CuadraoChatCanvas: View {
                         }
                     } else {
                         CuadraoBrand().scaleEffect(0.85).accessibilityLabel("Cuadrao")
-                        Text(es ? "¿Qué vemos hoy?" : "What shall we look at?")
+                        Text(store.current.groupID.flatMap { receiptWorkspace?.groups.group($0)?.name } ?? (es ? "¿Qué vemos hoy?" : "What shall we look at?"))
                             .font(CuadraoTypography.screen).multilineTextAlignment(.center)
                     }
                     Spacer(minLength: 32)
@@ -155,6 +174,16 @@ struct CuadraoChatCanvas: View {
                             }
                                 .font(.caption).foregroundStyle(.secondary)
                         }.frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    if let workspace = receiptWorkspace {
+                        if let groupID = store.current.groupID, let group = workspace.groups.group(groupID) {
+                            Text(group.name).font(CuadraoTypography.section)
+                        }
+                        ForEach(store.current.receiptIDs, id: \.self) { id in
+                            if let draft = workspace.receipts.receipt(id) {
+                                ReceiptCard(draft: draft, spanish: es) { workspace.open(id) }
+                            }
+                        }
                     }
                     ForEach(store.current.turns) { turn in
                         VStack(alignment: .leading, spacing: 24) {
@@ -275,6 +304,12 @@ struct CuadraoChatCanvas: View {
                 }
                 if tray && voiceMessage.state != .recording {
                     Divider()
+                    if let workspace = receiptWorkspace, !store.temporary,
+                       workspace.receipts.receipts.contains(where: { $0.groupID == store.current.groupID }) || workspace.receipts.loadFailed {
+                        Button { tray = false; savedReceipts = true } label: {
+                            Label(es ? "Recibos guardados" : "Saved receipts", systemImage: "receipt").frame(minHeight: 44)
+                        }.accessibilityIdentifier("chat-saved-receipts")
+                    }
                     HStack(spacing: 8) {
                         attachmentButton("doc.viewfinder", es ? "Escanear" : "Scan")
                         attachmentButton("photo", es ? "Foto" : "Photo")
@@ -306,7 +341,13 @@ struct CuadraoChatCanvas: View {
     }
 
     private func attachmentButton(_ symbol: String, _ title: String) -> some View {
-        Button { tray = false; sheet = .attachment(symbol) } label: {
+        Button {
+            tray = false
+            if symbol == "doc.viewfinder", let workspace = receiptWorkspace {
+                if store.temporary { temporaryReceipt = true }
+                else { workspace.capture(ReceiptOrigin(groupID: store.current.groupID, threadID: store.retainReceiptOrigin())) }
+            } else { sheet = .attachment(symbol) }
+        } label: {
             VStack(spacing: 9) { Image(systemName: symbol).font(.title3); Text(title).font(.caption) }
                 .frame(maxWidth: .infinity, minHeight: 70)
         }.buttonStyle(.plain)

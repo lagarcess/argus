@@ -11,6 +11,10 @@ enum WelcomePalette {
                                   UIColor(red: 0.37, green: 0.53, blue: 0.44, alpha: 1))
     static let sunshine = Color(red: 0.67, green: 0.43, blue: 0.13)
     static let bloom = Color(red: 0.48, green: 0.40, blue: 0.64)
+    static let owedNegative = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(red: 0.94, green: 0.63, blue: 0.48, alpha: 1)
+            : UIColor(red: 0.68, green: 0.36, blue: 0.26, alpha: 1)
+    })
     static let clay = Color(red: 0.68, green: 0.36, blue: 0.26)
     static let background = adaptive(.white, UIColor(white: 0.10, alpha: 1))
     static let surface = adaptive(UIColor(white: 0.965, alpha: 1), UIColor(white: 0.14, alpha: 1))

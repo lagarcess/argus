@@ -6,6 +6,8 @@ import Observation
     let id: String
     var title: String
     var turns: [CanvasChatTurn] = []
+    var receiptIDs: [UUID] = []
+    var groupID: UUID?
     var draft = ""
     var attachments: [CanvasChatAttachment] = []
     var pinned = false
@@ -73,6 +75,28 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
                 example: item.id == "chat-cd" ? .certificate : nil,
                 createdAt: Calendar.current.date(byAdding: .day, value: -index, to: .now)!)]
             threads.append(thread)
+        }
+    }
+    func attachReceipt(_ receiptID: UUID, to threadID: String) {
+        let thread = threads.first { $0.id == threadID } ?? (current.id == threadID ? current : nil)
+        guard let thread, !thread.receiptIDs.contains(receiptID) else { return }
+        thread.receiptIDs.append(receiptID)
+        if !threads.contains(where: { $0.id == thread.id }) { threads.append(thread) }
+    }
+    func removeReceipt(_ id: UUID) {
+        for thread in threads { thread.receiptIDs.removeAll { $0 == id } }
+        current.receiptIDs.removeAll { $0 == id }
+    }
+    func retainReceiptOrigin() -> String {
+        if !temporary && !threads.contains(where: { $0.id == current.id }) { threads.append(current) }
+        return current.id
+    }
+    func openGroup(_ id: UUID, name: String) {
+        if temporary { endTemporary() }
+        if let existing = threads.first(where: { $0.groupID == id }) { open(existing) }
+        else {
+            let thread = CanvasChatThread(title: name); thread.groupID = id
+            threads.append(thread); open(thread)
         }
     }
     var hasTemporaryContent: Bool {

@@ -23,6 +23,18 @@ import Foundation
             dateStore.send(spanish: spanish, now: midnight)
             precondition(datedThread.lastMessageDate == midnight)
 
+            let receiptChat = CuadraoChatPreview(spanish: spanish)
+            let originID = receiptChat.retainReceiptOrigin()
+            let originThread = receiptChat.current
+            receiptChat.newChat()
+            let receiptID = UUID()
+            receiptChat.attachReceipt(receiptID, to: originID)
+            receiptChat.attachReceipt(receiptID, to: originID)
+            precondition(originThread.receiptIDs == [receiptID] && receiptChat.current.receiptIDs.isEmpty,
+                         "Capture callback updates its originating thread once, never the new current thread")
+            precondition(originThread.turns.isEmpty, "A saved receipt never sends a message")
+            receiptChat.removeReceipt(receiptID)
+            precondition(originThread.receiptIDs.isEmpty, "Discard clears the originating card")
             let store = CuadraoChatPreview(spanish: spanish)
             let historyThread = store.threads[0]
             store.open(historyThread)

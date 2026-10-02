@@ -1,1 +1,4 @@
 "NSPhotoLibraryAddUsageDescription" = "Guarda una tarjeta de grupo de muestra en Fotos cuando elijas Guardar imagen.";
+
+"NSCameraUsageDescription" = "Escanea un recibo cuando elijas Escanear recibo.";
+"NSLocationWhenInUseUsageDescription" = "Añade tu ubicación actual a un recibo solo cuando lo elijas.";

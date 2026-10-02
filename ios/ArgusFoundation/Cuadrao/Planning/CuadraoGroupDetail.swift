@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct CuadraoGroupDetail: View {
+    @Environment(\.receiptWorkspace) private var receiptWorkspace
     let store: CuadraoGroupPreview
     let groupID: UUID
     let spanish: Bool
@@ -26,6 +27,20 @@ struct CuadraoGroupDetail: View {
                             Text(group.kind == .trip ? (spanish ? "Gastos" : "Expenses") : (spanish ? "Aportes" : "Contributions")).tag(1)
                             Text(spanish ? "Personas" : "People").tag(2)
                         }.pickerStyle(.segmented).accessibilityIdentifier("group-sections")
+                        if group.kind == .trip, let workspace = receiptWorkspace {
+                            HStack {
+                                Button { workspace.capture(ReceiptOrigin(groupID: group.id, threadID: nil)) } label: {
+                                    Label(spanish ? "Añadir recibo" : "Add receipt", systemImage: "receipt").frame(minHeight: 44)
+                                }.accessibilityIdentifier("group-add-receipt")
+                                Spacer()
+                                Button { workspace.groupChat(group.id) } label: {
+                                    Label(spanish ? "Chat" : "Chat", systemImage: "bubble").frame(minHeight: 44)
+                                }.accessibilityIdentifier("group-open-chat")
+                            }
+                            ForEach(workspace.receipts.receipts.filter { $0.groupID == group.id && $0.prepared }) { draft in
+                                ReceiptCard(draft: draft, spanish: spanish) { workspace.open(draft.id) }
+                            }
+                        }
                         if section == 0 { overview(group) }
                         if section == 1 { expenses(group) }
                         if section == 2 { members(group) }
@@ -111,12 +126,8 @@ struct CuadraoGroupDetail: View {
                 metric(spanish ? "Pagaste" : "You paid", cents: group.paid(group.me), group: group)
             }
             Divider()
-            HStack {
-                let balance = group.balance(group.me)
-                Text(balance == 0 ? (spanish ? "Todo cuadrado" : "All settled") : balance > 0 ? (spanish ? "Por recuperar" : "To receive") : (spanish ? "Por pagar" : "To pay"))
-                Spacer()
-                Text(PlanFormat.amount(Double(abs(balance)) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount)
-            }.font(.subheadline.weight(.medium)).foregroundStyle(group.look.color).accessibilityIdentifier("group-outstanding")
+            CuadraoOwedRow(cents: group.balance(group.me), currency: group.currency, spanish: spanish)
+                .accessibilityIdentifier("group-outstanding")
             if group.members.contains(where: { group.balance($0.id) < 0 }) {
                 Button(spanish ? "Ver cómo cuadramos" : "See how to settle up") { sheet = .settle }
                     .font(.subheadline).frame(minHeight: 44).accessibilityIdentifier("group-settle")
@@ -132,7 +143,10 @@ struct CuadraoGroupDetail: View {
                 .accessibilityIdentifier("group-add-expense")
             if group.expenses.isEmpty { Text(spanish ? "Aquí empieza la historia del plan." : "Your plan's story starts here.").foregroundStyle(.secondary) }
             ForEach(group.expenses.reversed()) { entry in
-                Button { sheet = .expense(entry) } label: {
+                Button {
+                    if let id = entry.receiptID { receiptWorkspace?.open(id) }
+                    else { sheet = .expense(entry) }
+                } label: {
                     HStack(spacing: 12) {
                         Image(systemName: entry.draft ? "doc.badge.clock" : group.kind == .saving ? "leaf" : "receipt").frame(width: 42, height: 42).background(group.look.color.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
                         VStack(alignment: .leading, spacing: 5) {
@@ -166,9 +180,11 @@ struct CuadraoGroupDetail: View {
                         Text(member.name)
                         if member.id == group.me && store.canManage { Text(spanish ? "Organiza" : "Organizer").font(.caption).foregroundStyle(.secondary) }
                     }; Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(PlanFormat.amount(Double(group.kind == .saving ? group.paid(member.id) : abs(group.balance(member.id))) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount)
-                        Text(group.kind == .saving ? (spanish ? "aportado" : "contributed") : group.balance(member.id) > 0 ? (spanish ? "por recuperar" : "to receive") : group.balance(member.id) < 0 ? (spanish ? "por pagar" : "to pay") : (spanish ? "al día" : "settled")).font(.caption).foregroundStyle(.secondary)
+                    if group.kind == .saving {
+                        Text(PlanFormat.amount(Double(group.paid(member.id)) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount)
+                    } else {
+                        CuadraoOwedRow(cents: group.balance(member.id), currency: group.currency,
+                                      spanish: spanish, own: member.id == group.me, compact: true)
                     }
                     if store.canManage && member.id != group.me {
                         Button { sheet = .remove(member) } label: {

@@ -12,6 +12,13 @@ struct CuadraoHomeCanvas: View {
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
         reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
         empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
+    @State private var groups = CuadraoGroupPreview(
+        spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
+        reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
+        empty: ProcessInfo.processInfo.arguments.contains("--plan-empty"))
+    @State private var receipts = CuadraoReceiptStore(reset: ProcessInfo.processInfo.arguments.contains("--receipt-reset"))
+    @State private var receiptRoute: ReceiptRoute?
+    @State private var receiptRecoveryError = false
     @State private var profile = CanvasProfileDraft()
     @State private var profilePath: [CanvasProfileRoute] = []
     @State private var updateReadIDs: Set<CanvasUpdate> = []
@@ -136,6 +143,17 @@ struct CuadraoHomeCanvas: View {
         } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
         .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
+        .environment(\.receiptWorkspace, receiptWorkspace)
+        .sheet(item: $receiptRoute) { route in
+            CuadraoReceiptFlow(route: route, workspace: receiptWorkspace, spanish: spanish)
+        }
+        .task {
+            do { try receipts.reconcile(groups: groups, accounts: data) }
+            catch { receiptRecoveryError = true }
+        }
+        .alert(spanish ? "No pudimos recuperar un recibo" : "A receipt could not be recovered", isPresented: $receiptRecoveryError) {
+            Button(spanish ? "Listo" : "OK") {}
+        } message: { Text(spanish ? "Los archivos siguen en este dispositivo. Revisa tus recibos guardados." : "The files remain on this device. Check your saved receipts.") }
         .onChange(of: selectedTab) { _, tab in
             if tab != .assistant { searchChatOrigin = false }
         }
@@ -300,6 +318,12 @@ struct CuadraoHomeCanvas: View {
         Text(title).font(CuadraoTypography.section).accessibilityAddTraits(.isHeader)
     }
 
+    private var receiptWorkspace: ReceiptWorkspace {
+        ReceiptWorkspace(receipts: receipts, groups: groups, accounts: data, chat: chat,
+                         capture: { receiptRoute = .capture($0) }, open: { receiptRoute = .review($0) },
+                         groupChat: { id in chat.openGroup(id, name: groups.group(id)?.name ?? ""); selectedTab = .assistant })
+    }
+
     @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
         if tab == .search {
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
@@ -321,7 +345,7 @@ struct CuadraoHomeCanvas: View {
                 path: $profilePath, bottomSpace: navigationBarHeight + 8 + (chat.voice.active ? 64 : 0))
         } else if tab == .plan && voiceProposal == nil {
             CuadraoPlanCanvas(store: plans, accounts: data, spanish: spanish,
-                bottomSpace: chat.voice.active ? 160 : 90)
+                bottomSpace: chat.voice.active ? 160 : 90, groups: groups)
         } else if voiceProposal != nil {
             CuadraoVoiceProposalCanvas(state: $voiceProposal, spanish: spanish)
         } else {
