@@ -1743,6 +1743,18 @@ this decision.
 
 ### Cuadrao consistency pass and Home chart follow-up
 
+**October 2 insights revision, UI-only implementation awaiting native acceptance:**
+completed-month spending averages and sustained category comparisons now derive
+from the same expense records and explicit coverage. Historical pages anchor their
+own windows. A full highlights destination groups averages and categories and
+opens supporting records. Expanded Balance/Activity use native interactive period
+paging and one dimensional allocation component. Balance keeps net position as
+its hero, with positive assets and deductions explained separately. The existing
+preview snapshots remain recorded-position examples, not a synthesized ledger or
+brokerage valuation feed. Connected coverage, financial-history ownership and
+valuation/provider integration remain future work under this roadmap.
+
+
 **Expanded insights storytelling — UI implemented October 1:** source `e1b2a4d7`
 implements the [locked design](../../.agent/designs/cuadrao/DESIGN.md#locked-home-and-expanded-insights-direction--october-1-2026):
 Title-sized period headings, explicit empty/incomplete-history states, calendar-week

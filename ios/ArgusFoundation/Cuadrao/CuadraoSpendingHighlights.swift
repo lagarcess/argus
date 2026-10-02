@@ -4,14 +4,50 @@ struct CuadraoSpendingHighlights: View {
     let story: CanvasSpendingStory
     let currency: String
     let spanish: Bool
+    private var insights: [CanvasSpendingInsight] { story.longitudinalInsights }
+    private var featured: [CanvasSpendingInsight] {
+        let trend = insights.first { $0.kind == .trend }
+        let average = insights.first { $0.kind == .average && $0.category == nil }
+        return [trend, average].compactMap { $0 }
+    }
     var body: some View {
-        if story.changedCategory != nil || story.largestExpense != nil {
+        if !insights.isEmpty || story.changedCategory != nil {
             VStack(alignment: .leading, spacing: 16) {
-                Text(spanish ? "Lo que destaca" : "Highlights").font(CuadraoTypography.section)
-                if let category = story.changedCategory { comparisonCard(category) }
-                if let expense = story.largestExpense { largestCard(expense) }
+                HStack {
+                    Text(spanish ? "Lo que destaca" : "Highlights").font(CuadraoTypography.section)
+                    Spacer()
+                    if insights.count + (story.changedCategory == nil ? 0 : 1) > 2 {
+                        NavigationLink(spanish ? "Ver todos" : "See all") { allHighlights }
+                            .font(CuadraoTypography.supporting).frame(minHeight: 44)
+                            .accessibilityIdentifier("home-highlights-all")
+                    }
+                }
+                ForEach(featured) { insight in
+                    CuadraoSpendingTrendCard(insight: insight, story: story, currency: currency, spanish: spanish)
+                }
+                if featured.count < 2, let category = story.changedCategory { comparisonCard(category) }
             }.padding(.top, 12)
         }
+    }
+    private var allHighlights: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 20) {
+                Text(spanish ? "Promedios" : "Averages").font(CuadraoTypography.feature)
+                ForEach(insights.filter { $0.category == nil }) { insight in
+                    CuadraoSpendingTrendCard(insight: insight, story: story, currency: currency, spanish: spanish)
+                }
+                Text(spanish ? "Categorías" : "Categories").font(CuadraoTypography.feature)
+                if let category = story.changedCategory { comparisonCard(category) }
+                ForEach(insights.filter { $0.category != nil }) { insight in
+                    CuadraoSpendingTrendCard(insight: insight, story: story, currency: currency, spanish: spanish)
+                }
+                if let expense = story.largestExpense {
+                    Text(spanish ? "Movimientos destacados" : "Notable activity").font(CuadraoTypography.feature)
+                    largestCard(expense)
+                }
+            }.padding(24)
+        }.background(WelcomePalette.background).navigationTitle(spanish ? "Lo que destaca" : "Highlights")
+            .navigationBarTitleDisplayMode(.inline).accessibilityIdentifier("home-all-highlights")
     }
     private func money(_ amount: Decimal) -> String { currency + " " + CanvasMoney.format(amount, currency: currency) }
     private func header(_ category: CanvasExpenseCategory, title: String) -> some View {

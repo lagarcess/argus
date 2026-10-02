@@ -9,7 +9,7 @@ struct CuadraoSpendingChart: View {
     let distribution: Bool
     let range: CanvasHistoryRange
     @Binding var periodOffset: Int
-    let controls: CuadraoInsightControls
+    var controls: CuadraoInsightControls?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedPosition: String?
     @State private var selectedCategory: CanvasExpenseCategory?
@@ -24,7 +24,6 @@ struct CuadraoSpendingChart: View {
     }
     private var buckets: [CanvasSpendingBucket] { CanvasSpendingHistory.buckets(entries, range: range) }
     private var categories: [CanvasExpenseCategory] { CanvasExpenseCategory.allCases.filter { categoryTotal($0) > 0 } }
-    private var oldest: Int { CanvasSpendingHistory.oldestOffset(expenses, range: range) }
     private var inspected: [CanvasActivity]? {
         guard let span = selectedSlot else { return nil }
         return CanvasSpendingHistory.entries(entries, in: span)
@@ -61,7 +60,7 @@ struct CuadraoSpendingChart: View {
                 Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("home-spending-insight")
             }
-            controls
+            if let controls { controls }
             if distribution { allocation } else { chart }
             ForEach(categories) { category in categoryRow(category) }
             CuadraoSpendingHighlights(story: story, currency: currency, spanish: spanish)
@@ -103,7 +102,7 @@ struct CuadraoSpendingChart: View {
             }
             .chartOverlay { proxy in
                 GeometryReader { geometry in
-                    CuadraoChartTouchSurface(inspect: { inspect($0, proxy: proxy, geometry: geometry) }, page: move)
+                    CuadraoChartTouchSurface(inspect: { inspect($0, proxy: proxy, geometry: geometry) })
                 }
             }
             .frame(height: entries.isEmpty ? 170 : 270).padding(14)
@@ -115,13 +114,9 @@ struct CuadraoSpendingChart: View {
                 }
             }
             .background(WelcomePalette.surface.opacity(0.5), in: RoundedRectangle(cornerRadius: 22))
-            .overlay(alignment: .leading) { if periodOffset > oldest { edge.offset(x: -192) } }
-            .overlay(alignment: .trailing) { if periodOffset < 0 { edge.offset(x: 192) } }
             .accessibilityIdentifier("home-spending-chart")
             .accessibilityValue(String(periodOffset))
             .accessibilityLabel(entries.isEmpty ? insight : (spanish ? "Gastos por período" : "Spending by period"))
-            .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { move(-1) }
-            .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { move(1) }
     }
     private func inspect(_ location: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) {
         guard let frame = proxy.plotFrame else { return }
@@ -155,25 +150,21 @@ struct CuadraoSpendingChart: View {
     }
     private var allocation: some View {
         VStack(alignment: .leading, spacing: 12) {
-            GeometryReader { proxy in
-                RoundedRectangle(cornerRadius: 12).fill(WelcomePalette.ink.opacity(0.06))
-                HStack(spacing: 0) {
-                    ForEach(categories) { category in
-                        Rectangle().fill(category.color)
-                            .frame(width: proxy.size.width * fraction(categoryTotal(category)))
-                    }
-                }.clipShape(RoundedRectangle(cornerRadius: 12))
-            }.frame(height: 64).accessibilityHidden(true)
+            CuadraoAllocationBar(segments: categories.map {
+                CuadraoAllocationSegment(id: $0.rawValue, title: $0.title(spanish), fraction: fraction(categoryTotal($0)), color: $0.color)
+            }, selection: Binding(get: { selectedCategory?.rawValue }, set: { selectedCategory = $0.flatMap(CanvasExpenseCategory.init(rawValue:)) }),
+                identifier: "home-spending-segment-")
+            if selectedCategory != nil {
+                Button(spanish ? "Todo" : "All") { selectedCategory = nil }.frame(minHeight: 44)
+            }
             HStack {
                 Text(interval.start, format: .dateTime.day().month(.abbreviated).year())
                 Spacer()
                 Text(interval.end.addingTimeInterval(-1), format: .dateTime.day().month(.abbreviated).year())
             }.font(CuadraoTypography.caption).foregroundStyle(.secondary)
         }.padding(.vertical, 20)
-            .overlay { CuadraoChartTouchSurface(inspect: { _ in }, page: move) }
+            .overlay { CuadraoChartTouchSurface(inspect: { _ in }) }
             .accessibilityIdentifier("home-spending-distribution")
-            .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { move(-1) }
-            .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { move(1) }
     }
     private func categoryRow(_ category: CanvasExpenseCategory) -> some View {
         DisclosureGroup(isExpanded: Binding(get: { selectedCategory == category }, set: { selectedCategory = $0 ? category : nil })) {
@@ -203,10 +194,5 @@ struct CuadraoSpendingChart: View {
         }.accessibilityIdentifier("home-spending-category-" + category.rawValue)
     }
     private func fraction(_ value: Decimal) -> Double { total > 0 ? NSDecimalNumber(decimal: value / total).doubleValue : 0 }
-    private var edge: some View {
-        RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface).frame(width: 180, height: entries.isEmpty ? 160 : 260)
-            .allowsHitTesting(false).accessibilityHidden(true)
-    }
-    private func move(_ direction: Int) { periodOffset = min(0, max(oldest, periodOffset + direction)) }
     private func clearSelection() { selectedPosition = nil; selectedCategory = nil }
 }

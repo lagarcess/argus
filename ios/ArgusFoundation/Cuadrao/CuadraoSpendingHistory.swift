@@ -94,7 +94,7 @@ enum CanvasSpendingHistory {
                 } else if account.kind == .cash && seed % 5 == 0 {
                     category = .food; amount = 95 + seed % 180; title = spanish ? "Café y algo más" : "Coffee and a bite"
                 } else if account.kind == .checking && seed % 9 == 0 {
-                    category = .food; amount = 600 + seed % 1900; title = spanish ? "Comida fuera" : "Eating out"
+                    category = .food; amount = 600 + seed % 1900 + (calendar.dateComponents([.month], from: days.first!, to: date).month ?? 0) * 75; title = spanish ? "Comida fuera" : "Eating out"
                 } else if account.kind == .checking && seed % 13 == 0 {
                     category = .transport; amount = 180 + seed % 750; title = spanish ? "Transporte" : "Getting around"
                 } else { return nil }

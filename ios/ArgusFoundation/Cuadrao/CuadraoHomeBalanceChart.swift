@@ -79,10 +79,8 @@ struct CuadraoHomeBalanceChart: View {
                 Text(spanish ? "No hay balances en este período." : "No balances in this period.")
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: expanded ? 270 : 125)
-                    .contentShape(Rectangle()).gesture(periodSwipe)
+                    .contentShape(Rectangle())
                     .accessibilityIdentifier("home-chart-empty")
-                    .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
-                    .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
             }
             if !expanded && availableRanges.count > 1 {
                 HStack(spacing: 2) {
@@ -131,17 +129,6 @@ struct CuadraoHomeBalanceChart: View {
             .background {
                 if expanded { RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface.opacity(0.5)) }
             }
-            .overlay(alignment: .leading) {
-                if expanded && periodOffset > range.oldestOffset(history) { pageEdge.offset(x: -192) }
-            }
-            .overlay(alignment: .trailing) {
-                if expanded && periodOffset < 0 { pageEdge.offset(x: 192) }
-            }
-    }
-    private var pageEdge: some View {
-        RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface)
-            .overlay { RoundedRectangle(cornerRadius: 22).stroke(WelcomePalette.border, lineWidth: 0.5) }
-            .frame(width: 180, height: 258).allowsHitTesting(false).accessibilityHidden(true)
     }
     private var periodTitle: String {
         let interval = range.interval(offset: periodOffset)
@@ -154,19 +141,6 @@ struct CuadraoHomeBalanceChart: View {
             return dateLabel(interval.start) + " – " + dateLabel(end)
         }
     }
-    private var periodSwipe: some Gesture {
-        DragGesture(minimumDistance: 25).onEnded { value in
-            guard abs(value.translation.width) > abs(value.translation.height) * 1.4 else { return }
-            movePeriod(value.translation.width > 0 ? -1 : 1)
-        }
-    }
-    private func movePeriod(_ direction: Int) {
-        guard expanded else { return }
-        let next = min(0, max(range.oldestOffset(history), periodOffset + direction))
-        guard next != periodOffset else { return }
-        selectedDate = nil
-        periodOffset = next
-    }
     private func takeaway(_ point: CanvasBalancePoint) -> String {
         guard let baseline = range.baseline(history, offset: periodOffset), baseline.date < point.date else {
             return spanish ? "Aquí empieza este período." : "This is where this period begins."
@@ -177,7 +151,7 @@ struct CuadraoHomeBalanceChart: View {
         if spanish { return "\(amount) \(change > 0 ? "más" : "menos") desde el \(dateLabel(baseline.date))." }
         return "\(amount) \(change > 0 ? "more" : "less") since \(dateLabel(baseline.date))."
     }
-    private var chart: some View {
+    private var chartBase: some View {
         Chart {
             ForEach(points) { point in
                 AreaMark(x: .value("Date", point.date), yStart: .value("Base", bounds.lowerBound), yEnd: .value("Balance", point.value))
@@ -208,20 +182,32 @@ struct CuadraoHomeBalanceChart: View {
                     }
                 }
             }
-            .chartXSelection(value: $selectedDate)
-            .chartGesture { proxy in
-                LongPressGesture(minimumDuration: 0.2)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
-                    .onChanged { value in
-                        if case .second(true, let drag?) = value { proxy.selectXValue(at: drag.location.x) }
-                    }
-                    .exclusively(before: periodSwipe)
-                    .simultaneously(with: SpatialTapGesture().onEnded { proxy.selectXValue(at: $0.location.x) })
-            }
             .frame(height: expanded ? 270 : 125).accessibilityIdentifier("home-balance-chart")
             .accessibilityValue(periodTitle)
-            .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
-            .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
+    }
+    @ViewBuilder private var chart: some View {
+        if expanded {
+            chartBase
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    CuadraoChartTouchSurface { location in
+                        guard let frame = proxy.plotFrame else { return }
+                        let plot = geometry[frame]
+                        selectedDate = proxy.value(atX: min(max(0, location.x - plot.minX), plot.width), as: Date.self)
+                    }
+                }
+            }
+        } else {
+            chartBase.chartXSelection(value: $selectedDate)
+                .chartGesture { proxy in
+                    LongPressGesture(minimumDuration: 0.2)
+                        .sequenced(before: DragGesture(minimumDistance: 0))
+                        .onChanged { value in
+                            if case .second(true, let drag?) = value { proxy.selectXValue(at: drag.location.x) }
+                        }
+                        .simultaneously(with: SpatialTapGesture().onEnded { proxy.selectXValue(at: $0.location.x) })
+                }
+        }
     }
     private func dateLabel(_ date: Date) -> String {
         date.formatted(expanded

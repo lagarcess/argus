@@ -177,39 +177,59 @@ final class CuadraoHomeChartUITests: XCTestCase {
         chart.swipeRight(velocity: .fast)
         shot(app, "story-month-title-es")
         let content = app.scrollViews["home-insights-content"]
-        let highlight = app.buttons["home-highlight-comparison"]
-        for _ in 0..<6 {
+        let highlight = app.buttons["home-highlight-all-average-6"]
+        for _ in 0..<8 {
             if highlight.isHittable && highlight.frame.maxY < app.frame.maxY - 40 { break }
             content.swipeUp()
         }
-        shot(app, "story-category-highlight-es")
         XCTAssertTrue(highlight.isHittable)
+        shot(app, "story-history-average-es")
         highlight.tap()
         XCTAssertTrue(app.scrollViews["home-highlight-records"].waitForExistence(timeout: 3))
-        shot(app, "story-supporting-records-es")
+        shot(app, "story-supporting-months-es")
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(highlight.waitForExistence(timeout: 3))
-        let largest = app.buttons["home-highlight-largest"]
-        for _ in 0..<3 {
-            if largest.isHittable && largest.frame.maxY < app.frame.maxY - 40 { break }
-            content.swipeUp()
-        }
-        shot(app, "story-largest-highlight-es")
-        largest.tap()
+        let all = app.buttons["home-highlights-all"]
+        for _ in 0..<4 { if all.isHittable { break }; content.swipeDown() }
+        all.tap()
+        XCTAssertTrue(app.scrollViews["home-all-highlights"].waitForExistence(timeout: 3))
+        shot(app, "story-all-highlights-es")
+        let comparison = app.buttons["home-highlight-comparison"]
+        for _ in 0..<8 { if comparison.isHittable { break }; app.scrollViews["home-all-highlights"].swipeUp() }
+        XCTAssertTrue(comparison.isHittable)
+        comparison.tap()
         XCTAssertTrue(app.scrollViews["home-highlight-records"].waitForExistence(timeout: 3))
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        for _ in 0..<7 { content.swipeDown(velocity: .fast) }
-        XCTAssertEqual(chart.value as? String, "-1", "Record drill-through must preserve the selected period")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        for _ in 0..<8 { content.swipeDown(velocity: .fast) }
+        XCTAssertEqual(chart.value as? String, "-1")
         app.buttons["home-view-distribution"].tap()
-        let distribution = app.otherElements.matching(identifier: "home-spending-distribution").firstMatch
-        distribution.swipeLeft(velocity: .fast)
-        distribution.swipeRight(velocity: .fast)
-        for _ in 0..<6 {
-            if largest.isHittable && largest.frame.maxY < app.frame.maxY - 40 { break }
-            content.swipeUp()
-        }
-        XCTAssertTrue(largest.isHittable, "Distribution also allows vertical scrolling to highlights")
-        shot(app, "story-distribution-highlights-es")
+        let segment = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-spending-segment-")).firstMatch
+        XCTAssertTrue(segment.waitForExistence(timeout: 3))
+        segment.tap()
+        shot(app, "story-distribution-decomposition-es")
+    }
+    func testInteractivePagingAndBalanceMeaning() {
+        continueAfterFailure = false
+        let app = launch()
+        app.buttons["home-history-expand"].tap()
+        let chart = app.otherElements.matching(identifier: "home-balance-chart").firstMatch
+        XCTAssertTrue(chart.waitForExistence(timeout: 3))
+        let period = chart.value as? String
+        let amount = app.staticTexts["home-chart-amount"].label
+        app.buttons["home-view-distribution"].tap()
+        XCTAssertEqual(app.staticTexts["home-distribution-total"].label, amount)
+        app.buttons["home-view-history"].tap()
+        let start = chart.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+        start.press(forDuration: 0.01, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.5)), withVelocity: .slow, thenHoldForDuration: 0.3)
+        XCTAssertEqual(chart.value as? String, period, "A cancelled short drag retains its page")
+        start.press(forDuration: 0.01, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)), withVelocity: .slow, thenHoldForDuration: 0.1)
+        XCTAssertNotEqual(chart.value as? String, period)
+        let prior = chart.value as? String
+        chart.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)).press(forDuration: 0.35, thenDragTo: chart.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.5)))
+        XCTAssertEqual(chart.value as? String, prior)
+        chart.swipeLeft()
+        XCTAssertEqual(chart.value as? String, period, "One committed drag advances one period")
+        shot(app, "interactive-paging-balance-es")
     }
     func testSpendingEmptyAndUnavailable() {
         continueAfterFailure = false
@@ -237,7 +257,7 @@ final class CuadraoHomeChartUITests: XCTestCase {
         let content = app.scrollViews["home-insights-content"]
         let chart = app.otherElements.matching(identifier: "home-spending-chart").firstMatch
         chart.swipeRight(velocity: .fast)
-        let highlight = app.buttons["home-highlight-comparison"]
+        let highlight = app.buttons["home-highlight-all-average-6"]
         for _ in 0..<9 {
             if highlight.isHittable { break }
             content.swipeUp()

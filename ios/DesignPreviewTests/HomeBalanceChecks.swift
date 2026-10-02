@@ -107,6 +107,28 @@ import Foundation
         let monthEnd = calendar.date(from: DateComponents(year: 2026, month: 5, day: 31, hour: 12))!
         let unequal = CanvasSpendingStory(expenses: [], range: .month, offset: 0, coverageStart: start, now: monthEnd)
         check(unequal.comparison == nil, "A 31st day never compares against a shorter completed month")
+        let coverage = calendar.date(from: DateComponents(year: 2025, month: 1, day: 1))!
+        let historyRows = (0..<12).map { index in
+            CanvasActivity(accountID: cash.id, title: "Monthly", amount: index < 9 ? 100 : 400,
+                date: calendar.date(byAdding: .month, value: index, to: coverage)!, income: false, category: .food)
+        }
+        let january = calendar.date(from: DateComponents(year: 2026, month: 1, day: 15))!
+        let annualStory = CanvasSpendingStory(expenses: historyRows, range: .month, offset: 0, coverageStart: coverage, now: january)
+        let trend = annualStory.longitudinalInsights.first { $0.kind == .trend && $0.category == .food }
+        check(trend?.priorAverage == 100 && trend?.recentAverage == 400 && trend?.difference == 300, "Recent three months compare with the preceding nine from records")
+        let average = annualStory.longitudinalInsights.first { $0.kind == .average && $0.category == nil && $0.months.count == 12 }
+        check(average?.average == 175, "Twelve complete monthly totals have an exact arithmetic average")
+        check(annualStory.completedMonths(count: 6)?.last?.interval.end == calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)), "Running month excluded from completed averages")
+        let sparse = CanvasSpendingStory(expenses: [historyRows.last!], range: .month, offset: 0, coverageStart: coverage, now: january)
+        check(sparse.longitudinalInsights.first(where: { $0.category == nil && $0.months.count == 12 })?.average == Decimal(400) / 12, "Covered zero months stay in the average denominator")
+        check(!sparse.longitudinalInsights.contains(where: { $0.kind == .trend }), "An isolated expense does not claim a sustained category trend")
+        check(unknownStory.longitudinalInsights.isEmpty, "Unknown coverage never produces longitudinal insight")
+        check(emptyStory.longitudinalInsights.isEmpty, "All-zero history does not manufacture a pattern")
+        let historical = CanvasSpendingStory(expenses: historyRows, range: .month, offset: -4, coverageStart: coverage, now: january)
+        check(historical.completedMonths(count: 6)?.last?.interval.end == calendar.date(from: DateComponents(year: 2025, month: 10, day: 1)), "Past pages exclude later records from their average")
+        check(historical.completedMonths(count: 12) == nil, "A window beginning before coverage is unavailable")
+        let annualHistorical = CanvasSpendingStory(expenses: historyRows, range: .year, offset: -1, coverageStart: coverage, now: january)
+        check(annualHistorical.completedMonths(count: 12)?.last?.amount == 400, "A completed historical year includes its December")
         print("Passed \(checks) Home balance projection checks")
     }
 }

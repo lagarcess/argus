@@ -19,7 +19,7 @@ struct CuadraoHomeDistribution: View {
     private var deductions: [CanvasAccount] { known.filter { value($0) < 0 } }
     private var total: Decimal { amount(positive) }
     private var kinds: [CanvasAccountKind] { CanvasAccountKind.allCases.filter { kind in positive.contains { $0.kind == kind } } }
-    private var palette: [Color] { [.orange, WelcomePalette.pine, .teal, .indigo, .red, .purple, .mint, .brown, .gray] }
+    private var palette: [Color] { [WelcomePalette.sunshine, WelcomePalette.pine, WelcomePalette.clay, WelcomePalette.overlap, WelcomePalette.bloom, WelcomePalette.sage, WelcomePalette.clay.opacity(0.7), WelcomePalette.pine.opacity(0.65), WelcomePalette.ink.opacity(0.5)] }
     private func color(_ kind: CanvasAccountKind) -> Color { palette[CanvasAccountKind.allCases.firstIndex(of: kind)!] }
     private func rows(_ kind: CanvasAccountKind) -> [CanvasAccount] { positive.filter { $0.kind == kind } }
     private func amount(_ rows: [CanvasAccount]) -> Decimal { rows.reduce(0) { $0 + value($1) } }
@@ -35,11 +35,11 @@ struct CuadraoHomeDistribution: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(asOf.map { (spanish ? "Activos · " : "Assets · ") + $0.formatted(.dateTime.day().month(.abbreviated).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) } ?? (historical ? (spanish ? "Sin balances en este período" : "No balances in this period") : (spanish ? "Activos · Hoy" : "Assets · Today")))
+                Text(asOf.map { (spanish ? "Balance neto · " : "Net balance · ") + $0.formatted(.dateTime.day().month(.abbreviated).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) } ?? (historical ? (spanish ? "Sin balances en este período" : "No balances in this period") : (spanish ? "Balance neto · Hoy" : "Net balance · Today")))
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text(known.isEmpty ? "—" : CanvasMoney.format(total, currency: currency))
+                    Text(known.isEmpty ? "—" : CanvasMoney.format(total + amount(deductions), currency: currency))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-distribution-total")
                 }
@@ -50,6 +50,11 @@ struct CuadraoHomeDistribution: View {
             }
             if let controls { controls }
             if !positive.isEmpty {
+                HStack {
+                    Text(spanish ? "Distribución de activos" : "Asset allocation")
+                    Spacer()
+                    Text(CanvasMoney.format(total, currency: currency)).font(CuadraoTypography.rowAmount)
+                }.font(CuadraoTypography.supporting)
                 distributionBar
                 HStack(spacing: 8) {
                     Button { select(nil) } label: {
@@ -95,29 +100,10 @@ struct CuadraoHomeDistribution: View {
             }
     }
     private var distributionBar: some View {
-        GeometryReader { geometry in
-            let width = max(0, geometry.size.width - 8)
-            ZStack(alignment: .topLeading) {
-                ForEach(kinds) { kind in
-                    let active = selectedKind == nil || selectedKind == kind
-                    let segmentWidth = width * fraction(amount(rows(kind)))
-                    let start = width * kinds.prefix { $0 != kind }.reduce(0.0) { $0 + fraction(amount(rows($1))) }
-                    ZStack(alignment: .topLeading) {
-                        CuadraoAllocationBlock(color: color(kind), filled: active,
-                            exposedSide: kind == kinds.first || selectedKind == kind,
-                            start: start, segmentWidth: segmentWidth)
-                        Button { select(kind) } label: {
-                            Color.clear.frame(width: segmentWidth, height: 62).contentShape(Rectangle())
-                        }.buttonStyle(.plain).offset(x: start + 8, y: 22)
-                            .accessibilityLabel(kind.title(spanish))
-                            .accessibilityValue(percent(amount(rows(kind))))
-                            .accessibilityIdentifier("home-distribution-segment-" + kind.rawValue)
-                    }
-                    .offset(y: !reduceMotion && selectedKind == kind ? -10 : 0)
-                    .opacity(active ? 1 : 0.28)
-                }
-            }
-        }.frame(height: 104)
+        CuadraoAllocationBar(segments: kinds.map {
+            CuadraoAllocationSegment(id: $0.rawValue, title: $0.title(spanish), fraction: fraction(amount(rows($0))), color: color($0))
+        }, selection: Binding(get: { selectedKind?.rawValue }, set: { selectedKind = $0.flatMap(CanvasAccountKind.init(rawValue:)) }),
+            identifier: "home-distribution-segment-")
     }
     private func categoryRow(_ kind: CanvasAccountKind) -> some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -164,37 +150,4 @@ struct CuadraoHomeDistribution: View {
         }.buttonStyle(.plain).accessibilityIdentifier("home-distribution-account-" + account.id.uuidString)
     }
 
-}
-
-private struct CuadraoAllocationBlock: View {
-    let color: Color
-    let filled: Bool
-    let exposedSide: Bool
-    let start: CGFloat
-    let segmentWidth: CGFloat
-    var body: some View {
-        Canvas { context, _ in
-            let depth: CGFloat = 8
-            let topY: CGFloat = 22
-            let front = Path(CGRect(x: start + depth, y: topY + depth, width: segmentWidth, height: 54))
-            let top = Path { path in
-                path.move(to: CGPoint(x: start, y: topY))
-                path.addLine(to: CGPoint(x: start + segmentWidth, y: topY))
-                path.addLine(to: CGPoint(x: start + segmentWidth + depth, y: topY + depth))
-                path.addLine(to: CGPoint(x: start + depth, y: topY + depth)); path.closeSubpath()
-            }
-            let side = Path { path in
-                path.move(to: CGPoint(x: start, y: topY))
-                path.addLine(to: CGPoint(x: start + depth, y: topY + depth))
-                path.addLine(to: CGPoint(x: start + depth, y: topY + 62))
-                path.addLine(to: CGPoint(x: start, y: topY + 54)); path.closeSubpath()
-            }
-            context.fill(top, with: .color(color.opacity(filled ? 0.55 : 0.04)))
-            if exposedSide { context.fill(side, with: .color(color.opacity(filled ? 0.65 : 0.04))) }
-            context.fill(front, with: .color(color.opacity(filled ? 0.8 : 0.03)))
-            for path in (exposedSide ? [top, side, front] : [top, front]) {
-                context.stroke(path, with: .color(filled ? .white.opacity(0.65) : color), lineWidth: 0.75)
-            }
-        }.accessibilityHidden(true).allowsHitTesting(false)
-    }
 }

@@ -232,14 +232,17 @@ preview code; connected delivery is still roadmap work.
 row. Adapt to localized labels and larger text, preserving 44-point targets. No
 previous/next chevrons or Back to today button in detail. The single period label
 above the amount follows the selected range; tick context stays on the axis. Swipe right for older periods, left toward the present;
-stop at the oldest available period and today. Neighboring edges hint at available
-pages. VoiceOver custom Previous/Next period actions provide the same navigation.
+stop at the oldest available period and today. Real neighboring period pages follow the finger through native paging; do not
+use decorative edges with an update-only gesture. VoiceOver custom Previous/Next period actions provide the same navigation.
 Long-press inspection must not page; vertical scrolling remains available.
 
 Switching chart/distribution preserves the selected period. For Balance, historical
 allocation uses matching recorded account snapshots and identifies their date;
 never relabel current assets as a past allocation. Missing observations remain
-unknown. The current snapshot says Activos · Hoy / Assets · Today.
+unknown. The hero remains recorded net balance in both modes. Its current snapshot says
+Balance neto · Hoy / Net balance · Today. Label the positive composition separately
+as Distribución de activos / Asset allocation, with its own total. Deductions and
+net balance remain separate from the positive 100% composition.
 
 **Activity:** vertical bars stack expenses by category. Week uses daily buckets;
 month uses calendar-week buckets clipped to the month, labeled with their day
@@ -330,3 +333,25 @@ Cuadrao implementation or acceptance evidence.
 the checkmark column; never switch a selected row to Label while unselected rows
 use Text. Keep captions centered independently of selection indicators. Appearance
 checks sit on the preview image; searchable currency checks sit after a Spacer.
+
+### History-based insights and interactive periods
+
+Expanded Balance and Activity share native horizontal paging with vertical scroll
+inside each page. The period headline, amount and supporting content travel
+together; metric and period/chart controls remain anchored. Cancelled drags return
+to the same page, completed drags reveal the adjacent period, and range changes
+return to the present. Long-hold chart inspection must leave the selected period
+unchanged. Home retains its compact inspection behavior.
+
+Activity highlights use completed covered months for 6/12-month averages and a
+recent-three versus preceding-nine category comparison. Covered zero months count
+in averages. Incomplete months and future pages never leak into these windows.
+A sustained category comparison needs activity throughout both windows, not an
+isolated large expense. One or two supported highlights sit below categories;
+Ver todos / See all opens the full collection grouped into averages and categories.
+Each insight opens its supporting monthly records. Current-period comparisons
+still use equal elapsed coverage. No history means no invented average or trend.
+
+`CuadraoAllocationBar` owns the dimensional bar for both financial views. Geometry,
+selection lift, Reduce Motion fade and proportional widths agree across views;
+asset types and expense categories retain their own meaning and shared palette.

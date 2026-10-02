@@ -14,65 +14,71 @@ struct CuadraoHomeInsights: View {
     @State private var accountPath: [UUID] = []
     @State private var accountSheet: CanvasAccountSheet?
     @Environment(\.dismiss) private var dismiss
-    private var periodLabel: some View {
-        Text(range.periodLabel(spanish: spanish, offset: periodOffset))
+    private func periodLabel(_ offset: Int) -> some View {
+        Text(range.periodLabel(spanish: spanish, offset: offset))
             .font(CuadraoTypography.feature).foregroundStyle(WelcomePalette.ink)
             .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("home-insight-period")
     }
     private var metricChoice: some View {
-        CuadraoChoiceMenu(title: spanish ? "Vista" : "View", selection: $activity,
+        CuadraoChoiceMenu(title: spanish ? "Vista" : "View", selection: Binding(get: { activity }, set: { value in
+            periodOffset = max(value ? CanvasSpendingHistory.oldestOffset(expenses, range: range) : range.oldestOffset(history), periodOffset)
+            activity = value
+        }),
             values: [false, true], valueTitle: { value in value ? (spanish ? "Actividad" : "Activity") : "Balance" })
             .accessibilityIdentifier("home-insight-metric")
     }
-    private var controls: CuadraoInsightControls { CuadraoInsightControls(range: $range, distribution: $distribution, spanish: spanish, activity: activity) }
+    private var controls: CuadraoInsightControls { CuadraoInsightControls(range: Binding(get: { range }, set: { periodOffset = 0; range = $0 }), distribution: $distribution, spanish: spanish, activity: activity) }
     private var expenses: [CanvasActivity] {
         CanvasSpendingHistory.expenses(data.visibleActivity, accounts: data.scopedAccounts, currency: currency)
     }
     private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: data.balanceObservations, now: .now) }
     private var oldest: Int { activity ? CanvasSpendingHistory.oldestOffset(expenses, range: range) : range.oldestOffset(history) }
-    private var snapshot: [CanvasAccount] {
-        guard periodOffset < 0 else { return accounts }
-        guard let date = range.points(history, offset: periodOffset).last?.date else { return [] }
+    private func snapshot(_ offset: Int) -> [CanvasAccount] {
+        guard offset < 0 else { return accounts }
+        guard let date = range.points(history, offset: offset).last?.date else { return [] }
         return CanvasBalanceHistory.snapshot(accounts: accounts, observations: data.balanceObservations, at: date)
     }
     private func movePeriod(_ direction: Int) { periodOffset = min(0, max(oldest, periodOffset + direction)) }
-    private var distributionSwipe: some Gesture {
-        DragGesture(minimumDistance: 25).onEnded { value in
-            guard abs(value.translation.width) > abs(value.translation.height) * 1.4 else { return }
-            movePeriod(value.translation.width > 0 ? -1 : 1)
+    @ViewBuilder private func periodContent(_ offset: Int) -> some View {
+        if activity {
+            CuadraoSpendingChart(expenses: expenses, coverageStart: data.spendingCoverageStart(currency: currency), currency: currency,
+                spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset))
+        } else if distribution {
+            CuadraoHomeDistribution(accounts: snapshot(offset), currency: currency, spanish: spanish, historical: offset < 0,
+                asOf: offset == 0 ? nil : range.points(history, offset: offset).last?.date)
+        } else {
+            CuadraoHomeBalanceChart(accounts: accounts, observations: data.balanceObservations, currency: currency,
+                currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true,
+                range: $range, periodOffset: .constant(offset))
         }
     }
     var body: some View {
         NavigationStack(path: $accountPath) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            periodLabel
-                            Spacer(minLength: 8)
-                            metricChoice
+            VStack(spacing: 8) {
+                VStack(spacing: 4) {
+                    metricChoice.frame(maxWidth: .infinity, alignment: .trailing)
+                    controls
+                }.padding(.horizontal, 24)
+                TabView(selection: $periodOffset) {
+                    ForEach(Array(oldest...0), id: \.self) { offset in
+                        ScrollView {
+                            if abs(offset - periodOffset) <= 1 {
+                                VStack(alignment: .leading, spacing: 16) {
+                                    periodLabel(offset)
+                                    periodContent(offset)
+                                }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 32)
+                            }
                         }
-                        VStack(alignment: .leading, spacing: 8) {
-                            periodLabel
-                            metricChoice.frame(maxWidth: .infinity, alignment: .trailing)
-                        }
+                        .accessibilityIdentifier("home-insights-content")
+                        .accessibilityHidden(offset != periodOffset)
+                        .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
+                        .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
+                        .tag(offset)
                     }
-                    if activity {
-                        CuadraoSpendingChart(expenses: expenses, coverageStart: data.spendingCoverageStart(currency: currency), currency: currency, spanish: spanish,
-                            distribution: distribution, range: range, periodOffset: $periodOffset, controls: controls)
-                    } else if distribution {
-                        CuadraoHomeDistribution(accounts: snapshot, currency: currency, spanish: spanish, controls: controls, historical: periodOffset < 0,
-                            asOf: periodOffset == 0 ? nil : range.points(history, offset: periodOffset).last?.date)
-                            .contentShape(Rectangle()).simultaneousGesture(distributionSwipe)
-                            .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
-                            .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
-                    } else {
-                        CuadraoHomeBalanceChart(accounts: accounts, observations: data.balanceObservations, currency: currency,
-                            currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true, controls: controls,
-                            range: $range, periodOffset: $periodOffset)
-                    }
-                }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 32)
-            }.accessibilityIdentifier("home-insights-content").background(WelcomePalette.background)
+                }.tabViewStyle(.page(indexDisplayMode: .never)).id(range.rawValue + String(activity))
+                    .accessibilityAction(named: Text(spanish ? "Período anterior" : "Previous period")) { movePeriod(-1) }
+                    .accessibilityAction(named: Text(spanish ? "Período siguiente" : "Next period")) { movePeriod(1) }
+            }.background(WelcomePalette.background)
                 .navigationDestination(for: UUID.self) { id in
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
                         actions: { accountSheet = $0 }, record: { accountSheet = .record($0) })
@@ -89,8 +95,7 @@ struct CuadraoHomeInsights: View {
                 show: { accountSheet = $0 }, archived: { _ in
                     accountSheet = nil; accountPath = []
                 })
-        }.onChange(of: range) { _, _ in periodOffset = 0 }
-            .onChange(of: activity) { _, _ in periodOffset = max(oldest, periodOffset) }
+        }.onChange(of: oldest) { _, value in periodOffset = max(value, periodOffset) }
             .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
     }
 }
