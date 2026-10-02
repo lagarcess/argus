@@ -7996,44 +7996,53 @@ uncertain fields, and more than 18 digits leaves the amount unresolved.
 
 ## Import review queue (default-off)
 
-### Document upload into review
+### Document capture, preparation and review
 
-`POST /api/v1/financial-documents` accepts a raw `application/pdf`, `image/jpeg`
-or `image/png` request body. `X-Extraction-Consent: true` confirms provider
-processing; `X-Document-Filename` is an optional display label. The registered
-owner and existing ingestion/accounts gates apply, with the additional default-off
-`ARGUS_DOCUMENT_EXTRACTION_ENABLED` gate checked before authentication.
+**PR #776 founder clarification, October 2: CAPTURE → SAVE → PREPARE → REVIEW → APPROVE.**
+A successful upload saves the supported source and an owner-scoped durable draft
+before extraction. It creates no expense, balance change, amount owed or sharing
+grant. The same connection ID reopens the draft from Chat or Plan. These are
+backend contracts under implementation in the default-off lane, not hosted or
+native availability claims.
 
-The body is streamed with a 10 MiB ceiling. Preparation rejects invalid files,
-encrypted PDFs, more than eight pages, oversized decoded images and incomplete
-extraction. Configured limits may be lower. Photos are decoded, oriented and
-stripped of metadata; PDFs use local Poppler text extraction and page rendering.
-Prepared content is sent to the explicitly configured `ARGUS_VISION_MODEL` through
-OpenRouter with data collection denied, zero data retention required and no
-automatic fallback or retry. Raw bytes and OCR text are transient.
+`POST /api/v1/financial-documents` accepts bounded PDF, JPEG or PNG bytes and an
+optional `X-Document-Filename`. Capture does not require a model, provider key,
+OCR tools, successful extraction or candidate sink. Provider consent remains
+explicit: `X-Extraction-Consent: true` allows background preparation; capture
+without it remains saved. Existing registered-owner/accounts/ingestion/document
+feature gates remain. The model stays `ARGUS_VISION_MODEL`; no fallback or retry
+is implied by capture or recovery.
 
-Response `{connection_id,status:"review_ready",replayed,candidate_count}` points
-to canonical statement candidates in the existing import queue. Upload never
-accepts an activity or maps a financial account. The person resolves, previews
-and accepts through the routes below. Balances remain informational evidence.
+The existing document checkpoint owns retained source, preparation lifecycle and
+prepared evidence. Owner-authorized draft and source reads support close/reopen.
+Queued intent is durable; API background dispatch is a wake-up mechanism. A
+process interruption leaves recoverable work. An expired in-flight attempt is
+marked for attention and is never automatically billed again. Explicit prepare
+or resume recovers from retained source; completed preparation is replayed without
+another model call. Identical owner/file captures reuse the same draft.
 
-Identical bytes for one owner reuse a document connection and frozen extraction.
-`POST /api/v1/financial-documents/{connection_id}/resume` replays an already
-saved extraction without a new provider request. Before that checkpoint, retry
-requires uploading the file again. Connection status exposes safe error codes;
-disconnect deletes the checkpoint and follows normal candidate retention.
-Another person's connection is unavailable even for identical uploaded bytes.
+Preparation preserves extracted observations and receipt itemization separately
+from canonical candidate projection. Compatible observations enter existing
+reconciliation; incompatible observations remain on the draft with review issues.
+Opening, closing, available and running balances remain distinguishable; unknown
+scope is unresolved, never guessed. Receipt items, subtotal, tax/service, tip and
+total remain review detail, not independent purchases. Missing fields stay unknown.
+Only explicit confirmation through existing reconciliation and MoneyService
+creates canonical activity, with existing strict amount/currency/account checks.
 
-Errors include 413 `document_too_large`, 415 `document_media_type_unsupported`,
-422 `document_extraction_consent_required` and preparation/extraction codes,
-404 `financial_document_not_found`, 409 `document_busy`, 410
-`document_disconnected`, and 503 for provider/configuration/delivery failures.
-Requests are limited to five per minute and thirty per day per owner per API
-process, including resumes. These in-process limits reset with the process;
-the registered provider key cap remains the operator's spending safeguard.
+Destination, payer, participants, equal-split proposal and shared item assignments
+are draft proposals. Attaching a plan reference does not authorize access or
+sharing; canonical Plan ownership and fixed currency remain authoritative. Full
+Chat actions, native UI, group authorization and split approval are subsequent
+integration work, not implemented financial effects of this foundation.
 
-No native presentation or demo adoption is implied. Fixture and benchmark
-provenance lives in `tests/document_extraction_fixtures/README.md`.
+**Retention amendment:** the former transient-source/re-upload contract is
+superseded by this explicit founder assignment. Supported source files stay in the
+same server-only document store until explicit disconnect/deletion; user/connection
+deletion cascades. Rendered pages and OCR intermediates stay transient. Draft/source
+reads are owner-only and uncached. Disconnect removes retained source and draft
+without deleting already accepted activity. Source and extracted contents never
+belong in logs, analytics, public evidence or automatically shared household data.
 
 Same gate as connected sources: `ARGUS_INGESTION_ENABLED` inside
 `ARGUS_FINANCIAL_ACCOUNTS_ENABLED`, flag before authentication, registered

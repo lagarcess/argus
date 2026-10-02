@@ -5,37 +5,38 @@ Worker: `codex/document-extraction`. Target: `codex/private-alpha-next`.
 
 ## Outcome and boundaries
 
-PDFs and receipt photos produce canonical `ImportCandidate` evidence in the
-existing reconciliation queue. Only explicit acceptance through reconciliation
-and `MoneyService` changes financial records. This implements the document entry
-path in MVEE section 4 and extends `financial-ingestion-connectors.md`.
+CAPTURE → SAVE → PREPARE → REVIEW → APPROVE. Founder clarification on October 2
+supersedes the original extraction-before-save contract. Upload persists a private
+source and durable draft even if preparation fails. The shared connection ID is
+reused across entry surfaces. Only existing reconciliation and MoneyService
+confirmation changes financial records.
 
-Native design, existing demos, chat interpretation, other connectors, production
-configuration, merge and deployment are outside this lane. API upload is the
-initial surface; any web control requires the user's scope answer.
+Native design, demos, full Chat actions, payroll, new verticals and a complete
+bill-splitting engine are outside this lane. No additional paid model calls,
+merge, deployment, hosted configuration, privacy relaxation or feature enablement.
+`ARGUS_VISION_MODEL` remains `openai/gpt-6-luna`.
 
-## Contract
+## Contract and design decision
 
-- Registered owner upload under the existing financial accounts and ingestion
-  gates, plus a default-off document extraction flag.
-- PDF, JPEG and PNG bytes are bounded and validated. Raw bytes and OCR text are
-  transient and are never logged, persisted in candidates, or shared with a
-  household. Upload consent explicitly covers sending content to OpenRouter.
-- One owner-scoped document identity names a statement source connection.
-  Concurrent attempts are leased. A validated extraction checkpoint is saved
-  before candidate submission so retries replay identical source identities.
-- Canonical candidates own extracted money facts. The checkpoint is a delivery
-  outbox, not a second ledger. Disconnect removes its extracted content and
-  existing reconciliation retention rules preserve accepted activity.
-- Extraction distinguishes transaction rows, balance evidence and statement
-  periods. Missing currency, date, amount or direction remains unresolved.
-  Receipt items, taxes and totals must not become multiple purchases.
-- Provider output is untrusted structured data, validated before any submission.
-  Invalid, truncated, empty/unreadable or incomplete results cannot silently
-  succeed. Bounded calls have no hidden retries.
-- Existing OpenRouter credentials are reused. A dedicated vision model setting
-  must be supplied explicitly; no silent model substitution. New configuration
-  names and safe descriptions belong in `.env.example`.
+Extend the existing document checkpoint, rather than expanding every connector's
+canonical candidate into a receipt/draft store. Keep one document owner and one
+financial confirmation owner. See the [API contract](../../API_CONTRACT.md#document-capture-preparation-and-review).
+
+- Retain bounded supported source files in the existing server-only checkpoint
+  until explicit disconnect/deletion. Keep rendered/OCR intermediates transient.
+- Persist source and preparation intent before asynchronous dispatch. Use the
+  existing connection lease, fence completion, and mark interrupted provider work
+  for attention without automatic retries. Re-deliver a saved batch without AI.
+- Retain typed observations and receipt details; project compatible candidates
+  individually and retain explicit issues for the others. Never silently drop,
+  relabel or invent evidence to satisfy the canonical import contract.
+- Receipt details include merchant/date/currency, items, quantities/prices,
+  category suggestions, subtotal, tax/service, tip and total. Split/destination
+  proposals remain separate from extracted evidence and confirmed financial data.
+- Reuse the captured Luna response offline. Its unknown balance scope remains
+  unknown; fixture knowledge must not be used to pretend the model identified it.
+- Scope options for future preparation must distinguish opening, closing,
+  available and running balances. Confirmation remains strict and owner-scoped.
 
 ## Verification and delivery
 
@@ -54,6 +55,5 @@ initial surface; any web control requires the user's scope answer.
 ## Stop conditions
 
 Do not run paid requests without approval or a configured vision model. Do not
-claim Dominican-bank compatibility from synthetic or foreign fixtures. Escalate
-if existing reconciliation cannot safely represent observed evidence; do not
-bypass its confirmation boundary or change native design to complete this lane.
+claim Dominican-bank compatibility from synthetic or foreign fixtures. Retain observations that cannot project into reconciliation on the same draft;
+do not bypass confirmation or change native design to complete this lane.
