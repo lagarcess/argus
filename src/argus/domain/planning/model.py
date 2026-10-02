@@ -202,8 +202,13 @@ def occurrences(state: dict[str, Any], until: date) -> dict[str, dict[str, Any]]
                     "account_id": segment["account_id"],
                     "due_date": due.isoformat(),
                 }
-    for oid, link in state["links"].items():
+    from argus.domain.planning import claims
+
+    for key, link in claims.protected_links(state).items():
         if not link.get("expectation_id"):
+            continue
+        oid = claims.occurrence_id(key, link)
+        if oid is None:
             continue
         snapshot = dict(link["snapshot"])
         snapshot["expectation_version"] = state["expectations"][link["expectation_id"]][

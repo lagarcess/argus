@@ -248,6 +248,51 @@ def test_historical_reassignment_redacts_old_and_current_legs(lane):
     assert old_private.account.id not in body and new_private.account.id not in body
 
 
+def test_corrected_away_activity_is_absent_without_losing_authorized_position(lane):
+    service, records, (owner, recipient, _) = lane
+    financial = HouseholdFinancialService(service)
+    hid, mid, _ = setup(lane)
+    visible = stored_account(records, owner)
+    private = stored_account(records, owner)
+    money = MoneyService(FinancialAccountService(records, clock=lambda: NOW))
+
+    def post(request, activity_id=None):
+        preview = money.preview(user_id=owner, request=request, activity_id=activity_id)
+        return money.write(
+            user_id=owner,
+            request=MoneyRequest.model_validate(
+                preview["reviewed_request"] | {"preview_token": preview["preview_token"]}
+            ),
+            activity_id=activity_id,
+            idempotency_key=key(),
+        )["activity"]
+
+    original = post(expense(visible.account.id))
+    post(
+        expense(private.account.id, "15", revision=original["revision"]),
+        original["activity_id"],
+    )
+    share(service, owner, hid, visible.account.id, mid)
+
+    snapshot = financial.snapshot(recipient, hid)
+
+    assert snapshot["activities"] == []
+    assert [item["account"]["id"] for item in snapshot["accounts"]] == [
+        visible.account.id
+    ]
+    expected = FinancialAccountService(records, clock=lambda: NOW).get(
+        user_id=owner, account_id=visible.account.id
+    )
+    from argus.domain.recording.schemas import account_response
+
+    assert snapshot["positions"][0]["amount_minor"] == (
+        account_response(expected).balance.amount_minor
+    )
+    assert private.account.id not in json.dumps(snapshot, default=str)
+    history = financial.history(recipient, hid, original["activity_id"])
+    assert [item["activity"]["revision"] for item in history["items"]] == [1]
+
+
 @pytest.mark.parametrize("surface", ["snapshot", "detail", "activity-options"])
 def test_changed_asset_uses_redacted_household_wire_contract(lane, surface):
     from argus.api.households import HouseholdsContext, require_households_context

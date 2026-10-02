@@ -95,10 +95,13 @@ class PostgresFinancialAccountRepository:
                 (user_id,),
             ).fetchall()
             openings = self._openings(connection, user_id, [str(row[0]) for row in rows])
-            return [
+            records = [
                 hydrate(connection, StoredAccount(_facts(row), openings.get(str(row[0]))))
                 for row in rows
             ]
+            from .canonical_groups import VisibleAccounts, load
+
+            return VisibleAccounts(records, load(self, connection, {user_id}))
 
     def get_account(self, *, user_id: str, account_id: str) -> StoredAccount | None:
         with self._pool.connection() as connection:

@@ -12,6 +12,9 @@ from argus.domain.recording.repository import StoredAccount
 def groups(
     accounts: list[StoredAccount],
 ) -> dict[str, dict[int, list[tuple[StoredAccount, ExpenseRecord, ExpenseRevision]]]]:
+    canonical = getattr(accounts, "canonical", None)
+    if canonical is not None:
+        return canonical.history
     result: dict[
         str, dict[int, list[tuple[StoredAccount, ExpenseRecord, ExpenseRevision]]]
     ] = {}
@@ -31,7 +34,47 @@ def groups(
 def activity(
     accounts: list[StoredAccount], activity_id: str, revision: int | None = None
 ) -> dict[str, Any]:
-    return render_activity(activity_id, groups(accounts).get(activity_id), revision)
+    canonical = getattr(accounts, "canonical", None)
+    if canonical is None:
+        return render_activity(activity_id, groups(accounts).get(activity_id), revision)
+    visible = {s.account.id for s in accounts}
+    if revision is None:
+        revision = canonical.current_visible(visible).get(activity_id)
+        if revision is None:
+            raise AccountNotFound()
+    full = render_activity(activity_id, canonical.history.get(activity_id), revision)
+    return visible_activity(full, visible, canonical.history)
+
+
+def visible_activity(full: dict, account_ids: set[str], history: dict) -> dict:
+    body = full.copy()
+    legs = [leg for leg in body["legs"] if leg["account_id"] in account_ids]
+    if not legs:
+        raise AccountNotFound()
+    primary_hidden = body["legs"][0]["account_id"] not in account_ids
+    body["legs"] = legs
+    if primary_hidden:
+        for key in (
+            "amount",
+            "amount_minor",
+            "note",
+            "reason",
+            "source_id",
+            "category_id",
+            "principal_minor",
+            "interest_minor",
+            "fees_minor",
+            "recorded_by",
+        ):
+            body[key] = None
+    for key, rev in (
+        ("purchase_activity_id", "purchase_revision"),
+        ("reversal_of_activity_id", "reversal_of_revision"),
+    ):
+        linked = history.get(body[key], {}).get(body[rev], []) if body[key] else []
+        if body[key] and any(s.account.id not in account_ids for s, _, __ in linked):
+            body[key] = body[rev] = None
+    return body
 
 
 def render_activity(
@@ -87,4 +130,12 @@ def render_activity(
 
 
 def current_activities(accounts: list[StoredAccount]) -> list[dict[str, Any]]:
+    canonical = getattr(accounts, "canonical", None)
+    if canonical is not None:
+        return [
+            activity(accounts, aid, revision)
+            for aid, revision in canonical.current_visible(
+                {s.account.id for s in accounts}
+            ).items()
+        ]
     return [render_activity(aid, history) for aid, history in groups(accounts).items()]

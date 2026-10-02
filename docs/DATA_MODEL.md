@@ -2796,6 +2796,234 @@ Recording position and spending remain the actual owners. Loan interest and fees
 
 Debt-plan archive preserves canonical payments and claimed occurrence snapshots. The shared occurrence projection marks retained archived intentions `plan_archived`, suppressing only residual forecast movement. Restore derives the same residual from current canonical activity.
 
+## Shared Household planning storage sketch
+
+**Status:** Worker storage contract for the [assigned shared planning lane](specs/argus-execution-board.md#connected-shared-household-planning-lane), October 1, 2026. Schema/cutover source is applied only to NEW disposable Postgres on port 59752. The connected native journey and focused independent review passed; exact publication gates are recorded on PR #773. No existing demo or hosted database is migrated. The [API contract](API_CONTRACT.md#shared-household-planning-contract-sketch) owns the scoped public wire and approved permission/departure rules.
+
+The implemented design adds consent and responsibility references to existing
+owner-qualified definitions. The alternative adds Household scope directly to
+every canonical definition and replaces owner-qualified readers with scope
+readers. References retain existing Personal ownership, identities, and
+recurrence with fewer authorization changes. Neither candidate permits copied
+definitions, shadow Personal goals, a second allocation engine, or stored
+editable actual totals.
+
+### Binding and participant records
+
+The `household_plan_bindings` contains `id`, `household_id`,
+`owner_membership_id`, `owner_user_id`, exactly one of `budget_id`,
+`expectation_id`, `goal_id`, or `debt_plan_id`, and `revoked_at`.
+The original definition ID remains its financial identity. Composite foreign
+keys bind the selected definition to its original owner and the owner's current
+membership to the same Household. Binding lifecycle also records owner-departure
+archive, the retained authorized recipients and previously shared definition
+revision. Read-only archived history grants no write or future projection. An
+expectation binding admits bills, not
+private expected income. A partial unique key permits one live, non-departed binding per
+canonical definition; retained departed bindings preserve prior consent. There is no second plan amount, balance, name, schedule,
+completion flag, or owner in a copied body.
+
+The `household_plan_participants` contains `binding_id`,
+`membership_id`, one permission `view|edit`, and revocation state. Owner powers
+derive from original ownership; no stored owner role competes with that fact.
+The participant membership FK binds the same Household incarnation. Joining or
+rejoining cannot reactivate consent. The household row/version remains the
+authorization lock and generation owner.
+
+Responsibilities belong to the canonical definition's versioned state and name
+participant membership, optional explicit minor-unit amount, and their
+occurrence or period. They retain safe cutover and fulfilled snapshot rules.
+They contain intentions, never receipts, editable progress, or account balance.
+Every activity or definition edit retains the actual authenticated actor and
+append-only correction history. View-only participants may record/link and
+correct their own contributions, without definition editing or access to other
+participants' private funding. These powers require distinct server checks.
+
+### One canonical claim and allocation owner
+
+`financial_plan_links` remains the activity-claim owner. The proposed extension
+separates definition owner `user_id` from `activity_owner_id`, backfilled to the
+same value for existing rows. Definition foreign keys continue to use
+`user_id`. The exact activity-revision FK uses `activity_owner_id`. A unique
+`(activity_owner_id,activity_id)` over active or occurrence-bound claims replaces
+the existing same-owner uniqueness. Released unscheduled extras remain historical
+rows without reserving the active slot. Personal and shared writers cannot
+count one activity twice; scheduled claim lifecycle remains unchanged.
+
+Shared claims add binding, contributor membership, explicit purpose, and an
+optional budget purpose. Checks require one canonical definition purpose and
+an owner-qualified binding. A goal claim may fulfill its own occurrence without
+another attribution. Shared bills permit multiple independently claimed actual
+payments on one occurrence; the existing single-claim rule remains for Personal
+bill occurrences. Debt's existing multiple-payment rule remains. Budget
+matching and explicit claims deduplicate by logical activity identity.
+Funding transfers are attributed receipts, not spending or bill/debt fulfillment.
+
+Goal claims and any explicit unlinked residual allocations identify the actual
+destination account owner through owner-qualified account references. The
+existing `goal_projection` pool reducer must load all Personal and shared claims
+against that owner's account capacity. Claim creation, replacement, correction,
+and release use the same owner serialization. There is one pool per original
+account, regardless of which definition owner or Household uses it. Actual
+account position, account ownership-share rounding, and current activity remain
+Recording facts. Unshared private claims affect capacity validation internally
+but never become shared contribution rows or shared totals.
+
+No shared adapter calls a Personal projection and filters its output. Shared
+responses select consented definition facts and claims before projection. Full
+private pools, min(balance,claim) support, shortfall amounts, affected private
+goals, funding accounts, notes, history, and copied Personal receipts cannot
+enter the shared output. Fully supported public credit discloses the consented
+claim amount; unresolved support stays null with a review state.
+
+Private cross-owner attribution cannot remain directly readable through the
+definition owner's `financial_plan_links.owner_read` policy. Shared claim rows
+require service projection; existing same-owner Personal rows retain their read
+policy. Private residual account references likewise cannot enter an owner-
+readable goal body. The canonical `financial_goal_allocations` relation
+stores `goal_id`, `goal_owner_id`, `account_id`, `account_owner_id`, and
+`unlinked_minor`, with both owner-qualified FKs and a unique goal/account key.
+Existing JSON residuals backfill into that relation and cease to be a second
+authoritative allocation store. The Personal API's allocation shape remains
+derived and compatible. Only the safe API exposes shared residuals; there is no
+direct Household SELECT grant. This normalization is a required migration and
+deployment-compatibility risk, not a second allocation reducer. Source changes
+and backfill rehearsal are approved only for a new disposable local test
+database. Validate every legacy allocation, exact amount, owner reference and
+row count before removing JSON; update all readers/writers in the same cutover.
+No incomplete migration fallback is permitted. Existing demos and hosted
+databases remain untouched.
+
+### Smallest multi-owner Money extension
+
+The extended `financial_activity_memberships` retains one logical group
+owner in `user_id` and adds `record_owner_id`, completely backfilled from
+`user_id` for pre-extension rows. Group/revision FKs
+keep `user_id`; record/revision FKs use `record_owner_id`. Each leg stays bound
+to its original account and owner. Existing same-owner rows retain the same
+identity, revision, money facts, and coverage.
+
+The source account owner owns a paired transfer/payment group. Canonical
+Recording persistence writes each leg, observation coverage, and account-version
+update under that leg's actual owner. It derives amount and payment splits from
+the same original signed leg revisions. It creates no parallel income, expense,
+transaction copy, or saved aggregate. Current activity readers assemble the
+complete logical group internally, then expose only independently authorized
+legs and public consented contribution facts.
+
+One Recording resolver loads the authoritative group `current_revision`, its
+exact revision membership, and all original-owner leg records internally.
+Every Personal and Household activity, balance-linked summary, spending,
+refund/return cap, debt progress, and goal claim reader derives from that
+resolver. `groups(load_owner(...))`, the first visible leg, and
+`max(visible_history)` cannot choose the canonical revision or primary amount.
+A destination-only loan view must not turn principal into the full payment.
+An account removed from the current revision must not revive an earlier active
+leg. Personal spending counts only the owned funding leg's canonical costs;
+destination debt principal does not become spending. Transfers/card payments
+remain zero spending in every scope.
+
+Personal and Household disclosure are explicit projections over that complete
+canonical fact. A source owner's private note, cost breakdown, source identity,
+and history never copy into a foreign-owned destination revision or public
+contribution. Destination revision details retain only facts necessary for that
+owner's canonical movement and exact group linkage. They do not depend on
+filtering a private note after raw table access has already exposed it.
+
+Cross-owner payment returns require an explicit original group owner beside
+the existing exact original activity/revision reference. A generated
+`reversal_of_owner_id` derives from revision details, with same-owner fallback
+only for pre-extension rows. Its composite FK preserves the original canonical
+identity. Purchase refunds retain their existing owner-qualified boundary.
+Neither a return nor a correction may create an unqualified foreign reference.
+
+Membership SELECT RLS must not expose the other owner's record/account IDs
+through the group-owner row. Existing Personal read access stays owner-scoped;
+cross-owner metadata requires a safe service projection. New binding,
+participant, and command receipt tables have RLS enabled and no direct
+`anon` or `authenticated` grants. Shared claims do not widen direct Personal
+table policies to Household members.
+
+The group owner's existing membership SELECT policy cannot expose a foreign
+leg merely because `user_id` matches. Direct membership reads require the
+caller to own the leg as well. Account owners retain reads of their own
+financial records; full cross-owner group assembly remains service-owned.
+
+Consent history records `first_shared_revision` and each named recipient's
+`granted_revision`. New consent cannot expose earlier private revisions.
+Owner departure pins retained definition, claim, activity and allocation
+**revision references**, not copied balances/totals/ledgers. Service-only
+`household_plan_archived_*` relations and restrictive foreign keys preserve
+those previously shared facts. Remaining readers still need their live granted
+membership incarnation; archived plans provide no future projections or writes.
+Private post-departure edits cannot enter retained history.
+
+Contributor departure uses the same canonical retention owner even on an active
+plan owned by someone else. The protected retention relations pin exact
+original/related activity and allocation revision references to the ended
+membership incarnation. `membership_ended_at` records that access boundary;
+signed `last_applied_minor` and nonnegative `last_supported_minor` are immutable
+last-authorized disclosure evidence, never editable current money or pool
+totals. Current Goal backing is null/`needs_review` after that consent ends.
+Remaining members' current activity continues through the ordinary canonical
+reader. Distinct allocation revisions preserve history when fresh explicit
+consent follows rejoining.
+
+Migration `20261002050000` fails atomically if a legacy active binding already
+contains a departed contributor without its authorized retention boundary.
+Today's private state cannot safely backfill a past consent boundary. Recover
+verified history before such a cutover; never invent a snapshot or hide the
+gap through a fallback. Its rehearsal/application is limited to NEW local
+Postgres59752, which retained seven account rows unchanged; it does not authorize
+any existing demonstration, hosted or production migration.
+
+### Transactions, receipts, and migration risks
+
+Cross-owner groups cannot retain cascades that delete another account owner's
+leg, claim, or payment-return history when the group owner is removed. The
+migration must preserve surviving owners' financial history and reject an
+unsafe destructive deletion. Owner departure archives their shared plans, retains the previously shared
+history for remaining authorized members and suppresses future projections.
+The retained view contains no private funding. Departure revokes the departing
+member's household access; removal/revocation still ends a recipient's access.
+Closure revokes household access while preserving owners' records and history.
+These operations never delete financial activity or transfer ownership. This lane does not add account
+deletion or define a new profile-erasure policy.
+
+Shared mutations take the Household row lock, resolve the current binding and
+membership, acquire all involved owner advisory locks in UUID order, then all
+old/new/dependency account locks in UUID order. They never acquire a Household
+lock after an owner/account lock. Plan and Recording commands share this owner
+lock convention. Canonical activity correction must discover every claim owner
+before acquiring locks; it cannot take a second owner lock after account locks.
+Read projections use one coherent database snapshot and live scope checks.
+
+Correction/return dependency discovery includes every old and new account leg,
+every exact original/refund/return reference, and every Personal/shared claim
+that can change backing or fulfillment. The transaction locks the complete
+owner set before any account lock, revalidates the dependency set under those
+locks, and rejects a changed set without posting. Partial correction of one
+side is invalid. Activity authorship alone does not grant authority over another
+owner's account. After an edit grant is withdrawn, a paired correction requiring
+that account is denied; retained originals remain readable only through the
+caller's currently authorized projection.
+
+A service-owned scoped receipt binds actor, Household, original membership,
+operation, key, normalized request hash, and accepted canonical identities.
+It stores no protected result snapshot. Activity, leg revisions, coverage,
+account versions, claim, plan version, and receipt commit or roll back together.
+Replay uses live authorization before loading an accepted result. Existing
+Personal receipt bodies and replay semantics remain compatible.
+
+The migration risks are composite-FK replacement, direct SELECT leakage through
+cross-owner memberships/claims, changed claim uniqueness, and multi-owner lock
+ordering. Backfill and constraint validation must preserve all existing rows.
+PG tests must exercise real concurrent claim/record/correction/revoke commands,
+failure rollback, exact retries, owner-qualified malformed inserts, and direct
+registered/anonymous RLS reads. Existing Personal goal pools, receipts, budgets,
+debt returns, recurrence, and Household same-owner financial tests remain
+regression coverage. This sketch is not permission to apply hosted migrations.
+
 
 ## Connected personal asset estimates and links
 

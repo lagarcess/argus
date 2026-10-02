@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from argus.domain.planning import debt_projection, goal_projection, storage
+from argus.domain.planning import claims, debt_projection, goal_projection, storage
 from argus.domain.planning.budget_schemas import BudgetDefinition
 from argus.domain.planning.budgets import definition
 from argus.domain.planning.debt_schemas import DebtProgress
@@ -153,7 +153,7 @@ def search(
     today = PlanService(service).today(state)
     for item in state["expectations"].values():
         expectation = Expectation.model_validate(
-            expectation_response(item, state["links"], today)
+            expectation_response(item, claims.protected_links(state), today)
         )
         add(
             ExpectationHit(expectation=expectation),

@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 
 from local_stack import Allocation
+from shared_plan_scene import shared_scene
 
 ROOT = Path(__file__).resolve().parents[3]
 WORK = ROOT / "ios/.build/auth-local"
@@ -39,6 +40,11 @@ parser.add_argument(
     action="store_true",
     help="Opt in to local committed-response-loss acceptance; requires a build using the allocation's API fault-proxy port",
 )
+parser.add_argument(
+    "--shared-plan-scene",
+    action="store_true",
+    help="Use only the assigned shared-plan simulator, bundle, cache and three-user fixture",
+)
 args = parser.parse_args()
 allocation = Allocation(args.accounts, args.port_base)
 WORK = allocation.work
@@ -52,6 +58,9 @@ if not 58400 <= api_port <= 59900 or 58700 <= api_port <= 58749:
 api_origin = f"http://127.0.0.1:{api_port}"
 if cfg["apiURL"] != api_origin + "/api/v1" or cfg["supabaseURL"] != allocation.url(1):
     raise SystemExit("Fixture does not match this loopback allocation")
+shared = shared_scene(args, WORK) if args.shared_plan_scene else None
+if shared:
+    DERIVED = Path("/private/tmp/argus-shared-household-planning-native-build")
 stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 common = [
     "-destination",
@@ -72,6 +81,13 @@ with (WORK / f"ui-build-{stamp}.log").open("w") as log:
             str(DERIVED),
             *common,
             "CODE_SIGNING_REQUIRED=NO",
+            *(
+                [
+                    "ARGUS_LOCAL_BUNDLE_IDENTIFIER=local.argus.shared-household-planning-demo"
+                ]
+                if shared
+                else []
+            ),
         ],
         stdout=log,
         stderr=log,
@@ -103,6 +119,15 @@ for target in targets:
             "ARGUS_TEST_PASSWORD": cfg["users"][args.user_index]["password"],
         }
     )
+    if shared:
+        target["EnvironmentVariables"].update(shared)
+    if len(cfg["users"]) == 3:
+        target["EnvironmentVariables"].update(
+            {
+                "ARGUS_TEST_EMAIL_C": cfg["users"][2]["email"],
+                "ARGUS_TEST_PASSWORD_C": cfg["users"][2]["password"],
+            }
+        )
     if args.search_query is not None:
         target["EnvironmentVariables"]["ARGUS_TEST_SEARCH_QUERY"] = args.search_query
     if args.goal_supported is not None:

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from argus.domain.recording.canonical_groups import ResolvedGroups
 from argus.domain.recording.currency import currency_exponent
 from argus.domain.recording.loop import position
 from argus.domain.recording.loop_reads import personal_share
@@ -47,8 +48,13 @@ def activity(
     revision: int | None = None,
     *,
     all_owner_records: list[StoredAccount] | None = None,
+    canonical: ResolvedGroups | None = None,
 ) -> dict[str, Any]:
-    history = groups(records)
+    history = canonical.history if canonical is not None else groups(records)
+    if canonical is not None and revision is None:
+        revision = canonical.current.get(aid)
+        if revision is None:
+            raise HouseholdUnavailable()
     if aid not in history or revision is not None and revision not in history[aid]:
         raise HouseholdUnavailable()
     body = render_activity(aid, history[aid], revision)

@@ -326,7 +326,8 @@ final class FinancialLoopUITests: XCTestCase {
     }
     func signIn(fresh: Bool = false, user: String = "A") throws {
         let environment = ProcessInfo.processInfo.environment
-        let suffix = user == "B" ? "_B" : ""
+        let suffix = try XCTUnwrap(["A": "", "B": "_B", "C": "_C"][user],
+                                   "Unknown synthetic identity")
         guard let email = environment["ARGUS_TEST_EMAIL" + suffix], let password = environment["ARGUS_TEST_PASSWORD" + suffix] else {
             throw XCTSkip("Requires isolated synthetic API and registered identity.")
         }
