@@ -82,7 +82,6 @@ async def test_reserves_before_http_and_blocks_second_attempt(endpoint, payload)
     [
         {"pricing": {"prompt": "NaN", "completion": "1"}},
         {"pricing": {"prompt": "1", "completion": "1", "new_fee": "0.1"}},
-        {"pricing": {"prompt": "1", "completion": "1", "input_cache_write": "2"}},
         {"context_length": None},
         {"supported_parameters": []},
     ],
@@ -165,3 +164,100 @@ async def test_six_attempts_cannot_become_seven(endpoint, payload):
             with pytest.raises(ValueError, match="spend_cap_reached"):
                 await post(client, payload)
     assert len(requests) == budget.max_attempts
+
+
+@pytest.mark.parametrize("field", ["prompt", "input_cache_read", "input_cache_write"])
+def test_price_envelope_reserves_highest_input_and_output_tiers(endpoint, field):
+    prices = endpoint["pricing"] | {
+        "input_cache_write": "0.00000125",
+        "overrides": [
+            {"min_prompt_tokens": 10000, field: "0.000003", "completion": "0.000005"},
+            {"min_prompt_tokens": 20000, "prompt": "0.000002", "completion": "0.000004"},
+        ],
+    }
+    envelope = price_envelope("fixture-model", [endpoint | {"pricing": prices}])
+    assert envelope.prompt == Decimal("0.000003" if field == "prompt" else "0.000002")
+    assert envelope.completion == Decimal("0.000005")
+    assert envelope.maximum_cost == endpoint["context_length"] * Decimal(
+        "0.000003"
+    ) + envelope.output_tokens * Decimal("0.000005")
+
+
+def test_cache_write_is_full_input_price_not_added_to_prompt(endpoint):
+    prices = endpoint["pricing"] | {"input_cache_write": "0.00000125"}
+    envelope = price_envelope("fixture-model", [endpoint | {"pricing": prices}])
+    assert envelope.prompt == Decimal("0.000001")
+    assert envelope.cache_write == Decimal("0.00000125")
+    assert (
+        envelope.maximum_cost
+        == endpoint["context_length"] * envelope.cache_write
+        + envelope.output_tokens * envelope.completion
+    )
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        None,
+        {},
+        [None],
+        [{}],
+        [{"min_prompt_tokens": -1}],
+        [{"min_prompt_tokens": True}],
+        [{"min_prompt_tokens": "10"}],
+        [{"min_prompt_tokens": 1.5}],
+        [{"min_prompt_tokens": 10, "new_fee": "0.01"}],
+        [{"min_prompt_tokens": 10, "input_cache_write": "NaN"}],
+        [{"min_prompt_tokens": 10, "overrides": []}],
+    ],
+)
+def test_malformed_or_unbounded_price_tiers_are_rejected(endpoint, overrides):
+    prices = endpoint["pricing"] | {"overrides": overrides}
+    with pytest.raises(ValueError, match="no_bounded_endpoint"):
+        price_envelope("fixture-model", [endpoint | {"pricing": prices}])
+
+
+@pytest.mark.asyncio
+async def test_two_tiered_calls_fit_remaining_cap_without_extra_attempt(
+    endpoint, payload
+):
+    prior = Decimal("1.4030075136")
+    remaining = Decimal("6") - prior
+    prices = dict(
+        prompt="0.00000032",
+        completion="0.00000128",
+        input_cache_read="0.000000064",
+        input_cache_write="0.0000004",
+        overrides=[
+            dict(
+                min_prompt_tokens=256000,
+                prompt="0.00000096",
+                completion="0.00000384",
+                input_cache_read="0.000000192",
+                input_cache_write="0.0000012",
+            )
+        ],
+    )
+    envelope = price_envelope(
+        "fixture-model", [endpoint | dict(context_length=1_000_000, pricing=prices)]
+    )
+    budget = BenchmarkBudget(envelope, remaining, 2)
+    assert prior + envelope.maximum_cost * 2 == Decimal("3.8951675136")
+    calls = []
+
+    def transport(request):
+        calls.append(request)
+        return httpx.Response(200, json={})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
+        for sample in ("statement-usd", "receipt-dop"):
+            with budget.attempt(sample, lambda: None):
+                await post(client, payload)
+        with budget.attempt("extra", lambda: None):
+            with pytest.raises(ValueError, match="spend_cap_reached"):
+                await post(client, payload)
+    assert len(calls) == 2
+    assert json.loads(calls[0].content)["provider"]["max_price"]["prompt"] == 0.96
+    assert envelope.evidence()["reserved_input_usd_per_token"] == "0.0000012"
+    with pytest.raises(ValueError, match="run_exceeds_cap"):
+        BenchmarkBudget(envelope, Decimal("2") - prior, 2)

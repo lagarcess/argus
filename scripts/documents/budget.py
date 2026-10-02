@@ -24,11 +24,14 @@ class PriceEnvelope:
     output_tokens: int
     prompt: Decimal
     completion: Decimal
+    cache_read: Decimal = Decimal(0)
+    cache_write: Decimal = Decimal(0)
 
     @property
     def maximum_cost(self) -> Decimal:
-        # Full uncached context also bounds image tokens; output is over-reserved.
-        return self.context_tokens * self.prompt + self.output_tokens * self.completion
+        # Cache rates are full input prices, not surcharges on the prompt rate.
+        input_rate = max(self.prompt, self.cache_read, self.cache_write)
+        return self.context_tokens * input_rate + self.output_tokens * self.completion
 
     def evidence(self) -> dict:
         return dict(
@@ -38,6 +41,11 @@ class PriceEnvelope:
             output_tokens=self.output_tokens,
             prompt_usd_per_token=str(self.prompt),
             completion_usd_per_token=str(self.completion),
+            cache_read_usd_per_token=str(self.cache_read),
+            cache_write_usd_per_token=str(self.cache_write),
+            reserved_input_usd_per_token=str(
+                max(self.prompt, self.cache_read, self.cache_write)
+            ),
             maximum_request_usd=str(self.maximum_cost),
         )
 
@@ -48,15 +56,38 @@ def price_envelope(model: str, endpoints: list[dict]) -> PriceEnvelope:
     for endpoint in endpoints:
         try:
             prices = endpoint["pricing"]
-            prompt, completion = rate(prices["prompt"]), rate(prices["completion"])
-            for name, value in prices.items():
-                if name in {"prompt", "completion", "discount"}:
-                    continue
-                if name == "input_cache_read":
-                    if rate(value) > prompt:
-                        raise ValueError("unbounded_cache_price")
-                elif rate(value) != 0:
-                    raise ValueError("unbounded_additional_price")
+            rates = {
+                "prompt": rate(prices["prompt"]),
+                "completion": rate(prices["completion"]),
+                "input_cache_read": Decimal(0),
+                "input_cache_write": Decimal(0),
+            }
+            overrides = prices.get("overrides", [])
+            if not isinstance(overrides, list):
+                raise ValueError("invalid_price_tiers")
+            for tier in overrides:
+                if not isinstance(tier, dict):
+                    raise ValueError("invalid_price_tier")
+                threshold = tier.get("min_prompt_tokens")
+                if (
+                    not isinstance(threshold, int)
+                    or isinstance(threshold, bool)
+                    or threshold < 0
+                ):
+                    raise ValueError("invalid_price_threshold")
+            for index, tier in enumerate([prices, *overrides]):
+                for name, value in tier.items():
+                    if name in rates:
+                        rates[name] = max(rates[name], rate(value))
+                    elif (
+                        name == "discount"
+                        or (index == 0 and name == "overrides")
+                        or (index > 0 and name == "min_prompt_tokens")
+                    ):
+                        continue
+                    elif rate(value) != 0:
+                        raise ValueError("unbounded_additional_price")
+            prompt, completion = rates["prompt"], rates["completion"]
             context = endpoint["context_length"]
             if not isinstance(context, int) or isinstance(context, bool) or context <= 0:
                 raise ValueError("missing_context_limit")
@@ -72,7 +103,14 @@ def price_envelope(model: str, endpoints: list[dict]) -> PriceEnvelope:
                 continue
             envelopes.append(
                 PriceEnvelope(
-                    model, provider, context, profile.max_tokens, prompt, completion
+                    model,
+                    provider,
+                    context,
+                    profile.max_tokens,
+                    prompt,
+                    completion,
+                    rates["input_cache_read"],
+                    rates["input_cache_write"],
                 )
             )
         except (KeyError, TypeError, ValueError):
