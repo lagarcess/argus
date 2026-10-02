@@ -79,13 +79,13 @@ struct CuadraoBalanceBreakdown: View {
     }
     private func accountValue(_ row: CanvasBalanceChange, alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: 4) {
-                Text(row.change.map(signed) ?? row.closing.map(money) ?? "—").font(CuadraoTypography.rowAmount)
-                if let change = row.change {
-                    Text(change == 0 ? (spanish ? "Sin cambio" : "Unchanged") : change > 0 ? (spanish ? "Suma al balance" : "Adds to balance") : (spanish ? "Resta al balance" : "Reduces balance"))
-                        .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                } else if row.closing == nil {
-                    Text(spanish ? "Sin balance" : "No balance").font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                }
+            Text(row.change.map(signed) ?? row.closing.map(money) ?? "—").font(CuadraoTypography.rowAmount)
+            if let change = row.change {
+                Text(change == 0 ? (spanish ? "Sin cambio" : "Unchanged") : change > 0 ? (spanish ? "Suma al balance" : "Adds to balance") : (spanish ? "Resta al balance" : "Reduces balance"))
+                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            } else if row.closing == nil {
+                Text(spanish ? "Sin balance" : "No balance").font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            }
         }
     }
 }

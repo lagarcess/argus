@@ -5,6 +5,7 @@ struct CuadraoChartState: View {
     let title: String
     let detail: String
     var loading = false
+    var motionEnabled = true
     var actionTitle: String?
     var action: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -34,9 +35,9 @@ struct CuadraoChartState: View {
                     .frame(minHeight: 44).accessibilityIdentifier("chart-state-action")
             }
         }.padding(.vertical, 16)
-            .task(id: reduceMotion) {
+            .task(id: reduceMotion || !motionEnabled) {
                 breathing = false
-                if loading && !reduceMotion {
+                if loading && motionEnabled && !reduceMotion {
                     withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) { breathing = true }
                 }
             }

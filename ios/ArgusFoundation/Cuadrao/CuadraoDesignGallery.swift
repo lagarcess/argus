@@ -8,7 +8,6 @@ struct CuadraoDesignGallery: View {
     private var dark: Binding<Bool> { Binding(get: { appearance == .dark }, set: { appearance = $0 ? .dark : .light }) }
     @State private var largeText = false
     @State private var previewReducedMotion = false
-    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @State private var raw = ""
     @State private var accountError = ""
     @State private var amount = 0.0
@@ -88,7 +87,7 @@ struct CuadraoDesignGallery: View {
                     }
                     sample(spanish ? "Carga en curso" : "Loading in progress") {
                         CuadraoChartState(title: spanish ? "Reuniendo tu historia" : "Gathering your history",
-                            detail: spanish ? "Un momento para poner todo en su lugar." : "A moment to bring everything together.", loading: true)
+                            detail: spanish ? "Un momento para poner todo en su lugar." : "A moment to bring everything together.", loading: true, motionEnabled: !previewReducedMotion)
                             .accessibilityIdentifier("gallery-loading-state")
                     }
                 }.padding(24)
@@ -99,7 +98,6 @@ struct CuadraoDesignGallery: View {
             .onAppear { originalAppearance = appearance }
             .onDisappear { if let originalAppearance { appearance = originalAppearance } }
             .environment(\.dynamicTypeSize, largeText ? .accessibility2 : .large)
-            .environment(\.accessibilityReduceMotion, systemReducedMotion || previewReducedMotion)
             .tint(WelcomePalette.pine)
     }
     private var controls: some View {
