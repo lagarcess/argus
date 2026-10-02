@@ -15,7 +15,9 @@ Create/open and recipient preview/defer/accept are separate from People and
 explicit account consent. Acceptance grants membership only. Owners choose
 current members and view-only access; activity editing is an explicit switch.
 People also exposes invite revocation, member removal, transfer and close/leave.
-Household Plan and Argus show their supported-scope notice.
+The landed account-sharing demonstration retains its supported-scope notice.
+The shared-planning worker adds connected Plan below; Household Argus remains
+outside this assignment.
 
 The existing device-only write journal is partitioned by actor and Household
 namespace. It stores exact command bytes and the original membership/version.
@@ -23,6 +25,95 @@ Retry survives relaunch and uses the same key. Invitation creation replay has
 metadata but no recovered capability; revoke and replace that invitation.
 Selection and authorization changes invalidate protected reads and editor state.
 Departure returns to Personal without deleting legitimate financial records.
+
+## Shared planning worker: separate retained demonstration
+
+Run from the assigned worker
+`/Users/garces/.codex/worktrees/shared-household-planning/private-alpha-next`.
+Its new disposable allocation is `ios-accounts-59750`: API59750, Auth59751,
+Postgres on port 59752 and CAPTCHA59755. Its three synthetic users, prepared Household
+and seven personal accounts are retained in ignored 0600 files under
+`ios/.build/accounts-local-59750`. The other Household/financial demos and the
+phone stack are separate. Never run configure, seed, reset or migrations against
+those environments. This lane's schema was applied only to its NEW database.
+
+If this assigned stack is stopped, restart its retained data:
+
+```bash
+python3 ios/scripts/auth/local_stack.py start --accounts --port-base 59750
+```
+
+In separate terminals, start the following only if their assigned ports are
+free. If a port is occupied, verify its process and working directory first;
+do not kill another environment or start a second listener.
+
+```bash
+python3 ios/scripts/auth/local_stack.py api --accounts --port-base 59750 \
+  --accounts-enabled on --households-enabled on \
+  --python /Users/garces/.codex/worktrees/5a42/private-alpha-next/.venv/bin/python
+python3 ios/scripts/auth/bridge.py --accounts --port-base 59750
+```
+
+The assigned simulator is `C93072E7-D29A-4B0A-BE76-E6418E4E9F88`. Shared Plan
+uses only bundle `local.argus.shared-household-planning-demo` and cache
+`/private/tmp/argus-shared-household-planning-native-build`; its older
+`local.argus.household-current-demo` installation/cache remain preserved.
+Do not select the booted design simulator by default. Its UUID `8AFB6084…`
+and `/private/tmp/cuadrao-native-design-build` are protected.
+
+For manual use, launch only the assigned installation:
+
+```bash
+xcrun simctl launch C93072E7-D29A-4B0A-BE76-E6418E4E9F88 \
+  local.argus.shared-household-planning-demo
+```
+
+The installed demo retains user A. Use **Household**, choose **Shared plans 0e957ed2**, then **Plan**. Open **Native household budget C6E10C**, bill, goal or debt. The budget shows 40 actual against 100 limit and 70/30 intentions; the bill shows 60 agreed/20 paid, goal 20 backed and debt 20 paid. Switch to Home or Search, inspect your original entry, correct it, and return with refreshed progress. To check view-only behavior, sign out and use retained member B from the private fixture.
+
+Use the saved registered user, choose **Household**, then **Plan**. Create a
+shared plan with the plus control; People shows the explicit rights and unequal
+responsibilities. Record or link a contribution, then open its original entry
+to inspect or correct it. Home and Household Search use those same records.
+The two retained member logins and unauthorized third synthetic identity are
+in the ignored 0600 `client.json`; do not publish or copy that file into evidence.
+
+Do not rerun `shared-plans-journey.py prepare` after contributions change the
+balances. Preparation intentionally rejects changed data rather than resetting
+it. Keep the retained journal, accounts, activity and prior native plans. An
+active budget with identical accounts/categories/currency/month is a real
+duplicate-scope conflict; edit it or choose another scope instead of creating a
+second copy. Archive preserves its activity and history.
+
+The reproducible native runner selects the safe retained fixture and refuses
+other devices, ports or bundles:
+
+```bash
+python3 ios/scripts/auth/run-ui.py C93072E7-D29A-4B0A-BE76-E6418E4E9F88 \
+  --accounts --port-base 59750 --shared-plan-scene \
+  --only ArgusFoundationUITests/FinancialLoopUITests/testSharedPlanningFourKindsPrivateContributionsCorrectionsAndReopen
+```
+
+The retained C6E10C journey already passed. That case creates new synthetic plans and records real local activity; an identical active budget scope correctly conflicts. For a repeat, first archive the existing budget through its own UI/API, preserving activity, or use another scope. Do not blindly rerun it or reset data. Keep
+its records; never reset the demo to make a retry appear green. The separate
+three-identity case checks current Auth identity, personal-account isolation,
+Household selection and Spanish relaunch. The opted-in response-loss case uses
+only a temporary helper59762 forwarding to59750, then restores the app's direct
+API configuration; it verifies an upstream commit, relaunch and explicit exact
+retry. Temporary credential-bearing xctestrun files are removed by the runner.
+No fixture credentials, invitation capabilities or full result bundles belong
+in committed evidence. The execution manifest owns the actual acceptance status.
+
+For manual use, open the new shared-planning app, choose the prepared Household,
+then Plan. Create or open a budget, bill, goal or debt commitment. People shows
+named view/edit rights and unequal planned amounts; Record/Link discloses only
+the contribution amount, currency, date, person and status. Original opens only
+your authorized activity. A view-only participant may correct their own
+contribution without editing the plan or another person's activity. Goal planned
+contributions stay separate from supported actual savings. Scheduled edits show
+their server-provided apply-from date and preserve existing recorded payments.
+Departure explains that the owner's shared plans become archived/read-only,
+retain previously shared history and stop future projections. Personal funding
+accounts remain private unless separately shared.
 
 ## Assigned local runtime
 
@@ -165,3 +256,5 @@ xctestrun environment; the runner's in-memory fixture API URL may be overridden
 to 59620 without changing the credential fixture. Keep Auth59501, PG59502,
 CAPTCHA59505 and the assigned simulator/bundle/cache. Restore API59520 afterward.
 This test performs no financial writes and requires no client capability flag.
+
+The accepted shared-planning recording and exact-source proof are in [the durable evidence packet](../docs/reports/evidence/shared-household-planning/native-provenance.json) and [short recording](../docs/reports/evidence/shared-household-planning/shared-plan-demo.mp4). The existing execution manifest remains the sole progress/remaining-work map.

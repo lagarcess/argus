@@ -22,7 +22,11 @@ class Fault:
 
     def arm_read(self, path_prefix: str, status: int, delay_ms: int = 0) -> None:
         if (
-            not path_prefix.startswith("/api/v1/financial-")
+            not (
+                path_prefix.startswith("/api/v1/financial-")
+                or path_prefix == "/api/v1/households"
+                or path_prefix.startswith("/api/v1/households/")
+            )
             or status not in {0, 404, 503}
             or not 0 <= delay_ms <= 10_000
         ):

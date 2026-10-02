@@ -16,6 +16,9 @@ final class HouseholdModel: ObservableObject {
     @Published private(set) var searchState = SearchState.idle
     @Published private(set) var highlightActivityId: UUID?
     private var lastSearchQuery: String?
+    private var searchPages = 0
+    @Published var searchQuery = ""
+    @Published var searchReturnAnchor: UUID?
     @Published private(set) var nextCursor: String?
     @Published private(set) var busy = false
     @Published private(set) var errorKey: String?
@@ -31,6 +34,8 @@ final class HouseholdModel: ObservableObject {
     var addAccount: (() -> Void)?
     var navigateToAccounts: (() -> Void)?
     var sessionChanged: ((SessionSnapshot) -> Void)?
+    var financialChanged: (() async -> Void)?
+    lazy var plan = HouseholdPlanModel(household: self)
     let controller: SessionController
     let journal: FinancialWriteJournal
     private let storagePrefix: String
@@ -51,12 +56,13 @@ final class HouseholdModel: ObservableObject {
         identity = next?.phase == .authenticated ? next : nil
         clear(); households = []; household = nil; preparedInvitation = nil; invitationPreview = nil; pending = nil; busy = false; writeAttempt = nil
         selectedId = storageKey.flatMap { UserDefaults.standard.string(forKey: $0) }.flatMap(UUID.init(uuidString:))
-        lastSearchQuery = nil; availability = .discovering; showManagement = false; errorKey = nil
+        lastSearchQuery = nil; searchQuery = ""; availability = .discovering; showManagement = false; errorKey = nil
         reviewedInvitationToken = nil; pendingInvitationToken = ""
         if let identity { pending = try? journal.pending(for: identity) }
     }
     func clear() {
         generation = UUID(); searchGeneration = UUID(); snapshot = nil; detail = nil; history = []; search = []; nextCursor = nil; editor = nil; highlightActivityId = nil; searchState = .idle
+        searchQuery = ""; searchReturnAnchor = nil; searchPages = 0; plan.clear()
     }
     func select(_ id: UUID?) async {
         guard isAvailable else { return }
@@ -82,6 +88,7 @@ final class HouseholdModel: ObservableObject {
                 clear()
             }
             household = h; snapshot = values; availability = .available; errorKey = nil
+            await plan.refresh()
         } catch { await failed(error, ticket, identity, householdId: requestedHousehold, discovery: true) }
     }
     func foreground() async { clear(); await refresh() }
@@ -96,8 +103,13 @@ final class HouseholdModel: ObservableObject {
     }
     func back() { detail = nil; history = []; highlightActivityId = nil }
     func openSearchHit(_ hit: HouseholdSearchHit) async {
-        await open(hit.accountId)
-        if detail?.account.account.id == hit.accountId { highlightActivityId = hit.activityId }
+        searchReturnAnchor = hit.id
+        if hit.kind == .plan, let ref = hit.planRef {
+            await plan.open(ref, origin: .search)
+        } else if hit.kind != .plan, let accountId = hit.accountId {
+            await open(accountId)
+            if detail?.account.account.id == accountId { highlightActivityId = hit.activityId }
+        }
     }
     func loadHistory(_ id: UUID) async {
         guard isAvailable, let identity, let selectedId else { return }; let ticket = generation
@@ -109,7 +121,7 @@ final class HouseholdModel: ObservableObject {
     func find(_ query: String, more: Bool = false) async {
         guard isAvailable, let identity, let selectedId else { return }
         let ticket = generation; let searchTicket = UUID(); searchGeneration = searchTicket
-        lastSearchQuery = query; searchState = .loading
+        lastSearchQuery = query; searchQuery = query; searchState = .loading
         var items = [URLQueryItem(name: "q", value: query)]
         if more, let nextCursor { items.append(URLQueryItem(name: "cursor", value: nextCursor)) }
         if !more { search = []; nextCursor = nil }
@@ -117,6 +129,7 @@ final class HouseholdModel: ObservableObject {
             let value = try await controller.householdResponse(HouseholdSearchPage.self, path: path(selectedId, "/search"), query: items, expectedIdentity: identity)
             guard current(ticket, identity), searchGeneration == searchTicket else { return }
             search = more ? search + value.items.filter { item in !search.contains(where: { $0.id == item.id }) } : value.items
+            searchPages = more ? searchPages + 1 : 1
             nextCursor = value.nextCursor; searchState = search.isEmpty ? .empty : .results
         } catch {
             guard current(ticket, identity), searchGeneration == searchTicket else { return }
@@ -141,21 +154,30 @@ final class HouseholdModel: ObservableObject {
         guard isAvailable, let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), !busy, pending == nil else { return }
         if path == "/invitations/accept", command.token != reviewedInvitationToken { errorKey = "household.changed"; return }
         do {
-            let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: nil, route: "households", path: path, method: method, body: try JSONEncoder().encode(command), key: UUID(), householdMembershipId: household?.membershipId, householdAuthorizationVersion: household?.version)
+            let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: nil, route: "households", path: path, method: method, body: try JSONEncoder().encode(command), key: UUID(), householdMembershipId: household?.membershipId, householdAuthorizationVersion: household?.version, householdOperation: .management)
             try journal.begin(write, for: identity); pending = write
             await retry()
         } catch { errorKey = "household.storageError" }
     }
     func retry() async {
         guard isAvailable, let identity, let write = pending, !busy else { return }
+        let operation = operation(write)
+        if case .plan(let id, _) = operation {
+            guard selectedId == id, household?.membershipId == write.householdMembershipId else { errorKey = "sharedPlan.changed"; return }
+        }
         let ticket = generation; let attempt = UUID()
         writeAttempt = attempt; busy = true; errorKey = nil
         defer { if writeAttempt == attempt { busy = false; writeAttempt = nil } }
         do {
             guard write.route == "households" else { throw SessionFailure.invalidResponse }
-            if write.path.contains("/activities") {
+            switch operation {
+            case .plan:
+                let value = try await controller.sendHouseholdPlanConfirmation(write, expectedIdentity: identity)
+                guard current(ticket, identity) else { return }
+                plan.writeResolved(value)
+            case .activity:
                 let _: HouseholdReceipt = try await send(write, identity)
-            } else {
+            case .management:
                 let value: HouseholdMutation = try await send(write, identity)
                 guard current(ticket, identity) else { return }
                 if write.path == "" || write.path == "/invitations/accept" {
@@ -169,23 +191,66 @@ final class HouseholdModel: ObservableObject {
             guard current(ticket, identity) else { return }
             try journal.clear(write, for: identity); pending = nil; editor = nil
             if let storageKey { UserDefaults.standard.set(selectedId?.uuidString, forKey: storageKey) }
-            busy = false; clear(); await refresh()
-            if write.path.contains("/activities"), let query = lastSearchQuery { await find(query) }
+            busy = false
+            if case .plan = operation {
+                let query = lastSearchQuery; let anchor = searchReturnAnchor; let pages = searchPages
+                await refresh()
+                guard current(ticket, identity) else { return }
+                if let query {
+                    await refreshSearch(query, pages: pages)
+                    searchReturnAnchor = anchor
+                }
+                await financialChanged?()
+            } else {
+                clear(); await refresh()
+                if case .activity = operation, let query = lastSearchQuery { await find(query) }
+            }
         } catch {
             guard current(ticket, identity) else { return }
-            let accessFailure = handleAccessFailure(error, householdId: requestHouseholdId(write.path))
+            let accessFailure: Bool
+            if case .plan(let id, _) = operation { accessFailure = await handlePlanAccessFailure(error, householdId: id) }
+            else { accessFailure = handleAccessFailure(error, householdId: requestHouseholdId(write.path)) }
+            guard current(ticket, identity) else { return }
             if availability != .disabled {
                 if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 && status != 429 {
                     try? journal.clear(write, for: identity); pending = nil
-                    if !accessFailure { clear(); errorKey = "household.changed" }
+                    if !accessFailure {
+                        if case .plan = operation {
+                            plan.sheet = nil
+                            await refresh()
+                            if current(ticket, identity) { errorKey = HouseholdPlanModel.message(error) }
+                        } else { clear(); errorKey = "household.changed" }
+                    }
                 } else { errorKey = "household.uncertain" }
             }
             let latest = await controller.snapshot()
             if latest.revision != identity.revision || latest.phase != .authenticated { bind(latest); sessionChanged?(latest) }
         }
     }
+    private func refreshSearch(_ query: String, pages: Int) async {
+        guard isAvailable, let identity, let selectedId else { return }
+        let ticket = generation; let searchTicket = UUID(); searchGeneration = searchTicket
+        var refreshed: [HouseholdSearchHit] = []; var cursor: String?
+        do {
+            for page in 0..<max(1, pages) {
+                var items = [URLQueryItem(name: "q", value: query)]
+                if let cursor { items.append(URLQueryItem(name: "cursor", value: cursor)) }
+                let value = try await controller.householdResponse(HouseholdSearchPage.self, path: path(selectedId, "/search"), query: items, expectedIdentity: identity)
+                guard current(ticket, identity), searchGeneration == searchTicket else { return }
+                refreshed += value.items.filter { item in !refreshed.contains { $0.id == item.id } }
+                cursor = value.nextCursor
+                if cursor == nil || page == max(1, pages) - 1 { break }
+            }
+            // Publish the complete refreshed window together, keeping the
+            // mounted ScrollView's content height stable during every read.
+            search = refreshed; nextCursor = cursor; searchState = refreshed.isEmpty ? .empty : .results
+        } catch {
+            guard current(ticket, identity), searchGeneration == searchTicket else { return }
+            searchState = .unavailable; handleAccessFailure(error, householdId: selectedId)
+        }
+    }
     private func send<Value: Decodable & Sendable>(_ write: PendingFinancialConfirmation, _ identity: SessionSnapshot) async throws -> Value {
-        if write.path.contains("/activities"), let id = requestHouseholdId(write.path) {
+        if case .activity(let id, _) = operation(write) {
             let value = try await controller.householdResponse(Household.self, path: path(id), expectedIdentity: identity)
             guard value.membershipId == write.householdMembershipId else { throw SessionFailure.rejected(status: 404, code: "household_access_unavailable") }
         }
@@ -202,9 +267,18 @@ final class HouseholdModel: ObservableObject {
     func confirmActivity(_ body: FinancialActivityCommand, activityId: UUID?, membership: UUID, version: Int) async {
         guard isAvailable, let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), let household, household.membershipId == membership, household.version == version, pending == nil else { return }
         do {
-            let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: body.accountId ?? body.sourceAccountId, route: "households", path: path(household.id, "/activities" + (activityId.map { "/" + $0.uuidString } ?? "")), method: activityId == nil ? "POST" : "PATCH", body: try JSONEncoder().encode(HouseholdFinancialCommand(membershipId: membership, expectedVersion: version, activity: body)), key: UUID(), householdMembershipId: membership, householdAuthorizationVersion: version)
+            let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: body.accountId ?? body.sourceAccountId, route: "households", path: path(household.id, "/activities" + (activityId.map { "/" + $0.uuidString } ?? "")), method: activityId == nil ? "POST" : "PATCH", body: try JSONEncoder().encode(HouseholdFinancialCommand(membershipId: membership, expectedVersion: version, activity: body)), key: UUID(), householdMembershipId: membership, householdAuthorizationVersion: version, householdOperation: .activity(householdId: household.id, activityId: activityId))
             try journal.begin(write, for: identity); pending = write; await retry()
         } catch { errorKey = "household.storageError" }
+    }
+    func confirmPlan(body: Data, scope: HouseholdPlanScope, action: HouseholdPlanAction) async throws {
+        guard isAvailable, let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), let household,
+              household.membershipId == scope.membershipId, household.version == scope.authorizationVersion, pending == nil, !busy else { throw SessionFailure.staleOperation }
+        let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: nil, route: "households", path: path(household.id, "/plan" + action.path), method: action.method, body: body, key: UUID(), householdMembershipId: scope.membershipId, householdAuthorizationVersion: scope.authorizationVersion, householdOperation: .plan(householdId: household.id, action: action))
+        try journal.begin(write, for: identity); pending = write; await retry()
+    }
+    private func operation(_ write: PendingFinancialConfirmation) -> HouseholdWriteOperation {
+        write.householdOperation ?? .management
     }
     private func requestHouseholdId(_ path: String) -> UUID? {
         path.split(separator: "/").first.flatMap { UUID(uuidString: String($0)) }
@@ -217,6 +291,25 @@ final class HouseholdModel: ObservableObject {
         showManagement = false; cancelInvitationReview(); pendingInvitationToken = ""
         if let storageKey { UserDefaults.standard.removeObject(forKey: storageKey) }
         errorKey = "household.accessEnded"
+    }
+    // A plan's uniform not-found response also covers a removed definition or
+    // claim. Verify the Household boundary before discarding its Search context.
+    func handlePlanAccessFailure(_ error: Error, householdId: UUID) async -> Bool {
+        guard case SessionFailure.rejected(404, "household_not_found") = error else { return handleAccessFailure(error, householdId: householdId) }
+        guard let identity, let household, household.id == householdId else { return true }
+        let ticket = generation
+        do {
+            let value = try await controller.householdResponse(Household.self, path: path(householdId), expectedIdentity: identity)
+            guard current(ticket, identity), selectedId == householdId else { return true }
+            guard value.id == householdId, value.membershipId == household.membershipId, value.version == household.version else {
+                suspend(.unavailable); errorKey = "sharedPlan.changed"; return true
+            }
+            return false
+        } catch {
+            guard current(ticket, identity) else { return true }
+            if !handleAccessFailure(error, householdId: householdId) { errorKey = "household.loadError" }
+            return true
+        }
     }
     // Surface availability is server-owned; a disabled route says nothing about membership.
     @discardableResult

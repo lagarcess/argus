@@ -82,6 +82,11 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         configure_ingestion_hub(
             IngestionHub(connections, box=box, sink=None, clock=_clock)
         )
+        from argus.api.gmail import start_gmail
+        from argus.api.plaid import start_plaid
+
+        start_gmail(ingestion_hub(), pool)
+        start_plaid(ingestion_hub())
         from argus.api.shortcuts import start_shortcuts
 
         start_shortcuts(app, ingestion_hub())
@@ -94,6 +99,11 @@ def start_ingestion(app) -> None:  # noqa: ANN001
 
 
 def stop_ingestion(app) -> None:  # noqa: ANN001
+    from argus.api.gmail import stop_gmail
+    from argus.api.plaid import stop_plaid
+
+    stop_gmail()
+    stop_plaid()
     from argus.api.shortcuts import stop_shortcuts
 
     stop_shortcuts()

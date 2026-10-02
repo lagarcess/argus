@@ -65,6 +65,7 @@ struct HouseholdManagement: View {
                     }
                     Section {
                         Text("household.departureNotice").font(.footnote)
+                        Text("sharedPlan.departureNotice").font(.footnote).accessibilityIdentifier("sharedPlan.departureNotice")
                         if household.isAdmin {
                             Text("household.adminDeparture").font(.footnote)
                             Button("household.close", role: .destructive) { confirmation = HouseholdAction(suffix: "/close", title: "household.close") }.accessibilityIdentifier("household.close")
@@ -86,7 +87,7 @@ struct HouseholdManagement: View {
             .confirmationDialog(confirmation.map { LocalizedStringKey($0.title) } ?? "household.manage", isPresented: Binding(get: { confirmation != nil }, set: { if !$0 { confirmation = nil } }), titleVisibility: .visible) {
                 if let action = confirmation { Button(LocalizedStringKey(action.title), role: .destructive) { Task { await model.versionCommand(action.suffix, member: action.member); confirmation = nil } } }
                 Button("accounts.cancel", role: .cancel) { confirmation = nil }
-            } message: { Text("household.departureNotice") }
+            } message: { VStack { Text("household.departureNotice"); Text("sharedPlan.departureNotice") } }
         }
     }
 }

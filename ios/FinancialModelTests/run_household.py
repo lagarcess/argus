@@ -14,6 +14,7 @@ with tempfile.TemporaryDirectory(prefix="argus-household-models-") as temporary:
     source.mkdir(parents=True)
     tests.mkdir(parents=True)
     shutil.copy(root / "ios/ArgusFoundation/Household/HouseholdModel.swift", source)
+    shutil.copy(root / "ios/ArgusFoundation/Household/HouseholdPlanModel.swift", source)
     shutil.copy(root / "ios/ArgusFoundation/Accounts/AccountEntry.swift", source)
     editor = (
         root / "ios/ArgusFoundation/Household/HouseholdActivityEditor.swift"
@@ -21,6 +22,14 @@ with tempfile.TemporaryDirectory(prefix="argus-household-models-") as temporary:
     (source / "HouseholdActivityEditor.swift").write_text(
         editor[: editor.index("struct HouseholdActivityEditorView:")]
     )
+    contribution = (root / "ios/ArgusFoundation/Household/HouseholdContributionEditor.swift").read_text()
+    (source / "HouseholdContributionEditor.swift").write_text(contribution[:contribution.index("struct HouseholdContributionEditorView:")])
+    views = (root / "ios/ArgusFoundation/Household/HouseholdViews.swift").read_text()
+    plan_views = (root / "ios/ArgusFoundation/Household/HouseholdPlanViews.swift").read_text()
+    people = (root / "ios/ArgusFoundation/Household/HouseholdPlanPeople.swift").read_text()
+    definition_editor = (root / "ios/ArgusFoundation/Household/HouseholdPlanDefinitionEditor.swift").read_text()
+    (source / "HouseholdPlanDefinitionEdit.swift").write_text("import Foundation\nimport ArgusSession\n" + definition_editor[definition_editor.index("enum HouseholdPlanDefinitionEdit {"):])
+    (source / "HouseholdPlanPresentation.swift").write_text("import Foundation\nimport ArgusSession\n" + plan_views[plan_views.index("enum HouseholdPlanPresentation {"):] + "\n" + people[people.index("enum PlanDate {"):] + "\n" + views[views.index("enum HouseholdMoney {"):views.index("struct HouseholdConnectedDestination:")])
     presentation = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
     (source / "AccountPresentation.swift").write_text(
         "import Foundation\nimport ArgusSession\n"
@@ -31,6 +40,9 @@ with tempfile.TemporaryDirectory(prefix="argus-household-models-") as temporary:
         tests,
     )
     shutil.copy(Path(__file__).with_name("HouseholdModelTests.swift"), tests)
+    shutil.copy(Path(__file__).with_name("HouseholdPlanModelTests.swift"), tests)
+    wire_tests = (root / "ios/Packages/ArgusSession/Tests/ArgusSessionTests/HouseholdPlanTests.swift").read_text()
+    (tests / "SharedPlanTestData.swift").write_text("import Foundation\nimport ArgusSession\n" + wire_tests[wire_tests.index("enum SharedPlanTestData {"):])
     (package / "Package.swift").write_text(
         '''// swift-tools-version: 6.0
 import PackageDescription
@@ -54,6 +66,9 @@ let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], depend
             root / "ios/.build/household-model-tests",
         )
     )
+    cache_args = []
+    if cache := os.environ.get("ARGUS_SWIFT_CACHE_PATH"):
+        cache_args = ["--cache-path", cache]
     subprocess.run(
         [
             "swift",
@@ -64,6 +79,7 @@ let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], depend
             str(scratch),
             "--disable-sandbox",
             "--disable-automatic-resolution",
+            *cache_args,
         ],
         check=True,
     )

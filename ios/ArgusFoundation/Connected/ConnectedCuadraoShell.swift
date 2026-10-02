@@ -31,6 +31,7 @@ struct ConnectedCuadraoShell: View {
             }
         }
         .background { if let household = auth.household { HouseholdPresenter(model: household) } }
+        .background { if let household = auth.household { HouseholdPlanPresenter(model: household.plan) } }
         .financialBudgetBackground(auth.financialLoop?.budgets)
         .financialGoalBackground(auth.financialLoop?.goals)
         .financialDebtBackground(auth.financialLoop?.debts)

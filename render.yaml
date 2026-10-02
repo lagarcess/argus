@@ -67,6 +67,24 @@ services:
         value: "false"
       - key: ARGUS_INGESTION_SECRET_KEY
         sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REDIRECT_URI
+        sync: false
+      - key: PLAID_CLIENT_ID
+        sync: false
+      - key: PLAID_SECRET
+        sync: false
+      - key: PLAID_ENV
+        value: "sandbox"
+      - key: PLAID_CREDENTIALS_INJECTED
+        value: "false"
+      - key: PLAID_WEBHOOK_URL
+        sync: false
+      - key: PLAID_COUNTRY_CODES
+        value: "US"
       - key: ARGUS_IN_PLACE_CARD_EDITS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
