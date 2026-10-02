@@ -30,6 +30,7 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-28, clarified 2026-09-29 | Revenue, pricing, paywalls and billing remain deferred; existing usage and cost safeguards remain. The current user-trial boundary permits founder dogfooding and physical-phone demonstrations. Detailed owner: [documentation authority — founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral). | Lucas |
 | 2026-09-29 | The [private iPhone delivery and execution lock](#september-29-2026-private-iphone-delivery-and-execution-lock) owns the current delivery decision and supersedes the batch instructions below. | Lucas |
 | 2026-10-01 | Lock Household permission policy: creator administers invitations/membership and may transfer administration or close before departure; members see the member list and may leave; shared accounts start view-only with editing only via explicit grant; edit grants do not confer ownership, membership administration or resharing; leave/removal revokes membership and that member's account grants while owners retain records/history; invitations are revocable, single-use, seven-day links with safe same-recipient acceptance retries; create ≠ invite ≠ share account and acceptance is membership only. MVEE consent and financial-meaning boundaries remain. Owners: [execution board Household lane](argus-execution-board.md#connected-spaces-and-household-lane), [MVEE section 12](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), [lane contract](lanes/household-permission-policy.md). | Lucas (Project orchestrator recorded) |
+| 2026-10-02 | Lock the invitation, TestFlight beta-gate, Home comparison, Updates, plan-export and account-move rules for the five Cuadrao lanes. Detailed record: [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
 
 ## Superseded coordination instructions (historical only)
 
@@ -154,3 +155,84 @@ is stopped, #723/#724/#725/#726 are closed unmerged, and no prior coordination
 instruction restarts them. The founder authorized this documentation PR only.
 The manifest's proposed work order is the delivery lead's plan, not an already
 accepted technical contract or a new implementation/deployment grant.
+
+## October 2, 2026: Cuadrao lane locks
+
+The founder approved these in the Docs Alignment room while scoping the five
+lanes (Home data, Household invitations, Updates, Search, Spaces). Product
+Lead (Iris) drafted the recommendations and the founder said yes; Head of
+Engineering (Yelena) recorded them for the lane handoff. These are decisions,
+not claims that anything is built. The lane handoff links here instead of
+restating them.
+
+### Invitations
+
+- An invitation produces a share link, an invite code and a QR code. Email
+  invitations are part of the design but stay switched off until the founder
+  connects the email service.
+- The invite link is a universal link on cuadrao.ai that opens the app. The
+  current `argus-household://` scheme and the design branch's placeholder
+  domain are not the target.
+- Each code works once and records who sent it, so the who-invited-whom
+  record exists. This builds on the October 1 single-use, seven-day rule.
+- When an account is deleted, an anonymous record that an invite was sent and
+  accepted is kept, with no name or identifier. Deleting an account still
+  removes the person. (Detail added by Iris right after the founder's lock and
+  carried into the handoff; the founder did not object.)
+- The inviter gets an "invitation accepted" entry in Updates. There is no
+  "invitation received" entry, because the invitee already has the link or
+  code and an invitation has no named recipient before acceptance.
+
+### TestFlight beta gate
+
+- The cuadrao.ai landing page collects a waitlist, and the founder rolls access
+  out personally. He onboards the first users himself.
+- Each person starts with 3 invites; the founder can add more.
+- A TestFlight public link only installs the app. The in-app invite code is the
+  real gate. Anyone without a code is sent to the cuadrao.ai waitlist.
+- Three network numbers are tracked from the start: invites sent per user, the
+  share of invites accepted, and the share of invitees who go on to invite
+  someone.
+- Apple's first beta review must be scheduled before the first outside
+  distribution.
+
+### Home comparisons
+
+- A month with a real zero is data, so the comparison still shows. When the
+  earlier period is zero, the difference is shown as an amount (for example
+  "RD$4,500 more than last month"), not a percent.
+- Only a period with no records at all shows as no data.
+
+### Updates
+
+- Everything Cuadrao notifies about lands in Updates. Home's Próximamente
+  section keeps showing upcoming bills for the Space in focus.
+- A bill gets an Updates entry 3 days before its due date and again on the day.
+- During TestFlight, Updates uses the in-app inbox plus push for people who
+  turn push on. Push never includes amounts; amounts appear only inside the
+  app. Updates are not sent by email yet.
+
+### Joint plans
+
+- Exporting joint plans is deferred until after TestFlight. The read-only
+  archive from [#773](https://github.com/lagarcess/argus/pull/773) stays until
+  its owner deletes it.
+
+### Leaving a household and moving accounts
+
+- When a member leaves, the accounts they own go with them and the household
+  loses access right away. The household keeps that account's history up to
+  the move date, greyed out and read-only, with the state at the move recorded.
+  Shared plans that relied on it are archived read-only for the remaining
+  members.
+- Moving an account between Spaces never rewrites past balances or
+  settlements. A move is recorded as an event, replaying it changes nothing, and
+  access rules block creating, editing or deleting the locked history. Home is
+  recomputed from history.
+
+### Outside services
+
+- Email, the universal link and push are each built behind a switch with a
+  stand-in and stay off until the founder connects the real service. Turning one
+  on later is configuration only. The domain, keys and links the founder will
+  supply are not recorded here.
