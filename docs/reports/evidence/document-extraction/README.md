@@ -232,3 +232,76 @@ status, and an unknown invoice is not reported as zero cost. Remaining authoriza
 does not permit proceeding after this failure; another paid attempt needs approval.
 No financial records were written. No PR merge, deployment, hosted setting change
 or feature enablement was performed.
+
+## Luna diagnostic, October 2
+
+The development environment resolved `document_extraction` to
+`openai/gpt-6-luna`. Azure was checked first using the public
+[model endpoint catalog](https://openrouter.ai/api/v1/models/openai/gpt-6-luna/endpoints)
+and [ZDR inventory](https://openrouter.ai/api/v1/endpoints/zdr). Both image input
+and structured output were supported. The actual response identifies Azure and
+the requested Luna model. The development credentials worked; this run has no
+missing-key or provider-routing blocker.
+
+The bounded request compatibility fix uses `max_completion_tokens`, omits
+unsupported temperature, and derives Azure's strict wire schema from the existing
+Pydantic schema. All object fields are required and provider-unsupported constraint
+keywords are omitted from the wire schema only. Local Pydantic and canonical
+candidate validation remain authoritative. See
+[Azure structured output limitations](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs?view=foundry-classic).
+There is no new extraction pipeline, model fallback or prompt change.
+
+The preflight covered all published pricing tiers, including cache reads/writes.
+Optional web-search pricing does not apply: the guard rejects search plugins,
+tools, online model variants, search options and presets. Azure regional variants
+were excluded from the selected root route. The request retained `zdr=true`,
+`data_collection=deny`, `require_parameters=true` and `allow_fallbacks=false`.
+No account-wide or hosted settings changed.
+
+The two calls fit the existing $6 cumulative ceiling: $0.2715 reserved per call,
+$0.543 proposed new reservations and $3.1920875136 proposed cumulatively. The
+previous $2.6490875136 reservation ledger was retained, including the failed Qwen
+attempt. Independent review found the request and budget guards clean before
+execution at code head `e00bec89`.
+
+**Only the statement was sent. Paid execution stopped after canonical validation
+failed; the receipt was not attempted.** The [safe live report](luna-live-2026-10-02.json)
+contains request-image dimensions/hashes, endpoint pricing, classification counts,
+field-match checks and cost receipts, without document contents or extracted
+financial values.
+
+| Fixture | Expected transactions | Model transactions | Delivered transactions | Result | Total latency | Provider cost |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| Synthetic USD statement | 2 | 2 exact | 0 | Canonical batch rejected | 13.273 s | $0.001120175 |
+| Synthetic DOP receipt | 1 | Not attempted | Not attempted | Stopped after first failure | — | — |
+
+The statement returned one period observation, two balances and two transactions.
+Both transactions matched amount, currency, date, direction and income/expense
+kind; totals matched and no balance became a transaction. Offline replay preserved
+those fields through candidate normalization. The model's opening balance had
+`balance_scope=null`. The extraction response schema permits this, but canonical
+`ImportCandidate` requires a scope for balance evidence and its enum has no opening
+scope. This rejects the entire batch as `invalid_extraction`; no partial reviewable
+batch or financial records were produced. The closing balance validated.
+
+Independent diagnosis confirmed a canonical representation gap, not lost
+transaction fields, invalid JSON or a credentials problem. This continuation does
+not invent an opening scope, relabel it as current/closing, silently discard it,
+or weaken completeness. Resolving that gap needs a scoped contract decision.
+A regression check confirms that an unscoped balance rejects the whole batch even
+when its transaction validates independently. Receipt totals/item separation remain
+unmeasured with Luna. Synthetic results do not establish Dominican-bank support.
+
+Consumed new reservation is **$0.2715**; cumulative reserved is
+**$2.9205875136**, leaving **$3.0794124864** under the $6 ceiling. New actual
+provider-reported cost is **$0.001120175**. Cumulative known actual subtotal is
+**$0.00601217036**; cumulative actual total remains unknown because four earlier
+requests lack cost receipts. Unused budget does not authorize another attempt.
+
+The request changes passed 204 focused tests, Ruff and modularity checks before
+dispatch. The final extraction suite passed 26 tests, including the rejection
+regression; Ruff passed again. Final independent review found no blocking findings
+in the evidence or regression. Current integration remains
+`8e06e892a8cc035fe0c6cb0223fae27cd050b2c3`. The later evidence and rejection
+regression do not change the executed runtime. No further paid call, merge, manual deployment or feature enablement was
+performed. Live end-to-end acceptance remains blocked.

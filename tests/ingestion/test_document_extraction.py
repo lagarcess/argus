@@ -72,6 +72,17 @@ def test_model_cannot_choose_connection_or_owner():
         ExtractionResult.model_validate(body)
 
 
+def test_unscoped_balance_rejects_batch_even_with_valid_transactions():
+    body = result().model_dump(mode="json")
+    body["observations"][1]["balance_scope"] = None
+    parsed = ExtractionResult.model_validate(body)
+    observed_at = datetime.now(timezone.utc)
+    transaction_only = parsed.model_copy(update={"observations": parsed.observations[:1]})
+    assert len(candidates_from_result(transaction_only, "a" * 64, "owner", observed_at, 1)) == 1
+    with pytest.raises(DocumentExtractionError, match="invalid_extraction"):
+        candidates_from_result(parsed, "a" * 64, "owner", observed_at, 1)
+
+
 def test_provider_schema_avoids_unique_items_and_candidates_own_deduplication():
     import json
 
