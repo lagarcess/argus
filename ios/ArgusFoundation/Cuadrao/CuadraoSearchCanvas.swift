@@ -44,10 +44,13 @@ struct CuadraoSearchCanvas: View {
     }
     private var matchingPlans: [CanvasPlan] {
         plans.plans.filter { plan in
-            !data.spaces.contains { $0.id == plan.spaceID && $0.deleted }
+            planIsAvailable(plan)
             && (scope == .all || (scope == .household ? plan.spaceID == CanvasSpace.householdID : plan.spaceID != CanvasSpace.householdID))
             && matches(plan.name + " " + plan.kind.title(spanish) + " " + PlanFormat.space(plan.spaceID, accounts: data, spanish: spanish))
         }
+    }
+    private func planIsAvailable(_ plan: CanvasPlan) -> Bool {
+        !data.spaces.contains { $0.id == plan.spaceID && $0.deleted }
     }
     private var count: Int {
         (kind == .all || kind == .accounts ? accounts.count : 0)
@@ -157,7 +160,12 @@ struct CuadraoSearchCanvas: View {
                 case .activity(let id):
                     activityDetail(id)
                 case .plan(let id):
-                    CuadraoPlanDetail(store: plans, accounts: data, planID: id, spanish: spanish)
+                    if let plan = plans.plan(id), planIsAvailable(plan) {
+                        CuadraoPlanDetail(store: plans, accounts: data, planID: id, spanish: spanish)
+                    } else {
+                        ContentUnavailableView(spanish ? "Plan no disponible" : "Plan unavailable", systemImage: "calendar")
+                            .toolbar(.visible, for: .navigationBar)
+                    }
                 case .reference(let id):
                     if let item = references.first(where: { $0.id == id }) {
                         CuadraoSearchReferenceDetail(item: item, spanish: spanish,
