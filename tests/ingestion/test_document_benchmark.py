@@ -94,7 +94,8 @@ async def test_serial_benchmark_stops_without_retry(
         async def extract(self, *args):
             calls.append(args)
             return SimpleNamespace(
-                candidates=(), metadata=dict(route_receipts=[dict(usage_cost_usd=cost)])
+                candidates=(candidate(evidence="unclassified"),),
+                metadata=dict(route_receipts=[dict(usage_cost_usd=cost)]),
             )
 
     budget = BenchmarkBudget(
@@ -117,6 +118,12 @@ async def test_serial_benchmark_stops_without_retry(
     assert report.get("stop_reason") == reason
     assert report["complete"] == (reason is None)
     assert saves
+    fields = report["results"][0]["candidate_fields"][0]
+    assert fields["evidence"] == "unclassified"
+    assert fields["amount"] == "10"
+    assert "source" not in fields
+    assert "description" not in fields
+    assert "account" not in fields
     if cost is None:
         assert report["actual_cost_usd"] is None
         assert report["known_cost_usd"] == "0"

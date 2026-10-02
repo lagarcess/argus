@@ -178,6 +178,21 @@ async def run_live(samples, directory, extractor, budget, report, save):
             if sample["expected_status"] == "unreadable"
             else error is None,
             "quality": row_score(sample, candidates),
+            "candidate_fields": [
+                row.model_dump(
+                    mode="json",
+                    include={
+                        "evidence",
+                        "amount",
+                        "currency",
+                        "occurred_on",
+                        "direction",
+                        "kind_hint",
+                        "uncertain",
+                    },
+                )
+                for row in candidates
+            ],
         }
         report["results"].append(result)
         try:

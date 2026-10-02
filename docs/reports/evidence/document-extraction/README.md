@@ -55,21 +55,35 @@ The founder approved six documents, one attempt each, with a US$2 cap, using
 the existing development key. The selected model is
 `deepseek/deepseek-v4-flash-vision-exp`.
 
-The live run at `51469c10` attempted `cord-test-0` once and stopped because the
-shared provider path returned `extraction_provider_failed` with a `ValueError`
-receipt and no token/cost receipt. Total elapsed time was 811 ms; the route
-receipt recorded 799 ms. Five documents were not sent and no retry ran.
-This is a failed live validation, not extraction accuracy evidence.
-The precise cause cannot be classified as provider configuration or application
-response handling from the retained receipt alone. The development key was
-accepted by the read-only key endpoint and had remaining allowance.
+The six approved documents were each attempted once, with no retries.
+The first three attempts failed at the provider boundary. The synthetic DOP
+statement exposed an embedded 400 response: `Grammar error: Unimplemented keys:
+["uniqueItems"]`. The model-output uncertainty field used a frozenset, which
+Pydantic encoded with this unsupported keyword. Commit `e624cb9a` changes only
+that model-facing field to an immutable tuple; canonical ImportCandidate
+uncertainty still deduplicates into a frozenset. A regression failed before the
+fix and passed after it. Independent review returned clean.
 
-Actual cost is unknown, not zero. The conservative $0.2338345856 reservation
-for the attempted request remains consumed. The subsequent key-wide daily
-usage reading was zero, but it is not request-specific proof of zero charge.
-The [live report](live-benchmark-2026-10-02.json) retains fixture hashes, exact
-code head, public endpoint metadata, budget reservation and failure outcome.
-No private document text or credentials are included.
+The remaining three approved samples ran on the fixed schema. The USD statement
+and DOP receipt returned valid structured candidates, but strict scoring found
+zero of the three expected transactions classified as transaction evidence.
+The unreadable fixture was correctly rejected. No balances were classified as
+transactions. These results fail live extraction acceptance; they are not a
+successful extraction-quality claim. Actual candidate field snapshots were not
+retained, so no unsupported explanation for the misclassification is asserted.
+
+Post-fix elapsed times were 77,627 ms for the USD statement, 16,818 ms for the
+DOP receipt and 3,387 ms for the unreadable image. Their measured total cost was
+$0.00489199536. The first three provider rejections had no cost receipts, so
+actual total cost remains unknown. All six conservative reservations remain
+consumed, totaling $1.4030075136 within the $2 approval. No key limits changed.
+
+The [complete attempt summary](live-benchmark-summary-2026-10-02.json) preserves
+all six outcomes, per-attempt code heads, quality scores and usage. The
+[initial stopped report](live-benchmark-2026-10-02.json) also retains the dated
+public endpoint snapshot. No private document text or credentials are included.
+Three failed samples were not repeated after the schema fix, honoring the
+single-attempt scope. Further paid validation needs a new bounded approval.
 
 The runner uses the existing development key and a run-local reservation.
 Each actual POST reserves a full uncached context window plus the canonical
@@ -116,7 +130,7 @@ benchmark arguments through domain APIs. One budget owns attempts and reserved
 spend; ordinary runtime requests remain unchanged outside its scope.
 
 A clean independent delta review passed 24 focused tests. Full focused checks
-passed 638 tests. Public endpoint metadata supports a full-context reservation
+passed 639 tests after the schema regression was added. Public endpoint metadata supports a full-context reservation
 of $0.2338345856 per request, or $1.4030075136 for six requests. Price ceilings
 are enforced by [OpenRouter provider routing](https://openrouter.ai/docs/guides/routing/provider-selection#max-price);
 endpoint metadata and actual cost remain part of the live report.
