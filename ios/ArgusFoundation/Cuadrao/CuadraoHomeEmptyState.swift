@@ -14,12 +14,7 @@ struct CuadraoHomeEmptyState: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
-            Image(systemName: shared ? "person.2" : "wallet.bifold")
-                .font(.system(size: 28, weight: .light)).foregroundStyle(WelcomePalette.pine)
-                .frame(width: 60, height: 60)
-                .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 18))
-                .accessibilityHidden(true)
-            RegistrationHeading(title: title, detail: detail)
+            CuadraoChartState(title: title, detail: detail)
             if shared {
                 RegistrationButton(title: spanish ? "Añadir cuenta conjunta" : "Add a joint account", action: addAccount)
                 if case .alone = data.household {
