@@ -64,7 +64,9 @@ struct HouseholdDestination: View {
     @ObservedObject var model: HouseholdModel
     let tab: AppDestination
     let active: Bool
-    @State private var query = ""
+    @ObservedObject private var plan: HouseholdPlanModel
+    init(model: HouseholdModel, tab: AppDestination, active: Bool) { self.model = model; self.tab = tab; self.active = active; plan = model.plan }
+    private var showingPlan: Bool { plan.openedRef != nil && plan.origin.rawValue == tab.rawValue }
     var body: some View {
         if active {
         ScrollViewReader { proxy in
@@ -76,7 +78,9 @@ struct HouseholdDestination: View {
                 }
                 if let detail = model.detail, tab != .plan && tab != .argus {
                     accountDetail(detail)
-                } else if tab == .plan || tab == .argus {
+                } else if tab == .plan {
+                    HouseholdPlanContent(model: plan)
+                } else if tab == .argus {
                     Text("household.unsupported").foregroundStyle(Color.secondary)
                 } else if let snapshot = model.snapshot {
                     HStack {
@@ -98,6 +102,7 @@ struct HouseholdDestination: View {
                                 }
                             }
                         }
+                        HouseholdPlanContent(model: plan, compact: true, origin: .home)
                     }
                     if tab == .search { searchContent }
                     else {
@@ -116,6 +121,14 @@ struct HouseholdDestination: View {
                 } else if model.errorKey == nil { ProgressView("accounts.loading") }
             }.padding(24)
         }.accessibilityIdentifier("screen." + tab.rawValue)
+        .opacity(showingPlan ? 0 : 1).allowsHitTesting(!showingPlan).accessibilityHidden(showingPlan)
+        .overlay {
+            if showingPlan {
+                ScrollView { HouseholdPlanDetailView(model: plan).padding(24).frame(maxWidth: .infinity, alignment: .leading) }
+                    .background(Color.white).accessibilityIdentifier("sharedPlan.detail")
+                    .refreshable { await model.refresh() }
+            }
+        }
         .refreshable { await model.foreground() }
         .onChange(of: model.highlightActivityId) { _, id in if let id { proxy.scrollTo(id, anchor: .top) } }
         }
@@ -123,17 +136,17 @@ struct HouseholdDestination: View {
     }
     private var searchContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            TextField("household.search", text: $query).textFieldStyle(.roundedBorder).submitLabel(.search)
-                .accessibilityIdentifier("household.search.query").onSubmit { Task { await model.find(query) } }
+            TextField("household.search", text: $model.searchQuery).textFieldStyle(.roundedBorder).submitLabel(.search)
+                .accessibilityIdentifier("household.search.query").onSubmit { Task { await model.find(model.searchQuery) } }
             if model.searchState == .loading { ProgressView("accounts.loading") }
             if model.searchState == .empty { Text("household.searchEmpty").foregroundStyle(Color.secondary).accessibilityIdentifier("household.search.empty") }
-            if model.searchState == .unavailable { Text("household.loadError"); Button("accounts.retry") { Task { await model.find(query) } }.frame(minHeight: 44) }
+            if model.searchState == .unavailable { Text("household.loadError"); Button("accounts.retry") { Task { await model.find(model.searchQuery) } }.frame(minHeight: 44) }
             ForEach(model.search) { item in
                 Button { Task { await model.openSearchHit(item) } } label: {
                     HStack { Text(item.title); Spacer(); Image(systemName: "chevron.right") }.frame(minHeight: 44)
-                }.accessibilityIdentifier("household.search." + item.id.uuidString)
+                }.accessibilityIdentifier("household.search." + item.id.uuidString).id(item.id)
             }
-            if model.nextCursor != nil { Button("household.more") { Task { await model.find(query, more: true) } }.frame(minHeight: 44) }
+            if model.nextCursor != nil { Button("household.more") { Task { await model.find(model.searchQuery, more: true) } }.frame(minHeight: 44) }
         }
     }
     private func accountRow(_ item: HouseholdAccount) -> some View {

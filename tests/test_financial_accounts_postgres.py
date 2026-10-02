@@ -71,6 +71,9 @@ def _create_users(connection, *labels: tuple[str, bool]) -> dict[str, str]:  # n
 
 
 def _delete_users(connection, ids: dict[str, str]) -> None:  # noqa: ANN001
+    from tests.household.shared_cleanup import cleanup
+
+    cleanup(connection, list(ids.values()))
     with connection.cursor() as cursor:
         cursor.execute("delete from auth.users where id = any(%s)", (list(ids.values()),))
     connection.commit()

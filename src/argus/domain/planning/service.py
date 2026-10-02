@@ -6,7 +6,7 @@ from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from argus.domain.backtest_admission import canonical_hash
-from argus.domain.planning import model, storage
+from argus.domain.planning import claims, model, storage
 from argus.domain.planning.projection import matches, occurrence_response, projection
 from argus.domain.planning.schemas import (
     ExpectationCreate,
@@ -58,7 +58,9 @@ class PlanService:
         item = state["expectations"].get(identifier)
         if item is None:
             raise AccountNotFound()
-        return model.expectation_response(item, state["links"], self.today(state))
+        return model.expectation_response(
+            item, claims.protected_links(state), self.today(state)
+        )
 
     def _write(
         self, user_id: str, scope: str, body: Any, key: str, action: Any
@@ -97,10 +99,12 @@ class PlanService:
             item = state["expectations"].get(eid)
             if item is None:
                 raise AccountNotFound()
-            model.edit(item, body, accounts, state["links"], self.today(state))
+            model.edit(
+                item, body, accounts, claims.protected_links(state), self.today(state)
+            )
             return {
                 "expectation": model.expectation_response(
-                    item, state["links"], self.today(state)
+                    item, claims.protected_links(state), self.today(state)
                 )
             }, None
 

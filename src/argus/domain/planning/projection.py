@@ -9,6 +9,7 @@ from argus.domain.planning import (
     debt_projection,
     goal_model,
     goal_projection,
+    shared_claims,
 )
 from argus.domain.planning.budgets import all_progress
 from argus.domain.planning.model import expectation_response, occurrences
@@ -41,6 +42,23 @@ def occurrence_response(
 ) -> dict[str, Any]:
     if item["kind"] == "debt_payment":
         return debt_projection.occurrence(item, state, actual, start)
+    shared = shared_claims.for_occurrence(state, item["id"])
+    if shared is not None:
+        paid = shared["amount"]
+        remaining = max(0, item["amount_minor"] - paid) if paid is not None else None
+        return item | dict(
+            projection_date=max(start, date.fromisoformat(item["due_date"])).isoformat(),
+            status="needs_review"
+            if remaining is None
+            else "fulfilled"
+            if remaining == 0
+            else "planned",
+            activity_id=None,
+            activity_revision=None,
+            exclusion_reason="link_needs_review" if remaining is None else None,
+            overdue=date.fromisoformat(item["due_date"]) < start and remaining != 0,
+            remaining_minor=remaining,
+        )
     link = claims.for_occurrence(state, item["id"])
     activity = actual.get(link["activity_id"]) if link else None
     status = (
@@ -78,6 +96,17 @@ def projection(
     end: date,
     now: datetime,
 ) -> dict[str, Any]:
+    canonical = getattr(accounts, "canonical", None)
+    if canonical is not None:
+        from argus.domain.recording.money_reads import render_activity
+
+        state = state | {
+            "_canonical_records": canonical.records,
+            "_canonical_activities": {
+                aid: render_activity(aid, canonical.history[aid], revision)
+                for aid, revision in canonical.current.items()
+            },
+        }
     actual = {a["activity_id"]: a for a in current_activities(accounts)}
     rows = [
         occurrence_response(item, state, actual, start)
@@ -252,7 +281,7 @@ def projection(
         "selection": state["selection"],
         "accounts": [account_response(s).model_dump(mode="json") for s in accounts],
         "expectations": [
-            expectation_response(e, state["links"], start)
+            expectation_response(e, claims.protected_links(state), start)
             for e in state["expectations"].values()
         ],
         "occurrences": rows,
@@ -268,6 +297,8 @@ def projection(
 
 def movement_legs(row: dict[str, Any]) -> list[tuple[str | None, int]]:
     amount = row.get("remaining_minor", row["amount_minor"])
+    if amount is None:
+        return []
     if row["kind"] == "goal_transfer":
         return [
             (row["source_account_id"], -amount),

@@ -10,6 +10,413 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
+## Connected shared Household planning lane
+
+**Assigned 2026-10-01; connected local acceptance complete; independent review clean.** Full original integration base:
+`15e57931584b21dd7f9e453dbeb9127fc4b8cff3`, freshly fetched and verified to
+include #763/#764, #760/#765 and #766/#767. Worker:
+`codex/shared-household-planning`, isolated managed worktree. Preserve the landed
+Household demo, personal financial demos, design simulator/cache and phone stack.
+
+**Explicit fixed design assignment:** founder chose
+`7f72dfd73d0c137a1118dffebe5219985577548a` in this lane's checkpoint question.
+`b32b0705359f02aab9c3091ab59d7067ab7ddf46` remains an older reference.
+Neither the moving design branch nor preview stores/fixtures establish connected
+functionality. Selective presentation only; no wholesale design merge.
+
+### Approved restart and policy, October 1
+
+Resume from published `6296b8840b6e4f07f0b3475ed50cc8c601db9ced`. Fresh
+integration remains `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`; no merge or
+semantic overlap is present at restart. The fixed design remains `7f72dfd7`.
+No other open integration backend lane was found.
+
+- View-only participants may record/link and correct their own contributions.
+  They cannot edit the plan, other participants' contributions or private
+  funding accounts. Original account/activity authorization remains separate.
+- Owner departure archives their shared plans as read-only for remaining
+  authorized members, retains previously shared history/linked transactions,
+  and removes future projections. Explain this before departure. No financial
+  activity deletion, private funding disclosure or ownership transfer.
+- Required allocation/schema/RLS source, migration and complete backfill are
+  approved in this worker. Test only in a new isolated disposable local
+  database. Remove JSON only after completeness is proved and all readers and
+  writers use the canonical owner. Existing demo/hosted databases are forbidden
+  targets; incomplete cutover must fail visibly rather than use a fallback.
+
+The prior product questions and automatic-review authorization blocker are
+resolved by this explicit grant. Full budgets, bills, goals and debt delivery
+remains required through native acceptance and merge-ready review. The new local
+resource assignment is `ios-accounts-59750`: API 59750 reserved, local Auth
+59751 / disposable Postgres 59752, CAPTCHA 59755 reserved, helper ports
+59753–59754 and 59757–59761. Configuration/state stays in this worker's ignored
+`ios/.build/accounts-local-59750`. Configure verifies every assigned port is
+unused and project ownership matches before starting. Old 59700 stays stopped
+and is never migrated. Response-loss proxy 59762 and optional mirror 59763 were
+verified unused before assignment. The explicitly assigned simulator is
+`C93072E7-D29A-4B0A-BE76-E6418E4E9F88`, this thread's retained Household device;
+no active native build was found. Use only the new bundle
+`local.argus.shared-household-planning-demo` and cache
+`/private/tmp/argus-shared-household-planning-native-build`. Preserve its existing
+`local.argus.household-current-demo` installation and
+`/private/tmp/argus-household-current-build`. Design device `8AFB6084…`, compact
+financial demos and the phone environment remain untouched.
+
+Canonical residual storage is implemented at
+`f32e301198c39a1bcafd24e698466b9fc6441439`. Migration
+`20261001190000_goal_residual_allocations.sql` was applied only to NEW Postgres
+59752. It validates every legacy allocation, backfills ordered owner-qualified
+rows, proves bidirectional multiset completeness, then removes the JSON field
+and rejects old writers in one explicit transaction. The Personal adapter reads
+and writes only this relation; no JSON fallback remains. Captain verification
+at that source passed **170 tests, zero skips/failures**, including zero/Int64
+bounds, malformed/foreign/duplicate rejection, rollback, RLS and existing
+Personal Goal/Budget/Debt/Plan regressions. Durable
+[cutover proof](../reports/evidence/shared-household-planning/allocation-cutover-check.json)
+links the command, JUnit and log. Extending shared claims/pools and all four
+connected native journeys remains required. This is storage progress, not
+shared-planning delivery. Code-only rollback is unsafe after cutover; restore
+validated ordered JSON from canonical rows in a coordinated transaction before
+using the legacy adapter. No existing or hosted environment was migrated.
+
+### Connected implementation checkpoint, October 1
+
+Five subsequent additive migrations were reviewed and applied **only** to NEW
+Postgres 59752: `20261002000000` shared-plan consent/revision/claim storage,
+`20261002010000` true original Money leg owners, and `20261002020000` retained
+consent revision bounds, `20261002030000` consent/claim lifecycle uniqueness,
+and `20261002040000` responsibility carry-forward for every canonical writer.
+All five ran in explicit transactions. Seven synthetic
+accounts and the one prepared Household remain intact. Raw shared claims,
+allocations and retained activity references stay service-only under RLS; history
+foreign keys retain restrictive deletion. No existing demo or hosted database was
+migrated. These schema checks do not establish the complete shared journey.
+
+The four-kind native forms compile against the fixed checkpoint presentation.
+The Session package executes 79 checks with four existing opt-in skips and zero
+failures (75 passed); production presentation models pass 24 checks. Scheduled
+forms use the canonical server cutoff and preserve recorded occurrences when
+changing intentions. Real connected acceptance is still in progress.
+Initial real-Postgres shared-budget proof keeps 70/30 planned amounts
+separate from 20/10 actual contributions, allows a view-only member's own link,
+redacts the other's private source and rejects the third identity. Full bills,
+goals, debt, corrections/recovery, cross-owner privacy and departure acceptance
+remain required before publication/readiness. The captain-owned UI launcher
+`--shared-plan-scene` selects only the assigned C930 simulator, new app/cache,
+59750 allocation and retained synthetic fixture; it refuses other devices/ports.
+Its bounded resource/recovery helper checks pass. Existing demos stay available.
+
+Backend checkpoint `82383423e23947adb156059b89d664695d7a97f9` implements
+all four kinds. The focused real-Postgres matrix passed 458 cases with zero
+skips; the final canonical adapter/currentness/Search delta passed 68. Native
+checkpoint `05d6c2e0dc820dbc9495fba1d076ea178f3c35fc` passed 77 Session checks
+(four existing opt-in skips), 24 Household presentation checks and five affected
+Personal recovery/original checks. The repaired broader Personal harness has
+six assertion failures in four cases, matching the exact integration baseline;
+it is not counted as a green full suite. Its baseline comparison will accompany
+the evidence. Assembled native acceptance and independent review were pending at
+that component checkpoint; the completed local results are recorded below.
+
+Fresh integration on October 1 remains `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`.
+Open ingestion lanes #768–#772 consume Recording and keep their own branches;
+they do not modify its canonical services. Versions `20261002120000` through
+`20261002120300` are reserved for ingestion. The earlier `20261001190000`
+collision is resolved: #772 head `5608a83ef7a28c3359195e947acc12c428cbe4f0`
+uses all four reserved versions. Its owner renumbered ingestion on its own
+branch; this lane did not edit ingestion or its infrastructure. The consumer handoff lives in
+the existing [API contract](../API_CONTRACT.md#recording-consumer-handoff-for-ingestion-october-1).
+
+### Published review and assembled acceptance, October 1
+
+[PR #773](https://github.com/lagarcess/argus/pull/773) targets
+`codex/private-alpha-next`. Reviewed and natively tested implementation head:
+`41cd27ac93a0e00f39f8190aea0838aa1b59104f`; its financial source remains
+`942f1f009a5927816176d166f6c1357577e0ce51`. Final follow-up adds only documentation, durable evidence and the bounded
+Goal concurrency-test repair at `d290207646956a60ad1b1eb62b4a49a20e91901a`. Source fingerprints explicitly revalidate
+the retained screenshots/recording at that publication; the terminal PR comment
+records its exact head and CI state. Original/current integration remains
+`15e57931584b21dd7f9e453dbeb9127fc4b8cff3`; no reconciliation merge or
+intervening semantic overlap is present. Modularity is checked against the
+would-be merged tree.
+
+The fresh independent reviewer `shared_plan_independent_review` completed one
+whole-diff pass at `5bd9417a671b6dbdabe2c558794c55d289410352`, then only affected
+fixes. Five confirmed findings were fixed: budget-only People fields,
+self-advancing exact retries, supported savings credit, unchanged recurrence
+anchors and consented originals in Personal projections. The final affected
+review is clean at `41cd27ac…`, including distinct native contribution actions,
+the bounded menu wait and **Can edit plan / View only** copy. This is the
+founder-permitted independent substitution, not a claim of a new Codex review.
+
+A subsequent confirmed GitHub privacy finding is fixed at the shared lifecycle
+owner: leaving/removal pins a non-owner contributor's exact original,
+refund/reversal and allocation revisions in the same transaction as access
+removal. Later private activity or balance changes cannot alter already-shared
+history. Remaining contributors stay live. Ended savings backing is unknown
+with **Needs review**; fresh rejoining/consent preserves older authorized
+revisions. The finding has a written rationale, accepted reaction and resolved
+thread. Final unresolved-thread verification belongs to the terminal PR audit.
+
+The affected financial/Household matrix passed **481 tests, zero skips** against
+NEW local Postgres on port 59752. The focused departure matrix passed **185**, including
+13 new departure cases. Session checks passed **79** with four existing opt-in
+skips; Household/Plan presentation checks passed **33**; OpenAPI compatibility
+checks passed **23**. The broader Personal harness retains the same six
+assertions in four cases as its integration baseline; it is not described as a
+green full Personal suite. Logs, JUnit, migration completeness and source
+provenance live in the existing
+[evidence packet](../reports/evidence/shared-household-planning/).
+
+Four assembled native cases passed at `41cd27ac…`, each with zero skips:
+
+| Observable journey | Saved result and independent proof |
+| --- | --- |
+| Create all four shared kinds, contribute, correct, archive/restore, Home, Search/back and Spanish relaunch | Budget actual25 + 15 = 40 remains separate from 70/30 planned responsibilities. Bill agreed60/paid20, backed goal 20 with its separate planned definition, and debt paid20 persist. One savings transfer/card payment changes canonical balances without extra spending. |
+| View-only own activity and named plan editor | B inspects/corrects only B's original; A's private source and notes stay hidden. B may edit the explicitly granted bill, preserving its recorded payment. |
+| Committed response lost, app closed, explicit Retry | Temporary proxy59762 drops one response after upstream commit. Relaunch retains the exact journal command; retry leaves one 700-minor contribution and one 700-minor debit. Proxy stops and the direct API build is restored. |
+| Three registered identities and disabled feature | A/B see their own Personal accounts and authorized shared plans; C has neither shared access nor others' private accounts. English/Spanish relaunch preserves scope. With Household disabled only on this lane API, Personal Home/Accounts/Search remain usable and shared controls stay hidden. |
+
+The independent authorized API readback proves the native totals and account
+deltas, unknown balance and separate currency preservation, shared/private
+history boundaries, and third-user 404s. Departure/removal/rejoining, stale CAS,
+parallel retries, allocation conflicts, reversals and recurrence are additionally
+covered by real Postgres acceptance and native presentation/journal checks;
+the short video is not represented as proof of every case.
+
+Earlier failed verification attempts remain in ignored results. One exposed a
+real parent accessibility identifier overriding three contribution actions;
+the shared presentation fix preserves each action's identifier. Driver fixes
+use actual hittability and a bounded initial menu wait. An extra identity run
+after repeated readbacks could not sign in; its normal-cooldown repeat passed
+without resetting the authentication limiter. Partial test plans were archived
+through their canonical API. Their activity/history remain; no balances,
+accounts or datasets were reset.
+
+Source-head CI is green. At documentation head `d140f3a1…`, PR CI passed but
+its parallel push guest matrix exposed a valid stale-account rejection omitted
+by the existing Goal allocation/recording concurrency test. The repair retains
+runtime CAS and adds strict allocation-first/expense-first expectations,
+coherent assigned/support pairs, cash80000 and exactly one expense20000.
+Seven affected real-Postgres cases passed with zero skips. A P2 ordered-case
+assertion gap from the affected reviewer was corrected; final delta review is
+clean at `d2902076…`. No production/native code, schema or demo data changed;
+all captured runtime fingerprints remain identical. The next publication runs
+its normal exact-head CI; no unchanged-head retry is used to hide the race.
+
+Supabase's existing automation **ignored #773 at the
+concurrent preview limit** and created no preview. No settings or existing
+previews changed. The local demo does not depend on hosted previews. Final
+publication CI and review-thread checks are recorded on the PR before READY.
+
+The retained native plans are named **Native household <kind> C6E10C**. Open the
+new shared-planning app on assigned C930, choose the prepared Household, then
+Plan or Home. The 85-second
+[recording](../reports/evidence/shared-household-planning/shared-plan-demo.mp4)
+shows own correction, authorized bill edit, Search return and Spanish reopen.
+[Restart and click-through instructions](../../ios/HOUSEHOLD_SETUP.md#shared-planning-worker-separate-retained-demonstration)
+use only 59750–59755, the new bundle/cache and retained synthetic users/data.
+
+**Remaining limits:** no physical-iPhone/internet verification, deployment,
+hosted migration/enablement or external invitation delivery. The lane remains
+unmerged. One non-blocking invalid-frame runtime warning is retained in the
+native result; the established root/design is unchanged. Other MVEE journeys,
+including imports, Updates and conversation/voice, keep their existing owners
+and scope in this manifest. Completed writers/reviewer are stopped. The demo API,
+Auth/Postgres and CAPTCHA bridge remain available; temporary fault/recording
+helpers are stopped. Existing demos, design simulator/cache and phone services
+are preserved.
+
+### Outcome, owners and execution
+
+The captain owns this one lane through a merge-ready PR: two signed-in members
+create, share, inspect, edit and manage budgets, bills, savings goals and debt
+commitments, with unequal responsibilities, actual versus planned progress,
+private funding, attributable corrections and durable recovery. An unauthorized
+third identity cannot discover or access these records. Personal plans remain
+private unless explicitly shared. [MVEE Household][mvee-household] and
+[MVEE Plan][mvee-plan] retain product authority.
+
+The backend writer `shared_plan_implementation` owns financial rules, canonical
+services, schemas, routers, migrations and domain tests. The native writer
+`shared_plan_native_scout` owns transport/models/screens/localization against
+the fixed typed wire; it cannot change financial rules. Each shared surface has one writer.
+The captain owns local fixture/runner helpers, UI acceptance tests, runtime
+resources, documentation, integration, durable evidence and release claims.
+Read-only scouts/reviewer own no source or runtime resources. No second
+allocation owner or financial ledger.
+
+| Surface owned by this lane | Existing owner to retain | Bounded change |
+| --- | --- | --- |
+| `src/argus/domain/household/` | Membership, grant incarnations and live authorization | Explicit plan consent and safe authorized projections/adapters |
+| `src/argus/domain/recording/canonical_groups.py`, bounded Money persistence/read changes | Recording owns exact logical groups, revisions and actual legs | Complete current-group resolution before authorized projection; only then a safe canonical cross-owner extension |
+| `src/argus/domain/planning/` | Budgets, recurrence, goal pools, debt intentions and canonical activity claims | Shared responsibilities and authorized participant activity linking without duplicate facts |
+| `src/argus/domain/financial_search.py` | Financial search and origin continuity | Authorized shared plan retrieval; no private funding disclosure |
+| `src/argus/api/routers/household*`, bounded new shared-plan router, router registration | Thin authenticated transport | Additive documented shared Plan routes using canonical services |
+| Bounded additive `supabase/migrations/` and `tests/household/`, `tests/planning/` | Owner-qualified integrity, RLS, transaction locks and receipts | Plan consent/claims; concurrency, privacy and Personal regression evidence |
+| `ios/Packages/ArgusSession/` Household/Plan types and transport | Auth, actor partitioning and durable exact-byte journal | Typed scoped commands/reads; preserve session and recovery ownership |
+| `ios/ArgusFoundation/Household/` and bounded new shared-plan module | Connected Household model and existing domain details | Shared lifecycle, participant rights and private contribution controls |
+| Shared native root, Connected shell, Home/Plan/Search mounting and localization | Landed #760/#766 composition | Native writer alone serializes minimal root/session changes; no redesign |
+| `ios/ArgusFoundationUITests/` and `ios/FinancialModelTests/` | Native assembled proof and production model checks | Captain owns UI acceptance; native writer owns model checks; no duplicate edits |
+| Existing API/data contracts, this board and lane evidence packet | Respective canonical document owners | Contract first; durable exact-head evidence and restart recipe |
+
+Open PR inventory at start found #762 (design-only), #732 (frozen web preview)
+and #646 (unrelated chat); no open integration backend delivery PR. The design
+owner reports a clean checkpoint and a proposed, not started, typography/input
+pass. Its private checkout, physical-device signing and simulator remain untouched.
+Root/session/model/API/migration overlap is reserved above; recheck before READY.
+
+### Required journeys and proof
+
+| User outcome | Inherit | Remaining work | Actual dependency | Assembled acceptance |
+| --- | --- | --- | --- | --- |
+| Share/create/manage each of budget, bill, goal and debt commitment | Personal domain services and original identities | Explicit consent/participants, view/edit and archive/restore | Accepted plan permission interaction; canonical domain contract | A and B manage authorized definitions; C and unshared Personal IDs denied |
+| Agree unequal planned contributions | Canonical schedules, exact currency money | Named responsibilities, planned amounts separate from actual | Shared definition/participant contract | 70/30 intention remains distinct from 20/10 actually recorded, without forced equal split |
+| Record/link using private funding | Recording preview/confirm, original revisions, Plan claims | Explicit minimal contribution disclosure and atomic linking | Canonical account-owner boundary and one activity claim owner | Shared amount/date/person/status only; private source IDs/names/balances/notes/history absent through details, Home, Search, totals and receipts |
+| Correct and recover without duplicate money | CAS, owner locks, exact-byte journals, original activity screens | Scoped attribution, concurrent edit and live replay authorization | Current original permissions and membership incarnation | Correction recomputes progress; double-tap/lost response retries commit once; stale competing edit explicitly rejected |
+| Leave/remove/revoke safely | Landed membership and account grants | Shared-plan access/claim visibility invalidation | Existing approved departure policy; explicit plan consent | Access stops immediately and after relaunch, owner records and legitimate activity remain; rejoin does not revive old grants |
+| Refresh authorized Home/Plan/Search | Existing projections and navigation origin | One shared projection owner and context-preserving readers | All four canonical domain adapters | Both users refresh/reopen to consistent authorized progress; unknown/currency rules and Personal regressions hold |
+| Safe unavailable state | Server Household default-off and native availability owner | Shared-plan disabled-surface coverage | Existing server exposure gate | No protected read/write/UI or stale protected replay while disabled; no false departure or data loss |
+
+### Decisions and verification disposition
+
+The following is preserved **pre-restart investigation history**. The active
+implementation, assigned resources, publication and verification state are in
+the checkpoints above; historical pending states below are not current blockers.
+
+Pre-change deterministic baseline: **81 passed, 74 skipped, zero failures**
+(15.47s), recorded in [baseline.json](../reports/evidence/shared-household-planning/baseline.json).
+Skipped cases require the not-yet-assigned disposable Postgres DSN; they establish
+no database acceptance. Existing Household Plan is still explicitly unavailable.
+No new demo or shared-planning behavior is claimed at this checkpoint.
+Existing native transport/session baseline also compiles: **64 passed, one
+opt-in local-service test skipped, zero failures**, at `150a9b10`. Live session
+tests were excluded and no Auth fixture was supplied. The command and durable
+log are in the same baseline packet. This is not shared-planning native proof.
+
+Two code-grounded shapes were inspected: consent/responsibility references around
+canonical definitions, versus explicit Household scope embedded in definitions.
+Prefer the additive reference shape if it closes canonical global claims and
+private allocation without a second store of money. The backend implementation
+writer is `shared_plan_implementation`; the typed wire is its first integration
+checkpoint. The founder restart above settles permissions and departure; dependent work
+now follows those rules.
+
+The proposed technical shape is preserved in the existing
+[API contract](../API_CONTRACT.md#shared-household-planning-contract-sketch) and
+[data model](../DATA_MODEL.md#shared-household-planning-storage-sketch). It is
+not implemented or enabled. The architecture check identified a required
+complete-transaction/current-revision resolver, actual leg owners, safe read
+projections, global claim uniqueness, one normalized savings allocation owner,
+and ordered cross-owner locks. Raw owner-readable claims and cascade deletion
+must not expose or erase another person's private financial records. These
+requirements remain implementation and database verification work, not proof
+of delivery. Initial contract preparation created no runtime resources. The
+isolated local database assigned for the subsequent read checks is recorded
+below; no simulator or connected API is running. Bounded read-only scouts and
+contract preparation are complete. Independent complete-group reads are
+implemented at `2499e3c5a602c4b50b03bc9be8d7fb631feeae3f` in
+`canonical_groups.py` and Household `financial.py`/`projection.py`. The writer
+reported **45 passed / 65 skipped** focused regressions and clean scoped Ruff.
+The captain verified the affected subset at that exact commit: **10 passed /
+30 skipped**, zero failures. Missing exact references and incomplete paired
+groups fail closed; current revision controls visibility before existing
+redaction. Account positions load separately.
+[Commands and evidence](../reports/evidence/shared-household-planning/canonical-read-check.json)
+explicitly mark SQL-backed load/snapshot/history unverified without the local
+DSN. This step retains current write permissions and cross-owner rejection.
+No shared plan, contribution or native delivery is claimed.
+
+Independent follow-up verification at `d3147db88e8b7efe01af0f23256b929b575b48a1`
+ran the same focused regression set against the new lane-owned local Postgres
+59702: **110 passed, zero skipped, zero failures**. This includes the SQL-backed
+resolver, Household visibility/history, correction, receipt and Personal debt
+regressions. The assigned local allocation is `ios-accounts-59700`, isolated
+Auth 59701 / Postgres 59702; API 59700 and CAPTCHA 59705 are reserved for later
+assembled work. Its configuration and state live only in this worker's ignored
+`ios/.build/accounts-local-59700`. Other allocations remain untouched.
+[CI at this head](https://github.com/lagarcess/argus/actions/runs/36901975308) is
+SUCCESS, including backend, frontend and required guest database/Auth gates.
+Durable [Postgres proof](../reports/evidence/shared-household-planning/canonical-read-postgres-check.json)
+records the exact source and 110 executed tests. These checks do not prove shared
+planning or native acceptance. A fresh fetch still reports integration
+`15e57931584b21dd7f9e453dbeb9127fc4b8cff3`; no reconciliation is needed at this
+component checkpoint. The open PR inventory has no other backend delivery lane.
+
+The sole writer's next independent prerequisite owns
+`src/argus/domain/planning/goal_allocations.py`, bounded `planning/storage.py`,
+one additive local-only allocation migration and focused PG tests. It replaces
+owner-readable goal-body residuals with one canonical owner-qualified allocation
+relation, retaining Personal API shape and the existing pool reducer. No shared
+rows, foreign-authority writers, plan permissions, custody or native UI are
+activated by this prerequisite alone. The approved restart now authorizes the
+required source/cutover and settles dependent rights/custody. Historically,
+automatic approval review rejected the
+combined storage/migration patch and then the strictly source-only proposal.
+Its stated reason was missing direct founder authorization for the allocation
+backfill, JSON-field removal and storage/RLS change. No source patch or database
+migration was applied before restart. The founder subsequently approved the
+exact change and requires a new disposable local test database; 59702 is not a
+migration target. Production migrations
+and hosted changes remain prohibited. The test-first
+[draft](../reports/evidence/shared-household-planning/goal-allocation-tests-pending.py.txt)
+is preserved outside test discovery: its initial case failed on the intended
+existing JSON authority, and the expanded cases have not been executed against
+the nonexistent new schema. That red test is not passing acceptance evidence. A schema/code cutover would need coordination; reverting the
+adapter alone after a future durable cutover is unsafe.
+
+The checkpoint's temporary groups, splitting and guest proposals do not define
+Household permissions. Guest finance remains registered-only. A narrow proposed
+People & permissions / private-contribution review interaction is approved by
+the restart above; implementation and acceptance are still required.
+Existing account edit grants never grant plan editing. Shared plan editing never
+authorizes private activity correction, ownership change or resharing.
+
+Grounding identified real owner-qualified Money/Plan boundaries and protected
+personal receipt payloads. Reuse must preserve those constraints and live
+Household checks before replay; do not pretend a foreign-owner transfer is
+already supported. Contract and smallest safe canonical extension are settled
+within this implementation before dependent writes, never as a parallel ledger.
+
+Execution checklist: (1) ground/record ownership and missing interaction;
+(2) choose the smallest canonical contract and privacy shape; (3) implement and
+verify one connected shared journey at a time across all four plan types;
+(4) assembled real Auth/API/Postgres/native proof and durable recording;
+(5) fresh independent review and only affected fixes; (6) fresh one-way
+integration reconciliation, merged-tree modularity and exact-head CI; (7) PR and
+restart handoff. Component checks do not establish assembled or phone delivery.
+
+The active resource assignment and implementation checkpoint above supersede
+these historical prerequisite states. Native assembled acceptance remains
+pending; all prior demos and the physical-phone environment stay preserved. No merge, deployment, hosted changes,
+production data, paid providers or physical-phone internet readiness is granted.
+The entire assigned shared-planning outcome remains required through resumed implementation; it is not narrowed or newly deferred.
+
+### Historical stopped prerequisite stack
+
+Only the new `ios-accounts-59700` services were stopped; their local data is
+retained. Existing demos, design/phone environments and source remain intact.
+No native simulator was created and no connected API was started by this lane.
+From this worker worktree, restart the component test database with:
+
+```sh
+python3 ios/scripts/auth/local_stack.py start --accounts --port-base 59700
+```
+
+The 110-test reproduction command and exact checked source are in the linked
+Postgres proof. Use only its synthetic loopback Postgres 59702, never a hosted
+DSN. The pending allocation test draft is deliberately outside discovery until
+its prerequisite is authorized and implemented. Stop only this allocation with:
+
+```sh
+python3 ios/scripts/auth/local_stack.py stop --accounts --port-base 59700
+```
+
+This is a runnable database-check checkpoint, not a shared-planning app demo.
+The existing #766 native Household demo remains the connected demonstration;
+this lane's four shared-plan journeys, recording and assembled acceptance remain
+undelivered and required. The next writer resumes the existing branch and fixed
+design snapshot, not a new roadmap or a replacement environment.
+
 ## PR #766 integration landing
 
 Founder-confirmed squash merge of the verified Household native head;
@@ -2295,9 +2702,9 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants and physical-phone proof remain tracked | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants are locally verified in #773 pending merge; physical-phone proof remains pending | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762 | Assigned Household context adapter in the active lane above; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof for this lane; later private lifecycle/move evidence remains required |
-| [Household][mvee-household], D07 | Existing identities/accounts/history, fixed #762 create/invite/accept/People flow and #763 landed default-off membership API | Active bounded lane: membership, invitations, explicit account grants; **permission policy founder-approved 2026-10-01**. Shared plans, private contributions, other consumers and live delivery retain their dependencies | Household captain; one membership/authorization writer | Identities; locked member/edit/departure policy; existing financial adapters | Two synthetic users on Auth/API/Postgres and assigned C930 native simulator; revocation/isolation; physical-phone and other shared journeys remain required |
+| [Household][mvee-household], D07 | #763/#766 landed membership, invitations, explicit account consent and canonical activity with retained native/API/Postgres proof | #773 locally verifies shared budgets, bills, goals, debt commitments and private contributions; merge pending. External invitation delivery, other authorized consumers and physical-phone/hosted delivery remain required | Household captain; existing membership, financial and allocation owners | Approved rights/departure policy; canonical Recording/Plan; fixed `7f72dfd7` presentation | Two member identities plus unauthorized C; four-kind native journey, recovery, English/Spanish, real Postgres privacy/removal tests; phone/internet proof still pending |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |

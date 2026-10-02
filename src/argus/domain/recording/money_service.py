@@ -13,7 +13,6 @@ from argus.domain.recording.money_reads import (
     activity,
     current_activities,
     groups,
-    render_activity,
 )
 from argus.domain.recording.money_schemas import MoneyRequest
 from argus.domain.recording.repository import StoredAccount
@@ -30,8 +29,10 @@ class MoneyService:
         self, *, user_id: str, request: MoneyRequest, activity_id: str | None = None
     ) -> dict[str, Any]:
         activity_id = self._id(activity_id)
+        records = self.accounts.list_accounts(user_id=user_id)
+        self.require_personal(records, request, activity_id)
         return plan(
-            self.accounts.list_accounts(user_id=user_id),
+            records,
             request,
             activity_id,
             self.accounts._clock(),
@@ -50,6 +51,7 @@ class MoneyService:
         activity_id = self._id(activity_id)
 
         def planner(accounts: list[StoredAccount]) -> MoneyPlan:
+            self.require_personal(accounts, request, activity_id)
             return self.prepare(accounts, request, activity_id)
 
         records, aid, revision, affected, replayed = transact(
@@ -101,8 +103,9 @@ class MoneyService:
             raise AccountNotFound()
         return {
             "items": [
-                render_activity(aid, revisions, r)
+                activity(records, aid, r)
                 for r in sorted(revisions, reverse=True)
+                if any(s.account.user_id == user_id for s, _, __ in revisions[r])
             ],
             "next_cursor": None,
         }
@@ -129,6 +132,16 @@ class MoneyService:
                 }
             )
         return {"items": sorted(items, key=lambda a: a["occurred_at"], reverse=True)}
+
+    @staticmethod
+    def require_personal(records, request, activity_id):
+        canonical = getattr(records, "canonical", None)
+        if canonical is not None:
+            from argus.domain.household.access import dependencies
+
+            ids = dependencies(canonical.records, request, activity_id)
+            if not ids <= {s.account.id for s in records}:
+                raise AccountNotFound()
 
     @staticmethod
     def _id(value: str | None) -> str | None:

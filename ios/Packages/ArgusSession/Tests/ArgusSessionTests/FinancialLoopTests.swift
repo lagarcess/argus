@@ -3,6 +3,18 @@ import XCTest
 @testable import ArgusSession
 
 final class FinancialLoopTests: XCTestCase, @unchecked Sendable {
+    func testDestinationOnlyOriginalKeepsAmountUnknownWhileSourceOwnerKeepsFullFacts() throws {
+        let source = UUID(), destination = UUID()
+        let redacted = try MoneyActivityWireFixture.detail(source: source, destination: destination, kind: .debtPayment, redacted: true)
+        XCTAssertNil(redacted.amount); XCTAssertNil(redacted.amountMinor); XCTAssertNil(redacted.principalMinor)
+        XCTAssertNil(redacted.note); XCTAssertNil(redacted.reason); XCTAssertNil(redacted.recordedBy)
+        XCTAssertEqual(redacted.legs.map(\.accountId), [destination]); XCTAssertEqual(redacted.legs[0].balanceMovementMinor, -1000)
+        XCTAssertFalse(redacted.originalAmountAvailable)
+        let full = try MoneyActivityWireFixture.detail(source: source, destination: destination, kind: .debtPayment, redacted: false)
+        XCTAssertEqual(full.amount, MoneyActivityWireFixture.amount); XCTAssertEqual(full.amountMinor, MoneyActivityWireFixture.amountMinor)
+        XCTAssertEqual(full.principalMinor, 1000); XCTAssertNotNil(full.note); XCTAssertTrue(full.originalAmountAvailable)
+        XCTAssertEqual(full.legs.map(\.accountId), [source, destination])
+    }
     func testHomePreservesAggregateBeyondInt64AndUnknownCoverage() throws {
         let raw = #"{"currencies":[{"currency":"DOP","currency_fraction_digits":2,"cash_minor":"18446744073709551614","other_assets_minor":"0","assets_minor":"18446744073709551614","debts_minor":"0","net_worth_minor":"18446744073709551614","known_accounts":2,"unknown_accounts":1,"recorded_spending_minor":"50","as_of":null}],"recent_activity":[],"recorded_at":"2026-09-29T12:00:00Z"}"#
         let home = try JSONDecoder().decode(FinancialHome.self, from: Data(raw.utf8))
