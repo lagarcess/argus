@@ -2734,6 +2734,206 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/plaid/exchange:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: 'Idempotent: a retried exchange or a re-linked Item returns the existing
+
+        connection with ``created=false``.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeResponse'
+        '200':
+          description: Already connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/plaid/link-token:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/LinkTokenRequest'
+              - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkTokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/plaid/webhook:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: Plaid-signed; no user session. Answers quickly and syncs afterwards.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookReceipt'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/plaid/{connection_id}/link-token:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: Link update mode for a connection that needs the person's login again.
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/LinkTokenRequest'
+              - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkTokenResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/plaid/{connection_id}/reconnected:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      description: 'After Link update mode succeeds: re-check the Item, then resume syncing.'
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialConnectionResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-connections/plaid/{connection_id}/sync:
+    post:
+      tags:
+      - financial-accounts
+      - financial-connections
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/financial-connections/{connection_id}/disconnect:
     post:
       tags:
@@ -10127,6 +10327,28 @@ components:
       - payload
       - created_at
       - updated_at
+    ExchangeRequest:
+      properties:
+        public_token:
+          type: string
+          maxLength: 200
+          minLength: 1
+          pattern: ^public-[A-Za-z0-9-]+$
+      additionalProperties: false
+      type: object
+      required:
+      - public_token
+    ExchangeResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        created:
+          type: boolean
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - created
     ExistingDefinition:
       properties:
         ref:
@@ -11668,6 +11890,30 @@ components:
       required:
       - occurrence
       - replayed
+    LinkTokenRequest:
+      properties:
+        language:
+          type: string
+          enum:
+          - en
+          - es
+          default: en
+      additionalProperties: false
+      type: object
+    LinkTokenResponse:
+      properties:
+        link_token:
+          type: string
+        expiration:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - link_token
+      - expiration
     LinkWrite:
       properties:
         expected_version:
@@ -16236,6 +16482,47 @@ components:
       type: object
       required:
       - success
+    SyncResponse:
+      properties:
+        connection:
+          $ref: '#/components/schemas/FinancialConnectionResponse'
+        sync:
+          $ref: '#/components/schemas/SyncSummary'
+      additionalProperties: false
+      type: object
+      required:
+      - connection
+      - sync
+    SyncSummary:
+      properties:
+        status:
+          type: string
+          enum:
+          - synced
+          - not_ready
+          - busy
+          - no_sink
+          - failed
+          - sink_failed
+          - superseded
+        added:
+          type: integer
+        modified:
+          type: integer
+        removed:
+          type: integer
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - status
+      - added
+      - modified
+      - removed
+      - error_code
     ToolResultRecomputeRequest:
       properties:
         message_id:
@@ -16516,6 +16803,14 @@ components:
       type: object
       required:
       - expected_version
+    WebhookReceipt:
+      properties:
+        received:
+          type: boolean
+      additionalProperties: false
+      type: object
+      required:
+      - received
     argus__domain__financial_search__SearchPage:
       properties:
         items:
