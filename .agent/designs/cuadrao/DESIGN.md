@@ -565,8 +565,17 @@ rules rather than copying those apps' deletion semantics.
 
 ### Receipt capture and review
 
+Choose a receipt source once. Chat **Escanear / Scan** opens the native scanner.
+The group's and existing Saved receipts view's **Añadir recibo / Add receipt**
+menus offer Scan, Photos and Files, then open the chosen native picker immediately. Do not insert a second source
+chooser, currency form or promotional landing page before acquisition.
+Cancel before acquisition returns to the originating screen without a receipt.
+
 Capture saves a draft and opens a compact review. **Después / Later** lets the person
-leave immediately; leaving never confirms an expense.
+leave immediately; leaving never confirms an expense. A personal import can remain
+without a currency until review. Choose its currency once before editing amounts
+or confirming; then it stays fixed. A group supplies its fixed currency immediately.
+An unknown currency must not be displayed as DOP or another guessed currency.
 Return through the existing Chat or group entry. Do not add a top-level receipt
 inbox or automatically reopen review on launch.
 

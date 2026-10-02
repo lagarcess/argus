@@ -121,3 +121,54 @@ Build, diff and modularity checks passed. Independent scoped review and its fina
 swipe delta returned no findings; comment review required no deletions. Decisions
 and Mobbin references live in the existing Cuadrao guide; outstanding context-chip,
 return/draft continuity and direct-capture work remain in roadmap C01/C04.
+
+## Direct capture, build 3417
+
+App source: `84c7c8add595ff141a3314055566dbc0a858fbb7`.
+Signed build **3417** installed on the same iPhone, with independent installed
+version readback. Launch was blocked by the locked phone; physical interaction
+remains unverified. See [delivery evidence](direct-device.json).
+
+Receipt source choice happens once. Chat Scan opens the native scanner; Plan
+Expenses and the existing Saved receipts view offer Scan, Photos and Files.
+The repeated landing page and pre-capture currency form are removed. Canceling
+before acquisition creates no receipt. Successful acquisition persists the
+original before review, and Later keeps the draft. Personal imports can remain
+without currency, then choose it once during review. Group currency stays fixed.
+Generic Chat Photo/File attachments retain their separate preview behavior.
+
+Verification at this source:
+
+- **44 receipt checks and 50 group checks passed.** These include persistence,
+  unknown-currency restrictions, one-time currency locking, missing-group rejection
+  and source cleanup after an index-save failure.
+- **10 native receipt journeys passed**, split into the
+  [personal photo-import run](direct-personal-import.json) and the [remaining nine journeys](direct-final-journeys.json). Coverage includes picker cancellation, scanner-unavailable recovery,
+  generic attachment routing, Plan/Chat receipt identity, fixed group currency,
+  Later/relaunch, item assignment, confirmation and money direction.
+- Actual native Photos import used the committed fictional receipt. The original
+  source and unknown currency survive relaunch. Files picker open/cancel passed;
+  actual Files import and physical camera capture were not exercised.
+- Signed device build, diff check and modularity budget passed. Independent scoped
+  review and the final Menu delta review returned no findings.
+
+The first native run exposed a Menu label tap-area failure in Saved receipts.
+Making the label fill its row with a 44-point minimum height and using borderless
+Menu styling fixed it. Screenshot review also caught a truncated empty-state
+heading, now shortened. The aborted first run is not acceptance evidence; the
+final personal and group saved-list journeys passed after the correction.
+
+- [Receipt source menu](direct-receipt-source-menu-en.png).
+- [Saved original, currency can wait](direct-receipt-saved-currency-later-en.png).
+- [Imported draft](direct-receipt-import-draft-en.png).
+- [Group review, Spanish](direct-receipt-prepared-es.png).
+- [Same group receipt reopened from Chat](direct-receipt-plan-chat-same-record-en.png).
+
+Xcode delayed finalizing the second result bundle while collecting simulator
+diagnostics. Stopping only that post-test diagnostic collector allowed normal
+completion with exit code 0 and a Passed result; no tests were interrupted.
+
+The existing receipt keyboard frame warning remains under C10. Vision extraction,
+automatic categorization, connected financial posting and shared source access
+remain future connected work in the main roadmap. Context-chip and return/draft
+continuity work remains under C01/C04; this checkpoint does not implement it.

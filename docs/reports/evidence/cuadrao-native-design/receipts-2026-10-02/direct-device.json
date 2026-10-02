@@ -1,0 +1,12 @@
+{
+  "appSource": "84c7c8add595ff141a3314055566dbc0a858fbb7",
+  "bundleIdentifier": "local.cuadrao.design.47R3855RTJ",
+  "build": "3417",
+  "version": "0.1.0",
+  "signedBuild": "succeeded",
+  "installation": "succeeded",
+  "installedVersionReadback": "3417",
+  "launch": "blocked: device locked",
+  "physicalJourneyVerified": false,
+  "earlierInstallAttempt": "connection unavailable; later retry succeeded"
+}

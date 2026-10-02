@@ -1743,12 +1743,14 @@ Debes / You owe uses an accessible warm tone. Labels and direction symbols accom
 color. Apply this rule to group totals, people and receipt confirmation. Existing
 external repayment tracking records money returned elsewhere, not a bank transfer.
 
-**C01 capture correction retained:** source choice happens once, then native
-camera/Photos/Files acquisition. Avoid the repeated receipt landing form before
-capture. Save the source as a draft and allow review now or later; group currency
-already comes from its owner. Generic attachments must not automatically become
-receipts. This approved correction remains outstanding in the existing capture
-implementation and does not close with the People-only polish.
+**C01 direct-capture correction, October 2:** the repeated receipt landing form
+is removed. Chat Scan opens native acquisition; Plan and the existing Saved receipts
+view choose Scan, Photos or Files once. A canceled picker creates no draft. Source
+capture persists before review, and Later retains it. Personal imports can remain
+without currency until an explicit one-time choice during review. Group currency
+remains fixed. Generic Chat attachments remain separate. The native acceptance and
+phone delivery status are recorded in the
+[direct-capture checkpoint](../reports/evidence/cuadrao-native-design/receipts-2026-10-02/README.md#direct-capture-build-3417).
 [ZARA's Add receipt flow](https://mobbin.com/flows/5719cb3d-02c1-4d2a-924a-efb8bcebac86)
 shows direct camera entry, though it scans receipt QR codes rather than performing
 Cuadrao's document extraction.
