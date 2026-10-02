@@ -34,7 +34,6 @@ final class CuadraoReceiptUITests: XCTestCase {
         }
         reveal(app, app.staticTexts["receipt-unassigned"])
         XCTAssertEqual(app.staticTexts["receipt-unassigned"].label, "Todos los artículos asignados")
-        app.swipeDown()
         shot(app, "receipt-shared-items-es")
         tap(app, "receipt-confirm")
         XCTAssertEqual(app.buttons["receipt-later"].label, "Listo")
@@ -94,6 +93,20 @@ final class CuadraoReceiptUITests: XCTestCase {
         app.buttons[id].tap()
         XCTAssertTrue(app.buttons["receipt-source"].waitForExistence(timeout: 3))
         shot(app, "receipt-plan-chat-same-record-en")
+    }
+
+    func testReceiptAssignmentNamesRemainVisible() {
+        let app = launch()
+        openGroup(app)
+        tap(app, "group-add-receipt")
+        tap(app, "receipt-sample")
+        let method = app.segmentedControls["receipt-split"]
+        reveal(app, method)
+        method.buttons["Por consumo"].tap()
+        let person = app.buttons["receipt-assign-0-1"]
+        reveal(app, person)
+        XCTAssertTrue(person.staticTexts["Ana"].isHittable)
+        shot(app, "receipt-assignment-names-es")
     }
 
     func testReceiptShowsYouOweWhenAnotherPersonPaid() {
