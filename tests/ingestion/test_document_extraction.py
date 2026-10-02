@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 
 import pytest
-from argus.domain.ingestion.documents.extractor import candidates_from_result
+from argus.domain.ingestion.documents.extractor import (
+    batch_from_result,
+    candidates_from_result,
+)
 from argus.domain.ingestion.documents.models import (
     DocumentExtractionError,
     ExtractionResult,
@@ -56,11 +59,11 @@ def test_maps_balances_and_transactions_without_model_owned_identity():
         dict(observations=[]),
     ],
 )
-def test_incomplete_extraction_never_yields_partial_candidates(changes):
-    with pytest.raises(DocumentExtractionError):
-        candidates_from_result(
-            result(**changes), "a" * 64, "owner", datetime.now(timezone.utc), 1
-        )
+def test_incomplete_extraction_remains_reviewable_with_explicit_issue(changes):
+    parsed = result(**changes)
+    batch = batch_from_result(parsed, "a" * 64, "owner", datetime.now(timezone.utc), 1)
+    assert batch.issues
+    assert batch.observations == parsed.observations
 
 
 def test_model_cannot_choose_connection_or_owner():
@@ -72,15 +75,15 @@ def test_model_cannot_choose_connection_or_owner():
         ExtractionResult.model_validate(body)
 
 
-def test_unscoped_balance_rejects_batch_even_with_valid_transactions():
+def test_unscoped_balance_keeps_draft_and_valid_transaction():
     body = result().model_dump(mode="json")
     body["observations"][1]["balance_scope"] = None
     parsed = ExtractionResult.model_validate(body)
-    observed_at = datetime.now(timezone.utc)
-    transaction_only = parsed.model_copy(update={"observations": parsed.observations[:1]})
-    assert len(candidates_from_result(transaction_only, "a" * 64, "owner", observed_at, 1)) == 1
-    with pytest.raises(DocumentExtractionError, match="invalid_extraction"):
-        candidates_from_result(parsed, "a" * 64, "owner", observed_at, 1)
+    batch = batch_from_result(parsed, "a" * 64, "owner", datetime.now(timezone.utc), 1)
+    assert len(batch.candidates) == 1
+    assert len(batch.observations) == 2
+    assert batch.observations[1].balance_scope is None
+    assert batch.issues[0].code == "candidate_incompatible"
 
 
 def test_provider_schema_avoids_unique_items_and_candidates_own_deduplication():
@@ -197,12 +200,13 @@ async def test_missing_vision_config_does_not_call_provider(monkeypatch, respx_m
 
 @pytest.mark.parametrize("amount", ["-12.00", "1e999999999", "NaN", "1,200.00"])
 def test_non_decimal_amount_cannot_reach_canonical_conversion(amount):
-    from pydantic import ValidationError
-
     body = result().model_dump(mode="json")
     body["observations"][0]["amount"] = amount
-    with pytest.raises(ValidationError):
-        ExtractionResult.model_validate(body)
+    parsed = ExtractionResult.model_validate(body)
+    batch = batch_from_result(parsed, "a" * 64, "owner", datetime.now(timezone.utc), 1)
+    assert batch.observations[0].amount == amount
+    assert len(batch.candidates) == 1 and batch.candidates[0].evidence == "balance"
+    assert batch.issues[0].fields == ("amount",)
 
 
 def document_payload(model="openai/gpt-6-luna", task="document_extraction"):
@@ -257,9 +261,7 @@ def test_other_model_and_task_wire_contracts_are_unchanged(model, task):
     assert "max_tokens" in payload and "max_completion_tokens" not in payload
 
 
-@pytest.mark.parametrize(
-    "field,value", [("amount", "-1"), ("occurred_on", "not-a-date"), ("page", 9)]
-)
+@pytest.mark.parametrize("field,value", [("occurred_on", "not-a-date"), ("page", 9)])
 def test_wire_projection_does_not_weaken_local_field_validation(field, value):
     from pydantic import ValidationError
 

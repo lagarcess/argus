@@ -58,6 +58,22 @@ def test_checkpoint_is_immutable_and_owner_scoped(
         batch=changed,
     )
     assert store.get(user_id=users["owner"], connection_id=row.id) == batch
+    from argus.domain.ingestion.documents.models import DocumentDraft
+
+    legacy_capture = DocumentDraft(
+        connection_id=row.id,
+        filename="legacy.pdf",
+        media_type="application/pdf",
+        sha256="b" * 64,
+        size_bytes=12,
+        created_at=now,
+        updated_at=now,
+    )
+    assert store.capture(
+        user_id=users["owner"], draft=legacy_capture, content=b"%PDF-fixture"
+    )
+    assert store.source(user_id=users["owner"], connection_id=row.id) == b"%PDF-fixture"
+    assert store.get(user_id=users["owner"], connection_id=row.id) == batch
     assert store.get(user_id=users["other"], connection_id=row.id) is None
     assert not store.save(
         user_id=users["other"], connection_id=row.id, holder=holder, now=now, batch=batch
@@ -86,3 +102,52 @@ def test_clients_have_no_checkpoint_access(pool: ConnectionPool) -> None:
                     (role, privilege),
                 ).fetchone()
                 assert allowed == (False,)
+
+
+def test_capture_survives_new_store_handles_and_disconnect_hides_source(
+    pool: ConnectionPool, users: dict[str, str]
+) -> None:
+    from argus.domain.ingestion.documents.models import DocumentDraft
+
+    now = datetime.now(timezone.utc)
+    repo = PostgresConnectionRepository(pool)
+    owner, other = users["owner"], users["other"]
+    connection = repo.create(
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label="Document",
+        now=now,
+    )
+    draft = DocumentDraft(
+        connection_id=connection.id,
+        filename="synthetic.pdf",
+        media_type="application/pdf",
+        sha256="a" * 64,
+        size_bytes=12,
+        created_at=now,
+        updated_at=now,
+    )
+    source = b"%PDF-fixture"
+    assert PostgresDocumentStore(pool).capture(user_id=owner, draft=draft, content=source)
+    with ConnectionPool(shared.DSN, min_size=0, max_size=2) as restarted:
+        store = PostgresDocumentStore(restarted)
+        assert store.draft(user_id=owner, connection_id=connection.id) == draft
+        assert store.source(user_id=owner, connection_id=connection.id) == source
+        assert store.source(user_id=other, connection_id=connection.id) is None
+        changed = draft.model_copy(
+            update={"version": 2, "status": "queued", "consent": True}
+        )
+        assert store.update(user_id=owner, draft=changed, expected_version=1)
+        assert not store.update(user_id=owner, draft=changed, expected_version=1)
+        repo.disconnect(user_id=owner, connection_id=connection.id, now=now)
+        assert store.source(user_id=owner, connection_id=connection.id) is None
+        assert store.draft(user_id=owner, connection_id=connection.id) is None
+        assert not store.capture(user_id=owner, draft=draft, content=source)
+        assert not store.update(user_id=owner, draft=changed, expected_version=2)
+        store.forget(user_id=owner, connection_id=connection.id)
+    with pool.connection() as sql:
+        assert sql.execute(
+            "select count(*) from public.financial_document_extractions where connection_id=%s",
+            (connection.id,),
+        ).fetchone() == (0,)

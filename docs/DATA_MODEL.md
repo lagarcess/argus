@@ -3120,20 +3120,39 @@ write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.
 
 ## Import reconciliation
 
-`financial_document_extractions` is a server-only delivery checkpoint keyed by
-statement connection, with owner, creation time and the validated canonical
-candidate batch plus bounded extraction metadata. It contains no raw document
-bytes or OCR text and grants no access to `anon` or `authenticated` roles.
-This checkpoint freezes extraction across delivery retries; reconciliation
-continues to own review state and MoneyService owns canonical activity.
+`financial_document_extractions` owns the private retained source, durable draft
+and immutable preparation delivery checkpoint, keyed by the existing statement
+connection. It is not a second ledger. `source_bytes` is bounded to 10 MiB;
+`draft` stores source metadata, consent, preparation status, version and destination
+or split proposals. `batch` holds typed observations, receipt itemization,
+projection issues and compatible canonical candidates. It may be null before
+preparation. Legacy rows can have a batch without retained source; a duplicate
+upload can attach that source without changing the frozen batch.
 
-Saving locks the live owner connection, checks its lease holder and expiry,
-and inserts once. A stale worker cannot overwrite a saved extraction or save
-after disconnect. Disconnect removes checkpoints before the normal import
-cleanup; accepted activity remains under existing retention rules. Connection
-and user deletion cascade. Raw files must be re-uploaded after an interruption
-before a checkpoint exists. A document connection uses an owner-scoped file
-digest, so identical bytes uploaded by different people never share state.
+The October 2 founder clarification explicitly replaces this lane's former
+transient-file policy. Source files remain until explicit disconnect/deletion;
+rendered images and OCR intermediates stay transient. Row level security and
+revoked client grants remain. Owner/live-connection checks protect all draft and
+source reads. User/connection deletion cascades; disconnect removes source,
+draft and preparation while accepted financial activity follows existing retention.
+
+Capture locks the live owner connection and saves source plus draft before
+background dispatch. Draft updates compare versions, and preparation completion
+checks the connection lease. Duplicate capture cannot replace a source or reset
+an attempt. A persisted in-flight state prevents automatic retry after uncertain
+process loss. Queued work can resume explicitly; frozen candidate delivery can
+repeat without another model request. The process background task is not the
+source of durability.
+
+Preparation status is `saved|queued|preparing|review_ready|needs_attention`.
+Approval state remains in reconciliation events. Valid observations can project
+independently while incompatible observations stay on the draft with issues.
+Opening/running scopes and unknown scopes remain reviewable preparation evidence
+without being relabeled into the narrower canonical candidate scope enum. Receipt
+items, tax/service, tip and totals do not independently create financial records.
+Destination/payer/participant/item assignments remain private proposals and grant
+no access or sharing. Canonical Plan owns authorization and fixed currency;
+MoneyService owns confirmed financial activity.
 
 Default-off with `ARGUS_INGESTION_ENABLED`. Lane spec:
 [financial-ingestion-connectors](specs/lanes/financial-ingestion-connectors.md).

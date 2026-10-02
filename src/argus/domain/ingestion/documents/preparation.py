@@ -1,4 +1,4 @@
-"""Bounded local decoding. Source bytes live only for this call."""
+"""Bounded local decoding. Rendered pages and OCR intermediates are transient."""
 
 from __future__ import annotations
 
@@ -177,3 +177,18 @@ def prepare_document(
         return PreparedDocument(
             pages, tuple(images), text_path.read_text(errors="replace")
         )
+
+
+def validate_source(content: bytes, media_type: str) -> None:
+    """Validate bounded capture without requiring extraction tools or credentials."""
+    if not content:
+        raise DocumentExtractionError("document_empty")
+    if len(content) > DocumentExtractionSettings().max_bytes:
+        raise DocumentExtractionError("document_too_large")
+    if media_type in ("image/jpeg", "image/png"):
+        _image(content, media_type)
+    elif media_type == "application/pdf":
+        if not content.startswith(b"%PDF-"):
+            raise DocumentExtractionError("invalid_document")
+    else:
+        raise DocumentExtractionError("unsupported_media_type")

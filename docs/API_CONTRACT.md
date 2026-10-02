@@ -8006,12 +8006,43 @@ backend contracts under implementation in the default-off lane, not hosted or
 native availability claims.
 
 `POST /api/v1/financial-documents` accepts bounded PDF, JPEG or PNG bytes and an
-optional `X-Document-Filename`. Capture does not require a model, provider key,
+optional `X-Document-Filename`. Optional `X-Document-Proposal` is a bounded
+(8192-character) JSON `DraftProposal`, saved atomically with the source so a known
+Plan destination survives closing the app immediately after capture. It grants no
+Plan access or sharing. Capture does not require a model, provider key,
 OCR tools, successful extraction or candidate sink. Provider consent remains
 explicit: `X-Extraction-Consent: true` allows background preparation; capture
 without it remains saved. Existing registered-owner/accounts/ingestion/document
 feature gates remain. The model stays `ARGUS_VISION_MODEL`; no fallback or retry
 is implied by capture or recovery.
+
+Capture responds with `{connection_id,status,replayed,candidate_count}`. `status`
+is preparation state (`saved|queued|preparing|review_ready|needs_attention`), never
+an approval flag. Approval remains owned by reconciliation events on that connection.
+The response can be `queued` even when a fast background task completes before the
+client reads it. Poll `GET /financial-documents/{connection_id}` for current state.
+
+- `GET /financial-documents?limit=50&offset=0` returns bounded draft metadata and
+  `next_offset`; maximum limit is 100. Full preparation is not included in lists.
+- `GET /financial-documents/{connection_id}` returns source metadata, lifecycle,
+  version, consent, proposal and optional `preparation`. Preparation contains typed
+  observations, receipt detail, candidates, completeness/readability and projection
+  issues. Internal provider/route metadata is excluded. The connection ID links to
+  existing import review; no duplicate approval state is stored here.
+- `GET /financial-documents/{connection_id}/source` returns the retained file as a
+  download with a safe generic filename, `Cache-Control: no-store` and `nosniff`.
+- `POST /financial-documents/{connection_id}/prepare` and `/resume` queue explicit
+  preparation or replay saved candidate delivery. A fresh provider attempt requires
+  `X-Extraction-Consent: true`; replay of saved preparation makes no provider call.
+- `PATCH /financial-documents/{connection_id}/proposal` accepts `{version,proposal}`.
+  Proposal has optional `plan_ref` (existing `PlanRef`), requested-plan label, payer,
+  participants, `equal|items` method and item assignments with multiple participant
+  IDs for shared items. A stale version or active preparation returns 409. Proposals
+  do not change extracted evidence, grant access, share content or write money.
+
+All draft/source reads are owner-only and `no-store`. Missing retained source on
+an older checkpoint is explicit (`source_available=false`); an identical reupload
+can attach source to that same checkpoint without repeating extraction.
 
 The existing document checkpoint owns retained source, preparation lifecycle and
 prepared evidence. Owner-authorized draft and source reads support close/reopen.

@@ -5,16 +5,26 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import re
 from datetime import datetime
+from decimal import Decimal
+from typing import get_args
 
 from pydantic import ValidationError
 
-from argus.domain.ingestion.contract import Attachment, ImportCandidate, SourceRef
+from argus.domain.ingestion.contract import (
+    AccountHint,
+    Attachment,
+    BalanceScope,
+    ImportCandidate,
+    SourceRef,
+)
 from argus.domain.ingestion.documents.config import DocumentExtractionSettings
 from argus.domain.ingestion.documents.models import (
     DocumentExtractionError,
     ExtractionBatch,
     ExtractionResult,
+    ProjectionIssue,
 )
 from argus.domain.ingestion.documents.preparation import prepare_document
 from argus.llm.openrouter import (
@@ -48,6 +58,138 @@ Descriptions and merchants should be short factual labels. Do not copy document 
 """
 
 
+def _plain_amount(value: str | None) -> bool:
+    return (
+        value is not None
+        and re.fullmatch(r"[0-9]{1,18}(?:\.[0-9]{1,8})?", value) is not None
+    )
+
+
+def batch_from_result(
+    result: ExtractionResult,
+    digest: str,
+    connection_id: str,
+    observed_at: datetime,
+    pages: int,
+) -> ExtractionBatch:
+    issues = []
+    if not result.readable:
+        issues.append(ProjectionIssue(code="unreadable_document"))
+    if not result.complete or sorted(result.pages_read) != list(range(1, pages + 1)):
+        issues.append(ProjectionIssue(code="incomplete_extraction"))
+    if not result.observations:
+        issues.append(ProjectionIssue(code="no_financial_observations"))
+    receipt_rows = [row for row in result.observations if row.evidence == "transaction"]
+    receipt_ambiguous = result.receipt is not None and len(receipt_rows) != 1
+    if (
+        result.receipt is not None
+        and len(receipt_rows) == 1
+        and result.receipt.total is not None
+    ):
+        total, amount = result.receipt.total, receipt_rows[0].amount
+        receipt_ambiguous = not (
+            _plain_amount(total) and _plain_amount(amount)
+        ) or Decimal(total) != Decimal(amount)
+    if result.receipt is not None and len(receipt_rows) == 1:
+        receipt, purchase = result.receipt, receipt_rows[0]
+        if receipt.currency is not None and purchase.currency is not None:
+            try:
+                if (
+                    AccountHint(currency=receipt.currency).currency
+                    != AccountHint(currency=purchase.currency).currency
+                ):
+                    receipt_ambiguous = True
+            except ValidationError:
+                receipt_ambiguous = True
+        if (
+            receipt.occurred_on is not None
+            and purchase.occurred_on is not None
+            and receipt.occurred_on != purchase.occurred_on
+        ):
+            receipt_ambiguous = True
+    if receipt_ambiguous:
+        issues.append(ProjectionIssue(code="receipt_purchase_ambiguous"))
+    seen = set()
+    candidates = []
+    for row in result.observations:
+        identity = (row.page, row.row)
+        if row.page > pages or identity in seen:
+            issues.append(
+                ProjectionIssue(
+                    page=row.page, row=row.row, code="invalid_observation_identity"
+                )
+            )
+            continue
+        seen.add(identity)
+        if row.amount is not None and not _plain_amount(row.amount):
+            issues.append(
+                ProjectionIssue(
+                    page=row.page,
+                    row=row.row,
+                    code="candidate_incompatible",
+                    fields=("amount",),
+                )
+            )
+            continue
+        if not result.readable or (receipt_ambiguous and row.evidence == "transaction"):
+            continue
+        if row.evidence == "balance" and row.balance_scope not in get_args(BalanceScope):
+            issues.append(
+                ProjectionIssue(
+                    page=row.page,
+                    row=row.row,
+                    code="candidate_incompatible",
+                    fields=("balance_scope",),
+                )
+            )
+            continue
+        fields = row.model_dump(exclude={"page", "row", "uncertain"})
+        uncertain = set(row.uncertain)
+        for name in ("amount", "currency", "occurred_on"):
+            if fields[name] is None:
+                uncertain.add(name)
+        if row.direction == "unknown" and row.evidence == "transaction":
+            uncertain.add("direction")
+        if row.evidence in ("balance", "statement_period", "due_notice"):
+            fields["direction"] = "unknown"
+            fields["kind_hint"] = "unknown"
+        try:
+            candidate = ImportCandidate(
+                source=SourceRef(
+                    source="statement",
+                    connection_id=connection_id,
+                    external_id=f"{digest}:p{row.page}:r{row.row}",
+                    observed_at=observed_at,
+                ),
+                uncertain=frozenset(uncertain),
+                **fields,
+            )
+        except ValidationError as error:
+            issues.append(
+                ProjectionIssue(
+                    page=row.page,
+                    row=row.row,
+                    code="candidate_incompatible",
+                    fields=tuple(
+                        str(part)
+                        for item in error.errors(include_input=False)
+                        for part in item["loc"]
+                    ),
+                )
+            )
+            continue
+        candidates.append(candidate)
+    return ExtractionBatch(
+        complete=result.complete,
+        readable=result.readable,
+        pages_read=result.pages_read,
+        candidates=tuple(candidates),
+        observations=result.observations,
+        receipt=result.receipt,
+        issues=tuple(issues),
+    )
+
+
 def candidates_from_result(
     result: ExtractionResult,
     digest: str,
@@ -55,45 +197,7 @@ def candidates_from_result(
     observed_at: datetime,
     pages: int,
 ) -> tuple[ImportCandidate, ...]:
-    if not result.readable:
-        raise DocumentExtractionError("unreadable_document")
-    if not result.complete or sorted(result.pages_read) != list(range(1, pages + 1)):
-        raise DocumentExtractionError("incomplete_extraction")
-    if not result.observations:
-        raise DocumentExtractionError("no_financial_observations")
-    seen = set()
-    candidates = []
-    try:
-        for row in result.observations:
-            identity = (row.page, row.row)
-            if row.page > pages or identity in seen:
-                raise DocumentExtractionError("invalid_extraction")
-            seen.add(identity)
-            fields = row.model_dump(exclude={"page", "row", "uncertain"})
-            uncertain = set(row.uncertain)
-            for name in ("amount", "currency", "occurred_on"):
-                if fields[name] is None:
-                    uncertain.add(name)
-            if row.direction == "unknown" and row.evidence == "transaction":
-                uncertain.add("direction")
-            if row.evidence in ("balance", "statement_period", "due_notice"):
-                fields["direction"] = "unknown"
-                fields["kind_hint"] = "unknown"
-            candidates.append(
-                ImportCandidate(
-                    source=SourceRef(
-                        source="statement",
-                        connection_id=connection_id,
-                        external_id=f"{digest}:p{row.page}:r{row.row}",
-                        observed_at=observed_at,
-                    ),
-                    uncertain=frozenset(uncertain),
-                    **fields,
-                )
-            )
-    except ValidationError:
-        raise DocumentExtractionError("invalid_extraction") from None
-    return tuple(candidates)
+    return batch_from_result(result, digest, connection_id, observed_at, pages).candidates
 
 
 class DocumentExtractor:
@@ -178,17 +282,9 @@ class DocumentExtractor:
             failure.metadata = metadata
             raise failure from None
         assert result is not None
-        try:
-            candidates = candidates_from_result(
-                result,
-                str(metadata["sha256"]),
-                connection_id,
-                observed_at,
-                prepared.pages,
-            )
-        except DocumentExtractionError as error:
-            error.metadata = metadata
-            raise
+        batch = batch_from_result(
+            result, str(metadata["sha256"]), connection_id, observed_at, prepared.pages
+        )
         attachment = Attachment(
             external_id=str(metadata["sha256"]),
             sha256=str(metadata["sha256"]),
@@ -198,6 +294,6 @@ class DocumentExtractor:
         )
         candidates = tuple(
             candidate.model_copy(update={"attachments": (attachment,)})
-            for candidate in candidates
+            for candidate in batch.candidates
         )
-        return ExtractionBatch(candidates=candidates, metadata=metadata)
+        return batch.model_copy(update={"candidates": candidates, "metadata": metadata})

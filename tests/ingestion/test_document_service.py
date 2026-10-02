@@ -55,12 +55,14 @@ def rig() -> Rig:
 
 
 async def upload(service: DocumentsService, user: str) -> DocumentOutcome:
-    return await service.upload(
+    captured = await service.upload(
         user_id=user,
         content=b"%PDF-fixture",
         filename="statement.pdf",
         media_type="application/pdf",
+        consent=True,
     )
+    return await service.resume(user_id=user, connection_id=captured.connection_id)
 
 
 @pytest.mark.asyncio
@@ -130,7 +132,7 @@ async def test_resume_without_checkpoint_requires_reupload(rig: Rig) -> None:
         label=None,
         now=hub.clock(),
     )
-    with pytest.raises(DocumentServiceError, match="document_reupload_required"):
+    with pytest.raises(DocumentServiceError, match="document_source_unavailable"):
         await service.resume(user_id=user, connection_id=row.id)
     extractor.extract.assert_not_awaited()
 
@@ -222,7 +224,7 @@ async def test_concurrent_duplicate_is_busy_and_does_not_call_provider_twice(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("invalid", ["empty", "foreign", "duplicates", "removed"])
+@pytest.mark.parametrize("invalid", ["foreign", "duplicates", "removed"])
 async def test_invalid_candidate_batch_never_reaches_checkpoint_or_sink(
     rig: Rig, invalid: str
 ) -> None:

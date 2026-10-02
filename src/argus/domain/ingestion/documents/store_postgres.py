@@ -1,4 +1,4 @@
-"""Connection-fenced, immutable document extraction checkpoints."""
+"""Connection-fenced document sources, drafts and preparation checkpoints."""
 
 from __future__ import annotations
 
@@ -7,21 +7,103 @@ from datetime import datetime
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from argus.domain.ingestion.documents.models import ExtractionBatch
+from argus.domain.ingestion.documents.models import DocumentDraft, ExtractionBatch
 
 
 class PostgresDocumentStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
 
-    def get(self, *, user_id: str, connection_id: str) -> ExtractionBatch | None:
+    def _read(self, column: str, user_id: str, connection_id: str) -> object | None:
+        from psycopg import sql
+
         with self._pool.connection() as connection:
             row = connection.execute(
-                "select batch from public.financial_document_extractions "
-                "where user_id=%s and connection_id=%s",
-                (user_id, connection_id),
+                sql.SQL(
+                    "select d.{} from public.financial_document_extractions d join "
+                    "public.financial_source_connections c on c.id=d.connection_id "
+                    "where d.user_id=%s and d.connection_id=%s and c.user_id=%s "
+                    "and c.source='statement' and c.status <> 'disconnected'"
+                ).format(sql.Identifier(column)),
+                (user_id, connection_id, user_id),
             ).fetchone()
-        return ExtractionBatch.model_validate(row[0]) if row else None
+        return row[0] if row else None
+
+    def get(self, *, user_id: str, connection_id: str) -> ExtractionBatch | None:
+        raw = self._read("batch", user_id, connection_id)
+        return ExtractionBatch.model_validate(raw) if raw is not None else None
+
+    def draft(self, *, user_id: str, connection_id: str) -> DocumentDraft | None:
+        raw = self._read("draft", user_id, connection_id)
+        return DocumentDraft.model_validate(raw) if raw is not None else None
+
+    def source(self, *, user_id: str, connection_id: str) -> bytes | None:
+        raw = self._read("source_bytes", user_id, connection_id)
+        return bytes(raw) if raw is not None else None
+
+    def capture(self, *, user_id: str, draft: DocumentDraft, content: bytes) -> bool:
+        with self._pool.connection() as connection, connection.transaction():
+            row = connection.execute(
+                "select id from public.financial_source_connections where id=%s "
+                "and user_id=%s and source='statement' and status <> 'disconnected' for update",
+                (draft.connection_id, user_id),
+            ).fetchone()
+            if row is None:
+                return False
+            connection.execute(
+                "insert into public.financial_document_extractions "
+                "(connection_id,user_id,draft,source_bytes,created_at) values (%s,%s,%s,%s,%s) "
+                "on conflict (connection_id) do update set "
+                "source_bytes=coalesce(financial_document_extractions.source_bytes,excluded.source_bytes), "
+                "draft=coalesce(financial_document_extractions.draft, case "
+                "when financial_document_extractions.batch is not null then "
+                'excluded.draft || \'{"status":"review_ready"}\'::jsonb else excluded.draft end)',
+                (
+                    draft.connection_id,
+                    user_id,
+                    Jsonb(draft.model_dump(mode="json")),
+                    content,
+                    draft.created_at,
+                ),
+            )
+        return True
+
+    def update(
+        self,
+        *,
+        user_id: str,
+        draft: DocumentDraft,
+        expected_version: int,
+        holder: str | None = None,
+    ) -> bool:
+        with self._pool.connection() as connection, connection.transaction():
+            row = connection.execute(
+                "select lease_holder,lease_until from public.financial_source_connections "
+                "where id=%s and user_id=%s and source='statement' and status <> 'disconnected' for update",
+                (draft.connection_id, user_id),
+            ).fetchone()
+            if row is None or (
+                holder is not None
+                and (row[0] != holder or row[1] is None or row[1] <= draft.updated_at)
+            ):
+                return False
+            if (
+                draft.error_code == "document_preparation_interrupted"
+                and row[1] is not None
+                and row[1] > draft.updated_at
+            ):
+                return False
+            changed = connection.execute(
+                "update public.financial_document_extractions set draft=%s "
+                "where connection_id=%s and user_id=%s and (draft->>'version')::integer=%s returning connection_id",
+                (
+                    Jsonb(draft.model_dump(mode="json")),
+                    draft.connection_id,
+                    user_id,
+                    expected_version,
+                ),
+            ).fetchone()
+        return changed is not None
 
     def save(
         self,
@@ -36,8 +118,7 @@ class PostgresDocumentStore:
             row = connection.execute(
                 "select id from public.financial_source_connections "
                 "where id=%s and user_id=%s and source='statement' "
-                "and status <> 'disconnected' and lease_holder=%s "
-                "and lease_until > %s for update",
+                "and status <> 'disconnected' and lease_holder=%s and lease_until > %s for update",
                 (connection_id, user_id, holder, now),
             ).fetchone()
             if row is None:
@@ -45,7 +126,8 @@ class PostgresDocumentStore:
             connection.execute(
                 "insert into public.financial_document_extractions "
                 "(connection_id,user_id,batch,created_at) values (%s,%s,%s,%s) "
-                "on conflict (connection_id) do nothing",
+                "on conflict (connection_id) do update set batch=excluded.batch "
+                "where financial_document_extractions.batch is null",
                 (connection_id, user_id, Jsonb(batch.model_dump(mode="json")), now),
             )
         return True
@@ -53,7 +135,6 @@ class PostgresDocumentStore:
     def forget(self, *, user_id: str, connection_id: str) -> None:
         with self._pool.connection() as connection:
             connection.execute(
-                "delete from public.financial_document_extractions "
-                "where user_id=%s and connection_id=%s",
+                "delete from public.financial_document_extractions where user_id=%s and connection_id=%s",
                 (user_id, connection_id),
             )

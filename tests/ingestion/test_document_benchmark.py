@@ -107,6 +107,7 @@ async def test_serial_benchmark_stops_without_retry(
             return SimpleNamespace(
                 candidates=(candidate(evidence="unclassified"),),
                 metadata=dict(route_receipts=[dict(usage_cost_usd=cost)]),
+                issues=(),
             )
 
     budget = BenchmarkBudget(

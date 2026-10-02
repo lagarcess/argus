@@ -155,7 +155,7 @@ async def run_live(samples, directory, extractor, budget, report, save):
             report["stop_reason"] = "spend_cap_reached"
             break
         started = time.perf_counter()
-        candidates, metadata, error = (), {}, None
+        candidates, metadata, error, issues = (), {}, None, ()
         try:
             with budget.attempt(sample["id"], save_budget):
                 batch = await extractor.extract(
@@ -166,6 +166,7 @@ async def run_live(samples, directory, extractor, budget, report, save):
                     datetime.now(timezone.utc),
                 )
             candidates, metadata = batch.candidates, batch.metadata
+            issues = tuple(issue.code for issue in batch.issues)
         except DocumentExtractionError as failure:
             error, metadata = failure.code, failure.metadata
         result = {
@@ -173,10 +174,13 @@ async def run_live(samples, directory, extractor, budget, report, save):
             "sha256": sample["sha256"],
             "latency_ms": round((time.perf_counter() - started) * 1000),
             "error_code": error,
+            "preparation_issues": issues,
             "expected_rejection": sample["expected_status"] == "unreadable",
-            "rejection_correct": error == "unreadable_document"
+            "rejection_correct": (
+                error == "unreadable_document" or "unreadable_document" in issues
+            )
             if sample["expected_status"] == "unreadable"
-            else error is None,
+            else error is None and not issues,
             "quality": row_score(sample, candidates),
             "candidate_fields": [
                 row.model_dump(

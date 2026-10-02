@@ -55,6 +55,22 @@ Use streaming or jobs only where they materially improve UX.
 
 Prefer simpler architecture that can ship now.
 
+## Document draft and preparation ownership
+
+The default-off document lane follows the [capture contract](API_CONTRACT.md#document-capture-preparation-and-review).
+`DocumentsService` saves supported source bytes and a draft in the existing
+`financial_document_extractions` store before model work. The statement connection
+ID is the shared identity for later Chat and Plan entry points. Source retention,
+preparation state, observations and candidate delivery share that owner.
+
+FastAPI background tasks dispatch persisted preparation intent. Connection leases
+and draft versions fence work; interrupted in-flight attempts require explicit
+recovery instead of automatic model retries. Prepared candidates enter existing
+reconciliation. Retained observations and receipt itemization remain review data,
+and only reconciliation confirmation through MoneyService writes financial activity.
+Plan proposals grant no sharing or authority to change plan currency. No separate
+ledger, draft store, OCR vendor or conversational runtime is introduced.
+
 ## Agent Quality Pillars
 
 The four assistant-quality pillars (Intelligence, Evaluation, Platform, User

@@ -3202,6 +3202,48 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
   /api/v1/financial-documents:
+    get:
+      tags:
+      - financial-accounts
+      - financial-documents
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     post:
       tags:
       - financial-accounts
@@ -3213,6 +3255,14 @@ paths:
         schema:
           anyOf:
           - type: string
+          - type: 'null'
+      - name: X-Document-Proposal
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 8192
           - type: 'null'
       - name: X-Extraction-Consent
         in: header
@@ -3257,8 +3307,8 @@ paths:
             schema:
               type: string
               format: binary
-  /api/v1/financial-documents/{connection_id}/resume:
-    post:
+  /api/v1/financial-documents/{connection_id}:
+    get:
       tags:
       - financial-accounts
       - financial-documents
@@ -3274,7 +3324,156 @@ paths:
           content:
             application/json:
               schema:
+                type: object
+                additionalProperties: true
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-documents/{connection_id}/prepare:
+    post:
+      tags:
+      - financial-accounts
+      - financial-documents
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Extraction-Consent
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
                 $ref: '#/components/schemas/DocumentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-documents/{connection_id}/proposal:
+    patch:
+      tags:
+      - financial-accounts
+      - financial-documents
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-documents/{connection_id}/resume:
+    post:
+      tags:
+      - financial-accounts
+      - financial-documents
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Extraction-Consent
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/financial-documents/{connection_id}/source:
+    get:
+      tags:
+      - financial-accounts
+      - financial-documents
+      parameters:
+      - name: connection_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
         '422':
           description: Validation Error
           content:
@@ -11207,7 +11406,12 @@ components:
           type: string
         status:
           type: string
-          const: review_ready
+          enum:
+          - saved
+          - queued
+          - preparing
+          - review_ready
+          - needs_attention
         replayed:
           type: boolean
         candidate_count:
@@ -11219,6 +11423,44 @@ components:
       - status
       - replayed
       - candidate_count
+    DraftProposal:
+      properties:
+        plan_ref:
+          anyOf:
+          - $ref: '#/components/schemas/PlanRef'
+          - type: 'null'
+        requested_plan:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        payer_id:
+          anyOf:
+          - type: string
+            maxLength: 100
+          - type: 'null'
+        participant_ids:
+          items:
+            type: string
+            maxLength: 100
+            minLength: 1
+          type: array
+          maxItems: 100
+          default: []
+        split_method:
+          type: string
+          enum:
+          - equal
+          - items
+          default: equal
+        item_assignments:
+          items:
+            $ref: '#/components/schemas/ItemAssignment'
+          type: array
+          maxItems: 300
+          default: []
+      additionalProperties: false
+      type: object
     EditFinancialAccountRequest:
       properties:
         expected_version:
@@ -13228,6 +13470,24 @@ components:
       - name
       - expires_at
       - available
+    ItemAssignment:
+      properties:
+        item_id:
+          type: string
+          maxLength: 80
+          minLength: 1
+        participant_ids:
+          items:
+            type: string
+            maxLength: 100
+            minLength: 1
+          type: array
+          maxItems: 100
+      additionalProperties: false
+      type: object
+      required:
+      - item_id
+      - participant_ids
     JsonValue: {}
     LinkActivityBody:
       properties:
@@ -15138,6 +15398,17 @@ components:
             pattern: ^[A-Z]{3}$
           - type: 'null'
       type: object
+    ProposalUpdate:
+      properties:
+        version:
+          type: integer
+        proposal:
+          $ref: '#/components/schemas/DraftProposal'
+      additionalProperties: false
+      type: object
+      required:
+      - version
+      - proposal
     ProviderReconciliationStatus:
       type: string
       enum:

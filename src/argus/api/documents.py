@@ -81,7 +81,8 @@ def require_document_context(
     service: DocumentsService = Depends(require_document_surface),  # noqa: B008
     context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
 ) -> DocumentContext:
-    for limiter, limit, seconds in ((_minute, 5, 60), (_day, 30, 86400)):
+    limits = ((_minute, 5, 60), (_day, 30, 86400)) if request.method == "POST" else ()
+    for limiter, limit, seconds in limits:
         retry = limiter.record_or_retry_after(
             keys=(context.user_id,), limit=limit, window_seconds=seconds
         )

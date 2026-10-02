@@ -79,7 +79,11 @@ def test_upload_review_accept_and_duplicate_remain_one_activity(client, extracti
     ).json()
     result = upload(client)
     assert result.status_code == 200, result.text
-    assert result.json()["candidate_count"] == 1
+    assert result.json()["status"] == "queued"
+    prepared = client.get(
+        f"{DOCUMENTS}/{result.json()['connection_id']}", headers=bearer(ALICE)
+    ).json()
+    assert len(prepared["preparation"]["candidates"]) == 1
     duplicate = upload(client)
     assert duplicate.json()["replayed"] is True
     assert duplicate.json()["connection_id"] == result.json()["connection_id"]
@@ -134,10 +138,10 @@ def test_uploads_and_resume_are_owner_scoped(client, extraction):
     assert extraction.await_count == 2
 
 
-def test_upload_requires_consent_and_rejects_bad_media_before_extraction(
+def test_upload_without_consent_saves_and_rejects_bad_media_before_extraction(
     client, extraction
 ):
-    assert upload(client, **{"X-Extraction-Consent": "false"}).status_code == 422
+    assert upload(client, **{"X-Extraction-Consent": "false"}).json()["status"] == "saved"
     assert upload(client, **{"Content-Type": "text/html"}).status_code == 415
     assert extraction.await_count == 0
 
@@ -161,3 +165,71 @@ def test_upload_size_is_bounded_before_extraction(client, extraction):
     )
     assert response.status_code == 413
     assert extraction.await_count == 0
+
+
+def test_source_reopen_failure_and_explicit_recovery(client, extraction):
+    from argus.domain.ingestion.documents.models import DocumentExtractionError
+
+    original = extraction.return_value
+    extraction.side_effect = DocumentExtractionError("missing_vision_model")
+    captured = upload(client).json()
+    connection = captured["connection_id"]
+    draft = client.get(f"{DOCUMENTS}/{connection}", headers=bearer(ALICE))
+    assert draft.json()["status"] == "needs_attention"
+    assert draft.headers["cache-control"] == "no-store"
+    assert draft.json()["source_available"] is True
+    source = client.get(f"{DOCUMENTS}/{connection}/source", headers=bearer(ALICE))
+    assert source.status_code == 200
+    assert source.headers["cache-control"] == "no-store"
+    assert source.headers["x-content-type-options"] == "nosniff"
+    assert (
+        source.content
+        == (
+            Path(__file__).parents[1] / "document_extraction_fixtures/receipt-dop.png"
+        ).read_bytes()
+    )
+    assert (
+        client.get(f"{DOCUMENTS}/{connection}/source", headers=bearer(BOB)).status_code
+        == 404
+    )
+    duplicate = upload(client).json()
+    assert (
+        duplicate["connection_id"] == connection
+        and duplicate["status"] == "needs_attention"
+    )
+    assert extraction.await_count == 1
+    extraction.side_effect = None
+    extraction.return_value = original
+    recovered = client.post(
+        f"{DOCUMENTS}/{connection}/prepare",
+        headers={**bearer(ALICE), "X-Extraction-Consent": "true"},
+    )
+    assert recovered.status_code == 200
+    completed = client.get(f"{DOCUMENTS}/{connection}", headers=bearer(ALICE)).json()
+    assert completed["status"] == "review_ready"
+    assert completed["connection_id"] == connection
+    assert "metadata" not in completed["preparation"]
+    assert extraction.await_count == 2
+    listing = client.get(DOCUMENTS, headers=bearer(ALICE)).json()
+    assert len(listing["items"]) == 1 and "preparation" not in listing["items"][0]
+
+
+def test_capture_keeps_destination_before_preparation(client, extraction):
+    import json
+
+    proposal = {
+        "requested_plan": "Trip",
+        "split_method": "equal",
+        "participant_ids": ["one", "two"],
+    }
+    captured = upload(
+        client,
+        **{"X-Extraction-Consent": "false", "X-Document-Proposal": json.dumps(proposal)},
+    ).json()
+    draft = client.get(
+        f"{DOCUMENTS}/{captured['connection_id']}", headers=bearer(ALICE)
+    ).json()
+    assert draft["status"] == "saved" and draft["preparation"] is None
+    assert draft["proposal"]["requested_plan"] == proposal["requested_plan"]
+    assert draft["proposal"]["participant_ids"] == proposal["participant_ids"]
+    extraction.assert_not_awaited()
