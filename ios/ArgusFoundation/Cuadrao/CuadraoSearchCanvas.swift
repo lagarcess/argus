@@ -195,7 +195,7 @@ struct CuadraoSearchCanvas: View {
                 Button(spanish ? "Buscar en todo" : "Search everything") { kind = .all }
                     .accessibilityIdentifier("cuadrao.search.everything")
             }
-        }.accessibilityIdentifier("cuadrao.search.empty")
+        }
     }
     private var emptyTitle: String {
         switch kind {
