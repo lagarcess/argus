@@ -541,9 +541,23 @@ Avatar themes use the existing palette and icon family. A personal photo uses
 Apple's image picker, a circular preview, replacement/removal and the same editor
 Save/Cancel boundary. One avatar value owns the active initial, theme or photo;
 loading a photo cannot replace a newer choice. The preview retains only a small
-re-encoded image, without source metadata, for the session. Home reads the same
+re-encoded working source and derived avatar, without source metadata, for the
+session. Crop/reposition uses a circular preview with native pan/zoom; an accepted
+crop changes only the editor draft until profile Save. Crop Cancel and profile
+Cancel retain their separate boundaries. Reopening the crop uses the retained
+working source, so repeated edits do not repeatedly crop the thumbnail. Home reads the same
 preferred-name value. Appearance retains its existing preference owner. Server
-upload, public identity and connected account operations remain separate work.
+upload and connected account operations remain separate work. The October 2
+scope decision keeps QR codes attached to plan invitations. Profile QR, usernames
+and public profile discovery are deferred; Profile needs no extra entry point.
+Keep the existing avatar family and native identity typography.
+
+A plan code card inherits its plan's artwork or selected cover, name and member
+context. The QR sits on an opaque light panel with a clear four-module margin;
+art stays outside the code. On-screen and exported cards share one composition.
+The native share sheet owns user-directed export. Sample-code wording travels
+with preview exports, and scanning must not imply a live invitation until the
+invitation contract is connected.
 
 Profile keeps the main navigation on its landing page, with clearance inside the
 scrolling content so Sign out stays above it. Pushed Settings pages hide the main
