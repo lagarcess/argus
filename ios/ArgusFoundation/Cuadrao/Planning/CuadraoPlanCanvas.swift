@@ -76,13 +76,12 @@ struct CuadraoPlanCanvas: View {
     private var header: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Plan").font(CuadraoTypography.screen)
+                Text(spanish ? "Lo que viene" : "What’s ahead").font(CuadraoTypography.screen)
+                    .accessibilityIdentifier("plan-heading")
                     .contextMenu {
                         Button(spanish ? "Ver primer uso" : "See first use") { showEmpty = true; resetConfirmation = true }
                         Button(spanish ? "Restablecer ejemplos" : "Reset examples") { showEmpty = false; resetConfirmation = true }
                     }
-                Text(spanish ? "Lo que viene, lo hacemos." : "Make what's next happen.")
-                    .font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
             Button { if together { newGroup = true } else { creation = PlanEditorRoute(plan: newPlan) } } label: {

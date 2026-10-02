@@ -198,7 +198,7 @@ struct CuadraoSearchCanvas: View {
                 VStack(alignment: .leading, spacing: 28) {
                     Text(entry.title).font(CuadraoTypography.feature)
                     Text(account.currency + " " + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                        .font(.title).monospacedDigit()
+                        .font(CuadraoTypography.amount)
                     LabeledContent(spanish ? "Tipo" : "Type", value: entry.income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
                     LabeledContent(spanish ? "Fecha" : "Date") { Text(entry.date, format: .dateTime.day().month(.wide).year()) }
                     NavigationLink(value: Route.account(account.id)) {

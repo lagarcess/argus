@@ -32,6 +32,8 @@ struct CuadraoDesignGallery: View {
                         Text(spanish ? "Un lugar para lo que viene." : "A place for what's next.").font(CuadraoTypography.body)
                         Text("DOP 24,580.50").font(CuadraoTypography.amount).foregroundStyle(WelcomePalette.ink)
                             .lineLimit(1).minimumScaleFactor(0.5)
+                        Text("DOP 3,240.00").font(CuadraoTypography.secondaryAmount)
+                        Text("DOP 650.00").font(CuadraoTypography.rowAmount)
                         Text(spanish ? "Ejemplo · Balance registrado" : "Example · Recorded balance")
                             .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                     }
@@ -66,6 +68,16 @@ struct CuadraoDesignGallery: View {
                                         title: spanish ? "Monto del plan" : "Plan amount", identifier: "gallery-plan-amount", spanish: spanish)
                         Text(spanish ? "Prueba escribir, pegar o borrar. Ambos campos comparten las mismas reglas." : "Try typing, pasting or clearing. Both fields share the same rules.")
                             .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                    }
+                    sample(spanish ? "Sin movimientos todavía" : "No transactions yet") {
+                        CuadraoChartState(title: spanish ? "Tu historia empieza aquí" : "Your story starts here",
+                            detail: spanish ? "Tus movimientos darán forma a este espacio." : "Your transactions will give this space its shape.")
+                            .accessibilityIdentifier("gallery-empty-state")
+                    }
+                    sample(spanish ? "Carga en curso" : "Loading in progress") {
+                        CuadraoChartState(title: spanish ? "Reuniendo tu historia" : "Gathering your history",
+                            detail: spanish ? "Un momento para poner todo en su lugar." : "A moment to bring everything together.", loading: true)
+                            .accessibilityIdentifier("gallery-loading-state")
                     }
                 }.padding(24)
             }.scrollDismissesKeyboard(.interactively).background(WelcomePalette.background)

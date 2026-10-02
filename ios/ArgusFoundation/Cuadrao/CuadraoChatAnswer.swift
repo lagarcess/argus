@@ -60,7 +60,7 @@ struct CuadraoChatAnswer: View {
                         Text(es ? "En seis meses" : "In six months").font(.subheadline).foregroundStyle(.secondary)
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text("DOP").font(.subheadline).foregroundStyle(.secondary)
-                            Text(CanvasChatCalculation.amount(CanvasChatCalculation.total)).font(.system(.largeTitle, design: .rounded)).monospacedDigit()
+                            Text(CanvasChatCalculation.amount(CanvasChatCalculation.total)).font(CuadraoTypography.amount).monospacedDigit()
                         }
                         Divider()
                         HStack {

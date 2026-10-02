@@ -98,7 +98,7 @@ struct PlanCard: View {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(PlanFormat.amount(plan.kind == .debt ? plan.remaining : plan.recorded, currency: plan.currency))
-                        .font(.headline).monospacedDigit()
+                        .font(CuadraoTypography.secondaryAmount)
                     Spacer(minLength: 8)
                     Text(plan.kind == .debt ? (spanish ? "por pagar" : "to go") : "\(Int(plan.recorded / max(plan.target, 1) * 100))%")
                         .font(.caption).foregroundStyle(.secondary)

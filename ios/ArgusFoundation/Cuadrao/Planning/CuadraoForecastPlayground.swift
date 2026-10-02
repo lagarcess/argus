@@ -35,7 +35,7 @@ struct CuadraoForecastPlayground: View {
                          ?? (spanish ? "Al cierre del mes" : "At month end"))
                         .font(.caption).foregroundStyle(.secondary)
                     Text(PlanFormat.amount(point?.balance ?? forecast.ending(daily: draft)))
-                        .font(.system(size: 36, weight: .regular, design: .rounded)).monospacedDigit()
+                        .font(CuadraoTypography.amount)
                         .lineLimit(1).minimumScaleFactor(0.6).accessibilityIdentifier("forecast-ending")
                     PlanForecastChart(forecast: forecast, daily: draft, spanish: spanish, comparison: baseline, selectedDay: $selectedDay, detailed: true)
                     HStack(spacing: 16) {
@@ -52,7 +52,7 @@ struct CuadraoForecastPlayground: View {
                         Text(spanish ? "Gasto diario" : "Daily spending").font(.subheadline)
                         Spacer()
                         Button { exact = true } label: {
-                            HStack(spacing: 6) { Text(PlanFormat.amount(draft)).monospacedDigit(); Image(systemName: "pencil").font(.caption) }
+                            HStack(spacing: 6) { Text(PlanFormat.amount(draft)).font(CuadraoTypography.rowAmount); Image(systemName: "pencil").font(.caption) }
                         }.font(.subheadline.weight(.medium)).frame(minHeight: 44).accessibilityIdentifier("forecast-exact")
                     }
                     Slider(value: $draft, in: 0...3000, step: 50) { editing in

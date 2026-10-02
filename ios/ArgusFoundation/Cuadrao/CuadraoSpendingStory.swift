@@ -12,6 +12,12 @@ struct CanvasSpendingStory {
         CanvasSpendingHistory.entries(expenses.filter { $0.date <= now }, in: interval)
     }
     var total: Decimal { CanvasSpendingHistory.total(entries) }
+    enum State { case populated, emptyPeriod, firstUse, unavailable }
+    var state: State {
+        if !entries.isEmpty { return .populated }
+        if expenses.isEmpty && coverageStart == nil { return .firstUse }
+        return covered ? .emptyPeriod : .unavailable
+    }
     var covered: Bool { coverageStart.map { $0 <= interval.start } ?? false }
     var comparison: DateInterval? {
         let prior = CanvasSpendingHistory.comparisonInterval(range: range, offset: offset, now: now)

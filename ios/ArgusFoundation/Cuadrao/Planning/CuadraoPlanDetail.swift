@@ -89,7 +89,7 @@ struct CuadraoPlanDetail: View {
                 PlanLandscape(look: plan.look).frame(width: 70, height: 76)
             }
             HStack {
-                Text(PlanFormat.amount(plan.kind == .debt ? plan.remaining : plan.recorded, currency: plan.currency)).font(.headline).monospacedDigit()
+                Text(PlanFormat.amount(plan.kind == .debt ? plan.remaining : plan.recorded, currency: plan.currency)).font(CuadraoTypography.secondaryAmount)
                 Text(plan.kind == .debt ? (spanish ? "por pagar" : "left to pay") : plan.kind.recordedTitle(spanish)).font(.caption).foregroundStyle(.secondary)
             }
             if plan.remaining == 0 && plan.kind != .budget {
@@ -126,7 +126,7 @@ struct CuadraoPlanDetail: View {
                     Text(plan.kind == .budget ? (spanish ? "Mi margen" : "My allowance") : (spanish ? "Cada mes" : "Each month")).font(.subheadline)
                     Spacer()
                     Button { exact = true } label: {
-                        HStack(spacing: 6) { Text(PlanFormat.amount(amount(plan), currency: plan.currency)).monospacedDigit(); Image(systemName: "pencil").font(.caption) }
+                        HStack(spacing: 6) { Text(PlanFormat.amount(amount(plan), currency: plan.currency)).font(CuadraoTypography.rowAmount); Image(systemName: "pencil").font(.caption) }
                             .font(.subheadline.weight(.medium)).frame(minHeight: 44)
                     }.accessibilityIdentifier("plan-detail-exact")
                 }

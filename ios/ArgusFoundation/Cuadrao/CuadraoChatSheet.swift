@@ -61,7 +61,7 @@ struct CuadraoChatSheet: View {
             case .temporary:
                 CuadraoTemporaryChatSettings(store: store, spanish: es) { requestExit(.returnToRegular) }
             case .calculation:
-                Text("DOP " + CanvasChatCalculation.amount(CanvasChatCalculation.total)).font(.system(.largeTitle, design: .rounded))
+                Text("DOP " + CanvasChatCalculation.amount(CanvasChatCalculation.total)).font(CuadraoTypography.amount)
                 detail(es ? "Aporte mensual" : "Monthly contribution", "DOP " + CanvasChatCalculation.amount(CanvasChatCalculation.monthly))
                 detail(es ? "Meses" : "Months", String(CanvasChatCalculation.months))
                 Divider()

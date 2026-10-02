@@ -64,10 +64,28 @@ final class CuadraoConsistencyUITests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication(); app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", "light"]; app.launch()
         shot(app, "home-type-es")
-        app.buttons["cuadrao-tab-1"].tap(); shot(app, "plan-type-es")
+        app.buttons["cuadrao-tab-1"].tap()
+        XCTAssertEqual(app.staticTexts["plan-heading"].label, "Lo que viene")
+        XCTAssertFalse(app.staticTexts["Lo que viene, lo hacemos."].exists)
+        shot(app, "plan-type-es")
         app.buttons["cuadrao-tab-2"].tap(); shot(app, "chat-type-es")
         app.buttons["cuadrao-tab-3"].tap(); shot(app, "search-type-es")
         app.buttons["cuadrao-tab-4"].tap(); shot(app, "profile-type-es")
+    }
+    func testEmptyAndLoadingGallery() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--design-gallery", "--design-english", "-cuadrao.design.appearance", "dark"]
+        app.launch()
+        app.switches["gallery-large-text"].tap()
+        let empty = app.staticTexts["Your story starts here"]
+        for _ in 0..<12 { if empty.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(empty.isHittable)
+        shot(app, "gallery-empty-dark-large-en")
+        let loading = app.staticTexts["Gathering your history"]
+        for _ in 0..<5 { if loading.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(loading.isHittable)
+        shot(app, "gallery-loading-dark-large-en")
     }
     private func replace(_ field: XCUIElement, _ text: String) {
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()

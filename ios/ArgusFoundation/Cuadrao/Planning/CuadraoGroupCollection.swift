@@ -36,8 +36,10 @@ struct CuadraoGroupCollection: View {
                                 ProgressView(value: group.progress).tint(group.look.color)
                                 Text(spanish ? "\(Int(group.progress * 100))% reunido entre ustedes" : "\(Int(group.progress * 100))% saved together").font(.caption).foregroundStyle(.secondary)
                             } else {
-                                Text(spanish ? "Tu parte: \(PlanFormat.amount(Double(group.share(group.me)) / 100, currency: group.currency))" : "Your share: \(PlanFormat.amount(Double(group.share(group.me)) / 100, currency: group.currency))")
-                                    .font(.subheadline).foregroundStyle(WelcomePalette.ink)
+                                ViewThatFits(in: .horizontal) {
+                                    HStack(spacing: 6) { shareLabel; shareAmount(group) }
+                                    VStack(alignment: .leading, spacing: 4) { shareLabel; shareAmount(group) }
+                                }.foregroundStyle(WelcomePalette.ink)
                             }
                         }.padding(.horizontal, 20).padding(.bottom, 20)
                     }.background(group.look.color.opacity(0.055), in: RoundedRectangle(cornerRadius: 28)).clipShape(RoundedRectangle(cornerRadius: 28))
@@ -53,6 +55,10 @@ struct CuadraoGroupCollection: View {
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44)
             }.accessibilityIdentifier("group-archives")
         }.sheet(item: $editing) { CuadraoGroupEditor(store: store, spanish: spanish, initial: $0) }
+    }
+    private var shareLabel: some View { Text(spanish ? "Tu parte:" : "Your share:").font(CuadraoTypography.supporting) }
+    private func shareAmount(_ group: PlanGroup) -> some View {
+        Text(PlanFormat.amount(Double(group.share(group.me)) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount)
     }
 }
 

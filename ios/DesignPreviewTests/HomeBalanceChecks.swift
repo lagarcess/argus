@@ -129,6 +129,47 @@ import Foundation
         check(historical.completedMonths(count: 12) == nil, "A window beginning before coverage is unavailable")
         let annualHistorical = CanvasSpendingStory(expenses: historyRows, range: .year, offset: -1, coverageStart: coverage, now: january)
         check(annualHistorical.completedMonths(count: 12)?.last?.amount == 400, "A completed historical year includes its December")
+        let october = calendar.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 12))!
+        let septemberEnd = calendar.date(from: DateComponents(year: 2026, month: 9, day: 30))!
+        let octoberFifth = calendar.date(from: DateComponents(year: 2026, month: 10, day: 5))!
+        let octoberTenth = calendar.date(from: DateComponents(year: 2026, month: 10, day: 10))!
+        let wallet = CanvasAccount(name: "Wallet", kind: .cash, balance: 800)
+        let mortgage = CanvasAccount(name: "Mortgage", kind: .loan, balance: 150)
+        let owned = CanvasAccount(name: "Shared property", kind: .property, balance: 1000, share: 25)
+        let scoped = [wallet, mortgage, owned]
+        func observed(_ account: CanvasAccount, _ amount: Decimal, _ date: Date) -> CanvasBalanceObservation {
+            CanvasBalanceObservation(accountID: account.id, currency: account.currency, kind: account.kind,
+                share: account.share, date: date, balance: amount)
+        }
+        let startingBalances = [observed(wallet, 1000, septemberEnd), observed(mortgage, 200, septemberEnd), observed(owned, 800, septemberEnd)]
+        let period = CanvasBalancePeriod(accounts: scoped, observations: startingBalances, range: .month, offset: 0, now: october)
+        check(period.opening?.balance == 1000 && period.closing?.balance == 900 && period.change == -100, "One pair of snapshots owns opening, closing and net change")
+        check(period.changes.map { $0.change! } == [-200, 50, 50], "Debt paydown and partial asset ownership contribute with their true signs")
+        check(period.changes.compactMap(\.change).reduce(0, +) == period.change, "Account changes exactly reconcile to displayed net change")
+        check(CanvasBalanceHistory.position(period.closingAccounts) == period.closing?.balance, "Allocation and line hero use the same closing snapshot")
+        let scopedPeriod = CanvasBalancePeriod(accounts: [wallet], observations: startingBalances, range: .month, offset: 0, now: october)
+        check(scopedPeriod.change == -200 && scopedPeriod.changes.count == 1, "Scope excludes other account contributions")
+        let partialPeriod = CanvasBalancePeriod(accounts: scoped + [unknown], observations: startingBalances, range: .month, offset: 0, now: october)
+        check(partialPeriod.isPartial && partialPeriod.changes.last?.closing == nil && partialPeriod.change == -100, "Unknown account remains unknown while known rows reconcile")
+        let freshPeriod = CanvasBalancePeriod(accounts: scoped + [newcomer], observations: startingBalances, range: .month, offset: 0, now: october)
+        check(freshPeriod.opening == nil && freshPeriod.change == nil && freshPeriod.closing?.balance == 1000, "New account cannot inherit or zero-fill a historical opening")
+        let noBaseline = CanvasBalancePeriod(accounts: [wallet], observations: [], range: .month, offset: 0, now: october)
+        check(noBaseline.opening == nil && noBaseline.change == nil && noBaseline.closing?.balance == 800, "A single observation is a starting point, never a zero trend")
+        let partialWindow = CanvasBalancePeriod(accounts: [wallet], observations: [observed(wallet, 900, octoberFifth)], range: .month, offset: 0, now: october)
+        check(partialWindow.opening?.date == octoberFifth && partialWindow.change == -100, "Two in-period observations compare from their actual first date")
+        let equalWindow = CanvasBalancePeriod(accounts: [wallet], observations: [observed(wallet, 800, octoberTenth)], range: .month, offset: 0, now: october)
+        check(equalWindow.change == 0, "Two genuine equal observations support an unchanged balance")
+        let november = calendar.date(from: DateComponents(year: 2026, month: 11, day: 15))!
+        let quietPast = CanvasBalancePeriod(accounts: scoped, observations: startingBalances, range: .month, offset: -1, now: november)
+        check(quietPast.closing?.date == septemberEnd && quietPast.change == nil, "Empty past period retains a dated known position without artificial change")
+        check(CanvasBalanceHistory.position(quietPast.closingAccounts) == quietPast.closing?.balance, "Empty historical allocation preserves the same known dated snapshot")
+        let unknowable = CanvasBalancePeriod(accounts: [unknown], observations: [], range: .month, offset: 0, now: october)
+        check(unknowable.closing == nil && unknowable.change == nil, "Unknown balance never becomes zero")
+        check(emptyStory.state == .emptyPeriod && unknownStory.state == .populated, "Known empty and partial populated spending use distinct states")
+        let firstUse = CanvasSpendingStory(expenses: [], range: .month, offset: 0, coverageStart: nil, now: october)
+        check(firstUse.state == .firstUse && firstUse.previousTotal == nil, "No spending history is first use without invented comparisons")
+        let unavailablePeriod = CanvasSpendingStory(expenses: historyRows, range: .month, offset: 0, coverageStart: nil, now: october)
+        check(unavailablePeriod.state == .unavailable, "Existing spending elsewhere with missing coverage is not a first-use or zero month")
         print("Passed \(checks) Home balance projection checks")
     }
 }

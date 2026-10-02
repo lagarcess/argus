@@ -27,6 +27,9 @@ struct CuadraoHomeBalanceChart: View {
         _range = range; _periodOffset = periodOffset
     }
     private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now) }
+    private var period: CanvasBalancePeriod {
+        CanvasBalancePeriod(accounts: accounts, observations: observations, range: range, offset: periodOffset)
+    }
     private var availableRanges: [CanvasHomeRange] { CanvasHomeRange.available(history) }
     private var effectiveRange: CanvasHomeRange { availableRanges.contains(compactRange) ? compactRange : .all }
     private var points: [CanvasBalancePoint] {
@@ -44,7 +47,7 @@ struct CuadraoHomeBalanceChart: View {
         guard let selectedDate else { return nil }
         return points.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
     }
-    private var shown: CanvasBalancePoint? { selected ?? points.last }
+    private var shown: CanvasBalancePoint? { selected ?? (expanded ? period.closing : points.last) }
     private var partial: Bool { accounts.contains { $0.balance == nil } }
     private var bounds: ClosedRange<Double> {
         let values = points.map(\.value)
@@ -55,7 +58,7 @@ struct CuadraoHomeBalanceChart: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             amountRow
-            Text((expanded ? nil : selected.map { dateLabel($0.date) }) ?? (partial
+            Text((expanded ? shown.map { (partial ? (spanish ? "Balance parcial · " : "Partial balance · ") : (spanish ? "Balance neto · " : "Net balance · ")) + dateLabel($0.date) } : selected.map { dateLabel($0.date) }) ?? (partial
                 ? (spanish ? "Balance parcial" : "Partial balance")
                 : (spanish ? "Balance neto" : "Net balance")))
                 .font(CuadraoTypography.caption).foregroundStyle(.secondary)
@@ -76,11 +79,14 @@ struct CuadraoHomeBalanceChart: View {
                     } else { Text(dateLabel(expanded ? xDomain.upperBound.addingTimeInterval(-1) : points.last!.date)) }
                 }.font(CuadraoTypography.caption).foregroundStyle(.secondary)
             } else {
-                Text(spanish ? "No hay balances en este período." : "No balances in this period.")
-                    .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: expanded ? 270 : 125)
-                    .contentShape(Rectangle())
+                CuadraoChartState(title: spanish ? "Tu balance, a tu ritmo" : "Your balance, at your pace",
+                    detail: shown == nil
+                        ? (spanish ? "Los balances que registres darán forma a este espacio." : "Your recorded balances will give this space its shape.")
+                        : (spanish ? "No hay nuevos balances registrados en este período." : "No new balances were recorded in this period."))
                     .accessibilityIdentifier("home-chart-empty")
+            }
+            if expanded, period.closing != nil {
+                CuadraoBalanceBreakdown(period: period, currency: currency, spanish: spanish)
             }
             if !expanded && availableRanges.count > 1 {
                 HStack(spacing: 2) {
@@ -142,8 +148,8 @@ struct CuadraoHomeBalanceChart: View {
         }
     }
     private func takeaway(_ point: CanvasBalancePoint) -> String {
-        guard let baseline = range.baseline(history, offset: periodOffset), baseline.date < point.date else {
-            return spanish ? "Aquí empieza este período." : "This is where this period begins."
+        guard let baseline = period.opening, baseline.date < point.date else {
+            return spanish ? "Tu último balance registrado, sin estimaciones." : "Your latest recorded balance, without estimates."
         }
         let change = point.balance - baseline.balance
         if change == 0 { return spanish ? "Tu balance sigue igual desde el \(dateLabel(baseline.date))." : "Your balance is unchanged since \(dateLabel(baseline.date))." }
