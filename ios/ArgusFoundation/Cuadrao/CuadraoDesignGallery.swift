@@ -7,6 +7,8 @@ struct CuadraoDesignGallery: View {
     @State private var originalAppearance: AppearancePreference?
     private var dark: Binding<Bool> { Binding(get: { appearance == .dark }, set: { appearance = $0 ? .dark : .light }) }
     @State private var largeText = false
+    @State private var previewReducedMotion = false
+    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @State private var raw = ""
     @State private var accountError = ""
     @State private var amount = 0.0
@@ -74,6 +76,16 @@ struct CuadraoDesignGallery: View {
                             detail: spanish ? "Tus movimientos darán forma a este espacio." : "Your transactions will give this space its shape.")
                             .accessibilityIdentifier("gallery-empty-state")
                     }
+                    sample(spanish ? "Mes sin gastos" : "Month without expenses") {
+                        CuadraoChartState(title: spanish ? "Octubre empieza aquí" : "October starts here",
+                            detail: spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
+                            .accessibilityIdentifier("gallery-empty-month")
+                    }
+                    sample(spanish ? "Historial incompleto" : "Incomplete history") {
+                        CuadraoChartState(title: spanish ? "Falta una parte de la historia" : "Part of the story is missing",
+                            detail: spanish ? "El historial de este período está incompleto." : "This period's history is incomplete.")
+                            .accessibilityIdentifier("gallery-unavailable-state")
+                    }
                     sample(spanish ? "Carga en curso" : "Loading in progress") {
                         CuadraoChartState(title: spanish ? "Reuniendo tu historia" : "Gathering your history",
                             detail: spanish ? "Un momento para poner todo en su lugar." : "A moment to bring everything together.", loading: true)
@@ -87,6 +99,7 @@ struct CuadraoDesignGallery: View {
             .onAppear { originalAppearance = appearance }
             .onDisappear { if let originalAppearance { appearance = originalAppearance } }
             .environment(\.dynamicTypeSize, largeText ? .accessibility2 : .large)
+            .environment(\.accessibilityReduceMotion, systemReducedMotion || previewReducedMotion)
             .tint(WelcomePalette.pine)
     }
     private var controls: some View {
@@ -95,6 +108,7 @@ struct CuadraoDesignGallery: View {
                 .pickerStyle(.segmented).accessibilityIdentifier("gallery-language")
             Toggle(spanish ? "Oscuro" : "Dark", isOn: dark).accessibilityIdentifier("gallery-dark")
             Toggle(spanish ? "Texto grande" : "Large text", isOn: $largeText).accessibilityIdentifier("gallery-large-text")
+            Toggle(spanish ? "Reducir movimiento" : "Reduce motion", isOn: $previewReducedMotion).accessibilityIdentifier("gallery-reduce-motion")
         }.font(CuadraoTypography.supporting)
     }
     private var rowLabel: some View {

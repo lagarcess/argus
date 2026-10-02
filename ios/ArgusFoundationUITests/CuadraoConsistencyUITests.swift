@@ -78,10 +78,15 @@ final class CuadraoConsistencyUITests: XCTestCase {
         app.launchArguments = ["--design-gallery", "--design-english", "-cuadrao.design.appearance", "dark"]
         app.launch()
         app.switches["gallery-large-text"].tap()
+        app.switches["gallery-reduce-motion"].tap()
         let empty = app.staticTexts["Your story starts here"]
         for _ in 0..<12 { if empty.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(empty.isHittable)
         shot(app, "gallery-empty-dark-large-en")
+        let unavailable = app.staticTexts["Part of the story is missing"]
+        for _ in 0..<8 { if unavailable.isHittable { break }; app.swipeUp() }
+        XCTAssertTrue(unavailable.isHittable)
+        shot(app, "gallery-unavailable-dark-large-en")
         let loading = app.staticTexts["Gathering your history"]
         for _ in 0..<5 { if loading.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(loading.isHittable)
