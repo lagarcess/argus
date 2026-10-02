@@ -11,7 +11,7 @@ The lanes below land on integration one at a time, in the order under [Landing o
 
 ## Decisions this handoff implements
 
-Lucas locked these on 2 October 2026. The reasons and wording live in the [decision log](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). The right column says where each one lands and what the code has today.
+Lucas locked rows 1 to 10 on 2 October 2026. Row 11 and the extras listed under the table are Head of Engineering delivery decisions, not founder locks. The reasons and wording for the founder locks live in the [decision log](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). The right column says where each one lands and what the code has today.
 
 | # | Decision | Lane | Today on `d9a7acfc` |
 | --- | --- | --- | --- |
@@ -24,10 +24,17 @@ Lucas locked these on 2 October 2026. The reasons and wording live in the [decis
 | 7 | A bill appears in Updates 3 days before its due date and on the due date | Updates | No inbox, no trigger |
 | 8 | Updates go to the in-app inbox, plus push for people who turn it on. Push never shows amounts. No email for updates | Updates | No inbox, no push code |
 | 9 | Joint-plan export waits until after TestFlight | None in this pass | The read-only departure archive from #773 stays |
-| 10 | When a member leaves, their account goes with them. The household keeps that account's history up to the move, greyed out and read-only, with the state at the move recorded. Moves are idempotent events and never rewrite past balances or settlements. Home recomputes from history. Explicit per-role access rules in RLS and API checks. Locked history is read-only for everyone, owner included. Manual Codex review and a dedicated eval | Account moves | Leave revokes grants and the household sees nothing afterward. No move command, no locked history |
-| 11 | Landing order: Household, space list on its own, Search, Home series, account moves, Updates | All | Not applicable |
+| 10 | When a member leaves, their account goes with them. The household keeps that account's history up to the move, greyed out and read-only, with the state at the move recorded. Moves are idempotent events and never rewrite past balances or settlements. Home recomputes from history. Explicit per-role access rules in RLS and API checks | Account moves | Leave revokes grants and the household sees nothing afterward. No move command, no locked history |
+| 11 (HoE) | Landing order: Household, space list on its own, Search, Home series, account moves, Updates | All | Not applicable |
 
-Already locked before today and still in force: the [Household permission policy](household-permission-policy.md) of 1 October, the MVEE visibility rules, and the rule that a plan stays in the space where it was created.
+Head of Engineering delivery decisions that go with decision 10. These are not founder locks:
+
+- Locked history is read-only for everyone, the owner included. The one exception is the account-deletion path in lane 2.
+- Account moves need a manual Codex review plus a dedicated eval before landing.
+- A member, including the household admin, reads a departed member's locked history only if they had an explicit grant to that account at the cut-off.
+- The departure event is written by the system when a member leaves or is removed, not by the admin or the member.
+
+Already locked before today and still in force: the [Household permission policy](household-permission-policy.md) of 1 October, except where decision 10 narrows what happens on departure. Also still in force: the MVEE visibility rules, and the rule that a plan stays in the space where it was created.
 
 ## Build environment and how iOS lands
 
@@ -57,15 +64,15 @@ The flag names below are proposals. The captain confirms the final name in the l
 | TestFlight public link | The link itself | A setting the app reads and shows with the invite | `ARGUS_TESTFLIGHT_PUBLIC_URL`. Unset means no install link is shown |
 | Code gate and waitlist | The cuadrao.ai waitlist page | Code check and the redirect to the waitlist | `ARGUS_BETA_INVITE_GATE_ENABLED` and `ARGUS_WAITLIST_URL` |
 | Push | APNs key | Device registration, a push sender interface, and a recording fake that keeps payloads for tests | `ARGUS_UPDATES_PUSH_ENABLED`. Off uses the fake and sends nothing |
-| Email | Resend sending domain on cuadrao.ai | Nothing in this pass. Household email and update email are out of scope | None |
+| Email | A cuadrao.ai sending domain in Resend | Nothing. Household email delivery and update email are out of scope for this pass | None |
 
 Lane surfaces with no outside piece also start default-off, one flag each: `ARGUS_FINANCIAL_SPACES_ENABLED` for the space list, `ARGUS_ACCOUNT_MOVES_ENABLED` for moves, `ARGUS_HOME_SERIES_ENABLED` for the series, and `ARGUS_UPDATES_ENABLED` for the inbox. Search documents stay behind the existing `ARGUS_DOCUMENT_EXTRACTION_ENABLED`.
 
-**Resend today.** An adapter exists: `send_resend_email` in `src/argus/domain/resend_email.py`, sending through Resend SMTP with `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`. It is used by `src/argus/api/feedback_notification.py` and `src/argus/domain/access_approval_email.py`. Its sender is hard-coded to `noreply@get-argus.com`. A later Household email reuses this adapter with a cuadrao.ai sender. It does not add a second mail client.
+**Email.** Household email delivery is out of scope for this pass. A Resend adapter already exists: `send_resend_email` in `src/argus/domain/resend_email.py`, sending through Resend SMTP from `noreply@get-argus.com` with `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`. It is used by `src/argus/api/feedback_notification.py` and `src/argus/domain/access_approval_email.py`. What is missing is a cuadrao.ai sending domain. When Household email comes back, it reuses this adapter with that domain and does not add a second mail client.
 
 **Push today.** No APNs, `UNUserNotificationCenter`, or device-push code exists under `src/` or `ios/`. `financial_shortcut_device_tokens` stores Shortcuts enrollment tokens for ingestion. It is not a push token table and is not reused for push. `reminders_opted_in` and `reminders_opted_out` in `src/argus/observability/analytics_events.py` are analytics events only.
 
-**Universal link today.** No `CFBundleURLSchemes`, associated domain, `applinks:` entry, or `onOpenURL` handler exists under `ios/`. The string `cuadrao.ai` does not appear anywhere in the repository.
+**Universal link today.** No `CFBundleURLSchemes`, associated domain, `applinks:` entry, or `onOpenURL` handler exists under `ios/`. The string `cuadrao.ai` appears nowhere in code or config.
 
 ## Contracts between lanes
 
@@ -142,14 +149,14 @@ Codex review is not a merge gate except where this file says so. Request it for 
 These are not founder locks yet. Each one blocks only the piece named. Everything else in this file can be built.
 
 1. **Is the beta invite the same code as a household invite?** Today a household invitation can only be created by the household admin, and accepting it grants household membership and nothing else (1 October policy). Decision 4 gives every user 3 invites and makes the code the gate into the app. Someone can be invited into the beta without joining a household. The recommended reading is two kinds of invite that share the same link, code, QR, and who-invited-whom record: a beta invite any user can send, inside the quota, that admits a person to the app; and the existing household invitation, admin-only and membership-only. Iris and Lucas confirm before the quota and gate are coded. The link, code, and QR presentation for household invitations does not wait.
-2. **Locked household history when the owner later deletes their account.** Decision 10 keeps a read-only copy of a departed member's pre-move history for the household. Decision 3 and Apple's rule say deleting an account actually removes it. The recommended reading is that deletion removes the locked copy too, and the household sees that a former member's account was removed. Lucas confirms before the account-move departure piece is coded. Space-to-space moves do not wait.
+2. **Locked household history when the owner later deletes their account.** Decision 10 keeps a read-only copy of a departed member's pre-move history for the household. Decision 3 and Apple's rule say deleting an account actually removes it. The recommended reading is that deletion removes the locked copy too, and the household sees that a former member's account was removed. The Head of Engineering has written that reading into lane 2 as the delivery contract, through a dedicated deletion path, so the departure piece can be built. Lucas can still reverse it. If he does, only the deletion path changes.
 3. **How the code gate fits the existing access gate.** `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` and the `private_alpha_allowlist` table already decide who can sign up and sign in, and the [API contract](../../API_CONTRACT.md) says public registration has been open in production since 12 August 2026. Turning that flag off to gate the beta would also close web registration. The code gate gets its own flag and does not flip the existing one. The exact way a redeemed code admits a person is a technical design item in the Household PR, under Codex review.
 
 ## Next steps for Lucas
 
 These are the pieces only Lucas can hand over. Each lane lands without them, with the fake and the flag off. Turning a piece on is a separate, explicit step after he supplies it.
 
-1. **Resend sending domain on cuadrao.ai.** Needed only when Household email comes back into scope. Nothing in this pass sends email.
+1. **A cuadrao.ai sending domain in Resend.** The Resend adapter already exists and sends from `noreply@get-argus.com`. The domain is needed only when Household email comes back into scope. Nothing in this pass sends email.
 2. **The cuadrao.ai universal link.** Host the `apple-app-site-association` file on cuadrao.ai and confirm the app's Team ID and bundle id for its `applinks` entry. The captain then adds the Associated Domains entitlement in the iOS PR. Until both exist, `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED` stays off.
 3. **APNs key** for push. Until then `ARGUS_UPDATES_PUSH_ENABLED` stays off and the recording fake is used.
 4. **The TestFlight public link.** Until then `ARGUS_TESTFLIGHT_PUBLIC_URL` stays unset and no install link is shown.
@@ -221,36 +228,40 @@ Spaces lands in two separate slots: the space list in slot 2, and account moves 
 
 ### Space list, slot 2
 
-Personal already exists for every account because `space_id` defaults to `personal`. The person creates one named private Business space and one named Custom space. Names are unique among their spaces, including archived ones. A new account chooses a space. Archive keeps the records. Delete is only for an empty private space. Personal cannot be renamed, archived, or deleted. This slot ships one Business and one Custom space per user, archive, and restore. It does not ship a purge job or an unlimited entitlement. It does not move an existing account.
+Personal already exists for every account because `space_id` defaults to `personal`. The person creates one named private Business space and one named Custom space. Names are unique among their spaces, including archived ones. A new account chooses a space. Archive keeps the records. Delete is only for an empty private space. Personal cannot be renamed, archived, or deleted. An archived space cannot be the source or the destination of a move. Unarchive it first. This slot ships one Business and one Custom space per user, archive, and restore. It does not ship a purge job or an unlimited entitlement. It does not move an existing account.
 
 ### Account moves, slot 5
 
 Two kinds of move, both under decision 10.
 
-**Leaving a household.** When a member leaves or is removed, the accounts they own go with them, as today. New: the household keeps a locked, read-only view of each account the leaver had shared, up to the moment they left. It shows greyed out. The state at that moment is recorded as a cut-off: the account, the leaver's grant, and the exact activity and balance revisions the household could see. Nobody can create, edit, or delete that locked history, including the owner and the admin. The owner keeps editing their own account. A later correction to an old record is a new revision in the owner's history and does not change the household's locked view. See open item 2 for later account deletion.
+**Leaving a household.** When a member leaves or is removed, the accounts they own go with them, as today. That includes an account they had shared with the household: it moves with its owner. New: a server-side function runs when a member leaves or is removed. It writes the departure event, keyed for idempotency, and records the cut-off before grants are revoked. Neither the admin nor the member writes move events directly. The cut-off is the account, each grant that existed at that moment, and the exact activity and balance revisions those grants could see. The household keeps a locked, read-only, greyed-out copy only for the members who had an explicit grant to that account at the cut-off. Nobody gets locked history they could not see at the cut-off. That keeps rule 3 of the 1 October policy: an account is visible only through an explicit grant. Nobody can create, edit, or delete locked history, including the owner and the admin. The only exception is account deletion, below. The owner keeps editing their own account. A later correction to an old record is a new revision in the owner's history and does not change the household's locked view.
+
+**Account deletion.** When the owner deletes their account, a dedicated server-side deletion function removes that user's rows and the household's locked copy of that history. This follows the recommendation in open item 2 and Apple's account-deletion rule. The household then sees that a former member's account was removed. This function is new. Today a registered user asks for deletion through `account_deletion_request` on `POST /api/v1/feedback`, and no in-app deletion function exists.
 
 **Moving between spaces.** The person moves a standalone account from Personal to Business. The account id is unchanged. Opening balance, activity, corrections, and notes still load. No new transaction appears. A budget that included the account stops including it in Personal and the budget row does not move. A goal or debt plan linked to the account still opens and points at the same account id. Household grants on that account are unchanged. An account with a transfer, payment, cross-account refund, loan link, or unfinished document draft cannot be moved, and the screen explains the link.
 
 ### Move invariants
 
 - Do not rewrite historical balances, opening balances, corrections, or settlements. Do not copy them onto the destination.
-- Each move is an event: account id, kind (space or departure), source, destination, actor, time, and an idempotency key. The account id does not change. `space_id` is the current assignment only.
+- Each move is an event: account id, kind (space or departure), source, destination, actor, time, and an idempotency key. The owner creates space moves through the move command. Departure events come only from the system departure function. The account id does not change. `space_id` is the current assignment only.
 - The same idempotency key replayed is a no-op that returns the first result. A failed move leaves one end state, source or destination, with history intact.
 - Home series and comparisons are recomputed from canonical history. They are not a snapshot copied onto the new space.
 - Locked household history pins revisions. It never references a revision written after the cut-off.
 
 ### Access rules per role
 
-New tables follow the household pattern: RLS on, all client privileges revoked, the API service writes, and the API checks the role on every route. Locked history and move events are append-only. The service role gets select and insert only on them, and a trigger rejects update and delete. That is the database-level guarantee that locked history is read-only for everyone, because the service role bypasses RLS.
+New tables follow the household pattern: RLS on, all client privileges revoked, the API service writes, and the API checks the role on every route. Locked history and move events are append-only. The service role gets select and insert only on them. A trigger rejects update and delete for every role, ordinary service-role writes included, because the service role bypasses RLS. The trigger's one exception is the new account-deletion function, which removes the deleting user's rows and the household's locked copy of their history. Nothing else can change or remove them.
 
 | Role | Move events | Locked household history | Live account |
 | --- | --- | --- | --- |
-| Account owner | Create own moves. Read own | Read. No create, edit, or delete | Full owner rights, unchanged |
-| Household admin | Read departure events for the household | Read. No create, edit, or delete | Only what a live grant allows |
-| Member who could see the account at the cut-off | None | Read | None after departure |
-| Member who could not see it | None | None | None |
+| Account owner | Create own space moves through the move command. Read own. No departure events | Read. No create, edit, or delete. Removed only by the account-deletion function | Full owner rights, unchanged |
+| Household admin | Read departure events for the household. Never writes them | Read only if the admin had an explicit grant to that account at the cut-off. Otherwise none. No create, edit, or delete | Only what a live grant allows |
+| Member who had an explicit grant at the cut-off | None. Never writes them | Read. No create, edit, or delete | None after departure |
+| Member with no grant at the cut-off | None | None | None |
 | Anyone else | None, `404` | None, `404` | None |
-| API service | Insert once per idempotency key | Insert at the cut-off only | Existing writes |
+| System departure function | Insert the departure event once per idempotency key | Insert at the cut-off only | None |
+| Account-deletion function, new | Remove the deleting user's events | Remove the household's locked copy of that user's history | Remove that user's rows |
+| Other service-role writes | Insert space moves once per idempotency key. No update or delete | No update or delete | Existing writes |
 
 Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and `financial_record_revisions_owner_select` in `supabase/migrations/20260928200000_financial_accounts_first_slice.sql`; `is_active_household_member` and `household_account_grants_member_select` in `20261001090000_household_membership.sql`; the client-privilege revoke in `20261001120000_household_consent_recovery.sql`; `household_command_receipts` for idempotency; and the revision-pinning pattern of `household_plan_archived_activities` in `20261002020000_shared_plan_retained_revision_scope.sql`, which already pins exact activity revisions when a shared plan's owner departs.
 
@@ -264,11 +275,15 @@ Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and
 - An interrupted move retries to the same end state. Never in both spaces, and history is never half-copied.
 - Home series and the comparison read after the move match a fresh computation from canonical history for the destination space.
 - Household grants, budget rows, and goal rows keep their ids.
-- After a departure, an update or delete on locked history fails for the owner, the admin, and the service role.
+- After a departure, an update or delete on locked history fails for the owner, the admin, and ordinary service-role writes.
+- After a departure, a member or admin who had no grant to the account at the cut-off reads no locked history for it.
+- Replaying the departure with the same key writes no second event and no second cut-off.
+- The owner's account deletion removes their rows and the household's locked copy, and nothing else.
+- A move from or to an archived space is rejected.
 
 ### Dedicated eval
 
-The move needs a manual Codex review and a dedicated eval before landing. The eval runs the cases above against Postgres. It fails if any historical balance, correction, or settlement row changes, if a move event is missing or duplicated, if locked history can be changed by anyone, or if the Home series differs from a fresh read of canonical history.
+The move needs a manual Codex review and a dedicated eval before landing. The eval runs the cases above against Postgres. It fails if any historical balance, correction, or settlement row changes, if a move event is missing or duplicated, if locked history can be changed by anyone other than the account-deletion function, if anyone reads locked history they could not see at the cut-off, or if the Home series differs from a fresh read of canonical history.
 
 ### What exists and is reused
 
@@ -283,7 +298,7 @@ The move needs a manual Codex review and a dedicated eval before landing. The ev
 
 - A space table owned by the user, with the account's `space_id` pointing at it. Personal is the default row and cannot be deleted. Slot 2.
 - A move command, a move event table, the link check, and the budget-inclusion update. Slot 5.
-- The locked household history table and the change to departure so it records the cut-off before grants are revoked. Slot 5. The API contract and data model departure paragraphs change in the same PR, because today they say remaining members lose access.
+- The locked household history table, the system departure function that records the cut-off before grants are revoked, and the dedicated account-deletion function. Slot 5. The API contract and data model departure paragraphs change in the same PR, because today they say remaining members lose access.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
 
@@ -303,7 +318,7 @@ No-touch: `CuadraoSpaces*.swift`, document storage, the chart canvas.
 
 Slot 2: Postgres. Create Business and Custom, relaunch, and see the same names. A second user cannot list the spaces. Delete is rejected while the space has an account. Personal delete and rename are rejected. `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` off still `404`s the new routes, and the new space flag off does too.
 
-Slot 5: the reconciliation cases and the eval pass. Move a standalone account, relaunch, and read the same activity on the same account id in the new space. A linked transfer blocks the move and leaves every row in place. After a departure, the household reads the locked history greyed out and cannot change it. iOS screens are checked in English and Spanish by Lucas's local agent after landing.
+Slot 5: the reconciliation cases and the eval pass. Move a standalone account, relaunch, and read the same activity on the same account id in the new space. A linked transfer blocks the move and leaves every row in place. After a departure, members who had a grant at the cut-off read the locked history greyed out and cannot change it. Members without one see nothing of it. iOS screens are checked in English and Spanish by Lucas's local agent after landing.
 
 ## Lane 3. Search coverage
 
@@ -320,7 +335,7 @@ The person searches from the connected Search tab. Existing results still open a
 | Financial search | `GET /api/v1/financial-search`. `src/argus/domain/financial_search.py` kinds `account`, `activity`, `expectation`, `budget`, `goal`, `debt`. Native `FinancialSearch.swift`, `FinancialSearchModel.swift`, `FinancialSearchView.swift` | #751, then #753, #755, #757 for the later kinds |
 | Household financial search | `GET /api/v1/households/{id}/search`. Hit shape in `financial_schemas.SearchHit`, with `plan_ref` for shared plans | #766, #773 |
 | Conversation search | `GET /api/v1/search` in `src/argus/api/routers/search.py`. Items are `type: conversation` with `conversation_id` | Existing Omnisearch, not the iPhone financial tab |
-| Documents | `src/argus/api/routers/financial_documents.py`. List, get, source download, proposal patch. `require_document_surface` requires the ingestion gate and `ARGUS_DOCUMENT_EXTRACTION_ENABLED`, which defaults off. Bytes in `financial_document_extractions.source_bytes` via `src/argus/domain/ingestion/documents/store_postgres.py` | #776 |
+| Documents | `src/argus/api/routers/financial_documents.py`. List, get, source download, proposal patch. `require_document_surface` in `src/argus/api/documents.py` requires the ingestion gate and `ARGUS_DOCUMENT_EXTRACTION_ENABLED`, which defaults off. Bytes in `financial_document_extractions.source_bytes` via `src/argus/domain/ingestion/documents/store_postgres.py` | #776 |
 | Design Search chrome | `CuadraoSearchCanvas.swift` has sample sections for plans, chats, files, and memory | Design canvas |
 
 Reuse `financial_search.search` for financial rows, the document service's list and get for documents, and `GET /api/v1/search` for conversations. [Issue #778](https://github.com/lagarcess/argus/issues/778) plans to move retained document source bytes into a private Supabase Storage bucket before documents are enabled. Search uses the document API and never storage internals, so that move does not affect Search.
@@ -448,7 +463,7 @@ iOS, by Lucas's local agent: relaunch shows the same unread and read rows. Engli
 | Space list | Space table and routes | Space picker and space list | Nothing |
 | Search | Document and conversation hits | Rows and open paths | Nothing. Issue #778 does not block it |
 | Home series | Series and the decision 6 comparison | Binding the connected Home to the series | The design-branch collision on `ConnectedCuadraoHome.swift` for the iOS binding |
-| Account moves | Move command, events, locked history, RLS, eval | Move review and greyed-out locked history | The Home series reader, then manual Codex review and the eval. Open item 2 for the departure piece only. Linked moves stay blocked |
+| Account moves | Move command, events, locked history, RLS, eval | Move review and greyed-out locked history | The Home series reader, then manual Codex review and the eval. Linked moves stay blocked |
 | Updates | Inbox, three triggers, device tokens, push fake | Inbox screen, push opt-in and handling | Lucas's APNs key before the push flag turns on |
 
 No lane is dispatched by this document.
