@@ -13,6 +13,7 @@ struct CuadraoHomeInsights: View {
     @State private var activity = false
     @State private var accountPath: [UUID] = []
     @State private var tipSheet: InsightAccountSheet?
+    @State private var chooseRecordingAccount = false
     @Environment(\.dismiss) private var dismiss
 
     private enum InsightAccountSheet: Identifiable {
@@ -45,19 +46,22 @@ struct CuadraoHomeInsights: View {
     }
     private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: data.balanceObservations, now: .now) }
     private var oldest: Int { activity ? CanvasSpendingHistory.oldestOffset(expenses, range: range) : range.oldestOffset(history) }
-    private func snapshot(_ offset: Int) -> [CanvasAccount] {
-        guard offset < 0 else { return accounts }
-        guard let date = range.points(history, offset: offset).last?.date else { return [] }
-        return CanvasBalanceHistory.snapshot(accounts: accounts, observations: data.balanceObservations, at: date)
+    private func balancePeriod(_ offset: Int) -> CanvasBalancePeriod {
+        CanvasBalancePeriod(accounts: accounts, observations: data.balanceObservations, range: range, offset: offset)
+    }
+    private func recordFirstExpense() {
+        if accounts.count == 1, let account = accounts.first { tipSheet = .record(account.id) }
+        else { chooseRecordingAccount = true }
     }
     private func movePeriod(_ direction: Int) { periodOffset = min(0, max(oldest, periodOffset + direction)) }
     @ViewBuilder private func periodContent(_ offset: Int) -> some View {
         if activity {
             CuadraoSpendingChart(expenses: expenses, coverageStart: data.spendingCoverageStart(currency: currency), currency: currency,
-                spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset))
+                spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset),
+                record: accounts.isEmpty ? nil : recordFirstExpense)
         } else if distribution {
-            CuadraoHomeDistribution(accounts: snapshot(offset), currency: currency, spanish: spanish, historical: offset < 0,
-                asOf: offset == 0 ? nil : range.points(history, offset: offset).last?.date)
+            CuadraoHomeDistribution(accounts: balancePeriod(offset).closingAccounts, currency: currency, spanish: spanish, historical: offset < 0,
+                asOf: balancePeriod(offset).closing?.date)
         } else {
             CuadraoHomeBalanceChart(accounts: accounts, observations: data.balanceObservations, currency: currency,
                 currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true,
@@ -102,6 +106,10 @@ struct CuadraoHomeInsights: View {
                             .accessibilityLabel(spanish ? "Cerrar" : "Close").accessibilityIdentifier("home-history-done")
                     }
                 }
+        }.confirmationDialog(spanish ? "¿En qué cuenta?" : "Which account?", isPresented: $chooseRecordingAccount, titleVisibility: .visible) {
+            ForEach(accounts) { account in
+                Button(account.displayName(spanish)) { tipSheet = .record(account.id) }
+            }
         }.sheet(item: $tipSheet) { selection in
             switch selection {
             case .actions(let id):

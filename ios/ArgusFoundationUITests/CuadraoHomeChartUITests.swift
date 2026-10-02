@@ -241,8 +241,12 @@ final class CuadraoHomeChartUITests: XCTestCase {
         let app = launch(extra: ["--insights-empty-month"])
         openActivity(app)
         XCTAssertEqual(app.staticTexts["home-spending-total"].label, "0.00")
-        XCTAssertTrue(app.staticTexts["home-spending-insight"].label.contains("Aún no hay"))
-        XCTAssertTrue(app.otherElements.matching(identifier: "home-spending-chart").firstMatch.label.contains("Aún no hay"))
+        XCTAssertTrue(app.staticTexts["Aún no hay gastos registrados en este período."].exists)
+        XCTAssertTrue(app.otherElements.matching(identifier: "home-spending-chart").firstMatch.exists)
+        app.buttons["home-view-distribution"].tap()
+        XCTAssertTrue(app.staticTexts["Aún no hay gastos registrados en este período."].exists)
+        XCTAssertFalse(app.buttons["home-spending-all"].exists)
+        app.buttons["home-view-history"].tap()
         XCTAssertFalse(app.buttons["home-highlight-comparison"].exists)
         XCTAssertFalse(app.buttons["home-highlight-largest"].exists)
         shot(app, "story-empty-month-es")
@@ -252,7 +256,7 @@ final class CuadraoHomeChartUITests: XCTestCase {
         let unavailable = launch(extra: ["--insights-empty-month", "--insights-no-coverage"])
         openActivity(unavailable)
         XCTAssertEqual(unavailable.staticTexts["home-spending-total"].label, "—")
-        XCTAssertTrue(unavailable.staticTexts["home-spending-insight"].label.contains("incompleto"))
+        XCTAssertTrue(unavailable.staticTexts["El historial de este período está incompleto. No lo contamos como cero."].exists)
         shot(unavailable, "story-unknown-month-es")
     }
     func testSpendingHighlightsLargeEnglish() {
@@ -271,6 +275,64 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertTrue(highlight.isHittable)
         highlight.tap()
         XCTAssertTrue(app.scrollViews["home-highlight-records"].waitForExistence(timeout: 3))
+    }
+    func testBalanceBreakdownAndAccountReturn() {
+        continueAfterFailure = false
+        let app = launch()
+        app.buttons["home-history-expand"].tap()
+        let content = app.scrollViews["home-insights-content"]
+        let period = app.staticTexts["home-insight-period"].label
+        let row = content.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "home-balance-change-", "Día a día")).firstMatch
+        for _ in 0..<5 { if row.isHittable && row.frame.maxY < app.frame.maxY - 50 { break }; content.swipeUp() }
+        XCTAssertTrue(row.isHittable)
+        XCTAssertTrue(app.staticTexts["Qué cambió"].exists)
+        shot(app, "balance-change-breakdown-es")
+        row.tap()
+        XCTAssertEqual(app.staticTexts["account-detail-title"].label, "Día a día")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(row.isHittable)
+        for _ in 0..<5 { content.swipeDown(velocity: .fast) }
+        XCTAssertEqual(app.staticTexts["home-insight-period"].label, period)
+        let amount = content.staticTexts["home-chart-amount"].label
+        app.buttons["home-view-distribution"].tap()
+        XCTAssertEqual(content.staticTexts["home-distribution-total"].label, amount)
+    }
+    func testFirstObservationAndFirstExpense() {
+        continueAfterFailure = false
+        let app = launch(extra: ["--insights-first-use"])
+        app.buttons["home-history-expand"].tap()
+        let content = app.scrollViews["home-insights-content"]
+        XCTAssertEqual(content.staticTexts["home-chart-amount"].label, "153,920.00")
+        content.swipeUp()
+        XCTAssertTrue(app.staticTexts["Tu punto de partida"].exists)
+        XCTAssertFalse(app.staticTexts["home-balance-net-change"].exists)
+        shot(app, "balance-first-observation-es")
+        app.buttons["home-insight-metric"].tap(); app.buttons["Actividad"].tap()
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "—")
+        XCTAssertTrue(app.staticTexts["Tu historia empieza aquí"].exists)
+        shot(app, "activity-first-use-es")
+        app.buttons["chart-state-action"].tap()
+        app.buttons["Día a día"].tap()
+        XCTAssertTrue(app.navigationBars["Añadir movimiento"].waitForExistence(timeout: 3))
+        let amount = app.textFields["cuadrao-amount"]
+        amount.tap(); amount.typeText("250")
+        app.toolbars.buttons["Listo"].tap()
+        app.buttons["Revisar"].tap(); app.buttons["Guardar"].tap()
+        XCTAssertTrue(app.staticTexts["home-spending-total"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "250.00")
+        XCTAssertFalse(app.staticTexts["Tu historia empieza aquí"].exists)
+        XCTAssertTrue(app.otherElements.matching(identifier: "home-spending-chart").firstMatch.exists)
+        shot(app, "activity-first-expense-es")
+    }
+    func testBalanceBreakdownLargeEnglish() {
+        continueAfterFailure = false
+        let app = launch(english: true)
+        app.buttons["home-history-expand"].tap()
+        let content = app.scrollViews["home-insights-content"]
+        let change = app.staticTexts["home-balance-net-change"]
+        for _ in 0..<9 { if change.isHittable { break }; content.swipeUp() }
+        XCTAssertTrue(change.isHittable)
+        shot(app, "balance-change-dark-large-en")
     }
     private func openActivity(_ app: XCUIApplication, english: Bool = false) {
         app.buttons["home-history-expand"].tap()

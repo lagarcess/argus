@@ -10,7 +10,7 @@ enum CuadraoTypography {
     static let supporting = Font.subheadline
     static let caption = Font.caption
     static let action = Font.body.weight(.medium)
-    static let rowAmount = Font.system(.subheadline, design: .rounded).monospacedDigit()
+    static let rowAmount = Font.system(.subheadline, design: .rounded).weight(.medium).monospacedDigit()
     static let amount = Font.system(.largeTitle, design: .rounded).weight(.medium).monospacedDigit()
     static let secondaryAmount = Font.system(.title2, design: .rounded).weight(.medium).monospacedDigit()
 
