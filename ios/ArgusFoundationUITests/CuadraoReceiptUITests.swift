@@ -34,6 +34,7 @@ final class CuadraoReceiptUITests: XCTestCase {
         }
         reveal(app, app.staticTexts["receipt-unassigned"])
         XCTAssertEqual(app.staticTexts["receipt-unassigned"].label, "Todos los artículos asignados")
+        app.swipeDown()
         shot(app, "receipt-shared-items-es")
         tap(app, "receipt-confirm")
         XCTAssertEqual(app.buttons["receipt-later"].label, "Listo")

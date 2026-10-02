@@ -263,7 +263,10 @@ private struct ReceiptEditor: View {
                     if draft.lines[index].members.contains(member.id) { draft.lines[index].members.remove(member.id) }
                     else { draft.lines[index].members.insert(member.id) }
                 } label: {
-                    Label(member.name, systemImage: line.members.contains(member.id) ? "checkmark.circle.fill" : "circle")
+                    HStack(spacing: 6) {
+                        Image(systemName: line.members.contains(member.id) ? "checkmark.circle.fill" : "circle")
+                        Text(member.name)
+                    }
                         .font(.subheadline).fixedSize(horizontal: !vertical, vertical: true)
                         .padding(.horizontal, 8).frame(minHeight: 44)
                         .background(line.members.contains(member.id) ? WelcomePalette.sage : .clear, in: Capsule())
