@@ -41,7 +41,7 @@ private struct ReceiptEditor: View {
         Form {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label(draft.prepared ? (es ? "Guardado · por revisar" : "Saved · ready to review") : (es ? "Confirmado en esta vista previa" : "Confirmed in this preview"), systemImage: draft.prepared ? "checkmark.circle" : "checkmark.seal")
+                    Label(draft.prepared ? (es ? "Guardado · por revisar" : "Saved · ready to review") : (es ? "Confirmado" : "Confirmed"), systemImage: draft.prepared ? "checkmark.circle" : "checkmark.seal")
                         .font(CuadraoTypography.caption).foregroundStyle(.secondary).accessibilityIdentifier("receipt-status")
                     if draft.example { Text(es ? "Recibo de ejemplo" : "Sample receipt").font(CuadraoTypography.caption).foregroundStyle(WelcomePalette.pine) }
                     Text(posted?.title ?? (draft.merchant.isEmpty ? (es ? "Tu recibo" : "Your receipt") : draft.merchant)).font(CuadraoTypography.feature)
@@ -55,7 +55,7 @@ private struct ReceiptEditor: View {
                                 .lineLimit(1).minimumScaleFactor(0.65)
                         }.accessibilityIdentifier("receipt-total")
                     }
-                    Text((CanvasExpenseCategory(rawValue: draft.category) ?? .other).title(es) + " · " + draft.date.formatted(date: .abbreviated, time: .omitted))
+                    Text((CanvasExpenseCategory(rawValue: draft.category) ?? .other).title(es) + " · " + draft.date.formatted(.dateTime.day().month(.abbreviated).year().locale(Locale(identifier: es ? "es-419" : "en_US"))))
                         .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                 }.padding(.vertical, 8)
                 Button { showSource = true } label: {
@@ -69,12 +69,12 @@ private struct ReceiptEditor: View {
                             ForEach(CanvasExpenseCategory.allCases) { Text($0.title(es)).tag($0.rawValue) }
                         }
                         Label(draft.currency, systemImage: "lock").font(.caption).foregroundStyle(.secondary)
-                    }.accessibilityIdentifier("receipt-edit-details")
+                    }
                 }
             }
             Section(es ? "Artículos" : "Items") {
                 if draft.lines.isEmpty {
-                    Text(es ? "Añade los artículos del recibo. Esta vista previa no extrae datos de tus imágenes." : "Add the receipt's items. This preview does not extract data from your images.").font(.subheadline).foregroundStyle(.secondary)
+                    Text(es ? "Añade los artículos del recibo." : "Add the receipt's items.").font(.subheadline).foregroundStyle(.secondary)
                 }
                 ForEach(draft.lines) { line in
                     Button { if draft.prepared { editingLine = line } } label: {
@@ -86,7 +86,7 @@ private struct ReceiptEditor: View {
                             Spacer()
                             Text(money(line.cents)).font(CuadraoTypography.rowAmount).foregroundStyle(WelcomePalette.ink)
                             if draft.prepared { Image(systemName: "chevron.right").font(.caption2) }
-                        }.frame(minHeight: 44)
+                        }.frame(minHeight: 44).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("receipt-line-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)")
                 }
                 if draft.prepared {
@@ -138,7 +138,6 @@ private struct ReceiptEditor: View {
                     Text(es ? "Hasta confirmar, este recibo no cambia ningún balance." : "Until you confirm, this receipt changes no balances.").font(.caption).foregroundStyle(.secondary)
                 } else {
                     Label(es ? "Gasto guardado" : "Expense saved", systemImage: "checkmark.seal.fill").foregroundStyle(WelcomePalette.pine).accessibilityIdentifier("receipt-confirmed")
-                    Text(es ? "Registro local de ejemplo. No se envió dinero ni mensajes." : "Local preview record. No money or messages were sent.").font(.caption).foregroundStyle(.secondary)
                 }
             }
         }.scrollContentBackground(.hidden).background(WelcomePalette.background)
@@ -222,7 +221,7 @@ private struct ReceiptEditor: View {
                             PlanMemberAvatar(member: member, index: index)
                             Text(member.name); Spacer()
                             Text(money(shares[member.id] ?? 0)).font(CuadraoTypography.rowAmount)
-                        }.frame(minHeight: 44)
+                        }.frame(minHeight: 44).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("receipt-member-\(index)")
                 }
                 if draft.split == .items {

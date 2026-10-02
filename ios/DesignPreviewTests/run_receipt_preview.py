@@ -1,4 +1,3 @@
-"""Run receipt arithmetic and durable preview journeys without a simulator."""
 from pathlib import Path
 import subprocess
 import tempfile

@@ -85,7 +85,6 @@ struct ReceiptDraft: Identifiable, Codable, Equatable {
             guard !assigned.isEmpty, line.members.isSubset(of: participants) else { throw ReceiptError.unassigned }
             for (id, cents) in Self.divide(line.cents, among: assigned) { result[id, default: 0] += cents }
         }
-        // Charges follow consumed items, with largest remainders in roster order.
         let charges = includedCharges + addedTipCents
         guard subtotal > 0 else { throw ReceiptError.incomplete }
         let weighted = members.map { (id: $0, numerator: Int64(result[$0, default: 0]) * Int64(charges)) }

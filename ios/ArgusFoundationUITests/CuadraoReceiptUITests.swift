@@ -16,7 +16,7 @@ final class CuadraoReceiptUITests: XCTestCase {
         XCTAssertFalse(app.buttons["receipt-later"].exists)
         openGroup(app)
         receiptCard(app).tap()
-        tap(app, "receipt-edit-details")
+        tap(app, "Corregir datos")
         let merchant = app.textFields["receipt-merchant"]
         merchant.tap(); merchant.typeText(" corregido")
         dismissKeyboard(app)
@@ -117,7 +117,10 @@ final class CuadraoReceiptUITests: XCTestCase {
         button.tap()
     }
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
-        for _ in 0..<12 where !element.isHittable { app.swipeUp() }
+        for _ in 0..<12 {
+            if element.isHittable && element.frame.midY < app.frame.maxY - 100 { return }
+            app.swipeUp()
+        }
     }
     private func dismissKeyboard(_ app: XCUIApplication) {
         if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }

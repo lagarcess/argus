@@ -44,10 +44,14 @@ struct CuadraoReceiptFlow: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(spanish ? "Después" : "Later") { dismiss() }.accessibilityIdentifier("receipt-later")
+                    Button(closeTitle) { dismiss() }.accessibilityIdentifier("receipt-later")
                 }
             }
         }.tint(WelcomePalette.pine).presentationDragIndicator(.visible)
+    }
+    private var closeTitle: String {
+        let confirmed = reviewID.flatMap(workspace.receipts.receipt).map { !$0.prepared } ?? false
+        return confirmed ? (spanish ? "Listo" : "Done") : (spanish ? "Después" : "Later")
     }
     private var reviewID: UUID? {
         if let captured { return captured }
@@ -75,7 +79,7 @@ struct CuadraoReceiptCapture: View {
             VStack(alignment: .leading, spacing: 24) {
                 PlanLandscape(look: .coast).frame(height: 110).clipShape(RoundedRectangle(cornerRadius: 24))
                 Text(spanish ? "Guárdalo ahora.\nCuádralo después." : "Save it now.\nSplit it later.").font(CuadraoTypography.feature)
-                Text(spanish ? "El recibo queda en este dispositivo. Tú decides cuándo confirmar el gasto." : "The receipt stays on this device. You decide when to confirm the expense.")
+                Text(spanish ? "Revisa ahora o vuelve cuando tengas un momento." : "Review now or come back when you have a moment.")
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                 if let group {
                     Label(group.name + " · " + group.currency, systemImage: "lock").font(CuadraoTypography.supporting)
@@ -98,8 +102,6 @@ struct CuadraoReceiptCapture: View {
                 Button { sample() } label: {
                     Label(spanish ? "Probar un recibo de ejemplo" : "Try a sample receipt", systemImage: "sparkles").frame(minHeight: 44)
                 }.accessibilityIdentifier("receipt-sample")
-                Text(spanish ? "El ejemplo incluye artículos y categoría preparados. Las fotos y archivos reales se completan manualmente." : "The sample includes prepared items and a category. Real photos and files are completed manually.")
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 if busy { ProgressView() }
                 if !error.isEmpty { Text(error).font(.subheadline).foregroundStyle(.red).accessibilityIdentifier("receipt-error") }
             }.padding(24)
