@@ -72,6 +72,24 @@ def test_model_cannot_choose_connection_or_owner():
         ExtractionResult.model_validate(body)
 
 
+def test_provider_schema_avoids_unique_items_and_candidates_own_deduplication():
+    import json
+
+    # DeepInfra rejects this grammar keyword before generating any output.
+    assert '"uniqueItems"' not in json.dumps(ExtractionResult.model_json_schema())
+    body = result().model_dump(mode="json")
+    body["observations"][0]["uncertain"] = ["amount", "amount"]
+    items = candidates_from_result(
+        ExtractionResult.model_validate(body),
+        "a" * 64,
+        "owner",
+        datetime.now(timezone.utc),
+        1,
+    )
+    assert isinstance(items[0].uncertain, frozenset)
+    assert list(items[0].uncertain).count("amount") == 1
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "finish,valid", [("stop", True), ("length", True), ("stop", False)]

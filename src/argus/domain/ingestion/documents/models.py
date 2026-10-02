@@ -44,7 +44,7 @@ class ExtractedObservation(_Frozen):
     due_on: date | None = None
     period_start: date | None = None
     period_end: date | None = None
-    uncertain: frozenset[UncertainField] = frozenset()
+    uncertain: tuple[UncertainField, ...] = ()
 
 
 class ExtractionResult(_Frozen):
