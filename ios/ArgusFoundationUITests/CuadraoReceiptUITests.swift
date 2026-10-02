@@ -36,7 +36,10 @@ final class CuadraoReceiptUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["receipt-unassigned"].label, "Todos los artículos asignados")
         shot(app, "receipt-shared-items-es")
         tap(app, "receipt-confirm")
-        XCTAssertTrue(app.otherElements["receipt-confirmed"].exists || app.staticTexts["Gasto guardado"].exists)
+        XCTAssertEqual(app.buttons["receipt-later"].label, "Listo")
+        let saved = app.staticTexts["Gasto guardado"]
+        reveal(app, saved)
+        XCTAssertTrue(saved.exists)
         shot(app, "receipt-confirmed-es")
         tap(app, "receipt-later")
         app.segmentedControls["group-sections"].buttons["Gastos"].tap()
@@ -92,6 +95,40 @@ final class CuadraoReceiptUITests: XCTestCase {
         shot(app, "receipt-plan-chat-same-record-en")
     }
 
+    func testReceiptShowsYouOweWhenAnotherPersonPaid() {
+        let app = launch(english: true, dark: true)
+        openGroup(app, english: true)
+        tap(app, "group-add-receipt")
+        tap(app, "receipt-sample")
+        tap(app, "receipt-payer")
+        app.buttons["Ana"].tap()
+        let direction = app.staticTexts["You owe"]
+        reveal(app, direction)
+        XCTAssertTrue(direction.exists)
+        shot(app, "receipt-you-owe-en-dark")
+        tap(app, "receipt-later")
+    }
+
+    func testPhotoImportKeepsOriginalWithoutInventedItems() {
+        let app = launch(english: true)
+        tap(app, "cuadrao-tab-2")
+        scanFromChat(app, english: true)
+        tap(app, "Photos")
+        let photo = app.images.matching(NSPredicate(format: "label BEGINSWITH %@", "Photo,")).firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 5), "Seed the task simulator with a fictional receipt photo before running this journey.")
+        photo.tap()
+        XCTAssertTrue(app.staticTexts["Total to review"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["receipt-line-0"].exists)
+        tap(app, "receipt-source")
+        XCTAssertTrue(app.navigationBars["Original receipt"].waitForExistence(timeout: 3))
+        shot(app, "receipt-import-original-en")
+        app.buttons["Done"].tap()
+        tap(app, "receipt-later")
+        receiptCard(app).tap()
+        XCTAssertTrue(app.staticTexts["Total to review"].waitForExistence(timeout: 3))
+        shot(app, "receipt-import-draft-en")
+    }
+
     private func launch(english: Bool = false, dark: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -114,13 +151,11 @@ final class CuadraoReceiptUITests: XCTestCase {
     private func tap(_ app: XCUIApplication, _ id: String) {
         let button = app.buttons[id]; reveal(app, button)
         XCTAssertTrue(button.waitForExistence(timeout: 5), id)
+        XCTAssertTrue(button.isEnabled, id)
         button.tap()
     }
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
-        for _ in 0..<12 {
-            if element.isHittable && element.frame.midY < app.frame.maxY - 100 { return }
-            app.swipeUp()
-        }
+        for _ in 0..<12 where !element.isHittable { app.swipeUp() }
     }
     private func dismissKeyboard(_ app: XCUIApplication) {
         if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }

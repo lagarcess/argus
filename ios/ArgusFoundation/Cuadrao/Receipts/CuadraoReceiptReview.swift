@@ -264,7 +264,8 @@ private struct ReceiptEditor: View {
                     else { draft.lines[index].members.insert(member.id) }
                 } label: {
                     Label(member.name, systemImage: line.members.contains(member.id) ? "checkmark.circle.fill" : "circle")
-                        .font(.subheadline).padding(.horizontal, 8).frame(minHeight: 44)
+                        .font(.subheadline).fixedSize(horizontal: !vertical, vertical: true)
+                        .padding(.horizontal, 8).frame(minHeight: 44)
                         .background(line.members.contains(member.id) ? WelcomePalette.sage : .clear, in: Capsule())
                 }.buttonStyle(.plain).accessibilityIdentifier("receipt-assign-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)-\(group.activeMembers.firstIndex(where: { $0.id == member.id }) ?? 0)")
             }
