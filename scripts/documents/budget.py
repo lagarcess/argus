@@ -26,6 +26,7 @@ class PriceEnvelope:
     completion: Decimal
     cache_read: Decimal = Decimal(0)
     cache_write: Decimal = Decimal(0)
+    output_parameter: str = "max_tokens"
 
     @property
     def maximum_cost(self) -> Decimal:
@@ -39,6 +40,7 @@ class PriceEnvelope:
             provider=self.provider,
             context_tokens=self.context_tokens,
             output_tokens=self.output_tokens,
+            output_parameter=self.output_parameter,
             prompt_usd_per_token=str(self.prompt),
             completion_usd_per_token=str(self.completion),
             cache_read_usd_per_token=str(self.cache_read),
@@ -51,6 +53,8 @@ class PriceEnvelope:
 
 
 def price_envelope(model: str, endpoints: list[dict]) -> PriceEnvelope:
+    if ":" in model:
+        raise ValueError("no_bounded_endpoint")
     profile = openrouter_profile_for_task("document_extraction")
     envelopes = []
     for endpoint in endpoints:
@@ -79,6 +83,9 @@ def price_envelope(model: str, endpoints: list[dict]) -> PriceEnvelope:
                 for name, value in tier.items():
                     if name in rates:
                         rates[name] = max(rates[name], rate(value))
+                    elif name == "web_search":
+                        # The dispatch guard excludes every search activation path.
+                        rate(value)
                     elif (
                         name == "discount"
                         or (index == 0 and name == "overrides")
@@ -91,9 +98,18 @@ def price_envelope(model: str, endpoints: list[dict]) -> PriceEnvelope:
             context = endpoint["context_length"]
             if not isinstance(context, int) or isinstance(context, bool) or context <= 0:
                 raise ValueError("missing_context_limit")
-            if not {"structured_outputs", "max_tokens"}.issubset(
-                endpoint["supported_parameters"]
-            ):
+            supported = endpoint["supported_parameters"]
+            if "structured_outputs" not in supported:
+                continue
+            output_parameter = next(
+                (
+                    name
+                    for name in ("max_tokens", "max_completion_tokens")
+                    if name in supported
+                ),
+                None,
+            )
+            if output_parameter is None:
                 continue
             output = endpoint.get("max_completion_tokens")
             if output is not None and output < profile.max_tokens:
@@ -111,6 +127,7 @@ def price_envelope(model: str, endpoints: list[dict]) -> PriceEnvelope:
                     completion,
                     rates["input_cache_read"],
                     rates["input_cache_write"],
+                    output_parameter,
                 )
             )
         except (KeyError, TypeError, ValueError):
@@ -163,12 +180,24 @@ class BenchmarkBudget:
             if (
                 task != "document_extraction"
                 or payload.get("model") != self.envelope.model
-                or payload.get("max_tokens") != self.envelope.output_tokens
+                or payload.get(self.envelope.output_parameter)
+                != self.envelope.output_tokens
+                or {"max_tokens", "max_completion_tokens"}.intersection(payload)
+                != {self.envelope.output_parameter}
                 or not isinstance(provider, dict)
                 or any(provider.get(k) != v for k, v in privacy.items())
                 or any(
                     k in payload
-                    for k in ("tools", "plugins", "models", "route", "reasoning")
+                    for k in (
+                        "tools",
+                        "plugins",
+                        "models",
+                        "route",
+                        "reasoning",
+                        "web_search_options",
+                        "preset",
+                        "presets",
+                    )
                 )
             ):
                 raise ValueError("unexpected_benchmark_request")

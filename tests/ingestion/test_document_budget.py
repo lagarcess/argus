@@ -104,6 +104,8 @@ def test_entire_run_must_fit_before_first_attempt(endpoint):
         {"model": "different"},
         {"max_tokens": 999999},
         {"plugins": []},
+        {"preset": "search-enabled"},
+        {"presets": ["search-enabled"]},
         {"models": []},
         {"tools": []},
         {"provider": {"zdr": False}},
@@ -261,3 +263,81 @@ async def test_two_tiered_calls_fit_remaining_cap_without_extra_attempt(
     assert envelope.evidence()["reserved_input_usd_per_token"] == "0.0000012"
     with pytest.raises(ValueError, match="run_exceeds_cap"):
         BenchmarkBudget(envelope, Decimal("2") - prior, 2)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("output_parameter", ["max_tokens", "max_completion_tokens"])
+async def test_output_parameter_and_conditional_search_price(
+    endpoint, payload, output_parameter
+):
+    prices = dict(prompt="0.00000025", completion="0.00000075", web_search="0.01")
+    envelope = price_envelope(
+        "fixture-model",
+        [
+            endpoint
+            | dict(
+                context_length=1_050_000,
+                pricing=prices,
+                supported_parameters=["structured_outputs", output_parameter],
+            )
+        ],
+    )
+    assert envelope.output_parameter == output_parameter
+    assert envelope.evidence()["output_parameter"] == output_parameter
+    assert envelope.maximum_cost == Decimal("0.2715")
+    prior = Decimal("2.6490875136")
+    budget = BenchmarkBudget(envelope, Decimal("6") - prior, 2)
+    assert prior + envelope.maximum_cost * 2 == Decimal("3.1920875136")
+    payload.pop("max_tokens")
+    payload[output_parameter] = envelope.output_tokens
+    requests = []
+
+    def transport(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, json={})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as client:
+        with budget.attempt("allowed", lambda: None):
+            await post(client, payload)
+        alternate = (
+            "max_completion_tokens" if output_parameter == "max_tokens" else "max_tokens"
+        )
+        invalid = [
+            payload | {alternate: envelope.output_tokens},
+            {k: v for k, v in payload.items() if k != output_parameter},
+            payload | {output_parameter: 1},
+        ]
+        invalid.extend(
+            payload | {key: {}}
+            for key in ("tools", "plugins", "models", "route", "web_search_options")
+        )
+        invalid.append(payload | {"model": "fixture-model:online"})
+        for index, request in enumerate(invalid):
+            with budget.attempt(str(index), lambda: None):
+                with pytest.raises(ValueError, match="unexpected_benchmark_request"):
+                    await post(client, request)
+    assert len(requests) == 1
+    assert requests[0][output_parameter] == envelope.output_tokens
+    assert alternate not in requests[0]
+
+
+@pytest.mark.parametrize("fee", ["NaN", "-0.01", "Infinity"])
+@pytest.mark.parametrize("tier", [False, True])
+def test_invalid_conditional_search_price_still_rejected(endpoint, fee, tier):
+    prices = endpoint["pricing"] | (
+        {"overrides": [{"min_prompt_tokens": 0, "web_search": fee}]}
+        if tier
+        else {"web_search": fee}
+    )
+    with pytest.raises(ValueError, match="no_bounded_endpoint"):
+        price_envelope("fixture-model", [endpoint | {"pricing": prices}])
+
+
+def test_prefers_existing_output_parameter_when_both_supported(endpoint):
+    endpoint["supported_parameters"].append("max_completion_tokens")
+    assert price_envelope("fixture-model", [endpoint]).output_parameter == "max_tokens"
+
+
+def test_online_model_cannot_bypass_tool_fee_exclusion(endpoint):
+    with pytest.raises(ValueError, match="no_bounded_endpoint"):
+        price_envelope("fixture-model:online", [endpoint])

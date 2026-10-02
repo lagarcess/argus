@@ -860,6 +860,23 @@ _SCHEMA_IN_PROMPT_INSTRUCTION = (
 )
 
 
+def _document_wire_schema(node: object, *, fields: bool = False) -> object:
+    if isinstance(node, list):
+        return [_document_wire_schema(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    # Provider grammar limits do not weaken local Pydantic validation.
+    unsupported = {"default", "minLength", "maxLength", "pattern", "format", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minItems", "maxItems", "uniqueItems", "minProperties", "maxProperties"}
+    projected = {
+        key: _document_wire_schema(item, fields=not fields and key in {"properties", "$defs"})
+        for key, item in node.items() if fields or key not in unsupported
+    }
+    if not fields and "properties" in projected:
+        projected["required"] = list(projected["properties"])
+        projected["additionalProperties"] = False
+    return projected
+
+
 def _json_schema_payload(
     *,
     model: str,
@@ -868,8 +885,9 @@ def _json_schema_payload(
     schema_name: str,
     profile: OpenRouterProfile,
 ) -> dict[str, object]:
+    openai_document = profile.task == "document_extraction" and model.startswith("openai/")
     sampling_parameters = (
-        {} if openrouter_model_tier_for_task(profile.task) == "readout"
+        {} if openai_document or openrouter_model_tier_for_task(profile.task) == "readout"
         else {"temperature": profile.temperature}
     )
     if model.startswith("anthropic/"):
@@ -901,12 +919,12 @@ def _json_schema_payload(
             "json_schema": {
                 "name": schema_name,
                 "strict": True,
-                "schema": schema_model.model_json_schema(),
+                "schema": _document_wire_schema(schema_model.model_json_schema()) if openai_document else schema_model.model_json_schema(),
             },
         },
         "provider": {"require_parameters": True},
         **sampling_parameters,
-        "max_tokens": profile.max_tokens,
+        "max_completion_tokens" if openai_document else "max_tokens": profile.max_tokens,
     }
     _apply_reasoning_for_structured_artifact(payload, profile)
     return payload

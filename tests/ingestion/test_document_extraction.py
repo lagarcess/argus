@@ -94,8 +94,9 @@ def test_provider_schema_avoids_unique_items_and_candidates_own_deduplication():
 @pytest.mark.parametrize(
     "finish,valid", [("stop", True), ("length", True), ("stop", False)]
 )
+@pytest.mark.parametrize("model", ["test/vision", "openai/gpt-6-luna"])
 async def test_single_private_provider_attempt_preserves_usage(
-    monkeypatch, respx_mock, finish, valid
+    monkeypatch, respx_mock, finish, valid, model
 ):
     import io
     import json
@@ -105,7 +106,7 @@ async def test_single_private_provider_attempt_preserves_usage(
     from argus.domain.ingestion.documents.extractor import DocumentExtractor
     from PIL import Image
 
-    monkeypatch.setenv("ARGUS_VISION_MODEL", "test/vision")
+    monkeypatch.setenv("ARGUS_VISION_MODEL", model)
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("ARGUS_PROD_OPENROUTER_API_KEY", "registered-test-key")
     monkeypatch.setenv("ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY", "guest-test-key")
@@ -159,6 +160,11 @@ async def test_single_private_provider_attempt_preserves_usage(
         "zdr": True,
         "allow_fallbacks": False,
     }
+    if model.startswith("openai/"):
+        assert "max_completion_tokens" in payload
+        assert "max_tokens" not in payload and "temperature" not in payload
+    else:
+        assert "max_tokens" in payload
     assert "reasoning" not in payload
     assert payload["messages"][1]["content"][2]["type"] == "image_url"
     assert metadata["route_receipts"][0]["usage_cost_usd"] == 0.002
@@ -184,5 +190,80 @@ def test_non_decimal_amount_cannot_reach_canonical_conversion(amount):
 
     body = result().model_dump(mode="json")
     body["observations"][0]["amount"] = amount
+    with pytest.raises(ValidationError):
+        ExtractionResult.model_validate(body)
+
+
+def document_payload(model="openai/gpt-6-luna", task="document_extraction"):
+    from argus.llm.openrouter import _json_schema_payload, openrouter_profile_for_task
+
+    return _json_schema_payload(
+        model=model,
+        messages=[{"role": "user", "content": "extract"}],
+        schema_model=ExtractionResult,
+        schema_name="document",
+        profile=openrouter_profile_for_task(task),
+    )
+
+
+def test_openai_document_wire_schema_is_closed_required_and_preserves_nullability():
+    original = ExtractionResult.model_json_schema()
+    payload = document_payload()
+    wire = payload["response_format"]["json_schema"]["schema"]
+    unsupported = {"default", "pattern", "format", "minimum", "maximum", "maxItems"}
+
+    def check(node):
+        if isinstance(node, list):
+            for child in node:
+                check(child)
+        elif isinstance(node, dict):
+            assert not unsupported.intersection(node)
+            if "properties" in node:
+                assert set(node["required"]) == set(node["properties"])
+                assert node["additionalProperties"] is False
+            for child in node.values():
+                check(child)
+
+    check(wire)
+    amount = wire["$defs"]["ExtractedObservation"]["properties"]["amount"]
+    assert {branch["type"] for branch in amount["anyOf"]} == {"string", "null"}
+    assert ExtractionResult.model_json_schema() == original
+    assert "default" in original["$defs"]["ExtractedObservation"]["properties"]["amount"]
+    assert "max_tokens" not in payload and "temperature" not in payload
+    assert payload["max_completion_tokens"] > 0
+
+
+@pytest.mark.parametrize(
+    "model,task",
+    [("test/vision", "document_extraction"), ("openai/gpt-6-luna", "interpretation")],
+)
+def test_other_model_and_task_wire_contracts_are_unchanged(model, task):
+    payload = document_payload(model, task)
+    assert (
+        payload["response_format"]["json_schema"]["schema"]
+        == ExtractionResult.model_json_schema()
+    )
+    assert "max_tokens" in payload and "max_completion_tokens" not in payload
+
+
+@pytest.mark.parametrize(
+    "field,value", [("amount", "-1"), ("occurred_on", "not-a-date"), ("page", 9)]
+)
+def test_wire_projection_does_not_weaken_local_field_validation(field, value):
+    from pydantic import ValidationError
+
+    document_payload()
+    body = result().model_dump(mode="json")
+    body["observations"][0][field] = value
+    with pytest.raises(ValidationError):
+        ExtractionResult.model_validate(body)
+
+
+def test_wire_projection_does_not_weaken_local_array_validation():
+    from pydantic import ValidationError
+
+    document_payload()
+    body = result().model_dump(mode="json")
+    body["observations"] = [body["observations"][0]] * 301
     with pytest.raises(ValidationError):
         ExtractionResult.model_validate(body)
