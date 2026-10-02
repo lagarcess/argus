@@ -9,22 +9,36 @@ final class CuadraoCollectionUITests: XCTestCase {
         app.buttons["group-card-trip"].tap()
         app.buttons["group-people-open"].tap()
         XCTAssertTrue(app.buttons["group-invite"].waitForExistence(timeout: 3))
+        assertPeopleOnly(app)
+        let own = member(app, "Tú")
+        reveal(app, own)
+        own.swipeLeft()
+        XCTAssertFalse(app.buttons["group-remove-Tú"].exists)
+        let ana = member(app, "Ana")
+        reveal(app, ana)
+        ana.swipeLeft()
+        XCTAssertTrue(app.buttons["group-remove-Ana"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["group-remove-confirm"].exists)
         app.buttons["group-remove-Ana"].tap()
         XCTAssertFalse(app.buttons["group-remove-confirm"].isEnabled)
         shot(app, "group-outstanding-removal-review")
         app.buttons["Cancelar"].tap()
+        XCTAssertTrue(member(app, "Ana").exists)
         app.buttons["group-invite"].tap()
         reveal(app, app.buttons["group-invite-preview"])
         app.buttons["group-invite-preview"].tap()
         reveal(app, app.buttons["group-invite-accept"])
         app.buttons["group-invite-accept"].tap()
         app.buttons["Cerrar"].tap()
-        reveal(app, app.buttons["group-remove-Mar"])
+        let mar = member(app, "Mar")
+        reveal(app, mar)
+        XCTAssertFalse(app.buttons["group-remove-Mar"].exists)
         shot(app, "group-people-owner")
+        mar.swipeLeft()
         app.buttons["group-remove-Mar"].tap()
         XCTAssertTrue(app.buttons["group-remove-confirm"].isEnabled)
         app.buttons["group-remove-confirm"].tap()
-        XCTAssertFalse(app.buttons["group-remove-Mar"].exists)
+        XCTAssertFalse(member(app, "Mar").exists)
         XCTAssertTrue(app.buttons["Participaron antes"].exists)
     }
     func testMemberRoleAndLegacyControls() {
@@ -36,8 +50,48 @@ final class CuadraoCollectionUITests: XCTestCase {
         app.buttons["group-card-trip"].tap()
         app.buttons["group-people-open"].tap()
         XCTAssertFalse(app.buttons["group-invite"].exists)
+        assertPeopleOnly(app)
+        let ana = member(app, "Ana")
+        reveal(app, ana)
+        ana.press(forDuration: 1)
         XCTAssertFalse(app.buttons["group-remove-Ana"].exists)
         shot(app, "group-people-member-en")
+    }
+    func testMemberRoleHasNoNativeRemovalEnglishDark() {
+        continueAfterFailure = false
+        let app = launch(dark: true, extra: ["--group-member", "--design-english"])
+        app.buttons["cuadrao-tab-1"].tap()
+        app.segmentedControls.buttons["Together"].tap()
+        app.buttons["group-card-trip"].tap()
+        app.buttons["group-people-open"].tap()
+        assertPeopleOnly(app)
+        let ana = member(app, "Ana")
+        reveal(app, ana)
+        let rowX = ana.frame.minX
+        ana.swipeLeft()
+        let rowAtRest = NSPredicate { _, _ in abs(ana.frame.minX - rowX) < 1 }
+        expectation(for: rowAtRest, evaluatedWith: nil)
+        waitForExpectations(timeout: 3)
+        XCTAssertFalse(app.buttons["group-remove-Ana"].exists)
+        XCTAssertFalse(app.buttons["group-remove-confirm"].exists)
+        XCTAssertFalse(app.buttons["group-invite"].exists)
+        shot(app, "group-people-member-native-en-dark")
+    }
+    func testOwnerLegacyRemovalMenu() {
+        continueAfterFailure = false
+        let app = launch(extra: ["--legacy-collection", "--design-english"])
+        app.buttons["cuadrao-tab-1"].tap()
+        app.segmentedControls.buttons["Together"].tap()
+        app.buttons["group-card-trip"].tap()
+        app.buttons["group-people-open"].tap()
+        assertPeopleOnly(app)
+        let ana = member(app, "Ana")
+        reveal(app, ana)
+        ana.press(forDuration: 1)
+        app.buttons["group-remove-Ana"].tap()
+        XCTAssertFalse(app.buttons["group-remove-confirm"].isEnabled)
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(member(app, "Ana").exists)
     }
     func testPersonalPlanSwipeEditArchiveRestore() {
         continueAfterFailure = false
@@ -77,9 +131,20 @@ final class CuadraoCollectionUITests: XCTestCase {
         reveal(app, app.buttons["group-archives"]); app.buttons["group-archives"].tap()
         XCTAssertTrue(app.buttons["Retomar"].waitForExistence(timeout: 3)); app.buttons["Retomar"].tap()
     }
-    private func launch(extra: [String] = []) -> XCUIApplication {
+    private func assertPeopleOnly(_ app: XCUIApplication) {
+        XCTAssertFalse(app.buttons["group-add-receipt"].exists)
+        XCTAssertFalse(app.buttons["group-open-chat"].exists)
+        XCTAssertFalse(app.buttons["group-add-expense"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ OR label BEGINSWITH %@", "Vista previa local", "Local preview")).firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "receipt-card-")).firstMatch.exists)
+        XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "group-remove-")).firstMatch.exists)
+    }
+    private func member(_ app: XCUIApplication, _ name: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "group-member-" + name).firstMatch
+    }
+    private func launch(dark: Bool = false, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", "light"] + extra
+        app.launchArguments = ["--plan-reset", "--receipt-reset", "-cuadrao.design.appearance", dark ? "dark" : "light"] + extra
         app.launch(); return app
     }
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {

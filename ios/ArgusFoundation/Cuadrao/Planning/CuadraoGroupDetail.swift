@@ -27,30 +27,22 @@ struct CuadraoGroupDetail: View {
                             Text(group.kind == .trip ? (spanish ? "Gastos" : "Expenses") : (spanish ? "Aportes" : "Contributions")).tag(1)
                             Text(spanish ? "Personas" : "People").tag(2)
                         }.pickerStyle(.segmented).accessibilityIdentifier("group-sections")
-                        if group.kind == .trip, let workspace = receiptWorkspace {
-                            HStack {
-                                Button { workspace.capture(ReceiptOrigin(groupID: group.id, threadID: nil)) } label: {
-                                    Label(spanish ? "Añadir recibo" : "Add receipt", systemImage: "receipt").frame(minHeight: 44)
-                                }.accessibilityIdentifier("group-add-receipt")
-                                Spacer()
-                                Button { workspace.groupChat(group.id) } label: {
-                                    Label(spanish ? "Chat" : "Chat", systemImage: "bubble").frame(minHeight: 44)
-                                }.accessibilityIdentifier("group-open-chat")
-                            }
-                            ForEach(workspace.receipts.receipts.filter { $0.groupID == group.id && $0.prepared }) { draft in
-                                ReceiptCard(draft: draft, spanish: spanish) { workspace.open(draft.id) }
-                            }
-                        }
                         if section == 0 { overview(group) }
                         if section == 1 { expenses(group) }
                         if section == 2 { members(group) }
-                        Text(spanish ? "Vista previa local · no envía invitaciones ni mueve dinero" : "Local preview · no invitations sent or money moved")
-                            .font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                        if section != 2 {
+                            Text(spanish ? "Vista previa local · no envía invitaciones ni mueve dinero" : "Local preview · no invitations sent or money moved")
+                                .font(.caption2).foregroundStyle(.secondary).frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                        }
                     }.padding(.horizontal, 24).padding(.bottom, bottomSpace)
                 }.background(WelcomePalette.background).cuadraoSoftScrollEdges()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
+                                if let workspace = receiptWorkspace {
+                                    Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") { workspace.groupChat(group.id) }
+                                        .accessibilityIdentifier("group-open-chat")
+                                }
                                 if store.canManage { Button(spanish ? "Editar grupo" : "Edit group", systemImage: "pencil") { sheet = .edit } }
                                 Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { store.archive(group.id, true); dismiss() }
                             } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }.accessibilityIdentifier("group-options")
@@ -139,6 +131,14 @@ struct CuadraoGroupDetail: View {
     }
     private func expenses(_ group: PlanGroup) -> some View {
         VStack(alignment: .leading, spacing: 18) {
+            if group.kind == .trip, let workspace = receiptWorkspace {
+                Button { workspace.capture(ReceiptOrigin(groupID: group.id, threadID: nil)) } label: {
+                    Label(spanish ? "Añadir recibo" : "Add receipt", systemImage: "receipt").frame(minHeight: 44)
+                }.accessibilityIdentifier("group-add-receipt")
+                ForEach(workspace.receipts.receipts.filter { $0.groupID == group.id && $0.prepared }) { draft in
+                    ReceiptCard(draft: draft, spanish: spanish) { workspace.open(draft.id) }
+                }
+            }
             PlanPrimaryButton(title: group.kind == .trip ? (spanish ? "Añadir gasto" : "Add expense") : (spanish ? "Registrar aporte" : "Record contribution"), symbol: "plus") { sheet = .expense(nil) }
                 .accessibilityIdentifier("group-add-expense")
             if group.expenses.isEmpty { Text(spanish ? "Aquí empieza la historia del plan." : "Your plan's story starts here.").foregroundStyle(.secondary) }
@@ -173,25 +173,23 @@ struct CuadraoGroupDetail: View {
     }
     private func members(_ group: PlanGroup) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            ForEach(Array(group.activeMembers.enumerated()), id: \.element.id) { index, member in
-                HStack(spacing: 12) {
-                    PlanMemberAvatar(member: member, index: index)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(member.name)
-                        if member.id == group.me && store.canManage { Text(spanish ? "Organiza" : "Organizer").font(.caption).foregroundStyle(.secondary) }
-                    }; Spacer()
-                    if group.kind == .saving {
-                        Text(PlanFormat.amount(Double(group.paid(member.id)) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount)
-                    } else {
-                        CuadraoOwedRow(cents: group.balance(member.id), currency: group.currency,
-                                      spanish: spanish, own: member.id == group.me, compact: true)
+            if #available(iOS 27.0, *), !ProcessInfo.processInfo.arguments.contains("--legacy-collection") {
+                VStack(spacing: 20) {
+                    ForEach(Array(group.activeMembers.enumerated()), id: \.element.id) { index, member in
+                        if store.canManage && member.id != group.me {
+                            memberRow(member, index: index, group: group)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) { removeAction(member) }
+                        } else {
+                            memberRow(member, index: index, group: group)
+                        }
                     }
-                    if store.canManage && member.id != group.me {
-                        Button { sheet = .remove(member) } label: {
-                            Image(systemName: "person.crop.circle.badge.minus").frame(width: 44, height: 44)
-                        }.accessibilityLabel((spanish ? "Quitar a " : "Remove ") + member.name)
-                            .accessibilityIdentifier("group-remove-" + member.name)
-                    }
+                }.swipeActionsContainer()
+            } else {
+                ForEach(Array(group.activeMembers.enumerated()), id: \.element.id) { index, member in
+                    memberRow(member, index: index, group: group)
+                        .contextMenu {
+                            if store.canManage && member.id != group.me { removeAction(member) }
+                        }
                 }
             }
             if store.canManage {
@@ -208,4 +206,32 @@ struct CuadraoGroupDetail: View {
             Text(spanish ? "Solo compartimos este plan. Las cuentas, otros planes y chats de cada quien siguen privados." : "Only this plan is shared. Everyone's accounts, other plans and chats stay private.").font(.caption).foregroundStyle(.secondary)
         }
     }
+    private func memberRow(_ member: PlanMember, index: Int, group: PlanGroup) -> some View {
+        HStack(spacing: 12) {
+            PlanMemberAvatar(member: member, index: index)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(member.name)
+                if member.id == group.me && store.canManage { Text(spanish ? "Organiza" : "Organizer").font(.caption).foregroundStyle(.secondary) }
+            }
+            Spacer()
+            if group.kind == .saving {
+                Text(PlanFormat.amount(Double(group.paid(member.id)) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount)
+            } else {
+                CuadraoOwedRow(cents: group.balance(member.id), currency: group.currency,
+                              spanish: spanish, own: member.id == group.me, compact: true)
+            }
+        }
+        .frame(minHeight: 54).contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("group-member-" + member.name)
+        .accessibilityActions {
+            if store.canManage && member.id != group.me { removeAction(member) }
+        }
+    }
+    private func removeAction(_ member: PlanMember) -> some View {
+        Button(spanish ? "Quitar" : "Remove", systemImage: "person.crop.circle.badge.minus", role: .destructive) { sheet = .remove(member) }
+            .accessibilityLabel((spanish ? "Quitar a " : "Remove ") + member.name)
+            .accessibilityIdentifier("group-remove-" + member.name)
+    }
+
 }

@@ -10,6 +10,16 @@ final class CuadraoReceiptUITests: XCTestCase {
         shot(app, "receipt-prepared-es")
         tap(app, "receipt-later")
         XCTAssertTrue(receiptCard(app).waitForExistence(timeout: 5))
+        for section in ["El plan", "Personas"] {
+            app.segmentedControls["group-sections"].buttons[section].tap()
+            XCTAssertFalse(receiptCard(app).exists)
+            XCTAssertFalse(app.buttons["group-add-receipt"].exists)
+            XCTAssertFalse(app.buttons["group-open-chat"].exists)
+        }
+        shot(app, "receipt-people-clean-es")
+        app.segmentedControls["group-sections"].buttons["Gastos"].tap()
+        XCTAssertTrue(receiptCard(app).exists)
+        XCTAssertTrue(app.buttons["group-add-receipt"].exists)
         app.terminate()
         app.launchArguments.removeAll { ["--plan-reset", "--receipt-reset"].contains($0) }
         app.launch()
@@ -79,6 +89,7 @@ final class CuadraoReceiptUITests: XCTestCase {
     func testGroupChatUsesSameReceiptAsPlanAndSource() {
         let app = launch(english: true)
         openGroup(app, english: true)
+        tap(app, "group-options")
         tap(app, "group-open-chat")
         scanFromChat(app, english: true)
         tap(app, "receipt-sample")
@@ -89,6 +100,7 @@ final class CuadraoReceiptUITests: XCTestCase {
         tap(app, "receipt-later")
         let id = receiptCard(app).identifier
         tap(app, "cuadrao-tab-1")
+        app.segmentedControls["group-sections"].buttons["Expenses"].tap()
         XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5))
         app.buttons[id].tap()
         XCTAssertTrue(app.buttons["receipt-source"].waitForExistence(timeout: 3))
@@ -154,6 +166,7 @@ final class CuadraoReceiptUITests: XCTestCase {
         tap(app, "cuadrao-tab-1")
         app.segmentedControls["plan-audience"].buttons[english ? "Together" : "En grupo"].tap()
         tap(app, "group-card-trip")
+        app.segmentedControls["group-sections"].buttons[english ? "Expenses" : "Gastos"].tap()
     }
     private func scanFromChat(_ app: XCUIApplication, english: Bool) {
         tap(app, "chat-attach")
