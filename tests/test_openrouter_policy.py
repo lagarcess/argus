@@ -429,7 +429,7 @@ def test_reasoning_effort_override_is_sent_in_json_schema_payload(
 
 @pytest.mark.parametrize("task", openrouter.OPENROUTER_TASK_MODEL_TIERS)
 @pytest.mark.parametrize("model", ["openai/gpt-5.6-luna", "anthropic/test-model"])
-def test_json_schema_payload_omits_temperature_only_for_readout_tier(
+def test_json_schema_payload_omits_temperature_for_readout_and_openai_documents(
     task: openrouter.OpenRouterTask,
     model: str,
 ) -> None:
@@ -444,12 +444,14 @@ def test_json_schema_payload_omits_temperature_only_for_readout_tier(
         profile=profile,
     )
 
-    if openrouter.openrouter_model_tier_for_task(task) == "readout":
+    if openrouter.openrouter_model_tier_for_task(task) == "readout" or (
+        task == "document_extraction" and model.startswith("openai/")
+    ):
         assert "temperature" not in payload
     else:
         assert payload["temperature"] == profile.temperature
     if not model.startswith("anthropic/"):
-        assert payload["provider"] == {"require_parameters": True}
+        assert payload["provider"]["require_parameters"] is True
 
 
 def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:

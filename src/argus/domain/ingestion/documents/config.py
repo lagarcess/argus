@@ -1,0 +1,82 @@
+"""Document extraction settings.
+
+``ARGUS_DOCUMENT_EXTRACTION_ENABLED`` uses the same true-value set as the
+other default-off surfaces. Anything else, including a blank or unrecognized
+value, leaves extraction off. A setting that cannot be read leaves the
+document surface off and is logged; it never raises into ingestion startup
+or a document route.
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Annotated
+
+from loguru import logger
+from pydantic import BeforeValidator, Field, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from argus.api.financial_accounts import TRUE_VALUES
+
+_MAX_BYTES = 10 * 1024 * 1024
+_MAX_PAGES = 8
+_RECOGNIZED_OFF = frozenset({"0", "false", "no", "off"})
+_warned_flags: set[str] = set()
+_warned_invalid = False
+
+
+def _enabled_flag(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in TRUE_VALUES
+
+
+class DocumentExtractionSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="ARGUS_DOCUMENT_EXTRACTION_", extra="ignore"
+    )
+    enabled: Annotated[bool, BeforeValidator(_enabled_flag)] = False
+    max_bytes: int = Field(default=_MAX_BYTES, ge=1, le=_MAX_BYTES)
+    max_pages: int = Field(default=_MAX_PAGES, ge=1, le=_MAX_PAGES)
+
+
+def _disabled_document_extraction_settings() -> DocumentExtractionSettings:
+    return DocumentExtractionSettings.model_construct(
+        enabled=False,
+        max_bytes=_MAX_BYTES,
+        max_pages=_MAX_PAGES,
+    )
+
+
+def _warn_unusable_flag() -> None:
+    raw = os.getenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED")
+    if raw is None:
+        return
+    normalized = raw.strip().lower()
+    if normalized in TRUE_VALUES or normalized in _RECOGNIZED_OFF:
+        return
+    if normalized in _warned_flags:
+        return
+    _warned_flags.add(normalized)
+    logger.warning(
+        "Document extraction flag is blank or unrecognized; document surface stays off"
+    )
+
+
+def load_document_extraction_settings() -> DocumentExtractionSettings:
+    """Read document settings, or a disabled snapshot when they cannot be read."""
+
+    global _warned_invalid
+    _warn_unusable_flag()
+    try:
+        return DocumentExtractionSettings()
+    except ValidationError:
+        if not _warned_invalid:
+            _warned_invalid = True
+            logger.warning(
+                "Document extraction settings are invalid; document surface stays off",
+                failure_mode="ValidationError",
+            )
+        return _disabled_document_extraction_settings()

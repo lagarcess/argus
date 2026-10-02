@@ -677,7 +677,15 @@ The product must work with incomplete banking connectivity. Users may mix input 
 
 **All ingestion methods converge on one flow:**
 
-**Capture → interpret/extract → review and resolve → confirm → save the canonical record → update dependent surfaces.**
+**CAPTURE → SAVE → PREPARE → REVIEW → APPROVE.**
+
+**Founder clarification, October 2, 2026:** saving a captured document creates a
+durable private draft and retains its source. Successful extraction is not a
+prerequisite. The user can close the app and return later. Preparation runs
+asynchronously; failure preserves the draft/source with an honest recoverable
+status. Approval alone creates confirmed financial activity through the existing
+canonical services. Upload does not create an expense, change a balance or make
+anyone owe money.
 
 The confirmed record is the durable financial fact. Chat messages, uploaded files, notifications, and extracted text provide context and provenance; they are not independent competing ledgers. Home, Accounts, Plan, Search, and Updates derive from the same confirmed records.
 
@@ -737,7 +745,7 @@ Support a path for statements and structured transaction files. Exact supported 
 
 The experience should:
 
-1. Identify the account, currency, statement period, and available balances.
+1. Save the supported source and draft, then prepare account, currency, statement period and balance information.
 2. Extract candidate transactions and relevant statement facts, such as payment due dates or rates when actually present.
 3. Show the original source alongside reviewable extracted information when needed.
 4. Flag uncertain fields, missing pages, unreadable content, and suspected duplicates.
@@ -746,13 +754,39 @@ The experience should:
 
 Do not force separate confirmation for every reliable row in a large statement. Batch confirmation must remain understandable, with exceptions highlighted. Failed imports must be recoverable without re-adding successful records.
 
-Statement balances and transactions may describe the same money. Do not add them together as if both were new activity. Preserve statement dates instead of presenting older statement data as today's bank balance.
+Statement balances and transactions may describe the same money. Keep opening,
+closing, available and running balances distinct from transactions and statement
+periods. Never relabel them to satisfy validation or add them as new activity.
+Retain useful observations even when one cannot become an import candidate.
+Preserve statement dates instead of presenting older data as today's balance.
 
 ### 4.5 Photograph or scan a document
 
 Camera capture, document scans, receipts, and screenshots feed the document-review flow. Help users capture readable, complete information and request a retake when necessary.
 
 A photographed receipt can propose a purchase; a bank screenshot may establish only a balance. Extract only what the source supports. OCR output is a proposal, not an authoritative financial fact. Users can always correct or abandon it.
+
+Receipt preparation preserves merchant, date, currency, line items, quantities,
+prices, suggested categories, subtotal, tax/service, tip and total when present.
+Missing or uncertain details remain reviewable. Items and totals are components
+of one purchase, not automatic separate expenses. Keep extracted information,
+proposed interpretations and confirmed records distinct. Strict financial
+validation applies at confirmation; never invent values or convert currencies.
+
+The supported journeys share one durable draft identity:
+
+- Personal receipt from Chat: save, prepare details/categories, review now or
+  later, confirm the account and approve.
+- Group receipt from Plan: save in that plan, prepare receipt details and an
+  equal-split proposal, review payer/participants, keep equal splitting or assign
+  items, including shared items, then approve. Sharing is a separate action.
+- Group receipt from Chat: attach the same draft to the requested plan. Chat and
+  Plan reopen that draft. A missing or ambiguous destination can wait for review.
+
+A group plan's currency remains fixed. Resolve a receipt currency mismatch during
+review without changing the plan or converting amounts. The backend foundation
+preserves destination and split proposals; full Chat actions, native presentation
+and the complete split-approval journey require their own integration work.
 
 ### 4.6 Apple Pay / Google Pay and device-assisted capture
 

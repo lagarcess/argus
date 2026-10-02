@@ -7996,6 +7996,95 @@ uncertain fields, and more than 18 digits leaves the amount unresolved.
 
 ## Import review queue (default-off)
 
+### Document capture, preparation and review
+
+**PR #776 founder clarification, October 2: CAPTURE → SAVE → PREPARE → REVIEW → APPROVE.**
+A successful upload saves the supported source and an owner-scoped durable draft
+before extraction. It creates no expense, balance change, amount owed or sharing
+grant. The same connection ID reopens the draft from Chat or Plan. These are
+backend contracts under implementation in the default-off lane, not hosted or
+native availability claims.
+
+`POST /api/v1/financial-documents` accepts bounded PDF, JPEG or PNG bytes and an
+optional `X-Document-Filename`. Optional `X-Document-Proposal` is a bounded
+(8192-character) JSON `DraftProposal`, saved atomically with the source so a known
+Plan destination survives closing the app immediately after capture. It grants no
+Plan access or sharing. Capture does not require a model, provider key,
+OCR tools, successful extraction or candidate sink. Provider consent remains
+explicit: `X-Extraction-Consent: true` allows background preparation; capture
+without it remains saved. Existing registered-owner/accounts/ingestion/document
+feature gates remain. The model stays `ARGUS_VISION_MODEL`; no fallback or retry
+is implied by capture or recovery.
+
+`ARGUS_DOCUMENT_EXTRACTION_ENABLED` is the document gate, default off. It
+accepts the same true values as the other default-off surfaces (`1`, `true`,
+`yes`, `on`). Unset, `false`, `0`, `no`, `off`, a blank value, or an
+unrecognized value leaves the document surface off. A document setting that
+cannot be read, including a non-integer max-bytes value, also leaves it off.
+While the document surface is off, every `/api/v1/financial-documents` route
+answers 404 `financial_connections_unavailable` and no extraction runs. Plaid,
+Gmail, Shortcuts, disconnect, and `GET /api/v1/financial-connections` keep
+their own gates.
+
+Capture responds with `{connection_id,status,replayed,candidate_count}`. `status`
+is preparation state (`saved|queued|preparing|review_ready|needs_attention`), never
+an approval flag. Approval remains owned by reconciliation events on that connection.
+The response can be `queued` even when a fast background task completes before the
+client reads it. Poll `GET /financial-documents/{connection_id}` for current state.
+
+- `GET /financial-documents?limit=50&offset=0` returns bounded draft metadata and
+  `next_offset`; maximum limit is 100. Full preparation is not included in lists.
+- `GET /financial-documents/{connection_id}` returns source metadata, lifecycle,
+  version, consent, proposal and optional `preparation`. Preparation contains typed
+  observations, receipt detail, candidates, completeness/readability and projection
+  issues. Internal provider/route metadata is excluded. The connection ID links to
+  existing import review; no duplicate approval state is stored here.
+- `GET /financial-documents/{connection_id}/source` returns the retained file as a
+  download with a safe generic filename, `Cache-Control: no-store` and `nosniff`.
+- `POST /financial-documents/{connection_id}/prepare` and `/resume` queue explicit
+  preparation or replay saved candidate delivery. A fresh provider attempt requires
+  `X-Extraction-Consent: true`; replay of saved preparation makes no provider call.
+- `PATCH /financial-documents/{connection_id}/proposal` accepts `{version,proposal}`.
+  Proposal has optional `plan_ref` (existing `PlanRef`), requested-plan label, payer,
+  participants, `equal|items` method and item assignments with multiple participant
+  IDs for shared items. A stale version or active preparation returns 409. Proposals
+  do not change extracted evidence, grant access, share content or write money.
+
+All draft/source reads are owner-only and `no-store`. Missing retained source on
+an older checkpoint is explicit (`source_available=false`); an identical reupload
+can attach source to that same checkpoint without repeating extraction.
+
+The existing document checkpoint owns retained source, preparation lifecycle and
+prepared evidence. Owner-authorized draft and source reads support close/reopen.
+Queued intent is durable; API background dispatch is a wake-up mechanism. A
+process interruption leaves recoverable work. An expired in-flight attempt is
+marked for attention and is never automatically billed again. Explicit prepare
+or resume recovers from retained source; completed preparation is replayed without
+another model call. Identical owner/file captures reuse the same draft.
+
+Preparation preserves extracted observations and receipt itemization separately
+from canonical candidate projection. Compatible observations enter existing
+reconciliation; incompatible observations remain on the draft with review issues.
+Opening, closing, available and running balances remain distinguishable; unknown
+scope is unresolved, never guessed. Receipt items, subtotal, tax/service, tip and
+total remain review detail, not independent purchases. Missing fields stay unknown.
+Only explicit confirmation through existing reconciliation and MoneyService
+creates canonical activity, with existing strict amount/currency/account checks.
+
+Destination, payer, participants, equal-split proposal and shared item assignments
+are draft proposals. Attaching a plan reference does not authorize access or
+sharing; canonical Plan ownership and fixed currency remain authoritative. Full
+Chat actions, native UI, group authorization and split approval are subsequent
+integration work, not implemented financial effects of this foundation.
+
+**Retention amendment:** the former transient-source/re-upload contract is
+superseded by this explicit founder assignment. Supported source files stay in the
+same server-only document store until explicit disconnect/deletion; user/connection
+deletion cascades. Rendered pages and OCR intermediates stay transient. Draft/source
+reads are owner-only and uncached. Disconnect removes retained source and draft
+without deleting already accepted activity. Source and extracted contents never
+belong in logs, analytics, public evidence or automatically shared household data.
+
 Same gate as connected sources: `ARGUS_INGESTION_ENABLED` inside
 `ARGUS_FINANCIAL_ACCOUNTS_ENABLED`, flag before authentication, registered
 only. Reconciliation is the single sink for every connector, so this is the

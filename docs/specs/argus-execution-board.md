@@ -10,6 +10,38 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
+## Shared document draft foundation, PR #776
+
+**Founder clarification, October 2, 2026; backend checkpoint under review.**
+Worker `codex/document-extraction`, original integration base
+`5d403d7bf97d8154b89d88613bdb706c3a35fbb1`. Preserve existing design checkouts and
+demos. The [MVEE ingestion flow](argus-minimum-viable-ecosystem-experience.md#4-information-ingestion-one-destination-several-entry-methods)
+owns CAPTURE → SAVE → PREPARE → REVIEW → APPROVE. The
+[API contract](../API_CONTRACT.md#document-capture-preparation-and-review) and
+[data model](../DATA_MODEL.md#import-reconciliation) own the shared backend.
+
+This assignment replaces transient document storage with durable private source
+and draft retention on the existing checkpoint. Preparation runs after capture,
+keeps recoverable failure state and preserves incompatible observations alongside
+valid transactions. Receipt itemization and destination/equal-split/shared-item
+proposals remain draft data. Confirmation stays with reconciliation and MoneyService.
+No upload or preparation creates an expense, balance change, amount owed or share.
+
+Offline acceptance covers the captured Luna failure without another paid call:
+all five observations retained, two exact transactions projected, unknown balance
+scope preserved with a review issue. The existing $6 cumulative ceiling and
+$2.9205875136 consumed reservations remain unchanged. `ARGUS_VISION_MODEL` stays
+`openai/gpt-6-luna`; no paid retries are authorized by this assignment.
+
+Remaining integration: native and Chat entry/reopen actions, authorized Plan
+resolution and fixed-currency mismatch review, group split approval and separate
+sharing. The expanded preparation schema has not had a new live measurement.
+Durable PostgreSQL acceptance must pass the disposable-database CI gate; local
+memory checks do not establish persistence across process restart. See the
+[PR evidence](../reports/evidence/document-extraction/README.md) for current tests,
+review, exact head and CI status. No merge, deployment, hosted changes, privacy
+relaxation or feature enablement is authorized.
+
 ## Connected shared Household planning lane
 
 **Assigned 2026-10-01; connected local acceptance complete; independent review clean.** Full original integration base:

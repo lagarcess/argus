@@ -1,0 +1,133 @@
+from datetime import date, datetime
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from argus.domain.household.planning_schemas import PlanRef
+from argus.domain.ingestion.contract import (
+    AccountHint,
+    Direction,
+    EvidenceKind,
+    ImportCandidate,
+    KindHint,
+    UncertainField,
+)
+
+
+class DocumentExtractionError(Exception):
+    def __init__(self, code: str, retryable: bool = False) -> None:
+        super().__init__(code)
+        self.code = code
+        self.retryable = retryable
+        self.metadata: dict[str, object] = {}
+
+
+class _Frozen(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ExtractedObservation(_Frozen):
+    page: int = Field(ge=1, le=8)
+    row: int = Field(ge=1, le=300)
+    evidence: EvidenceKind
+    status: Literal["pending", "posted", "unknown"] = "unknown"
+    account: AccountHint = AccountHint()
+    occurred_on: date | None = None
+    posted_on: date | None = None
+    amount: str | None = Field(default=None, max_length=80)
+    currency: str | None = Field(default=None, max_length=20)
+    direction: Direction = "unknown"
+    kind_hint: KindHint = "unknown"
+    merchant: str | None = Field(default=None, max_length=300)
+    description: str | None = Field(default=None, max_length=500)
+    balance_scope: (
+        Literal["available", "current", "statement_closing", "opening", "running"] | None
+    ) = None
+    due_on: date | None = None
+    period_start: date | None = None
+    period_end: date | None = None
+    uncertain: tuple[UncertainField, ...] = ()
+
+
+class ReceiptItem(_Frozen):
+    id: str = Field(min_length=1, max_length=80)
+    description: str | None = Field(default=None, max_length=300)
+    quantity: str | None = Field(default=None, max_length=80)
+    unit_price: str | None = Field(default=None, max_length=80)
+    total: str | None = Field(default=None, max_length=80)
+    suggested_category: str | None = Field(default=None, max_length=120)
+
+
+class ReceiptDetails(_Frozen):
+    suggested_category: str | None = Field(default=None, max_length=120)
+    merchant: str | None = Field(default=None, max_length=300)
+    occurred_on: date | None = None
+    currency: str | None = Field(default=None, max_length=20)
+    items: tuple[ReceiptItem, ...] = Field(default=(), max_length=300)
+    subtotal: str | None = Field(default=None, max_length=80)
+    tax: str | None = Field(default=None, max_length=80)
+    service: str | None = Field(default=None, max_length=80)
+    tip: str | None = Field(default=None, max_length=80)
+    total: str | None = Field(default=None, max_length=80)
+
+
+class ProjectionIssue(_Frozen):
+    page: int | None = None
+    row: int | None = None
+    code: str
+    fields: tuple[str, ...] = ()
+
+
+class ExtractionResult(_Frozen):
+    complete: bool = Field(strict=True)
+    readable: bool = Field(strict=True)
+    pages_read: tuple[int, ...] = Field(max_length=8)
+    observations: tuple[ExtractedObservation, ...] = Field(max_length=300)
+    receipt: ReceiptDetails | None = None
+
+
+class ExtractionBatch(_Frozen):
+    complete: bool | None = None
+    readable: bool | None = None
+    pages_read: tuple[int, ...] = ()
+    candidates: tuple[ImportCandidate, ...]
+    metadata: dict[str, object] = Field(default_factory=dict)
+    observations: tuple[ExtractedObservation, ...] = ()
+    receipt: ReceiptDetails | None = None
+    issues: tuple[ProjectionIssue, ...] = ()
+
+
+ParticipantRef = Annotated[str, Field(min_length=1, max_length=100)]
+
+
+class ItemAssignment(_Frozen):
+    item_id: str = Field(min_length=1, max_length=80)
+    participant_ids: tuple[ParticipantRef, ...] = Field(max_length=100)
+
+
+class DraftProposal(_Frozen):
+    plan_ref: PlanRef | None = None
+    requested_plan: str | None = Field(default=None, max_length=200)
+    payer_id: str | None = Field(default=None, max_length=100)
+    participant_ids: tuple[ParticipantRef, ...] = Field(default=(), max_length=100)
+    split_method: Literal["equal", "items"] = "equal"
+    item_assignments: tuple[ItemAssignment, ...] = Field(default=(), max_length=300)
+
+
+DraftStatus = Literal["saved", "queued", "preparing", "review_ready", "needs_attention"]
+
+
+class DocumentDraft(_Frozen):
+    connection_id: str
+    filename: str = Field(max_length=80)
+    media_type: str
+    sha256: str
+    size_bytes: int
+    source_available: bool = True
+    status: DraftStatus = "saved"
+    consent: bool = False
+    version: int = 1
+    created_at: datetime
+    updated_at: datetime
+    error_code: str | None = None
+    proposal: DraftProposal = Field(default_factory=DraftProposal)

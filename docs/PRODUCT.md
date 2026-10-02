@@ -73,6 +73,12 @@ These are capabilities within the ecosystem, not a separate investing product.
 The approved financial-record, household, and native-app experience is not
 claimed implemented by this document.
 
+Document intake follows the [MVEE capture flow](specs/argus-minimum-viable-ecosystem-experience.md#4-information-ingestion-one-destination-several-entry-methods):
+save a durable private draft and source before preparation, then review and approve.
+An upload alone creates no confirmed expense, balance change or amount owed.
+The shared backend foundation is tracked in PR #776; native and Chat actions,
+group approval and hosted enablement remain separate integration work.
+
 For supported questions, Argus computes from supplied inputs or provides
 source-backed explanations. General-knowledge responses must be distinguishable
 from current research; assumptions and source freshness stay visible.
