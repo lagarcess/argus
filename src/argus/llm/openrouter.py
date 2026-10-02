@@ -4,7 +4,8 @@ import asyncio
 import json
 import os
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
@@ -44,6 +45,22 @@ from argus.log_sink import exception_origin
 load_project_dotenv()
 
 _OpenRouterRetryAttempt = tuple[OpenRouterTask, float, str, Literal["json_schema", "chat_model"], str | None, list[str] | None]
+
+_REQUEST_GUARD: ContextVar[Callable[[OpenRouterTask, dict[str, object]], dict[str, object]] | None] = ContextVar("openrouter_request_guard", default=None)
+
+
+@contextmanager
+def openrouter_request_guard(guard: Callable[[OpenRouterTask, dict[str, object]], dict[str, object]]) -> Iterator[None]:
+    token = _REQUEST_GUARD.set(guard)
+    try:
+        yield
+    finally:
+        _REQUEST_GUARD.reset(token)
+
+
+def _guard_request(task: OpenRouterTask, payload: dict[str, object]) -> dict[str, object]:
+    guard = _REQUEST_GUARD.get()
+    return guard(task, payload) if guard else payload
 
 SchemaModelT = TypeVar("SchemaModelT", bound=BaseModel)
 
@@ -943,7 +960,7 @@ async def _post_openrouter_json_schema(
     retry_attempt: _OpenRouterRetryAttempt,
 ) -> httpx.Response | None:
     response = await client.post(
-        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=payload
+        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=_guard_request(retry_attempt[0], payload)
     )
     try:
         response.raise_for_status()
@@ -955,7 +972,7 @@ async def _post_openrouter_json_schema(
         fallback_payload = {key: value for key, value in payload.items() if key != "reasoning"}
         response = await client.post(
             "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key),
-            json=fallback_payload,
+            json=_guard_request(retry_attempt[0], fallback_payload),
             timeout=permit.timeout_seconds,
         )
         response.raise_for_status()
@@ -970,7 +987,7 @@ def _post_openrouter_json_schema_sync(
     retry_attempt: _OpenRouterRetryAttempt,
 ) -> httpx.Response | None:
     response = client.post(
-        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=payload
+        "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key), json=_guard_request(retry_attempt[0], payload)
     )
     try:
         response.raise_for_status()
@@ -982,7 +999,7 @@ def _post_openrouter_json_schema_sync(
         fallback_payload = {key: value for key, value in payload.items() if key != "reasoning"}
         response = client.post(
             "https://openrouter.ai/api/v1/chat/completions", headers=_openrouter_headers(api_key),
-            json=fallback_payload,
+            json=_guard_request(retry_attempt[0], fallback_payload),
             timeout=permit.timeout_seconds,
         )
         response.raise_for_status()

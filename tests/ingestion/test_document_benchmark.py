@@ -9,33 +9,8 @@ from scripts.documents.benchmark import (
     receipt_cost,
     row_score,
     run_live,
-    validate_key_cap,
 )
-
-
-def key_data(**changes):
-    return (
-        dict(limit=1, limit_remaining=1, limit_reset=None, include_byok_in_limit=True)
-        | changes
-    )
-
-
-@pytest.mark.parametrize(
-    "changes",
-    [
-        dict(limit=None),
-        dict(limit_remaining=None),
-        dict(limit=2),
-        dict(limit_remaining=2),
-        dict(limit_reset="daily"),
-        dict(include_byok_in_limit=False),
-        dict(limit_remaining="NaN"),
-        dict(limit_remaining=0),
-    ],
-)
-def test_requires_provider_enforced_nonresetting_cap(changes):
-    with pytest.raises(ValueError):
-        validate_key_cap(key_data(**changes), Decimal("1"))
+from scripts.documents.budget import BenchmarkBudget, PriceEnvelope
 
 
 def candidate(amount="10", direction="outflow", evidence="transaction"):
@@ -98,7 +73,7 @@ def test_unknown_cost_or_multiple_dispatches_is_not_zero_cost(receipts):
     "cost,expected_calls,reason",
     [
         (None, 1, "unknown_cost_or_multiple_attempts"),
-        (1, 1, "spend_cap_reached"),
+        (1, 1, "request_price_bound_exceeded"),
         (0.1, 2, None),
     ],
 )
@@ -122,8 +97,11 @@ async def test_serial_benchmark_stops_without_retry(
                 candidates=(), metadata=dict(route_receipts=[dict(usage_cost_usd=cost)])
             )
 
-    async def check():
-        return key_data()
+    budget = BenchmarkBudget(
+        PriceEnvelope("fixture", "provider", 1, 1, Decimal("0.1"), Decimal("0.1")),
+        Decimal("1"),
+        2,
+    )
 
     report = dict(results=[])
     saves = []
@@ -131,8 +109,7 @@ async def test_serial_benchmark_stops_without_retry(
         [sample, sample | {"id": "two"}],
         tmp_path,
         Extractor(),
-        Decimal("1"),
-        check,
+        budget,
         report,
         lambda value: saves.append(dict(value)),
     )
@@ -140,19 +117,3 @@ async def test_serial_benchmark_stops_without_retry(
     assert report.get("stop_reason") == reason
     assert report["complete"] == (reason is None)
     assert saves
-
-
-@pytest.mark.asyncio
-async def test_uncapped_key_never_dispatches(tmp_path):
-    async def check():
-        return key_data(limit=None)
-
-    class Extractor:
-        async def extract(self, *args):
-            pytest.fail("uncapped key dispatched")
-
-    report = dict(results=[])
-    await run_live(
-        [{}], tmp_path, Extractor(), Decimal("1"), check, report, lambda _: None
-    )
-    assert report["stop_reason"] == "provider_cap_not_verified"

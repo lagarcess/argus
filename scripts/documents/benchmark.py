@@ -1,4 +1,4 @@
-"""Validate fixtures offline; run approved serial extraction with a capped provider key."""
+"""Validate fixtures offline; run approved extraction with a per-run spend limit."""
 
 from __future__ import annotations
 
@@ -14,12 +14,15 @@ from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 from argus.domain.ingestion.documents.config import DocumentExtractionSettings
 from argus.domain.ingestion.documents.extractor import DocumentExtractor
 from argus.domain.ingestion.documents.models import DocumentExtractionError
 from argus.llm.openrouter_key_policy import resolve_openrouter_api_key
+
+from scripts.documents.budget import BenchmarkBudget, price_envelope
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "tests/document_extraction_fixtures/manifest.json"
@@ -42,32 +45,13 @@ def money(value: object) -> Decimal:
     return amount
 
 
-def validate_key_cap(data: dict, cap: Decimal) -> Decimal:
-    """Require a nonresetting provider cap, including any BYOK usage."""
-    if cap <= 0 or not cap.is_finite():
-        raise ValueError("invalid_spend_cap")
-    if data.get("limit") is None or data.get("limit_remaining") is None:
-        raise ValueError("dedicated_capped_key_required")
-    remaining = money(data["limit_remaining"])
-    if (
-        money(data["limit"]) > cap
-        or remaining > cap
-        or remaining <= 0
-        or data.get("limit_reset") is not None
-        or data.get("include_byok_in_limit") is not True
-    ):
-        raise ValueError("dedicated_capped_key_required")
-    return remaining
-
-
-async def key_status(key: str) -> dict:
+async def model_endpoints(model: str) -> list[dict]:
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.get(
-            "https://openrouter.ai/api/v1/key",
-            headers={"Authorization": f"Bearer {key}"},
+            f"https://openrouter.ai/api/v1/models/{quote(model, safe='/')}/endpoints"
         )
         response.raise_for_status()
-        return response.json()["data"]
+        return response.json()["data"]["endpoints"]
 
 
 def row_score(sample: dict, candidates: tuple) -> dict:
@@ -158,27 +142,29 @@ def validate_fixtures(manifest: Path) -> list[dict]:
     return samples
 
 
-async def run_live(samples, directory, extractor, cap, check_key, report, save):
+async def run_live(samples, directory, extractor, budget, report, save):
     spent = Decimal(0)
+
+    def save_budget():
+        report["budget"] = budget.evidence()
+        save(report)
+
+    save_budget()
     for sample in samples:
-        try:
-            validate_key_cap(await check_key(), cap)
-        except (ValueError, httpx.HTTPError, KeyError):
-            report["stop_reason"] = "provider_cap_not_verified"
-            break
-        if spent >= cap:
+        if spent >= budget.cap:
             report["stop_reason"] = "spend_cap_reached"
             break
         started = time.perf_counter()
         candidates, metadata, error = (), {}, None
         try:
-            batch = await extractor.extract(
-                (directory / sample["file"]).read_bytes(),
-                sample["file"],
-                mimetypes.guess_type(sample["file"])[0],
-                "document-benchmark",
-                datetime.now(timezone.utc),
-            )
+            with budget.attempt(sample["id"], save_budget):
+                batch = await extractor.extract(
+                    (directory / sample["file"]).read_bytes(),
+                    sample["file"],
+                    mimetypes.guess_type(sample["file"])[0],
+                    "document-benchmark",
+                    datetime.now(timezone.utc),
+                )
             candidates, metadata = batch.candidates, batch.metadata
         except DocumentExtractionError as failure:
             error, metadata = failure.code, failure.metadata
@@ -203,8 +189,8 @@ async def run_live(samples, directory, extractor, cap, check_key, report, save):
         result["usage"] = usage
         spent += cost
         report["actual_cost_usd"] = str(spent)
-        if spent > cap:
-            report["stop_reason"] = "provider_cap_exceeded"
+        if cost > budget.envelope.maximum_cost or spent > budget.cap:
+            report["stop_reason"] = "request_price_bound_exceeded"
         save(report)
         if report.get("stop_reason"):
             break
@@ -253,18 +239,26 @@ def main() -> int:
                 "live requires --max-documents 6, --spend-cap-usd and ARGUS_VISION_MODEL"
             )
         cap = money(args.spend_cap_usd)
+        if os.getenv("APP_ENV", "").lower() in {"production", "staging", "preview"}:
+            parser.error("benchmark requires local development credentials")
         key = resolve_openrouter_api_key("registered")
         if not key:
             parser.error("missing OpenRouter credentials")
         report["approved_cap_usd"] = str(cap)
+        endpoints = asyncio.run(model_endpoints(report["model"]))
+        report["pricing_observed_at"] = datetime.now(timezone.utc).isoformat()
+        report["endpoint_snapshot"] = endpoints
+        budget = BenchmarkBudget(
+            price_envelope(report["model"], endpoints), cap, len(samples)
+        )
+        save(report)
         extractor = DocumentExtractor(DocumentExtractionSettings(enabled=True))
         asyncio.run(
             run_live(
                 samples,
                 args.manifest.parent,
                 extractor,
-                cap,
-                lambda: key_status(key),
+                budget,
                 report,
                 save,
             )

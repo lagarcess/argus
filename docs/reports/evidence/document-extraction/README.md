@@ -52,12 +52,15 @@ again passed 632 tests. All delegated work is complete.
 ## Unverified and pending
 
 No paid provider call has run. Extraction accuracy, live latency and actual
-provider cost are **not measured**. The proposed benchmark is six documents,
-one attempt each, with a US$2 cap; user approval and an explicit
-`ARGUS_VISION_MODEL` are pending. OpenRouter credentials are present locally;
+provider cost are **not measured**. The founder approved six documents, one attempt each, with a US$2 cap, using
+the existing development key. The selected model is
+`deepseek/deepseek-v4-flash-vision-exp`. OpenRouter credentials are present locally;
 their values are never printed or committed. The benchmark additionally
-requires a nonresetting provider key cap within the approved cap, including
-BYOK usage, and stops on unknown cost.
+now uses the existing development key and a run-local reservation. Each actual
+POST reserves a full uncached context window plus the canonical output limit,
+pins a verified endpoint and sets provider price ceilings. Separate request
+and image fees are prohibited. A second attempt is blocked before HTTP;
+unknown cost stops the run. No key or account limits are changed.
 
 The benchmark's offline mode validates hashes and recorded pair review. The
 fixture tests separately check original annotation/image pairs and PDF table
@@ -78,13 +81,27 @@ no Dominican-bank compatibility claim. This checkpoint is not a READY claim.
 
 ```sh
 poetry run pytest tests/ingestion tests/document_extraction_fixtures tests/test_openrouter_policy.py tests/test_openapi_compatibility.py tests/test_route_receipt_tiers_migration.py tests/test_document_extractions_postgres.py -q --no-cov
-poetry run python scripts/documents/benchmark.py --output temp/document-offline-new.json
+poetry run python -m scripts.documents.benchmark --output temp/document-offline-new.json
 poetry run python scripts/check_modularity_budget.py
 ```
 
-After explicit approval, set the configured model and dedicated capped key
+After explicit approval, set the configured model and existing local dev key
 without committing them, then run once with a new output path:
 
 ```sh
-poetry run python scripts/documents/benchmark.py --live --max-documents 6 --spend-cap-usd 2 --output temp/document-live-new.json
+poetry run python -m scripts.documents.benchmark --live --max-documents 6 --spend-cap-usd 2 --output temp/document-live-new.json
 ```
+
+## Run-budget correction
+
+The dedicated key-cap prerequisite was an unnecessary benchmark restriction.
+The runner now uses the existing local `OPENROUTER_API_KEY`. Two bounded design
+reviews selected a ContextVar guard at the actual HTTP POST over passing
+benchmark arguments through domain APIs. One budget owns attempts and reserved
+spend; ordinary runtime requests remain unchanged outside its scope.
+
+A clean independent delta review passed 24 focused tests. Full focused checks
+passed 638 tests. Public endpoint metadata supports a full-context reservation
+of $0.2338345856 per request, or $1.4030075136 for six requests. Price ceilings
+are enforced by [OpenRouter provider routing](https://openrouter.ai/docs/guides/routing/provider-selection#max-price);
+endpoint metadata and actual cost remain part of the live report.
