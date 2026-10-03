@@ -41,7 +41,7 @@ struct CuadraoEmailConfirmation: View {
                         Text(spanish ? "Ir a iniciar sesión" : "Go to sign in")
                             .font(.body.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 56)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(WelcomePalette.onAccent)
                             .background(WelcomePalette.pine, in: RoundedRectangle(cornerRadius: 16))
                     }.buttonStyle(.plain)
                     Button(spanish ? "¿No encuentras el correo?" : "Can’t find the email?") {
@@ -64,8 +64,8 @@ struct CuadraoEmailConfirmation: View {
                 .frame(minHeight: geometry.size.height, alignment: .topLeading)
             }
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
 

@@ -23,7 +23,7 @@ struct CuadraoSpaceSelector: View {
                 }.scrollIndicators(.hidden)
                     .onChange(of: data.selectedSpaceID) { _, id in proxy.scrollTo(id) }
             }
-            Button(action: add) { Image(systemName: "plus").frame(width: 44, height: 44) }
+            CuadraoSectionAddButton(title: spanish ? "Añadir o gestionar espacios" : "Add or manage spaces", action: add)
                 .accessibilityLabel(spanish ? "Añadir o gestionar espacios" : "Add or manage spaces")
                 .accessibilityIdentifier("cuadrao-spaces-add")
         }

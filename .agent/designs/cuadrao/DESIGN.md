@@ -25,7 +25,7 @@ value, make a row hard to scan or imply that a prediction is certain.
 | Home | Welcome: Hola / Hello plus preferred name | Compact native system greeting |
 | Chat | Invite conversation | Expressive serif landing text; preserve typed opening behavior |
 | Plan | Look ahead: Lo que viene / What's ahead | One serif heading with the primary plus; no repeated subtitle |
-| Profile and Settings | Identify the destination | Clear native titles; preserve the paused Profile layout |
+| Profile and Settings | Identify the destination | Personal identity, quiet grouped destinations and clear native titles |
 | Expanded insights | Identify the selected period | Serif feature title; controls stay anchored while period evidence pages |
 
 Tab identity does not require a second literal surface title. Keep heading/action
@@ -498,9 +498,9 @@ remains in the Argus guide.
 
 - The attachment action is **Escanear** in Spanish and **Scan** in English,
   with a document-scanner symbol. Photos and files remain independent entry points.
-- The future native scanner, interpretation/review boundary and receipt-splitting
-  disposition are owned by [roadmap C01](../../../docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
-  The current preview still attaches sample documents; capture is not connected.
+- Apple's native document scanner owns capture, page cropping and retakes. Cuadrao
+  owns entry, saved drafts and review around that native screen. Delivery and the
+  interpretation boundary belong to [roadmap C01](../../../docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
 - Recents uses title-first rows, separate Pinned/Recent sections, unread/current
   indicators, and one conversation object shared with Chat and Search. Do not repeat a sample subtitle on every row. Dates derive from the last
   message timestamp, shared with Search; metadata changes do not update recency.
@@ -514,6 +514,107 @@ remains in the Argus guide.
   Delete requires confirmation and retains recovery in Deleted. Actions on a row
   never also open it. Opening temporary-chat destinations keeps the existing discard
   confirmation. Archiving/deleting the active regular chat opens a fresh chat.
+
+### Contextual conversation entry
+
+**Founder-locked October 2, 2026.** One **Preguntar a Cuadrao / Ask Cuadrao**
+action points the assistant at a selected record. Broader permitted app context
+remains available; selecting a record tells Cuadrao what the person means.
+
+1. Keep Home and collection rows quiet. Use existing record actions instead of
+   repeating a Chat button beside each item. Preserve assigned edit/archive/order
+   gestures.
+2. Make the action discoverable in record details. Reuse an existing action menu;
+   where none exists, use a quiet labelled action in the detail content rather
+   than adding an ellipsis solely to conceal it.
+3. Show the selected record in a removable composer chip. Chart context includes
+   its selected period and filters. This is a focus reference, not a separate
+   group messaging destination or a requirement for one conversation per plan.
+
+4. Open contextual Cuadrao over the active detail. Closing it reveals the same
+   source, selection and scroll position. The main Chat tab uses the same
+   conversation and unfinished message.
+5. Selecting context changes only the removable chip. Preserve existing text and
+   attachments; never send automatically. Removing the chip leaves the message
+   intact. A sent message retains its original context reference.
+6. Keep unfinished regular conversations reachable when switching chats. Temporary
+   conversations keep their existing discard rules; selecting a record does not
+   silently enable broader app context or turn Temporary off.
+
+The founder approved completing this continuity behavior on October 2. UI delivery
+and connected context contracts remain in
+[roadmap C04](../../../docs/specs/argus-execution-board.md#c04--contextual-conversation-handoff).
+
+Mobbin references inspected October 2:
+[Fabric item selection and Ask AI](https://mobbin.com/flows/a9096ee9-967b-4110-a738-d77acb704671)
+shows the chosen item in the composer;
+[Grok document question](https://mobbin.com/flows/1fdf3416-da7c-49f1-b9be-8f481dc6f586)
+shows a removable source attachment. These support explicit context, not a claim
+that either app implements Cuadrao's record permissions or continuity contracts.
+
+### Group people and receipt placement
+
+**Founder-approved October 2, 2026.** Personas / People contains member identity,
+shared-plan balances or contributions, invitations, and former participants.
+Receipt capture and saved receipt cards belong in Gastos / Expenses. Contextual
+Cuadrao entry belongs in the group's existing detail actions, not beside Add receipt
+or above the people list.
+
+Member removal is secondary and owner-only. A trailing swipe reveals Remove on
+iOS 27 without executing on full swipe. Older systems retain a native contextual
+action; VoiceOver exposes the same review. Preserve the existing removal review,
+outstanding-balance restriction, and history. Members are not reorderable cards.
+Keep the shared debt-direction labels, colors and symbols visible.
+
+[Bond's member actions](https://mobbin.com/screens/a6e69b41-ae6e-4e2e-b6b6-b0bb75f27e9c)
+keep removal out of the resting row;
+[X's removal row](https://mobbin.com/screens/873d27a4-ba4e-4922-8055-09d02debd295)
+shows a trailing swipe action. Cuadrao preserves its own confirmation and ownership
+rules rather than copying those apps' deletion semantics.
+
+### Receipt capture and review
+
+Choose a receipt source once. Chat **Escanear / Scan** opens the native scanner.
+The group's and existing Saved receipts view's **Añadir recibo / Add receipt**
+menus offer Scan, Photos and Files, then open the chosen native picker immediately. Do not insert a second source
+chooser, currency form or promotional landing page before acquisition.
+Capture has one full-screen presentation containing the native picker. Do not open
+a receipt tray underneath it. After the original is saved, close capture before
+opening the review sheet. Cancel before acquisition returns to the originating
+screen without a receipt. An unfinished expense keeps its edits on return.
+
+Capture saves a draft and opens a compact review. **Después / Later** lets the person
+leave immediately; leaving never confirms an expense. A personal import can remain
+without a currency until review. Choose its currency once before editing amounts
+or confirming; then it stays fixed. A group supplies its fixed currency immediately.
+An unknown currency must not be displayed as DOP or another guessed currency.
+Return through the existing Chat or group entry. Do not add a top-level receipt
+inbox or automatically reopen review on launch.
+
+Personal Chat, group Chat and Plan open the same receipt identity. Generic files
+remain attachments unless the person chooses the receipt journey. Keep merchant,
+date, category and total readable before revealing editing controls. Use the shared
+money editor and category symbols. A keyboard appears only when editing requires it.
+
+A group receipt inherits the group's fixed currency. Confirm the payer and people,
+propose an equal split, and reveal item assignment under **Por consumo / By item**.
+Shared items retain one price and several people. Show how many items still need
+assignment. Included tax and service appear once; an added tip is separate.
+The final review shows each person's share before one explicit confirmation.
+
+Color explains direction. **Te deben / You're owed** uses the positive pine accent;
+**Debes / You owe** uses a legible warm clay accent. Settled amounts use a quiet
+neutral treatment. Always retain the direction label and symbol. Category colors
+continue to describe categories, not debt, and destructive red remains separate.
+
+Location is optional and attached only through an explicit choice. Label a capture
+pin as where the receipt was scanned, not as the merchant's address. Denied access
+never blocks a draft. A later review must not relabel the phone's current location
+as the original capture location.
+
+Prepared examples demonstrate the proposed automatic categorization and review.
+An imported image or file must not acquire invented merchant, amount or item data.
+Real extraction and connected posting remain roadmap work.
 
 References: [Apple document camera](https://developer.apple.com/documentation/visionkit/vndocumentcameraviewcontroller),
 [scan output](https://developer.apple.com/documentation/visionkit/vndocumentcamerascan),
@@ -535,9 +636,58 @@ The row's shared contextual actions are exposed through Apple's
 Search retains its Accounts, Activity, Plans, Chats, Files and Memory perspectives.
 Financial currency filters do not filter nonfinancial content. Household excludes
 private chats, source files and memory; a preview filter is not authorization.
-Preserve Profile's approved identity, grouped destinations, artwork and appearance
-choice while its broader redesign remains paused. Settings remain literal native
-headings rather than expressive landing copy.
+The October 2 support-surface assignment reopens Profile polish within the existing
+identity and App, Account, Support groups. Settings keep literal native headings.
+Avatar themes use the existing palette and icon family. A personal photo uses
+Apple's image picker, a circular preview, replacement/removal and the same editor
+Save/Cancel boundary. One avatar value owns the active initial, theme or photo;
+loading a photo cannot replace a newer choice. The preview retains only a small
+re-encoded working source and derived avatar, without source metadata, for the
+session. Crop/reposition uses a circular preview with native pan/zoom; an accepted
+crop changes only the editor draft until profile Save. Crop Cancel and profile
+Cancel retain their separate boundaries. Reopening the crop uses the retained
+working source, so repeated edits do not repeatedly crop the thumbnail. Home reads the same
+preferred-name value. Appearance retains its existing preference owner. Server
+upload and connected account operations remain separate work. The October 2
+scope decision keeps QR codes attached to plan invitations. Profile QR, usernames
+and public profile discovery are deferred; Profile needs no extra entry point.
+Keep the existing avatar family and native identity typography.
+
+A plan code card inherits its plan's artwork or selected cover, name and member
+context. The QR sits on an opaque light panel with a clear four-module margin;
+art stays outside the code. On-screen and exported cards share one composition.
+The native share sheet owns user-directed export. Sample-code wording travels
+with preview exports, and scanning must not imply a live invitation until the
+invitation contract is connected.
+
+Profile keeps the main navigation on its landing page, with clearance inside the
+scrolling content so Sign out stays above it. Pushed Settings pages hide the main
+navigation and return through native Back. The navigation path owns this state.
+
+Generic feedback borrows Argus's comment, problem and idea categories. Only a
+problem opens the title, reproduction steps and expected/actual outcome fields.
+Switching categories preserves each draft; Save draft accepts unfinished text.
+Conversation-specific ratings and context consent belong to contextual feedback,
+not the Settings entry. Submission and durable intake remain roadmap work.
+
+Search opens account and plan results in its own navigation stack. Chat handoff
+has an explicit return to Search and preserves the current query and filters.
+An empty perspective describes that content type. A no-match state preserves the
+query and offers a clear way to remove it or reset the active filters.
+
+Updates is a quiet inbox with read/unread state, source-linked rows and direct
+access to notification preferences. Opening a detail keeps Back anchored to the
+inbox. A contextual suggestion is not a new financial event; do not invent an
+event date, threshold crossing or milestone from a current value. Ordinary
+transactions and chat messages do not each earn an inbox notification. The bell
+and list derive unread state from the same visible items. Delivery preferences
+control future delivery channels; disabling them does not erase the inbox.
+The current preview keeps read state and edited profile fields for the session.
+Connected identity and durable inbox state belong to the main roadmap.
+
+Empty inbox and no-match states use small Cuadrao artwork and one useful recovery
+action where available. Reserve chart silhouettes for financial chart states.
+Do not add permanent loading motion or test disclosures to these screens.
 
 ## 12. Localization and accessibility
 
