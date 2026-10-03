@@ -30,7 +30,7 @@ import json
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
 
 from loguru import logger
@@ -96,7 +96,7 @@ def subject_hash(user_id: str) -> str:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def _uuid(value: str) -> str:

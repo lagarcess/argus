@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.secrets import SecretBox
@@ -29,7 +29,7 @@ def _hub(*adapters):  # noqa: ANN002
         None,  # type: ignore[arg-type]
         box=SecretBox(secrets.token_bytes(32)),
         sink=None,
-        clock=lambda: datetime(2026, 10, 3, tzinfo=UTC),
+        clock=lambda: datetime(2026, 10, 3, tzinfo=timezone.utc),
     )
     for adapter in adapters:
         hub.register(adapter)
