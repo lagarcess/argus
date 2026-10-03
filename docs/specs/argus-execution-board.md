@@ -15,12 +15,13 @@ Recovery branch: `codex/mvee-iphone-delivery-plan`.
 Lane contract, 2 October 2026. Integration tip `d9a7acfc` includes landed
 PR #773 `f28b5642` and PR #776. The
 [five-lane handoff](lanes/mvee-five-lane-handoff.md) writes the founder's
-2 October locks into contract and acceptance for Household invitations, the
-space list and account moves, Search, Home series, and Updates. The decisions
+2 October locks into contract and acceptance for Household invitations, account
+deletion, the space list and account moves, Search, Home series, and Updates. The decisions
 themselves live in the
 [decision log](argus-decision-log.md#october-2-2026-cuadrao-lane-locks).
-Landing order is Household, the space list, Search, Home series, account moves,
-then Updates, one at a time. Outside services land as fakes behind default-off
+Landing order is Household, account deletion, the space list, Search, Home
+series, account moves, then Updates, one at a time. Account deletion is its own
+lane and lands before external TestFlight. Outside services land as fakes behind default-off
 flags. iOS pieces land in their own PRs as unverified, with a Mac pass by
 Lucas's local agent. The handoff does not dispatch a worker, authorize a merge,
 or rewrite the historical landing records below. Sentences in the #773 section
@@ -2728,8 +2729,8 @@ before repeating a pattern across screens.
 ## Work map
 
 The [five-lane handoff](lanes/mvee-five-lane-handoff.md) is the current lane
-contract for Household invitations, private Spaces and account moves, Search
-documents and conversations, Home series data, and Updates. The table below
+contract for Household invitations, account deletion, private Spaces and account
+moves, Search documents and conversations, Home series data, and Updates. The table below
 remains the coverage index.
 
 ### Complete MVEE coverage

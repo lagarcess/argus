@@ -1,40 +1,52 @@
 # Five-lane MVEE delivery handoff
 
 **Status:** Lane contract. Founder decisions of 2 October 2026 are written in as contract and acceptance. This file assigns no worker, merge, hosted change, or deployment.
-**Integration:** `codex/private-alpha-next` at `d9a7acfcfc9970edb07fee2cbbd1c21e19536772`, 2 October 2026. That commit is `d9a7acfc`, which includes landed PR #776. Remote integration matched this SHA at the time of writing.
-**Decisions:** [decision log, October 2 lane locks](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). That section arrives with PR #780. This file links there and does not restate the rationale.
+**Integration:** `codex/private-alpha-next` at `2185aefe8390490f7edf7dc2f127b3a9d71f2e98`, 2 October 2026, which is landed PR #779. The code facts in this file were read at `d9a7acfc`, which includes landed PR #776. The two commits since then, #780 and #779, change docs only.
+**Decisions:** [decision log, October 2 lane locks](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). That section landed with PR #780 at `3b840605`. This file links there and does not restate the rationale.
 **Design checkout to preserve:** `codex/cuadrao-design-scan-recents` at `8f521518`. That branch owns Cuadrao UI chrome and has already diverged from integration. Delivery lanes do not edit its files and do not merge it.
 **Product owner:** [MVEE](../argus-minimum-viable-ecosystem-experience.md). This handoff links to that owner. It does not copy a second scope list.
 **Execution map:** [execution board](../argus-execution-board.md).
 
 The lanes below land on integration one at a time, in the order under [Landing order](#landing-order), through one integration captain. The team is small, so lanes are built one after another, not in parallel.
 
+On 2 October, account deletion moved out of account moves into its own lane, [Lane 6](#lane-6-account-deletion). The file keeps its name so existing links still work.
+
 ## Decisions this handoff implements
 
-Lucas locked rows 1 to 10 on 2 October 2026. Row 11 and the extras listed under the table are Head of Engineering delivery decisions, not founder locks. The reasons and wording for the founder locks live in the [decision log](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). The right column says where each one lands and what the code has today.
+Lucas locked rows 1 to 10 and rows 12 to 16 on 2 October 2026. Rows 12 to 16 were locked later that evening and settle what this file first listed as open items 1 and 2. Row 11 and the extras listed under the table are Head of Engineering delivery decisions, not founder locks. The reasons and wording for the founder locks live in the [decision log](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). The right column says where each one lands and what the code has today.
 
 | # | Decision | Lane | Today on `d9a7acfc` |
 | --- | --- | --- | --- |
 | 1 | An invite is a cuadrao.ai universal link plus a code plus a QR. Household email is out of scope for this pass | Household | Share link only, with the unregistered `argus-household://invite#` scheme. No code, no QR, no universal link |
-| 2 | Each code works once and records who sent it. The inviter gets an "invitation accepted" notice | Household, then Updates | Single use exists (`invitation_consumed`). Sender is `created_by`. No notice |
+| 2 | Each code works once and records who sent it. The one exception is the founder group link in row 13. The inviter gets an "invitation accepted" notice | Household, then Updates | Single use exists (`invitation_consumed`). Sender is `created_by`. No notice |
 | 3 | On account deletion, keep an anonymous record that an invite was sent and accepted, with no name or user id | Household | Not there. `created_by` and `accepted_by` are set to null on delete, so the count of people is lost |
-| 4 | 3 invites per user to start, more at Lucas's discretion. The in-app code is the real gate. A TestFlight public link only installs the app. No code means the cuadrao.ai waitlist | Household | No quota, no code gate, no TestFlight link |
-| 5 | Three network numbers from day one: invites sent per user, share of invites accepted, share of invitees who invite someone | Household | No event and no durable record |
+| 4 | 10 beta invites per user for TestFlight, more at Lucas's discretion. The in-app code is the real gate. A TestFlight public link only installs the app. No code means the cuadrao.ai waitlist | Household | No quota, no code gate, no TestFlight link |
+| 5 | Three network numbers from day one: invites sent per user, share of invites accepted, share of invitees who invite someone. Household invites are counted separately from beta invites, and each group link is its own source | Household | No event and no durable record |
 | 6 | A comparison against a zero month shows the amount difference, not a percent. A month with no records shows as no data | Home | No series on the API. `financial-home` returns zero strings for a month with no records |
 | 7 | A bill appears in Updates 3 days before its due date and on the due date | Updates | No inbox, no trigger |
 | 8 | Updates go to the in-app inbox, plus push for people who turn it on. Push never shows amounts. No email for updates | Updates | No inbox, no push code |
 | 9 | Joint-plan export waits until after TestFlight | None in this pass | The read-only departure archive from #773 stays |
 | 10 | When a member leaves, their account goes with them. The household keeps that account's history up to the move, greyed out and read-only, with the state at the move recorded. Moves are idempotent events and never rewrite past balances or settlements. Home recomputes from history. Explicit per-role access rules in RLS and API checks | Account moves | Leave revokes grants and the household sees nothing afterward. No move command, no locked history |
-| 11 (HoE) | Landing order: Household, space list on its own, Search, Home series, account moves, Updates | All | Not applicable |
+| 11 (HoE) | Landing order: Household, account deletion, space list on its own, Search, Home series, account moves, Updates | All | Not applicable |
+| 12 | Two kinds of invite. Any user sends beta invites from the quota in row 4. Only the household admin sends household invites. Those don't count against the 10, and accepting one also lets the person into the beta | Household | Household invitations exist and only the admin creates them. No beta invite and no quota |
+| 13 | Lucas, and only Lucas, can create a group link: a multi-use beta invite with a cap he picks and an expiry date, redeemed atomically. Once the cap is reached, the link sends people to the cuadrao.ai waitlist and says so. Each link is its own source, and the who-invited-whom record shows the link as the inviter. It is the one exception to single use in row 2. It is beta-only and never grants household membership | Household | Nothing. Every invitation is single use |
+| 14 | When an owner deletes their account, the household's locked copy of that owner's history is deleted too, and the other members see a short note that it was removed | Account deletion, with the trigger exception in account moves | No in-app deletion and no locked history |
+| 15 | When the household admin deletes their account, the admin role passes automatically to the longest-standing remaining member. If no one is left, the household closes | Account deletion | No handoff. The admin transfers administration or closes the household by hand before leaving |
+| 16 | Deleting any account also clears the person's email from saved feedback and deletes the person in PostHog by distinct id, including their events | Account deletion | The feedback row's `user_id` is set to null on delete and `context.account_email` stays. No PostHog deletion call |
 
 Head of Engineering delivery decisions that go with decision 10. These are not founder locks:
 
-- Locked history is read-only for everyone, the owner included. The one exception is the account-deletion path in lane 2.
+- Locked history is read-only for everyone, the owner included. The one exception is the account-deletion function from [Lane 6](#lane-6-account-deletion). Lane 2 owns that trigger exception.
 - Account moves need a manual Codex review plus a dedicated eval before landing.
 - A member, including the household admin, reads a departed member's locked history only if they had an explicit grant to that account at the cut-off.
 - The departure event is written by the system when a member leaves or is removed, not by the admin or the member.
 
-Already locked before today and still in force: the [Household permission policy](household-permission-policy.md) of 1 October, except where decision 10 narrows what happens on departure. Also still in force: the MVEE visibility rules, and the rule that a plan stays in the space where it was created.
+Head of Engineering delivery decisions for account deletion, also not founder locks:
+
+- Account deletion is its own lane. It lands right after Household and before external TestFlight, because Apple reviews the first external TestFlight build against the App Review Guidelines, and in-app account deletion is one of them.
+- Account deletion needs a manual Codex review plus its own eval before landing.
+
+Already locked before today and still in force: the [Household permission policy](household-permission-policy.md) of 1 October, except where decision 10 narrows what happens on departure and decision 15 replaces the admin's transfer-or-close step when the admin deletes their account. Also still in force: the MVEE visibility rules, and the rule that a plan stays in the space where it was created.
 
 ## Build environment and how iOS lands
 
@@ -65,8 +77,9 @@ The flag names below are proposals. The captain confirms the final name in the l
 | Code gate and waitlist | The cuadrao.ai waitlist page | Code check and the redirect to the waitlist | `ARGUS_BETA_INVITE_GATE_ENABLED` and `ARGUS_WAITLIST_URL` |
 | Push | APNs key | Device registration, a push sender interface, and a recording fake that keeps payloads for tests | `ARGUS_UPDATES_PUSH_ENABLED`. Off uses the fake and sends nothing |
 | Email | A cuadrao.ai sending domain in Resend | Nothing. Household email delivery and update email are out of scope for this pass | None |
+| PostHog person deletion | A PostHog personal API key that can delete persons. The project token the server sends events with cannot | A deletion adapter and a recording fake that keeps each request for tests | `ARGUS_ANALYTICS_DELETION_ENABLED`. Off uses the fake and sends nothing |
 
-Lane surfaces with no outside piece also start default-off, one flag each: `ARGUS_FINANCIAL_SPACES_ENABLED` for the space list, `ARGUS_ACCOUNT_MOVES_ENABLED` for moves, `ARGUS_HOME_SERIES_ENABLED` for the series, and `ARGUS_UPDATES_ENABLED` for the inbox. Search documents stay behind the existing `ARGUS_DOCUMENT_EXTRACTION_ENABLED`.
+Lane surfaces with no outside piece also start default-off, one flag each: `ARGUS_FINANCIAL_SPACES_ENABLED` for the space list, `ARGUS_ACCOUNT_MOVES_ENABLED` for moves, `ARGUS_ACCOUNT_DELETION_ENABLED` for in-app deletion, `ARGUS_HOME_SERIES_ENABLED` for the series, and `ARGUS_UPDATES_ENABLED` for the inbox. Search documents stay behind the existing `ARGUS_DOCUMENT_EXTRACTION_ENABLED`.
 
 **Email.** Household email delivery is out of scope for this pass. A Resend adapter already exists: `send_resend_email` in `src/argus/domain/resend_email.py`, sending through Resend SMTP from `noreply@get-argus.com` with `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`. It is used by `src/argus/api/feedback_notification.py` and `src/argus/domain/access_approval_email.py`. What is missing is a cuadrao.ai sending domain. When Household email comes back, it reuses this adapter with that domain and does not add a second mail client.
 
@@ -109,12 +122,13 @@ Personal financial search and conversation search stay separate HTTP APIs. `GET 
 
 One integration captain lands one lane at a time onto `codex/private-alpha-next`. The captain reconciles the current integration into the worker branch by merge, never by rebase, then lands the worker through its PR. Each lane may land as a backend PR and a separate iOS PR.
 
-1. **Household.** Universal link, code, QR, single-use code with sender, the anonymous invite record, quota, code gate, and the three numbers. No email.
-2. **Space list on its own.** Space rows, unique names, archive, and a new account choosing a space. No move of an existing account. This is the one `space_id` writer later readers use.
-3. **Search.** Document and conversation hits and opens, so Updates has real destinations.
-4. **Home series.** Derived from canonical history, filtered by the account's current space, with decision 6 for comparisons.
-5. **Account moves.** Leaving a household with locked history, and moving an account between spaces. Manual Codex review and the dedicated eval before landing.
-6. **Updates.** Inbox, bill rows, draft-ready rows, the inviter's accepted notice, and opt-in push without amounts.
+1. **Household.** Universal link, code, QR, single-use code with sender, the anonymous invite record, the beta and household invite split, the 10-invite quota, the founder group link, code gate, and the three numbers. No email.
+2. **Account deletion.** In-app deletion and its ordered server-side steps, in [Lane 6](#lane-6-account-deletion). Lands before external TestFlight. Manual Codex review and its own eval before landing.
+3. **Space list on its own.** Space rows, unique names, archive, and a new account choosing a space. No move of an existing account. This is the one `space_id` writer later readers use.
+4. **Search.** Document and conversation hits and opens, so Updates has real destinations.
+5. **Home series.** Derived from canonical history, filtered by the account's current space, with decision 6 for comparisons.
+6. **Account moves.** Leaving a household with locked history, and moving an account between spaces. Adds the trigger exception for the deletion function. Manual Codex review and the dedicated eval before landing.
+7. **Updates.** Inbox, bill rows, draft-ready rows, the inviter's accepted notice, and opt-in push without amounts.
 
 A lane does not wait on an outside piece Lucas supplies later. It lands with the fake and the flag off.
 
@@ -124,7 +138,8 @@ Codex review is not a merge gate except where this file says so. Request it for 
 
 | Lane | Review |
 | --- | --- |
-| Household | Yes. The code store, the anonymous record, and the quota are schema and authorization work |
+| Household | Yes. The code store, the anonymous record, the quota, and the group link cap are schema and authorization work |
+| Account deletion | Required. A manual Codex review plus its own eval, both before landing |
 | Spaces list | Yes. The space table is migration and authorization work |
 | Search | Yes if a query can return another owner's document or conversation. No for a read-only adapter that calls the existing document and conversation owners and adds no table |
 | Home | Yes if the series is a new stored table. No if it is derived inside the existing financial-home read from canonical activity and balance observations |
@@ -148,9 +163,10 @@ Codex review is not a merge gate except where this file says so. Request it for 
 
 These are not founder locks yet. Each one blocks only the piece named. Everything else in this file can be built.
 
-1. **Is the beta invite the same code as a household invite?** Today a household invitation can only be created by the household admin, and accepting it grants household membership and nothing else (1 October policy). Decision 4 gives every user 3 invites and makes the code the gate into the app. Someone can be invited into the beta without joining a household. The recommended reading is two kinds of invite that share the same link, code, QR, and who-invited-whom record: a beta invite any user can send, inside the quota, that admits a person to the app; and the existing household invitation, admin-only and membership-only. Iris and Lucas confirm before the quota and gate are coded. The link, code, and QR presentation for household invitations does not wait.
-2. **Locked household history when the owner later deletes their account.** Decision 10 keeps a read-only copy of a departed member's pre-move history for the household. Decision 3 and Apple's rule say deleting an account actually removes it. The recommended reading is that deletion removes the locked copy too, and the household sees that a former member's account was removed. The Head of Engineering has written that reading into lane 2 as the delivery contract, through a dedicated deletion path, so the departure piece can be built. Lucas can still reverse it. If he does, only the deletion path changes.
-3. **How the code gate fits the existing access gate.** `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` and the `private_alpha_allowlist` table already decide who can sign up and sign in, and the [API contract](../../API_CONTRACT.md) says public registration has been open in production since 12 August 2026. Turning that flag off to gate the beta would also close web registration. The code gate gets its own flag and does not flip the existing one. The exact way a redeemed code admits a person is a technical design item in the Household PR, under Codex review.
+Lucas settled the two earlier open items on 2 October. Whether a beta invite is the same as a household invite is now decisions 12 and 13. What happens to locked household history when the owner deletes their account is now decision 14, a founder lock rather than a delivery contract.
+
+1. **How the code gate fits the existing access gate.** `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` and the `private_alpha_allowlist` table already decide who can sign up and sign in, and the [API contract](../../API_CONTRACT.md) says public registration has been open in production since 12 August 2026. Turning that flag off to gate the beta would also close web registration. The code gate gets its own flag and does not flip the existing one. The exact way a redeemed code admits a person is a technical design item in the Household PR, under Codex review.
+2. **Sign in with Apple revocation on deletion.** The Sign in with Apple button exists in the app as a preview and does not sign anyone in. Lucas has not yet decided whether it is connected before external TestFlight or hidden. If he says yes, account deletion also revokes the person's Apple tokens through Apple's REST API, as Apple requires for apps that use Sign in with Apple. If he says no, the button is hidden and that step is dropped. Only that step in [Lane 6](#lane-6-account-deletion) waits.
 
 ## Next steps for Lucas
 
@@ -161,20 +177,23 @@ These are the pieces only Lucas can hand over. Each lane lands without them, wit
 3. **APNs key** for push. Until then `ARGUS_UPDATES_PUSH_ENABLED` stays off and the recording fake is used.
 4. **The TestFlight public link.** Until then `ARGUS_TESTFLIGHT_PUBLIC_URL` stays unset and no install link is shown.
 5. **Schedule Apple's first external beta review.** Apple must approve the first build for external testing before the TestFlight public link works for outside testers. Put that review on the calendar before the first distribution.
+6. **A PostHog personal API key that can delete persons.** Until then `ARGUS_ANALYTICS_DELETION_ENABLED` stays off, the recording fake is used, and account deletion reports the PostHog step as not done.
 
 Also needed later, not secret: the cuadrao.ai waitlist page URL for `ARGUS_WAITLIST_URL`. The waitlist page itself is not in this repository.
 
 ## Lane 1. Household invitations
 
-**MVEE:** [section 12](../argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), invitation delivery, and the [permission policy](household-permission-policy.md). Board rows for #763, #766, and #773. Decisions 1 to 5.
+**MVEE:** [section 12](../argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), invitation delivery, and the [permission policy](household-permission-policy.md). Board rows for #763, #766, and #773. Decisions 1 to 5, 12, and 13.
 
 ### Journey and completion
 
 A registered admin creates a household and shares one invitation. It shows as a cuadrao.ai link, a short code, and a QR of that link. All three resolve to the same invitation. The recipient, on their own sign-in, opens the link, scans the QR, or types the code, previews, and accepts. They see no accounts until an owner shares one. The code works once. A second use fails with the existing `invitation_consumed` error. Revoke and expiry fail with the existing `invitation_revoked` and `invitation_expired` errors. The same acceptance retried with the same idempotency key does not create a second membership. The inviter later gets an "invitation accepted" row in Updates, once that lane lands.
 
-The beta gate, once open item 1 is confirmed: each user starts with 3 invites. Lucas can add more. A person without a valid code who installs from the TestFlight public link is sent to the cuadrao.ai waitlist. The TestFlight link only installs the app.
+The beta gate: any user can send a beta invite, and each user has 10 for TestFlight. Lucas can add more. Only the household admin sends household invites. They don't use any of the 10, and accepting one also lets the person into the beta. A person without a valid code who installs from the TestFlight public link is sent to the cuadrao.ai waitlist. The TestFlight link only installs the app.
 
-Completion is the link, the code, and the QR against Postgres, English and Spanish, relaunch, and a third registered user who gets `404` for the household. No email is sent.
+The founder group link: Lucas, and only Lucas, can create a link that many people can use, with a cap he picks and an expiry date. It is the one stated exception to single-use codes. Redemption is atomic, so a burst of taps cannot go past the cap. Once the cap is reached, a person who opens the link lands on the cuadrao.ai waitlist and the screen says so. After the expiry date the link admits no one. Each group link is its own source in the network numbers, and the who-invited-whom record shows the link as the inviter, not a person. The group link is beta-only. Redeeming it never grants household membership.
+
+Completion is the link, the code, and the QR against Postgres, English and Spanish, relaunch, and a third registered user who gets `404` for the household. It also covers a beta invite inside the quota, a household invite that lets the person into the beta without using the quota, and a group link that stops at its cap. No email is sent.
 
 ### What exists and is reused
 
@@ -187,19 +206,20 @@ Completion is the link, the code, and the QR against Postgres, English and Spani
 | Idempotent commands | `household_command_receipts` keyed by actor, operation, and idempotency key, in `20261001120000_household_consent_recovery.sql`, used by `src/argus/domain/household/commands.py` | Reused for code redemption and quota grants |
 | Access rules | RLS is on for all four household tables. `20261001090000` defines `households_member_select`, `household_members_peer_select`, `household_invitations_admin_select`, and `household_account_grants_member_select` with `is_active_household_member`. `20261001120000` then revokes all client privileges on those tables, so only the API service reads and writes them | Same pattern for new tables: RLS on, client privileges revoked, service writes, API checks the role |
 | Native share | `ShareLink` in `ios/ArgusFoundation/Household/HouseholdManagement.swift` shares `argus-household://invite#` plus the token and shows it at `household.invite.link`. Paste-to-preview at `household.invite.input`. `ios/ArgusFoundationUITests/HouseholdUITests.swift` expects the `argus-household://invite#` prefix | Kept while the universal-link flag is off |
-| Existing access gate | `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` in `src/argus/api/guest_access.py`, the `private_alpha_allowlist` table, and `POST /api/v1/auth/access-requests` | See open item 3. Not flipped by this lane |
+| Existing access gate | `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` in `src/argus/api/guest_access.py`, the `private_alpha_allowlist` table, and `POST /api/v1/auth/access-requests` | See [Still open](#still-open) item 1. Not flipped by this lane |
 
 Not there, on integration or on the design branch at `8f521518`: a household invite code, a household QR (the only QR is the plan-group sample in `CuadraoGroupCodeCard.swift` on the design branch, which says it joins no real group), a universal link, a quota, a durable who-invited-whom record, and any network event. The `cohort` string on `signed_in`, `session_started`, `landing_viewed`, and `first_answer_shown` in `src/argus/observability/analytics_events.py` is a campaign code. It is not a person and is not the referral record.
 
 ### What is new
 
-- **Code.** A short human-typeable code for each invitation, stored only as a hash beside `token_hash`, unique while the invitation is live, single use, with the same expiry and revoke rules. New migration.
+- **Code.** A short human-typeable code for each invitation, stored only as a hash beside `token_hash`, unique while the invitation is live, single use except for the group link, with the same expiry and revoke rules. New migration.
 - **Universal link.** The server builds `https://cuadrao.ai/invite#<secret>` when `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED` is on. The secret stays in the URL fragment, as today's link does, so it never reaches a web server log. Off keeps today's link.
 - **QR.** The QR encodes the same link. It is drawn on the device. No QR image is stored.
-- **Who-invited-whom record.** One row per invitation that records send and accept, and the invitation that brought the sender in, if any. Live sender and acceptor user ids are kept beside it and cleared on account deletion. The row itself keeps no name, email, or user id once that happens. That keeps decision 3: counts and the "invitee invited someone" chain survive, and the deleted person is gone. New migration.
-- **Quota.** 3 invites per user to start, with a grant command Lucas uses to add more. Counted from the who-invited-whom record, not from PostHog.
-- **Code gate.** Behind `ARGUS_BETA_INVITE_GATE_ENABLED`, after open item 1. With the gate on, a signed-in user with no redeemed code gets the waitlist response, using `ARGUS_WAITLIST_URL`.
-- **Three numbers.** Invites sent per user, share accepted, and share of invitees who send an invite of their own. Computed in SQL from the who-invited-whom record. A PostHog event, if added, goes through the closed registry in `analytics_events.py` and carries no person id.
+- **Who-invited-whom record.** One row per invitation that records its kind (beta, household, or group link), send and accept, and the invitation that brought the sender in, if any. A group link records each redemption with the link as the inviter. Live sender and acceptor user ids are kept beside it and cleared on account deletion. The row itself keeps no name, email, or user id once that happens. That keeps decision 3: counts and the "invitee invited someone" chain survive, and the deleted person is gone. New migration.
+- **Quota.** 10 beta invites per user for TestFlight, with a grant command Lucas uses to add more. Household invites and group-link redemptions do not count against it. Counted from the who-invited-whom record, not from PostHog.
+- **Founder group link.** One more kind of code, with a cap, an expiry date, and a source label, created only from Lucas's account. Redemption is atomic: the count and the cap are checked and updated in one locked step, so concurrent taps cannot pass the cap. Over the cap, the waitlist response. It lets the person into the beta and never creates a household membership. How Lucas's account is identified, and whether he creates the link from a screen or a server command, is a technical design item in the Household PR.
+- **Code gate.** Behind `ARGUS_BETA_INVITE_GATE_ENABLED`. With the gate on, a signed-in user who has not redeemed a beta invite, a household invite, or a group link gets the waitlist response, using `ARGUS_WAITLIST_URL`.
+- **Three numbers.** Invites sent per user, share accepted, and share of invitees who send an invite of their own. Household invites are counted separately from beta invites, and each group link is its own source. Computed in SQL from the who-invited-whom record. A PostHog event, if added, goes through the closed registry in `analytics_events.py` and carries no person id.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
 
@@ -216,29 +236,29 @@ No-touch: grant semantics in `_end_membership` (account moves owns the departure
 
 ### Acceptance
 
-Backend, on this box: two real users and a third who is denied, against Postgres. Create, then preview and accept by link token and by code for the same invitation. A second use of the code fails with `invitation_consumed`. Revoke and expire fail with the existing errors. Retry a lost accept response and get one membership. The who-invited-whom row records sender and accept. Delete the acceptor's auth user, then the sender's: the counts and the chain are unchanged and no row holds either user id, name, or email. A fourth invite beyond the quota is refused, and a grant from Lucas allows it. With `ARGUS_BETA_INVITE_GATE_ENABLED` on, a user without a code gets the waitlist response. With it off, behavior is today's. With `ARGUS_HOUSEHOLDS_ENABLED` off, `404 households_unavailable` before auth. No email is sent.
+Backend, on this box: two real users and a third who is denied, against Postgres. Create, then preview and accept by link token and by code for the same invitation. A second use of the code fails with `invitation_consumed`. Revoke and expire fail with the existing errors. Retry a lost accept response and get one membership. The who-invited-whom row records sender and accept. Delete the acceptor's auth user, then the sender's: the counts and the chain are unchanged and no row holds either user id, name, or email. An eleventh beta invite beyond the quota is refused, and a grant from Lucas allows it. A household invite from the admin does not use the quota, and accepting it also passes the beta gate. A member who is not the admin cannot create a household invite. A group link requested by anyone other than Lucas is refused. A group link with a cap of N admits exactly N people under concurrent redemption, and the next person gets the waitlist response. An expired group link admits no one. Redeeming a group link creates no household membership. The numbers count household invites apart from beta invites and report each group link as its own source. With `ARGUS_BETA_INVITE_GATE_ENABLED` on, a user without a code gets the waitlist response. With it off, behavior is today's. With `ARGUS_HOUSEHOLDS_ENABLED` off, `404 households_unavailable` before auth. No email is sent.
 
 iOS, by Lucas's local agent after landing: share, code, and QR show the same invitation in English and Spanish. Code entry and QR scan reach the existing preview. Relaunch both clients. With the universal-link flag off, the existing `HouseholdUITests` prefix test still passes.
 
 ## Lane 2. Spaces
 
-**MVEE:** [Financial spaces](../argus-minimum-viable-ecosystem-experience.md#financial-spaces), [managing private spaces](../argus-minimum-viable-ecosystem-experience.md#managing-private-spaces), and [reassigning accounts](../argus-minimum-viable-ecosystem-experience.md#reassigning-accounts-between-spaces). Board row D04. Decision 10 and 11.
+**MVEE:** [Financial spaces](../argus-minimum-viable-ecosystem-experience.md#financial-spaces), [managing private spaces](../argus-minimum-viable-ecosystem-experience.md#managing-private-spaces), and [reassigning accounts](../argus-minimum-viable-ecosystem-experience.md#reassigning-accounts-between-spaces). Board row D04. Decisions 10 and 11, and the trigger exception for decision 14.
 
-Spaces lands in two separate slots: the space list in slot 2, and account moves in slot 5. They are described together here because they share the table.
+Spaces lands in two separate slots: the space list in slot 3, and account moves in slot 6. They are described together here because they share the table.
 
-### Space list, slot 2
+### Space list, slot 3
 
 Personal already exists for every account because `space_id` defaults to `personal`. The person creates one named private Business space and one named Custom space. Names are unique among their spaces, including archived ones. A new account chooses a space. Archive keeps the records. Delete is only for an empty private space. Personal cannot be renamed, archived, or deleted. An archived space cannot be the source or the destination of a move. Unarchive it first. This slot ships one Business and one Custom space per user, archive, and restore. It does not ship a purge job or an unlimited entitlement. It does not move an existing account.
 
-### Account moves, slot 5
+### Account moves, slot 6
 
 Two kinds of move, both under decision 10.
 
-**Leaving a household.** When a member leaves or is removed, the accounts they own go with them, as today. That includes an account they had shared with the household: it moves with its owner. New: a server-side function runs when a member leaves or is removed. It writes the departure event, keyed for idempotency, and records the cut-off before grants are revoked. Neither the admin nor the member writes move events directly. The cut-off is the account, each grant that existed at that moment, and the exact activity and balance revisions those grants could see. The household keeps a locked, read-only, greyed-out copy only for the members who had an explicit grant to that account at the cut-off. Nobody gets locked history they could not see at the cut-off. That keeps rule 3 of the 1 October policy: an account is visible only through an explicit grant. Nobody can create, edit, or delete locked history, including the owner and the admin. The only exception is account deletion, below. The owner keeps editing their own account. A later correction to an old record is a new revision in the owner's history and does not change the household's locked view.
+**Leaving a household.** When a member leaves or is removed, the accounts they own go with them, as today. That includes an account they had shared with the household: it moves with its owner. New: a server-side function runs when a member leaves or is removed. It writes the departure event, keyed for idempotency, and records the cut-off before grants are revoked. Neither the admin nor the member writes move events directly. The cut-off is the account, each grant that existed at that moment, and the exact activity and balance revisions those grants could see. The household keeps a locked, read-only, greyed-out copy only for the members who had an explicit grant to that account at the cut-off. Nobody gets locked history they could not see at the cut-off. That keeps rule 3 of the 1 October policy: an account is visible only through an explicit grant. Nobody can create, edit, or delete locked history, including the owner and the admin. The only exception is the account-deletion function, below. The owner keeps editing their own account. A later correction to an old record is a new revision in the owner's history and does not change the household's locked view.
 
-**Account deletion.** When the owner deletes their account, a dedicated server-side deletion function removes that user's rows and the household's locked copy of that history. This follows the recommendation in open item 2 and Apple's account-deletion rule. The household then sees that a former member's account was removed. This function is new. Today a registered user asks for deletion through `account_deletion_request` on `POST /api/v1/feedback`, and no in-app deletion function exists.
+**Account deletion.** Account deletion is its own lane, [Lane 6](#lane-6-account-deletion), and lands in slot 2, before this slot. This slot keeps only the trigger exception. The trigger that blocks update and delete on locked history and move events lets that deletion function, and nothing else, remove the deleting user's move events and the household's locked copy of their history (decision 14). Because the locked history table is created in this slot, this slot also adds that removal to step 5 of the deletion function.
 
-**Moving between spaces.** The person moves a standalone account from Personal to Business. The account id is unchanged. Opening balance, activity, corrections, and notes still load. No new transaction appears. A budget that included the account stops including it in Personal and the budget row does not move. A goal or debt plan linked to the account still opens and points at the same account id. Household grants on that account are unchanged. An account with a transfer, payment, cross-account refund, loan link, or unfinished document draft cannot be moved, and the screen explains the link.
+**Moving between spaces.** The person moves a standalone account from Personal to Business. Standalone means the account has no transfer, payment, cross-account refund, or loan link to another account, and no unfinished document draft. Only a standalone account can be moved. The account id is unchanged. Opening balance, activity, corrections, and notes still load. No new transaction appears. A budget that included the account stops including it in Personal and the budget row does not move. A goal or debt plan linked to the account still opens and points at the same account id. Household grants on that account are unchanged. An account that is not standalone cannot be moved, and the screen explains the link.
 
 ### Move invariants
 
@@ -250,7 +270,7 @@ Two kinds of move, both under decision 10.
 
 ### Access rules per role
 
-New tables follow the household pattern: RLS on, all client privileges revoked, the API service writes, and the API checks the role on every route. Locked history and move events are append-only. The service role gets select and insert only on them. A trigger rejects update and delete for every role, ordinary service-role writes included, because the service role bypasses RLS. The trigger's one exception is the new account-deletion function, which removes the deleting user's rows and the household's locked copy of their history. Nothing else can change or remove them.
+New tables follow the household pattern: RLS on, all client privileges revoked, the API service writes, and the API checks the role on every route. Locked history and move events are append-only. The service role gets select and insert only on them. A trigger rejects update and delete for every role, ordinary service-role writes included, because the service role bypasses RLS. The trigger's one exception is the account-deletion function from Lane 6, which removes the deleting user's rows and the household's locked copy of their history. Nothing else can change or remove them.
 
 | Role | Move events | Locked household history | Live account |
 | --- | --- | --- | --- |
@@ -260,8 +280,8 @@ New tables follow the household pattern: RLS on, all client privileges revoked, 
 | Member with no grant at the cut-off | None | None | None |
 | Anyone else | None, `404` | None, `404` | None |
 | System departure function | Insert the departure event once per idempotency key | Insert at the cut-off only | None |
-| Account-deletion function, new | Remove the deleting user's events | Remove the household's locked copy of that user's history | Remove that user's rows |
-| Other service-role writes | Insert space moves once per idempotency key. No update or delete | No update or delete | Existing writes |
+| Account-deletion function, from Lane 6 | Remove the deleting user's events | Remove the household's locked copy of that user's history | Remove that user's rows |
+| Other service-role writes | Insert space moves once per idempotency key. No update or delete | No insert, update, or delete | Existing writes |
 
 Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and `financial_record_revisions_owner_select` in `supabase/migrations/20260928200000_financial_accounts_first_slice.sql`; `is_active_household_member` and `household_account_grants_member_select` in `20261001090000_household_membership.sql`; the client-privilege revoke in `20261001120000_household_consent_recovery.sql`; `household_command_receipts` for idempotency; and the revision-pinning pattern of `household_plan_archived_activities` in `20261002020000_shared_plan_retained_revision_scope.sql`, which already pins exact activity revisions when a shared plan's owner departs.
 
@@ -278,7 +298,7 @@ Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and
 - After a departure, an update or delete on locked history fails for the owner, the admin, and ordinary service-role writes.
 - After a departure, a member or admin who had no grant to the account at the cut-off reads no locked history for it.
 - Replaying the departure with the same key writes no second event and no second cut-off.
-- The owner's account deletion removes their rows and the household's locked copy, and nothing else.
+- The account-deletion function removes the deleting owner's move events and the household's locked copy of their history, and nothing else. The Lane 6 eval covers the rest of the deletion.
 - A move from or to an archived space is rejected.
 
 ### Dedicated eval
@@ -296,15 +316,15 @@ The move needs a manual Codex review and a dedicated eval before landing. The ev
 
 ### What is new
 
-- A space table owned by the user, with the account's `space_id` pointing at it. Personal is the default row and cannot be deleted. Slot 2.
-- A move command, a move event table, the link check, and the budget-inclusion update. Slot 5.
-- The locked household history table, the system departure function that records the cut-off before grants are revoked, and the dedicated account-deletion function. Slot 5. The API contract and data model departure paragraphs change in the same PR, because today they say remaining members lose access.
+- A space table owned by the user, with the account's `space_id` pointing at it. Personal is the default row and cannot be deleted. Slot 3.
+- A move command, a move event table, the link check, and the budget-inclusion update. Slot 6.
+- The locked household history table, the system departure function that records the cut-off before grants are revoked, and the trigger exception that lets the Lane 6 deletion function remove the locked copy. Slot 6. The API contract and data model departure paragraphs change in the same PR, because today they say remaining members lose access.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
 
-- Space picker on new-account entry and the space list screens. Slot 2.
-- Move review and blocked-link explanation on Manage account. Slot 5.
-- Greyed-out, read-only rendering of locked household history. Slot 5.
+- Space picker on new-account entry and the space list screens. Slot 3.
+- Move review and blocked-link explanation on Manage account. Slot 6.
+- Greyed-out, read-only rendering of locked household history. Slot 6.
 
 ### Allowed files
 
@@ -316,9 +336,9 @@ No-touch: `CuadraoSpaces*.swift`, document storage, the chart canvas.
 
 ### Acceptance
 
-Slot 2: Postgres. Create Business and Custom, relaunch, and see the same names. A second user cannot list the spaces. Delete is rejected while the space has an account. Personal delete and rename are rejected. `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` off still `404`s the new routes, and the new space flag off does too.
+Slot 3: Postgres. Create Business and Custom, relaunch, and see the same names. A second user cannot list the spaces. Delete is rejected while the space has an account. Personal delete and rename are rejected. `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` off still `404`s the new routes, and the new space flag off does too.
 
-Slot 5: the reconciliation cases and the eval pass. Move a standalone account, relaunch, and read the same activity on the same account id in the new space. A linked transfer blocks the move and leaves every row in place. After a departure, members who had a grant at the cut-off read the locked history greyed out and cannot change it. Members without one see nothing of it. iOS screens are checked in English and Spanish by Lucas's local agent after landing.
+Slot 6: the reconciliation cases and the eval pass. Move a standalone account, relaunch, and read the same activity on the same account id in the new space. A linked transfer blocks the move and leaves every row in place. After a departure, members who had a grant at the cut-off read the locked history greyed out and cannot change it. Members without one see nothing of it. iOS screens are checked in English and Spanish by Lucas's local agent after landing.
 
 ## Lane 3. Search coverage
 
@@ -367,7 +387,7 @@ iOS, by Lucas's local agent: A opens the document through the document API and t
 
 ### Journey and completion
 
-A signed-in person opens Home in Personal, then in a private space once the space list has landed. The balance chart and the activity insights use that space's recorded accounts and activity, one currency at a time. A month with no records is no data. It is not a zero balance and not zero spending. A month that has records adding up to zero is a real zero. A comparison against a real zero month shows the amount difference, not a percent. A comparison with a no-data month is not shown. Unknown balances stay out of the known total. The person can open the account or activity behind a point. Relaunch shows the same series. Household Home includes only accounts that live grants allow, plus locked history after slot 5, and drops an account the moment its grant is revoked.
+A signed-in person opens Home in Personal, then in a private space once the space list has landed. The balance chart and the activity insights use that space's recorded accounts and activity, one currency at a time. A month with no records is no data. It is not a zero balance and not zero spending. A month that has records adding up to zero is a real zero. A comparison against a real zero month shows the amount difference, not a percent. A comparison with a no-data month is not shown. Unknown balances stay out of the known total. The person can open the account or activity behind a point. Relaunch shows the same series. Household Home includes only accounts that live grants allow, plus locked history after slot 6, and drops an account the moment its grant is revoked.
 
 Completion is a real Postgres read, an app relaunch, a second user who cannot see the first user's series, and the same screen in English and Spanish. The design canvas sample series is not completion.
 
@@ -455,11 +475,71 @@ Backend: Postgres. A bill due in 3 days makes one row, and the due date makes a 
 
 iOS, by Lucas's local agent: relaunch shows the same unread and read rows. English and Spanish for the inbox and the push text. Push opt-in off sends nothing.
 
+## Lane 6. Account deletion
+
+**Decisions:** 3, 14, 15, and 16, and Apple's in-app account-deletion rule (App Review Guideline 5.1.1(v)). The lane and its place in the landing order are Head of Engineering delivery decisions. It lands in slot 2, right after Household and before external TestFlight. Internal TestFlight is not blocked by it.
+
+### Journey and completion
+
+A signed-in person opens Delete account in the app, sees what will be deleted, and confirms. The server runs the steps below in order. When it finishes, the app signs out and that account can no longer sign in. If the person was a household admin, the admin role has passed to the longest-standing remaining member, or the household has closed if no one is left. The other members see a short note that a former member's account was removed. The anonymous invite record and the network counts stay.
+
+Completion is a real deletion against Postgres of a user who has a plan, a household membership as admin, a membership as a member, a Gmail or Plaid connection, a document, an accepted invite, and saved feedback. Nothing of theirs is left, and the other members' own records are unchanged.
+
+### What exists today
+
+- Deletion is a support request. `account_deletion_request` on `POST /api/v1/feedback`, in `src/argus/api/routers/feedback.py`, saves a feedback row with the account email in its context and emails support. There is no in-app deletion function. `delete_auth_user` in `src/argus/domain/supabase_guest_accounts.py` is used only for guest cleanup.
+- A plain delete of the auth user would fail for anyone who has ever made a plan. `financial_plan_definition_revisions.owner_id` and `actor_id` reference `auth.users` with `on delete restrict` in `supabase/migrations/20261002000000_shared_household_planning.sql`, and household planning rows in the same migration also restrict deletes. This comes from reading the migrations. A real deletion test against Postgres comes first in this lane.
+- Where a delete does go through, it skips other domains. `financial_source_connections` cascades, so the stored credential is dropped without revoking access at Google or Plaid. `household_invitations.created_by` and `accepted_by` are set to null. The feedback row's `user_id` is set to null and the email in its context stays. PostHog events stay under the person's distinct id.
+- `disconnect` in `src/argus/domain/ingestion/hub.py` already revokes at Google and Plaid, deletes the stored credential, and is idempotent. If revocation fails it reports `provider_revocation: failed`.
+- The PostHog distinct id comes from `actor_hash_for_user` in `src/argus/observability/product_events.py`: a SHA-256 of the user id with a fixed prefix, not a secret salt. Events are sent with `$process_person_profile` set to false in `src/argus/observability/envelope.py`, so there may be no person record in PostHog for that distinct id.
+
+### Steps, in order
+
+1. **Household leave and admin handoff.** If the person is a household admin, the admin role passes to the longest-standing remaining member, or the household closes if no one is left (decision 15). Then the existing leave rules run for each membership, so grants are revoked and shared plans are archived as they are when someone leaves.
+2. **Revoke every connected source.** The existing `disconnect` runs for each source connection, which revokes Gmail and Plaid at the provider and deletes the credential. How a failed revocation is retried and reported is a technical design item in the lane PR.
+3. **Delete Storage files.** After #778 moves document bytes into a private Supabase Storage bucket, delete each of the person's Storage objects. A database cascade does not remove them. Until #778 lands, document bytes are database rows and go with the person's rows.
+4. **Clear invite ids and keep the anonymous record.** Clear the live sender and acceptor ids on the who-invited-whom record from Lane 1, and keep the anonymous row, so the counts and the invite chain survive (decision 3). This is an explicit step. It does not rely on `on delete set null`.
+5. **Delete the locked and protected plan history.** Delete the person's plan definition revisions and the household planning rows that restrict deletion, explicitly, inside this function. Once account moves has landed, this step also removes the household's locked copy of the person's history and their move events (decision 14), under the trigger exception in Lane 2. The other members then see the short note.
+6. **Delete the auth user.** This runs after the steps above, so no restricting row blocks it.
+7. **Feedback and PostHog cleanup.** Clear the person's email from their saved feedback rows. Delete the person in PostHog by distinct id, including their events (decision 16). Person profiles are off, so there may be no person record for that distinct id. The lane PR shows which PostHog call deletes the events in that case and records the response. Until Lucas supplies a PostHog key that can delete persons, this goes to the recording fake.
+
+**Pending Lucas's decision:** Sign in with Apple revocation. This step applies only if Lucas says yes to connecting Sign in with Apple before external TestFlight ([Still open](#still-open) item 2). Then the deletion also revokes the person's Apple tokens through Apple's REST API. If he says no, the button is hidden and there is no step.
+
+The whole run is idempotent and can resume after a partial failure. A retry continues from the first step that did not finish. Step 7 runs after the auth user is gone, so the run keeps what step 7 needs until step 7 finishes.
+
+### What is new
+
+- An in-app deletion route on the API, behind `ARGUS_ACCOUNT_DELETION_ENABLED`. The route name and whether it asks the person to sign in again are confirmed in the lane PR.
+- The ordered deletion function and the record of how far a run got.
+- The admin handoff on deletion, inside the Household owner.
+- A PostHog deletion adapter with a recording fake, behind `ARGUS_ANALYTICS_DELETION_ENABLED`. See [Outside services](#outside-services-fakes-behind-default-off-flags).
+- The note the other members see.
+
+### iOS parts: landed unverified, Mac pass by Lucas's local agent
+
+- A Delete account row and a confirmation screen that names what will be deleted. It goes on whichever profile screen is on integration when this lane lands.
+- After deletion, the app signs out and clears what it keeps on the phone for that user.
+
+### Allowed files
+
+A new deletion module under `src/argus/domain/` and one router, `src/argus/domain/household/` for the admin handoff and the leave call only, `src/argus/observability/` for the PostHog deletion adapter, the feedback store for clearing the email, one new migration, the account and Household deletion sections of the API contract and data model when this lane is landing, the iOS profile row and confirmation screen, and the tests for all of these.
+
+No-touch: the provider revocation code in `src/argus/domain/ingestion/` (called, not changed), `resend_email.py`, invitation token storage, Plan math, and the design branch files.
+
+### Acceptance
+
+Backend, on this box, against Postgres: delete a user who has a plan, is admin of one household with two other members, is a member of a second household, has a Gmail or Plaid connection on the provider fake, a document, an invite they sent and one they accepted, and saved feedback. After deletion, no row holds their user id. The first household's admin is the longest-standing remaining member. A household where they were the only member is closed. The provider fake recorded a revocation for each source. The who-invited-whom counts and chain are unchanged and hold no id. Their feedback rows hold no email. The PostHog fake recorded a deletion for their distinct id with events included. The other members' own records are unchanged and they see the note. Replaying the deletion changes nothing. Stopping the run after any step and retrying reaches the same end state. With `ARGUS_ACCOUNT_DELETION_ENABLED` off, the route answers `404` before auth. After #778, no Storage object of theirs remains. After account moves lands, its eval also checks that the locked copy is removed.
+
+iOS, by Lucas's local agent: the row and the confirmation in English and Spanish, deletion ends signed out, and relaunch does not restore the deleted session.
+
+Manual Codex review plus this eval, both before landing.
+
 ## Lane status
 
 | Lane | Backend can be built and tested here now | iOS: landed unverified, Mac pass by Lucas's local agent | Waits on |
 | --- | --- | --- | --- |
-| Household | Code, who-invited-whom record, anonymous record on deletion, link builder, quota, gate, the three numbers | Code and QR screens, code entry, universal-link handling, TestFlight link and waitlist hand-off | Open item 1 for quota and gate only. Lucas's AASA file before the link flag turns on |
+| Household | Code, who-invited-whom record, anonymous record on deletion, link builder, the beta and household invite split, quota, founder group link, gate, the three numbers | Code and QR screens, code entry, universal-link handling, TestFlight link and waitlist hand-off | Lucas's AASA file before the link flag turns on |
+| Account deletion | Deletion route, the ordered steps, admin handoff, provider revocation, feedback cleanup, PostHog fake, eval | Delete account row, confirmation screen, sign-out after deletion | Household landing first. #778 for the Storage step. Lucas's Sign in with Apple decision for that step only. A PostHog personal API key before the real PostHog call turns on |
 | Space list | Space table and routes | Space picker and space list | Nothing |
 | Search | Document and conversation hits | Rows and open paths | Nothing. Issue #778 does not block it |
 | Home series | Series and the decision 6 comparison | Binding the connected Home to the series | The design-branch collision on `ConnectedCuadraoHome.swift` for the iOS binding |
