@@ -23,6 +23,12 @@ The baseline is `2185aefe`, integration just before #783.
   (`CuadraoReceiptUITests.testPhotoImportKeepsOriginalWithoutInventedItems`,
   `testGroupPhotoImportInheritsFixedCurrency`). Seed the simulator with one fictional
   receipt photo first: `xcrun simctl addmedia <UDID> <photo>`.
+- Give the simulator a location before the tests run, so
+  `CuadraoReceiptPermissionUITests.testAllowedLocationCanBeRemoved` gets a place to attach:
+  `xcrun simctl location <UDID> set <lat>,<lon>` (any fictional point, for example
+  `18.4861,-69.9312`).
+- If #790 has landed, merge it into the branch (or run from integration) first. Its avatar
+  and zero-month changes are what the tests should be checked against.
 - Optional: `brew install imagemagick` to count differing pixels between screenshots.
 
 ## Run
@@ -36,7 +42,9 @@ SIMULATOR_ID=<UDID> ios/scripts/cuadrao-design-mac-pass.sh all
 The steps can also run separately as `checks`, `tests` or `screens`. Output goes to
 `ios/.build/mac-pass/<UTC stamp>/`, which git ignores. The
 [script](../../../../ios/scripts/cuadrao-design-mac-pass.sh) only builds, runs tests and
-takes screenshots. It doesn't sign, upload or call a backend.
+takes screenshots. It doesn't sign, upload or call a backend. A failing step doesn't stop the
+later ones: `all` always runs `checks`, `tests` and `screens`, prints `FAILED <runner>` or
+`<step>: FAILED` for each failure, and exits non-zero at the end if anything failed.
 
 ### 1. Preview state checks (`checks`)
 
@@ -55,19 +63,22 @@ counts the Mac run should match:
 
 On integration, `run_home_balance.py` doesn't compile `CuadraoBalancePeriod.swift`, which
 `HomeBalanceChecks.swift` needs, so it fails under `xcrun swiftc` until #790 lands with
-the same one-line fix. PR 4 leaves that file to #790. `run_linux.py` includes the file
-on its own.
+the same one-line fix (`HomeBalanceChecks.swift:145`: cannot find 'CanvasBalancePeriod').
+PR 4 leaves that file to #790. Before #790, expect `FAILED run_home_balance` and
+`checks: FAILED`; the other runners, the tests and the screenshots still run. `run_linux.py`
+includes the file on its own.
 
 ### 2. Design UI tests (`tests`)
 
-The script runs `CuadraoHomeChartUITests` and the 13 design UI test classes through
+The script runs `CuadraoHomeChartUITests`, the 13 grafted design UI test classes and
+`CuadraoSignInPresentationUITests` through
 `ios/scripts/verify.sh test`. It then exports their screenshot attachments to
 `ui-attachments/`. Every design launch now passes
 `--cuadrao-design --cuadrao-home --home-populated` (`CuadraoPreviewLaunch.arguments`),
 which is what a standalone `CUADRAO_DESIGN_PREVIEW = true` build implied on the design
 branch. Without those arguments the tests open the Connected app.
 
-These tests are expected to skip:
+These four tests are expected to skip on a simulator:
 
 - `CuadraoProfileFollowupUITests.testPhotoPickerSaveCancelAndRemove` and
   `testPhotoCropCancelPanZoomAndReedit`. Integration hides the personal-photo option
@@ -77,6 +88,8 @@ These tests are expected to skip:
   `--cuadrao-voice-selection` and the sample clips, which stay out while their licensing
   is unsettled. `testVoiceProposalHandoffWithoutVoiceSelection` covers the rest of that
   journey and checks that no picker is offered.
+- `CuadraoReceiptUITests.testPhysicalScannerPresentationAndCancel`. The document camera
+  needs a physical device.
 
 Location, camera and photo-save prompts come from the simulator. The permission journeys
 answer them through Springboard.
@@ -84,7 +97,10 @@ answer them through Springboard.
 ### 3. Before/after screenshots (`screens`)
 
 The script builds `BASELINE` (default `2185aefe`) in a temporary worktree, then this tree.
-Each build gets a clean install and a fixed status bar. It takes these screenshots in
+Both builds pass `ARGUS_AUTH_ENABLED=false CUADRAO_DESIGN_PREVIEW=false` to `xcodebuild`.
+The baseline worktree has no copy of the ignored `ios/Config/Local.xcconfig`, so without the
+pin a local override would apply to the after build only. Each build gets a clean install
+and a fixed status bar. It takes these screenshots in
 `screens/`:
 
 | Screenshot | Launch arguments | Expected difference from baseline |
@@ -106,24 +122,32 @@ The automation doesn't cover these. Record each result in #784.
 1. **Connected, signed in, against the baseline.** Check Priya's shared-code value swaps
    from #783: `WelcomePalette.pine`/`sage`/`separator`, the Registration heading, button
    and field, the navigation bar's glass tint and the Home section font.
-2. **Release gate for the permission keys.** Camera (receipt scan), location (receipt
+2. **No preview side effects without the flag (#785).** Launch with no flag and use the
+   app. No `Application Support/CuadraoReceipts` folder and no `cuadrao-groups.json` should
+   appear in the app container (`xcrun simctl get_app_container <UDID> local.argus.foundation data`),
+   and no location prompt should appear.
+3. **Release gate for the permission keys.** Camera (receipt scan), location (receipt
    place) and photo-add (save the sample group card) are requested only inside the design
    preview. Before any TestFlight or App Store build, those requests must be reachable in
    the shipped app, or `NSCameraUsageDescription`, `NSLocationWhenInUseUsageDescription`
    and `NSPhotoLibraryAddUsageDescription` come out. The photo-add strings are marked
    `REWORD` for when group cards are real.
-3. **First-release presentation (#787).** Profile shows no Personalization, Security,
+4. **First-release presentation (#787).** Profile shows no Personalization, Security,
    Shared conversations, Removed activity, Memory, Usage, More options or photo option.
    Search has no Memory perspective, through the same `CuadraoFirstRelease.shows(.memory)`
    gate. Notifications has no "Por correo". The preview sign-up and sign-in screens show no Apple
    or Google button, and password-recovery help doesn't mention Apple.
-4. **Chart truth.** A month with no records shows "Sin datos" and "—". A month whose
+   `CuadraoSignInPresentationUITests` checks the Apple and Google absence for a default
+   launch and a `--cuadrao-design` launch. Known follow-up for the #790 pickup: the
+   temporary-chat settings (`CuadraoTemporaryChatSettings.swift:15,22`, from #785) still say
+   "Sin nuevas memorias" and "Usar mi contexto" without the Memory gate.
+5. **Chart truth.** A month with no records shows "Sin datos" and "—". A month whose
    records add up to zero shows 0, and a comparison against it is an amount, never a
    percent. A previous month with no records gets no comparison. A month with confirmed
    coverage and no spending ships in Lucas's #790. Check it against #790's rule once #790
    is in, not against this list. Until then, `CuadraoHomeChartUITests` asserts #786's
    behaviour and its empty-month expectations may need updating with #790.
-5. **Physical device (optional).** Scan, save for later and reopen a receipt. The design
+6. **Physical device (optional).** Scan, save for later and reopen a receipt. The design
    branch's founder check covered this on build 3419. This graft hasn't been on a device.
 
 ## Sign-off

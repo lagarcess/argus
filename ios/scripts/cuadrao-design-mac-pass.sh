@@ -11,6 +11,9 @@
 #
 # Output goes to ios/.build/mac-pass/<UTC stamp>/ (ignored by git). Nothing here signs,
 # uploads or calls a backend; the default launch stays signed out.
+#
+# A failing step doesn't stop the later ones: `all` always runs checks, tests and screens,
+# then exits non-zero if any of them failed. Merge #790 into the tree first if it has landed.
 set -euo pipefail
 
 ios_dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,17 +38,27 @@ design_tests=(
   CuadraoCollectionUITests CuadraoConsistencyUITests CuadraoContextUITests
   CuadraoGroupDesignUITests CuadraoHistoryDesignUITests CuadraoPlanCurrencyUITests
   CuadraoPlanDesignUITests CuadraoPolishUITests CuadraoProfileFollowupUITests
-  CuadraoReceiptPermissionUITests CuadraoReceiptUITests CuadraoSupportUITests
-  CuadraoVoiceDesignUITests
+  CuadraoReceiptPermissionUITests CuadraoReceiptUITests CuadraoSignInPresentationUITests
+  CuadraoSupportUITests CuadraoVoiceDesignUITests
 )
 
+# Each runner is non-fatal so one broken check can't hide the others, the tests or the screens.
 run_checks() {
-  local runner
-  for runner in run_home_balance run_plan_preview run_group_preview run_receipt_preview \
-                run_temporary_chat run_avatar_crop; do
-    echo "== $runner"
-    python3 "$ios_dir/DesignPreviewTests/$runner.py"
-  done 2>&1 | tee "$out/design-preview-checks.log"
+  local runner failed=0
+  {
+    for runner in run_home_balance run_plan_preview run_group_preview run_receipt_preview \
+                  run_temporary_chat run_avatar_crop; do
+      echo "== $runner"
+      if [[ "$runner" == run_home_balance ]]; then
+        echo "   (expected to fail until #790 lands: integration's runner omits CuadraoBalancePeriod.swift," \
+             "so HomeBalanceChecks.swift reports cannot find 'CanvasBalancePeriod')"
+      fi
+      python3 "$ios_dir/DesignPreviewTests/$runner.py" || { echo "FAILED $runner"; failed=1; }
+    done
+  } 2>&1 | tee "$out/design-preview-checks.log"
+  [[ "${PIPESTATUS[0]}" -eq 0 ]] || failed=1
+  grep -q '^FAILED ' "$out/design-preview-checks.log" && failed=1
+  return "$failed"
 }
 
 run_tests() {
@@ -67,11 +80,14 @@ prepare_simulator() {
     --batteryLevel 100 --cellularBars 4 --wifiBars 3
 }
 
-# build_app <ios dir> <derived data dir>: prints the built .app path.
+# build_app <ios dir> <derived data dir>: prints the built .app path. Both builds pin the
+# flags on the command line: the baseline worktree has no ignored ios/Config/Local.xcconfig,
+# so this tree's local overrides must not apply to one side only.
 build_app() {
   xcodebuild build -project "$1/ArgusFoundation.xcodeproj" -scheme ArgusFoundation \
     -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-    -derivedDataPath "$2" CODE_SIGNING_REQUIRED=NO >"$2.log" 2>&1
+    -derivedDataPath "$2" CODE_SIGNING_REQUIRED=NO \
+    ARGUS_AUTH_ENABLED=false CUADRAO_DESIGN_PREVIEW=false >"$2.log" 2>&1
   find "$2/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' ! -name '*-Runner.app' | head -1
 }
 
@@ -143,11 +159,28 @@ compare_pairs() {
 }
 
 status=0
+failed_steps=()
+# run_step <name> <function>: runs the step in a subshell with errexit still on (an `if` or
+# `||` would switch it off inside the function), records a failure and carries on.
+run_step() {
+  local name="$1" rc; shift
+  set +e
+  ( set -e; "$@" )
+  rc=$?
+  set -e
+  if (( rc == 0 )); then
+    echo "== $name: ok"
+  else
+    echo "== $name: FAILED (exit $rc)"
+    failed_steps+=("$name"); status=1
+  fi
+}
 case "$step" in
-  checks) run_checks ;;
-  tests) run_tests || status=$? ;;
-  screens) run_screens ;;
-  all) run_checks; run_tests || status=$?; run_screens ;;
+  checks) run_step checks run_checks ;;
+  tests) run_step tests run_tests ;;
+  screens) run_step screens run_screens ;;
+  all) run_step checks run_checks; run_step tests run_tests; run_step screens run_screens ;;
 esac
 echo "Mac pass output: $out"
+if (( status != 0 )); then echo "Failed steps: ${failed_steps[*]}"; fi
 exit "$status"
