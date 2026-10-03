@@ -8,13 +8,19 @@ from datetime import datetime, timezone
 
 import httpx
 import pytest
-from argus.domain.apple_sign_in.client import AppleAuthClient, AppleError
+from argus.domain.apple_sign_in.client import (
+    DISCARD_TIMEOUT_SECONDS,
+    TIMEOUT_SECONDS,
+    AppleAuthClient,
+    AppleError,
+)
 from argus.domain.apple_sign_in.credentials import (
     SOURCE,
     AppleCaptureNotStored,
     AppleCredentialService,
     AppleIdentityMismatch,
     AppleRevocationPending,
+    DiscardOutcome,
     InMemoryAppleCredentialRepository,
     RevokeOutcome,
 )
@@ -77,6 +83,7 @@ def test_exchange_posts_the_code_with_a_fresh_secret_and_reads_the_subject(
     [
         ({"aud": "ai.someone.else"}, "unexpected_id_token"),
         ({"sub": ""}, "unexpected_id_token"),
+        ({"iss": "https://appleid.example.test"}, "unexpected_id_token"),
     ],
 )
 def test_exchange_refuses_an_identity_token_for_another_client(
@@ -328,3 +335,150 @@ def test_a_sealed_token_does_not_open_for_another_user(service, apple) -> None: 
             source=SOURCE,
             connection_id=base64.b16encode(os.urandom(16)).decode(),
         )
+
+
+# Priya's #793 notes ------------------------------------------------------------
+
+LEGACY_CLIENT = "ai.cuadrao.legacy"
+
+
+def _phases(seconds: float) -> dict[str, float]:
+    return {"connect": seconds, "read": seconds, "write": seconds, "pool": seconds}
+
+
+def test_every_apple_call_carries_the_client_timeout(client, apple) -> None:  # noqa: ANN001
+    apple.grant()
+    client.exchange_code("c.code")
+    client.revoke("r.stored", client_id=BUNDLE_ID)
+    assert apple.timeouts == [_phases(TIMEOUT_SECONDS), _phases(TIMEOUT_SECONDS)]
+
+
+def test_revoke_sends_the_client_the_token_was_issued_to(client, apple) -> None:  # noqa: ANN001
+    # The fake also checks that the client secret's sub names this same client.
+    client.revoke("r.stored", client_id=LEGACY_CLIENT)
+    path, form = apple.calls[-1]
+    assert path == "/auth/revoke"
+    assert form["client_id"] == LEGACY_CLIENT != BUNDLE_ID
+
+
+def test_service_revokes_with_the_stored_client_not_the_configured_one(
+    service,
+    apple,  # noqa: ANN001
+) -> None:
+    service.repository.upsert(
+        user_id=USER,
+        client_id=LEGACY_CLIENT,
+        secret_ciphertext=service._box.seal(
+            "r.legacy", source=SOURCE, connection_id=USER
+        ),
+        now=NOW,
+    )
+    assert service.revoke(user_id=USER) is RevokeOutcome.REVOKED
+    assert apple.calls[-1][1]["client_id"] == LEGACY_CLIENT
+    assert apple.calls[-1][1]["token"] == "r.legacy"
+
+
+def test_apple_invalid_grant_on_revoke_counts_as_already_revoked(service, apple) -> None:  # noqa: ANN001
+    apple.grant()
+    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    apple.revoke_responses.append((400, {"error": "invalid_grant"}))
+    assert service.revoke(user_id=USER) is RevokeOutcome.ALREADY_REVOKED
+    assert service.repository.get(user_id=USER) is None
+    assert service.revoke(user_id=USER) is RevokeOutcome.NOTHING_STORED
+
+
+def test_other_revoke_refusals_still_keep_the_pending_row(service, apple) -> None:  # noqa: ANN001
+    apple.grant()
+    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    apple.revoke_responses.append((400, {"error": "invalid_client"}))
+    with pytest.raises(AppleRevocationPending):
+        service.revoke(user_id=USER)
+    assert service.repository.get(user_id=USER) is not None
+
+
+@pytest.mark.parametrize("path", ["mismatch", "failed_save"])
+def test_the_compensating_revoke_is_one_short_attempt(client, apple, path) -> None:  # noqa: ANN001
+    # Inside the person's capture request: no retry, no backoff sleep, and a
+    # two-second timeout instead of thirty, even while Apple answers 503.
+    repository = (
+        _BrokenRepository()
+        if path == "failed_save"
+        else InMemoryAppleCredentialRepository()
+    )
+    service = AppleCredentialService(
+        repository, box=_box(), client=client, clock=lambda: NOW
+    )
+    apple.grant(sub="000999.other" if path == "mismatch" else SUBJECT)
+    apple.revoke_responses += [(503, None), (503, None), (200, None)]
+    expected = AppleIdentityMismatch if path == "mismatch" else AppleCaptureNotStored
+    with pytest.raises(expected):
+        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    revokes = [i for i, (p, _) in enumerate(apple.calls) if p == "/auth/revoke"]
+    assert len(revokes) == 1
+    assert apple.timeouts[revokes[0]] == _phases(DISCARD_TIMEOUT_SECONDS)
+    assert client.sleeps == []
+
+
+@pytest.mark.parametrize("path", ["mismatch", "failed_save"])
+def test_an_unexpected_compensating_revoke_error_keeps_the_outcome(
+    client, apple, path
+) -> None:  # noqa: ANN001
+    repository = (
+        _BrokenRepository()
+        if path == "failed_save"
+        else InMemoryAppleCredentialRepository()
+    )
+    service = AppleCredentialService(
+        repository, box=_box(), client=client, clock=lambda: NOW
+    )
+    apple.grant(sub="000999.other" if path == "mismatch" else SUBJECT)
+    apple.revoke_raises = RuntimeError("unexpected")
+    expected = AppleIdentityMismatch if path == "mismatch" else AppleCaptureNotStored
+    with pytest.raises(expected):
+        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+
+
+def _logged(records: list) -> str:  # noqa: ANN001
+    return "\n".join(str(r) + str(r.record["extra"]) for r in records)
+
+
+def test_discard_removes_only_an_unreadable_row_and_logs_no_token(service, apple) -> None:  # noqa: ANN001
+    from loguru import logger
+
+    stale = SecretBox(os.urandom(32)).seal(
+        "r.under-old-key", source=SOURCE, connection_id=USER
+    )
+    service.repository.upsert(
+        user_id=USER, client_id=BUNDLE_ID, secret_ciphertext=stale, now=NOW
+    )
+    with pytest.raises(AppleRevocationPending) as raised:
+        service.revoke(user_id=USER)
+    assert raised.value.reason == "credential_unreadable"
+
+    records: list = []
+    sink = logger.add(records.append, level="DEBUG")
+    try:
+        assert service.discard_unreadable(user_id=USER) is DiscardOutcome.DISCARDED
+    finally:
+        logger.remove(sink)
+    assert service.repository.get(user_id=USER) is None
+    assert apple.calls == []
+    assert "r.under-old-key" not in _logged(records)
+    assert service.discard_unreadable(user_id=USER) is DiscardOutcome.NOTHING_STORED
+
+
+def test_discard_never_drops_a_token_that_can_still_be_revoked(service, apple) -> None:  # noqa: ANN001
+    apple.grant()
+    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    assert service.discard_unreadable(user_id=USER) is DiscardOutcome.READABLE
+    assert service.repository.get(user_id=USER) is not None
+
+
+def test_discard_is_scoped_to_the_given_user(service, apple) -> None:  # noqa: ANN001
+    other = "1f6b7c9a-5d3e-4a2b-8c1d-0e9f8a7b6c5d"
+    stale = SecretBox(os.urandom(32)).seal("r.other", source=SOURCE, connection_id=other)
+    service.repository.upsert(
+        user_id=other, client_id=BUNDLE_ID, secret_ciphertext=stale, now=NOW
+    )
+    assert service.discard_unreadable(user_id=USER) is DiscardOutcome.NOTHING_STORED
+    assert service.repository.get(user_id=other) is not None

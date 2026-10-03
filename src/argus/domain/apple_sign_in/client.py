@@ -8,7 +8,9 @@ exception or a log line.
 
 The authorization-code exchange is not retried: Apple's codes are single use,
 so a retry after an ambiguous failure would only ever see ``invalid_grant``.
-Revocation is idempotent and is retried on 429/5xx with bounded backoff.
+Revocation is idempotent and is retried on 429/5xx with bounded backoff. A
+caller on a user's request path (the capture route's compensating revoke) can
+ask for one short attempt instead, so that request stays well under 10 seconds.
 
 The identity token in the exchange response arrives over TLS directly from
 Apple's token endpoint, so its signature check is replaced by TLS server
@@ -36,6 +38,9 @@ from argus.domain.apple_sign_in.config import (
 )
 
 TIMEOUT_SECONDS = 30.0
+# The compensating revoke inside a capture request: one attempt, two seconds per
+# phase, so the extra call can't hold the person's request for long.
+DISCARD_TIMEOUT_SECONDS = 2.0
 MAX_JSON_BYTES = 64 * 1024
 RETRYABLE = frozenset({429, 500, 502, 503, 504})
 MAX_ATTEMPTS = 3
@@ -99,10 +104,19 @@ class AppleAuthClient:
             raise AppleError(status=200, reason="missing_refresh_token")
         return AppleGrant(refresh_token=refresh, subject=self._subject(payload))
 
-    def revoke(self, refresh_token: str, *, client_id: str) -> None:
+    def revoke(
+        self,
+        refresh_token: str,
+        *,
+        client_id: str,
+        timeout: float | None = None,
+        attempts: int | None = None,
+    ) -> None:
         """Apple answers 200 for a revoked token and for one it no longer knows
         (RFC 7009), so 200 is the only proof and every other answer raises.
-        ``client_id`` is the client the token was issued to, as stored."""
+        ``client_id`` is the client the token was issued to, as stored.
+        ``timeout`` and ``attempts`` narrow this one call (the defaults are the
+        client's 30 seconds and three attempts)."""
 
         self._call(
             REVOKE_URL,
@@ -113,6 +127,8 @@ class AppleAuthClient:
                 "token_type_hint": "refresh_token",
             },
             expect_json=False,
+            timeout=timeout,
+            attempts=attempts,
         )
 
     def _subject(self, payload: dict[str, Any]) -> str:
@@ -148,12 +164,16 @@ class AppleAuthClient:
         *,
         retry: bool = True,
         expect_json: bool = True,
+        timeout: float | None = None,
+        attempts: int | None = None,
     ) -> dict[str, Any]:
-        attempts = self._attempts if retry else 1
+        if not retry:
+            attempts = 1
+        attempts = max(1, min(attempts or self._attempts, self._attempts))
         for attempt in range(attempts):
             last = attempt == attempts - 1
             try:
-                status, body, retry_after = self._send(url, data)
+                status, body, retry_after = self._send(url, data, timeout)
             except httpx.HTTPError:
                 if last:
                     raise AppleError(status=None, reason="unreachable") from None
@@ -172,9 +192,15 @@ class AppleAuthClient:
             return payload
         raise AppleError(status=None, reason="unreachable")  # pragma: no cover
 
-    def _send(self, url: str, data: dict[str, str]) -> tuple[int, bytes, str | None]:
+    def _send(
+        self, url: str, data: dict[str, str], timeout: float | None
+    ) -> tuple[int, bytes, str | None]:
         with self._http.stream(
-            "POST", url, data=data, headers={"Accept": "application/json"}
+            "POST",
+            url,
+            data=data,
+            headers={"Accept": "application/json"},
+            timeout=httpx.Timeout(timeout or TIMEOUT_SECONDS),
         ) as response:
             body = bytearray()
             for chunk in response.iter_bytes():

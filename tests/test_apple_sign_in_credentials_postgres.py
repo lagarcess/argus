@@ -3,8 +3,10 @@
 Runs against ``ARGUS_DISPOSABLE_DATABASE_URL`` with every migration applied.
 Proves what the in-memory twin cannot: no client role can read or write the
 table, RLS is on with no policy, the service role can, the restrict key keeps
-an auth user with an unrevoked token from being deleted, and the full capture
-and revoke run against the migration.
+an auth user with an unrevoked token from being deleted, the full capture
+and revoke run against the migration, and the two ways a row ends without a
+200 from Apple: ``invalid_grant`` (already revoked) and ``discard_unreadable``
+after the secret key was rotated.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from argus.domain.apple_sign_in.credentials import (
     SOURCE,
     AppleCredentialService,
     AppleRevocationPending,
+    DiscardOutcome,
     RevokeOutcome,
 )
 from argus.domain.ingestion.secrets import SecretBox
@@ -224,3 +227,80 @@ def test_capture_then_revoke_against_the_migration(repo, users) -> None:  # noqa
     assert apple.calls[-1][1]["token"] == refresh
     assert repo.get(user_id=user) is None
     client.close()
+
+
+def _service(repo, box: SecretBox) -> tuple[AppleCredentialService, FakeApple]:  # noqa: ANN001
+    key = generated_key()
+    apple = FakeApple(public_key=key.public_key())
+    client = AppleAuthClient(
+        config(key), transport=apple.transport(), sleep=lambda _s: None
+    )
+    return AppleCredentialService(repo, box=box, client=client, clock=lambda: NOW), apple
+
+
+def _delete_auth_user(user: str) -> None:
+    with psycopg.connect(DSN) as connection, connection.transaction():
+        connection.execute("delete from auth.users where id = %s", (user,))
+
+
+def _auth_user_exists(user: str) -> bool:
+    with psycopg.connect(DSN) as connection, connection.cursor() as cursor:
+        cursor.execute("select count(*) from auth.users where id = %s", (user,))
+        return cursor.fetchone() == (1,)
+
+
+def test_invalid_grant_on_revoke_deletes_the_row_and_frees_the_user(repo, users) -> None:  # noqa: ANN001
+    service, apple = _service(repo, SecretBox(os.urandom(32)))
+    user = users["apple"]
+    apple.grant()
+    service.capture(user_id=user, apple_subject=SUBJECT, authorization_code="c.code")
+
+    apple.revoke_responses.append((400, {"error": "invalid_grant"}))
+    assert service.revoke(user_id=user) is RevokeOutcome.ALREADY_REVOKED
+    assert repo.get(user_id=user) is None
+    _delete_auth_user(user)
+    assert not _auth_user_exists(user)
+
+
+def test_a_rotated_key_row_is_discarded_and_the_user_can_be_deleted(repo, users) -> None:  # noqa: ANN001
+    user = users["apple"]
+    old_box = SecretBox(os.urandom(32))
+    repo.upsert(
+        user_id=user,
+        client_id=BUNDLE_ID,
+        secret_ciphertext=old_box.seal(
+            "r.under-old-key", source=SOURCE, connection_id=user
+        ),
+        now=NOW,
+    )
+    # ARGUS_INGESTION_SECRET_KEY rotated: the service now holds another key.
+    service, apple = _service(repo, SecretBox(os.urandom(32)))
+
+    with pytest.raises(AppleRevocationPending) as pending:
+        service.revoke(user_id=user)
+    assert pending.value.reason == "credential_unreadable"
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        _delete_auth_user(user)
+
+    assert service.discard_unreadable(user_id=user) is DiscardOutcome.DISCARDED
+    assert repo.get(user_id=user) is None
+    assert apple.calls == []
+    _delete_auth_user(user)
+    assert not _auth_user_exists(user)
+    assert service.discard_unreadable(user_id=user) is DiscardOutcome.NOTHING_STORED
+
+
+def test_discard_keeps_a_readable_row_and_the_restrict_key(repo, users) -> None:  # noqa: ANN001
+    service, apple = _service(repo, SecretBox(os.urandom(32)))
+    user = users["apple"]
+    apple.grant()
+    service.capture(user_id=user, apple_subject=SUBJECT, authorization_code="c.code")
+
+    assert service.discard_unreadable(user_id=user) is DiscardOutcome.READABLE
+    assert repo.get(user_id=user) is not None
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        _delete_auth_user(user)
+    assert (
+        service.discard_unreadable(user_id=users["other"])
+        is DiscardOutcome.NOTHING_STORED
+    )

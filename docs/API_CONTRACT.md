@@ -2807,20 +2807,30 @@ from the verified session; the body accepts no other field.
 
 | Status | `code` | Meaning |
 | --- | --- | --- |
-| 404 | `apple_token_capture_unavailable` | Flag off. Answered before authentication |
+| 404 | none: body `{"detail": "Not Found"}` | Flag off. The plain answer of a route that doesn't exist, given before the body is read or the session checked, so invalid JSON, no session and a valid call all get it |
 | 503 | `apple_sign_in_unconfigured` | Flag on, but an Apple client-secret input, the credential key or durable storage is missing. Fails closed |
 | 401 / 403 | `unauthorized` / `account_conversion_required` | No session, or a guest session |
 | 409 | `apple_identity_missing` | The account has no Apple identity |
-| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple |
+| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple in one short attempt. The answer is 409 whatever that revoke returns |
 | 400 | `apple_authorization_invalid` | Apple says the code expired, was used, or is malformed |
 | 429 | `too_many_requests` | Five attempts per user per ten minutes |
-| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple, and the next Apple sign-in sends a fresh code) |
+| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple in one short attempt, and the next Apple sign-in sends a fresh code). The answer is 503 whatever that revoke returns, never 500 |
 
 A later sign-in replaces the stored token without revoking the old one,
 because revoking any token ends the whole Apple authorization for the app.
-No route revokes. Account deletion (Lane 6) calls
-`AppleCredentialService.revoke`, which deletes the row only after Apple
-answers 200 and keeps it as the pending revoke otherwise. Storage is in
+The compensating revoke on the 409 and 503 paths is a single attempt with a
+2-second timeout per phase and no retry, so it can't hold the request for long.
+The code exchange before it keeps its 30-second timeout.
+
+No route revokes or discards. Account deletion (Lane 6) calls
+`AppleCredentialService.revoke`. It deletes the row after Apple answers 200
+(`revoked`) or `invalid_grant` (`already_revoked`: the token is already dead),
+and keeps it as the pending revoke otherwise. When revoke reports
+`credential_unreadable` because `ARGUS_INGESTION_SECRET_KEY` was rotated, Lane 6
+calls `AppleCredentialService.discard_unreadable`. It deletes the row only while
+the token still can't be opened, and returns `discarded`, `nothing_stored` or
+`readable`, so the user can be deleted. Apple's authorization for the app then
+stays until the person removes it in their Apple ID settings. Storage is in
 [DATA_MODEL.md](DATA_MODEL.md#apple-sign-in-credentials).
 
 ## `POST /auth/logout`
