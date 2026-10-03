@@ -152,8 +152,8 @@ esté activa. [Pendiente P7]
 documentos, conversaciones, planes y fuentes conectadas, y revocamos esas
 conexiones. Solo conservamos un registro anónimo de que se envió y se aceptó
 una invitación, sin tu nombre ni ningún identificador.
-También borramos tu correo de los comentarios que nos enviaste y tu registro en
-la analítica de producto.
+También borramos tu correo de los comentarios que nos enviaste y tu actividad
+registrada en la analítica de producto.
 [Pendiente P1: también se revoca tu inicio de sesión con Apple]
 Si administrabas un hogar, el rol pasa al miembro con más tiempo en él; si no
 queda nadie, el hogar se cierra.
@@ -290,7 +290,7 @@ is active. [Pending P7]
 documents, conversations, plans and connected sources, and revoke those
 connections. The only thing we keep is an anonymous record that an invitation
 was sent and accepted, with no name or identifier.
-We also remove your email from feedback you sent us and delete your record in
+We also remove your email from feedback you sent us and delete your activity in
 product analytics.
 [Pending P1: your Sign in with Apple is also revoked]
 If you were a household's admin, the role passes to the longest-standing
