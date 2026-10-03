@@ -128,9 +128,10 @@ class FailingAnalytics(RecordingAnalyticsDeletion):
 def _locked(user_id: str) -> tuple[bool, bool]:
     """(the auth user is banned, the run holds the id so sessions are refused)."""
     with psycopg.connect(DSN) as c:
-        banned = user_id in BANNED and c.execute(
-            "select 1 from auth.users where id=%s", (user_id,)
-        ).fetchone()
+        banned = (
+            user_id in BANNED
+            and c.execute("select 1 from auth.users where id=%s", (user_id,)).fetchone()
+        )
         held = c.execute(
             "select 1 from argus_private.account_deletion_runs where user_id=%s",
             (user_id,),
