@@ -154,17 +154,16 @@ def preview_invitation(
     body: wire.AcceptInvitationRequest,
     context: Context,
 ):
-    return call(
-        request,
-        response,
-        invite_limits.guarded(
+    with invite_limits.attempt(request, context.user_id) as lookup:
+        return call(
             request,
-            context.user_id,
-            lambda: context.service.preview_invitation(
-                user_id=context.user_id, token=body.token, code=body.code
+            response,
+            lookup.wrap(
+                lambda: context.service.preview_invitation(
+                    user_id=context.user_id, token=body.token, code=body.code
+                )
             ),
-        ),
-    )
+        )
 
 
 @router.post("/household-invitations/accept", response_model=wire.CommandResult)
@@ -174,23 +173,22 @@ def accept_invitation(
     body: wire.AcceptInvitationRequest,
     context: Context,
 ):
-    return mutate(
-        request,
-        response,
-        context,
-        body,
-        None,
-        invite_limits.guarded(
+    with invite_limits.attempt(request, context.user_id) as lookup:
+        return mutate(
             request,
-            context.user_id,
-            lambda: context.service.accept(
-                user_id=context.user_id,
-                token=body.token,
-                code=body.code,
-                display_name=body.display_name,
+            response,
+            context,
+            body,
+            None,
+            lookup.wrap(
+                lambda: context.service.accept(
+                    user_id=context.user_id,
+                    token=body.token,
+                    code=body.code,
+                    display_name=body.display_name,
+                )
             ),
-        ),
-    )
+        )
 
 
 @router.post("/households/{household_id}/leave", response_model=wire.CommandResult)
@@ -463,15 +461,12 @@ def preview_invite(
     body: invites.InviteSecretRequest,
     context: Invites,
 ):
-    return call(
-        request,
-        response,
-        invite_limits.guarded(
+    with invite_limits.attempt(request, context.user_id) as lookup:
+        return call(
             request,
-            context.user_id,
-            lambda: context.store.preview(token=body.token, code=body.code),
-        ),
-    )
+            response,
+            lookup.wrap(lambda: context.store.preview(token=body.token, code=body.code)),
+        )
 
 
 @router.post("/invites/redeem", response_model=invites.RedeemResult)
@@ -481,17 +476,16 @@ def redeem_invite(
     body: invites.InviteSecretRequest,
     context: Invites,
 ):
-    return call(
-        request,
-        response,
-        invite_limits.guarded(
+    with invite_limits.attempt(request, context.user_id) as lookup:
+        return call(
             request,
-            context.user_id,
-            lambda: context.store.redeem(
-                user_id=context.user_id, token=body.token, code=body.code
+            response,
+            lookup.wrap(
+                lambda: context.store.redeem(
+                    user_id=context.user_id, token=body.token, code=body.code
+                )
             ),
-        ),
-    )
+        )
 
 
 @router.post(

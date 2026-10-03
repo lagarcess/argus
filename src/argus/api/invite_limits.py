@@ -7,10 +7,11 @@ There is no founder or admin bypass.
 - Every lookup spends one request from ``SlidingWindowLimiter``.
 - A lookup that names no invitation (unknown or malformed code or token) also
   spends from a separate failure budget, ``WeightedWindow``, hourly and daily.
-  A found invitation, even an expired or used one, costs nothing there, so
-  failed guesses weigh far more than real use.
+  Every lookup reserves one failure atomically before it runs and gives it back
+  once it found an invitation (even an expired or used one), so concurrent
+  guesses can never run past the budget, and real use costs nothing there.
 - Once a budget is spent the answer is ``429 invite_rate_limited`` with
-  ``Retry-After``, checked before the lookup so a blocked caller learns nothing.
+  ``Retry-After``, decided before the lookup so a blocked caller learns nothing.
 
 Like every limiter in this API the counts are process-local. Production runs
 one Render instance with one Uvicorn worker, and the code space (60 bits) is
@@ -21,7 +22,8 @@ security" section of docs/API_CONTRACT.md for the numbers.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from typing import TypeVar
 
 from fastapi import HTTPException, Request
@@ -75,36 +77,61 @@ def rate_limited_problem(request: Request, wait: int) -> HTTPException:
     )
 
 
-def check(request: Request, user_id: str) -> None:
-    """Refuse before the lookup when a failure or request budget is spent."""
-    waits = [
-        counter.blocked(key, limit=limit, window=window)
-        for key, limit, window, counter in _budgets(request, user_id)
-    ]
-    blocked = [w for w in waits if w is not None]
-    if blocked:
-        raise rate_limited_problem(request, max(blocked))
+class Attempt:
+    """One lookup holding a failure reservation; kept only if nothing was found."""
+
+    def __init__(self) -> None:
+        self.failed = False
+
+    def wrap(self, action: Callable[[], T]) -> Callable[[], T]:
+        def run() -> T:
+            try:
+                return action()
+            except InvitationNotFound:
+                self.failed = True
+                raise
+
+        return run
+
+
+def _release(held: list[tuple[str, int, WeightedWindow]]) -> None:
+    for key, window, counter in held:
+        counter.refund(key, 1, window=window)
+
+
+def _reserve(request: Request, user_id: str) -> list[tuple[str, int, WeightedWindow]]:
+    """Reserve one failure in every budget and one request, or refuse with 429."""
+    held: list[tuple[str, int, WeightedWindow]] = []
+    waits: list[int] = []
+    for key, limit, window, counter in _budgets(request, user_id):
+        wait = counter.spend(key, 1, limit=limit, window=window)
+        if wait is None:
+            held.append((key, window, counter))
+        else:
+            waits.append(wait)
+    if waits:
+        _release(held)
+        raise rate_limited_problem(request, max(waits))
     wait = _requests.record_or_retry_after(
         keys=_keys(request, user_id), limit=REQUESTS_PER_MINUTE, window_seconds=60
     )
     if wait is not None:
+        _release(held)
         raise rate_limited_problem(request, wait)
+    return held
 
 
-def record_failure(request: Request, user_id: str) -> None:
-    for key, limit, window, counter in _budgets(request, user_id):
-        counter.spend(key, 1, limit=limit, window=window)
+@contextmanager
+def attempt(request: Request, user_id: str) -> Iterator[Attempt]:
+    """Reserve before the lookup; keep the failure only if it named nothing.
 
-
-def guarded(request: Request, user_id: str, action: Callable[[], T]) -> Callable[[], T]:
-    """Check the budgets now; charge a failure if the lookup finds nothing."""
-    check(request, user_id)
-
-    def run() -> T:
-        try:
-            return action()
-        except InvitationNotFound:
-            record_failure(request, user_id)
-            raise
-
-    return run
+    Wrap the lookup with ``Attempt.wrap``. A lookup that never ran (an
+    idempotent replay, a refused request) or found an invitation is refunded.
+    """
+    held = _reserve(request, user_id)
+    current = Attempt()
+    try:
+        yield current
+    finally:
+        if not current.failed:
+            _release(held)

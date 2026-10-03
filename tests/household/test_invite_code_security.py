@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import math
+import threading
+import time
 from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
@@ -34,6 +36,7 @@ from argus.domain.household.repository import (
     InMemoryHouseholdRepository,
 )
 from argus.domain.recording.repository import InMemoryFinancialAccountRepository
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from tests.household.conftest import ALICE, TEST_CODE_SECRET
@@ -322,3 +325,91 @@ def test_limiter_keys_use_the_trusted_client_ip_helper():
     assert (
         ip_key == "invite-code:ip:198.51.100.77" and user_key == "invite-code:user:user-1"
     )
+
+
+def _mock_request(ip: str) -> MagicMock:
+    request = MagicMock()
+    request.headers = {"CF-Connecting-IP": ip}
+    request.client.host = "127.0.0.1"
+    return request
+
+
+def test_concurrent_guesses_cannot_run_past_the_failure_budget():
+    """Codex P2 on #794: every lookup reserves its failure before it runs.
+
+    All guesses start together and stay in flight until every one has been
+    admitted or refused, so a check-then-charge limiter would let all of them
+    through. Exactly the account budget may be in flight at once.
+    """
+    limit = invite_limits.FAILED_PER_ACCOUNT[0][0]
+    total = limit + 5
+    start = threading.Barrier(total)
+    release = threading.Event()
+    outcomes: list[object] = []
+    lock = threading.Lock()
+
+    def unknown() -> None:
+        raise InvitationNotFound()
+
+    def guess(n: int) -> None:
+        start.wait(timeout=5)
+        try:
+            with invite_limits.attempt(_mock_request(f"192.0.2.{n}"), "user-1") as lookup:
+                with lock:
+                    outcomes.append("in_flight")
+                release.wait(timeout=5)
+                lookup.wrap(unknown)()
+        except InvitationNotFound:
+            pass
+        except HTTPException as refused:
+            with lock:
+                outcomes.append(refused.status_code)
+
+    threads = [threading.Thread(target=guess, args=(n,)) for n in range(total)]
+    for thread in threads:
+        thread.start()
+    deadline = time.monotonic() + 5
+    while len(outcomes) < total and time.monotonic() < deadline:
+        time.sleep(0.01)
+    release.set()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert outcomes.count("in_flight") == limit
+    assert outcomes.count(429) == total - limit
+    with pytest.raises(HTTPException) as after:
+        with invite_limits.attempt(_mock_request("192.0.2.200"), "user-1"):
+            pass
+    assert after.value.status_code == 429  # the reservations were kept as failures
+
+
+def test_a_reservation_is_refunded_when_the_lookup_finds_or_never_runs():
+    limit = invite_limits.FAILED_PER_ACCOUNT[0][0]
+    request = _mock_request("192.0.2.50")
+    # Found an invitation, or never ran (an idempotent replay): no charge.
+    # (Within the 30 a minute request budget.)
+    for n in range(limit + 2):
+        with invite_limits.attempt(request, "user-2") as lookup:
+            if n % 2:
+                lookup.wrap(lambda: "found")()
+    for _ in range(limit):
+        with pytest.raises(InvitationNotFound):
+            with invite_limits.attempt(request, "user-2") as lookup:
+                lookup.wrap(_raise_not_found)()
+    with pytest.raises(HTTPException):
+        with invite_limits.attempt(request, "user-2"):
+            pass
+
+
+def _raise_not_found() -> None:
+    raise InvitationNotFound()
+
+
+def test_weighted_window_refund_gives_back_the_newest_matching_spend():
+    window = WeightedWindow()
+    assert window.spend("k", 1, limit=2, window=60) is None
+    assert window.spend("k", 1, limit=2, window=60) is None
+    assert window.spend("k", 1, limit=2, window=60) is not None
+    window.refund("k", 1, window=60)
+    assert window.spend("k", 1, limit=2, window=60) is None
+    window.refund("missing", 1, window=60)  # nothing to give back is a no-op

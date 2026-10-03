@@ -7498,9 +7498,11 @@ by code or token, are limited per client IP (`resolve_client_ip`, the trusted
 | Lookups of any outcome | 30 per minute | 30 per minute |
 | Lookups that named no invitation | 20 per hour, 60 per day | 10 per hour, 30 per day |
 
-A found invitation costs nothing from the failure budget, even if it is expired,
-revoked or used. A spent budget answers `429 invite_rate_limited` with
-`Retry-After`, checked before the lookup. The counters are per process, like
+Each lookup reserves one failure in every budget before it runs, and the
+reservation is given back once it found an invitation (even an expired, revoked
+or used one) or never ran (an idempotent replay), so concurrent guesses cannot
+run past a budget. A spent budget answers `429 invite_rate_limited` with
+`Retry-After`, before the lookup. The counters are per process, like
 every limiter in this API. Production runs one Render instance with one worker;
 with N processes an attacker gets at most N times the budget, which the code
 length absorbs.
