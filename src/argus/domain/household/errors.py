@@ -77,3 +77,38 @@ class HouseholdRule(HouseholdError):
         self.code = code
         self.detail = "The household changed. Refresh and try again."
         super().__init__()
+
+
+class BetaQuotaExhausted(HouseholdError):
+    code = "beta_invite_quota_exhausted"
+    detail = "You have used all of your beta invites."
+
+
+class FounderRequired(HouseholdError):
+    code = "founder_required"
+    detail = "Only the founder can do that."
+
+
+class BetaInviteRequired(HouseholdError):
+    code = "beta_invite_required"
+    detail = "An invite code is required to use Cuadrao."
+
+
+class GroupLinkFull(HouseholdError):
+    code = "group_link_full"
+    detail = "This invite link is full. You are on the waitlist."
+
+
+class HouseholdInvitationKind(HouseholdError):
+    code = "household_invitation_requires_accept"
+    detail = "This is a household invitation. Accept it from Household."
+
+
+class InviteRuleViolation(HouseholdError):
+    code = "invite_request_invalid"
+    detail = "The invite request is not valid."
+
+
+class VerifiedUserRequired(HouseholdError):
+    code = "verified_user_required"
+    detail = "Sign in to use invites."
