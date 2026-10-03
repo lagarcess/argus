@@ -77,12 +77,17 @@ struct CuadraoLiveVoiceCanvas: View {
             Spacer()
             Text("Cuadrao").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
             Spacer()
-            Button { choosingVoice = true } label: {
-                Image(systemName: "slider.horizontal.3").font(.system(size: 20))
-                    .frame(width: 48, height: 48)
-                    .background(.ultraThinMaterial, in: Circle())
-            }.accessibilityLabel(es ? "Elegir voz" : "Choose voice")
-                .accessibilityIdentifier("voice-choose")
+            if CuadraoDesignPreview.voiceSelection {
+                Button { choosingVoice = true } label: {
+                    Image(systemName: "slider.horizontal.3").font(.system(size: 20))
+                        .frame(width: 48, height: 48)
+                        .background(.ultraThinMaterial, in: Circle())
+                }.accessibilityLabel(es ? "Elegir voz" : "Choose voice")
+                    .accessibilityIdentifier("voice-choose")
+            } else {
+                // Keeps the title centered while voice selection is off.
+                Color.clear.frame(width: 48, height: 48).accessibilityHidden(true)
+            }
         }.buttonStyle(.plain).padding(.horizontal, 24).padding(.top, 12)
     }
 
