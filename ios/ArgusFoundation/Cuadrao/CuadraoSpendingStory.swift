@@ -31,11 +31,10 @@ struct CanvasSpendingStory {
         }
         return prior
     }
-    /// Founder decision (Oct 2): a covered prior period with no spending is a known zero and a
-    /// valid baseline; its comparison is an amount difference, never a percent. `comparison` is
-    /// nil when coverage is missing, which is the only case that reads as Sin datos.
+    /// A prior period with no records is Sin datos, not a zero baseline, so it never
+    /// supports a comparison. A prior period whose records add up to zero still does (#787).
     var previousEntries: [CanvasActivity]? {
-        comparison.map { CanvasSpendingHistory.entries(expenses, in: $0) }
+        comparison.map { CanvasSpendingHistory.entries(expenses, in: $0) }.flatMap { $0.isEmpty ? nil : $0 }
     }
     var previousTotal: Decimal? { previousEntries.map(CanvasSpendingHistory.total) }
     func total(for category: CanvasExpenseCategory, previous: Bool = false) -> Decimal {

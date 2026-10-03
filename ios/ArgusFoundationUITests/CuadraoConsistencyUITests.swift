@@ -83,7 +83,7 @@ final class CuadraoConsistencyUITests: XCTestCase {
         for _ in 0..<12 { if empty.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(empty.isHittable)
         shot(app, "gallery-empty-dark-large-en")
-        let unavailable = app.staticTexts["No data"]
+        let unavailable = app.staticTexts["Part of the story is missing"]
         for _ in 0..<8 { if unavailable.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(unavailable.isHittable)
         shot(app, "gallery-unavailable-dark-large-en")
