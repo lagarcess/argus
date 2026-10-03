@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Connected welcome and email auth with Cuadrao chrome. Apple is hidden.
+/// Connected welcome and email auth with Cuadrao chrome. Apple and Google appear only when
+/// their native sign-in switches are on (ConnectedProviderButtons).
 struct ConnectedCuadraoAuthFlow: View {
     @EnvironmentObject private var auth: ProfileAuthModel
     @Environment(\.locale) private var locale
@@ -136,6 +137,7 @@ struct ConnectedCreateAccount: View {
                             : (spanish ? "Tus cuentas y tus planes, en un solo lugar."
                                 : "Your accounts and plans, in one place."))
                     Spacer(minLength: 64)
+                    ConnectedProviderButtons(spanish: spanish)
                     NavigationLink {
                         if signingIn {
                             ConnectedEmailSignIn(spanish: spanish)

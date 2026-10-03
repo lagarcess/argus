@@ -57,6 +57,10 @@ actor AuthServer {
     var refreshGate: RequestGate?
     var mismatchedProfile = false
     var expired = false
+    var idTokenStatus = 200
+    var idTokenErrorCode = "bad_jwt"
+    var anonymousIdToken = false
+    var captureStatus = 204
 
     func configure(meStatuses: [Int] = [], logoutStatus: Int = 204, refreshStatus: Int = 200, refreshErrorCode: String = "refresh_token_not_found", mismatch: Bool = false, expired: Bool = false) {
         self.meStatuses = meStatuses
@@ -66,6 +70,12 @@ actor AuthServer {
         self.mismatchedProfile = mismatch
         self.expired = expired
     }
+    func configureIdToken(status: Int = 200, errorCode: String = "bad_jwt", anonymous: Bool = false) {
+        idTokenStatus = status
+        idTokenErrorCode = errorCode
+        anonymousIdToken = anonymous
+    }
+    func configureCapture(status: Int) { captureStatus = status }
     func holdMe(_ gate: RequestGate) { meGate = gate }
     func holdRefresh(_ gate: RequestGate) { refreshGate = gate }
     func count(_ suffix: String) -> Int { requests.filter { $0.url!.path.hasSuffix(suffix) }.count }
@@ -83,6 +93,16 @@ actor AuthServer {
             }
             let id = body["email"] as? String == "bob@example.test" ? bob : alice
             return response(url, 200, ["session": makeSession(id), "user": user(id)])
+        }
+        if path.hasSuffix("/token"), url.query?.contains("grant_type=id_token") == true {
+            if idTokenStatus != 200 {
+                return response(url, idTokenStatus, ["error_code": idTokenErrorCode, "msg": "Synthetic failure"])
+            }
+            let id = body["id_token"] as? String == Self.bobIdToken ? bob : alice
+            return response(url, 200, makeSession(id, anonymous: anonymousIdToken))
+        }
+        if path.hasSuffix("/auth/apple/authorization-code") {
+            return response(url, captureStatus, captureStatus == 204 ? [:] : ["code": "apple_token_capture_unavailable"])
         }
         if path.hasSuffix("/token") {
             if let gate = refreshGate { await gate.enter() }
@@ -102,6 +122,9 @@ actor AuthServer {
         }
         return response(url, 404, [:])
     }
+
+    static let aliceIdToken = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.c2lnbmF0dXJl"
+    static let bobIdToken = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJib2IifQ.c2lnbmF0dXJl"
 
     func sessionData(anonymous: Bool = false) throws -> Data {
         let raw = makeSession(alice, anonymous: anonymous)
