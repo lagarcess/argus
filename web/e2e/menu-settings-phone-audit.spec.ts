@@ -124,8 +124,8 @@ for (const cell of AUDIT_CELLS) {
               : surface.name === "account-delete" ? page.getByRole("dialog", { name: label(language, "settings.profile.request_deletion.title"), exact: true })
                 : page.getByRole("dialog").last();
           if (surface.name === "account-delete") {
-            const supportButton = marker.getByRole("button", { name: label(language, "settings.profile.request_deletion.contact_support"), exact: true });
-            const hitTest = await supportButton.evaluate((control) => {
+            const confirmButton = marker.getByRole("button", { name: label(language, "settings.profile.request_deletion.confirm"), exact: true });
+            const hitTest = await confirmButton.evaluate((control) => {
               const rect = control.getBoundingClientRect();
               const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
               return { controlCovered: hit !== null && !control.contains(hit), coveringClass: hit?.className, coveringZIndex: hit ? getComputedStyle(hit).zIndex : null };

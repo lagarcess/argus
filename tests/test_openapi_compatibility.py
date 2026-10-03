@@ -460,3 +460,17 @@ def test_regeneration_script_matches_checked_artifact() -> None:
         build_artifact_document(), checked_document
     )
     assert failures == [], "\n".join(failures)
+
+
+def test_account_deletion_lists_every_refusal(generated: dict, checked: dict) -> None:
+    """Priya #801 note 7: starting and resuming a deletion are one POST, and
+    its contract lists each refusal a client must handle."""
+    for document in (generated, checked):
+        responses = document["paths"]["/api/v1/account/delete"]["post"]["responses"]
+        assert {"200", "202", "401", "403", "404", "429", "503"} <= set(responses)
+        for status_code in ("401", "403", "404", "429", "503"):
+            assert responses[status_code]["content"]["application/json"]["schema"] == {
+                "$ref": "#/components/schemas/Error"
+            }
+        assert "account_deletion_incomplete" in responses["503"]["description"]
+        assert "account_deletion_not_allowed" in responses["403"]["description"]

@@ -1012,7 +1012,7 @@
       "default_user": "Usuario",
       "edit_display_name": "Editar nombre para mostrar",
       "delete_account": "Eliminar cuenta",
-      "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
+      "delete_account_note": "Elimina para siempre tu cuenta de Argus y tus datos.",
       "display_name_save_error": "No pudimos guardar ese nombre todavía.",
       "display_name_too_long": "Usa {{count}} caracteres o menos.",
       "preferred_name": "¿Cómo quieres que Argus te llame?",
@@ -1042,16 +1042,20 @@
       "close": "Cerrar perfil",
       "title": "Perfil",
       "request_deletion": {
-        "title": "Solicitar eliminación de cuenta",
-        "body": "Soporte gestiona la eliminación de cuentas. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
-        "contact_support": "Contactar soporte",
-        "submitting": "Enviando...",
-        "success": "Solicitud enviada. Te contactaremos por correo electrónico.",
-        "error": "No pudimos enviar esa solicitud todavía.",
+        "title": "¿Eliminar tu cuenta?",
+        "body": "Tu cuenta y tus datos se eliminarán, y no se puede deshacer. Los hogares que administras pasan al miembro con más antigüedad, o se cierran si eres el único.",
+        "shared_plans": "En los planes que compartes, tus montos se quedan para que las cuentas de los demás sigan cuadrando, pero sin tu nombre: aparecerás como «Exmiembro». Tus recibos y notas se borran. Lo que debes o te deben queda cerrado en la app, no marcado como pagado. Los planes que creaste pasan a la persona que lleva más tiempo en cada uno, salvo los planes de deuda compartidos, que se cierran y quedan solo para consulta.",
+        "confirm": "Eliminar cuenta",
+        "submitting": "Eliminando...",
+        "success": "Tu cuenta está eliminada. Ya cerraste sesión.",
+        "in_progress": "Estamos eliminando tu cuenta. Ya cerraste sesión y terminaremos de eliminarla en unos días. No tienes que hacer nada.",
+        "requested": "Solicitud enviada. Soporte eliminará tu cuenta y te escribirá por correo electrónico.",
+        "error": "No pudimos eliminar tu cuenta en este momento. Inténtalo de nuevo.",
+        "unavailable": "Todavía no se puede eliminar desde la app aquí. Soporte puede eliminar tu cuenta por ti.",
         "email_fallback": "Enviar correo a soporte",
         "email_subject": "Solicitud de eliminación de cuenta de Argus",
         "email_body": "Ayúdame a solicitar la eliminación de mi cuenta de Argus{{account_hint}}.",
-        "close": "Cerrar solicitud de eliminación"
+        "close": "Cerrar eliminación de cuenta"
       }
     },
     "subscription": {

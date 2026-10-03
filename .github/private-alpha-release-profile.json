@@ -27,6 +27,7 @@
         "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": "false",
         "ARGUS_FINANCIAL_ACCOUNTS_ENABLED": "false",
         "ARGUS_HOUSEHOLDS_ENABLED": "false",
+        "ARGUS_ACCOUNT_DELETION_ENABLED": "false",
         "ARGUS_INGESTION_ENABLED": "false",
         "PLAID_ENV": "sandbox",
         "PLAID_CREDENTIALS_INJECTED": "false",

@@ -3182,6 +3182,79 @@ Update profile preferences. Partial update semantics are supported.
 
 Argus supports English and Spanish (Latin America) in Alpha.
 
+## `POST /account/delete`
+
+Deletes the signed-in person's account, in the app. A guest session is deleted
+by the same command. Off unless
+`ARGUS_ACCOUNT_DELETION_ENABLED` is on; while off it answers `404` before any
+authentication. The account is always the session's. The body is only a
+confirmation, and any other field is a `422`:
+
+```json
+{ "confirm": true }
+```
+
+The command runs the Lane 6 order (`docs/specs/lanes/account-deletion-fk-census.md`
+and #787). It hands over or closes the person's households and plans, keeps their
+amounts in other people's plans under a nameless former-member placeholder (one
+per household or standalone shared group, shown as "Former member" or
+"Exmiembro" in the viewer's language), deletes everything else of theirs,
+revokes provider tokens, and deletes the auth user. A retry resumes the same run.
+
+**Who may call it.** Every other route refuses a person whose run is in flight
+(the account is locked). This route alone accepts them, so a retry resumes
+their own run: GoTrue refuses a banned account's token, so the API verifies it
+itself (signature against the project's JWKS, or `SUPABASE_JWT_SECRET` for
+HS256; expiry; audience; `exp`, `sub` and `session_id` must all be present),
+then requires a live `auth.sessions` row for its session that belongs to its
+subject (live: not past its `not_after`, GoTrue's session time-box, when one is
+set), a run in flight for that subject, and a subject that is not a
+placeholder. Anything else is `401`. Anyone not locked goes through the usual session check. The route
+is rate limited per account (6 a minute, `429 too_many_requests` with
+`Retry-After`). A guest create-then-delete loop makes a new account each time,
+so it is bounded where guests are made (captcha and the guest limits).
+
+**Response `200`:** everything is deleted, every third party has confirmed,
+and the auth user is gone.
+
+```json
+{ "status": "done", "pending": [] }
+```
+
+**Response `202`:** deletion is in progress. The data step has run (or is
+being retried), and the account is locked: its sessions are refused from the
+moment the run opens and the auth user is banned, so clients sign out. A third
+party hasn't confirmed yet, so the auth delete waits. `pending` names it
+(`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
+itself is being retried. Every third-party step (Sign in with Apple through
+#793, Google/Gmail and Plaid tokens, PostHog person deletion) runs before the
+auth delete. A repeat request resumes the run, and so does the operator-run
+sweep (`scripts/ops/resume_account_deletions.py` inside
+`scheduled_maintenance.py`; nothing runs it on a schedule, see
+PRIVATE_LAUNCH_RUNBOOK.md for the cadence). `pending` is also empty when
+another request holds the run at that moment. Clients sign out as soon as
+this response (or `200`) arrives, keep showing "deletion in progress" as the
+signed-out confirmation, and never show the finished state. The web signs out
+once, on the result; closing the confirmation only clears local state.
+
+```json
+{ "status": "in_progress", "pending": ["plaid"] }
+```
+
+A request after another one finished the run answers `200` `done`: the session
+was verified, so the person existed a moment ago.
+
+**Errors** (the same for a first request and a resume; all listed in
+`docs/api/openapi.yaml`): `401` (no valid session, or on resume a token that
+doesn't name the person's own live session), `403 account_deletion_not_allowed`,
+`404 not_found` (flag off), `429 too_many_requests`,
+`503 account_deletion_unavailable` (no `DATABASE_URL` or Admin API client;
+nothing happened), `503 account_deletion_incomplete` with `Retry-After` (an
+unexpected failure; the run may be open and the account locked, so clients
+treat it as in progress, and a retry resumes the same run), and the shared
+`503 auth_session_verification_unavailable`.
+
+
 ## Supported Values
 - **language:** `en`, `es-419`
 - **locale:** `en-US`, `es-419`
@@ -6838,7 +6911,6 @@ retain the existing refusal shape. No production client holds a direct write gra
 - `bug`
 - `feature`
 - `general`
-- `account_deletion_request`
 
 `message` is capped at 5,000 characters.
 
@@ -6877,10 +6949,10 @@ profile language, message, and the sanitized context above, and adds no contact
 details the submission did not already carry. A missing credential or a failed
 delivery is logged and never changes the response or the saved feedback.
 
-For `account_deletion_request`, clients send a one-click support request from
-the account surface. The backend enriches `context` with authenticated account
-metadata such as account email, profile language, request user id, and request
-timestamp before persistence. The frontend must not render the internal user id.
+`account_deletion_request` is the support-ticket fallback while the in-app
+command (`POST /account/delete`) is off: the web sends it when that route
+answers `404`. The API adds `source` (default `profile_modal`), the account
+email, profile language, user id and request time to its context.
 
 ---
 

@@ -60,6 +60,7 @@ import {
   type BacktestRun, type BacktestJobResponse,
   type SearchConversationItem,
 } from "@/lib/argus-api";
+import { endSessionKeepingSurface, type LogoutOptions } from "@/lib/account-deletion-api";
 import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";
 import { omnisearchEnabled, researchRailEnabled } from "@/lib/private-alpha-flags";
 import {
@@ -1784,10 +1785,11 @@ export default function ChatInterface() {
   const receiptFollowup = useReceiptFollowup({ profileState, account, conversationId, hydrating: isHydratingConversation, guest: guestExperience, refreshAccount, navigate: navigateConversationTranscript, send: (text, options) => handleSend(text, undefined, undefined, options) });
   // ── Action routing ─────────────────────────────────────────────────────────
 
-  const handleLogout = async () => {
+  const handleLogout = async (options: LogoutOptions = {}) => {
+    if (options.afterAccountDeletion) return endSessionKeepingSurface(accountBoundary);
     try {
-      const result = await logoutFromApi();
-      if (result.revocation === "failed") {
+      const result = options.sessionEnded ? null : await logoutFromApi();
+      if (result?.revocation === "failed") {
         showToast(
           t(
             "settings.logout_error",
@@ -2248,8 +2250,8 @@ export default function ChatInterface() {
         onConversationRemoved={handleConversationRemoved}
         onAllConversationsDeleted={handleAllConversationsDeleted}
         onToast={showToast}
-        onLogout={() => {
-          void handleLogout();
+        onLogout={(options) => {
+          void handleLogout(options);
         }}
         onFeedback={(type) => {
           setFeedbackState({

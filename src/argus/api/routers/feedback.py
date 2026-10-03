@@ -26,6 +26,9 @@ def feedback(
     account = account_context(request)
     context = sanitize_feedback_context(payload.context)
     if payload.type == "account_deletion_request":
+        # The support-ticket fallback while the in-app command is off
+        # (ARGUS_ACCOUNT_DELETION_ENABLED): the web sends this when
+        # POST /account/delete answers 404.
         context.update(
             {
                 "source": str(context.get("source") or "profile_modal"),

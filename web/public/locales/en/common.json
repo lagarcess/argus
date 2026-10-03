@@ -1012,7 +1012,7 @@
       "default_user": "User",
       "edit_display_name": "Edit display name",
       "delete_account": "Delete account",
-      "delete_account_note": "Request permanent deletion of your Argus account. Support will follow up by email.",
+      "delete_account_note": "Permanently delete your Argus account and your data.",
       "display_name_save_error": "Could not save that name yet.",
       "display_name_too_long": "Keep this to {{count}} characters or fewer.",
       "preferred_name": "What should Argus call you?",
@@ -1042,16 +1042,20 @@
       "close": "Close profile",
       "title": "Profile",
       "request_deletion": {
-        "title": "Request account deletion",
-        "body": "Support handles account deletion. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
-        "contact_support": "Contact support",
-        "submitting": "Sending...",
-        "success": "Request sent. We'll follow up by email.",
-        "error": "We could not submit that request yet.",
+        "title": "Delete your account?",
+        "body": "Your account and your data will be deleted, and this can't be undone. Households you run pass to the longest-standing member, or close if you're the only one.",
+        "shared_plans": "In plans you share, your amounts stay so everyone else's numbers still add up, but without your name: you'll show as \"Former member.\" Your receipts and notes are deleted. Anything you owe or are owed is closed in the app, not marked as paid. Plans you created pass to whoever has been in each one longest, except shared debt plans, which are closed and stay view-only.",
+        "confirm": "Delete account",
+        "submitting": "Deleting...",
+        "success": "Your account is deleted. You're signed out.",
+        "in_progress": "Your account is being deleted. You're signed out now, and we'll finish removing it within a few days. You don't need to do anything.",
+        "requested": "Request sent. Support will delete your account and follow up by email.",
+        "error": "We couldn't delete your account just now. Try again.",
+        "unavailable": "Deleting in the app isn't available here yet. Support can delete your account for you.",
         "email_fallback": "Email support",
         "email_subject": "Argus account deletion request",
         "email_body": "Please help me request deletion for my Argus account{{account_hint}}.",
-        "close": "Close deletion request"
+        "close": "Close account deletion"
       }
     },
     "subscription": {

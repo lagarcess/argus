@@ -9,6 +9,80 @@ info:
     tool answers persist as conversation artifacts; completed backtests also own immutable
     backtest_runs.
 paths:
+  /api/v1/account/delete:
+    post:
+      tags:
+      - account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountDeletionRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionResponse'
+        '202':
+          description: '`in_progress`: the run is open and the account locked, but a step
+            hasn''t finished (`pending`). A retry of this route, or the operator-run sweep,
+            resumes it.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionResponse'
+        '401':
+          description: 'No valid session: missing or invalid token, an ended session, or on
+            resume a token that doesn''t name the person''s own live session (or lacks `sub`,
+            `exp` or `session_id`).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: '`account_deletion_not_allowed`: the account can''t be deleted here
+            (an account placeholder).'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: '`not_found`: `ARGUS_ACCOUNT_DELETION_ENABLED` is off; answered before
+            any session check.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: '`too_many_requests`: six requests per account per minute; see Retry-After.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: '`account_deletion_incomplete`: the run did not finish and may have
+            locked the account; retrying this route resumes it (Retry-After: 5). `account_deletion_unavailable`:
+            deletion isn''t configured on this server. `auth_session_verification_unavailable`:
+            the session could not be verified; retry.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/access-requests:
     post:
       tags:
@@ -8322,6 +8396,30 @@ components:
       - can_search_current_workspace
       - can_use_grounded_discovery
       - can_submit_feedback
+    AccountDeletionRequest:
+      properties:
+        confirm:
+          type: boolean
+          const: true
+      additionalProperties: false
+      type: object
+      required:
+      - confirm
+    AccountDeletionResponse:
+      properties:
+        status:
+          type: string
+          enum:
+          - done
+          - in_progress
+        pending:
+          items:
+            type: string
+          type: array
+      type: object
+      required:
+      - status
+      - pending
     AccountHit:
       properties:
         kind:
