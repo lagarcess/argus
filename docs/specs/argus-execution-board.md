@@ -27,6 +27,82 @@ Lucas's local agent. The handoff does not dispatch a worker, authorize a merge,
 or rewrite the historical landing records below. Sentences in the #773 section
 that still say that lane is unmerged predate the squash on this tip.
 
+## Cuadrao release UI landing order
+
+**Founder pivot, October 2, 2026. Requested UI scope; implementation pending.**
+Ported from design commit
+[`fc7650ea`](https://github.com/lagarcess/argus/commit/fc7650eab4eac9298a09eea37eddc3964a709fba)
+on `codex/cuadrao-design-scan-recents` and reconciled with the
+[October 2 lane locks](argus-decision-log.md#october-2-2026-cuadrao-lane-locks) and
+the [six-lane handoff](lanes/mvee-five-lane-handoff.md). Where they differ, the locks
+and the handoff win. This is the current remaining-design queue. It refines the
+design dispositions C01 to C10, which still live only in the
+[design branch's roadmap](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/docs/specs/argus-execution-board.md#cuadrao-design-dispositions)
+until design PRs bring them onto integration. Earlier preview screenshots and build
+3419 acceptance remain valid historical evidence; they do not prove the release
+behaviors below.
+[Cuadrao's guide](../../.agent/designs/cuadrao/DESIGN.md#13-release-readiness-interaction-rules)
+owns interaction rules and inspected Mobbin references. The
+[MVEE amendment](argus-minimum-viable-ecosystem-experience.md#native-release-access-and-account-lifecycle-october-2)
+owns the native product changes. No backend implementation, deployment or hosted
+change is assigned by this documentation checkpoint.
+
+**Starting point.** The design commit verified integration `2185aefe` against design
+`2558f866`, with merge base `7c29b2a9`. Since then, #783 adopted the shared design
+foundation from checkpoint `2558f866` (1 of 4), #782 landed the six-lane handoff,
+#785 adopted plans, groups, receipts and contextual Cuadrao (2 of 4), and #786
+adopted Home, Search, Updates, Profile and Settings (3 of 4). Integration is now
+`0ea81a20`, which also includes the Lane 1 backend from #788. Integration keeps the four
+`ios/ArgusFoundation/Connected/` files and ten `Household/` files that the design
+checkpoint lacks. Start each implementation checkpoint from current integration,
+recheck its head, and adapt approved design components to those owners. Do not
+replace them with `CuadraoHouseholdSheet`, fictional invite acceptance,
+`CanvasProfileDraft` or preview sign-out. Do not wholesale merge the divergent
+preview branch to obtain the style.
+
+Existing `ConnectedCuadraoAuthFlow` handles email auth; Apple is hidden and Google
+is not a connected native choice. The founder's design direction adds **Apple and
+Google** for the release design. That is not yet a decision-log lock, and the lane
+handoff still lists Sign in with Apple as open, so connected buttons stay hidden
+until both the choice and the connected path are settled. `HouseholdManagement`
+owns member/invitation management and explicit account consent;
+`HouseholdPlanPeople` owns shared-plan permissions. Current login deletion is a
+support request, and account archive is not an account move. In-app deletion is
+[Lane 6](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion). The team
+connecting each checkpoint owns the remaining contract gaps; simulated UI acceptance
+must stay distinguished from connected acceptance.
+
+| Landing checkpoint | User items | UI deliverable | Closure evidence and existing responsibility |
+| --- | --- | --- | --- |
+| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English, with Iris's founder-locked copy | Ordinary member, admin and financial-owner variants; "Exmiembro" / "Former member" in other people's plans and plan handover per decision 17; no false success or deletion of another owner's data. C07/C10, identity and Household owners, Lane 6 |
+| 1. Trust and profile | 2 | Signed-in Privacy and Terms destinations | Actual approved links, return to Settings, both languages. C07, native identity/support |
+| 1. Trust and profile | 3 | Apple and Google auth alongside email | Founder design direction, not yet a lock; Sign in with Apple is open in the lane handoff. Loading, cancellation, error, missing-name recovery and return to invitation; connected credentials/session and deletion revocation acceptance owned by auth. C07/C10 |
+| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows and photo avatars, retain initials/themes | Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
+| 2. Access and Household | 4 | Invitation gate after install and cuadrao.ai waitlist | Valid, invalid, expired, already-used, cancelled auth and admitted-user return. Preserve link intent/manual code recovery. C02/C08 plus auth, Lane 1 |
+| 2. Access and Household | 5–6 | Personal invitation link/code/QR, remaining quota out of ten and accepted notice | Sharing is not acceptance; counter and notice derive from canonical status; QR scans; the QR card names its purpose. C02/C08, Lane 1 |
+| 2. Access and Household | 7 | Administrator-only household invitation without personal quota charge, which also admits a new person to the beta | Existing integration invitation preview/accept and account-sharing boundaries preserved. C02/C05, Household, Lane 1 |
+| 2. Access and Household | 8 | Founder-only group access link: creation, cap, expiry, usage and full/waitlist states | Beta only, never household membership. Capacity race/expiry recovery; confirmed enrollment before joined-waitlist wording. Redemptions do not use a personal quota, per Lane 1. C02/C08, Lane 1 |
+| 2. Access and Household | 9 | Admin handoff, owner-history removal and household-closed notices | Authorized target or clear terminal explanation, including stale notice after deletion. With no remaining member the household closes (decision 15). Handoff and closure notices still need a lane. C05/C07, Household and Updates |
+| 3. Home and Updates | 10 | Monetary difference from a zero baseline, and Sin datos only for a period with no records at all | A real zero month is data and still shows. Real zero, missing history and covered comparison specimens in both languages. C05, financial history, Lane 4 |
+| 3. Home and Updates | 11 | Bill reminders three days before/on due date; contextual push opt-in | Paid/cancelled occurrence suppressed; denied permission preserves inbox; no amounts in push. C07, planning/Updates/native delivery, Lane 5 |
+| 3. Home and Updates | 12 | Read-only pre-move household history | Existing owner and cutoff supplied by move contract; lock/read-only text and readable muted style; no hidden edit gestures. C05, financial core/Household, Lane 2 |
+| With first external model processing | 15 | AI disclosure and explicit consent across chat/voice/document entry, before sharing personal data with an external model | No personal data sent before consent; decline preserves draft and local capture. May be a first-TestFlight dependency if live AI is enabled. C01/C04/C07, intake/conversation |
+| With source activation | 16 | Connected sources and Disconnect | Actual connections, errors/retry and distinction between future access and retained imports. Existing intake/source owner |
+| With native memory | 17 | Memory off and reset | Distinct pause vs deletion consequences, permission and recovery. C06/C07, existing memory owner |
+
+Each checkpoint includes shared typography/components, light/dark, Spanish/English,
+large text, accessible controls and actual navigation/return checks. Carry over
+working state owners and tests. The phone is disconnected; continue simulator
+acceptance and record physical checks when available. A UI handoff includes its
+state variants, integration base, screenshots and the exact service facts still
+needed. External TestFlight readiness requires connected acceptance, not UI-only
+success screens. Provide reviewer access to the invitation-gated build.
+
+The design commit also edits the design branch's C06 row (expose Memory only with
+its connected native feature and controls), its C07 and C08 rows and a historical
+Profile checkpoint paragraph. Those sections are not on integration, so they are
+not ported here.
+
 ## Shared document draft foundation, PR #776
 
 **Founder clarification, October 2, 2026; backend checkpoint under review.**
