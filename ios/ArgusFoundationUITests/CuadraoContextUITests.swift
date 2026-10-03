@@ -82,6 +82,21 @@ final class CuadraoContextUITests: XCTestCase {
         XCTAssertTrue(app.buttons["receipt-later"].exists)
     }
 
+    func testContextVoiceReturnsToConversation() {
+        let app = launch()
+        tap(app, "cuadrao-tab-1")
+        app.segmentedControls["plan-audience"].buttons["Together"].tap()
+        tap(app, "group-card-trip")
+        tap(app, "group-options")
+        tap(app, "group-open-chat")
+        tap(app, "chat-voice-entry")
+        XCTAssertTrue(app.buttons["voice-end"].waitForExistence(timeout: 5))
+        tap(app, "voice-end")
+        XCTAssertTrue(app.buttons["chat-context-close"].waitForExistence(timeout: 5))
+        tap(app, "chat-context-close")
+        XCTAssertTrue(app.segmentedControls["group-sections"].exists)
+    }
+
     private func launch() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()

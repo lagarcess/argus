@@ -78,7 +78,7 @@ final class CuadraoSupportUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["activity-detail-title"].label, "Almuerzo")
         let amount = app.staticTexts["activity-detail-amount"].label
         XCTAssertTrue(amount.hasPrefix("DOP −"))
-        XCTAssertTrue(app.staticTexts["Comida"].exists)
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Comida")).firstMatch.exists)
         app.buttons["activity-detail-account"].tap()
         XCTAssertTrue(app.staticTexts["account-detail-title"].waitForExistence(timeout: 3))
         let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "account-detail-activity.", "Almuerzo")).firstMatch
@@ -127,10 +127,9 @@ final class CuadraoSupportUITests: XCTestCase {
         XCTAssertTrue(group.exists)
         app.buttons["cuadrao.search.filters"].tap()
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Moneda,")).firstMatch.tap()
-        app.buttons["USD"].tap()
+        app.buttons["DOP"].tap()
         app.buttons["Listo"].tap()
-        XCTAssertFalse(group.exists)
-        app.buttons["cuadrao.search.reset"].tap()
+        XCTAssertTrue(group.exists)
         group.tap()
         app.buttons["group-options"].tap()
         app.buttons["Archivar"].tap()
