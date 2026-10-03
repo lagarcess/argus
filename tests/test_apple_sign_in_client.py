@@ -11,6 +11,7 @@ import pytest
 from argus.domain.apple_sign_in.client import AppleAuthClient, AppleError
 from argus.domain.apple_sign_in.credentials import (
     SOURCE,
+    AppleCaptureNotStored,
     AppleCredentialService,
     AppleIdentityMismatch,
     AppleRevocationPending,
@@ -190,11 +191,45 @@ def test_capture_keeps_only_the_sealed_refresh_token(service, apple) -> None:  #
     assert refresh not in repr(row)
 
 
-def test_capture_for_another_apple_id_stores_nothing(service, apple) -> None:  # noqa: ANN001
-    apple.grant(sub="000999.other")
+def test_capture_for_another_apple_id_stores_nothing_and_revokes_it(
+    service, apple
+) -> None:  # noqa: ANN001
+    refresh = apple.grant(sub="000999.other")
     with pytest.raises(AppleIdentityMismatch):
         service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
     assert service.repository.get(user_id=USER) is None
+    assert apple.calls[-1] == ("/auth/revoke", apple.calls[-1][1])
+    assert apple.calls[-1][1]["token"] == refresh
+
+
+class _BrokenRepository(InMemoryAppleCredentialRepository):
+    def upsert(self, **_: object) -> None:
+        raise ConnectionError("database down")
+
+
+def test_a_storage_failure_revokes_the_exchanged_token(client, apple) -> None:  # noqa: ANN001
+    # Apple already consumed the one-time code, so the token is revoked rather
+    # than dropped; the next Apple sign-in yields a fresh code.
+    service = AppleCredentialService(
+        _BrokenRepository(), box=_box(), client=client, clock=lambda: NOW
+    )
+    refresh = apple.grant()
+    with pytest.raises(AppleCaptureNotStored) as raised:
+        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    assert refresh not in str(raised.value)
+    path, form = apple.calls[-1]
+    assert path == "/auth/revoke"
+    assert form["token"] == refresh and form["token_type_hint"] == "refresh_token"
+
+
+def test_a_storage_failure_still_reports_when_the_revoke_fails(client, apple) -> None:  # noqa: ANN001
+    service = AppleCredentialService(
+        _BrokenRepository(), box=_box(), client=client, clock=lambda: NOW
+    )
+    apple.grant()
+    apple.revoke_responses.append((400, {"error": "invalid_client"}))
+    with pytest.raises(AppleCaptureNotStored):
+        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
 
 
 def test_a_later_sign_in_replaces_the_token_without_revoking_it(service, apple) -> None:  # noqa: ANN001

@@ -22,6 +22,7 @@ from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import User
 from argus.domain.apple_sign_in.client import MAX_CODE_LENGTH, AppleError
 from argus.domain.apple_sign_in.credentials import (
+    AppleCaptureNotStored,
     AppleCredentialService,
     AppleIdentityMismatch,
 )
@@ -107,6 +108,15 @@ def capture_apple_authorization_code(
             code="apple_identity_mismatch",
             title="Apple Identity Mismatch",
             detail="This Apple authorization belongs to a different Apple ID.",
+        ) from None
+    except AppleCaptureNotStored as exc:
+        logger.warning("Apple token capture not stored", error=str(exc))
+        raise problem(
+            request,
+            status_code=503,
+            code="apple_sign_in_unavailable",
+            title="Apple Sign-In Unavailable",
+            detail="The Apple authorization could not be saved. Please try again.",
         ) from None
     except AppleError as exc:
         if exc.invalid_grant or exc.reason == "malformed_code":

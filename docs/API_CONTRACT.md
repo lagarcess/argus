@@ -2811,10 +2811,10 @@ from the verified session; the body accepts no other field.
 | 503 | `apple_sign_in_unconfigured` | Flag on, but an Apple client-secret input, the credential key or durable storage is missing. Fails closed |
 | 401 / 403 | `unauthorized` / `account_conversion_required` | No session, or a guest session |
 | 409 | `apple_identity_missing` | The account has no Apple identity |
-| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored |
+| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple |
 | 400 | `apple_authorization_invalid` | Apple says the code expired, was used, or is malformed |
 | 429 | `too_many_requests` | Five attempts per user per ten minutes |
-| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable |
+| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple, and the next Apple sign-in sends a fresh code) |
 
 A later sign-in replaces the stored token without revoking the old one,
 because revoking any token ends the whole Apple authorization for the app.

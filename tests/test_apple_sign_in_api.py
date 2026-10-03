@@ -210,6 +210,24 @@ def test_a_code_for_another_apple_id_is_refused_and_not_stored(client, apple) ->
     assert apple_credentials_service().repository._rows == {}
 
 
+def test_a_storage_failure_is_503_and_revokes_the_token(
+    client, apple, monkeypatch
+) -> None:  # noqa: ANN001
+    repository = apple_credentials_service().repository
+
+    def down(**_: object) -> None:
+        raise ConnectionError("database down")
+
+    monkeypatch.setattr(repository, "upsert", down)
+    refresh = apple.grant()
+    response = client.post(URL, json={"authorization_code": "c"}, headers=bearer(ALICE))
+    assert response.status_code == 503
+    assert response.json()["code"] == "apple_sign_in_unavailable"
+    assert refresh not in response.text
+    assert apple.calls[-1][0] == "/auth/revoke"
+    assert repository._rows == {}
+
+
 def test_a_used_or_expired_code_is_400(client, apple) -> None:  # noqa: ANN001
     apple.token_responses.append((400, {"error": "invalid_grant"}))
     response = client.post(URL, json={"authorization_code": "c"}, headers=bearer(ALICE))

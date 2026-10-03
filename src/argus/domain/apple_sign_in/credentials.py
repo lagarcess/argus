@@ -8,6 +8,12 @@ keeps only the refresh token, sealed by ``SecretBox`` and bound to
 An older token is not revoked on replacement: revoking any token ends the
 person's whole Apple authorization for the app, including the new one.
 
+Apple has already consumed the one-time code by the time anything can go
+wrong locally, so a token that can't be kept is never just dropped: on a
+subject mismatch or a storage failure, capture revokes it at Apple right away
+(best effort). The person's next Apple sign-in then asks again and yields a
+fresh code, instead of leaving an Apple authorization nothing can revoke.
+
 Revoke is what the account-deletion lane calls. It opens the stored token,
 asks Apple to revoke it, and deletes the row only after Apple answers 200, and
 only if the row still holds the token that was revoked. Any failure leaves the
@@ -24,6 +30,8 @@ from enum import Enum
 from threading import Lock
 from typing import Protocol
 
+from loguru import logger
+
 from argus.domain.apple_sign_in.client import AppleAuthClient, AppleError
 from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 
@@ -32,6 +40,10 @@ SOURCE = "apple_sign_in"
 
 class AppleIdentityMismatch(RuntimeError):
     """The code's Apple subject is not the signed-in user's Apple identity."""
+
+
+class AppleCaptureNotStored(RuntimeError):
+    """The exchanged token couldn't be stored; it was revoked instead."""
 
 
 class AppleRevocationPending(RuntimeError):
@@ -119,20 +131,38 @@ class AppleCredentialService:
     def capture(
         self, *, user_id: str, apple_subject: str, authorization_code: str
     ) -> None:
-        """Raises ``AppleError`` (Apple refused or is unreachable) or
-        ``AppleIdentityMismatch``; nothing is stored in either case."""
+        """Raises ``AppleError`` (Apple refused or is unreachable),
+        ``AppleIdentityMismatch`` or ``AppleCaptureNotStored``; nothing is
+        stored in any of those cases."""
 
         grant = self._client.exchange_code(authorization_code)
         if grant.subject != apple_subject:
+            self._discard(grant.refresh_token, reason="identity_mismatch")
             raise AppleIdentityMismatch("apple subject does not match the user")
-        self.repository.upsert(
-            user_id=user_id,
-            client_id=self._client.config.client_id,
-            secret_ciphertext=self._box.seal(
-                grant.refresh_token, source=SOURCE, connection_id=user_id
-            ),
-            now=self._clock(),
-        )
+        try:
+            self.repository.upsert(
+                user_id=user_id,
+                client_id=self._client.config.client_id,
+                secret_ciphertext=self._box.seal(
+                    grant.refresh_token, source=SOURCE, connection_id=user_id
+                ),
+                now=self._clock(),
+            )
+        except Exception as exc:  # noqa: BLE001 - any storage failure loses the token
+            self._discard(grant.refresh_token, reason="storage_unavailable")
+            raise AppleCaptureNotStored(type(exc).__name__) from None
+
+    def _discard(self, refresh_token: str, *, reason: str) -> None:
+        """Revoke a token that won't be stored, so none is left unrevocable."""
+
+        try:
+            self._client.revoke(refresh_token, client_id=self._client.config.client_id)
+        except AppleError as exc:
+            logger.warning(
+                "Apple token discarded without revoke",
+                reason=reason,
+                apple_reason=exc.reason,
+            )
 
     def revoke(self, *, user_id: str) -> RevokeOutcome:
         """Raises ``AppleRevocationPending`` while the token is kept for retry."""
