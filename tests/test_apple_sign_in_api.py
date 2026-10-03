@@ -122,9 +122,47 @@ def test_flag_off_is_404_before_authentication(surface_env, gateway, monkeypatch
     for test_client in _client(gateway):
         response = test_client.post(URL, json={"authorization_code": "c"})
         assert response.status_code == 404
-        assert response.json()["code"] == "apple_token_capture_unavailable"
+        assert response.json() == {"detail": "Not Found"}
         assert apple_credentials_service() is None
     gateway.get_auth_user_from_token.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("path", "content", "headers"),
+    [
+        (URL, b"{not json", {"Content-Type": "application/json"}),
+        (URL, b"{not json", {"Content-Type": "application/json", **bearer(ALICE)}),
+        (URL, b'{"authorization_code": ""}', {"Content-Type": "application/json"}),
+        (URL, b"", {}),
+        (URL + "/", b"{not json", {"Content-Type": "application/json"}),
+    ],
+)
+def test_flag_off_gates_before_the_body_is_read(
+    surface_env,  # noqa: F811
+    gateway,  # noqa: F811
+    monkeypatch,
+    path,
+    content,
+    headers,
+) -> None:  # noqa: ANN001
+    # Same as EvidenceReceiptFlagGateMiddleware: invalid JSON is 404, not 422,
+    # so a disabled deployment looks exactly like one without the route.
+    monkeypatch.delenv(FLAG, raising=False)
+    for test_client in _client(gateway):
+        response = test_client.post(path, content=content, headers=headers)
+        assert response.status_code == 404
+        assert response.json() == {"detail": "Not Found"}
+        assert response.headers.get("x-request-id")
+    gateway.get_auth_user_from_token.assert_not_called()
+
+
+def test_flag_on_still_validates_the_body(client, apple) -> None:  # noqa: ANN001
+    response = client.post(
+        URL,
+        content=b"{not json",
+        headers={"Content-Type": "application/json", **bearer(ALICE)},
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -226,6 +264,44 @@ def test_a_storage_failure_is_503_and_revokes_the_token(
     assert refresh not in response.text
     assert apple.calls[-1][0] == "/auth/revoke"
     assert repository._rows == {}
+
+
+@pytest.mark.parametrize("failure", ["unexpected", "apple_down"])
+def test_a_failed_save_stays_503_whatever_the_compensating_revoke_does(
+    client, apple, monkeypatch, failure
+) -> None:  # noqa: ANN001
+    repository = apple_credentials_service().repository
+
+    def down(**_: object) -> None:
+        raise ConnectionError("database down")
+
+    monkeypatch.setattr(repository, "upsert", down)
+    if failure == "unexpected":
+        apple.revoke_raises = RuntimeError("unexpected client failure")
+    else:
+        apple.revoke_responses += [(503, None), (503, None), (503, None)]
+    refresh = apple.grant()
+    response = client.post(URL, json={"authorization_code": "c"}, headers=bearer(ALICE))
+    assert response.status_code == 503
+    assert response.json()["code"] == "apple_sign_in_unavailable"
+    assert refresh not in response.text
+    assert [path for path, _ in apple.calls].count("/auth/revoke") == 1
+
+
+@pytest.mark.parametrize("failure", ["unexpected", "apple_down"])
+def test_a_mismatch_stays_409_whatever_the_compensating_revoke_does(
+    client, apple, failure
+) -> None:  # noqa: ANN001
+    if failure == "unexpected":
+        apple.revoke_raises = RuntimeError("unexpected client failure")
+    else:
+        apple.revoke_responses += [(503, None), (503, None), (503, None)]
+    refresh = apple.grant(sub="000999.someone-else")
+    response = client.post(URL, json={"authorization_code": "c"}, headers=bearer(ALICE))
+    assert response.status_code == 409
+    assert response.json()["code"] == "apple_identity_mismatch"
+    assert refresh not in response.text
+    assert [path for path, _ in apple.calls].count("/auth/revoke") == 1
 
 
 def test_a_used_or_expired_code_is_400(client, apple) -> None:  # noqa: ANN001

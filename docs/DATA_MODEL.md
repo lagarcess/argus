@@ -3111,7 +3111,19 @@ still has an unrevoked Apple token cannot be deleted, so no deletion path can
 drop the token without revoking it at Apple. The account-deletion run revokes
 first, deletes this row only after Apple confirms, then deletes the user. The
 row is the pending revoke until then, which matches the contract that the
-encrypted credential is kept only while a revoke is pending.
+encrypted credential is kept only while a revoke is pending. Apple's
+`invalid_grant` on revoke means the token is already dead, so it also deletes
+the row.
+
+If `ARGUS_INGESTION_SECRET_KEY` was rotated, the token can't be opened and so
+can't be revoked, and the restrict key would keep that user undeletable
+forever. The deletion run then calls `discard_unreadable`, which deletes the
+row only while it still can't be opened and never logs a token. No route
+exposes it. Apple's authorization stays until the person removes it in their
+Apple ID settings.
+
+Capture never writes a row for a code that belongs to another Apple ID: that is
+`409 apple_identity_mismatch`, and the token is revoked at Apple instead.
 
 ## Connected financial sources
 

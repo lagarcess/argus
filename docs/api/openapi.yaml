@@ -63,6 +63,30 @@ paths:
       responses:
         '204':
           description: Successful Response
+        '400':
+          description: '`apple_authorization_invalid`: Apple says the code expired, was used,
+            or is malformed.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Capture is off: `{"detail": "Not Found"}`, the plain answer of a route
+            that doesn''t exist, before the body or session is read.'
+        '409':
+          description: '`apple_identity_missing`: the account has no Apple identity. `apple_identity_mismatch`:
+            the code belongs to another Apple ID; nothing is stored and the exchanged token
+            is revoked at Apple.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: '`too_many_requests`: five attempts per user per ten minutes.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Validation Error
           content:

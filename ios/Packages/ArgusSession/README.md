@@ -38,7 +38,8 @@ If Argus refuses the new session (for example the private-alpha allowlist at
 Provider 4xx errors surface as `rejected` with a bounded code, 5xx as
 `unavailable`. `captureAppleAuthorizationCode` posts Apple's one-time code to
 `POST /api/v1/auth/apple/authorization-code` for revocation at account deletion;
-it is best effort and the server answers 404 while capture is off.
+it is best effort. The server answers a plain 404 while capture is off and
+`409 apple_identity_mismatch` when the code belongs to another Apple ID.
 
 ## Credential and error behavior
 
