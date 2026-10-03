@@ -30,18 +30,39 @@ struct CuadraoProfilePage: View {
     @ViewBuilder private var content: some View {
         switch route {
         case .preferences: preferences
+        case .personalization: personalization
         case .notifications: notifications
+        case .security: security
         case .privacy: privacy
+        case .usage:
+            Section {
+                ContentUnavailableView(spanish ? "Tu uso, aquí" : "Your usage, here", systemImage: "chart.bar",
+                    description: Text(spanish ? "Verás tu disponibilidad y cuándo se renueva al conectar tu cuenta." : "Your allowance and reset time will appear when your account is connected."))
+            }
         case .help: help
         case .feedback: EmptyView()
-        case .files, .conversations: records
+        case .memory, .files, .conversations: records
+        case .shared:
+            empty(spanish ? "Sin conversaciones compartidas" : "No shared conversations", detail: spanish ? "Los enlaces que compartas aparecerán aquí." : "Links you share will appear here.")
+        case .removed:
+            empty(spanish ? "Sin movimientos eliminados" : "No removed activity", detail: spanish ? "Aquí podrás revisar los movimientos disponibles para restaurar." : "Review activity available to restore here.")
         case .voice:
             Section {
                 CuadraoVoicePreference(spanish: spanish)
                 LabeledContent(spanish ? "Idioma" : "Language", value: spanish ? "El de la conversación" : "Matches the conversation")
             } footer: {
-                Text(spanish ? "La voz cambia cómo suena Cuadrao. Esta vista previa no activa el micrófono."
-                     : "Voice changes how Cuadrao sounds. This preview does not activate the microphone.")
+                if CuadraoFirstRelease.shows(.personalization) {
+                    Text(spanish ? "La voz cambia cómo suena Cuadrao. El tono y la extensión se eligen en Personalización. Esta vista previa no activa el micrófono."
+                         : "Voice changes how Cuadrao sounds. Choose response tone and length in Personalization. This preview does not activate the microphone.")
+                } else {
+                    Text(spanish ? "La voz cambia cómo suena Cuadrao. Esta vista previa no activa el micrófono."
+                         : "Voice changes how Cuadrao sounds. This preview does not activate the microphone.")
+                }
+            }
+        case .advanced:
+            Section {
+                previewAction(spanish ? "Sugerencias" : "Suggestions")
+                previewAction(spanish ? "Agitar para reportar un problema" : "Shake to report a problem")
             }
         case .personal: EmptyView()
         }
@@ -65,13 +86,39 @@ struct CuadraoProfilePage: View {
                 }
             } header: { Text(spanish ? "Región y moneda" : "Region and currency") }
               footer: { Text(spanish ? "Elegir una moneda no convierte ni combina tus balances." : "Choosing a currency does not convert or combine your balances.") }
-            if CuadraoDesignPreview.voiceSelection { Section { link(.voice) } }
+            if CuadraoFirstRelease.shows(.voice) || CuadraoFirstRelease.shows(.advanced) {
+                Section { link(.voice); link(.advanced) }
+            }
+        }
+    }
+
+    private var personalization: some View {
+        Group {
+            Section {
+                Picker(spanish ? "Extensión" : "Length", selection: $profile.responseLength) {
+                    Text(spanish ? "Automática" : "Automatic").tag(0)
+                    Text(spanish ? "Breve" : "Brief").tag(1)
+                    Text(spanish ? "Detallada" : "Detailed").tag(2)
+                }
+                Picker(spanish ? "Tono" : "Tone", selection: $profile.tone) {
+                    Text(spanish ? "Natural" : "Natural").tag(0)
+                    Text(spanish ? "Directo" : "Direct").tag(1)
+                    Text(spanish ? "Didáctico" : "Educational").tag(2)
+                }
+            } header: { Text(spanish ? "Respuestas" : "Responses") }
+            Section {
+                TextField(spanish ? "Qué debería tener en cuenta" : "What should it keep in mind", text: $profile.instructions, axis: .vertical)
+                    .lineLimit(4...8)
+            } header: { Text(spanish ? "Tus instrucciones" : "Your instructions") }
+              footer: { Text(spanish ? "Son preferencias que tú eliges. No son recuerdos inferidos de tus chats. En esta vista previa no se envían al asistente." : "These are preferences you choose, not memories inferred from chats. This preview does not send them to the assistant.") }
+            if CuadraoFirstRelease.shows(.memory) { Section { link(.memory) } }
         }
     }
 
     private var notifications: some View {
         Group {
             Section {
+                // Release rule (fc7650ea/#787): the "Por correo / By email" toggle is removed.
                 Toggle(spanish ? "En este dispositivo" : "On this device", isOn: $profile.push)
             } header: { Text(spanish ? "Dónde recibirlas" : "Delivery") }
               footer: { Text(spanish ? "Novedades sigue disponible aunque desactives estos avisos. Los controles de esta vista previa no solicitan permisos ni envían notificaciones." : "Updates remain available when these alerts are off. Preview controls do not request permission or send notifications.") }
@@ -94,28 +141,52 @@ struct CuadraoProfilePage: View {
         }
     }
 
+    private var security: some View {
+        Group {
+            Section { previewAction(spanish ? "Cambiar contraseña" : "Change password") }
+            Section {
+                LabeledContent(spanish ? "Este dispositivo" : "This device", value: "iPhone")
+                previewAction(spanish ? "Cerrar otras sesiones" : "Sign out other sessions")
+                previewAction(spanish ? "Cerrar todas las sesiones" : "Sign out all sessions")
+            } header: { Text(spanish ? "Sesiones" : "Sessions") }
+              footer: { Text(spanish ? "Las sesiones reales se mostrarán al conectar tu cuenta." : "Real sessions will appear when your account is connected.") }
+        }
+    }
+
     private var privacy: some View {
         Group {
             Section {
-                link(.files); link(.conversations)
+                link(.memory); link(.files); link(.conversations)
             } header: { Text(spanish ? "Tus datos" : "Your data") }
+            if CuadraoFirstRelease.shows(.shared) || CuadraoFirstRelease.shows(.removed) {
+                Section {
+                    link(.shared); link(.removed)
+                } header: { Text(spanish ? "Compartir y recuperar" : "Sharing and recovery") }
+            }
             Section {
                 // Entry point only; the consequences/verification flow ships separately (DESIGN.md §13).
                 Button(spanish ? "Eliminar cuenta" : "Delete account", role: .destructive) {
                     notice = spanish ? "Eliminar cuenta" : "Delete account"
                 }
-            } footer: { Text(spanish ? "Compartir un hogar no comparte tus chats ni archivos." : "Joining a household does not share your chats or files.") }
+            } footer: {
+                if CuadraoFirstRelease.shows(.memory) {
+                    Text(spanish ? "Compartir un hogar no comparte tus chats, archivos ni memoria." : "Joining a household does not share your chats, files or memory.")
+                } else {
+                    Text(spanish ? "Compartir un hogar no comparte tus chats ni archivos." : "Joining a household does not share your chats or files.")
+                }
+            }
         }
     }
 
     private var records: some View {
-        let kind: CanvasSearchKind = route == .files ? .files : .chats
+        let kind: CanvasSearchKind = route == .memory ? .memory : route == .files ? .files : .chats
         let rows = includeExamples ? CanvasSearchReference.examples(spanish).filter { $0.kind == kind } : []
         return Group {
             Section {
                 ForEach(rows) { item in
                     NavigationLink {
-                        CuadraoSearchReferenceDetail(item: item, spanish: spanish, source: nil)
+                        CuadraoSearchReferenceDetail(item: item, spanish: spanish,
+                            source: item.kind == .memory ? CanvasSearchReference.examples(spanish).first { $0.id == "chat-cd" } : nil)
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(item.title)
@@ -124,6 +195,17 @@ struct CuadraoProfilePage: View {
                     }
                 }
                 if rows.isEmpty { Text(spanish ? "Nada guardado todavía." : "Nothing saved yet.").foregroundStyle(.secondary) }
+            } footer: {
+                if route == .memory {
+                    Text(spanish ? "Memoria guarda contexto que confirmas. Tus balances y movimientos permanecen en sus propios registros." : "Memory holds context you confirm. Balances and activity stay in their own records.")
+                }
+            }
+            if route == .conversations && CuadraoFirstRelease.showsConversationBulkActions {
+                Section {
+                    previewAction(spanish ? "Chats archivados" : "Archived chats")
+                    previewAction(spanish ? "Eliminados recientemente" : "Recently deleted")
+                    previewAction(spanish ? "Eliminar todas las conversaciones" : "Delete all conversations")
+                }
             }
         }
     }
@@ -141,15 +223,20 @@ struct CuadraoProfilePage: View {
         }
     }
 
-    private func link(_ route: CanvasProfileRoute) -> some View {
-        NavigationLink(value: route) {
-            HStack(spacing: 14) {
-                CanvasProfileIcon(route: route)
-                Text(route.title(spanish)).frame(minHeight: 30)
+    @ViewBuilder private func link(_ route: CanvasProfileRoute) -> some View {
+        if CuadraoFirstRelease.shows(route) {
+            NavigationLink(value: route) {
+                HStack(spacing: 14) {
+                    CanvasProfileIcon(route: route)
+                    Text(route.title(spanish)).frame(minHeight: 30)
+                }
             }
         }
     }
     private func previewAction(_ title: String) -> some View {
         Button(title) { notice = title }.foregroundStyle(.primary).frame(minHeight: 30)
+    }
+    private func empty(_ title: String, detail: String) -> some View {
+        ContentUnavailableView(title, systemImage: route.symbol, description: Text(detail))
     }
 }

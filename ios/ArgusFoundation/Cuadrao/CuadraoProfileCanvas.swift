@@ -8,6 +8,9 @@ struct CanvasProfileDraft {
     var avatar: CanvasProfileAvatarStyle = .initial
     var quietStart = Calendar.current.date(from: DateComponents(hour: 22)) ?? .now
     var quietEnd = Calendar.current.date(from: DateComponents(hour: 8)) ?? .now
+    var responseLength = 0
+    var tone = 0
+    var instructions = ""
     var feedback = CanvasFeedbackDraft()
     var push = false
     var budgets = true
@@ -18,21 +21,26 @@ struct CanvasProfileDraft {
     var quietHours = false
 }
 
-/// Release rules (fc7650ea) hide Personalization, Security and sessions, Shared conversations,
-/// Removed activity and Memory, plus placeholder-only Usage and More options, so they have no route.
 enum CanvasProfileRoute: Hashable {
-    case personal, preferences, notifications, privacy, help
-    case files, conversations, voice, feedback
+    case personal, preferences, personalization, notifications, security, privacy, usage, help
+    case memory, files, conversations, shared, removed, voice, advanced, feedback
     func title(_ es: Bool) -> String {
         switch self {
         case .personal: es ? "Mi perfil" : "My profile"
         case .preferences: es ? "Preferencias" : "Preferences"
+        case .personalization: es ? "Personalización" : "Personalization"
         case .notifications: es ? "Notificaciones" : "Notifications"
+        case .security: es ? "Seguridad" : "Security"
         case .privacy: es ? "Datos y privacidad" : "Data and privacy"
+        case .usage: es ? "Uso" : "Usage"
         case .help: es ? "Ayuda y comentarios" : "Help and feedback"
+        case .memory: es ? "Memoria" : "Memory"
         case .files: es ? "Archivos" : "Files"
         case .conversations: es ? "Conversaciones" : "Conversations"
+        case .shared: es ? "Conversaciones compartidas" : "Shared conversations"
+        case .removed: es ? "Movimientos eliminados" : "Removed activity"
         case .voice: es ? "Voz" : "Voice"
+        case .advanced: es ? "Más opciones" : "More options"
         case .feedback: es ? "Comentarios" : "Feedback"
         }
     }
@@ -40,14 +48,35 @@ enum CanvasProfileRoute: Hashable {
         switch self {
         case .personal: "person"
         case .preferences: "slider.horizontal.3"
+        case .personalization: "sparkle"
         case .notifications: "bell"
+        case .security: "lock"
         case .privacy: "hand.raised"
+        case .usage: "chart.bar"
         case .help: "questionmark.circle"
+        case .memory: "brain"
         case .files: "doc"
         case .conversations: "bubble.left.and.bubble.right"
+        case .shared: "link"
+        case .removed: "trash"
         case .voice: "waveform"
+        case .advanced: "ellipsis"
         case .feedback: "bubble.left"
         }
+    }
+}
+
+/// First native release presentation (fc7650ea; lock wording in #787). These Profile rows and the
+/// personal-photo option stay in code but are hidden; flip a value once its feature, owner and
+/// controls are ready. Voice follows its own default-off preview switch.
+enum CuadraoFirstRelease {
+    static let hiddenProfileRoutes: Set<CanvasProfileRoute> = [
+        .personalization, .security, .shared, .removed, .memory, .usage, .advanced
+    ]
+    static let showsPersonalPhoto = false
+    static let showsConversationBulkActions = false
+    static func shows(_ route: CanvasProfileRoute) -> Bool {
+        route == .voice ? CuadraoDesignPreview.voiceSelection : !hiddenProfileRoutes.contains(route)
     }
 }
 
@@ -71,8 +100,8 @@ struct CuadraoProfileCanvas: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     identity.padding(.bottom, 4)
-                    group("App", routes: [.preferences, .notifications])
-                    group(spanish ? "Cuenta" : "Account", routes: [.privacy])
+                    group("App", routes: [.preferences, .personalization, .notifications])
+                    group(spanish ? "Cuenta" : "Account", routes: [.security, .privacy, .usage])
                     group(spanish ? "Soporte" : "Support", routes: [.help])
                     Button(spanish ? "Cerrar sesión" : "Sign out") { signOut = true }
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -116,7 +145,9 @@ struct CuadraoProfileCanvas: View {
         }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.profile.identity")
     }
 
-    private func group(_ title: String, routes: [CanvasProfileRoute]) -> some View {
+    @ViewBuilder private func group(_ title: String, routes all: [CanvasProfileRoute]) -> some View {
+        let routes = all.filter { CuadraoFirstRelease.shows($0) }
+        if !routes.isEmpty {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.subheadline).foregroundStyle(.secondary).accessibilityAddTraits(.isHeader)
             VStack(spacing: 0) {
@@ -130,6 +161,7 @@ struct CuadraoProfileCanvas: View {
                     }
                 }
             }.background(CanvasSettingsStyle.surface, in: RoundedRectangle(cornerRadius: 22))
+        }
         }
     }
 }
@@ -174,6 +206,8 @@ struct CuadraoProfileEditor: View {
     @State private var name: String
     @State private var preferred: String
     @State private var avatar: CanvasProfileAvatarStyle
+    @State private var photoLoading = false
+    @State private var cropRequest: CanvasAvatarCropRequest?
 
     init(profile: Binding<CanvasProfileDraft>, spanish: Bool) {
         _profile = profile; self.spanish = spanish
@@ -194,7 +228,7 @@ struct CuadraoProfileEditor: View {
                 HStack { Spacer(); CanvasProfileAvatar(name: name, style: avatar); Spacer() }
                     .padding(.vertical, 12).listRowBackground(Color.clear)
             }
-            CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar)
+            CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar, loading: $photoLoading, cropRequest: $cropRequest)
             Section {
                 field(spanish ? "Nombre" : "Name", text: $name, id: "cuadrao.profile.name")
                     .textContentType(.name)
@@ -217,6 +251,9 @@ struct CuadraoProfileEditor: View {
                     .font(.footnote).foregroundStyle(.secondary).listRowBackground(Color.clear)
             }
         }.scrollContentBackground(.hidden).background(WelcomePalette.background)
+            .sheet(item: $cropRequest) { request in
+                CanvasAvatarCropSheet(request: request, spanish: spanish) { avatar = .photo($0) }
+            }
             .navigationTitle(spanish ? "Editar perfil" : "Edit profile").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -228,7 +265,7 @@ struct CuadraoProfileEditor: View {
                         profile.preferredName = preferred.trimmingCharacters(in: .whitespacesAndNewlines)
                         profile.avatar = avatar
                         dismiss()
-                    }.disabled(!valid || !changed).accessibilityIdentifier("cuadrao.profile.save")
+                    }.disabled(!valid || !changed || photoLoading).accessibilityIdentifier("cuadrao.profile.save")
                 }
             }
     }
