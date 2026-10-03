@@ -35,8 +35,15 @@ struct CuadraoIdentityAvatar: View {
             switch selection {
             case .none:
                 if presentation == .profile {
-                    Image(systemName: "camera.badge.plus")
+                    Image(systemName: "camera.fill")
                         .font(.system(size: size * 0.32, weight: .medium))
+                        .overlay(alignment: .topTrailing) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: size * 0.16, weight: .semibold))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(WelcomePalette.pine, Color(uiColor: .systemBackground))
+                                .offset(x: size * 0.07, y: -size * 0.05)
+                        }
                         .foregroundStyle(WelcomePalette.pine)
                         .frame(width: size, height: size)
                         .background(Color(uiColor: .tertiarySystemFill))

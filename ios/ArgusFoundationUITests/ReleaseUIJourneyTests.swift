@@ -110,8 +110,9 @@ final class ReleaseUIJourneyTests: XCTestCase {
         let app = launch(spanish: false, dark: true)
         app.buttons["release.profile.avatar"].tap()
         app.buttons["release.avatar.photo"].tap()
-        sleep(2)
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.45)).tap()
+        let photo = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
+        XCTAssertTrue(photo.waitForExistence(timeout: 8))
+        photo.tap()
         XCTAssertTrue(app.buttons["cuadrao.profile.crop.use"].waitForExistence(timeout: 8))
         capture(app, "photo-crop-dark-en")
         app.buttons["cuadrao.profile.crop.use"].tap()
