@@ -343,7 +343,9 @@ final class CuadraoHomeChartUITests: XCTestCase {
     }
     private func launch(english: Bool = false, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["--plan-reset", "-cuadrao.design.appearance", english ? "dark" : "light"] + extra
+        // Without the preview arguments this lands on Connected and never reaches the charts.
+        app.launchArguments = CuadraoPreviewLaunch.arguments
+            + ["--plan-reset", "-cuadrao.design.appearance", english ? "dark" : "light"] + extra
         if english { app.launchArguments += ["--design-english", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"] }
         app.launch()
         return app
