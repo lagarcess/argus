@@ -21,10 +21,12 @@ from argus.domain.ingestion.connections import (
     SourceConnection,
 )
 from argus.domain.ingestion.contract import SourceKind
-from argus.domain.ingestion.secrets import SecretBox
+from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 from argus.domain.ingestion.sink import CandidateSink
 
 Revocation = Literal["revoked", "failed", "not_applicable"]
+# Account deletion also learns when a credential can never be opened.
+DeletionRevocation = Literal["revoked", "failed", "not_applicable", "unreadable"]
 
 
 class SourceAdapter(Protocol):
@@ -129,12 +131,13 @@ class IngestionHub:
         connection_id: str,
         external_ref: str,
         envelope: bytes | None,
-    ) -> Revocation:
+    ) -> DeletionRevocation:
         """Account deletion's revocation path (Lane 6, step 2).
 
         Unlike ``disconnect`` it touches no connection row: the caller holds the
         encrypted credential in the deletion run and drops it only after this
-        returns ``revoked``. ``failed`` keeps the revocation pending for a retry.
+        returns ``revoked``. ``failed`` keeps the revocation pending for a retry;
+        ``unreadable`` means the credential can't be opened and never will be.
         """
         adapter = self._adapters.get(source)
         if envelope is None:
@@ -164,7 +167,13 @@ class IngestionHub:
             version=0,
         )
         try:
-            adapter.revoke(connection, self.credential(connection))
+            credential = self.credential(connection)
+        except SecretUnreadable:
+            # Sealed under a key this process no longer holds: it can never be
+            # opened, so no retry will revoke it.
+            return "unreadable"
+        try:
+            adapter.revoke(connection, credential)
         except Exception as exc:
             logger.warning(
                 "Deletion revocation failed; the credential stays pending",

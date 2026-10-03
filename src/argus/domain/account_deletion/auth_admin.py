@@ -25,6 +25,11 @@ class AuthAdmin(Protocol):
 
     def user_exists(self, user_id: str) -> bool: ...
 
+    def lock_user(self, user_id: str) -> None:
+        """Ban the user so no refresh token or sign-in succeeds while the
+        deletion run is in flight. Idempotent; a missing user is a no-op."""
+        ...
+
     def delete_user(self, user_id: str) -> None:
         """Delete the auth user. Deleting a user that is already gone is a no-op."""
         ...
@@ -60,6 +65,15 @@ class SupabaseAuthAdmin:
 
     def user_exists(self, user_id: str) -> bool:
         return self._get(user_id) is not None
+
+    def lock_user(self, user_id: str) -> None:
+        if self._get(user_id) is None:
+            return
+        # GoTrue revokes nothing on a ban, but refuses every refresh and
+        # sign-in while banned_until is in the future: the session dies at
+        # its access token's expiry, and the API rejects that token sooner
+        # through the in-flight run (auth_sessions).
+        self._admin.update_user_by_id(user_id, {"ban_duration": PLACEHOLDER_BAN})
 
     def delete_user(self, user_id: str) -> None:
         if self._get(user_id) is None:
