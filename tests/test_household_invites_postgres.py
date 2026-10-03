@@ -27,6 +27,7 @@ pytestmark = pytest.mark.skipif(
 
 psycopg = pytest.importorskip("psycopg")
 psycopg_pool = pytest.importorskip("psycopg_pool")
+pydantic = pytest.importorskip("pydantic")
 
 from argus.domain.household.errors import (  # noqa: E402
     AdminRequired,
@@ -39,6 +40,7 @@ from argus.domain.household.errors import (  # noqa: E402
     InvitationExpired,
     InvitationNotFound,
     InvitationRevoked,
+    InviteRuleViolation,
     VerifiedUserRequired,
 )
 from argus.domain.household.invite_codes import InviteSettings  # noqa: E402
@@ -502,6 +504,26 @@ def test_expired_or_revoked_group_link_admits_no_one(lane):
         key = str(uuid4())
         lane.group_link(3, label="Same key", key=key)
         lane.group_link(4, label="Same key", key=key)
+
+
+def test_blank_group_link_label_is_refused_before_insert(lane):
+    """Codex P2: a whitespace label is a validation error, never a 500."""
+    with pytest.raises(pydantic.ValidationError):
+        CreateGroupLinkRequest(
+            source_label="   ", cap=3, expires_at=lane.clock.now + timedelta(days=1)
+        )
+    smuggled = CreateGroupLinkRequest.model_construct(
+        source_label="   ", cap=3, expires_at=lane.clock.now + timedelta(days=1)
+    )
+    with pytest.raises(InviteRuleViolation):
+        lane.store.create_group_link(
+            user_id=lane.founder, request=smuggled, key=str(uuid4()), request_hash="x"
+        )
+    assert lane.row(
+        "select count(*) from public.beta_invitations where created_by=%s"
+        " and kind='group_link'",
+        lane.founder,
+    ) == (0,)
 
 
 # -- Gate ---------------------------------------------------------------------

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 InviteKind = Literal["beta", "household", "group_link"]
 InviteState = Literal["pending", "accepted", "revoked", "expired"]
@@ -36,6 +36,15 @@ class CreateGroupLinkRequest(BaseModel):
     source_label: str = Field(min_length=1, max_length=80)
     cap: int = Field(ge=1, le=10000)
     expires_at: datetime
+
+    @field_validator("source_label")
+    @classmethod
+    def _label_has_text(cls, value: str) -> str:
+        # Every group link names its source; a blank label is a 422, not a 500.
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("The source label cannot be blank.")
+        return stripped
 
 
 class QuotaGrantRequest(BaseModel):

@@ -47,6 +47,18 @@ def test_null_or_missing_caller_is_never_an_owner_or_the_founder():
     assert not founder.is_founder(other_id)
 
 
+def test_group_link_label_is_trimmed_and_cannot_be_blank():
+    from argus.domain.household.invite_schemas import CreateGroupLinkRequest
+    from pydantic import ValidationError
+
+    when = datetime.now(timezone.utc) + timedelta(days=1)
+    for blank in ("   ", "\t\n"):
+        with pytest.raises(ValidationError):
+            CreateGroupLinkRequest(source_label=blank, cap=3, expires_at=when)
+    request = CreateGroupLinkRequest(source_label="  Primos  ", cap=3, expires_at=when)
+    assert request.source_label == "Primos"
+
+
 def test_link_flag_off_keeps_todays_household_scheme_and_no_beta_link():
     off = InviteSettings()
     on = InviteSettings(universal_link_enabled=True)

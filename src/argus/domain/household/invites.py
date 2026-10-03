@@ -439,6 +439,9 @@ class PostgresInviteStore:
         request_hash: str,
     ) -> BetaInviteCreatedResponse:
         self._founder(user_id)
+        label = (request.source_label or "").strip()
+        if not label:
+            raise InviteRuleViolation("A group link needs a source label.")
         now = self._clock()
         expires_at = request.expires_at
         if expires_at.tzinfo is None:
@@ -460,7 +463,7 @@ class PostgresInviteStore:
                 request_hash=request_hash,
                 max_uses=request.cap,
                 expires_at=expires_at,
-                source_label=request.source_label.strip() or None,
+                source_label=label,
             )
             return BetaInviteCreatedResponse(invitation=created)
 
