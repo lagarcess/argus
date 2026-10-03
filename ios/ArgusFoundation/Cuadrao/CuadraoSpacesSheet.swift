@@ -40,7 +40,7 @@ struct CuadraoSpacesSheet: View {
             Image(systemName: kind.symbol).font(.title3).frame(width: 28).foregroundStyle(WelcomePalette.pine)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
-                Text(kind.title(spanish)).font(.body.weight(.medium))
+                Text(kind.title(spanish)).font(CuadraoTypography.action)
                 Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
             }
             Spacer()
@@ -78,7 +78,7 @@ private struct CuadraoSpaceNameForm: View {
                     data.saveSpace(kind: kind, name: name, existing: existing); finished()
                 }
             }.padding(24)
-        }.background(Color.white)
+        }.background(WelcomePalette.background)
             .navigationTitle(existing == nil ? kind.title(spanish) : (spanish ? "Cambiar nombre" : "Rename"))
             .navigationBarTitleDisplayMode(.inline)
             .onAppear { name = existing?.name ?? "" }

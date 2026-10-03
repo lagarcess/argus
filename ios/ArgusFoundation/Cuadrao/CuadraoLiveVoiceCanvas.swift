@@ -1,0 +1,116 @@
+import SwiftUI
+
+struct CuadraoLiveVoiceCanvas: View {
+    let chat: CuadraoChatPreview
+    let spanish: Bool
+    let keyboard: () -> Void
+    let showProposal: (() -> Void)?
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var choosingVoice = false
+    @State private var previewDetails = false
+    private var es: Bool { spanish }
+    private var voice: CuadraoVoicePreview { chat.voice }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                WelcomePalette.background.ignoresSafeArea()
+                CuadraoVoiceSea(voice: voice).ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 0) {
+                        header
+                        Spacer(minLength: 64)
+                        status
+                        Spacer(minLength: 64)
+                        CuadraoVoiceWave(voice: voice).padding(.bottom, 36)
+                        controls
+                        previewNotice.padding(.top, 16).padding(.bottom, 16)
+                    }.frame(minHeight: geometry.size.height)
+                }.scrollBounceBehavior(.basedOnSize)
+            }
+        }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+            .simultaneousGesture(DragGesture(minimumDistance: 24).onEnded { value in
+                // Keep system-edge gestures and accessibility scrolling intact.
+                guard !typeSize.isAccessibilitySize, value.startLocation.y > 64,
+                      value.translation.height > 120,
+                      value.translation.height > abs(value.translation.width) * 2 else { return }
+                voice.presentation = .compact
+            })
+            .sheet(isPresented: $choosingVoice) { CuadraoVoicePicker(spanish: es) }
+            .confirmationDialog(es ? "Vista previa de diseño" : "Design preview",
+                                isPresented: $previewDetails, titleVisibility: .visible) {
+                if let showProposal { Button(es ? "Ver propuesta de ejemplo" : "Show example proposal", action: showProposal) }
+                Button(es ? "Probar escucha" : "Preview listening") { voice.phase = .listening }
+                Button(es ? "Probar respuesta" : "Preview speaking") { voice.phase = .speaking }
+            } message: {
+                Text(es ? "El micrófono está apagado. Estas opciones permiten revisar el diseño; no ejecutan acciones reales."
+                     : "The microphone is off. These options let you review the design; they do not perform real actions.")
+            }
+    }
+
+    private var status: some View {
+        VStack(spacing: 16) {
+            Text(voice.status(es)).font(.title2.weight(.medium))
+                .multilineTextAlignment(.center).contentTransition(.opacity)
+                .accessibilityIdentifier("voice-status")
+            if voice.phase == .speaking {
+                Button(es ? "Interrumpir" : "Interrupt") { voice.interrupt() }
+                    .font(.subheadline).frame(minHeight: 44)
+                    .accessibilityIdentifier("voice-interrupt")
+            }
+            if chat.temporary {
+                Label { Text(es ? "Chat temporal" : "Temporary chat") } icon: {
+                    Image("CuadraoTemporaryChat").resizable().scaledToFit().frame(width: 16, height: 16)
+                }.font(.footnote).foregroundStyle(.secondary)
+            }
+        }.frame(maxWidth: .infinity).padding(.horizontal, 28)
+    }
+
+    private var header: some View {
+        HStack {
+            Button { voice.presentation = .compact } label: {
+                Image(systemName: "chevron.down").font(.system(size: 18, weight: .medium))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+            }.accessibilityLabel(es ? "Minimizar conversación de voz" : "Minimize voice conversation")
+                .accessibilityIdentifier("voice-minimize")
+            Spacer()
+            Text("Cuadrao").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+            Spacer()
+            Button { choosingVoice = true } label: {
+                Image(systemName: "slider.horizontal.3").font(.system(size: 20))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+            }.accessibilityLabel(es ? "Elegir voz" : "Choose voice")
+                .accessibilityIdentifier("voice-choose")
+        }.buttonStyle(.plain).padding(.horizontal, 24).padding(.top, 12)
+    }
+
+    private var controls: some View {
+        HStack(spacing: 16) {
+            control(voice.muted ? "mic.slash" : "mic",
+                    voice.muted ? (es ? "Activar micrófono" : "Unmute microphone") : (es ? "Silenciar micrófono" : "Mute microphone"),
+                    id: "voice-mute", selected: voice.muted) { voice.muted.toggle() }
+            control("keyboard", es ? "Escribir" : "Type", id: "voice-keyboard", action: keyboard)
+            control("xmark", es ? "Terminar conversación de voz" : "End voice conversation", id: "voice-end") { voice.end() }
+        }.padding(8).background(.regularMaterial, in: Capsule())
+            .overlay { Capsule().stroke(WelcomePalette.separator.opacity(0.5), lineWidth: 0.5) }
+    }
+
+    private var previewNotice: some View {
+        Button { previewDetails = true } label: {
+            Label(es ? "Vista previa · Sin conexión" : "Preview · Not connected", systemImage: "info.circle")
+                .font(.caption).foregroundStyle(.secondary).frame(minHeight: 44)
+        }.buttonStyle(.plain).accessibilityIdentifier("voice-preview-info")
+    }
+
+    private func control(_ symbol: String, _ title: String, id: String,
+                         selected: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 22, weight: .regular))
+                .frame(width: 52, height: 52)
+                .background(selected ? WelcomePalette.sage : Color.clear, in: Circle())
+        }.buttonStyle(.plain).accessibilityIdentifier(id)
+            .accessibilityLabel(title).accessibilityValue(selected ? (es ? "Activado" : "On") : "")
+    }
+}
