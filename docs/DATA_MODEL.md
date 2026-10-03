@@ -107,6 +107,16 @@ household_invitations
 household_account_grants
 ```
 
+Default-off, registered-only (`ARGUS_BETA_INVITES_ENABLED`; household
+invitations also write the record):
+```text
+beta_invitations
+invite_referrals
+invite_sender_refs
+beta_admissions
+beta_invite_quota_grants
+```
+
 Default-off, registered-only (`ARGUS_INGESTION_ENABLED`):
 ```text
 financial_source_connections
@@ -1959,6 +1969,25 @@ Members carry a user-supplied `display_name`; administrator authority remains
 including after departure, closure and rejoin. Historical accepted memberships
 are backfilled where the invitation acceptance timestamp identifies the row.
 Unresolvable historical outcomes fail closed. Token plaintext is returned once.
+`code_hash` stores the hash of the short typed code beside `token_hash`; it is
+unique, and plaintext is returned once.
+
+`beta_invitations` holds beta invites (`kind='beta'`, `max_uses=1`) and founder
+group links (`kind='group_link'`, a `source_label`, a cap in `max_uses`, an
+expiry, `use_count` and `overflow_count`). Creation is idempotent on
+`(created_by, idempotency_key)` with a request hash. `invite_referrals` is the
+who-invited-whom record: one row per beta or household invitation and one row
+per group-link redemption, with `kind`, `inviter_origin_id` (the row that
+admitted the sender), a random `sender_ref`, and live `sender_user_id` and
+`acceptor_user_id`. Live ids use `ON DELETE SET NULL`; the `invite_sender_refs`
+mapping cascades, so after a deletion the row identifies nobody while counts
+and the chain survive. `beta_admissions` has one row per admitted person
+(`via` beta invitation, group link, household invitation, or an account that
+existed when the migration ran) and cascades with the account.
+`beta_invite_quota_grants` records founder grants above the 10 beta invites.
+All five tables have RLS on, explicit per-command policies (owner-scoped
+select, no client insert, update or delete) and every client privilege revoked;
+only the API service reads and writes them.
 
 Each active `household_account_grants` row binds `owner_membership_id` and
 `recipient_membership_id` in the same household. The owner composite FK also

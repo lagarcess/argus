@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from psycopg_pool import ConnectionPool
 
+from argus.domain.household import invite_record
 from argus.domain.household.errors import (
     AccountNotOwned,
     AdminRequired,
@@ -24,10 +25,12 @@ from argus.domain.household.errors import (
     MemberNotFound,
     MustTransferOrClose,
 )
+from argus.domain.household.invite_codes import format_code, unique_code
 from argus.domain.household.repository import (
     INVITE_TTL,
     FinancialAccountLookup,
     hash_token,
+    secret_lookup,
 )
 from argus.domain.household.schemas import (
     AcceptanceResult,
@@ -122,19 +125,36 @@ class PostgresHouseholdRepository:
                 )
                 now = self._clock()
                 token = secrets.token_urlsafe(32)
+                code, code_digest = unique_code(connection)
                 invite_id = str(uuid4())
                 expires = now + INVITE_TTL
                 connection.execute(
                     "insert into public.household_invitations"
-                    " (id, household_id, token_hash, created_by, created_at, expires_at)"
-                    " values (%s, %s, %s, %s, %s, %s)",
-                    (invite_id, household_id, hash_token(token), user_id, now, expires),
+                    " (id, household_id, token_hash, code_hash, created_by, created_at,"
+                    " expires_at) values (%s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        invite_id,
+                        household_id,
+                        hash_token(token),
+                        code_digest,
+                        user_id,
+                        now,
+                        expires,
+                    ),
+                )
+                invite_record.record_sent(
+                    connection,
+                    kind="household",
+                    sender=user_id,
+                    at=now,
+                    household_invitation_id=invite_id,
                 )
                 return InvitationCreated(
                     id=invite_id,
                     household_id=household_id,
                     expires_at=expires,
                     token=token,
+                    code=format_code(code),
                 )
 
     def revoke_invitation(
@@ -163,11 +183,16 @@ class PostgresHouseholdRepository:
                         (self._clock(), invitation_id),
                     )
 
-    def preview_invitation(self, *, user_id: str, token: str) -> InvitationPreview:
+    def preview_invitation(
+        self, *, user_id: str, token: str | None = None, code: str | None = None
+    ) -> InvitationPreview:
+        column, digest = secret_lookup(token, code)
         with self.connection() as c:
             row = c.execute(
-                "select h.name,i.expires_at,i.revoked_at,i.accepted_at,h.status from public.household_invitations i join public.households h on h.id=i.household_id where i.token_hash=%s",
-                (hash_token(token),),
+                "select h.name,i.expires_at,i.revoked_at,i.accepted_at,h.status from public.household_invitations i join public.households h on h.id=i.household_id where i."  # noqa: S608
+                + column
+                + "=%s",
+                (digest,),
             ).fetchone()
             if row is None:
                 raise InvitationNotFound()
@@ -181,13 +206,17 @@ class PostgresHouseholdRepository:
             )
 
     def accept_invitation(
-        self, *, user_id: str, token: str, display_name: str = "Member"
+        self,
+        *,
+        user_id: str,
+        token: str | None = None,
+        display_name: str = "Member",
+        code: str | None = None,
     ) -> AcceptanceResult:
+        column, digest = secret_lookup(token, code)
+        where = " from public.household_invitations where " + column + "=%s"
         with self.connection() as c, c.transaction():
-            located = c.execute(
-                "select household_id from public.household_invitations where token_hash=%s",
-                (hash_token(token),),
-            ).fetchone()
+            located = c.execute("select household_id" + where, (digest,)).fetchone()
             if not located:
                 raise InvitationNotFound()
             hid = str(located[0])
@@ -195,8 +224,10 @@ class PostgresHouseholdRepository:
                 "select status from public.households where id=%s for update", (hid,)
             ).fetchone()[0]
             row = c.execute(
-                "select id,expires_at,revoked_at,accepted_by,accepted_at,accepted_membership_id from public.household_invitations where token_hash=%s for update",
-                (hash_token(token),),
+                "select id,expires_at,revoked_at,accepted_by,accepted_at,accepted_membership_id"
+                + where
+                + " for update",
+                (digest,),
             ).fetchone()
             if row[4] is not None:
                 if str(row[3]) != user_id or row[5] is None:
@@ -228,9 +259,14 @@ class PostgresHouseholdRepository:
                     "insert into public.household_members(id,household_id,user_id,joined_at,display_name) values(%s,%s,%s,%s,%s)",
                     (mid, hid, user_id, self._clock(), display_name),
                 )
+            accepted_at = self._clock()
             c.execute(
                 "update public.household_invitations set accepted_by=%s,accepted_at=%s,accepted_membership_id=%s where id=%s",
-                (user_id, self._clock(), mid, row[0]),
+                (user_id, accepted_at, mid, row[0]),
+            )
+            # Accepting a household invite also lets the person into the beta.
+            invite_record.record_household_accepted(
+                c, invitation_id=str(row[0]), acceptor=user_id, at=accepted_at
             )
             return AcceptanceResult(household_id=hid, membership_id=mid, state="active")
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Permission = Literal["view", "edit"]
 HouseholdStatus = Literal["active", "closed"]
@@ -20,10 +20,19 @@ class CreateHouseholdRequest(BaseModel):
 
 
 class AcceptInvitationRequest(BaseModel):
+    """The token from the link or QR, or the typed code. Exactly one."""
+
     model_config = ConfigDict(extra="forbid")
 
-    token: str = Field(min_length=8, max_length=200)
+    token: str | None = Field(default=None, min_length=8, max_length=200)
+    code: str | None = Field(default=None, min_length=4, max_length=32)
     display_name: str = Field(default="Member", min_length=1, max_length=60)
+
+    @model_validator(mode="after")
+    def _one_secret(self) -> AcceptInvitationRequest:
+        if (self.token is None) == (self.code is None):
+            raise ValueError("Send exactly one of token or code.")
+        return self
 
 
 class VersionRequest(BaseModel):
@@ -120,11 +129,15 @@ class HouseholdRecord(BaseModel):
 
 
 class InvitationCreated(BaseModel):
+    """Token, code and link are returned once; a replay carries none of them."""
+
     id: str
     household_id: str
     expires_at: datetime
     token: str | None
     state: str = "pending"
+    code: str | None = None
+    link: str | None = None
 
 
 class AccountGrantRecord(BaseModel):
