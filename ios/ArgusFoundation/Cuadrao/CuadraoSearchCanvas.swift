@@ -19,6 +19,10 @@ struct CuadraoSearchCanvas: View {
     @FocusState private var focused: Bool
 
     private typealias Kind = CanvasSearchKind
+    /// Release rule (fc7650ea): Memory appears only with the enabled native memory feature
+    /// and its controls. Neither exists yet, so the preview hides the Memory perspective.
+    private static let memoryEnabled = false
+    private var kinds: [Kind] { Kind.allCases.filter { $0 != .memory || Self.memoryEnabled } }
     private enum Scope: CaseIterable { case all, personal, household }
     private enum Route: Hashable { case account(UUID), activity(UUID), plan(UUID), group(UUID), reference(String) }
 
@@ -40,7 +44,7 @@ struct CuadraoSearchCanvas: View {
     }
     private var references: [CanvasSearchReference] {
         guard scope != .household else { return [] }
-        let examples = includeExamples ? CanvasSearchReference.examples(spanish).filter { $0.kind == .files || $0.kind == .memory } : []
+        let examples = includeExamples ? CanvasSearchReference.examples(spanish).filter { $0.kind == .files || ($0.kind == .memory && Self.memoryEnabled) } : []
         return (examples + chat.references(spanish))
             .filter { matches($0.title + " " + $0.detail + " " + $0.content) }
     }
@@ -120,7 +124,7 @@ struct CuadraoSearchCanvas: View {
                             Divider()
                         }
                     }
-                    ForEach([Kind.chats, .files, .memory], id: \.self) { section in
+                    ForEach([Kind.chats, .files, .memory].filter { kinds.contains($0) }, id: \.self) { section in
                         let rows = references.filter { $0.kind == section }
                         if (kind == .all || kind == section) && !rows.isEmpty {
                             heading(title(section), count: rows.count)
@@ -145,7 +149,7 @@ struct CuadraoSearchCanvas: View {
                     searchField
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 24) {
-                            ForEach(Kind.allCases, id: \.self) { value in
+                            ForEach(kinds, id: \.self) { value in
                                 Button { kind = value; focused = false } label: {
                                     Text(title(value)).font(.subheadline)
                                         .foregroundStyle(kind == value ? Color.primary : .secondary)
@@ -280,8 +284,8 @@ struct CuadraoSearchCanvas: View {
                 Section {
                     Button(spanish ? "Restablecer filtros" : "Reset filters") { scope = .all; currency = "" }
                 } footer: {
-                    Text(spanish ? "Solo yo incluye lo que no has compartido. Hogar incluye las cuentas compartidas y sus movimientos. Chats, archivos y memoria siguen siendo privados. Los planes en grupo aparecen en Todo. La moneda filtra cuentas, movimientos y planes."
-                         : "Only me includes what you haven't shared. Household includes shared accounts and their activity. Chats, files and memory remain private. Group plans appear in All. Currency filters accounts, activity and plans.")
+                    Text(spanish ? "Solo yo incluye lo que no has compartido. Hogar incluye las cuentas compartidas y sus movimientos. Chats y archivos siguen siendo privados. Los planes en grupo aparecen en Todo. La moneda filtra cuentas, movimientos y planes."
+                         : "Only me includes what you haven't shared. Household includes shared accounts and their activity. Chats and files remain private. Group plans appear in All. Currency filters accounts, activity and plans.")
                 }
             }.navigationTitle(spanish ? "Filtros" : "Filters").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { filters = false } } }

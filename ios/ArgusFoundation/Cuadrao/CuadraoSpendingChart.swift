@@ -53,7 +53,8 @@ struct CuadraoSpendingChart: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text(entries.isEmpty && !story.covered ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
+                    // Release rule (fc7650ea): no records shows Sin datos, never an invented zero.
+                    Text(entries.isEmpty ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-spending-total")
                 }
@@ -88,22 +89,19 @@ struct CuadraoSpendingChart: View {
     }
     private var emptyState: some View {
         CuadraoChartState(title: emptyTitle, detail: emptyDetail,
-            actionTitle: story.state == .firstUse && record != nil ? (spanish ? "Registrar un gasto" : "Record an expense") : nil,
-            action: story.state == .firstUse ? record : nil)
+            actionTitle: recordsHere && record != nil ? (spanish ? "Registrar un gasto" : "Record an expense") : nil,
+            action: recordsHere ? record : nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("home-spending-chart")
             .accessibilityValue(String(periodOffset))
     }
+    /// First use and the current period with no records offer one record-entry action.
+    private var recordsHere: Bool { story.state == .firstUse || (story.state == .emptyPeriod && periodOffset == 0) }
     private var emptyTitle: String {
         switch story.state {
         case .firstUse: return spanish ? "Tu historia empieza aquí" : "Your story starts here"
         case .unavailable: return spanish ? "Falta una parte de la historia" : "Part of the story is missing"
-        case .emptyPeriod:
-            if periodOffset == 0 && range == .month {
-                let month = interval.start.formatted(.dateTime.month(.wide).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
-                return spanish ? "\(month.prefix(1).uppercased() + month.dropFirst()) empieza aquí" : "\(month) starts here"
-            }
-            return spanish ? "Un período sin gastos" : "A period without spending"
+        case .emptyPeriod: return spanish ? "Sin datos" : "No data"
         case .populated: return ""
         }
     }
@@ -111,7 +109,10 @@ struct CuadraoSpendingChart: View {
         switch story.state {
         case .firstUse: return spanish ? "Registra tu primer gasto para empezar a ver tu ritmo." : "Record your first expense to start seeing your rhythm."
         case .unavailable: return spanish ? "El historial de este período está incompleto. No lo contamos como cero." : "This period's history is incomplete. We don't count it as zero."
-        case .emptyPeriod: return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet."
+        case .emptyPeriod:
+            return periodOffset == 0
+                ? (spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
+                : (spanish ? "No hay gastos registrados en este período." : "No expenses were recorded in this period.")
         case .populated: return ""
         }
     }

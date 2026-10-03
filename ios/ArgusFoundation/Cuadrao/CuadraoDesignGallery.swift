@@ -75,8 +75,8 @@ struct CuadraoDesignGallery: View {
                             detail: spanish ? "Tus movimientos darán forma a este espacio." : "Your transactions will give this space its shape.")
                             .accessibilityIdentifier("gallery-empty-state")
                     }
-                    sample(spanish ? "Mes sin gastos" : "Month without expenses") {
-                        CuadraoChartState(title: spanish ? "Octubre empieza aquí" : "October starts here",
+                    sample(spanish ? "Mes sin registros" : "Month without records") {
+                        CuadraoChartState(title: spanish ? "Sin datos" : "No data",
                             detail: spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
                             .accessibilityIdentifier("gallery-empty-month")
                     }
