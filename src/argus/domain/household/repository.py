@@ -25,6 +25,12 @@ from argus.domain.household.errors import (
     MemberNotFound,
     MustTransferOrClose,
 )
+from argus.domain.household.invite_codes import (
+    format_code,
+    hash_code,
+    new_code,
+    normalize_code,
+)
 from argus.domain.household.schemas import (
     AcceptanceResult,
     AccountGrantRecord,
@@ -53,6 +59,16 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def secret_lookup(token: str | None, code: str | None) -> tuple[str, str]:
+    """Which hash column to match, and the digest, for a link token or a code."""
+    if token is not None:
+        return "token_hash", hash_token(token)
+    normalized = normalize_code(code or "")
+    if normalized is None:
+        raise InvitationNotFound()
+    return "code_hash", hash_code(normalized)
+
+
 @dataclass
 class _Member:
     id: str
@@ -74,6 +90,7 @@ class _Invitation:
     accepted_by: str | None = None
     accepted_at: datetime | None = None
     accepted_membership_id: str | None = None
+    code_hash: str | None = None
 
 
 @dataclass
@@ -123,6 +140,7 @@ class InMemoryHouseholdRepository:
         self._clock = clock
         self._households: dict[str, _Household] = {}
         self._invites_by_hash: dict[str, str] = {}
+        self._codes: dict[str, str] = {}
         self._receipts = {}
         self._lock = RLock()
 
@@ -166,6 +184,9 @@ class InMemoryHouseholdRepository:
         household = self._require_admin(user_id=user_id, household_id=household_id)
         now = self._clock()
         token = secrets.token_urlsafe(32)
+        code = new_code()
+        while hash_code(code) in self._codes:
+            code = new_code()
         invite = _Invitation(
             id=str(uuid4()),
             household_id=household.id,
@@ -173,15 +194,27 @@ class InMemoryHouseholdRepository:
             created_by=user_id,
             created_at=now,
             expires_at=now + INVITE_TTL,
+            code_hash=hash_code(code),
         )
         household.invitations.append(invite)
         self._invites_by_hash[invite.token_hash] = household.id
+        self._codes[invite.code_hash] = invite.token_hash
         return InvitationCreated(
             id=invite.id,
             household_id=household.id,
             expires_at=invite.expires_at,
             token=token,
+            code=format_code(code),
         )
+
+    def _token_hash(self, token: str | None, code: str | None) -> str:
+        column, digest = secret_lookup(token, code)
+        if column == "token_hash":
+            return digest
+        found = self._codes.get(digest)
+        if found is None:
+            raise InvitationNotFound()
+        return found
 
     def revoke_invitation(
         self, *, user_id: str, household_id: str, invitation_id: str
@@ -195,12 +228,15 @@ class InMemoryHouseholdRepository:
         if invite.revoked_at is None:
             invite.revoked_at = self._clock()
 
-    def preview_invitation(self, *, user_id: str, token: str) -> InvitationPreview:
-        hid = self._invites_by_hash.get(hash_token(token))
+    def preview_invitation(
+        self, *, user_id: str, token: str | None = None, code: str | None = None
+    ) -> InvitationPreview:
+        token_hash = self._token_hash(token, code)
+        hid = self._invites_by_hash.get(token_hash)
         if hid is None:
             raise InvitationNotFound()
         h = self._households[hid]
-        i = next(i for i in h.invitations if i.token_hash == hash_token(token))
+        i = next(i for i in h.invitations if i.token_hash == token_hash)
         return InvitationPreview(
             name=h.name,
             expires_at=i.expires_at,
@@ -211,13 +247,19 @@ class InMemoryHouseholdRepository:
         )
 
     def accept_invitation(
-        self, *, user_id: str, token: str, display_name: str = "Member"
+        self,
+        *,
+        user_id: str,
+        token: str | None = None,
+        display_name: str = "Member",
+        code: str | None = None,
     ) -> AcceptanceResult:
-        hid = self._invites_by_hash.get(hash_token(token))
+        token_hash = self._token_hash(token, code)
+        hid = self._invites_by_hash.get(token_hash)
         if hid is None:
             raise InvitationNotFound()
         h = self._households[hid]
-        i = next(i for i in h.invitations if i.token_hash == hash_token(token))
+        i = next(i for i in h.invitations if i.token_hash == token_hash)
         if i.accepted_at is not None:
             if i.accepted_by != user_id or i.accepted_membership_id is None:
                 raise InvitationConsumed()
@@ -593,7 +635,7 @@ class InMemoryHouseholdRepository:
                 h = self._require_member(user_id=actor, household_id=household_id)
                 if body.get("expected_version") != h.version:
                     raise StaleVersion()
-            before = deepcopy((self._households, self._invites_by_hash))
+            before = deepcopy((self._households, self._invites_by_hash, self._codes))
             try:
                 value = action()
                 hid = household_id or (
@@ -629,7 +671,7 @@ class InMemoryHouseholdRepository:
                     invitation=i,
                 )
             except Exception:
-                self._households, self._invites_by_hash = before
+                self._households, self._invites_by_hash, self._codes = before
                 raise
 
 

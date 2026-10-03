@@ -21,8 +21,7 @@ struct CanvasSpendingStory {
     var covered: Bool { coverageStart.map { $0 <= interval.start } ?? false }
     var comparison: DateInterval? {
         let prior = CanvasSpendingHistory.comparisonInterval(range: range, offset: offset, now: now)
-        guard !entries.isEmpty, covered, let coverageStart, coverageStart <= prior.start,
-              !CanvasSpendingHistory.entries(expenses, in: prior).isEmpty else { return nil }
+        guard covered, let coverageStart, coverageStart <= prior.start else { return nil }
         // The 31st of a month has no equivalent point in a 30-day previous month.
         if offset == 0 {
             let calendar = Calendar.current
@@ -32,6 +31,7 @@ struct CanvasSpendingStory {
         }
         return prior
     }
+    /// Coverage confirms whether an empty period is a known zero.
     var previousEntries: [CanvasActivity]? {
         comparison.map { CanvasSpendingHistory.entries(expenses, in: $0) }
     }
@@ -89,7 +89,6 @@ extension CanvasSpendingStory {
             let span = calendar.dateInterval(of: .month, for: first)!
             let allRecords = CanvasSpendingHistory.entries(expenses, in: span)
             let records = allRecords.filter { category == nil || $0.category == category }
-            guard !records.isEmpty else { return nil }
             return CanvasSpendingMonth(interval: span, amount: CanvasSpendingHistory.total(records))
         }
         return months.count == count ? months : nil

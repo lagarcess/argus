@@ -109,6 +109,7 @@ struct CanvasActivity: Identifiable {
         let saved = (UserDefaults.standard.stringArray(forKey: orderKey) ?? []).compactMap(UUID.init(uuidString:))
         let known = Set(accounts.map(\.id))
         let order = saved.filter { known.contains($0) } + accounts.map(\.id).filter { !saved.contains($0) }
+        // Integration keeps first-use previews empty: sample history only joins populated previews.
         balanceObservations = populated ? CanvasBalanceHistory.examples(accounts: accounts, now: .now) : []
         activity = []
         expenseCoverageStarts = [:]
@@ -140,6 +141,7 @@ struct CanvasActivity: Identifiable {
     }
 }
 
+
 struct CanvasAccountIcon: View {
     let kind: CanvasAccountKind
     var size: CGFloat = 23
@@ -167,23 +169,29 @@ struct CanvasActionRow: View {
 struct CanvasAccountRow: View {
     let account: CanvasAccount
     let spanish: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: typeSize.isAccessibilitySize ? .top : .center, spacing: 12) {
             CanvasAccountIcon(kind: account.kind)
                 .frame(width: 42, height: 42)
                 .background(WelcomePalette.sage.opacity(0.65), in: RoundedRectangle(cornerRadius: 13))
             VStack(alignment: .leading, spacing: 5) {
-                Text(account.displayName(spanish)).font(.body.weight(.medium))
+                Text(account.displayName(spanish)).font(CuadraoTypography.action)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(account.kind.title(spanish) + (account.sharedWithHousehold ? (spanish ? " · Conjunta" : " · Joint") : ""))
                     .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 5) {
-                Text(account.balance.map { CanvasMoney.format($0, currency: account.currency) } ?? "—")
-                    .font(CuadraoTypography.rowAmount)
-                Text(account.currency + (account.kind.isDebt ? (spanish ? " · pendiente" : " · owed") : ""))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+                if typeSize.isAccessibilitySize { balance.padding(.top, 6) }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            if !typeSize.isAccessibilitySize { balance.fixedSize(horizontal: true, vertical: false) }
         }.padding(.vertical, 12).contentShape(Rectangle())
+    }
+    private var balance: some View {
+        VStack(alignment: typeSize.isAccessibilitySize ? .leading : .trailing, spacing: 5) {
+            Text(account.balance.map { CanvasMoney.format($0, currency: account.currency) } ?? "—")
+                .font(CuadraoTypography.rowAmount)
+                .lineLimit(1).minimumScaleFactor(0.6)
+            Text(account.currency + (account.kind.isDebt ? (spanish ? " · pendiente" : " · owed") : ""))
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }

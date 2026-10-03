@@ -15,8 +15,11 @@ from argus.domain.household.schemas import (
 
 
 class HouseholdService:
-    def __init__(self, repository) -> None:  # noqa: ANN001
+    def __init__(self, repository, invite_settings=None) -> None:  # noqa: ANN001
+        from argus.domain.household.invite_codes import InviteSettings
+
         self._repository = repository
+        self._invite_settings = invite_settings or InviteSettings.from_env()
 
     def create(self, *, user_id: str, request: CreateHouseholdRequest) -> HouseholdRecord:
         return self._repository.create_household(
@@ -30,8 +33,19 @@ class HouseholdService:
         return self._repository.get_household(user_id=user_id, household_id=household_id)
 
     def invite(self, *, user_id: str, household_id: str) -> InvitationCreated:
-        return self._repository.create_invitation(
+        from argus.domain.household.invite_codes import invite_link
+
+        created = self._repository.create_invitation(
             user_id=user_id, household_id=household_id
+        )
+        if created.token is None:
+            return created
+        return created.model_copy(
+            update={
+                "link": invite_link(
+                    created.token, household=True, settings=self._invite_settings
+                )
+            }
         )
 
     def revoke_invitation(
@@ -41,9 +55,16 @@ class HouseholdService:
             user_id=user_id, household_id=household_id, invitation_id=invitation_id
         )
 
-    def accept(self, *, user_id: str, token: str, display_name: str = "Member"):
+    def accept(
+        self,
+        *,
+        user_id: str,
+        token: str | None = None,
+        display_name: str = "Member",
+        code: str | None = None,
+    ):
         return self._repository.accept_invitation(
-            user_id=user_id, token=token, display_name=display_name
+            user_id=user_id, token=token, display_name=display_name, code=code
         )
 
     def leave(self, *, user_id: str, household_id: str) -> None:
@@ -142,8 +163,10 @@ class HouseholdService:
             action=action,
         )
 
-    def preview_invitation(self, *, user_id, token):
-        return self._repository.preview_invitation(user_id=user_id, token=token)
+    def preview_invitation(self, *, user_id, token=None, code=None):
+        return self._repository.preview_invitation(
+            user_id=user_id, token=token, code=code
+        )
 
     def replace_grants(self, *, user_id, household_id, account_id, recipients):
         return self._repository.replace_grants(

@@ -429,8 +429,8 @@ They identify the missing content without pretending to be records.
 
 | State | Presentation and behavior |
 | --- | --- |
-| Current month with no records | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
-| Historical period with no records | Sin datos / No data and neutral past-period copy; keep period navigation |
+| Current month with no records and no confirmed coverage | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
+| Historical period with no records and no confirmed coverage | Sin datos / No data and neutral past-period copy; keep period navigation |
 | Confirmed complete coverage with zero spending | Show the known zero; distinguish it from missing records |
 | First use with no history | Welcoming artwork and one working record-entry action |
 | Incomplete or unavailable history | Distinguish unknown from zero; omit unsupported comparison claims |
@@ -803,7 +803,9 @@ asks to enable it again. Push text never includes amounts or sensitive detail.
 An example is **Tienes un pago próximo / You have an upcoming payment**.
 
 A zero comparison baseline produces a monetary difference, never an infinite or
-invented percentage. No records produces **Sin datos / No data**. Unknown,
+invented percentage. No records without confirmed coverage produces **Sin datos / No data**.
+Confirmed continuous coverage with no expenses is a known zero, even without an
+expense row. It counts in covered averages and amount comparisons. Unknown,
 partially covered and confirmed zero periods remain different states. Keep the
 quiet chart and established category colors, icons and typography.
 

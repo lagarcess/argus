@@ -120,7 +120,7 @@ import Foundation
         check(average?.average == 175, "Twelve complete monthly totals have an exact arithmetic average")
         check(annualStory.completedMonths(count: 6)?.last?.interval.end == calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)), "Running month excluded from completed averages")
         let sparse = CanvasSpendingStory(expenses: [historyRows.last!], range: .month, offset: 0, coverageStart: coverage, now: january)
-        check(sparse.completedMonths(count: 12) == nil, "Months without records never become zero in an average")
+        check(sparse.completedMonths(count: 12)?.filter { $0.amount == 0 }.count == 11, "Confirmed coverage includes months with no spending as zero")
         check(!sparse.longitudinalInsights.contains(where: { $0.kind == .trend }), "An isolated expense does not claim a sustained category trend")
         check(unknownStory.longitudinalInsights.isEmpty, "Unknown coverage never produces longitudinal insight")
         check(emptyStory.longitudinalInsights.isEmpty, "All-zero history does not manufacture a pattern")
@@ -128,7 +128,9 @@ import Foundation
         check(historical.completedMonths(count: 6)?.last?.interval.end == calendar.date(from: DateComponents(year: 2025, month: 10, day: 1)), "Past pages exclude later records from their average")
         check(historical.completedMonths(count: 12) == nil, "A window beginning before coverage is unavailable")
         let noPriorRecords = CanvasSpendingStory(expenses: [historyRows.last!], range: .month, offset: -1, coverageStart: coverage, now: january)
-        check(noPriorRecords.previousTotal == nil, "A prior month without records has no comparison")
+        check(noPriorRecords.previousTotal == 0, "A prior covered month without spending is a known zero baseline")
+        let missingCoverage = CanvasSpendingStory(expenses: [historyRows.last!], range: .month, offset: -1, coverageStart: nil, now: january)
+        check(missingCoverage.previousTotal == nil && missingCoverage.completedMonths(count: 6) == nil, "Absent coverage never fills missing periods with zero")
         let zeroRows = historyRows.map { entry in
             CanvasActivity(accountID: entry.accountID, title: entry.title, amount: 0, date: entry.date, income: false, category: entry.category)
         }

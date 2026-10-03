@@ -11,6 +11,7 @@ struct CuadraoSpendingChart: View {
     @Binding var periodOffset: Int
     var record: (() -> Void)?
     var controls: CuadraoInsightControls?
+    var context: CanvasChartFocus?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedPosition: String?
     @State private var selectedCategory: CanvasExpenseCategory?
@@ -37,7 +38,7 @@ struct CuadraoSpendingChart: View {
         guard story.covered else {
             return spanish ? "Este período tiene un historial incompleto." : "This period has incomplete history."
         }
-        guard !entries.isEmpty else { return spanish ? "Sin datos en este período." : "No data in this period." }
+
         if let prior = story.previousTotal {
             let difference = total - prior
             if difference == 0 { return spanish ? "Has registrado el mismo gasto que en el período anterior." : "Your recorded spending matches the previous period." }
@@ -54,13 +55,13 @@ struct CuadraoSpendingChart: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text((inspected ?? entries).isEmpty ? (spanish ? "Sin datos" : "No data") : money(inspected.map(CanvasSpendingHistory.total) ?? total))
+                    Text((inspected ?? entries).isEmpty && !story.covered ? (spanish ? "Sin datos" : "No data") : money(inspected.map(CanvasSpendingHistory.total) ?? total))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-spending-total")
                 }
                 Text(selectedSlot.map { range == .year ? $0.start.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) : story.periodText($0, spanish: spanish) } ?? (spanish ? "Gastos registrados" : "Recorded spending"))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                if story.state == .populated {
+                if story.state == .populated || story.state == .emptyPeriod {
                     Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("home-spending-insight")
                 }
@@ -71,25 +72,37 @@ struct CuadraoSpendingChart: View {
             } else { emptyState }
             ForEach(categories) { category in categoryRow(category) }
             CuadraoSpendingHighlights(story: story, currency: currency, spanish: spanish)
+            if let context {
+                CanvasChartAsk(context: selectedContext(context), spanish: spanish)
+            }
         }.onChange(of: range) { _, _ in clearSelection() }
             .onChange(of: periodOffset) { _, _ in clearSelection() }
             .onChange(of: distribution) { _, _ in clearSelection() }
             .sensoryFeedback(.selection, trigger: selectedSlot?.start)
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
+    private func selectedContext(_ context: CanvasChartFocus) -> CanvasChartFocus {
+        var selected = context
+        selected.selection = selectedCategory.map { .expenseCategory(id: $0.rawValue, title: $0.title(spanish)) }
+        selected.inspectedInterval = selectedSlot
+        selected.inspectedTitle = selectedSlot.map { story.periodText($0, spanish: spanish) }
+        return selected
+    }
     private var emptyState: some View {
         CuadraoChartState(title: emptyTitle, detail: emptyDetail,
-            actionTitle: story.state == .firstUse && record != nil ? (spanish ? "Registrar un gasto" : "Record an expense") : nil,
-            action: story.state == .firstUse ? record : nil)
+            actionTitle: recordsHere && record != nil ? (spanish ? "Registrar un gasto" : "Record an expense") : nil,
+            action: recordsHere ? record : nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("home-spending-chart")
             .accessibilityValue(String(periodOffset))
     }
+    /// First use and the current period with no records offer one record-entry action.
+    private var recordsHere: Bool { story.state == .firstUse || (story.state == .emptyPeriod && periodOffset == 0) }
     private var emptyTitle: String {
         switch story.state {
         case .firstUse: return spanish ? "Tu historia empieza aquí" : "Your story starts here"
         case .unavailable: return spanish ? "Falta una parte de la historia" : "Part of the story is missing"
-        case .emptyPeriod: return spanish ? "Sin datos" : "No data"
+        case .emptyPeriod: return spanish ? "Sin gastos" : "No spending"
         case .populated: return ""
         }
     }
@@ -97,7 +110,10 @@ struct CuadraoSpendingChart: View {
         switch story.state {
         case .firstUse: return spanish ? "Registra tu primer gasto para empezar a ver tu ritmo." : "Record your first expense to start seeing your rhythm."
         case .unavailable: return spanish ? "El historial de este período está incompleto. No lo contamos como cero." : "This period's history is incomplete. We don't count it as zero."
-        case .emptyPeriod: return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet."
+        case .emptyPeriod:
+            return periodOffset == 0
+                ? (spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
+                : (spanish ? "No hay gastos registrados en este período." : "No expenses were recorded in this period.")
         case .populated: return ""
         }
     }

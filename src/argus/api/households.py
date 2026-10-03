@@ -22,9 +22,11 @@ from argus.domain.household.errors import HouseholdError
 from argus.domain.household.service import HouseholdService
 
 FLAG = "ARGUS_HOUSEHOLDS_ENABLED"
+INVITES_FLAG = "ARGUS_BETA_INVITES_ENABLED"
 TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 _service: HouseholdService | None = None
+_invites = None
 
 
 def households_enabled() -> bool:
@@ -35,12 +37,49 @@ def households_service() -> HouseholdService | None:
     return _service
 
 
+def invites_enabled() -> bool:
+    return os.getenv(INVITES_FLAG, "").strip().lower() in TRUE_VALUES
+
+
+def invites_store():  # noqa: ANN201
+    return _invites
+
+
+def configure_invites_store(store) -> None:  # noqa: ANN001
+    global _invites
+    _invites = store
+
+
+def start_invites(app) -> None:  # noqa: ANN001
+    """Beta invites, the group link and the gate. Postgres only; memory stays off."""
+    configure_invites_store(None)
+    if not invites_enabled():
+        return
+    if api_state.PERSISTENCE_MODE != "supabase" or not api_state.DATABASE_URL:
+        logger.warning(
+            "Beta invites need DATABASE_URL in supabase mode; surface stays off"
+        )
+        return
+    try:
+        from psycopg_pool import ConnectionPool
+
+        from argus.domain.household.invites import PostgresInviteStore
+
+        pool = ConnectionPool(api_state.DATABASE_URL, min_size=0, max_size=4, open=True)
+        app.state.invites_pool = pool
+        configure_invites_store(PostgresInviteStore(pool))
+    except Exception:
+        logger.exception("Beta invite surface failed to start; leaving off")
+        configure_invites_store(None)
+
+
 def configure_households_service(service: HouseholdService | None) -> None:
     global _service
     _service = service
 
 
 def start_households(app) -> None:  # noqa: ANN001
+    start_invites(app)
     if not households_enabled():
         configure_households_service(None)
         return
@@ -98,6 +137,14 @@ def start_households(app) -> None:  # noqa: ANN001
 
 def stop_households(app) -> None:  # noqa: ANN001
     configure_households_service(None)
+    configure_invites_store(None)
+    invites_pool = getattr(app.state, "invites_pool", None)
+    if invites_pool is not None:
+        try:
+            invites_pool.close()
+        except Exception:
+            logger.warning("Invites pool close failed")
+        app.state.invites_pool = None
     pool = getattr(app.state, "households_pool", None)
     if pool is not None:
         try:
@@ -130,11 +177,7 @@ class HouseholdsContext:
     user_id: str
 
 
-def require_households_context(
-    request: Request,
-    service: HouseholdService = Depends(require_households_surface),  # noqa: B008
-    _user: User = Depends(current_user),  # noqa: B008
-) -> HouseholdsContext:
+def _registered_user_id(request: Request) -> str:
     account = account_context(request)
     if account.kind != "registered":
         raise problem(
@@ -144,26 +187,85 @@ def require_households_context(
             title="Account Required",
             detail="Create an account to use households.",
         )
-    return HouseholdsContext(service=service, user_id=account.user_id)
+    return account.user_id
+
+
+def require_households_context(
+    request: Request,
+    service: HouseholdService = Depends(require_households_surface),  # noqa: B008
+    _user: User = Depends(current_user),  # noqa: B008
+) -> HouseholdsContext:
+    return HouseholdsContext(service=service, user_id=_registered_user_id(request))
+
+
+def require_invites_surface(request: Request):  # noqa: ANN201
+    store = invites_store()
+    if not invites_enabled() or store is None:
+        raise problem(
+            request,
+            status_code=404,
+            code="invites_unavailable",
+            title="Not Found",
+            detail="Invites are not available.",
+        )
+    return store
+
+
+@dataclass(frozen=True)
+class InvitesContext:
+    store: object
+    user_id: str
+
+
+def require_invites_context(
+    request: Request,
+    store=Depends(require_invites_surface),  # noqa: ANN001, B008
+    _user: User = Depends(current_user),  # noqa: B008
+) -> InvitesContext:
+    return InvitesContext(store=store, user_id=_registered_user_id(request))
+
+
+_STATUS = {
+    "account_not_owned": 403,
+    "household_admin_required": 403,
+    "not_a_member": 403,
+    "founder_required": 403,
+    "beta_invite_required": 403,
+    "invite_request_invalid": 422,
+    "verified_user_required": 401,
+}
+_WAITLIST_CODES = frozenset(
+    {
+        "beta_invite_required",
+        "group_link_full",
+        "invitation_expired",
+        "invitation_revoked",
+        "invitation_consumed",
+        "invitation_not_found",
+    }
+)
+
+
+def waitlist_context(request: Request, code: str) -> dict | None:
+    """Beta redeem failures point at the waitlist, so the screen can say so."""
+    if code not in _WAITLIST_CODES or not request.url.path.startswith("/api/v1/invites"):
+        return None
+    store = invites_store()
+    url = store.settings.waitlist_url if store is not None else None
+    return {"waitlist_url": url} if url else None
 
 
 def domain_problem(request: Request, error: Exception) -> HTTPException:
     if isinstance(error, HouseholdError):
         status = 404 if error.code.endswith("not_found") else 409
-        if error.code in {
-            "account_not_owned",
-            "household_admin_required",
-            "not_a_member",
-        }:
-            status = 403
-        if error.code == "must_transfer_or_close":
-            status = 409
+        status = _STATUS.get(error.code, status)
         return problem(
             request,
             status_code=status,
             code=error.code,
             title=error.code.replace("_", " ").capitalize(),
             detail=error.detail,
+            context=waitlist_context(request, error.code),
         )
     from argus.api.financial_accounts import domain_problem as financial_problem
 

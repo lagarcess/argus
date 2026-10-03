@@ -7365,8 +7365,8 @@ membership, and returns no protected household snapshot. Key reuse with another
 body returns `409 idempotency_conflict`; stale versions return `409` through
 Recording's canonical stale-version error. Exact bytes are retained by the
 native actor-partitioned journal until a definite response. Invitation creation
-returns `invitation: {id,household_id,expires_at,state,token}`; token appears only
-in the first response. Lost-response retry returns metadata with `token:null`:
+returns `invitation: {id,household_id,expires_at,state,token,code,link}`; token,
+code and link appear only in the first response. Lost-response retry returns metadata with `token:null`:
 revoke and replace that invitation to obtain a usable link. Receipts do not
 store token plaintext or financial payloads.
 
@@ -7375,8 +7375,8 @@ store token plaintext or financial payloads.
 | `POST /api/v1/households` | `name` optional <=80; `display_name` 1–60; no version |
 | `POST /api/v1/households/{id}/invitations` | none; current admin only |
 | `POST /api/v1/households/{id}/invitations/{invitation_id}/revoke` | none; current admin only |
-| `POST /api/v1/household-invitations/preview` | `token`; no version/key or consumption |
-| `POST /api/v1/household-invitations/accept` | `token`, `display_name`; no version |
+| `POST /api/v1/household-invitations/preview` | exactly one of `token` or `code`; no version/key or consumption |
+| `POST /api/v1/household-invitations/accept` | exactly one of `token` or `code`, `display_name`; no version |
 | `POST /api/v1/households/{id}/leave` | none; admin must explicitly transfer or close first |
 | `POST /api/v1/households/{id}/members/{user_id}/remove` | none; admin removes another current member |
 | `POST /api/v1/households/{id}/transfer-admin` | `user_id` of a current member |
@@ -7387,6 +7387,15 @@ UTC days, can be revoked, and have one acceptor. Same-recipient acceptance
 retries return their original membership outcome even after departure/closure
 or later rejoin. A fresh invitation creates a new membership incarnation.
 
+The `code` is 8 Crockford base32 characters shown as `XXXX-XXXX`; input
+ignores case, spaces and dashes. Only its hash is stored, beside `token_hash`,
+with the same single use, expiry and revoke rules. `link` is
+`https://cuadrao.ai/invite#<token>` when `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED`
+is on, otherwise today's `argus-household://invite#<token>`. The QR is drawn on
+the device from `link`; no QR image is stored. Accepting a household invitation
+also admits the person to the beta and marks the who-invited-whom record
+accepted. Household invitations never use the beta invite quota.
+
 `GET /api/v1/households` returns `{households:[HouseholdRecord]}`; GET by ID
 returns one current authorized record, otherwise 404. A HouseholdRecord retains
 `id,name,status,admin_user_id,created_by,created_at,closed_at,members` and adds
@@ -7394,6 +7403,48 @@ returns one current authorized record, otherwise 404. A HouseholdRecord retains
 member contains `user_id,membership_id,display_name,role,joined_at,is_self,is_admin`.
 Only admins receive invitation metadata. `shares` contains only the caller's
 own account consent, grouped as `{account_id,recipients:[{membership_id,permission}]}`.
+
+## Beta invites, founder group link and code gate
+
+Registered-only, default-off `ARGUS_BETA_INVITES_ENABLED`, durable PostgreSQL
+only. While disabled, or in memory mode, every `/api/v1/invites` route returns
+`404 invites_unavailable` before authentication. Responses are
+`Cache-Control: no-store`. Decisions: [October 2 lane locks](specs/argus-decision-log.md#october-2-2026-cuadrao-lane-locks);
+lane: [Household invitations](specs/lanes/mvee-five-lane-handoff.md#lane-1-household-invitations).
+
+| Endpoint | Who | Body / result |
+| --- | --- | --- |
+| `GET /api/v1/invites/access` | any registered | `{gate_enabled,admitted,waitlist_url,testflight_url}`. Gate off means `admitted:true` |
+| `GET /api/v1/invites` | sender | `{quota:{limit,used,remaining},invitations:[{id,kind,invitation_id,state,sent_at,expires_at,accepted_at}]}`; beta and household invites the caller sent. `accepted_at` is the in-app "invitation accepted" record |
+| `POST /api/v1/invites` | any registered | `Idempotency-Key`; `{}`. Returns `{invitation:{id,kind,expires_at,token,code,link},quota}`. Secrets appear once; a replay returns `replayed:true` and none |
+| `POST /api/v1/invites/{id}/revoke` | sender | `204`; an accepted invite answers `409 invitation_consumed` |
+| `POST /api/v1/invites/preview` | any registered | exactly one of `token` or `code`; `{kind,available,expires_at,household_name}` |
+| `POST /api/v1/invites/redeem` | any registered | exactly one of `token` or `code`; `{admitted,outcome,kind,replayed}`. A household code answers `409 household_invitation_requires_accept` |
+| `POST /api/v1/invites/group-links` | founder | `Idempotency-Key`; `{source_label,cap,expires_at}` with expiry inside a year |
+| `GET /api/v1/invites/group-links` | founder | `{links:[{id,source_label,cap,redeemed,overflow,expires_at,revoked_at,state}]}` |
+| `POST /api/v1/invites/group-links/{id}/revoke` | founder | `204` |
+| `POST /api/v1/invites/quota-grants` | founder | `Idempotency-Key`; `{user_id,extra}` adds beta invites |
+| `GET /api/v1/invites/network` | founder | the three numbers for `beta` and `household` separately, and per group link |
+
+Each user has 10 beta invites; a live or accepted invite uses one, a revoked or
+expired unaccepted invite returns it. The eleventh answers
+`409 beta_invite_quota_exhausted`. A beta code admits one person; a person who
+is already admitted does not use it up (`outcome:already_admitted`). The founder
+is `ARGUS_INVITE_FOUNDER_USER_ID`; anyone else gets `403 founder_required`. A
+group link is the one exception to single use: redemption increments the count
+in one guarded update, so concurrent taps cannot pass the cap. Over the cap the
+answer is `409 group_link_full`, the overflow is counted, and redeem failures
+carry `context.waitlist_url` when `ARGUS_WAITLIST_URL` is set. A group link is
+beta-only and never creates a household membership; its record rows name the
+link, not a person, as the inviter. With `ARGUS_BETA_INVITE_GATE_ENABLED` on, a
+caller who has not redeemed a beta code, a household invitation or a group link
+gets `admitted:false` from access and `403 beta_invite_required` when sending a
+beta invite. The gate is read by the native app; it does not change
+`ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` or web sign-up. Accounts that existed when
+the migration ran are admitted. The caller is always the verified JWT subject;
+a missing or null subject (as under `service_role`) owns nothing, is never the
+founder, and is refused with `401 verified_user_required`. Row-level security on
+the new tables likewise matches no row when `auth.uid()` is null.
 
 ## Explicit account consent
 
