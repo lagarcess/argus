@@ -45,20 +45,15 @@ struct CuadraoActivityDetail: View {
                                 Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
                             }.frame(minHeight: 62).contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityIdentifier("activity-detail-account")
+                        Button {
+                            chatFocus = .activity(id: entry.id, title: entry.title)
+                        } label: {
+                            Label(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble")
+                                .font(.subheadline).frame(minHeight: 44)
+                        }.buttonStyle(.plain).foregroundStyle(WelcomePalette.pine)
+                            .accessibilityIdentifier("activity-detail-ask")
                     }.padding(24)
                 }.background(WelcomePalette.background)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Menu {
-                                Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") {
-                                    chatFocus = .activity(id: entry.id, title: entry.title)
-                                }.accessibilityIdentifier("activity-detail-ask")
-                            } label: {
-                                Image(systemName: "ellipsis").frame(width: 44, height: 44)
-                            }.accessibilityLabel(spanish ? "Opciones del movimiento" : "Activity actions")
-                                .accessibilityIdentifier("activity-detail-options")
-                        }
-                    }
             } else {
                 ContentUnavailableView(spanish ? "Movimiento no disponible" : "Activity unavailable", systemImage: "doc.text.magnifyingglass")
             }
