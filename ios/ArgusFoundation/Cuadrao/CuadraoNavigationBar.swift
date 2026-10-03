@@ -88,7 +88,7 @@ private struct CuadraoNavigationMaterial: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.tint(.white.opacity(0.75)), in: .capsule)
+            content.glassEffect(.regular.tint(WelcomePalette.background.opacity(0.75)), in: .capsule)
         } else {
             content.background(.regularMaterial, in: Capsule())
                 .overlay { Capsule().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5) }

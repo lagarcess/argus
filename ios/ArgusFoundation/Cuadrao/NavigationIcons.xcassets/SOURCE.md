@@ -18,6 +18,21 @@ September 30 reference screenshots (6a08c79f-7ece-4dcb-b26a-6fff301bb702 and
 reference shapes; background and gray pixels are not part of the template assets.
 These redraws are not claimed to be original vendor SVGs.
 
+CuadraoTemporaryChat: exact dashed conversation SVG path from the founder-approved
+HTML chat-mode.js, reaffirmed September 30, 2026. Stroke 1.7, round caps/joins,
+24-point viewBox. Shared by the temporary entry, hero and active status.
+
+`CuadraoNewChat` preserves the exact `inheritedIcons.newchat` paths from the HTML
+`inherited-ui.js`, including the 2-point round stroke from `chat-shell.css`.
+The header and history sheet use this same bubble-plus asset for new regular chat.
+
+`CuadraoShare` preserves the exact `inheritedIcons.link` paths in the approved
+HTML `inherited-ui.js`: a horizontal chain link with a 2-point rounded stroke.
+The founder reaffirmed this specific shape with screenshot
+`codex-clipboard-299aa608-725e-4505-bff6-0d607c3c6ba1.png`.
+The chat header uses this asset rather than the system share symbol or the
+three-node `inheritedIcons.share` glyph.
+
 `CuadraoCategory-food`, `CuadraoCategory-groceries` and `CuadraoCategory-leisure`
 are original simple outline vectors added for Activity on October 1, 2026. They
 match Home's 24-point viewBox, 1.7-point round strokes and template rendering.

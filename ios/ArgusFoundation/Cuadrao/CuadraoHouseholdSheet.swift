@@ -69,7 +69,7 @@ struct CuadraoHouseholdSheet: View {
                         Label(name, systemImage: "person.crop.circle")
                     }
                 }.padding(24)
-            }.background(Color.white)
+            }.background(WelcomePalette.background)
                 .navigationTitle(spanish ? "Personas" : "People").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { dismiss() } } }
                 .confirmationDialog(spanish ? "¿Cancelar esta invitación?" : "Cancel this invitation?",

@@ -60,7 +60,7 @@ struct CuadraoSearchReferenceDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                Text(item.title).font(.system(.title2, design: .serif))
+                Text(item.title).font(CuadraoTypography.section)
                 Text(item.detail).font(.subheadline).foregroundStyle(.secondary)
                 Divider()
                 Text(item.content).font(.body).textSelection(.enabled)

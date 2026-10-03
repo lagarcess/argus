@@ -45,7 +45,7 @@ struct CuadraoArchivedAccounts: View {
                         }
                     }
                 }.padding(24)
-            }.background(Color.white)
+            }.background(WelcomePalette.background)
                 .navigationTitle(spanish ? "Cuentas archivadas" : "Archived accounts")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { dismiss() } } }
@@ -73,7 +73,7 @@ struct CuadraoRenameAccount: View {
                     data.replace(updated); dismiss()
                 }
                 Spacer(minLength: 0)
-            }.padding(24).background(Color.white)
+            }.padding(24).background(WelcomePalette.background)
                 .navigationTitle(spanish ? "Cambiar nombre" : "Rename account").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cancelar" : "Cancel") { dismiss() } } }
         }.tint(WelcomePalette.pine).presentationDetents([.medium, .large])

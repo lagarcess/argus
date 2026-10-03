@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CuadraoCreateAccount: View {
     let spanish: Bool
+    @Environment(\.colorScheme) private var colorScheme
     @State private var signingIn: Bool
     @State private var previewAction: String?
 
@@ -23,9 +24,10 @@ struct CuadraoCreateAccount: View {
                                 : "Your accounts and plans, in one place."))
                     Spacer(minLength: 64)
                     VStack(spacing: 14) {
-                        PreviewAppleButton {
+                        PreviewAppleButton(dark: colorScheme == .dark) {
                             previewAction = spanish ? "Continuar con Apple" : "Continue with Apple"
                         }
+                        .id(colorScheme)
                         .frame(height: 56)
                         .accessibilityIdentifier(signingIn ? "cuadrao.signin.apple" : "cuadrao.signup.apple")
                         NavigationLink {
@@ -40,7 +42,7 @@ struct CuadraoCreateAccount: View {
                                 .frame(maxWidth: .infinity, minHeight: 56)
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color(white: 0.80), lineWidth: 1)
+                                        .stroke(WelcomePalette.border, lineWidth: 1)
                                 }
                                 .contentShape(RoundedRectangle(cornerRadius: 16))
                         }
@@ -84,8 +86,8 @@ struct CuadraoCreateAccount: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -110,10 +112,11 @@ struct CuadraoCreateAccount: View {
 
 /// Uses Apple's standard control; deliberately makes no authorization request.
 private struct PreviewAppleButton: UIViewRepresentable {
+    let dark: Bool
     let action: () -> Void
 
     func makeUIView(context: Context) -> ASAuthorizationAppleIDButton {
-        let button = ASAuthorizationAppleIDButton(type: .continue, style: .black)
+        let button = ASAuthorizationAppleIDButton(type: .continue, style: dark ? .white : .black)
         button.cornerRadius = 16
         button.addAction(UIAction { _ in action() }, for: .touchUpInside)
         return button

@@ -124,24 +124,27 @@ struct CuadraoExpenseSheet: View {
                     }.font(Cuadrao.text())
                 }.padding(24)
             }
+            .cuadraoFormKeyboard()
             .background(Cuadrao.paper)
             .navigationTitle("Registrar gasto").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Listo") { amountFocused = false }
-                }
             }
             .safeAreaInset(edge: .bottom) {
-                Button("Guardar gasto") {
-                    guard let cents else { return }
-                    let title = note.trimmingCharacters(in: .whitespacesAndNewlines)
-                    data.expenses.insert(CuadraoSampleExpense(accountID: account.id,
-                        title: title.isEmpty ? category : title, category: category, cents: cents), at: 0)
-                    dismiss()
-                }.buttonStyle(CuadraoPrimaryButton()).disabled(cents == nil)
-                    .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 12)
+                VStack(spacing: 12) {
+                    if amountFocused {
+                        Button("Listo") { amountFocused = false }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
+                            .accessibilityIdentifier("account-amount-done")
+                    }
+                    Button("Guardar gasto") {
+                        guard let cents else { return }
+                        let title = note.trimmingCharacters(in: .whitespacesAndNewlines)
+                        data.expenses.insert(CuadraoSampleExpense(accountID: account.id,
+                            title: title.isEmpty ? category : title, category: category, cents: cents), at: 0)
+                        dismiss()
+                    }.buttonStyle(CuadraoPrimaryButton()).disabled(cents == nil)
+                }.padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 12)
                     .background(Cuadrao.paper)
             }
         }.tint(Cuadrao.pine).font(Cuadrao.text()).foregroundStyle(Cuadrao.ink)

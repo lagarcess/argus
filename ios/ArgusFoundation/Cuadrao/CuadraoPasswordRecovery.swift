@@ -56,9 +56,9 @@ struct CuadraoPasswordRecovery: View {
                 if state == .sent { dismiss() } else { send() }
             }
             .accessibilityIdentifier("cuadrao.recovery.submit")
-            .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 20).background(Color.white)
+            .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 20).background(WelcomePalette.background)
         }
-        .background(Color.white.ignoresSafeArea()).foregroundStyle(Color(white: 0.08))
+        .background(WelcomePalette.background.ignoresSafeArea()).foregroundStyle(WelcomePalette.ink)
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
