@@ -201,8 +201,10 @@ The space creation shortcut uses the shared plain plus. In Household, the existi
 avatar stack sits left-aligned between spaces and the amount. It includes the owner
 and accepted members only; pending invitations never count as members. Tapping it
 opens People. The current preview roster supports the owner and one companion.
-On the design branch, the greeting's context menu holds the preview gallery/reset
-tools. They are not on integration yet; they come with design PR 3 (#786).
+The greeting's context menu holds the preview reset tools (first use, household
+with no shared accounts, with activity); they are on integration in
+`CuadraoHomeCanvas.swift`. On the design branch the same menu also opens the
+gallery. The gallery is not on integration yet; it comes with design PR 3 (#786).
 
 ### Home account and activity shortcuts
 
@@ -751,7 +753,7 @@ screens. Use native titles, body type and the shared destructive action treatmen
   This copy must match the connected deletion and retention contract before
   release; the UI cannot certify anonymization itself.
 - If the person administers a household, explain succession to its longest-standing
-  eligible member. Show the actual successor only when resolved by the owner.
+  remaining member. Show the actual successor only when resolved by the owner.
 - If the person owns shared history, explain that deletion removes the household's
   locked copy of that history. Do not describe deleting another member's records.
 - Reuse supported identity verification, such as a code sent to an existing verified

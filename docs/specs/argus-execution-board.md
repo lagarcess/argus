@@ -85,7 +85,7 @@ must stay distinguished from connected acceptance.
 | 3. Home and Updates | 10 | Monetary difference from a zero baseline, and Sin datos only for a period with no records at all | A real zero month is data and still shows. Real zero, missing history and covered comparison specimens in both languages. C05, financial history, Lane 4 |
 | 3. Home and Updates | 11 | Bill reminders three days before/on due date; contextual push opt-in | Paid/cancelled occurrence suppressed; denied permission preserves inbox; no amounts in push. C07, planning/Updates/native delivery, Lane 5 |
 | 3. Home and Updates | 12 | Read-only pre-move household history | Existing owner and cutoff supplied by move contract; lock/read-only text and readable muted style; no hidden edit gestures. C05, financial core/Household, Lane 2 |
-| With first external model processing | 15 | AI disclosure and explicit consent across chat/voice/document entry, before any model call | No personal data sent before consent; decline preserves draft and local capture. May be a first-TestFlight dependency if live AI is enabled. C01/C04/C07, intake/conversation |
+| With first external model processing | 15 | AI disclosure and explicit consent across chat/voice/document entry, before sharing personal data with an external model | No personal data sent before consent; decline preserves draft and local capture. May be a first-TestFlight dependency if live AI is enabled. C01/C04/C07, intake/conversation |
 | With source activation | 16 | Connected sources and Disconnect | Actual connections, errors/retry and distinction between future access and retained imports. Existing intake/source owner |
 | With native memory | 17 | Memory off and reset | Distinct pause vs deletion consequences, permission and recovery. C06/C07, existing memory owner |
 
@@ -97,7 +97,8 @@ state variants, integration base, screenshots and the exact service facts still
 needed. External TestFlight readiness requires connected acceptance, not UI-only
 success screens. Provide reviewer access to the invitation-gated build.
 
-The design commit also edits the design branch's C07 and C08 rows and a historical
+The design commit also edits the design branch's C06 row (expose Memory only with
+its connected native feature and controls), its C07 and C08 rows and a historical
 Profile checkpoint paragraph. Those sections are not on integration, so they are
 not ported here.
 

@@ -729,7 +729,7 @@ data and still shows, and a comparison with it uses an amount difference rather
 than a percent ([Home comparisons lock](argus-decision-log.md#home-comparisons)).
 
 Explicit AI disclosure/consent must precede the first sharing of personal data
-with an external model, so no model call happens before consent. It ships with that feature, including if live chat lands
+with an external model. It ships with that feature, including if live chat lands
 before document reading. Local capture and save-for-later do not require model
 processing. [Cuadrao's guide](../../.agent/designs/cuadrao/DESIGN.md#13-release-readiness-interaction-rules)
 owns interaction details. The [main roadmap](argus-execution-board.md#cuadrao-release-ui-landing-order)
