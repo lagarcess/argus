@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,7 +27,7 @@ USER_ID = "00000000-0000-0000-0000-0000000000d1"
 URL = "/api/v1/account/delete"
 
 
-_NOW = datetime(2026, 10, 2, tzinfo=UTC)
+_NOW = datetime(2026, 10, 2, tzinfo=timezone.utc)
 
 
 def _user(email: str | None) -> User:
@@ -45,7 +45,7 @@ def _guest(request):  # noqa: ANN001, ANN202
         AccountContext(
             kind="guest",
             user_id=USER_ID,
-            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
             capabilities=guest_capabilities(),
         ),
     )
