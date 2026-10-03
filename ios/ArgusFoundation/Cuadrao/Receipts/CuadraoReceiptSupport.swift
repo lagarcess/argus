@@ -21,7 +21,7 @@ struct ReceiptLineEditor: View {
                                       title: spanish ? "Precio unitario" : "Unit price", size: .prominent, alignment: .left).frame(minHeight: 54)
                 if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red) }
                 if existing { Button(spanish ? "Quitar artículo" : "Remove item", role: .destructive) { save(nil); dismiss() } }
-            }.navigationTitle(spanish ? "Artículo" : "Item").navigationBarTitleDisplayMode(.inline)
+            }.cuadraoFormKeyboard().navigationTitle(spanish ? "Artículo" : "Item").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cancelar" : "Cancel") { dismiss() } }
                     ToolbarItem(placement: .confirmationAction) {

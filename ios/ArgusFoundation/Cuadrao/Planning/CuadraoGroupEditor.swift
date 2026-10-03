@@ -50,11 +50,10 @@ struct CuadraoGroupEditor: View {
                     }.disabled(!valid).opacity(valid ? 1 : 0.4).accessibilityIdentifier("group-save")
                     PlanPreviewFootnote(spanish: spanish)
                 }.padding(24)
-            }.scrollDismissesKeyboard(.interactively).background(WelcomePalette.background)
+            }.cuadraoFormKeyboard().background(WelcomePalette.background)
                 .navigationTitle(spanish ? "Un plan juntos" : "A plan together").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cancelar" : "Cancel") { discard = true } }
-                    ToolbarItemGroup(placement: .keyboard) { Spacer(); Button(spanish ? "Listo" : "Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
                 }
                 .confirmationDialog(spanish ? "¿Descartar cambios?" : "Discard changes?", isPresented: $discard, titleVisibility: .visible) {
                     Button(spanish ? "Descartar" : "Discard", role: .destructive) { dismiss() }

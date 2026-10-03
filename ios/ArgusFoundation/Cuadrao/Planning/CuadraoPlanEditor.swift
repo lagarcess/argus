@@ -11,6 +11,7 @@ struct CuadraoPlanEditor: View {
     @State private var showDetails = false
     @State private var discard = false
     @FocusState private var nameFocused: Bool
+    @FocusState private var rateFocused: Bool
     @Environment(\.dismiss) private var dismiss
     private var editing: Bool { store.plan(initial.id) != nil }
     private var valid: Bool {
@@ -69,7 +70,7 @@ struct CuadraoPlanEditor: View {
                             if draft.kind == .debt {
                                 HStack {
                                     Text(spanish ? "Interés anual (%)" : "Annual interest (%)")
-                                    TextField("0", value: $draft.annualRate, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                                    TextField("0", value: $draft.annualRate, format: .number).keyboardType(.decimalPad).focused($rateFocused).multilineTextAlignment(.trailing)
                                         .accessibilityIdentifier("plan-rate")
                                 }.padding(18)
                                 Text(spanish ? "La estimación supone una tasa fija, pagos mensuales, sin compras nuevas ni comisiones." : "The estimate assumes a fixed rate, monthly payments, no new purchases or fees.")
@@ -98,21 +99,24 @@ struct CuadraoPlanEditor: View {
                     PlanPreviewFootnote(spanish: spanish)
                 }.padding(24)
             }.safeAreaInset(edge: .bottom) {
-                PlanPrimaryButton(title: editing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Crear plan" : "Create plan")) {
+                VStack(spacing: 12) {
+                    if rateFocused {
+                        Button(spanish ? "Listo" : "Done") { rateFocused = false }
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
+                            .accessibilityIdentifier("plan-rate-done")
+                    }
+                    PlanPrimaryButton(title: editing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Crear plan" : "Create plan")) {
                         draft.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
                         if draft.kind == .budget { draft.monthly = draft.target }
                         store.save(draft); dismiss(); onSave?(draft.id)
                     }.disabled(!valid).opacity(valid ? 1 : 0.45).accessibilityIdentifier("plan-save")
-                    .padding(.horizontal, 24).padding(.vertical, 12).background(.regularMaterial)
-            }.scrollDismissesKeyboard(.interactively).background(WelcomePalette.background)
+                }.padding(.horizontal, 24).padding(.vertical, 12).background(.regularMaterial)
+            }.cuadraoFormKeyboard().background(WelcomePalette.background)
                 .navigationTitle(editing ? (spanish ? "Editar plan" : "Edit plan") : (spanish ? "Un nuevo plan" : "A new plan"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(spanish ? "Cancelar" : "Cancel") { if draft != initial { discard = true } else { dismiss() } }
-                    }
-                    ToolbarItemGroup(placement: .keyboard) {
-                        Spacer(); Button(spanish ? "Listo" : "Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
                     }
                 }
                 .confirmationDialog(spanish ? "¿Descartar cambios?" : "Discard changes?", isPresented: $discard, titleVisibility: .visible) {
