@@ -20,8 +20,8 @@ struct CuadraoSearchCanvas: View {
 
     private typealias Kind = CanvasSearchKind
     /// Release rule (fc7650ea): Memory appears only with the enabled native memory feature
-    /// and its controls. Neither exists yet, so the preview hides the Memory perspective.
-    private static let memoryEnabled = false
+    /// and its controls. One first-release switch gates it in Search and Profile alike.
+    private static var memoryEnabled: Bool { CuadraoFirstRelease.shows(.memory) }
     private var kinds: [Kind] { Kind.allCases.filter { $0 != .memory || Self.memoryEnabled } }
     private enum Scope: CaseIterable { case all, personal, household }
     private enum Route: Hashable { case account(UUID), activity(UUID), plan(UUID), group(UUID), reference(String) }
