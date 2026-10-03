@@ -315,10 +315,11 @@ final class CuadraoReceiptUITests: XCTestCase {
         for _ in 0..<12 where !element.isHittable { app.swipeUp() }
     }
     private func dismissKeyboard(_ app: XCUIApplication) {
-        if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }
-        if app.toolbars.buttons["Done"].exists { app.toolbars.buttons["Done"].tap() }
-        if app.keyboards.buttons["Listo"].exists { app.keyboards.buttons["Listo"].tap() }
-        if app.keyboards.buttons["Done"].exists { app.keyboards.buttons["Done"].tap() }
+        for title in ["Listo", "Done"] {
+            let done = app.toolbars.buttons[title]
+            if done.exists && done.isHittable { done.tap(); return }
+        }
+        app.typeText("\n")
     }
     private func shot(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())

@@ -62,7 +62,8 @@ final class CuadraoContextUITests: XCTestCase {
     }
 
     func testReceiptContextReturnsToSameReview() {
-        let app = launch()
+        let app = launch(extra: ["-cuadrao.design.appearance", "dark",
+                                 "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityM"])
         tap(app, "cuadrao-tab-1")
         app.segmentedControls["plan-audience"].buttons["Together"].tap()
         tap(app, "group-card-trip")
@@ -70,7 +71,7 @@ final class CuadraoContextUITests: XCTestCase {
         tap(app, "group-add-receipt")
         tap(app, "receipt-sample")
         XCTAssertTrue(app.buttons["receipt-source"].waitForExistence(timeout: 5))
-        let total = app.staticTexts["receipt-total"].label
+        let total = app.staticTexts["receipt-total"].firstMatch.label
         tap(app, "Receipt options")
         tap(app, "receipt-open-chat")
         XCTAssertTrue(app.buttons["chat-context-close"].waitForExistence(timeout: 5))
@@ -78,7 +79,7 @@ final class CuadraoContextUITests: XCTestCase {
         shot(app, "context-receipt-en")
         tap(app, "chat-context-close")
         XCTAssertTrue(app.buttons["receipt-source"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["receipt-total"].label, total)
+        XCTAssertEqual(app.staticTexts["receipt-total"].firstMatch.label, total)
         XCTAssertTrue(app.buttons["receipt-later"].exists)
     }
 
@@ -93,14 +94,22 @@ final class CuadraoContextUITests: XCTestCase {
         XCTAssertTrue(app.buttons["voice-end"].waitForExistence(timeout: 5))
         tap(app, "voice-end")
         XCTAssertTrue(app.buttons["chat-context-close"].waitForExistence(timeout: 5))
+        let voice = app.buttons["chat-voice-entry"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        voice.press(forDuration: 0.7, thenDragTo: voice.withOffset(CGVector(dx: 0, dy: -135)),
+                    withVelocity: .slow, thenHoldForDuration: 0.5)
+        XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 5))
+        shot(app, "context-locked-recording-en")
+        tap(app, "voice-message-stop")
+        XCTAssertTrue(app.staticTexts["voice-message-status"].waitForExistence(timeout: 5))
+        tap(app, "Discard")
         tap(app, "chat-context-close")
         XCTAssertTrue(app.segmentedControls["group-sections"].exists)
     }
 
-    private func launch() -> XCUIApplication {
+    private func launch(extra: [String] = []) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--cuadrao-design", "--home-populated", "--plan-reset", "--receipt-reset", "--design-english", "-cuadrao.design.appearance", "light"]
+        app.launchArguments = ["--cuadrao-design", "--home-populated", "--plan-reset", "--receipt-reset", "--design-english", "-cuadrao.design.appearance", "light"] + extra
         app.launch()
         return app
     }

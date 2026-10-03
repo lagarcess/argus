@@ -66,7 +66,7 @@ struct CuadraoAccountCanvas: View {
                                         Spacer()
                                         Text((entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
                                             .font(CuadraoTypography.rowAmount)
-                                    }.padding(.vertical, 10)
+                                    }.padding(.vertical, 10).contentShape(Rectangle())
                                 }.buttonStyle(.plain).accessibilityIdentifier("account-detail-activity.\(entry.id)")
                                 Divider()
                             }
