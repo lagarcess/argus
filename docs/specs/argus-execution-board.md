@@ -10,11 +10,11 @@ commit and push on September 29, 2026. That grant authorized documentation prese
 only, not implementation, worker dispatch, merge, deployment or hosted changes.
 Recovery branch: `codex/mvee-iphone-delivery-plan`.
 
-## Five-lane delivery handoff
+## Six-lane delivery handoff
 
 Lane contract, 2 October 2026. Integration tip `d9a7acfc` includes landed
 PR #773 `f28b5642` and PR #776. The
-[five-lane handoff](lanes/mvee-five-lane-handoff.md) writes the founder's
+[six-lane handoff](lanes/mvee-five-lane-handoff.md) writes the founder's
 2 October locks into contract and acceptance for Household invitations, account
 deletion, the space list and account moves, Search, Home series, and Updates. The decisions
 themselves live in the
@@ -561,7 +561,9 @@ only.
 
 [MVEE household][mvee-household] owns consent and financial meaning. Creation,
 invitation acceptance and account sharing are three separate operations.
-Acceptance grants membership only: no automatic joint account, financial-record
+Acceptance grants membership only, plus admission to the beta since the
+[October 2 lane locks](argus-decision-log.md#october-2-2026-cuadrao-lane-locks):
+no automatic joint account, financial-record
 ownership transfer, private account sharing, chat/document access or banking
 execution. Account ownership percentage remains a financial fact, never access.
 Keep one canonical account/history and count its permitted projection once.
@@ -593,7 +595,8 @@ Compact `1A90F684…` or design `8AFB6084…` for this lane.
 - Invitations: revocable, single-use, seven-day links; safe same-recipient
   acceptance retries. Local invitations are synthetic (no email/WhatsApp/
   external delivery in this lane).
-- Create household ≠ invite ≠ share account. Acceptance = membership only.
+- Create household ≠ invite ≠ share account. Acceptance = membership only, plus
+  admission to the beta since the October 2 lane locks.
 
 ### Ownership, reuse and overlap
 
@@ -2728,7 +2731,7 @@ before repeating a pattern across screens.
 
 ## Work map
 
-The [five-lane handoff](lanes/mvee-five-lane-handoff.md) is the current lane
+The [six-lane handoff](lanes/mvee-five-lane-handoff.md) is the current lane
 contract for Household invitations, account deletion, private Spaces and account
 moves, Search documents and conversations, Home series data, and Updates. The table below
 remains the coverage index.
