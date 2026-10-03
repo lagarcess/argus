@@ -261,6 +261,9 @@ user trials, no new growth analytics), scoped to invites only.
   transfers administration or closes the household before leaving: account
   deletion does not wait for a manual transfer.
 - Both are founder locks (8:04 PM CT) of Iris's proposals.
+- Deleting any account also clears that person's email from saved feedback
+  and deletes their person record in PostHog. (Yelena's recommendation, founder
+  lock at 8:04 PM CT.)
 
 ### Outside services
 
