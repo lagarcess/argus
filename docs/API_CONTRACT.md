@@ -3189,8 +3189,10 @@ revokes provider tokens, and deletes the auth user. A retry resumes the same run
 ```
 
 `status` is `auth_deleted` when the account is gone but a provider revocation is
-still owed. `pending` names those providers (for example `apple`). The session is
-dead either way; clients sign out locally.
+still owed. `pending` names those providers (for example `gmail`). The session is
+dead either way; clients sign out locally. A stored Sign in with Apple token
+(#793) is revoked before the account delete; while Apple can't confirm it, the
+account is not deleted yet and the answer is `503 account_deletion_incomplete`.
 
 **Errors:** `403 account_conversion_required` (guest session),
 `403 account_deletion_not_allowed`, `503 account_deletion_unavailable` (no

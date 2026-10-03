@@ -44,14 +44,16 @@ class AccountDeletionRequest(BaseModel):
 
 class AccountDeletionResponse(BaseModel):
     status: Literal["done", "auth_deleted"]
-    # Provider revocations still owed (for example "apple"). The account is
-    # already gone; these are retried by the run, not by the person.
+    # Provider revocations still owed (for example "gmail"). The account is
+    # already gone; these are retried by the run, not by the person. Apple is
+    # never here: it is revoked before the account delete, which waits for it.
     pending: list[str]
 
 
 def account_deletion_service() -> AccountDeletionService | None:
     """Built per request from the running surfaces; None when one is missing."""
 
+    from argus.api.apple_sign_in import apple_credentials_service
     from argus.api.households import households_service
     from argus.api.ingestion import ingestion_hub
     from argus.domain.account_deletion.auth_admin import SupabaseAuthAdmin
@@ -68,6 +70,9 @@ def account_deletion_service() -> AccountDeletionService | None:
         auth_admin=SupabaseAuthAdmin(gateway.client),
         revoker=ingestion_hub(),
         analytics=analytics_deletion_from_env(),
+        # #793's service when its capture surface is on; without it a stored
+        # Apple token keeps the run pending (503, retry) and is never dropped.
+        apple=apple_credentials_service(),
     )
 
 
