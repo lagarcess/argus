@@ -1,6 +1,27 @@
 import XCTest
 
 final class CuadraoReceiptUITests: XCTestCase {
+    func testPhysicalScannerPresentationAndCancel() throws {
+#if targetEnvironment(simulator)
+        throw XCTSkip("The document camera requires a physical device.")
+#else
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--cuadrao-design", "--design-english"]
+        app.launch()
+        tap(app, "cuadrao-tab-2")
+        scanFromChat(app, english: true)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let permission = springboard.buttons["Allow"]
+        if permission.waitForExistence(timeout: 2) { permission.tap() }
+        let cancel = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "Cancel", "receipt-later")).firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
+        shot(app, "receipt-physical-scanner")
+        cancel.tap()
+        XCTAssertTrue(app.buttons["chat-attach"].waitForExistence(timeout: 5))
+#endif
+    }
+
     func testGroupReceiptLaterRelaunchItemsAndConfirm() {
         let app = launch()
         openGroup(app)
@@ -192,7 +213,35 @@ final class CuadraoReceiptUITests: XCTestCase {
         XCTAssertTrue(receiptCard(app).waitForExistence(timeout: 5))
     }
 
-    func testDirectGroupPickersCancelWithoutDraft() {
+    func testExpenseEditsSurviveReceiptCapture() throws {
+        let app = launch(english: true)
+        openGroup(app, english: true)
+        tap(app, "group-add-expense")
+        let name = app.textFields["group-expense-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("Dinner draft")
+        dismissKeyboard(app)
+        tap(app, "Ana, included")
+        tap(app, "group-expense-receipt")
+        tap(app, "receipt-photos")
+        let cancel = app.navigationBars["Photos"].buttons["Cancel"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        shot(app, "receipt-native-from-expense")
+        cancel.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.value as? String, "Dinner draft")
+        XCTAssertTrue(app.buttons["Ana, excluded"].exists)
+        tap(app, "group-expense-receipt")
+        tap(app, "receipt-sample")
+        XCTAssertTrue(app.staticTexts["receipt-status"].waitForExistence(timeout: 5))
+        tap(app, "receipt-later")
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.value as? String, "Dinner draft")
+        XCTAssertTrue(app.buttons["Ana, excluded"].exists)
+        shot(app, "receipt-expense-edits-preserved")
+    }
+
+    func testDirectGroupPickersCancelWithoutDraft() throws {
         let app = launch(english: true)
         openGroup(app, english: true)
         for source in ["receipt-photos", "receipt-file"] {
@@ -201,6 +250,7 @@ final class CuadraoReceiptUITests: XCTestCase {
             let cancel = app.buttons.matching(NSPredicate(format: "label == %@ AND identifier != %@", "Cancel", "receipt-later")).firstMatch
             XCTAssertTrue(cancel.waitForExistence(timeout: 5))
             XCTAssertFalse(app.buttons["receipt-currency"].exists)
+            shot(app, "receipt-native-" + source)
             cancel.tap()
             XCTAssertTrue(app.buttons["group-add-receipt"].waitForExistence(timeout: 5))
             XCTAssertFalse(receiptCard(app).exists)

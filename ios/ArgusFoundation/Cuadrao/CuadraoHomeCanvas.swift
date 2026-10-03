@@ -144,9 +144,7 @@ struct CuadraoHomeCanvas: View {
         .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
         .environment(\.receiptWorkspace, receiptWorkspace)
-        .sheet(item: $receiptRoute) { route in
-            CuadraoReceiptFlow(route: route, workspace: receiptWorkspace, spanish: spanish)
-        }
+        .receiptPresentation(route: $receiptRoute, workspace: receiptWorkspace, spanish: spanish)
         .task {
             do { try receipts.reconcile(groups: groups, accounts: data) }
             catch { receiptRecoveryError = true }

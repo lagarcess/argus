@@ -3,7 +3,8 @@ import PhotosUI
 
 struct CuadraoGroupExpenseEditor: View {
     @Environment(\.receiptWorkspace) private var receiptWorkspace
-    @State private var captureReceipt: ReceiptSourceChoice?
+    @State private var receiptRoute: ReceiptRoute?
+    @State private var initialized = false
     let store: CuadraoGroupPreview
     let groupID: UUID
     var initial: PlanSharedExpense?
@@ -46,7 +47,7 @@ struct CuadraoGroupExpenseEditor: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         if initial == nil && group.kind == .trip && receiptWorkspace != nil {
-                            Menu { ReceiptSourceActions(spanish: spanish) { captureReceipt = $0 } } label: {
+                            Menu { ReceiptSourceActions(spanish: spanish) { receiptRoute = .capture(ReceiptOrigin(groupID: groupID, threadID: nil), $0) } } label: {
                                 Label(spanish ? "Usar un recibo" : "Use a receipt", systemImage: "receipt").frame(minHeight: 44)
                             }.accessibilityIdentifier("group-expense-receipt")
                         }
@@ -128,16 +129,14 @@ struct CuadraoGroupExpenseEditor: View {
                         }
                     }
                     .onAppear {
+                        guard !initialized else { return }
+                        initialized = true
                         payer = initial?.payer ?? group.me; selected = Set(initial?.shares.keys.map { $0 } ?? group.activeMembers.map(\.id))
                         if let initial { title = initial.title; amount = Double(initial.cents) / 100; receipt = initial.receipt; exactShares = initial.shares.mapValues { Double($0) / 100 }; custom = !initial.draft }
                     }
             }
         }.presentationDragIndicator(.visible).interactiveDismissDisabled()
-            .sheet(item: $captureReceipt) { source in
-                if let workspace = receiptWorkspace {
-                    CuadraoReceiptFlow(route: .capture(ReceiptOrigin(groupID: groupID, threadID: nil), source), workspace: workspace, spanish: spanish)
-                }
-            }
+            .receiptPresentation(route: $receiptRoute, workspace: receiptWorkspace, spanish: spanish)
             .task(id: photo) {
                 guard let photo else { return }; photoError = false
                 if let data = try? await photo.loadTransferable(type: Data.self), let image = UIImage(data: data) {

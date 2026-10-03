@@ -27,37 +27,77 @@ enum ReceiptRoute: Identifiable {
     var id: String { switch self { case .capture: "capture"; case .review(let id): id.uuidString } }
 }
 
+extension View {
+    func receiptPresentation(route: Binding<ReceiptRoute?>, workspace: ReceiptWorkspace?, spanish: Bool) -> some View {
+        modifier(ReceiptPresentation(route: route, workspace: workspace, spanish: spanish))
+    }
+}
+
+private struct ReceiptPresentation: ViewModifier {
+    @Binding var route: ReceiptRoute?
+    let workspace: ReceiptWorkspace?
+    let spanish: Bool
+    @State private var pendingReview: UUID?
+
+    func body(content: Content) -> some View {
+        content
+            .fullScreenCover(item: captureRoute, onDismiss: openSavedReceipt) { route in
+                if let workspace, case .capture(let origin, let source) = route {
+                    CuadraoReceiptCapture(origin: origin, source: source, workspace: workspace, spanish: spanish,
+                        cancel: { self.route = nil }, saved: { id in
+                            pendingReview = id
+                            self.route = nil
+                        })
+                        .interactiveDismissDisabled()
+                }
+            }
+            .sheet(item: reviewRoute) { route in
+                if let workspace, case .review(let id) = route {
+                    CuadraoReceiptFlow(id: id, workspace: workspace, spanish: spanish)
+                }
+            }
+    }
+    private var captureRoute: Binding<ReceiptRoute?> {
+        Binding(get: {
+            if case .capture = route { return route }
+            return nil
+        }, set: { value in
+            if case .capture = route { route = value }
+        })
+    }
+    private var reviewRoute: Binding<ReceiptRoute?> {
+        Binding(get: {
+            if case .review = route { return route }
+            return nil
+        }, set: { value in
+            if case .review = route { route = value }
+        })
+    }
+    private func openSavedReceipt() {
+        guard let id = pendingReview else { return }
+        pendingReview = nil
+        route = .review(id)
+    }
+}
+
 struct CuadraoReceiptFlow: View {
-    let route: ReceiptRoute
+    let id: UUID
     let workspace: ReceiptWorkspace
     let spanish: Bool
-    @State private var captured: UUID?
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
-            Group {
-                if let id = reviewID {
-                    CuadraoReceiptReview(id: id, workspace: workspace, spanish: spanish)
-                } else if case .capture(let origin, let source) = route {
-                    CuadraoReceiptCapture(origin: origin, source: source, workspace: workspace, spanish: spanish, cancel: { dismiss() }) { id in captured = id }
+            CuadraoReceiptReview(id: id, workspace: workspace, spanish: spanish)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(closeTitle) { dismiss() }.accessibilityIdentifier("receipt-later")
+                    }
                 }
-            }
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(closeTitle) { dismiss() }.accessibilityIdentifier("receipt-later")
-                }
-            }
         }.tint(WelcomePalette.pine).presentationDragIndicator(.visible)
     }
     private var closeTitle: String {
-        let confirmed = reviewID.flatMap(workspace.receipts.receipt).map { !$0.prepared } ?? false
-        if reviewID == nil { return spanish ? "Cancelar" : "Cancel" }
+        let confirmed = workspace.receipts.receipt(id).map { !$0.prepared } ?? false
         return confirmed ? (spanish ? "Listo" : "Done") : (spanish ? "Después" : "Later")
-    }
-    private var reviewID: UUID? {
-        if let captured { return captured }
-        if case .review(let id) = route { return id }
-        return nil
     }
 }
 
@@ -98,17 +138,52 @@ struct CuadraoReceiptCapture: View {
     let cancel: () -> Void
     let saved: (UUID) -> Void
     @State private var picker: ReceiptSourceChoice?
-    @State private var outcome: Result<ReceiptCapturedFiles, Error>?
     @State private var pending: ReceiptCapturedFiles?
-    @State private var selectedSource: ReceiptSourceChoice?
+    @State private var selectedSource: ReceiptSourceChoice
     @State private var error = ""
-    @State private var started = false
     @State private var captured = false
     private var group: PlanGroup? { origin.groupID.flatMap(workspace.groups.group) }
+    init(origin: ReceiptOrigin, source: ReceiptSourceChoice, workspace: ReceiptWorkspace, spanish: Bool,
+         cancel: @escaping () -> Void, saved: @escaping (UUID) -> Void) {
+        self.origin = origin; self.source = source; self.workspace = workspace; self.spanish = spanish
+        self.cancel = cancel; self.saved = saved
+        _selectedSource = State(initialValue: source)
+        if origin.groupID != nil && origin.groupID.flatMap(workspace.groups.group) == nil {
+            _error = State(initialValue: ReceiptError.destination.message(spanish))
+        } else if source == .scan && !VNDocumentCameraViewController.isSupported {
+            _error = State(initialValue: Self.scannerUnavailable(spanish))
+        } else if source != .sample {
+            _picker = State(initialValue: source)
+        }
+    }
     var body: some View {
+        Group {
+            if let picker {
+                ReceiptNativePicker(source: picker, spanish: spanish, completed: finishPicker)
+                    .id(picker)
+                    .ignoresSafeArea()
+            } else {
+                NavigationStack {
+                    recovery
+                        .navigationTitle(spanish ? "Un recibo" : "A receipt")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button(spanish ? "Cancelar" : "Cancel", action: cancel)
+                                    .accessibilityIdentifier("receipt-later")
+                            }
+                        }
+                }
+            }
+        }.tint(WelcomePalette.pine)
+            .task {
+                if source == .sample && error.isEmpty && !captured { sample() }
+            }
+    }
+    private var recovery: some View {
         VStack(spacing: 24) {
             if error.isEmpty {
-                ProgressView(spanish ? "Abriendo recibo…" : "Opening receipt…")
+                ProgressView(spanish ? "Guardando recibo…" : "Saving receipt…")
             } else {
                 Image(systemName: "receipt").font(.largeTitle).foregroundStyle(WelcomePalette.pine)
                 Text(error).font(CuadraoTypography.supporting).accessibilityIdentifier("receipt-error")
@@ -116,7 +191,7 @@ struct CuadraoReceiptCapture: View {
                     Button(spanish ? "Guardar de nuevo" : "Save again") { commit(pending, example: selectedSource == .sample) }
                         .accessibilityIdentifier("receipt-retry")
                 } else if selectedSource != .scan || VNDocumentCameraViewController.isSupported {
-                    Button(spanish ? "Intentar de nuevo" : "Try again") { begin(selectedSource ?? source) }
+                    Button(spanish ? "Intentar de nuevo" : "Try again") { begin(selectedSource) }
                         .accessibilityIdentifier("receipt-retry")
                 }
                 ForEach(ReceiptSourceChoice.allCases.filter { $0 != .scan }) { alternative in
@@ -126,24 +201,19 @@ struct CuadraoReceiptCapture: View {
             }
         }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(WelcomePalette.background)
-            .navigationTitle(spanish ? "Un recibo" : "A receipt").navigationBarTitleDisplayMode(.inline)
-            .task { guard !started else { return }; started = true; begin(source) }
-            .sheet(item: $picker, onDismiss: finishPicker) { choice in
-                ReceiptNativePicker(source: choice, spanish: spanish) { result in outcome = result; picker = nil }
-                    .interactiveDismissDisabled()
-            }
+    }
+    private static func scannerUnavailable(_ spanish: Bool) -> String {
+        spanish ? "El escáner no está disponible aquí. Puedes elegir una foto o un archivo." : "The scanner is unavailable here. Choose a photo or file."
     }
     private func begin(_ source: ReceiptSourceChoice) {
-        error = ""; pending = nil; outcome = nil; selectedSource = source
+        error = ""; pending = nil; selectedSource = source
         guard origin.groupID == nil || group != nil else { show(ReceiptError.destination); return }
         if source == .sample { sample() }
         else if source == .scan && !VNDocumentCameraViewController.isSupported {
-            error = spanish ? "El escáner no está disponible aquí. Puedes elegir una foto o un archivo." : "The scanner is unavailable here. Choose a photo or file."
+            error = Self.scannerUnavailable(spanish)
         } else { picker = source }
     }
-    private func finishPicker() {
-        guard let outcome else { cancel(); return }
-        self.outcome = nil
+    private func finishPicker(_ outcome: Result<ReceiptCapturedFiles, Error>) {
         switch outcome {
         case .success(let files): commit(files)
         case .failure(let failure):
@@ -152,6 +222,7 @@ struct CuadraoReceiptCapture: View {
         }
     }
     private func show(_ failure: Error) {
+        picker = nil
         error = (failure as? ReceiptError)?.message(spanish) ?? (spanish ? "No pudimos guardar el recibo. Inténtalo de nuevo." : "We couldn't save the receipt. Try again.")
     }
     private func commit(_ files: ReceiptCapturedFiles, example: Bool = false) {
