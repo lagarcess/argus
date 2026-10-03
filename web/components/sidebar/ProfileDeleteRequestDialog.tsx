@@ -11,8 +11,9 @@ import { useModalSurface } from "../layout/useModalSurface";
  * In-app account deletion (Lane 6), lifted out of the profile menu.
  *
  * Confirming runs the deletion command. Once it succeeds, or the account is
- * locked while it finishes (in_progress), the session is dead, so leaving the
- * dialog signs out. When the command is switched off on this server (404),
+ * locked while it finishes (in_progress), the session is dead, so the browser
+ * signs out on that result and this dialog stays as the signed-out
+ * confirmation; Done leaves. When the command is switched off on this server (404),
  * support gets a ticket instead (requested), or by email if that fails too.
  *
  * It portals to the body, outside the menu it opens from, so the menu's focus

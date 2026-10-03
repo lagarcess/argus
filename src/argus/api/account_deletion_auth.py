@@ -8,7 +8,8 @@ of ending in a 401.
 GoTrue answers ``user_banned`` for a locked account's token (the run bans it so
 no refresh or sign-in works), so the token is verified here instead: its
 signature against the project's signing key (the JWKS for an asymmetric key,
-``SUPABASE_JWT_SECRET`` for HS256), its expiry, a live ``auth.sessions`` row
+``SUPABASE_JWT_SECRET`` for HS256), its expiry (``exp``, ``sub`` and
+``session_id`` are required), a live ``auth.sessions`` row
 for its session, a deletion run in flight for its subject, and a subject that
 is not a placeholder. Anything else goes through ``current_user`` unchanged.
 """
@@ -32,6 +33,9 @@ from argus.api.dependencies import current_user, problem, request_access_token
 from argus.api.schemas import User
 
 _AUDIENCE = "authenticated"
+# A token without an expiry would never lapse; one without a subject or a
+# session can't be tied to the live session the lock check found.
+_REQUIRED = ("exp", "sub", "session_id")
 
 
 class _Unverified(Exception):
@@ -65,7 +69,13 @@ def verify_access_token(token: str) -> dict[str, Any]:
         if not secret:
             raise _Unverified("no_hs256_secret")
         try:
-            return jwt.decode(token, secret, algorithms=["HS256"], audience=_AUDIENCE)
+            return jwt.decode(
+                token,
+                secret,
+                algorithms=["HS256"],
+                audience=_AUDIENCE,
+                options={"require": list(_REQUIRED)},
+            )
         except jwt.PyJWTError as exc:
             raise _Unverified("hs256") from exc
     if alg not in {"RS256", "ES256"} or not header.get("kid"):
@@ -82,6 +92,8 @@ def verify_access_token(token: str) -> dict[str, Any]:
     claims = dict((response or {}).get("claims") or {})
     if claims.get("aud") not in (_AUDIENCE, [_AUDIENCE]):
         raise _Unverified("audience")
+    if any(not claims.get(name) for name in _REQUIRED):
+        raise _Unverified("claims")
     return claims
 
 

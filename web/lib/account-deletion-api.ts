@@ -1,4 +1,4 @@
-import { postFeedback } from "./argus-api";
+import { logoutFromApi, postFeedback } from "./argus-api";
 import { apiFetch } from "./argus-api-transport";
 
 export type AccountDeletionResult = {
@@ -27,6 +27,32 @@ export type AccountDeletionOutcome =
   | "in_progress"
   | "requested"
   | "unavailable";
+
+/** The account is gone, or locked while it finishes: the session is dead either
+ * way, so the browser signs out as soon as this result arrives, not when the
+ * dialog closes (Marcus #801 re-check N2). The dialog stays up as the
+ * signed-out confirmation; its Done finishes the sign-out and leaves. */
+export function deletionEndsSession(
+  outcome: AccountDeletionOutcome | string,
+): boolean {
+  return outcome === "success" || outcome === "in_progress";
+}
+
+/** Passed to onLogout when the account was just deleted: sign this browser
+ * out now, but keep the current surface (the confirmation dialog) mounted. */
+export type LogoutOptions = { afterAccountDeletion?: boolean };
+
+/** The account was just deleted: end this browser's session now. The chat's
+ * account boundary is told first, so the sign-out doesn't swap the surface
+ * for the account-changed screen and the dialog stays as the signed-out
+ * confirmation. Its Done comes back through the ordinary logout and leaves. */
+export async function endSessionKeepingSurface(
+  boundary: { beginConversion: () => void },
+  signOut: () => Promise<unknown> = logoutFromApi,
+): Promise<void> {
+  boundary.beginConversion();
+  await signOut().catch(() => undefined);
+}
 
 /** The Delete account button. Throws only when nothing happened and a retry
  * is the right answer (network, account_deletion_unavailable, rate limit). */

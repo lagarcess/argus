@@ -19,7 +19,7 @@ SUB = str(uuid.uuid4())
 SESSION = str(uuid.uuid4())
 
 
-def _token(secret: str = SECRET, **claims) -> str:  # noqa: ANN003
+def _token(secret: str = SECRET, drop: tuple[str, ...] = (), **claims) -> str:  # noqa: ANN003
     body = {
         "sub": SUB,
         "session_id": SESSION,
@@ -28,6 +28,8 @@ def _token(secret: str = SECRET, **claims) -> str:  # noqa: ANN003
         "exp": int(time.time()) + 600,
         **claims,
     }
+    for name in drop:
+        body.pop(name)
     return jwt.encode(body, secret, algorithm="HS256")
 
 
@@ -103,8 +105,11 @@ def test_anyone_not_locked_goes_through_current_user(wired, monkeypatch) -> None
         _token(secret="another-projects-secret-0123456789abcdef"),
         _token(exp=int(time.time()) - 5),
         _token(aud="anon"),
+        # Marcus #801 N1: a token with no expiry would never lapse.
+        _token(drop=("exp",)),
+        _token(drop=("session_id",)),
     ],
-    ids=["forged", "expired", "wrong_audience"],
+    ids=["forged", "expired", "wrong_audience", "no_exp", "no_session_id"],
 )
 def test_a_locked_token_that_does_not_verify_is_refused(
     wired, monkeypatch, token
@@ -130,10 +135,21 @@ def test_an_asymmetric_token_is_checked_against_the_projects_keys(
     monkeypatch.setattr(
         auth.jwt, "get_unverified_header", lambda token: {"alg": "ES256", "kid": "k1"}
     )
-    claims = MagicMock(return_value={"claims": {"sub": SUB, "aud": "authenticated"}})
+    good = {
+        "sub": SUB,
+        "session_id": SESSION,
+        "aud": "authenticated",
+        "exp": int(time.time()) + 600,
+    }
+    claims = MagicMock(return_value={"claims": good})
     wired["gateway"].client.auth.get_claims = claims
     assert auth.deletion_requester(_Request(_token())).id == SUB
     claims.assert_called_once()
+    # No expiry: refused even though the keys verified it.
+    claims.return_value = {"claims": {k: v for k, v in good.items() if k != "exp"}}
+    with pytest.raises(HTTPException) as refused:
+        auth.deletion_requester(_Request(_token()))
+    assert refused.value.status_code == 401
     claims.side_effect = RuntimeError("Invalid JWT signature")
     with pytest.raises(HTTPException):
         auth.deletion_requester(_Request(_token()))

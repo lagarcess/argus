@@ -50,7 +50,11 @@ import {
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import { requestAccountDeletion } from "@/lib/account-deletion-api";
+import {
+  deletionEndsSession,
+  requestAccountDeletion,
+  type LogoutOptions,
+} from "@/lib/account-deletion-api";
 import { type ApiUser } from "@/lib/argus-api";
 import {
   readProfile,
@@ -86,7 +90,7 @@ import { useQuickJump } from "@/components/keyboard/useQuickJump";
 type ProfileMenuProps = {
   isOpen: boolean;
   onClose: () => void;
-  onLogout: () => void;
+  onLogout: (options?: LogoutOptions) => void;
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   onDeleteAllConversations?: () => void;
   onHistoryMutated?: () => void;
@@ -371,8 +375,8 @@ export default function ProfileMenu({
       return;
     }
     if (isDeleteRequestOpen) {
-      // Deleted or locked: the session is dead, so leaving signs out.
-      if (deleteRequestState === "success" || deleteRequestState === "in_progress") {
+      // Deleted or locked: already signed out on the result; leaving finishes.
+      if (deletionEndsSession(deleteRequestState)) {
         onLogout();
       } else if (deleteRequestState !== "submitting") {
         setIsDeleteRequestOpen(false);
@@ -846,20 +850,25 @@ export default function ProfileMenu({
       return;
     }
     setDeleteRequestState("submitting");
+    let outcome: DeleteRequestState;
     try {
       // 202 and a post-lock 503 are in_progress, never shown as done or as a
       // failure; 404 (command off here) falls back to a support ticket.
-      setDeleteRequestState(await requestAccountDeletion(currentLanguage));
+      outcome = await requestAccountDeletion(currentLanguage);
     } catch (err) {
       console.error("Account deletion failed", err);
       setDeleteRequestState("error");
+      return;
     }
-  }, [currentLanguage, deleteRequestState]);
+    setDeleteRequestState(outcome);
+    // The session is dead: sign this browser out on the result itself, with
+    // the dialog kept up as the signed-out confirmation.
+    if (deletionEndsSession(outcome)) onLogout({ afterAccountDeletion: true });
+  }, [currentLanguage, deleteRequestState, onLogout]);
 
-  // The account is gone, or locked while it finishes, so the session is dead
-  // either way: leaving the dialog signs out.
+  // Already signed out on the result; Done finishes the sign-out and leaves.
   const handleCloseDeleteRequest = useCallback(() => {
-    if (deleteRequestState === "success" || deleteRequestState === "in_progress") {
+    if (deletionEndsSession(deleteRequestState)) {
       onLogout();
       return;
     }

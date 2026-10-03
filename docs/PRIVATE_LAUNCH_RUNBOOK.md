@@ -805,7 +805,9 @@ The account deletion sweep resumes runs still waiting on a third party (Apple,
 Plaid, Gmail, PostHog). Those accounts are locked meanwhile (signed out, every
 route but `POST /account/delete` refuses them) and their auth delete waits, so
 they finish only when the person retries or an operator runs this pass. Nothing
-runs it on a schedule. **Cadence: while any run is in flight, run
+runs it on a schedule: retries stay manual (this operator-run sweep, no cron),
+as Lucas decided at 2:04 AM CT on Oct 3, 2026, to be revisited before an
+external beta. **Cadence: while any run is in flight, run
 `scheduled_maintenance.py` at least daily.** To see whether any is:
 
 ```sql

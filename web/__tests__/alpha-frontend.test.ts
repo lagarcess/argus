@@ -2532,8 +2532,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(detailsDialog).toContain("languageDisplayAbbreviation");
     expect(profileMenu).toContain("localeForLanguage");
     // Lane 6: the delete button runs the deletion command; with the command
-    // off (404) it falls back to the support ticket. Leaving the dialog after
-    // success or in_progress signs out. Outcomes: account-deletion-api.test.ts.
+    // off (404) it falls back to the support ticket. Success or in_progress
+    // signs out on the result; Done leaves. See account-deletion-api.test.ts.
     expect(profileMenu).toContain("requestAccountDeletion(currentLanguage)");
     expect(profileMenu).toContain("onLogout();");
     expect(deleteRequestDialog).toContain(
@@ -2914,7 +2914,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     const logoutHandler = chat.slice(
-      chat.indexOf("const handleLogout = async () =>"),
+      chat.indexOf("const handleLogout = async ("),
       chat.indexOf("const handleCancelConfirmationAction"),
     );
 

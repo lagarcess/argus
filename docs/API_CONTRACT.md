@@ -3203,9 +3203,10 @@ revokes provider tokens, and deletes the auth user. A retry resumes the same run
 (the account is locked). This route alone accepts them, so a retry resumes
 their own run: GoTrue refuses a banned account's token, so the API verifies it
 itself (signature against the project's JWKS, or `SUPABASE_JWT_SECRET` for
-HS256; expiry; audience), then requires a live `auth.sessions` row for its
-session, a run in flight for its subject, and a subject that is not a
-placeholder. Anyone not locked goes through the usual session check. The route
+HS256; expiry; audience; `exp`, `sub` and `session_id` must all be present),
+then requires a live `auth.sessions` row for its session that belongs to its
+subject, a run in flight for that subject, and a subject that is not a
+placeholder. Anything else is `401`. Anyone not locked goes through the usual session check. The route
 is rate limited per account (6 a minute, `429 too_many_requests` with
 `Retry-After`). A guest create-then-delete loop makes a new account each time,
 so it is bounded where guests are made (captcha and the guest limits).
@@ -3228,8 +3229,9 @@ auth delete. A repeat request resumes the run, and so does the operator-run
 sweep (`scripts/ops/resume_account_deletions.py` inside
 `scheduled_maintenance.py`; nothing runs it on a schedule, see
 PRIVATE_LAUNCH_RUNBOOK.md for the cadence). `pending` is also empty when
-another request holds the run at that moment. Clients show "deletion in
-progress", sign out, and never show the finished state.
+another request holds the run at that moment. Clients sign out as soon as
+this response (or `200`) arrives, keep showing "deletion in progress" as the
+signed-out confirmation, and never show the finished state.
 
 ```json
 { "status": "in_progress", "pending": ["plaid"] }

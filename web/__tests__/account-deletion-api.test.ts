@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { requestAccountDeletion } from "@/lib/account-deletion-api";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  deletionEndsSession,
+  endSessionKeepingSurface,
+  requestAccountDeletion,
+} from "@/lib/account-deletion-api";
 
 type Call = { url: string; body: unknown };
 
@@ -87,5 +94,41 @@ describe("account deletion outcomes (Lane 6)", () => {
       { status: 500, body: { code: "internal_error" } },
     ]);
     expect(await requestAccountDeletion("en")).toBe("unavailable");
+  });
+
+  test("deleted or locked ends the session on the result; nothing else does", () => {
+    expect(deletionEndsSession("success")).toBe(true);
+    expect(deletionEndsSession("in_progress")).toBe(true);
+    for (const other of ["requested", "unavailable", "error", "idle", "submitting"]) {
+      expect(deletionEndsSession(other)).toBe(false);
+    }
+  });
+
+  test("the sign-out keeps the surface: the boundary hears first", async () => {
+    const order: string[] = [];
+    await endSessionKeepingSurface(
+      { beginConversion: () => order.push("boundary") },
+      async () => {
+        order.push("signOut");
+        throw new Error("network");
+      },
+    );
+    expect(order).toEqual(["boundary", "signOut"]);
+  });
+
+  test("the menu signs out on the result, and Done leaves (Marcus #801 N2)", () => {
+    const root = join(import.meta.dir, "..");
+    const menu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
+    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
+    expect(menu).toContain(
+      "if (deletionEndsSession(outcome)) onLogout({ afterAccountDeletion: true });",
+    );
+    const close = menu.slice(menu.indexOf("const handleCloseDeleteRequest"));
+    expect(close.slice(0, close.indexOf("}, [deleteRequestState, onLogout]);"))).toContain(
+      "onLogout();",
+    );
+    expect(chat).toContain(
+      "if (options.afterAccountDeletion) return endSessionKeepingSurface(accountBoundary);",
+    );
   });
 });
