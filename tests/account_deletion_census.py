@@ -127,8 +127,8 @@ class ForeignKey:
         if all(c.endswith("membership_id") for c in owners):
             return (
                 "Keyed by membership id, not user id: re-point it to the "
-                "placeholder membership of its own plan, keyed to that plan's "
-                "placeholder `auth.users` row (never nulled)."
+                "person's placeholder membership in its household, keyed to that "
+                "household's placeholder `auth.users` row (never nulled)."
             )
         if len(self.columns) == 1:
             return (
@@ -142,17 +142,17 @@ class ForeignKey:
         if self.deferrable:
             return (
                 f"Composite owner key, ON UPDATE {self.on_update}, deferrable: "
-                "copy the parent under the new owner, re-point the children and "
-                "delete the original in one transaction. The new id must still "
-                "reach `auth.users` through the parent."
+                "move the parent and its children to the new owner in place, in "
+                "one transaction, keeping ids and revisions. The new id must "
+                "still reach `auth.users` through the parent."
             )
         return (
             f"Composite owner key, ON UPDATE {self.on_update}, not deferrable: "
             "neither side can change its owner id first. Moving it, to a new plan "
-            "owner or a per-plan placeholder, needs this key made DEFERRABLE "
-            "INITIALLY IMMEDIATE (not ON UPDATE CASCADE): copy the parent under "
-            "the new owner, re-point the children, delete the original. The new "
-            "id must also reach `auth.users` through the parent."
+            "owner or a household's placeholder, needs this key made DEFERRABLE "
+            "INITIALLY IMMEDIATE (not ON UPDATE CASCADE): update the parent and "
+            "its children in place, keeping ids and revisions. The new id must "
+            "also reach `auth.users` through the parent."
         )
 
 
