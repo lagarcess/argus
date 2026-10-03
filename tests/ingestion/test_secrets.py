@@ -59,3 +59,15 @@ def test_digest_is_keyed_and_purpose_separated():
     assert first.digest(value, purpose="gmail") != first.digest(value, purpose="other")
     assert first.digest(value, purpose="gmail") != second.digest(value, purpose="gmail")
     assert value not in first.digest(value, purpose="gmail")
+
+
+def test_key_id_names_the_key_without_revealing_it():
+    """Stored next to every ciphertext (Lane 6, Priya B1): the same key gives
+    the same id, another key another one, and it is neither the key nor a
+    digest of it that any other purpose produces."""
+    raw = os.urandom(32)
+    first, again, other = SecretBox(raw), SecretBox(raw), box()
+    assert first.key_id == again.key_id != other.key_id
+    assert len(first.key_id) == 32 and set(first.key_id) <= set("0123456789abcdef")
+    assert raw.hex()[:32] != first.key_id
+    assert first.key_id not in first.digest("argus-ingestion-key-id:v1", purpose="x")

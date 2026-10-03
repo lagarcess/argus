@@ -69,6 +69,8 @@ def test_exchange_sync_and_resync_on_postgres(repo, users):  # noqa: ANN001
     assert connector.sync(first.connection).status == "synced"
     row = repo.get(user_id=owner, connection_id=first.connection.id)
     assert row.cursor == "c2" and row.lease_holder is None
+    # The sealing key's fingerprint round-trips through the table (Priya B1).
+    assert row.secret_key == connector.hub.box.key_id
     assert connector.sync(row).added == 0
     fake.item_error = "ITEM_LOGIN_REQUIRED"
     assert connector.sync(row).error_code == "plaid_item_login_required"

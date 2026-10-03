@@ -118,6 +118,7 @@ class PlaidLink:
                 now=self.hub.clock(),
                 secret=sealed,
                 connection_id=connection_id,
+                secret_key=box.key_id,
             )
         except DuplicateConnection as duplicate:
             # A concurrent exchange of the same Item won the insert.
@@ -172,11 +173,14 @@ class PlaidLink:
             return self._record(row, str(error["error_code"]))
         if row.secret is None:
             raise ConnectionNotReauthorizable()
+        assert self.hub.box is not None
         return self.hub.connections.set_secret(
             connection_id=row.id,
             secret=row.secret,
             status="active",
             now=self.hub.clock(),
+            # The token just opened under this key, so this key sealed it.
+            secret_key=self.hub.box.key_id,
         )
 
     def _institution_label(self, access_token: str) -> str | None:

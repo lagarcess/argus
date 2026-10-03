@@ -103,6 +103,53 @@ def members(c: Any, hid: str) -> dict[str, dict]:
     }
 
 
+FORMER_MEMBER = {"en": "Former member", "es-419": "Exmiembro"}
+
+
+def viewer_language(c: Any, user_id: str) -> str:
+    row = c.execute(
+        "select language from public.profiles where id = %s", (user_id,)
+    ).fetchone()
+    return row[0] if row and row[0] in FORMER_MEMBER else "en"
+
+
+def plan_people(c: Any, b: dict, people: dict, language: str = "en") -> dict:
+    """Former members (deleted accounts) are numbered per plan, in the
+    viewer's language: "Former member" / "Exmiembro" when the plan shows one,
+    "Former member 1", "Exmiembro 2" and so on when it shows several. Only
+    former members the plan shows (as owner, contributor or with a
+    responsibility) count; ended participations are not shown."""
+
+    rows = c.execute(
+        """select m.id from public.household_members m
+            where m.household_id = %s and m.former_member_number is not null
+              and m.id in (
+                select contributor_membership_id from public.financial_plan_links
+                       where binding_id = %s and contributor_membership_id is not null
+                union select membership_id from public.financial_plan_responsibilities
+                       where kind = %s and definition_id = %s and owner_id = %s
+                union select owner_membership_id from public.household_plan_bindings where id = %s)
+            order by m.former_member_number, m.id""",
+        (
+            b["household_id"],
+            b["id"],
+            b["kind"],
+            b["definition_id"],
+            b["owner_id"],
+            b["id"],
+        ),
+    ).fetchall()
+    if not rows:
+        return people
+    renamed = dict(people)
+    for number, (mid,) in enumerate(rows, start=1):
+        if str(mid) in renamed:
+            label = FORMER_MEMBER.get(language, FORMER_MEMBER["en"])
+            name = label if len(rows) == 1 else f"{label} {number}"
+            renamed[str(mid)] = dict(renamed[str(mid)], display_name=name)
+    return renamed
+
+
 def participants(c: Any, b: dict, people: dict) -> list[dict]:
     owner = people[b["owner_mid"]]
     result = [
