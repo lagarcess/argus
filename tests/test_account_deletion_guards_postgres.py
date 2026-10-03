@@ -12,7 +12,11 @@ import pytest
 from argus.domain.account_deletion.auth_admin import PLACEHOLDER_DOMAIN
 from argus.domain.account_deletion.service import (
     AccountDeletionIncomplete,
+    subject_hash,
 )
+from argus.domain.household.access import require_edit, resolve
+from argus.domain.household.errors import HouseholdNotFound as HouseholdUnavailable
+from argus.domain.household.financial import HouseholdFinancialService
 from argus.observability.analytics_deletion import RecordingAnalyticsDeletion
 
 from tests.household.financial_fixtures import DSN
@@ -114,21 +118,24 @@ def test_the_placeholder_domain_is_refused_to_everyone_else() -> None:
 def test_locked_owner_columns_move_only_inside_the_deletion_writer(lane, world):  # noqa: F811
     """S1/S2: an owner column on locked history changes only inside the
     deletion writer (the GUC and current_user postgres). Outside it the update
-    is refused (42501): with no GUC, and from a service_role session that sets
-    the GUC. The writers themselves refuse a service_role caller."""
+    is refused (42501): with no GUC, and from a service_role or authenticated
+    session that sets the GUC. The writers themselves refuse both roles."""
     a, b = world["a"], world["b"]
     tables = {
         "financial_record_revisions": "user_id",
         "household_plan_archived_claims": "activity_owner_id",
+        "household_plan_archived_activities": "activity_owner_id",
         "financial_goal_allocation_revisions": "account_owner_id",
     }
-    setups = (
-        [],
+    roles = ("service_role", "authenticated")
+    forced = [
         [
-            "set local role service_role",
+            f"set local role {role}",
             "select set_config('argus.locked_history_writer', 'deletion', true)",
-        ],
-    )
+        ]
+        for role in roles
+    ]
+    setups = ([], *forced)
     with psycopg.connect(DSN) as c:
         for table, column in tables.items():
             held = c.execute(
@@ -144,13 +151,12 @@ def test_locked_owner_columns_move_only_inside_the_deletion_writer(lane, world):
                             f"update public.{table} set {column}=%s where {column}=%s",
                             (b, a),
                         )
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):
-            with c.transaction():
-                c.execute("set local role service_role")
-                c.execute(
-                    "select set_config('argus.locked_history_writer', 'deletion', true)"
-                )
-                c.execute("select argus_private.deletion_finish(%s, null)", (a,))
+        for setup in forced:
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                with c.transaction():
+                    for line in setup:
+                        c.execute(line)
+                    c.execute("select argus_private.deletion_finish(%s, null)", (a,))
 
 
 class SlowRevoker(FakeRevoker):
@@ -262,7 +268,8 @@ def test_an_activity_two_households_pin_goes_with_the_oldest_claim(lane, world, 
     left H2, so that claim is archived) and also, released, in an H1 plan.
     The household whose claim is oldest (claim created_at, then claim id)
     gets it under its placeholder; the other household's claim stays a
-    read-only reference that still resolves, and the run counts them."""
+    read-only reference that still resolves, and the run counts them. Nobody
+    in the losing household can edit the activity through that reference."""
     a = world["a"]
     h1, h2 = world["households"][0], world["households"][1]
     with psycopg.connect(DSN, autocommit=True) as c:
@@ -340,3 +347,102 @@ def test_an_activity_two_households_pin_goes_with_the_oldest_claim(lane, world, 
             ).fetchone()[0]
             == owner
         )
+        legs = {
+            str(r[0])
+            for r in c.execute(
+                "select distinct r.account_id from public.financial_activity_memberships m"
+                " join public.financial_records r on r.id = m.record_id"
+                " where m.activity_id=%s",
+                (archived[2],),
+            ).fetchall()
+        }
+        loser_members = [
+            str(r[0])
+            for r in c.execute(
+                "select user_id from public.household_members"
+                " where household_id=%s and left_at is null",
+                (loser,),
+            ).fetchall()
+        ]
+        # Marcus re-check N3: the reference is read-only. The losing household
+        # holds no grant on the activity's accounts, so no member there can
+        # edit it through the household money path.
+        assert not c.execute(
+            "select 1 from public.household_account_grants where household_id=%s"
+            " and account_id = any(%s::uuid[]) and revoked_at is null",
+            (loser, list(legs)),
+        ).fetchone()
+    assert legs and loser_members
+    money = HouseholdFinancialService(lane[0])
+    for member in loser_members:
+        with money.households.transaction(member, loser) as (c, h, m):
+            scope = resolve(c, member, h, m)
+            editable = {
+                aid for aid, a in scope.accounts.items() if a.permission == "edit"
+            }
+            assert not legs & editable
+            with pytest.raises(HouseholdUnavailable):
+                require_edit(scope, legs)
+
+
+def _take_claim(user_id: str, *, release: bool = False) -> None:
+    """Another pass takes the run's claim (or lets it go)."""
+    with psycopg.connect(DSN, autocommit=True) as c:
+        c.execute(
+            "update argus_private.account_deletion_runs"
+            " set claim_id = case when %s then null else gen_random_uuid() end,"
+            "     claimed_until = case when %s then null else now() + interval '1 hour' end"
+            " where subject_hash = %s",
+            (release, release, subject_hash(user_id)),
+        )
+
+
+class ClaimThief(FakeRevoker):
+    """The claim lapses during the provider calls and another pass takes it."""
+
+    def __init__(self, user_id: str) -> None:
+        super().__init__()
+        self.user_id = user_id
+
+    def revoke_for_deletion(self, **kwargs):  # noqa: ANN003, ANN201
+        _take_claim(self.user_id)
+        return super().revoke_for_deletion(**kwargs)
+
+
+class LateThief(SqlAuthAdmin):
+    """The claim is taken while the account delete is in flight."""
+
+    def __init__(self, user_id: str) -> None:
+        super().__init__()
+        self.user_id = user_id
+
+    def delete_user(self, user_id: str) -> None:
+        if user_id == self.user_id:
+            _take_claim(user_id)
+        super().delete_user(user_id)
+
+
+def test_a_pass_that_lost_its_claim_never_finishes_the_run(lane, world):  # noqa: F811
+    """Marcus re-check N1: the claim is renewed before the account delete, and
+    the final update is fenced on it. A pass whose claim was taken stops
+    before deleting the account; one that loses it during the delete leaves
+    the run to the pass that holds it."""
+    a = world["a"]
+    admin = SqlAuthAdmin()
+    with pytest.raises(AccountDeletionIncomplete) as raised:
+        _service(lane, admin, ClaimThief(a)).delete_account(user_id=a)
+    world["placeholders"] += admin.created
+    assert raised.value.reason == "in_progress"
+    assert a not in admin.deleted
+    run_id = _run_id(a)
+    assert _run(run_id)[0] == "data_deleted"
+    _take_claim(a, release=True)
+    late = LateThief(a)
+    with pytest.raises(AccountDeletionIncomplete) as raised:
+        _service(lane, late, FakeRevoker()).delete_account(user_id=a)
+    assert raised.value.reason == "in_progress"
+    assert _run(run_id)[0] == "data_deleted"
+    _take_claim(a, release=True)
+    outcome = _service(lane, SqlAuthAdmin(), FakeRevoker()).delete_account(user_id=a)
+    assert outcome.status == "done"
+    assert _run(run_id)[0] == "done"
