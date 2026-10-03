@@ -9,8 +9,8 @@ and is compared against integration before the graft. Tracking issue: #784.
 | --- | --- | --- |
 | #783 | Shared foundation | Landed as `5dd2e36d` |
 | #785 | Plans, groups, receipts, chat and voice | Landed as `900178b3` |
-| #786 | Home, Search, Updates, Profile, Settings | In review at `a20362d3` |
-| PR 4 | Design tests, launch arguments, this checklist | Draft, stacked on #786 |
+| #786 | Home, Search, Updates, Profile, Settings | Landed as `0ea81a20` |
+| PR 4 | Design tests, launch arguments, this checklist | Open against `codex/private-alpha-next` |
 
 The baseline is `2185aefe`, integration just before #783.
 
@@ -108,11 +108,15 @@ The automation doesn't cover these. Record each result in #784.
    `REWORD` for when group cards are real.
 3. **First-release presentation (#787).** Profile shows no Personalization, Security,
    Shared conversations, Removed activity, Memory, Usage, More options or photo option.
-   Notifications has no "Por correo". The preview sign-up and sign-in screens show no Apple
+   Search has no Memory perspective, through the same `CuadraoFirstRelease.shows(.memory)`
+   gate. Notifications has no "Por correo". The preview sign-up and sign-in screens show no Apple
    or Google button, and password-recovery help doesn't mention Apple.
 4. **Chart truth.** A month with no records shows "Sin datos" and "—". A month whose
    records add up to zero shows 0, and a comparison against it is an amount, never a
-   percent. A previous month with no records gets no comparison.
+   percent. A previous month with no records gets no comparison. **Pending founder
+   decision:** a month with confirmed coverage and no spending currently shows "Sin datos".
+   Lucas is deciding between 0 and "Sin datos", so record what you see without filing it as
+   a bug.
 5. **Physical device (optional).** Scan, save for later and reopen a receipt. The design
    branch's founder check covered this on build 3419. This graft hasn't been on a device.
 
