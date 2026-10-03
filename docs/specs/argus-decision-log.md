@@ -182,7 +182,8 @@ them.
   app. do-blitz stays an option for marketing and ad links later. This narrows
   the September 27 invitation-delivery lock; its Resend and WhatsApp parts are
   unchanged. (Founder approval by reaction, 5:58 PM CT.)
-- Each code works once and records who sent it, so the who-invited-whom
+- Each code works once, except the founder's group link (see the TestFlight
+  beta gate below), and records who sent it, so the who-invited-whom
   record exists. This builds on the October 1 single-use, seven-day rule.
 - When an account is deleted, an anonymous record that an invite was sent and
   accepted is kept, with no name or identifier. Deleting an account still
@@ -206,6 +207,15 @@ user trials, no new growth analytics), scoped to invites only.
   let the invitee into the beta. This keeps October 1 rule 1: only the
   household creator administers household invitations. (Founder lock, 8:04 PM
   CT; the split is Iris's proposal, with the quota raised from 3 to 10.)
+- The founder, and only the founder, can create a group link that many people
+  can use. He sets a cap (for example 50) and an expiry date. Redemption is
+  atomic, so a burst of taps can't go past the cap. Once the cap is reached,
+  anyone who taps the link lands on the cuadrao.ai waitlist and is told so on
+  screen. Each group link is its own source in the network numbers, and the
+  who-invited-whom record shows the link as the inviter. This is an exception
+  to the single-use rule. The link can be forwarded beyond the chat it was
+  posted in; the cap and the expiry date limit that spread. (Iris's proposal,
+  Yelena's build note, founder lock at 8:06 PM CT.)
 - A TestFlight public link only installs the app. The in-app invite code is the
   real gate. Anyone without a code is sent to the cuadrao.ai waitlist.
 - Three network numbers are tracked from the start: invites sent per user, the
