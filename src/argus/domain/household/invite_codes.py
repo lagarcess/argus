@@ -1,24 +1,50 @@
 """Invite codes, links and settings shared by household and beta invites.
 
-A code is 8 Crockford base32 characters (about 40 bits), shown as XXXX-XXXX.
-Only a hash is stored, beside the token hash. The token stays in the URL
-fragment, so it never reaches a web server log.
+A code is 12 Crockford base32 characters (60 bits), shown as XXXX-XXXX-XXXX.
+Only a keyed digest is stored, in ``argus_private.invite_code_digests``, never
+on a client-readable table: HMAC-SHA-256 under a server secret that lives in
+the environment and never in the database. The digest names its version and
+the key that made it (``v2.<key id>.<hex>``), so a secret can be rotated: the
+previous secret still finds its codes, and a code found under it is re-hashed
+to the current secret on use. There is no unkeyed fallback; without a secret
+codes cannot be made or looked up (fail closed).
+
+The link token is 256 random bits and stays a plain SHA-256 digest: a digest of
+that much entropy cannot be reversed, so a key would add nothing. It stays in
+the URL fragment, so it never reaches a web server log.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
+import re
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from argus.domain.household.errors import InviteCodesUnavailable
 
 CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-CODE_LENGTH = 8
+CODE_LENGTH = 12
+CODE_GROUP = 4
 UNIVERSAL_LINK_BASE = "https://cuadrao.ai/invite#"
 LEGACY_HOUSEHOLD_LINK_BASE = "argus-household://invite#"
 BETA_INVITE_QUOTA = 10
 TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _CONFUSABLE = str.maketrans({"O": "0", "I": "1", "L": "1", "U": "V"})
+
+CODE_SECRET_ENV = "ARGUS_INVITE_CODE_SECRET"
+CODE_SECRET_PREVIOUS_ENV = "ARGUS_INVITE_CODE_SECRET_PREVIOUS"
+MIN_SECRET_LENGTH = 32
+DIGEST_VERSION = "v2"
+DIGEST_PATTERN = re.compile(r"^v2\.[0-9a-f]{8}\.[0-9a-f]{64}$")
+# Flags that turn on a surface which makes or looks up codes.
+CODE_FLAGS = (
+    "ARGUS_HOUSEHOLDS_ENABLED",
+    "ARGUS_BETA_INVITES_ENABLED",
+    "ARGUS_BETA_INVITE_GATE_ENABLED",
+)
 
 
 def new_code() -> str:
@@ -34,11 +60,79 @@ def normalize_code(raw: str) -> str | None:
 
 
 def format_code(code: str) -> str:
-    return f"{code[:4]}-{code[4:]}"
+    return "-".join(code[i : i + CODE_GROUP] for i in range(0, len(code), CODE_GROUP))
 
 
-def hash_code(code: str) -> str:
-    return hashlib.sha256(f"argus-invite-code:v1:{code}".encode()).hexdigest()
+@dataclass(frozen=True)
+class CodeKey:
+    """One server secret. ``key_id`` names it in stored digests, not the secret."""
+
+    key_id: str
+    secret: bytes = field(repr=False)
+
+    @classmethod
+    def from_secret(cls, raw: str) -> CodeKey:
+        value = raw.strip()
+        if len(value) < MIN_SECRET_LENGTH:
+            raise InviteCodesUnavailable(
+                f"The invite code secret must be at least {MIN_SECRET_LENGTH} characters."
+            )
+        secret = value.encode("utf-8")
+        key_id = hmac.new(secret, b"argus-invite-code-key-id", hashlib.sha256)
+        return cls(key_id=key_id.hexdigest()[:8], secret=secret)
+
+    def digest(self, code: str) -> str:
+        mac = hmac.new(
+            self.secret,
+            f"argus-invite-code:{DIGEST_VERSION}:{code}".encode(),
+            hashlib.sha256,
+        )
+        return f"{DIGEST_VERSION}.{self.key_id}.{mac.hexdigest()}"
+
+
+@dataclass(frozen=True)
+class CodeHasher:
+    """The current secret makes digests; the previous one only finds old codes."""
+
+    current: CodeKey
+    previous: CodeKey | None = None
+
+    @classmethod
+    def from_secrets(cls, current: str | None, previous: str | None = None) -> CodeHasher:
+        if not current or not current.strip():
+            raise InviteCodesUnavailable()
+        key = CodeKey.from_secret(current)
+        old = CodeKey.from_secret(previous) if previous and previous.strip() else None
+        if old is not None and old.key_id == key.key_id:
+            old = None
+        return cls(current=key, previous=old)
+
+    @classmethod
+    def from_env(cls) -> CodeHasher:
+        return cls.from_secrets(
+            os.getenv(CODE_SECRET_ENV), os.getenv(CODE_SECRET_PREVIOUS_ENV)
+        )
+
+    def digest(self, code: str) -> str:
+        return self.current.digest(code)
+
+    def candidates(self, code: str) -> list[str]:
+        """Digests to look a typed code up by: current secret first."""
+        keys = [self.current] + ([self.previous] if self.previous else [])
+        return [key.digest(code) for key in keys]
+
+
+def code_surface_on() -> bool:
+    return any(_flag(name) for name in CODE_FLAGS)
+
+
+def code_secret_problem() -> str | None:
+    """Why codes cannot work right now, or None. Read by readiness and startup."""
+    try:
+        CodeHasher.from_env()
+    except InviteCodesUnavailable as error:
+        return error.detail
+    return None
 
 
 def _flag(name: str) -> bool:
@@ -83,16 +177,55 @@ def invite_link(token: str, *, household: bool, settings: InviteSettings) -> str
     return LEGACY_HOUSEHOLD_LINK_BASE + token if household else None
 
 
-def unique_code(connection) -> tuple[str, str]:  # noqa: ANN001
-    """A code whose hash is unused by every invite table."""
+def unique_code(connection, hasher: CodeHasher) -> tuple[str, str]:  # noqa: ANN001
+    """A code no live digest already names, under the current or previous secret."""
     for _ in range(8):
         code = new_code()
-        digest = hash_code(code)
         taken = connection.execute(
-            "select 1 from public.household_invitations where code_hash=%s"
-            " union all select 1 from public.beta_invitations where code_hash=%s",
-            (digest, digest),
+            "select 1 from argus_private.invite_code_digests where digest=any(%s)",
+            (hasher.candidates(code),),
         ).fetchone()
         if taken is None:
-            return code, digest
+            return code, hasher.digest(code)
     raise RuntimeError("Could not allocate a unique invite code.")
+
+
+def store_code(
+    connection,  # noqa: ANN001
+    digest: str,
+    *,
+    household_invitation_id: str | None = None,
+    beta_invitation_id: str | None = None,
+) -> None:
+    connection.execute(
+        "insert into argus_private.invite_code_digests"
+        "(digest,household_invitation_id,beta_invitation_id) values(%s,%s,%s)",
+        (digest, household_invitation_id, beta_invitation_id),
+    )
+
+
+def find_code(connection, code: str | None, hasher: CodeHasher) -> str | None:  # noqa: ANN001
+    """The invitation id a typed code names, household or beta, or None.
+
+    A code found under the previous secret is re-hashed to the current one, so
+    long-lived group-link codes move to the new secret as they are used.
+    """
+    normalized = normalize_code(code or "")
+    if normalized is None:
+        return None
+    candidates = hasher.candidates(normalized)
+    row = connection.execute(
+        "select digest,coalesce(household_invitation_id,beta_invitation_id)"
+        " from argus_private.invite_code_digests where digest=any(%s)"
+        " order by digest=%s desc limit 1",
+        (candidates, candidates[0]),
+    ).fetchone()
+    if row is None:
+        return None
+    if row[0] != candidates[0]:
+        connection.execute(
+            "update argus_private.invite_code_digests set digest=%s,rehashed_at=now()"
+            " where digest=%s",
+            (candidates[0], row[0]),
+        )
+    return str(row[1])

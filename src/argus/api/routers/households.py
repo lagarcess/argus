@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel
 
+from argus.api import invite_limits
 from argus.api.households import (
     HouseholdsContext,
     InvitesContext,
@@ -156,8 +157,12 @@ def preview_invitation(
     return call(
         request,
         response,
-        lambda: context.service.preview_invitation(
-            user_id=context.user_id, token=body.token, code=body.code
+        invite_limits.guarded(
+            request,
+            context.user_id,
+            lambda: context.service.preview_invitation(
+                user_id=context.user_id, token=body.token, code=body.code
+            ),
         ),
     )
 
@@ -175,11 +180,15 @@ def accept_invitation(
         context,
         body,
         None,
-        lambda: context.service.accept(
-            user_id=context.user_id,
-            token=body.token,
-            code=body.code,
-            display_name=body.display_name,
+        invite_limits.guarded(
+            request,
+            context.user_id,
+            lambda: context.service.accept(
+                user_id=context.user_id,
+                token=body.token,
+                code=body.code,
+                display_name=body.display_name,
+            ),
         ),
     )
 
@@ -457,7 +466,11 @@ def preview_invite(
     return call(
         request,
         response,
-        lambda: context.store.preview(token=body.token, code=body.code),
+        invite_limits.guarded(
+            request,
+            context.user_id,
+            lambda: context.store.preview(token=body.token, code=body.code),
+        ),
     )
 
 
@@ -471,8 +484,12 @@ def redeem_invite(
     return call(
         request,
         response,
-        lambda: context.store.redeem(
-            user_id=context.user_id, token=body.token, code=body.code
+        invite_limits.guarded(
+            request,
+            context.user_id,
+            lambda: context.store.redeem(
+                user_id=context.user_id, token=body.token, code=body.code
+            ),
         ),
     )
 
