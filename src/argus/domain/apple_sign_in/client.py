@@ -75,9 +75,11 @@ class AppleAuthClient:
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
         max_attempts: int = MAX_ATTEMPTS,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self.config = config
         self._sleep = sleep
+        self._monotonic = monotonic
         self._attempts = max(1, max_attempts)
         self._http = httpx.Client(
             timeout=TIMEOUT_SECONDS, follow_redirects=False, transport=transport
@@ -195,6 +197,12 @@ class AppleAuthClient:
     def _send(
         self, url: str, data: dict[str, str], timeout: float | None
     ) -> tuple[int, bytes, str | None]:
+        # httpx's timeouts bound each phase and each read, not the whole
+        # request: a response trickled in small chunks would never trip them.
+        # One request may take ``timeout`` seconds in total, checked when the
+        # headers arrive and after every body chunk.
+        limit = timeout or TIMEOUT_SECONDS
+        deadline = self._monotonic() + limit
         with self._http.stream(
             "POST",
             url,
@@ -202,14 +210,20 @@ class AppleAuthClient:
             headers={"Accept": "application/json"},
             timeout=httpx.Timeout(timeout or TIMEOUT_SECONDS),
         ) as response:
+            self._check(deadline)
             body = bytearray()
             for chunk in response.iter_bytes():
+                self._check(deadline)
                 body.extend(chunk)
                 if len(body) > MAX_JSON_BYTES:
                     raise AppleError(
                         status=response.status_code, reason="response_too_large"
                     )
             return response.status_code, bytes(body), response.headers.get("Retry-After")
+
+    def _check(self, deadline: float) -> None:
+        if self._monotonic() > deadline:
+            raise httpx.ReadTimeout("Apple response exceeded its total deadline")
 
 
 def _backoff(attempt: int, retry_after: str | None) -> float:

@@ -482,3 +482,83 @@ def test_discard_is_scoped_to_the_given_user(service, apple) -> None:  # noqa: A
     )
     assert service.discard_unreadable(user_id=USER) is DiscardOutcome.NOTHING_STORED
     assert service.repository.get(user_id=other) is not None
+
+
+class _Trickle(httpx.SyncByteStream):
+    """A body sent one byte at a time, each just inside the per-read timeout."""
+
+    def __init__(self, clock: list[float], step: float) -> None:
+        self._clock = clock
+        self._step = step
+
+    def __iter__(self):  # noqa: ANN204
+        for byte in b"{}" * 8:
+            self._clock[0] += self._step
+            yield bytes([byte])
+
+
+def test_a_trickled_response_still_hits_the_total_deadline(key) -> None:  # noqa: ANN001
+    # httpx's read timeout restarts on every chunk; the client's own total
+    # deadline does not, so the compensating revoke can't be kept open.
+    clock = [0.0]
+    sent: list[str] = []
+
+    def trickle(request: httpx.Request) -> httpx.Response:
+        sent.append(request.url.path)
+        return httpx.Response(200, stream=_Trickle(clock, DISCARD_TIMEOUT_SECONDS / 3))
+
+    made = AppleAuthClient(
+        config(key),
+        transport=httpx.MockTransport(trickle),
+        sleep=lambda _s: None,
+        monotonic=lambda: clock[0],
+    )
+    with pytest.raises(AppleError) as raised:
+        made.revoke(
+            "r.x", client_id=BUNDLE_ID, timeout=DISCARD_TIMEOUT_SECONDS, attempts=1
+        )
+    assert raised.value.reason == "unreachable"
+    assert sent == ["/auth/revoke"]
+    assert clock[0] < DISCARD_TIMEOUT_SECONDS * 2
+    made.close()
+
+
+@pytest.mark.parametrize("path", ["mismatch", "failed_save"])
+def test_a_hung_compensating_revoke_releases_the_request(key, apple, path) -> None:  # noqa: ANN001
+    import threading
+    import time
+
+    release = threading.Event()
+    revoking = threading.Event()
+
+    def hang_on_revoke(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/auth/revoke":
+            revoking.set()
+            release.wait(10)
+            return httpx.Response(200)
+        return apple(request)
+
+    made = AppleAuthClient(
+        config(key), transport=httpx.MockTransport(hang_on_revoke), sleep=lambda _s: None
+    )
+    repository = (
+        _BrokenRepository()
+        if path == "failed_save"
+        else InMemoryAppleCredentialRepository()
+    )
+    service = AppleCredentialService(
+        repository, box=_box(), client=made, clock=lambda: NOW, discard_deadline=0.2
+    )
+    apple.grant(sub="000999.other" if path == "mismatch" else SUBJECT)
+    expected = AppleIdentityMismatch if path == "mismatch" else AppleCaptureNotStored
+    started = time.monotonic()
+    try:
+        with pytest.raises(expected):
+            service.capture(
+                user_id=USER, apple_subject=SUBJECT, authorization_code="c.code"
+            )
+        assert time.monotonic() - started < 2.0
+        assert revoking.is_set()
+    finally:
+        release.set()
+        made.close()

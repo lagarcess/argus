@@ -18,7 +18,10 @@ Revoke is what the account-deletion lane calls. It opens the stored token,
 asks Apple to revoke it, and deletes the row only after Apple answers 200, and
 only if the row still holds the token that was revoked. Apple's
 ``invalid_grant`` means the token is already dead (revoked from the person's
-Apple ID settings, or expired), so that counts as revoked too. Any other
+Apple ID settings, or expired), so that counts as revoked too. Revoke always
+sends the stored client id with a secret signed for it, so a client mismatch
+is not how it arises here, and no retry could ever turn an ``invalid_grant``
+token into a 200: keeping it would only block deletion forever. Any other
 failure leaves the row in place: that row is the pending revoke, retried by
 calling again.
 
@@ -37,7 +40,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from threading import Lock
+from threading import Lock, Thread
 from typing import Protocol
 
 from loguru import logger
@@ -50,6 +53,9 @@ from argus.domain.apple_sign_in.client import (
 from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 
 SOURCE = "apple_sign_in"
+# The most a compensating revoke may add to the person's capture request. The
+# Apple client bounds the body; this bounds everything, slow headers included.
+DISCARD_DEADLINE_SECONDS = 2 * DISCARD_TIMEOUT_SECONDS
 
 
 class AppleIdentityMismatch(RuntimeError):
@@ -143,11 +149,13 @@ class AppleCredentialService:
         box: SecretBox,
         client: AppleAuthClient,
         clock: Callable[[], datetime],
+        discard_deadline: float = DISCARD_DEADLINE_SECONDS,
     ) -> None:
         self.repository = repository
         self._box = box
         self._client = client
         self._clock = clock
+        self._discard_deadline = discard_deadline
 
     def close(self) -> None:
         self._client.close()
@@ -180,9 +188,26 @@ class AppleCredentialService:
         """Revoke a token that won't be stored, so none is left unrevocable.
 
         This runs inside the person's capture request, so it gets one short
-        attempt. It never raises: the caller's own outcome (409 or 503) stands.
+        attempt, on a worker thread the request waits for at most
+        ``discard_deadline`` seconds. It never raises: the caller's own outcome
+        (409 or 503) stands.
         """
 
+        worker = Thread(
+            target=self._revoke_unstored,
+            args=(refresh_token, reason),
+            name="apple-discard-revoke",
+            daemon=True,
+        )
+        worker.start()
+        worker.join(self._discard_deadline)
+        if worker.is_alive():
+            logger.warning(
+                "Apple token discard still waiting on Apple; request released",
+                reason=reason,
+            )
+
+    def _revoke_unstored(self, refresh_token: str, reason: str) -> None:
         try:
             self._client.revoke(
                 refresh_token,

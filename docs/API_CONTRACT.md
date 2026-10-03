@@ -2818,9 +2818,10 @@ from the verified session; the body accepts no other field.
 
 A later sign-in replaces the stored token without revoking the old one,
 because revoking any token ends the whole Apple authorization for the app.
-The compensating revoke on the 409 and 503 paths is a single attempt with a
-2-second timeout per phase and no retry, so it can't hold the request for long.
-The code exchange before it keeps its 30-second timeout.
+The compensating revoke on the 409 and 503 paths is a single attempt with no
+retry, 2 seconds in total, and the request waits at most 4 seconds for it
+however slowly Apple answers. The code exchange before it keeps its 30-second
+limit.
 
 No route revokes or discards. Account deletion (Lane 6) calls
 `AppleCredentialService.revoke`. It deletes the row after Apple answers 200
