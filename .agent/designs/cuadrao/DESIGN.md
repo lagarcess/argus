@@ -438,9 +438,9 @@ They identify the missing content without pretending to be records.
 
 | State | Presentation and behavior |
 | --- | --- |
-| Current month with no records | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
-| Historical period with no records | Sin datos / No data and neutral past-period copy; keep period navigation |
-| Period whose records add up to zero | A real zero is data: show it, and a comparison against it shows the amount difference, not a percent ([October 2 Home comparisons lock](../../../docs/specs/argus-decision-log.md#home-comparisons)) |
+| Current month with missing coverage | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
+| Historical period with missing coverage | Sin datos / No data and neutral past-period copy; keep period navigation |
+| Confirmed complete coverage with zero spending | Show the known zero; distinguish it from missing records. A comparison against it shows the amount difference, not a percent ([October 2 Home comparisons lock](../../../docs/specs/argus-decision-log.md#home-comparisons), clarified 10:18 PM CT) |
 | First use with no history | Welcoming artwork and one working record-entry action |
 | Incomplete or unavailable history | Distinguish unknown from zero; omit unsupported comparison claims |
 | Real records, even one | Real chart immediately; leave future buckets empty |
@@ -756,6 +756,11 @@ screens. Use native titles, body type and the shared destructive action treatmen
   remaining member. Show the actual successor only when resolved by the owner.
 - If the person owns shared history, explain that deletion removes the household's
   locked copy of that history. Do not describe deleting another member's records.
+- A shared debt plan whose owner deleted their account is archived read-only, not
+  handed over (decision 19 in the lane handoff, the Head of Engineering's call).
+  Participants see Iris's founder-locked banner on it, from the lane handoff's
+  copy, item 4, and get the usual member note. Show it as a closed plan with no
+  edit actions.
 - Reuse supported identity verification, such as a code sent to an existing verified
   channel. Cover incorrect/expired code, resend, cancellation, in-progress and
   retry states without requiring a support conversation.
@@ -769,10 +774,11 @@ history rules. Account deletion must not silently redefine them.
 
 ### Authentication and invitation purpose
 
-The founder's October 2 design direction adds **Apple and Google** alongside the
-existing email path. This is not yet a decision-log lock, and the lane handoff
-still lists Sign in with Apple as open; connected buttons stay hidden until the
-founder's choice and the connected path are both settled.
+Sign-in for TestFlight is **Apple, Google and email**
+([October 2 founder decision](../../../docs/specs/argus-decision-log.md#sign-in-for-testflight)).
+Email works with any address and has an in-app confirmation step. Engineering
+builds Apple and Google behind default-off flags until the founder supplies the
+keys; connected buttons stay hidden while a flag is off.
 Both social flows need loading, user cancellation, recoverable error and return
 to the intended invitation. Use Apple's native authorization treatment. Request
 a preferred name only if it is missing; reuse a supplied or saved name. A private
@@ -808,12 +814,13 @@ outside its quiet zone and test scan reliability. Public profile QR stays deferr
 
 ### Updates, chart truth and historical access
 
-Use the existing Updates inbox for invitation acceptance, administrator handoff,
+Use the Updates inbox for invitation acceptance, administrator handoff,
 owner deletion with history removal, and household closure. Use Iris's
-founder-locked wording for the deletion note and the new-owner message. Of these,
-the lane contract so far gives Updates the invitation-accepted row and the Lane 6
-deletion notices; administrator handoff and household closure notices still need
-a lane. Each notice explains
+founder-locked wording for the deletion note and the new-owner message. The lane
+that causes an event writes its entry: Household writes the closure when the last
+member leaves, and Lane 6 writes the administrator handoff and any closure a
+deletion causes. The Updates lane owns only how entries are displayed and the push
+opt-in (Yelena's rule, October 2). Each notice explains
 what changed and opens the relevant authorized destination. A closed household
 opens an explanation, not a broken detail. Do not leave deleted financial history
 readable through an old notification.
@@ -826,9 +833,10 @@ asks to enable it again. Push text never includes amounts or sensitive detail.
 An example is **Tienes un pago próximo / You have an upcoming payment**.
 
 A zero comparison baseline produces a monetary difference, never an infinite or
-invented percentage. Only a period with no records at all produces **Sin datos /
-No data**; a month with a real zero is data and still shows. Unknown, partially
-covered and real-zero periods remain different states. Keep the
+invented percentage. Missing coverage produces **Sin datos / No data**. A month
+with confirmed complete coverage and no spending is a known zero and shows 0.
+Unknown, partially covered and confirmed zero periods remain different states.
+Keep the
 quiet chart and established category colors, icons and typography.
 
 After an account move, the previous household's authorized pre-move history is
@@ -844,7 +852,13 @@ Remove the **Por correo / By email** notification toggle. This does not remove
 email authentication or recovery. Household email invitations and update email
 are not in this pass (October 2 lock), so no email invitation delivery is implied.
 Hide Personalization, Security and sessions, Shared conversations, Removed
-activity and personal-photo controls in the initial native release. Keep initials,
+activity, Usage, More options, conversation bulk actions and personal-photo
+controls in the initial native release. This list comes from Yelena's UI
+checklist, which the founder implemented in design commit `fc7650ea`. These are
+designed rows whose backend is still owed, not cuts. The first-release switch is
+meant to hide them only in release builds; development builds show every row.
+Yelena is ordering their backends after chat. **Por correo / By email** stays
+removed because Updates go to the inbox and push only. Keep initials,
 themes, supported preferences, help, legal links, deletion and sign-out. Avoid
 empty destinations, unavailable rows and new Coming soon settings sections.
 

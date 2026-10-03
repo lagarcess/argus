@@ -61,10 +61,12 @@ replace them with `CuadraoHouseholdSheet`, fictional invite acceptance,
 preview branch to obtain the style.
 
 Existing `ConnectedCuadraoAuthFlow` handles email auth; Apple is hidden and Google
-is not a connected native choice. The founder's design direction adds **Apple and
-Google** for the release design. That is not yet a decision-log lock, and the lane
-handoff still lists Sign in with Apple as open, so connected buttons stay hidden
-until both the choice and the connected path are settled. `HouseholdManagement`
+is not a connected native choice. Sign-in for TestFlight is **Apple, Google and
+email** ([October 2 founder
+decision](argus-decision-log.md#sign-in-for-testflight)). Apple and Google are
+built behind default-off flags until the founder supplies the keys, and connected
+buttons stay hidden while a flag is off. Email has an in-app confirmation step,
+which does not exist yet: today's sign-up ends on an emailed confirmation link. `HouseholdManagement`
 owns member/invitation management and explicit account consent;
 `HouseholdPlanPeople` owns shared-plan permissions. Current login deletion is a
 support request, and account archive is not an account move. In-app deletion is
@@ -74,16 +76,16 @@ must stay distinguished from connected acceptance.
 
 | Landing checkpoint | User items | UI deliverable | Closure evidence and existing responsibility |
 | --- | --- | --- | --- |
-| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English, with Iris's founder-locked copy | Ordinary member, admin and financial-owner variants; "Exmiembro" / "Former member" in other people's plans and plan handover per decision 17; no false success or deletion of another owner's data. C07/C10, identity and Household owners, Lane 6 |
+| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English, with Iris's founder-locked copy | Ordinary member, admin and financial-owner variants; "Exmiembro" / "Former member" in other people's plans and plan handover per decision 17; a shared debt plan archived read-only with Iris's banner instead (decision 19, Head of Engineering); no false success or deletion of another owner's data. C07/C10, identity and Household owners, Lane 6 |
 | 1. Trust and profile | 2 | Signed-in Privacy and Terms destinations | Actual approved links, return to Settings, both languages. C07, native identity/support |
-| 1. Trust and profile | 3 | Apple and Google auth alongside email | Founder design direction, not yet a lock; Sign in with Apple is open in the lane handoff. Loading, cancellation, error, missing-name recovery and return to invitation; connected credentials/session and deletion revocation acceptance owned by auth. C07/C10 |
-| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows and photo avatars, retain initials/themes | Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
+| 1. Trust and profile | 3 | Apple and Google auth alongside email | Founder decision, October 2: Apple, Google and email, Apple and Google behind default-off flags until the keys arrive; email with an in-app confirmation step. Loading, cancellation, error, missing-name recovery and return to invitation; connected credentials/session owned by auth; Apple token revocation at deletion is Lane 6. C07/C10 |
+| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows (including Usage, More options and conversation bulk actions) and photo avatars, retain initials/themes | Hidden rows come from Yelena's UI checklist, implemented in `fc7650ea`; they are designed rows whose backend is owed, hidden only in release builds. Today `CuadraoFirstRelease` hides them in every build. Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
 | 2. Access and Household | 4 | Invitation gate after install and cuadrao.ai waitlist | Valid, invalid, expired, already-used, cancelled auth and admitted-user return. Preserve link intent/manual code recovery. C02/C08 plus auth, Lane 1 |
 | 2. Access and Household | 5–6 | Personal invitation link/code/QR, remaining quota out of ten and accepted notice | Sharing is not acceptance; counter and notice derive from canonical status; QR scans; the QR card names its purpose. C02/C08, Lane 1 |
 | 2. Access and Household | 7 | Administrator-only household invitation without personal quota charge, which also admits a new person to the beta | Existing integration invitation preview/accept and account-sharing boundaries preserved. C02/C05, Household, Lane 1 |
 | 2. Access and Household | 8 | Founder-only group access link: creation, cap, expiry, usage and full/waitlist states | Beta only, never household membership. Capacity race/expiry recovery; confirmed enrollment before joined-waitlist wording. Redemptions do not use a personal quota, per Lane 1. C02/C08, Lane 1 |
-| 2. Access and Household | 9 | Admin handoff, owner-history removal and household-closed notices | Authorized target or clear terminal explanation, including stale notice after deletion. With no remaining member the household closes (decision 15). Handoff and closure notices still need a lane. C05/C07, Household and Updates |
-| 3. Home and Updates | 10 | Monetary difference from a zero baseline, and Sin datos only for a period with no records at all | A real zero month is data and still shows. Real zero, missing history and covered comparison specimens in both languages. C05, financial history, Lane 4 |
+| 2. Access and Household | 9 | Admin handoff, owner-history removal and household-closed notices | Authorized target or clear terminal explanation, including stale notice after deletion. With no remaining member the household closes (decision 15). The lane that causes the event writes the entry: Household for closure when the last member leaves, Lane 6 for admin handoff and closure caused by deletion. Updates owns display and push opt-in. C05/C07, Household, Lane 6 and Updates |
+| 3. Home and Updates | 10 | Monetary difference from a zero baseline, and Sin datos only for missing coverage | A month with confirmed complete coverage and no spending shows the known zero (founder clarification, 10:18 PM CT). Known zero, missing history and covered comparison specimens in both languages. C05, financial history, Lane 4 |
 | 3. Home and Updates | 11 | Bill reminders three days before/on due date; contextual push opt-in | Paid/cancelled occurrence suppressed; denied permission preserves inbox; no amounts in push. C07, planning/Updates/native delivery, Lane 5 |
 | 3. Home and Updates | 12 | Read-only pre-move household history | Existing owner and cutoff supplied by move contract; lock/read-only text and readable muted style; no hidden edit gestures. C05, financial core/Household, Lane 2 |
 | With first external model processing | 15 | AI disclosure and explicit consent across chat/voice/document entry, before sharing personal data with an external model | No personal data sent before consent; decline preserves draft and local capture. May be a first-TestFlight dependency if live AI is enabled. C01/C04/C07, intake/conversation |

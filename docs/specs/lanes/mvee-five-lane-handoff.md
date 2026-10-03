@@ -13,7 +13,7 @@ On 2 October, account deletion moved out of account moves into its own lane, [La
 
 ## Decisions this handoff implements
 
-Lucas locked rows 1 to 10 and rows 12 to 17 on 2 October 2026. Rows 12 to 17 were locked later that evening. Rows 12 to 14 settle what this file first listed as open items 1 and 2. Row 11 and the extras listed under the table are Head of Engineering delivery decisions, not founder locks. The reasons and wording for the founder locks live in the [decision log](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). The right column says where each one lands and what the code has today.
+Lucas locked rows 1 to 10 and rows 12 to 18 on 2 October 2026. Rows 12 to 18 were locked later that evening. Rows 12 to 14 settle what this file first listed as open items 1 and 2, and row 18 settles the Sign in with Apple item. Rows 11 and 19 and the extras listed under the table are Head of Engineering delivery decisions, not founder locks. The reasons and wording for the founder locks live in the [decision log](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks). The right column says where each one lands and what the code has today.
 
 | # | Decision | Lane | Today on `d9a7acfc` |
 | --- | --- | --- | --- |
@@ -22,7 +22,7 @@ Lucas locked rows 1 to 10 and rows 12 to 17 on 2 October 2026. Rows 12 to 17 wer
 | 3 | On account deletion, keep an anonymous record that an invite was sent and accepted, with no name or user id | Household | Not there. `created_by` and `accepted_by` are set to null on delete, so the count of people is lost |
 | 4 | 10 beta invites per user for TestFlight, more at Lucas's discretion. The in-app code is the real gate. A TestFlight public link only installs the app. No code means the cuadrao.ai waitlist | Household | No quota, no code gate, no TestFlight link |
 | 5 | Three network numbers from day one: invites sent per user, share of invites accepted, share of invitees who invite someone. Household invites are counted separately from beta invites, and each group link is its own source | Household | No event and no durable record |
-| 6 | A comparison against a zero month shows the amount difference, not a percent. A month with no records shows as no data | Home | No series on the API. `financial-home` returns zero strings for a month with no records |
+| 6 | A comparison against a zero month shows the amount difference, not a percent. A month with confirmed complete coverage and no spending shows 0. "Sin datos" shows only when coverage is missing (clarified 10:18 PM CT) | Home | No series on the API. `financial-home` returns zero strings for a month with no records |
 | 7 | A bill appears in Updates 3 days before its due date and on the due date | Updates | No inbox, no trigger |
 | 8 | Updates go to the in-app inbox, plus push for people who turn it on. Push never shows amounts. No email for updates | Updates | No inbox, no push code |
 | 9 | Joint-plan export waits until after TestFlight | None in this pass | The read-only departure archive from #773 stays |
@@ -34,6 +34,8 @@ Lucas locked rows 1 to 10 and rows 12 to 17 on 2 October 2026. Rows 12 to 17 wer
 | 15 | When the household admin deletes their account, the admin role passes automatically to the longest-standing remaining member. If no one is left, the household closes | Account deletion | No handoff. The admin transfers administration or closes the household by hand before leaving |
 | 16 | Deleting any account also clears the person's email from saved feedback and deletes the person in PostHog by distinct id, including their events. The PostHog wording was clarified Oct 2 via #782 | Account deletion | The feedback row's `user_id` is set to null on delete and `context.account_email` stays. No PostHog deletion call |
 | 17 | When a person deletes their account, their amounts in plans other people own keep their values and dates under a nameless "Exmiembro" placeholder ("Former member" in English), numbered when more than one. Their receipts, photos, and notes are deleted. Open balances with them are frozen as a closed line, not settled or forgiven, until a member marks them settled. Their future responsibilities go back to the plan's owner with an Update to reassign. Shared plans they owned, and the #773 archive, pass to the longest-standing participant, or are deleted if nobody else is in the plan | Account deletion | Nothing. A plain delete fails on the restricting keys. No placeholder, frozen balance, or plan ownership transfer |
+| 18 | Sign-in for TestFlight is Apple, Google, and email. Email works with any address and has an in-app confirmation step. Apple and Google are built behind default-off flags until Lucas supplies the keys. Because the app offers Sign in with Apple, deleting an account revokes the person's Apple tokens | Sign-in (Yelena), and Account deletion for the Apple revocation | Email only. `ConnectedCuadraoAuth.swift` says "Apple is hidden". `PreviewAppleButton` in `CuadraoCreateAccount.swift` makes no authorization request. No Google sign-in code. Email sign-up ends on "Check your email" with a confirmation link, then the person returns to sign in (`auth.confirmation.detail`), so there is no in-app confirmation step yet. `[auth.external.apple]` in `supabase/config.toml` is disabled |
+| 19 (HoE) | A shared debt plan whose owner deletes their account is not handed over, because nobody can own another person's debt account. It is archived read-only under the deleted person's tombstone. Contributions keep their values and dates under "Exmiembro", and open balances show as a closed line. Participants see Iris's banner and get the usual member note | Account deletion | Nothing. `financial_debt_plans.debt_account_id` is keyed to the owner's own account with `(debt_account_id, user_id)`, so it cannot move to another person |
 
 Head of Engineering delivery decisions that go with decision 10. These are not founder locks:
 
@@ -80,6 +82,8 @@ The flag names below are proposals. The captain confirms the final name in the l
 | Push | APNs key | Device registration, a push sender interface, and a recording fake that keeps payloads for tests | `ARGUS_UPDATES_PUSH_ENABLED`. Off uses the fake and sends nothing |
 | Email | A cuadrao.ai sending domain in Resend | Nothing. Household email delivery and update email are out of scope for this pass | None |
 | PostHog person deletion | A PostHog personal API key that can delete persons. The project token the server sends events with cannot | A deletion adapter and a recording fake that keeps each request for tests | `ARGUS_ANALYTICS_DELETION_ENABLED`. Off uses the fake and sends nothing |
+| Sign in with Apple | Sign in with Apple enabled on the app ID, a Services ID, and a .p8 key | Apple sign-in, the encrypted refresh-token store, and an Apple revocation adapter with a recording fake for Lane 6 | Proposed `ARGUS_APPLE_SIGN_IN_ENABLED`, backend and iOS; the captain confirms the name. Off hides the button and the deletion step uses the fake |
+| Google sign-in | A Google sign-in client. `GOOGLE_OAUTH_CLIENT_ID` in `render.yaml` belongs to the Gmail source connection | Google sign-in behind its own flag | Proposed `ARGUS_GOOGLE_SIGN_IN_ENABLED`, backend and iOS; the captain confirms the name. Off hides the button |
 
 Lane surfaces with no outside piece also start default-off, one flag each: `ARGUS_FINANCIAL_SPACES_ENABLED` for the space list, `ARGUS_ACCOUNT_MOVES_ENABLED` for moves, `ARGUS_ACCOUNT_DELETION_ENABLED` for in-app deletion, `ARGUS_HOME_SERIES_ENABLED` for the series, and `ARGUS_UPDATES_ENABLED` for the inbox. Search documents stay behind the existing `ARGUS_DOCUMENT_EXTRACTION_ENABLED`.
 
@@ -95,7 +99,7 @@ Household owns permission rules. Other lanes call that owner. They do not store 
 
 Account moves own what a move does to history, plans, Home, and Search. The account id stays the same. Current assignment changes by `space_id`. Historical balances, corrections, and settlements are not rewritten and are not copied onto the destination. The move is an idempotent event. Budget and goal rows stay in the space where they were created. Their inclusion of the account's activity changes with `space_id`. Home and Search read the same `space_id` and recompute from canonical history. They do not keep a private copy of which space an account is in, and they do not keep a copied series.
 
-Updates consumes events from the lane that owns the fact. It stores read state and a source link. It does not copy the amount, the draft, or the invitation token into the inbox row. Display text is read from the current source at open time, so a revoked grant, an approved draft, or a paid bill cannot leave a stale private fact in the inbox.
+The lane that causes an event writes its Updates entry, through the inbox model. Household writes the closure entry when the last member leaves. Lane 6 writes the admin handoff entry and the closure entry that a deletion causes, along with its member note, new-owner message, and reassign entry. The Updates lane owns only how entries are displayed and the push opt-in. (Yelena's rule, October 2.) An entry stores read state and a source link. It does not copy the amount, the draft, or the invitation token into the inbox row. Display text is read from the current source at open time, so a revoked grant, an approved draft, or a paid bill cannot leave a stale private fact in the inbox.
 
 ### Source link
 
@@ -165,11 +169,11 @@ Codex review is not a merge gate except where this file says so. Request it for 
 
 These are not founder locks yet. Each one blocks only the piece named. Everything else in this file can be built.
 
-Lucas settled the two earlier open items on 2 October. Whether a beta invite is the same as a household invite is now decisions 12 and 13. What happens to locked household history when the owner deletes their account is now decision 14, a founder lock rather than a delivery contract. What happens to a deleted person's part in other people's plans is decision 17.
+Lucas settled the earlier open items on 2 October. Whether a beta invite is the same as a household invite is now decisions 12 and 13. What happens to locked household history when the owner deletes their account is now decision 14, a founder lock rather than a delivery contract. What happens to a deleted person's part in other people's plans is decision 17. Sign in with Apple, formerly open item 2, is now decision 18: Apple, Google, and email ship for TestFlight, and Lane 6 revokes Apple tokens on deletion.
 
 1. **How the code gate fits the existing access gate.** `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` and the `private_alpha_allowlist` table already decide who can sign up and sign in, and the [API contract](../../API_CONTRACT.md) says public registration has been open in production since 12 August 2026. Turning that flag off to gate the beta would also close web registration. The code gate gets its own flag and does not flip the existing one. The exact way a redeemed code admits a person is a technical design item in the Household PR, under Codex review.
-2. **Sign in with Apple revocation on deletion.** The Sign in with Apple button exists in the app as a preview and does not sign anyone in. Lucas has not yet decided whether it is connected before external TestFlight or hidden. If he says yes, account deletion also revokes the person's Apple tokens through Apple's REST API, as Apple requires for apps that use Sign in with Apple. If he says no, the button is hidden and that step is dropped. Only that step in [Lane 6](#lane-6-account-deletion) waits.
-3. **Web account deletion.** The web deletion-request dialog in `web/components/sidebar/ProfileMenu.tsx` still sends `account_deletion_request` to `POST /api/v1/feedback`, which emails support. It stays live. Web will use the same [Lane 6](#lane-6-account-deletion) deletion command as every other client. Guest accounts will go through it too. Today a guest auth user is deleted only by `delete_auth_user`, called in `src/argus/api/routers/auth.py` (line 281) when a guest session fails to start. The support-email path and the dialog are retired only in the Lane 6 PR that moves web onto that command. Only that retirement waits.
+2. **Web account deletion.** The web deletion-request dialog in `web/components/sidebar/ProfileMenu.tsx` still sends `account_deletion_request` to `POST /api/v1/feedback`, which emails support. It stays live. Web will use the same [Lane 6](#lane-6-account-deletion) deletion command as every other client. Guest accounts will go through it too. Today a guest auth user is deleted only by `delete_auth_user`, called in `src/argus/api/routers/auth.py` (line 281) when a guest session fails to start. The support-email path and the dialog are retired only in the Lane 6 PR that moves web onto that command. Only that retirement waits.
+3. **Where the inbox model comes from.** Under the Updates ownership rule in [Contracts between lanes](#contracts-between-lanes), Household and Lane 6 write their own entries through the inbox model. No inbox table exists on integration yet. The only Updates code is the design preview's `CanvasUpdate` in `ios/ArgusFoundation/Cuadrao/CuadraoUpdatesCanvas.swift`, and Lane 5 lands last. Which PR adds the inbox table before Household and Lane 6 write to it is not settled.
 
 ## Next steps for Lucas
 
@@ -181,6 +185,8 @@ These are the pieces only Lucas can hand over. Each lane lands without them, wit
 4. **The TestFlight public link.** Until then `ARGUS_TESTFLIGHT_PUBLIC_URL` stays unset and no install link is shown.
 5. **Schedule Apple's first external beta review.** Apple must approve the first build for external testing before the TestFlight public link works for outside testers. Put that review on the calendar before the first distribution.
 6. **A PostHog personal API key that can delete persons.** Until then `ARGUS_ANALYTICS_DELETION_ENABLED` stays off, the recording fake is used, and account deletion reports the PostHog step as not done.
+7. **Sign in with Apple keys.** Sign in with Apple enabled on the app ID, a Services ID, and a .p8 key. Until then Apple sign-in stays off and Lane 6's Apple revocation uses the recording fake.
+8. **A Google sign-in client.** Until then Google sign-in stays off.
 
 Also needed later, not secret: the cuadrao.ai waitlist page URL for `ARGUS_WAITLIST_URL`. The waitlist page itself is not in this repository.
 
@@ -219,10 +225,12 @@ Not there, on integration or on the design branch at `8f521518`: a household inv
 - **Universal link.** The server builds `https://cuadrao.ai/invite#<secret>` when `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED` is on. The secret stays in the URL fragment, as today's link does, so it never reaches a web server log. Off keeps today's link.
 - **QR.** The QR encodes the same link. It is drawn on the device. No QR image is stored.
 - **Who-invited-whom record.** One row per invitation that records its kind (beta, household, or group link), send and accept, and the invitation that brought the sender in, if any. A group link records each redemption with the link as the inviter. Live sender and acceptor user ids are kept beside it and cleared on account deletion. The row itself keeps no name, email, or user id once that happens. That keeps decision 3: counts and the "invitee invited someone" chain survive, and the deleted person is gone. New migration.
-- **Quota.** 10 beta invites per user for TestFlight, with a grant command Lucas uses to add more. Household invites and group-link redemptions do not count against it. Counted from the who-invited-whom record, not from PostHog.
+- **Quota.** 10 beta invites per user for TestFlight, with a grant command Lucas uses to add more. A live or accepted beta invite uses one. An expired or revoked unused invite returns its slot, as the [API contract](../../API_CONTRACT.md#beta-invites-founder-group-link-and-code-gate) says. Household invites and group-link redemptions do not count against it. Since #788 it is counted from `beta_invitations` (`_quota` in `src/argus/domain/household/invites.py`), not from PostHog.
 - **Founder group link.** One more kind of code, with a cap, an expiry date, and a source label, created only from Lucas's account. Redemption is atomic: the count and the cap are checked and updated in one locked step, so concurrent taps cannot pass the cap. Over the cap, the waitlist response. It lets the person into the beta and never creates a household membership. How Lucas's account is identified, and whether he creates the link from a screen or a server command, is a technical design item in the Household PR.
 - **Code gate.** Behind `ARGUS_BETA_INVITE_GATE_ENABLED`. With the gate on, a signed-in user who has not redeemed a beta invite, a household invite, or a group link gets the waitlist response, using `ARGUS_WAITLIST_URL`.
 - **Three numbers.** Invites sent per user, share accepted, and share of invitees who send an invite of their own. Household invites are counted separately from beta invites, and each group link is its own source. Computed in SQL from the who-invited-whom record. A PostHog event, if added, goes through the closed registry in `analytics_events.py` and carries no person id.
+
+**Flags wait on issue #789.** #788 landed this lane's backend (`bf6ccf85`). Issue #789 (HMAC the codes with a server secret, and rate-limit preview, redeem, and household accept-by-code) must land before `ARGUS_HOUSEHOLDS_ENABLED`, `ARGUS_BETA_INVITES_ENABLED`, or `ARGUS_BETA_INVITE_GATE_ENABLED` is turned on in any hosted environment. Household accept-by-code goes through `ARGUS_HOUSEHOLDS_ENABLED`, which is why that flag waits too. All three are `false` in `.env.example`, and `ARGUS_HOUSEHOLDS_ENABLED` is `false` in `render.yaml`.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
 
@@ -292,7 +300,7 @@ Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and
 ### Reconciliation cases the lane must test
 
 - Opening balance and later corrections stay the same rows and revisions. The move does not write a new opening balance.
-- Recorded activity amounts and dates are unchanged. A month with no records stays no data.
+- Recorded activity amounts and dates are unchanged. A month with missing coverage stays no data, and a covered month with no spending stays a known zero.
 - A settlement between two accounts, including a transfer or a payment, is not rewritten. Moving one account in a linked pair is blocked, and both histories stay put. The same block covers a cross-account refund, a loan link, and an unfinished document draft.
 - Backfill after the move: a correction or an activity dated before the move appends to canonical history. It does not create a destination copy, does not rewrite the pre-move revision, and does not change locked household history.
 - Repeating the same move with the same key is a no-op: one event, one assignment.
@@ -392,7 +400,7 @@ iOS, by Lucas's local agent: A opens the document through the document API and t
 
 ### Journey and completion
 
-A signed-in person opens Home in Personal, then in a private space once the space list has landed. The balance chart and the activity insights use that space's recorded accounts and activity, one currency at a time. A month with no records is no data. It is not a zero balance and not zero spending. A month that has records adding up to zero is a real zero. A comparison against a real zero month shows the amount difference, not a percent. A comparison with a no-data month is not shown. Unknown balances stay out of the known total. The person can open the account or activity behind a point. Relaunch shows the same series. Household Home includes only accounts that live grants allow, plus locked history after slot 6, and drops an account the moment its grant is revoked.
+A signed-in person opens Home in Personal, then in a private space once the space list has landed. The balance chart and the activity insights use that space's recorded accounts and activity, one currency at a time. A month with confirmed complete coverage and no spending is a known zero and shows 0. A month whose coverage is missing is no data, "Sin datos". It is not a zero balance and not zero spending. A comparison against a known-zero month shows the amount difference, not a percent. A comparison with a no-data month is not shown. Unknown balances stay out of the known total. The person can open the account or activity behind a point. Relaunch shows the same series. Household Home includes only accounts that live grants allow, plus locked history after slot 6, and drops an account the moment its grant is revoked.
 
 Completion is a real Postgres read, an app relaunch, a second user who cannot see the first user's series, and the same screen in English and Spanish. The design canvas sample series is not completion.
 
@@ -406,12 +414,12 @@ Completion is a real Postgres read, an app relaunch, a second user who cannot se
 
 Reuse `home_response`, `spending`, and the Plan forecast. Do not add a second balance.
 
-Today `home_response` returns zero minor-unit spending strings for a currency that has accounts and no expenses in the month. Under decision 6 that month has no records, so the series shows it as no data. Those strings are the current-month totals, not a series, and must not be copied into the chart. The canvas `CanvasSpendingStory.comparison` compares against a previous period inside coverage and can show a zero difference, which is close to decision 6. The connected path must not show a percent change against a zero month.
+Today `home_response` returns zero minor-unit spending strings for a currency that has accounts and no expenses in the month, whether or not that month is covered. Under decision 6 the series shows 0 only when coverage is confirmed complete, and "Sin datos" when it is missing. Those strings are the current-month totals, not a series, and must not be copied into the chart. In the design preview, `CanvasSpendingStory` already shows a covered empty period as `.emptyPeriod` and an uncovered one as `.unavailable`. Its `previousEntries`, though, still drops a covered prior period with no records as a comparison baseline, citing #787. Design PR 4 changes that to the known-zero rule. The connected path must not show a percent change against a zero month.
 
 ### What is new
 
 - A multi-month balance and spending series on the API, derived from canonical account observations and current logical activity, filtered by current `space_id`. Behind a default-off flag. Each month is marked as having records or not.
-- The comparison rule of decision 6 in that series.
+- The comparison rule of decision 6 in that series, with each month marked as covered or not.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
 
@@ -425,7 +433,7 @@ No-touch: `ios/ArgusFoundation/Cuadrao/**`, design preview tests, and `Connected
 
 ### Acceptance
 
-Backend: Postgres. An account with an unknown balance does not become zero. A month with accounts and no records is no data, not the current zero string. A previous month with records summing to zero gives an amount difference and no percent. A no-data month gives no comparison. Household series hides an account the moment its grant is revoked. `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` unset still returns `404` on the financial routes.
+Backend: Postgres. An account with an unknown balance does not become zero. A month with missing coverage is no data, not the current zero string. A covered month with no spending shows 0. A previous known-zero month gives an amount difference and no percent. A no-data month gives no comparison. Household series hides an account the moment its grant is revoked. `ARGUS_FINANCIAL_ACCOUNTS_ENABLED` unset still returns `404` on the financial routes.
 
 iOS, by Lucas's local agent: relaunch reads the same points. English and Spanish strings for no data and for the amount comparison.
 
@@ -457,8 +465,8 @@ A person who turns on push also gets a push for each new row. A push never conta
 
 ### What is new
 
-- Inbox table with read state, RLS on, client privileges revoked, the service writes. New migration.
-- A trigger writer for the three row kinds, idempotent per source and offset.
+- How entries are displayed: the inbox screen's rows, read state, and opening through the source link.
+- Under the Updates ownership rule in [Contracts between lanes](#contracts-between-lanes), each row is written by the lane that causes it, idempotent per source and offset: bill reminders by the Plan service, which owns due dates, draft-ready rows by the document service, and invitation-accepted rows by Household. This reading of the rule for the three row kinds is the docs seat's, for Yelena to confirm. Which PR adds the inbox table is [Still open](#still-open) item 3.
 - Device-token registration for push, a push sender interface, and the recording fake. `ARGUS_UPDATES_PUSH_ENABLED` off uses the fake. The real APNs sender waits for the key.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
@@ -470,7 +478,7 @@ A person who turns on push also gets a push for each new row. A push never conta
 
 A new Updates package under `src/argus/domain/` and one router, a new migration assigned by the captain, `FoundationSheets.swift` only through the navigation writer, and tests that create a bill, a document draft, and an accepted invitation and then read the inbox as that user and as someone else.
 
-The document service keeps owning draft status. The Plan service keeps owning due dates. The Household service keeps owning invitations. Updates reads those rows. It does not add a status column to them.
+The document service keeps owning draft status. The Plan service keeps owning due dates. The Household service keeps owning invitations. Each writes its own entry. Updates does not add a status column to their rows.
 
 No-touch: `CuadraoUpdatesCanvas.swift`, `source_bytes`, invitation token storage, `resend_email.py`.
 
@@ -482,11 +490,11 @@ iOS, by Lucas's local agent: relaunch shows the same unread and read rows. Engli
 
 ## Lane 6. Account deletion
 
-**Decisions:** founder locks 3, 14, 15, 16, and 17, and Apple's in-app account-deletion rule (App Review Guideline 5.1.1(v)). The Head of Engineering (Yelena) made these delivery calls, which are not founder locks: deletion as its own lane, its place in the landing order, and applying Apple's deletion rule to external TestFlight builds. It lands in slot 2, right after Household and before external TestFlight. Internal TestFlight is not blocked by it. Guest accounts are covered by the same deletion command.
+**Decisions:** founder locks 3, 14, 15, 16, 17, and 18, and Apple's in-app account-deletion rule (App Review Guideline 5.1.1(v)). The Head of Engineering (Yelena) made these delivery calls, which are not founder locks: deletion as its own lane, its place in the landing order, applying Apple's deletion rule to external TestFlight builds, decision 19 for shared debt plans, the Updates ownership rule, and the design corrections from Marcus's #791 note. It lands in slot 2, right after Household and before external TestFlight. Internal TestFlight is not blocked by it. Guest accounts are covered by the same deletion command.
 
 ### Journey and completion
 
-A signed-in person opens Delete account in the app, sees what will be deleted, and confirms. The server runs the steps below in order. When it finishes, the app signs out and that account can no longer sign in. If the person was a household admin, the admin role has passed to the longest-standing remaining member, or the household has closed if no one is left. The other members see a short note that a member deleted their account, without naming them. In plans other people own, the person's amounts stay under a nameless former-member placeholder, and any open balance with them shows as a closed line. Shared plans they created pass to the longest-standing participant in each, as live plans that person can edit, and that person gets a message saying so. The anonymous invite record and the network counts stay. The wording is in [Copy](#copy-founder-locked-iriss-wording).
+A signed-in person opens Delete account in the app, sees what will be deleted, and confirms. The server runs the steps below in order. When it finishes, the app signs out and that account can no longer sign in. If the person was a household admin, the admin role has passed to the longest-standing remaining member, or the household has closed if no one is left. The other members see a short note that a member deleted their account, without naming them. In plans other people own, the person's amounts stay under a nameless former-member placeholder, and any open balance with them shows as a closed line. Shared plans they created pass to the longest-standing participant in each, as live plans that person can edit, and that person gets a message saying so. A shared debt plan they created is the exception: it is archived read-only with a banner (decision 19). The anonymous invite record and the network counts stay. The wording is in [Copy](#copy-founder-locked-iriss-wording).
 
 Completion is a real deletion against Postgres of a user who has their own plans, a part in a plan another member owns, a household membership as admin, a membership as a member, a Gmail or Plaid connection, a document, an accepted invite, and saved feedback. Nothing that identifies them is left, and the other members' balances are unchanged.
 
@@ -502,15 +510,21 @@ Completion is a real deletion against Postgres of a user who has their own plans
 ### Steps, in order
 
 1. **Admin handoff, plan handover, then household leave.** For each of the person's households, in this order:
-   1. If the person is the household admin, the admin role passes to the longest-standing remaining member, or the household closes if no one is left (decision 15). Longest-standing means the earliest `joined_at` on `household_members`, and a tie goes to the lowest membership id. The tie-break is deterministic but arbitrary: it always picks the same person, but nobody chose that person.
-   2. Each shared plan the person owns that has another participant passes to that plan's longest-standing participant (decision 17), who gets the new-owner message. This runs before the leave rules. The plan's binding, definition, and owner-keyed rows move to the new owner's user id and membership, and the plan stays live and editable, with the same name. It gets no `departed_at`, and it is not turned into the #773 read-only archive. The new owner can edit it as soon as the run finishes. Shared plans with no other participant are not handed over. Step 5.2 deletes them.
+   1. If the person is the household admin, the admin role passes to the longest-standing remaining member, or the household closes if no one is left (decision 15). Lane 6 writes the admin handoff entry, or the closure entry, to Updates. Household writes the closure entry only when the last member leaves on their own. Longest-standing means the earliest `joined_at` on `household_members`, and a tie goes to the lowest membership id. The tie-break is deterministic but arbitrary: it always picks the same person, but nobody chose that person.
+   2. Each shared plan the person owns that has another participant passes to that plan's longest-standing participant (decision 17), who gets the new-owner message. A shared debt plan is never handed over. It stays with the person until step 5.2 archives it (decision 19). This runs before the leave rules. The plan's binding, definition, and owner-keyed rows move to the new owner's user id and membership, and the plan stays live and editable, with the same name. It gets no `departed_at`, and it is not turned into the #773 read-only archive. The new owner can edit it as soon as the run finishes. Shared plans with no other participant are not handed over. Step 5.2 deletes them.
    3. Then the existing leave rules run for the membership. Grants are revoked, and `retain_membership` pins the person's contributions to plans other people own, including the plans just handed over. The leave archive, `departed_at` and the #773 read-only archive, never applies to a plan handed over in step 1.2, because the person no longer owns it when the leave runs.
 2. **Revoke every connected source.** Revoke Gmail and Plaid at the provider for each source connection, and delete the credential only after the provider confirms. If a revocation fails, the run keeps a pending revocation for that source, with the encrypted credential it needs, and retries it. The encrypted credential is kept only while that revocation is pending, and it is deleted when the revocation succeeds. It is not deleted silently while the revocation is still owed, as `disconnect` does today. The pending revocation is held in the run record, not in the person's connection row, so it survives step 7. The run does not report done while a revocation is pending.
+
+   **Sign in with Apple (decision 18).** If the person signed in with Apple, the run also revokes their Apple tokens through Apple's REST API. The sign-in work captures the Apple refresh token at sign-in and stores it encrypted with the account. Lane 6 calls the revoke. The run keeps that token in the pending revocation only while the revoke is pending, and deletes it when the revoke succeeds, the same rule as the source credentials above. Until Lucas supplies the Apple keys, the revoke goes to the recording fake.
 3. **Delete Storage files.** After #778 moves document bytes into a private Supabase Storage bucket, delete each of the person's Storage objects. A database cascade does not remove them. Until #778 lands, document bytes are database rows and go with the person's rows.
-4. **Clear invite ids and keep the anonymous record.** Clear the live sender and acceptor ids on the who-invited-whom record from Lane 1, and keep the anonymous row, so the counts and the invite chain survive (decision 3). This is an explicit step. It does not rely on `on delete set null`.
+4. **Clear invite ids and keep the anonymous record.** Clear the live sender and acceptor ids (`sender_user_id`, `acceptor_user_id`) on `invite_referrals` from #788, and keep the anonymous row, so the counts and the invite chain survive (decision 3). This is an explicit step. It does not rely on `on delete set null`. Two more parts:
+   - Rotate or null `invite_referrals.sender_ref` on the deleted sender's rows, so their sent invites cannot be grouped together. Deleting the `invite_sender_refs` mapping row alone, which cascades, leaves one shared `sender_ref` on all of them. This keeps decision 3's "no identifier". The lane PR says which of the two it does.
+   - Revoke the deleted sender's unused beta invites: set `revoked_at` on their `beta_invitations` rows of kind `beta` with `use_count = 0` that are still live, so no one can redeem them afterward.
 5. **Shared plans and protected plan history (decision 17, founder lock at 8:53 PM CT).** In this order:
-   1. **Plans other people own.** The person's amounts keep their values and dates under a nameless placeholder: "Exmiembro" in Spanish and "Former member" in English, numbered "Exmiembro 1", "Exmiembro 2" ("Former member 1", "Former member 2") when more than one person has left that plan. The placeholder has no user id, name, avatar, or email. Their receipts, photos, and free-text notes on those amounts are deleted. Amount, date, and category stay. Open balances with them are frozen: not marked settled and not forgiven. They come out of the active totals and show as a closed line. A member can later mark that line settled, which is recorded as a new event. Their future responsibilities go back to the plan's owner, who gets an Update to reassign or re-split them. Past legs stay as they are.
-   2. **Shared plans they owned.** Each one with another participant was already handed over in step 1.2, so its new owner has a live, editable plan with the same name. Here the function deletes only the shared plans where nobody else is a participant, with their bindings and revisions. A #773 archive left by an earlier departure passes as it is, still read-only, to the longest-standing participant of that plan. The deletion never creates a new archive.
+   1. **Plans other people own.** The person's amounts keep their values and dates under a nameless placeholder: "Exmiembro" in Spanish and "Former member" in English, numbered "Exmiembro 1", "Exmiembro 2" ("Former member 1", "Former member 2") when more than one person has left that plan. The placeholder has no name, avatar, or email, and none of the person's ids. Its rows are re-keyed to a per-person tombstone (see the engineering note). Their receipts, photos, and free-text notes on those amounts are deleted. Amount, date, and category stay. Open balances with them are frozen: not marked settled and not forgiven. They come out of the active totals and show as a closed line. A member can later mark that line settled, which is recorded as a new event. Their future responsibilities go back to the plan's owner, who gets an Update to reassign or re-split them. Past legs stay as they are.
+   2. **Shared plans they owned.** Each one with another participant was already handed over in step 1.2, so its new owner has a live, editable plan with the same name. Here the function deletes only the shared plans where nobody else is a participant, with their bindings and revisions. A #773 archive left by an earlier departure passes as it is, still read-only, to the longest-standing participant of that plan. That archive's participants are the ones not revoked at its departure. With none, the archived binding is deleted. The deletion never creates a new archive, except for a debt plan.
+
+      **Shared debt plans (decision 19).** A shared debt plan the person owns is not handed over and not deleted. It is archived read-only under the person's tombstone, because nobody can own another person's debt account. Contributions keep their values and dates under "Exmiembro", and open balances show as a closed line, as in step 5.1. Participants see the banner in [Copy](#copy-founder-locked-iriss-wording) item 4 on the archived plan, and they get the usual member note. Nothing else changes for them.
    3. **Their own remaining plans.** Delete the person's personal plan definitions and their `financial_plan_definition_revisions`, explicitly, inside this function.
    4. **Locked copy.** Once account moves has landed, also remove the household's locked copy of the person's history and the person's own move events (decision 14), under the trigger exception in Lane 2. This is the only thing the `deletion` writer value permits on those tables. The function writes no move event.
 
@@ -518,22 +532,21 @@ Completion is a real deletion against Postgres of a user who has their own plans
 
    **Engineering note, not a product decision.** The design for this step is in the lane PR, under Codex review. It has to cover:
    - Every entry in the census in [#791](https://github.com/lagarcess/argus/pull/791), `docs/specs/lanes/account-deletion-fk-census.md` (see [Foreign keys and user-id columns](#foreign-keys-and-user-id-columns)), with the action it lists.
-   - How the placeholder gets past `retain_foreign_activity`, which refuses to delete an activity group that holds another owner's leg, and past the `on delete restrict` references to the person's `household_members` row. One reading is that the membership row stays as the placeholder with its user id cleared. Today `household_members.user_id` is `not null` and cascades from `auth.users`, so that needs a migration.
-   - How the activity, record, and allocation revisions that other people's plans still reference stop holding the person's user id. Those references are composite keys that include the owner's user id (`activity_owner_id`, `record_owner_id`, `account_owner_id`, `goal_owner_id`), so the revisions cannot simply be deleted, and acceptance says no row may hold the user id afterward.
+   - **Tombstone (Marcus's #791 design note, approved by Yelena).** The placeholder membership and the person's kept rows are re-keyed to a per-person tombstone `auth.users` row. They are not nulled, because nulling breaks the composite keys and `validate_shared_allocation_binding` in `20261002000000_shared_household_planning.sql`. The tombstone is created and deleted only through the Supabase Admin API, with no direct DML on `auth.users`. It is permanently banned, it is listed in a new `argus_private.account_tombstones` table, and the API rejects its JWTs. This is how the placeholder gets past `retain_foreign_activity`, which refuses to delete an activity group that holds another owner's leg, and past the `on delete restrict` references to the person's `household_members` row.
+   - The activity, record, and allocation revisions that other people's plans still reference move to the tombstone id. Those references are composite keys that include the owner's user id (`activity_owner_id`, `record_owner_id`, `account_owner_id`, `goal_owner_id`), so the revisions cannot simply be deleted, and acceptance says no row may hold the person's user id afterward. The archived debt plan and the debt account it is keyed to move to the tombstone the same way.
+   - `financial_asset_changes.recorded_by` needs only an assertion, not a clear: its `check (recorded_by = user_id)` in `20260930230000_connected_personal_assets.sql`, plus the cascade from its account, already remove it with the person's rows.
    - The rows `retain_membership` pinned in `household_plan_archived_claims` and `household_plan_archived_allocations`, and the activity and allocation revisions they pin, which stay as the placeholder's amounts.
    - Moving ownership of a shared plan in step 1.2, and an existing #773 archive in `household_plan_archived_activities` in step 5.2, to the new owner across the owner-keyed columns, including `household_plan_bindings.owner_user_id` and `owner_membership_id` and the `first_shared_revision` reference from `20261002020000_shared_plan_retained_revision_scope.sql`.
    - Where receipts, photos, and notes attached to those amounts are stored, so they can be deleted while amount, date, and category stay.
    - "Longest-standing participant" for a plan. Lane 6 adds `joined_at` to `household_plan_participants`. It is backfilled from `recorded_at` on the plan definition revision named by the row's `granted_revision`. That column is `not null`, but it has no foreign key to the revision row (`20261002020000_shared_plan_retained_revision_scope.sql` adds it with only a `> 0` check), so the backfill checks that every row resolves to a revision. A re-grant resets seniority: when the participant list is saved, `planning_store.py` keeps `granted_revision` only for people who were still active participants, and a person who was removed and later added again gets the revision of that save. Rows that existed before `20261002020000_shared_plan_retained_revision_scope.sql` had `granted_revision` backfilled from the plan's `first_shared_revision`, so those participants tie on the same time. A tie goes to the lowest membership id, which matters for those older rows. This rule is deterministic but arbitrary: it always picks the same person, but nobody chose that person.
-   - The reassign Update, the member note, and the new-owner message are written as events this lane owns. Updates lands later, in slot 7, and reads them as its source, following [Contracts between lanes](#contracts-between-lanes).
+   - Lane 6 writes its own Updates entries through the inbox model, under the rule in [Contracts between lanes](#contracts-between-lanes): the admin handoff and closure entries from step 1, the reassign entry, the member note, the new-owner message, and the debt-plan banner. Updates lands later, in slot 7, and owns only how they are displayed and the push opt-in. The inbox table's origin is [Still open](#still-open) item 3.
 6. **Clear the email from feedback.** Clear the account email and the user id from the context of the person's saved feedback rows. This runs before the auth user is deleted, because `feedback.user_id` is set to null at that point and the rows could then only be found by the email itself. The copy already emailed to support through Resend cannot be cleared by this function.
 7. **Delete the auth user.** This runs after the steps above, so no restricting row blocks it.
 8. **PostHog cleanup.** Delete the person in PostHog by distinct id, including their events (decision 16, wording clarified Oct 2 via #782). Person profiles are off, so there may be no person record for that distinct id. The lane PR shows which PostHog call deletes the events in that case and records the response. Until Lucas supplies a PostHog key that can delete persons, this goes to the recording fake.
 
-**Pending Lucas's decision:** Sign in with Apple revocation. This step applies only if Lucas says yes to connecting Sign in with Apple before external TestFlight ([Still open](#still-open) item 2). Then the deletion also revokes the person's Apple tokens through Apple's REST API. If he says no, the button is hidden and there is no step.
+The whole run is idempotent and can resume after a partial failure. A retry continues from the first step that did not finish. The run record is keyed by a hash of the user id and never stores the user id itself. It keeps the PostHog distinct id, which is already a hash, and any pending revocation, Apple's included, until those steps finish.
 
-The whole run is idempotent and can resume after a partial failure. A retry continues from the first step that did not finish. The run record is keyed by a hash of the user id and never stores the user id itself. It keeps the PostHog distinct id, which is already a hash, and any pending revocation until those steps finish.
-
-The web deletion request stays live, and it is open ([Still open](#still-open) item 3). Today the web profile menu offers a deletion-request dialog that sends `type: "account_deletion_request"` (`web/components/sidebar/ProfileMenu.tsx`, line 838) through the feedback client typed in `web/lib/argus-api.ts` (line 1232) to `POST /api/v1/feedback` (`src/argus/api/routers/feedback.py` and `src/argus/api/schemas.py`). Web will use the same Lane 6 deletion command as every other client, and guest accounts will go through it too. Today guests are deleted only by `delete_auth_user` in `src/argus/api/routers/auth.py` (line 281), which removes the auth user when a guest session fails to start. The `account_deletion_request` path and the web dialog are retired only in the Lane 6 PR that moves web onto that command. Until then they keep working.
+The web deletion request stays live, and it is open ([Still open](#still-open) item 2). Today the web profile menu offers a deletion-request dialog that sends `type: "account_deletion_request"` (`web/components/sidebar/ProfileMenu.tsx`, line 838) through the feedback client typed in `web/lib/argus-api.ts` (line 1232) to `POST /api/v1/feedback` (`src/argus/api/routers/feedback.py` and `src/argus/api/schemas.py`). Web will use the same Lane 6 deletion command as every other client, and guest accounts will go through it too. Today guests are deleted only by `delete_auth_user` in `src/argus/api/routers/auth.py` (line 281), which removes the auth user when a guest session fails to start. The `account_deletion_request` path and the web dialog are retired only in the Lane 6 PR that moves web onto that command. Until then they keep working.
 
 ### Foreign keys and user-id columns
 
@@ -545,11 +558,14 @@ The Lane 6 PR opens with a real-Postgres test that deletes a user who has a row 
 
 - An in-app deletion route on the API, behind `ARGUS_ACCOUNT_DELETION_ENABLED`. The route name and whether it asks the person to sign in again are confirmed in the lane PR.
 - The ordered deletion function and its run record, keyed by a hash of the user id, with pending revocations.
-- A revocation path for deletion that keeps the credential until the provider confirms.
+- A revocation path for deletion that keeps the credential until the provider confirms, including the Apple token revoke with its recording fake.
+- The tombstone: its creation and deletion through the Supabase Admin API, the permanent ban, `argus_private.account_tombstones`, and the API check that rejects its JWTs.
+- The `sender_ref` rotation or clear and the revoke of unused beta invites in step 4.
+- The read-only archive of a shared debt plan with its banner.
 - The former-member placeholder, the frozen balance line with its settle event, the reassign Update for the plan owner, and plan ownership transfer, with the migration they need.
 - The admin handoff on deletion, inside the Household owner.
 - A PostHog deletion adapter with a recording fake, behind `ARGUS_ANALYTICS_DELETION_ENABLED`. See [Outside services](#outside-services-fakes-behind-default-off-flags).
-- The note the other members see.
+- The note the other members see, and the admin handoff and closure entries, written through the inbox model.
 - Moving web onto the deletion command, and in that same PR retiring `account_deletion_request` and the web dialog.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
@@ -559,7 +575,7 @@ The Lane 6 PR opens with a real-Postgres test that deletes a user who has a row 
 
 ### Allowed files
 
-A new deletion module under `src/argus/domain/` and one router, `src/argus/domain/household/` for the admin handoff, the leave call, the former-member placeholder, frozen balances, and plan ownership transfer, `src/argus/domain/ingestion/hub.py` for the deletion revocation path only, `src/argus/observability/` for the PostHog deletion adapter, the feedback router, schema, and store for clearing the email, and, in the PR that moves web onto the deletion command, retiring `account_deletion_request` together with `web/components/sidebar/ProfileMenu.tsx`, `web/lib/argus-api.ts`, and their web tests, one new migration, the account and Household deletion sections of the API contract and data model when this lane is landing, the iOS profile row and confirmation screen, and the tests for all of these.
+A new deletion module under `src/argus/domain/` and one router, `src/argus/domain/household/` for the admin handoff, the leave call, the former-member placeholder, frozen balances, and plan ownership transfer, `src/argus/domain/ingestion/hub.py` for the deletion revocation path only, the Apple token store from the sign-in work for reading and deleting the token only, `src/argus/domain/household/invites.py` for the step 4 invite changes only, `src/argus/observability/` for the PostHog deletion adapter, the feedback router, schema, and store for clearing the email, and, in the PR that moves web onto the deletion command, retiring `account_deletion_request` together with `web/components/sidebar/ProfileMenu.tsx`, `web/lib/argus-api.ts`, and their web tests, one new migration, the account and Household deletion sections of the API contract and data model when this lane is landing, the iOS profile row and confirmation screen, and the tests for all of these.
 
 No-touch: what `disconnect` does for an ordinary disconnect, `resend_email.py`, invitation token storage, Plan math, and the design branch files.
 
@@ -570,7 +586,8 @@ Backend, on this box, against Postgres. Delete a user who:
 - owns a plan shared with two other participants, with a #773 archive from an earlier departure, and owns a second shared plan where nobody else is a participant,
 - has amounts with a receipt, a photo, and a note, an open balance, a future responsibility, and a leg in a shared activity, in a plan another member owns,
 - is admin of one household with two other members and a member of a second household,
-- has a Gmail or Plaid connection on the provider fake, a document, an invite they sent and one they accepted, and saved feedback that includes an account-deletion request.
+- owns a shared debt plan with another participant,
+- has a Gmail or Plaid connection on the provider fake, signed in with Apple on the Apple fake, has a document, an invite they sent and one they accepted, an unused live beta invite, and saved feedback that includes an account-deletion request.
 
 After deletion:
 
@@ -584,7 +601,10 @@ After deletion:
 - The other members got the note. For a member with no open balance with the deleted person, the note has only its first two sentences and never shows a zero amount.
 - The first household's admin is the remaining member with the earliest join time, with the lowest membership id breaking a tie. A household where they were the only member is closed.
 - The provider fake recorded a revocation for each source. With the fake set to fail one revocation, the run keeps a pending revocation with its credential, retries it, and does not report done until it succeeds.
-- The who-invited-whom counts and chain are unchanged and hold no id.
+- The who-invited-whom counts and chain are unchanged and hold no id. Their sent invites no longer share one `sender_ref`. Their unused beta invite is revoked and cannot be redeemed.
+- The Apple fake recorded a revoke of their token. The stored token is gone after the revoke succeeds, and is kept while the fake fails.
+- Their shared debt plan is archived read-only under the tombstone, with the same values, dates, and closed balance line. Its participant sees the banner and the member note. It was not handed over.
+- The tombstone exists only as a banned `auth.users` row listed in `argus_private.account_tombstones`, and the API rejects a JWT for it.
 - Their feedback rows hold no email or user id.
 - The PostHog fake recorded a deletion for their distinct id with events included.
 - The new owner of a handed-over plan can edit it right after the run. It has no `departed_at` and no #773 archive from this deletion.
@@ -598,7 +618,7 @@ iOS, by Lucas's local agent: the row and the confirmation in English and Spanish
 
 ### Copy (founder-locked, Iris's wording)
 
-Lucas locked this wording with decision 17. `{plan}`, `{monto}`, and `{amount}` are placeholders. Lane PRs list the keys. The captain adds them to the strings files.
+Lucas locked this wording with decision 17. The English labels and the banner in item 4 were added to the locked copy later on October 2. `{plan}`, `{monto}`, and `{amount}` are placeholders. Lane PRs list the keys. The captain adds them to the strings files.
 
 **1. Deletion confirmation screen.** This block is added to the existing confirmation, beside the general text that everything is deleted and the admin and owner lines. It does not replace them.
 
@@ -620,8 +640,13 @@ Rule: when the reader has no open balance with that person, drop the third and f
 **Related labels.**
 
 - Placeholder: "Exmiembro" in Spanish and "Former member" in English. "Exmiembro 1", "Exmiembro 2" when more than one person leaves a plan.
-- Frozen balance line, ES: "Saldo con Exmiembro: $X (cerrado)". EN: to be confirmed by Iris.
-- Action, ES: "Marcar como saldado". EN: to be confirmed by Iris.
+- Frozen balance line, ES: "Saldo con Exmiembro: $X (cerrado)". EN: "Balance with Former member: $X (closed)".
+- Action, ES: "Marcar como saldado". EN: "Mark as settled".
+
+**4. Banner on a debt plan archived after its owner deletes their account (decision 19).** Participants still get the usual member note, and nothing else changes.
+
+- ES: "Este plan de deuda se cerró porque quien lo creó eliminó su cuenta. Puedes consultarlo, pero ya no se puede editar."
+- EN: "This debt plan was closed because the person who created it deleted their account. You can still view it, but it can't be edited."
 
 Manual Codex review plus this eval, both before landing.
 
@@ -629,12 +654,12 @@ Manual Codex review plus this eval, both before landing.
 
 | Lane | Backend can be built and tested here now | iOS: landed unverified, Mac pass by Lucas's local agent | Waits on |
 | --- | --- | --- | --- |
-| Household | Code, who-invited-whom record, anonymous record on deletion, link builder, the beta and household invite split, quota, founder group link, gate, the three numbers | Code and QR screens, code entry, universal-link handling, TestFlight link and waitlist hand-off | Lucas's AASA file before the link flag turns on |
-| Account deletion | Deletion route, the ordered steps, admin handoff, provider revocation with pending retries, former-member placeholder, frozen balances, plan ownership transfer, feedback cleanup, PostHog fake, eval | Delete account row, confirmation screen with the founder-locked copy, sign-out after deletion | Household landing first. #778 for the Storage step. Iris's English text for the frozen-balance line and its action. Lucas's Sign in with Apple decision for that step only. A PostHog personal API key before the real PostHog call turns on |
+| Household | Backend landed in #788 (`bf6ccf85`): code, who-invited-whom record, anonymous record on deletion, link builder, the beta and household invite split, quota, founder group link, gate, the three numbers | Code and QR screens, code entry, universal-link handling, TestFlight link and waitlist hand-off | Issue #789 before `ARGUS_HOUSEHOLDS_ENABLED` or either beta flag turns on in a hosted environment. Lucas's AASA file before the link flag turns on |
+| Account deletion | Deletion route, the ordered steps, admin handoff, provider and Apple revocation with pending retries, tombstone, former-member placeholder, frozen balances, plan ownership transfer, debt-plan archive, invite cleanup, feedback cleanup, PostHog fake, eval | Delete account row, confirmation screen with the founder-locked copy, sign-out after deletion | Household landing first. The #791 census test on integration and passing. #778 for the Storage step. Lucas's Apple keys before the real Apple revoke turns on. A PostHog personal API key before the real PostHog call turns on |
 | Space list | Space table and routes | Space picker and space list | Nothing |
 | Search | Document and conversation hits | Rows and open paths | Nothing. Issue #778 does not block it |
 | Home series | Series and the decision 6 comparison | Binding the connected Home to the series | The design-branch collision on `ConnectedCuadraoHome.swift` for the iOS binding |
 | Account moves | Move command, events, locked history, RLS, eval | Move review and greyed-out locked history | The Home series reader, then manual Codex review and the eval. Linked moves stay blocked |
-| Updates | Inbox, three triggers, device tokens, push fake | Inbox screen, push opt-in and handling | Lucas's APNs key before the push flag turns on |
+| Updates | How entries are displayed, read state, device tokens, push fake. The other lanes write the entries | Inbox screen, push opt-in and handling | Lucas's APNs key before the push flag turns on |
 
 No lane is dispatched by this document.
