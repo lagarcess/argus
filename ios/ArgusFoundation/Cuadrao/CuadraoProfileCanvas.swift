@@ -75,10 +75,6 @@ enum CuadraoFirstRelease {
     ]
     static let showsPersonalPhoto = false
     static let showsConversationBulkActions = false
-    /// Apple and Google sign-in stay hidden until the founder's choice and the connected path are
-    /// both settled (#787, Authentication). The preview's Apple control and its copy stay in code.
-    static let showsSocialSignIn = false
-    /// The one gate for each route. `.memory` also gates Search's Memory perspective.
     static func shows(_ route: CanvasProfileRoute) -> Bool {
         route == .voice ? CuadraoDesignPreview.voiceSelection : !hiddenProfileRoutes.contains(route)
     }

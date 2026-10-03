@@ -48,10 +48,15 @@ counts the Mac run should match:
 | --- | --- |
 | `run_plan_preview.py` | Passed 58 Plan preview checks |
 | `run_group_preview.py` | Passed 50 group preview checks |
-| `run_home_balance.py` | Passed 76 Home balance projection checks |
+| `run_home_balance.py` | Passed 76 Home balance projection checks (needs #790's runner fix, see below) |
 | `run_receipt_preview.py` | Receipt preview checks passed: 44 |
 | `run_avatar_crop.py` | Avatar crop checks passed: 213 |
 | `run_temporary_chat.py` | 10 `PASS:` lines, Spanish and English |
+
+On integration, `run_home_balance.py` doesn't compile `CuadraoBalancePeriod.swift`, which
+`HomeBalanceChecks.swift` needs, so it fails under `xcrun swiftc` until #790 lands with
+the same one-line fix. PR 4 leaves that file to #790. `run_linux.py` includes the file
+on its own.
 
 ### 2. Design UI tests (`tests`)
 
@@ -65,8 +70,9 @@ branch. Without those arguments the tests open the Connected app.
 These tests are expected to skip:
 
 - `CuadraoProfileFollowupUITests.testPhotoPickerSaveCancelAndRemove` and
-  `testPhotoCropCancelPanZoomAndReedit`. The first release hides the personal-photo
-  option (`CuadraoFirstRelease.showsPersonalPhoto = false`).
+  `testPhotoCropCancelPanZoomAndReedit`. Integration hides the personal-photo option
+  (`CuadraoFirstRelease.showsPersonalPhoto = false`). Lucas's #790 turns it on, so after
+  #790 these two skips should be revisited against #790's avatar behaviour.
 - `CuadraoVoiceDesignUITests.testVoiceChoiceAndProposalHandoff`. Voice selection needs
   `--cuadrao-voice-selection` and the sample clips, which stay out while their licensing
   is unsettled. `testVoiceProposalHandoffWithoutVoiceSelection` covers the rest of that
@@ -113,10 +119,10 @@ The automation doesn't cover these. Record each result in #784.
    or Google button, and password-recovery help doesn't mention Apple.
 4. **Chart truth.** A month with no records shows "Sin datos" and "—". A month whose
    records add up to zero shows 0, and a comparison against it is an amount, never a
-   percent. A previous month with no records gets no comparison. **Pending founder
-   decision:** a month with confirmed coverage and no spending currently shows "Sin datos".
-   Lucas is deciding between 0 and "Sin datos", so record what you see without filing it as
-   a bug.
+   percent. A previous month with no records gets no comparison. A month with confirmed
+   coverage and no spending ships in Lucas's #790. Check it against #790's rule once #790
+   is in, not against this list. Until then, `CuadraoHomeChartUITests` asserts #786's
+   behaviour and its empty-month expectations may need updating with #790.
 5. **Physical device (optional).** Scan, save for later and reopen a receipt. The design
    branch's founder check covered this on build 3419. This graft hasn't been on a device.
 
