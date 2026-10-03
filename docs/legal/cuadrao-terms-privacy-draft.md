@@ -14,13 +14,13 @@ This is product copy written to match those docs. It is not legal advice.
 
 | # | Open item | Owner |
 | --- | --- | --- |
-| P1 | Sign in with Apple is connected, and deletion cancels it. Needs Lucas's Apple sign-in key. | Lucas, then eng |
+| P1 | Deleting an account also clears your email from saved feedback and deletes your person record in PostHog analytics. Yelena recommends this. | Lucas to confirm |
 | P2 | If the household admin deletes their account, the role passes to the longest-standing member, or the household closes if nobody is left. | Lucas to lock |
 | P3 | When an owner deletes their account, the household's locked copy of their history is deleted too, and members see a short note. | Lucas to lock |
 | P4 | Operating entity, country and governing law. | Lucas (Iris drafts) |
 | P5 | Cuadrao support address. Only the get-argus.com one exists today. | Lucas |
-| P6 | Where these are published (likely cuadrao.ai, which the App Store listing needs) and what happens to the web app's cookie section. | Yelena |
-| P7 | How long backups and operational logs keep deleted data. | Eng to state from the real setup; don't guess |
+| P6 | Where these are published. Yelena recommends cuadrao.ai/privacy and cuadrao.ai/terms as the App Store URLs, plus an in-app link while signed in. The cookie section applies to the web app only. | Lucas to confirm the domain |
+| P7 | How long backups (Supabase), server logs (Render) and analytics (PostHog) keep deleted data. This depends on each plan. | Yelena to bring real numbers before deletion lands; don't guess |
 | P8 | Whether counsel reviews before beta. | Lucas |
 
 Bracketed **[Pendiente Pn]** marks show where each open item lands in the text.
@@ -88,7 +88,6 @@ comparten y qué puedes controlar.
 **Datos que recopilamos**
 
 - Tu cuenta: correo, nombre si lo das, idioma y estado de inicio de sesión.
-  [Pendiente P1: inicio de sesión con Apple]
 - Lo que registras: cuentas, saldos, movimientos, facturas, deudas, metas,
   presupuestos, bienes y espacios.
 - Lo que importas: documentos y recibos que subes, y los datos que traen las
@@ -155,7 +154,7 @@ esté activa. [Pendiente P7]
 documentos, conversaciones, planes y fuentes conectadas, y revocamos esas
 conexiones. Solo conservamos un registro anónimo de que se envió y se aceptó
 una invitación, sin tu nombre ni ningún identificador.
-[Pendiente P1: también se cancela tu inicio de sesión con Apple]
+[Pendiente P1: también borramos tu correo de los comentarios guardados y tu registro en la analítica]
 [Pendiente P2: si administrabas un hogar]
 [Pendiente P3: el historial que el hogar conservaba de tus cuentas]
 
@@ -225,7 +224,6 @@ what you control.
 **Data we collect**
 
 - Your account: email, name if you give it, language and sign-in state.
-  [Pending P1: Sign in with Apple]
 - What you record: accounts, balances, activity, bills, debts, goals, budgets,
   assets and spaces.
 - What you import: documents and receipts you upload, and data from sources you
@@ -290,7 +288,7 @@ is active. [Pending P7]
 documents, conversations, plans and connected sources, and revoke those
 connections. The only thing we keep is an anonymous record that an invitation
 was sent and accepted, with no name or identifier.
-[Pending P1: your Sign in with Apple is also revoked]
+[Pending P1: we also remove your email from saved feedback and your analytics record]
 [Pending P2: if you administered a household]
 [Pending P3: the history a household kept of your accounts]
 
