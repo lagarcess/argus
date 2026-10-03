@@ -255,25 +255,31 @@ revoke all on function argus_private.is_account_placeholder(uuid, jsonb)
   from public, anon, authenticated;
 grant execute on function argus_private.is_account_placeholder(uuid, jsonb) to service_role;
 
+-- The triggers test app_metadata only. GoTrue writes auth.users as
+-- supabase_auth_admin, which has no access to argus_private, so a WHEN clause
+-- calling the function above fails every sign-up. app_metadata is writable only
+-- with the service role, and every placeholder is created with
+-- {"placeholder": true} after its id is registered.
 drop trigger if exists bind_guest_signup_handoff on auth.users;
 create trigger bind_guest_signup_handoff
 after insert on auth.users
 for each row
-when (not argus_private.is_account_placeholder(new.id, new.raw_app_meta_data))
+when (coalesce(new.raw_app_meta_data ->> 'placeholder', '') <> 'true')
 execute function argus_private.bind_guest_signup_handoff();
 
 drop trigger if exists finalize_linked_guest_identity on auth.users;
 create trigger finalize_linked_guest_identity
 after update of email, is_anonymous on auth.users
 for each row
-when (not argus_private.is_account_placeholder(new.id, new.raw_app_meta_data))
+when (coalesce(new.raw_app_meta_data ->> 'placeholder', '') <> 'true')
 execute function argus_private.finalize_linked_guest_identity();
 
 -- 6a. Household-owned invite cleanup (step 4, decision 3) ------------------------------
 
 -- The only writer Lane 6 uses on the invite tables. It clears the person's live
 -- ids, keeps every anonymous row, rotates the person's sender reference to one
--- fresh uuid (so "invites sent per user" and the chain still count them),
+-- fresh uuid (their sent invites stay grouped for the chain, under a reference
+-- tied to no one, which intentionally ends the per-user count for them),
 -- revokes their unused beta invites, and writes no event. Idempotent.
 create function argus_private.forget_invite_party(p_user_id uuid)
 returns void
