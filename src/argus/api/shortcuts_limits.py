@@ -42,6 +42,17 @@ class WeightedWindow:
                 return None
             return self._wait(hits, now, window)
 
+    def refund(self, key: str, weight: int, *, window: int) -> None:
+        """Give back the newest ``weight`` spent on ``key`` (a released reservation)."""
+
+        now = monotonic()
+        with self._lock:
+            hits = self._current(key, now, window)
+            for index in range(len(hits) - 1, -1, -1):
+                if hits[index][1] == weight:
+                    del hits[index]
+                    return
+
     def reset(self) -> None:
         with self._lock:
             self._hits.clear()

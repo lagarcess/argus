@@ -43,7 +43,7 @@ from argus.domain.household.errors import (  # noqa: E402
     InviteRuleViolation,
     VerifiedUserRequired,
 )
-from argus.domain.household.invite_codes import InviteSettings  # noqa: E402
+from argus.domain.household.invite_codes import CodeHasher, InviteSettings  # noqa: E402
 from argus.domain.household.invite_schemas import (  # noqa: E402
     CreateGroupLinkRequest,
     QuotaGrantRequest,
@@ -75,18 +75,26 @@ class Clock:
         return self.now
 
 
+TEST_CODE_SECRET = "postgres-invite-tests-code-secret-0123456789"
+TEST_HASHER = CodeHasher.from_secrets(TEST_CODE_SECRET)
+
+
 class Lane:
-    def __init__(self, pool, users, clock, settings) -> None:  # noqa: ANN001
+    def __init__(self, pool, users, clock, settings, hasher=TEST_HASHER) -> None:  # noqa: ANN001
         self.pool = pool
         self.users = users
         self.clock = clock
         self.settings = settings
-        self.store = PostgresInviteStore(pool, settings=settings, clock=clock)
+        self.hasher = hasher
+        self.store = PostgresInviteStore(
+            pool, settings=settings, clock=clock, code_hasher=hasher
+        )
         self.households = HouseholdService(
             PostgresHouseholdRepository(
                 pool,
                 FinancialAccountLookup(PostgresFinancialAccountRepository(pool)),
                 clock=clock,
+                code_hasher=hasher,
             ),
             invite_settings=settings,
         )
@@ -226,7 +234,7 @@ def test_household_invite_link_and_code_resolve_to_one_single_use_invitation(lan
     hid = lane.household(admin)
     quota_before = lane.store.sent(user_id=admin).quota
     invite = lane.households.invite(user_id=admin, household_id=hid)
-    assert invite.code and len(invite.code) == 9 and invite.code[4] == "-"
+    assert invite.code and len(invite.code) == 14 and invite.code[4::5] == "--"
     assert invite.link == "argus-household://invite#" + invite.token
 
     by_token = lane.households.preview_invitation(user_id=member, token=invite.token)
@@ -247,7 +255,7 @@ def test_household_invite_link_and_code_resolve_to_one_single_use_invitation(lan
     with pytest.raises(InvitationConsumed):
         lane.households.accept(user_id=other, code=invite.code)
     with pytest.raises(InvitationNotFound):
-        lane.households.accept(user_id=other, code="ZZZZ-ZZZZ")
+        lane.households.accept(user_id=other, code="ZZZZ-ZZZZ-ZZZZ")
     with pytest.raises(HouseholdInvitationKind):
         lane.store.redeem(user_id=other, token=None, code=invite.code)
 

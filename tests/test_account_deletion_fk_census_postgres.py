@@ -28,6 +28,7 @@ from psycopg_pool import ConnectionPool
 
 from tests.account_deletion_census import PROTECTED_HISTORY, sweep, user_columns
 from tests.financial_accounts.test_assets import create as create_asset
+from tests.household.conftest import TEST_CODE_SECRET
 from tests.household.financial_fixtures import DSN, NOW, account, key, share
 from tests.household.financial_fixtures import command as household_command
 from tests.household.financial_fixtures import lane as lane  # noqa: F401 - fixture
@@ -40,6 +41,17 @@ from tests.memory.test_postgres_reconciliation_deletion import (
 from tests.test_guest_cleanup_postgres import _seed_complete_expired_guest_graph
 
 pytestmark = pytest.mark.skipif(not DSN, reason="Disposable PostgreSQL required")
+
+
+@pytest.fixture(autouse=True)
+def _invite_code_secret(monkeypatch):  # noqa: ANN001, ANN202
+    """The world makes household invitations, whose codes need the secret (#794).
+
+    Same test secret as tests/household; it passes the placeholder floor.
+    """
+    monkeypatch.setenv("ARGUS_INVITE_CODE_SECRET", TEST_CODE_SECRET)
+    monkeypatch.delenv("ARGUS_INVITE_CODE_SECRET_PREVIOUS", raising=False)
+
 
 CENSUS_DOC = (
     Path(__file__).resolve().parents[1] / "docs/specs/lanes/account-deletion-fk-census.md"

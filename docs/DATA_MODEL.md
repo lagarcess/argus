@@ -114,6 +114,7 @@ beta_invitations
 invite_referrals
 invite_sender_refs
 beta_admissions
+argus_private.invite_code_digests
 beta_invite_quota_grants
 ```
 
@@ -1969,8 +1970,19 @@ Members carry a user-supplied `display_name`; administrator authority remains
 including after departure, closure and rejoin. Historical accepted memberships
 are backfilled where the invitation acceptance timestamp identifies the row.
 Unresolvable historical outcomes fail closed. Token plaintext is returned once.
-`code_hash` stores the hash of the short typed code beside `token_hash`; it is
-unique, and plaintext is returned once.
+The short typed code is not stored on this table: its keyed digest lives in
+`argus_private.invite_code_digests` (below), and plaintext is returned once.
+
+`argus_private.invite_code_digests` (migration
+`20261003150100_invite_code_digests_private.sql`, #789) holds one row per typed
+code: `digest` (primary key, `v2.<key id>.<HMAC-SHA-256 hex>` under
+`ARGUS_INVITE_CODE_SECRET`, enforced by a check), exactly one of
+`household_invitation_id` or `beta_invitation_id` (unique, cascading), `created_at`
+and `rehashed_at` (set when a code found under the previous secret moves to the
+current one). The schema is unreachable for anon and authenticated; the table has
+RLS with no policy and no privilege for anon, authenticated or service_role.
+Only the backend database owner reads it. The earlier `code_hash` columns on
+`household_invitations` and `beta_invitations` are dropped.
 
 `beta_invitations` holds beta invites (`kind='beta'`, `max_uses=1`) and founder
 group links (`kind='group_link'`, a `source_label`, a cap in `max_uses`, an
