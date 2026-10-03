@@ -8,6 +8,7 @@ struct CuadraoHomeDistribution: View {
     var controls: CuadraoInsightControls?
     var historical = false
     var asOf: Date?
+    var context: CanvasChartFocus?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedKind: CanvasAccountKind?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -94,10 +95,18 @@ struct CuadraoHomeDistribution: View {
                     Text(CanvasMoney.format(total + amount(deductions), currency: currency)).font(CuadraoTypography.rowAmount)
                 }.font(CuadraoTypography.supporting)
             }
+            if let context {
+                CanvasChartAsk(context: selectedContext(context), spanish: spanish)
+            }
         }.sensoryFeedback(.selection, trigger: selectedKind)
             .onChange(of: kinds) { _, available in
                 if let selectedKind, !available.contains(selectedKind) { self.selectedKind = nil }
             }
+    }
+    private func selectedContext(_ context: CanvasChartFocus) -> CanvasChartFocus {
+        var selected = context
+        selected.selection = selectedKind.map { .accountKind(id: $0.rawValue, title: $0.title(spanish)) }
+        return selected
     }
     private var distributionBar: some View {
         CuadraoAllocationBar(segments: kinds.map {

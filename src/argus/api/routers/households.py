@@ -8,14 +8,19 @@ from pydantic import BaseModel
 
 from argus.api.households import (
     HouseholdsContext,
+    InvitesContext,
     domain_problem,
     require_households_context,
+    require_invites_context,
 )
 from argus.api.routers.financial_accounts import _required_idempotency_key
+from argus.domain.backtest_admission import canonical_hash
+from argus.domain.household import invite_schemas as invites
 from argus.domain.household import schemas as wire
 
 router = APIRouter(prefix="/api/v1", tags=["households"])
 Context = Annotated[HouseholdsContext, Depends(require_households_context)]
+Invites = Annotated[InvitesContext, Depends(require_invites_context)]
 
 
 class HouseholdListResponse(BaseModel):
@@ -152,7 +157,7 @@ def preview_invitation(
         request,
         response,
         lambda: context.service.preview_invitation(
-            user_id=context.user_id, token=body.token
+            user_id=context.user_id, token=body.token, code=body.code
         ),
     )
 
@@ -171,7 +176,10 @@ def accept_invitation(
         body,
         None,
         lambda: context.service.accept(
-            user_id=context.user_id, token=body.token, display_name=body.display_name
+            user_id=context.user_id,
+            token=body.token,
+            code=body.code,
+            display_name=body.display_name,
         ),
     )
 
@@ -385,3 +393,155 @@ def list_shared_accounts(
             )
         ),
     )
+
+
+# Beta invites, the founder group link and the in-app code gate. Default-off
+# behind ARGUS_BETA_INVITES_ENABLED; the gate itself is ARGUS_BETA_INVITE_GATE_ENABLED.
+
+
+def keyed(request, body):
+    key = _required_idempotency_key(request, request.headers.get("Idempotency-Key"))
+    return key, canonical_hash(body.model_dump(mode="json"))
+
+
+@router.get("/invites/access", response_model=invites.BetaAccess)
+def beta_access(request: Request, response: Response, context: Invites):
+    return call(request, response, lambda: context.store.access(user_id=context.user_id))
+
+
+@router.get("/invites", response_model=invites.SentInvitesResponse)
+def list_sent_invites(request: Request, response: Response, context: Invites):
+    return call(request, response, lambda: context.store.sent(user_id=context.user_id))
+
+
+@router.post(
+    "/invites", response_model=invites.BetaInviteCreatedResponse, status_code=201
+)
+def create_beta_invite(
+    request: Request,
+    response: Response,
+    body: invites.CreateBetaInviteRequest,
+    context: Invites,
+):
+    key, digest = keyed(request, body)
+    return call(
+        request,
+        response,
+        lambda: context.store.create_beta(
+            user_id=context.user_id, key=key, request_hash=digest
+        ),
+    )
+
+
+@router.post("/invites/{invitation_id}/revoke", status_code=204)
+def revoke_beta_invite(
+    invitation_id: UUID, request: Request, response: Response, context: Invites
+):
+    call(
+        request,
+        response,
+        lambda: context.store.revoke(
+            user_id=context.user_id, invitation_id=str(invitation_id)
+        ),
+    )
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/invites/preview", response_model=invites.InvitePreview)
+def preview_invite(
+    request: Request,
+    response: Response,
+    body: invites.InviteSecretRequest,
+    context: Invites,
+):
+    return call(
+        request,
+        response,
+        lambda: context.store.preview(token=body.token, code=body.code),
+    )
+
+
+@router.post("/invites/redeem", response_model=invites.RedeemResult)
+def redeem_invite(
+    request: Request,
+    response: Response,
+    body: invites.InviteSecretRequest,
+    context: Invites,
+):
+    return call(
+        request,
+        response,
+        lambda: context.store.redeem(
+            user_id=context.user_id, token=body.token, code=body.code
+        ),
+    )
+
+
+@router.post(
+    "/invites/group-links",
+    response_model=invites.BetaInviteCreatedResponse,
+    status_code=201,
+)
+def create_group_link(
+    request: Request,
+    response: Response,
+    body: invites.CreateGroupLinkRequest,
+    context: Invites,
+):
+    key, digest = keyed(request, body)
+    return call(
+        request,
+        response,
+        lambda: context.store.create_group_link(
+            user_id=context.user_id, request=body, key=key, request_hash=digest
+        ),
+    )
+
+
+@router.get("/invites/group-links", response_model=invites.GroupLinkListResponse)
+def list_group_links(request: Request, response: Response, context: Invites):
+    return call(
+        request,
+        response,
+        lambda: invites.GroupLinkListResponse(
+            links=context.store.group_links(user_id=context.user_id)
+        ),
+    )
+
+
+@router.post("/invites/group-links/{link_id}/revoke", status_code=204)
+def revoke_group_link(
+    link_id: UUID, request: Request, response: Response, context: Invites
+):
+    call(
+        request,
+        response,
+        lambda: context.store.revoke_group_link(
+            user_id=context.user_id, link_id=str(link_id)
+        ),
+    )
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
+@router.post(
+    "/invites/quota-grants", response_model=invites.QuotaGrantResult, status_code=201
+)
+def grant_invite_quota(
+    request: Request,
+    response: Response,
+    body: invites.QuotaGrantRequest,
+    context: Invites,
+):
+    key, digest = keyed(request, body)
+    return call(
+        request,
+        response,
+        lambda: context.store.grant_quota(
+            user_id=context.user_id, request=body, key=key, request_hash=digest
+        ),
+    )
+
+
+@router.get("/invites/network", response_model=invites.NetworkNumbers)
+def invite_network_numbers(request: Request, response: Response, context: Invites):
+    return call(request, response, lambda: context.store.network(user_id=context.user_id))

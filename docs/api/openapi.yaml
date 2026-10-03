@@ -7077,6 +7077,291 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/invites:
+    get:
+      tags:
+      - households
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SentInvitesResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBetaInviteRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetaInviteCreatedResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/access:
+    get:
+      tags:
+      - households
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetaAccess'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/group-links:
+    get:
+      tags:
+      - households
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupLinkListResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupLinkRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetaInviteCreatedResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/group-links/{link_id}/revoke:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: link_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/network:
+    get:
+      tags:
+      - households
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkNumbers'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/preview:
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteSecretRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitePreview'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/quota-grants:
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotaGrantRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaGrantResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/redeem:
+    post:
+      tags:
+      - households
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteSecretRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemResult'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/invites/{invitation_id}/revoke:
+    post:
+      tags:
+      - households
+      parameters:
+      - name: invitation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/market/session:
     get:
       tags:
@@ -7906,9 +8191,17 @@ components:
     AcceptInvitationRequest:
       properties:
         token:
-          type: string
-          maxLength: 200
-          minLength: 8
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 8
+          - type: 'null'
+        code:
+          anyOf:
+          - type: string
+            maxLength: 32
+            minLength: 4
+          - type: 'null'
         display_name:
           type: string
           maxLength: 60
@@ -7916,8 +8209,7 @@ components:
           default: Member
       additionalProperties: false
       type: object
-      required:
-      - token
+      description: The token from the link or QR, or the typed code. Exactly one.
     AccessApprovalResponse:
       properties:
         approved:
@@ -8977,6 +9269,76 @@ components:
       type: object
       required:
       - receipts
+    BetaAccess:
+      properties:
+        gate_enabled:
+          type: boolean
+        admitted:
+          type: boolean
+        waitlist_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+        testflight_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - gate_enabled
+      - admitted
+    BetaInviteCreated:
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum:
+          - beta
+          - group_link
+        expires_at:
+          type: string
+          format: date-time
+        token:
+          anyOf:
+          - type: string
+          - type: 'null'
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        link:
+          anyOf:
+          - type: string
+          - type: 'null'
+        source_label:
+          anyOf:
+          - type: string
+          - type: 'null'
+        cap:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        replayed:
+          type: boolean
+          default: false
+      type: object
+      required:
+      - id
+      - kind
+      - expires_at
+      description: Secrets are returned once. A replay returns the same id with no secrets.
+    BetaInviteCreatedResponse:
+      properties:
+        invitation:
+          $ref: '#/components/schemas/BetaInviteCreated'
+        quota:
+          anyOf:
+          - $ref: '#/components/schemas/InviteQuota'
+          - type: 'null'
+      type: object
+      required:
+      - invitation
     BillInput:
       properties:
         kind:
@@ -10490,6 +10852,10 @@ components:
       - account_id
       - recipient_membership_id
       - expected_version
+    CreateBetaInviteRequest:
+      properties: {}
+      additionalProperties: false
+      type: object
     CreateFinancialAccountRequest:
       properties:
         type:
@@ -10538,6 +10904,25 @@ components:
       required:
       - type
       - currency
+    CreateGroupLinkRequest:
+      properties:
+        source_label:
+          type: string
+          maxLength: 80
+          minLength: 1
+        cap:
+          type: integer
+          maximum: 10000.0
+          minimum: 1.0
+        expires_at:
+          type: string
+          format: date-time
+      additionalProperties: false
+      type: object
+      required:
+      - source_label
+      - cap
+      - expires_at
     CreateHouseholdRequest:
       properties:
         name:
@@ -12523,6 +12908,79 @@ components:
       required:
       - goal
       - replayed
+    GroupLinkListResponse:
+      properties:
+        links:
+          items:
+            $ref: '#/components/schemas/GroupLinkView'
+          type: array
+      type: object
+      required:
+      - links
+    GroupLinkNumbers:
+      properties:
+        id:
+          type: string
+        source_label:
+          type: string
+        cap:
+          type: integer
+        redeemed:
+          type: integer
+        overflow:
+          type: integer
+        invitees_who_invited:
+          type: integer
+        invitees_who_invited_share:
+          anyOf:
+          - type: number
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - source_label
+      - cap
+      - redeemed
+      - overflow
+      - invitees_who_invited
+      - invitees_who_invited_share
+    GroupLinkView:
+      properties:
+        id:
+          type: string
+        source_label:
+          type: string
+        cap:
+          type: integer
+        redeemed:
+          type: integer
+        overflow:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+        revoked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        state:
+          type: string
+          enum:
+          - open
+          - full
+          - expired
+          - revoked
+      type: object
+      required:
+      - id
+      - source_label
+      - cap
+      - redeemed
+      - overflow
+      - expires_at
+      - revoked_at
+      - state
     GuestAccountSignupRequest:
       properties:
         email:
@@ -13427,12 +13885,21 @@ components:
         state:
           type: string
           default: pending
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        link:
+          anyOf:
+          - type: string
+          - type: 'null'
       type: object
       required:
       - id
       - household_id
       - expires_at
       - token
+      description: Token, code and link are returned once; a replay carries none of them.
     InvitationMetadata:
       properties:
         id:
@@ -13470,6 +13937,58 @@ components:
       - name
       - expires_at
       - available
+    InvitePreview:
+      properties:
+        kind:
+          type: string
+          enum:
+          - beta
+          - household
+          - group_link
+        available:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+        household_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+      type: object
+      required:
+      - kind
+      - available
+      - expires_at
+    InviteQuota:
+      properties:
+        limit:
+          type: integer
+        used:
+          type: integer
+        remaining:
+          type: integer
+      type: object
+      required:
+      - limit
+      - used
+      - remaining
+    InviteSecretRequest:
+      properties:
+        token:
+          anyOf:
+          - type: string
+            maxLength: 200
+            minLength: 8
+          - type: 'null'
+        code:
+          anyOf:
+          - type: string
+            maxLength: 32
+            minLength: 4
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      description: A code typed by hand, or the token from a link or QR. Exactly one.
     ItemAssignment:
       properties:
         item_id:
@@ -13489,6 +14008,38 @@ components:
       - item_id
       - participant_ids
     JsonValue: {}
+    KindNumbers:
+      properties:
+        sent:
+          type: integer
+        senders:
+          type: integer
+        sent_per_sender:
+          anyOf:
+          - type: number
+          - type: 'null'
+        accepted:
+          type: integer
+        accepted_share:
+          anyOf:
+          - type: number
+          - type: 'null'
+        invitees_who_invited:
+          type: integer
+        invitees_who_invited_share:
+          anyOf:
+          - type: number
+          - type: 'null'
+      type: object
+      required:
+      - sent
+      - senders
+      - sent_per_sender
+      - accepted
+      - accepted_share
+      - invitees_who_invited
+      - invitees_who_invited_share
+      description: The three network numbers for one kind of invite.
     LinkActivityBody:
       properties:
         version:
@@ -14609,6 +15160,21 @@ components:
       - kind
       - amount
       - occurred_at
+    NetworkNumbers:
+      properties:
+        beta:
+          $ref: '#/components/schemas/KindNumbers'
+        household:
+          $ref: '#/components/schemas/KindNumbers'
+        group_links:
+          items:
+            $ref: '#/components/schemas/GroupLinkNumbers'
+          type: array
+      type: object
+      required:
+      - beta
+      - household
+      - group_links
     ObservationQuestion:
       properties:
         observation_id:
@@ -16484,6 +17050,37 @@ components:
       - legs
       - refunded_minor
       - refundable_minor
+    QuotaGrantRequest:
+      properties:
+        user_id:
+          type: string
+          maxLength: 80
+          minLength: 1
+        extra:
+          type: integer
+          maximum: 1000.0
+          minimum: 1.0
+      additionalProperties: false
+      type: object
+      required:
+      - user_id
+      - extra
+    QuotaGrantResult:
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        extra:
+          type: integer
+        replayed:
+          type: boolean
+          default: false
+      type: object
+      required:
+      - id
+      - user_id
+      - extra
     ReceiptCardFacts:
       properties:
         execution_costs:
@@ -16958,6 +17555,28 @@ components:
       type: object
       required:
       - membership_id
+    RedeemResult:
+      properties:
+        admitted:
+          type: boolean
+        outcome:
+          type: string
+          enum:
+          - admitted
+          - already_admitted
+        kind:
+          type: string
+          enum:
+          - beta
+          - group_link
+        replayed:
+          type: boolean
+          default: false
+      type: object
+      required:
+      - admitted
+      - outcome
+      - kind
     ReplaceAccountGrantsRequest:
       properties:
         expected_version:
@@ -17690,6 +18309,61 @@ components:
       - unassessed
       - clear
       - restricted
+    SentInvite:
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum:
+          - beta
+          - household
+        invitation_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        state:
+          type: string
+          enum:
+          - pending
+          - accepted
+          - revoked
+          - expired
+        sent_at:
+          type: string
+          format: date-time
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        accepted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - kind
+      - invitation_id
+      - state
+      - sent_at
+      - expires_at
+      - accepted_at
+      description: One invite the caller sent. accepted_at drives the "accepted" notice.
+    SentInvitesResponse:
+      properties:
+        quota:
+          $ref: '#/components/schemas/InviteQuota'
+        invitations:
+          items:
+            $ref: '#/components/schemas/SentInvite'
+          type: array
+      type: object
+      required:
+      - quota
+      - invitations
     SharePlan:
       properties:
         membership_id:

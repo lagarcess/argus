@@ -1,3 +1,4 @@
+/* REWORD when group cards are a real feature: "sample group card" is preview-only copy. */
 "NSPhotoLibraryAddUsageDescription" = "Guarda una tarjeta de grupo de muestra en Fotos cuando elijas Guardar imagen.";
 
 "NSCameraUsageDescription" = "Escanea un recibo cuando elijas Escanear recibo.";
