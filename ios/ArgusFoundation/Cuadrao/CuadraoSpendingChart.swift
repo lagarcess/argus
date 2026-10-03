@@ -11,6 +11,7 @@ struct CuadraoSpendingChart: View {
     @Binding var periodOffset: Int
     var record: (() -> Void)?
     var controls: CuadraoInsightControls?
+    var context: CanvasChartFocus?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedPosition: String?
     @State private var selectedCategory: CanvasExpenseCategory?
@@ -69,11 +70,21 @@ struct CuadraoSpendingChart: View {
             } else { emptyState }
             ForEach(categories) { category in categoryRow(category) }
             CuadraoSpendingHighlights(story: story, currency: currency, spanish: spanish)
+            if let context {
+                CanvasChartAsk(context: selectedContext(context), spanish: spanish)
+            }
         }.onChange(of: range) { _, _ in clearSelection() }
             .onChange(of: periodOffset) { _, _ in clearSelection() }
             .onChange(of: distribution) { _, _ in clearSelection() }
             .sensoryFeedback(.selection, trigger: selectedSlot?.start)
             .sensoryFeedback(.selection, trigger: periodOffset)
+    }
+    private func selectedContext(_ context: CanvasChartFocus) -> CanvasChartFocus {
+        var selected = context
+        selected.selection = selectedCategory.map { .expenseCategory(id: $0.rawValue, title: $0.title(spanish)) }
+        selected.inspectedInterval = selectedSlot
+        selected.inspectedTitle = selectedSlot.map { story.periodText($0, spanish: spanish) }
+        return selected
     }
     private var emptyState: some View {
         CuadraoChartState(title: emptyTitle, detail: emptyDetail,

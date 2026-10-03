@@ -5,7 +5,11 @@ struct CuadraoSearchCanvas: View {
     let data: CuadraoAccountsPreview
     let spanish: Bool
     let includeExamples: Bool
-    let actions: (UUID) -> Void
+    let plans: CuadraoPlanPreview
+    let groups: CuadraoGroupPreview
+    let chat: CuadraoChatPreview
+    let openChat: (CanvasChatThread) -> Void
+    let actions: (CanvasAccountSheet) -> Void
     let record: (UUID) -> Void
     @State private var query = ""
     @State private var kind = Kind.all
@@ -16,7 +20,7 @@ struct CuadraoSearchCanvas: View {
 
     private typealias Kind = CanvasSearchKind
     private enum Scope: CaseIterable { case all, personal, household }
-    private enum Route: Hashable { case account(UUID), activity(UUID), reference(String) }
+    private enum Route: Hashable { case account(UUID), activity(UUID), plan(UUID), group(UUID), reference(String) }
 
     private var availableAccounts: [CanvasAccount] {
         data.accounts.filter { account in
@@ -35,91 +39,138 @@ struct CuadraoSearchCanvas: View {
         }.sorted { $0.date > $1.date }
     }
     private var references: [CanvasSearchReference] {
-        guard includeExamples, scope != .household else { return [] }
-        return CanvasSearchReference.examples(spanish).filter { matches($0.title + " " + $0.detail + " " + $0.content) }
+        guard scope != .household else { return [] }
+        let examples = includeExamples ? CanvasSearchReference.examples(spanish).filter { $0.kind == .files || $0.kind == .memory } : []
+        return (examples + chat.references(spanish))
+            .filter { matches($0.title + " " + $0.detail + " " + $0.content) }
+    }
+    private var matchingPlans: [CanvasPlan] {
+        plans.plans.filter { plan in
+            planIsAvailable(plan)
+            && (currency.isEmpty || plan.currency == currency)
+            && (scope == .all || (scope == .household ? plan.spaceID == CanvasSpace.householdID : plan.spaceID != CanvasSpace.householdID))
+            && matches(plan.name + " " + plan.kind.title(spanish) + " " + PlanFormat.space(plan.spaceID, accounts: data, spanish: spanish))
+        }
+    }
+    private var matchingGroups: [PlanGroup] {
+        guard scope == .all else { return [] }
+        return groups.groups.filter {
+            (currency.isEmpty || $0.currency == currency)
+            && matches($0.name + " " + $0.kind.title(spanish))
+        }
+    }
+    private var availableCurrencies: [String] {
+        Array(Set(data.accounts.map(\.currency) + plans.plans.map(\.currency) + groups.groups.map(\.currency))).sorted()
+    }
+    private func planIsAvailable(_ plan: CanvasPlan) -> Bool {
+        !data.spaces.contains { $0.id == plan.spaceID && $0.deleted }
     }
     private var count: Int {
         (kind == .all || kind == .accounts ? accounts.count : 0)
         + (kind == .all || kind == .activity ? activity.count : 0)
         + references.filter { kind == .all || kind == $0.kind }.count
+        + (kind == .all || kind == .plans ? matchingPlans.count + matchingGroups.count : 0)
     }
     private var filterCount: Int { (scope == .all ? 0 : 1) + (currency.isEmpty ? 0 : 1) }
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                searchField
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 24) {
-                        ForEach(Kind.allCases, id: \.self) { value in
-                            Button { kind = value; focused = false } label: {
-                                Text(title(value)).font(.subheadline)
-                                    .foregroundStyle(kind == value ? Color.primary : .secondary)
-                                    .frame(minHeight: 44)
-                                    .overlay(alignment: .bottom) {
-                                        Rectangle().fill(kind == value ? WelcomePalette.pine : .clear).frame(height: 2)
-                                    }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if count == 0 {
+                        emptyState.padding(.top, 36)
+                    }
+                    if (kind == .all || kind == .accounts) && !accounts.isEmpty {
+                        heading(title(.accounts), count: accounts.count)
+                        ForEach(accounts) { account in
+                            NavigationLink(value: Route.account(account.id)) {
+                                resultRow(account.displayName(spanish), detail: subtitle(account), accountKind: account.kind)
                             }.buttonStyle(.plain)
-                                .accessibilityAddTraits(kind == value ? .isSelected : [])
+                            Divider().foregroundStyle(WelcomePalette.separator)
                         }
                     }
-                }
-                if filterCount > 0 {
-                    HStack {
-                        Text([scope == .all ? nil : scopeTitle(scope), currency.isEmpty ? nil : currency].compactMap { $0 }.joined(separator: " · "))
-                        Spacer()
-                        Button(spanish ? "Quitar filtros" : "Clear filters") { scope = .all; currency = "" }
-                            .frame(minHeight: 44)
-                    }.font(.caption).foregroundStyle(.secondary)
-                }
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        if count == 0 {
-                            ContentUnavailableView {
-                                Label(spanish ? (query.isEmpty && filterCount == 0 ? "Todo empieza con una cuenta" : "Sin resultados")
-                                      : (query.isEmpty && filterCount == 0 ? "Start with an account" : "No results"), systemImage: "magnifyingglass")
-                            } description: {
-                                Text(spanish ? (data.accounts.isEmpty ? "Las cuentas y movimientos que añadas aparecerán aquí." : "Prueba otro nombre o cambia los filtros.")
-                                     : (data.accounts.isEmpty ? "Accounts and activity you add will appear here." : "Try another name or change the filters."))
-                            }.padding(.top, 36)
-                        }
-                        if (kind == .all || kind == .accounts) && !accounts.isEmpty {
-                            heading(title(.accounts), count: accounts.count)
-                            ForEach(accounts) { account in
-                                NavigationLink(value: Route.account(account.id)) {
-                                    resultRow(account.displayName(spanish), detail: subtitle(account))
-                                }.buttonStyle(.plain)
+                    if (kind == .all || kind == .activity) && !activity.isEmpty {
+                        heading(title(.activity), count: activity.count)
+                        ForEach(activity) { entry in
+                            if let account = data.account(entry.accountID) {
+                                NavigationLink(value: Route.activity(entry.id)) {
+                                    resultRow(entry.title, detail: account.displayName(spanish) + " · " + account.currency + " "
+                                        + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
+                                        symbol: entry.income ? "arrow.down.left" : nil, category: entry.income ? nil : entry.category)
+                                }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.search.activity.\(entry.id)")
                                 Divider().foregroundStyle(WelcomePalette.separator)
                             }
                         }
-                        if (kind == .all || kind == .activity) && !activity.isEmpty {
-                            heading(title(.activity), count: activity.count)
-                            ForEach(activity) { entry in
-                                if let account = data.account(entry.accountID) {
-                                    NavigationLink(value: Route.activity(entry.id)) {
-                                        resultRow(entry.title, detail: account.displayName(spanish) + " · " + account.currency + " "
-                                            + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                                    }.buttonStyle(.plain)
-                                    Divider().foregroundStyle(WelcomePalette.separator)
-                                }
-                            }
+                    }
+                    if (kind == .all || kind == .plans) && (!matchingPlans.isEmpty || !matchingGroups.isEmpty) {
+                        heading(title(.plans), count: matchingPlans.count + matchingGroups.count)
+                        ForEach(matchingPlans) { plan in
+                            NavigationLink(value: Route.plan(plan.id)) {
+                                resultRow(plan.name, detail: [plan.kind.title(spanish),
+                                    PlanFormat.space(plan.spaceID, accounts: data, spanish: spanish),
+                                    plan.archived ? (spanish ? "Archivado" : "Archived") : nil].compactMap { $0 }.joined(separator: " · "), symbol: plan.look.symbol)
+                            }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.search.plan.\(plan.id)")
+                            Divider()
                         }
-                        ForEach([Kind.plans, .chats, .files, .memory], id: \.self) { section in
-                            let rows = references.filter { $0.kind == section }
-                            if (kind == .all || kind == section) && !rows.isEmpty {
-                                heading(title(section), count: rows.count)
-                                ForEach(rows) { item in
+                        ForEach(matchingGroups) { group in
+                            NavigationLink(value: Route.group(group.id)) {
+                                resultRow(group.name, detail: [group.kind.title(spanish), group.currency,
+                                    group.archived ? (spanish ? "Archivado" : "Archived") : nil].compactMap { $0 }.joined(separator: " · "), symbol: group.look.symbol)
+                            }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.search.group.\(group.id)")
+                            Divider()
+                        }
+                    }
+                    ForEach([Kind.chats, .files, .memory], id: \.self) { section in
+                        let rows = references.filter { $0.kind == section }
+                        if (kind == .all || kind == section) && !rows.isEmpty {
+                            heading(title(section), count: rows.count)
+                            ForEach(rows) { item in
+                                if item.kind == .chats, let thread = chat.threads.first(where: { $0.id == item.id }) {
+                                    Button { focused = false; openChat(thread) } label: {
+                                        resultRow(item.title, detail: item.detail, date: thread.lastMessageDate, symbol: "bubble.left")
+                                    }.buttonStyle(.plain)
+                                } else {
                                     NavigationLink(value: Route.reference(item.id)) {
-                                        resultRow(item.title, detail: item.detail)
+                                        resultRow(item.title, detail: item.detail, symbol: item.kind == .memory ? "brain" : "doc")
                                     }.buttonStyle(.plain)
-                                    Divider()
                                 }
+                                Divider()
                             }
                         }
-                    }.padding(.bottom, 24)
-                }.scrollDismissesKeyboard(.interactively)
+                    }
+                }.padding(.horizontal, 24).padding(.bottom, 24)
+            }.scrollDismissesKeyboard(.interactively)
+            .cuadraoScrollBar(edge: .top) {
+                VStack(alignment: .leading, spacing: 18) {
+                    searchField
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 24) {
+                            ForEach(Kind.allCases, id: \.self) { value in
+                                Button { kind = value; focused = false } label: {
+                                    Text(title(value)).font(.subheadline)
+                                        .foregroundStyle(kind == value ? Color.primary : .secondary)
+                                        .frame(minHeight: 44)
+                                        .overlay(alignment: .bottom) {
+                                            Rectangle().fill(kind == value ? WelcomePalette.pine : .clear).frame(height: 2)
+                                        }
+                                }.buttonStyle(.plain)
+                                    .accessibilityAddTraits(kind == value ? .isSelected : [])
+                                    .accessibilityIdentifier("cuadrao.search.kind.\(value)")
+                            }
+                        }
+                    }
+                    if filterCount > 0 {
+                        HStack {
+                            Text([scope == .all ? nil : scopeTitle(scope), currency.isEmpty ? nil : currency].compactMap { $0 }.joined(separator: " · "))
+                            Spacer()
+                            Button(spanish ? "Quitar filtros" : "Clear filters") { scope = .all; currency = "" }
+                                .frame(minHeight: 44)
+                        }.font(.caption).foregroundStyle(.secondary)
+                    }
+                }.padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 18)
+                    .background(WelcomePalette.background.opacity(0.92))
             }
-            .padding(.horizontal, 24).padding(.top, 24)
+            .cuadraoSoftScrollEdges()
             .background(WelcomePalette.background)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Route.self) { route in
@@ -127,9 +178,23 @@ struct CuadraoSearchCanvas: View {
                 case .account(let id):
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish, actions: actions, record: record)
                 case .activity(let id):
-                    activityDetail(id)
+                    CuadraoActivityDetail(data: data, activityID: id, spanish: spanish, actions: actions, record: record)
+                case .plan(let id):
+                    if let plan = plans.plan(id), planIsAvailable(plan) {
+                        CuadraoPlanDetail(store: plans, accounts: data, planID: id, spanish: spanish)
+                    } else {
+                        ContentUnavailableView(spanish ? "Plan no disponible" : "Plan unavailable", systemImage: "calendar")
+                            .toolbar(.visible, for: .navigationBar)
+                    }
+                case .group(let id):
+                    if groups.group(id) != nil {
+                        CuadraoGroupDetail(store: groups, groupID: id, spanish: spanish)
+                    } else {
+                        ContentUnavailableView(spanish ? "Plan no disponible" : "Plan unavailable", systemImage: "person.2")
+                            .toolbar(.visible, for: .navigationBar)
+                    }
                 case .reference(let id):
-                    if let item = CanvasSearchReference.examples(spanish).first(where: { $0.id == id }) {
+                    if let item = references.first(where: { $0.id == id }) {
                         CuadraoSearchReferenceDetail(item: item, spanish: spanish,
                             source: item.kind == .memory ? CanvasSearchReference.examples(spanish).first { $0.id == "chat-cd" } : nil)
                     }
@@ -137,6 +202,49 @@ struct CuadraoSearchCanvas: View {
             }
             .sheet(isPresented: $filters) { filterSheet }
         }.toolbar(.hidden, for: .tabBar)
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label(query.isEmpty && filterCount == 0 ? emptyTitle : (spanish ? "Sin resultados" : "No results"), systemImage: "magnifyingglass")
+        } description: {
+            Text(query.isEmpty && filterCount == 0 ? emptyDetail : (spanish ? "Prueba otro nombre o cambia los filtros." : "Try another name or change the filters."))
+        } actions: {
+            if !query.isEmpty {
+                Button(spanish ? "Borrar búsqueda" : "Clear search") { query = "" }
+                    .accessibilityIdentifier("cuadrao.search.clear")
+            }
+            if filterCount > 0 {
+                Button(spanish ? "Restablecer filtros" : "Reset filters") { scope = .all; currency = "" }
+                    .accessibilityIdentifier("cuadrao.search.reset")
+            }
+            if kind != .all {
+                Button(spanish ? "Buscar en todo" : "Search everything") { kind = .all }
+                    .accessibilityIdentifier("cuadrao.search.everything")
+            }
+        }
+    }
+    private var emptyTitle: String {
+        switch kind {
+        case .all: spanish ? "Tu información, aquí" : "Your information, here"
+        case .accounts: spanish ? "Sin cuentas todavía" : "No accounts yet"
+        case .activity: spanish ? "Sin movimientos todavía" : "No activity yet"
+        case .plans: spanish ? "Sin planes todavía" : "No plans yet"
+        case .chats: spanish ? "Sin chats todavía" : "No chats yet"
+        case .files: spanish ? "Sin archivos todavía" : "No files yet"
+        case .memory: spanish ? "Sin recuerdos todavía" : "No memories yet"
+        }
+    }
+    private var emptyDetail: String {
+        switch kind {
+        case .all: spanish ? "Busca cuentas, movimientos, planes y conversaciones." : "Search accounts, activity, plans and conversations."
+        case .accounts: spanish ? "Añade una cuenta desde Inicio para encontrarla aquí." : "Add an account from Home to find it here."
+        case .activity: spanish ? "Los movimientos que registres en tus cuentas aparecerán aquí." : "Activity recorded in your accounts will appear here."
+        case .plans: spanish ? "Crea una meta, un presupuesto o un plan de deuda en Plan." : "Create a goal, budget or debt plan in Plan."
+        case .chats: spanish ? "Tus conversaciones guardadas aparecerán aquí." : "Your saved conversations will appear here."
+        case .files: spanish ? "Los archivos disponibles aparecerán aquí." : "Available files will appear here."
+        case .memory: spanish ? "El contexto que confirmes aparecerá aquí." : "Context you confirm will appear here."
+        }
     }
 
     private var searchField: some View {
@@ -155,7 +263,7 @@ struct CuadraoSearchCanvas: View {
                     Image(systemName: "slider.horizontal.3")
                     if filterCount > 0 { Text(String(filterCount)).font(.caption) }
                 }.frame(minWidth: 44, minHeight: 48)
-            }.accessibilityLabel(spanish ? "Filtros, \(filterCount) activos" : "Filters, \(filterCount) active")
+            }.accessibilityIdentifier("cuadrao.search.filters").accessibilityLabel(spanish ? "Filtros, \(filterCount) activos" : "Filters, \(filterCount) active")
         }.overlay(alignment: .bottom) { Rectangle().fill(WelcomePalette.separator).frame(height: 1) }
     }
 
@@ -167,54 +275,40 @@ struct CuadraoSearchCanvas: View {
                 }
                 Picker(spanish ? "Moneda" : "Currency", selection: $currency) {
                     Text(spanish ? "Todas" : "All").tag("")
-                    ForEach(Array(Set(data.accounts.map(\.currency))).sorted(), id: \.self) { Text($0).tag($0) }
+                    ForEach(availableCurrencies, id: \.self) { Text($0).tag($0) }
                 }
                 Section {
                     Button(spanish ? "Restablecer filtros" : "Reset filters") { scope = .all; currency = "" }
                 } footer: {
-                    Text(spanish ? "Solo yo incluye lo que no has compartido. Hogar incluye las cuentas compartidas y sus movimientos. Chats, archivos y memoria siguen siendo privados. La moneda filtra solo cuentas y movimientos."
-                         : "Only me includes what you haven't shared. Household includes shared accounts and their activity. Chats, files and memory remain private. Currency filters only accounts and activity.")
+                    Text(spanish ? "Solo yo incluye lo que no has compartido. Hogar incluye las cuentas compartidas y sus movimientos. Chats, archivos y memoria siguen siendo privados. Los planes en grupo aparecen en Todo. La moneda filtra cuentas, movimientos y planes."
+                         : "Only me includes what you haven't shared. Household includes shared accounts and their activity. Chats, files and memory remain private. Group plans appear in All. Currency filters accounts, activity and plans.")
                 }
             }.navigationTitle(spanish ? "Filtros" : "Filters").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { filters = false } } }
         }.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
     }
 
-    @ViewBuilder private func activityDetail(_ id: UUID) -> some View {
-        if let entry = data.activity.first(where: { $0.id == id }), let account = data.account(entry.accountID) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    Text(entry.title).font(.system(.title, design: .serif))
-                    Text(account.currency + " " + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                        .font(CuadraoTypography.amount)
-                    LabeledContent(spanish ? "Tipo" : "Type", value: entry.income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
-                    LabeledContent(spanish ? "Fecha" : "Date") { Text(entry.date, format: .dateTime.day().month(.wide).year()) }
-                    NavigationLink(value: Route.account(account.id)) {
-                        resultRow(account.displayName(spanish), detail: subtitle(account))
-                    }.buttonStyle(.plain)
-                }.padding(24)
-            }.background(WelcomePalette.background).navigationTitle(spanish ? "Movimiento" : "Activity")
-                .navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
-        } else {
-            ContentUnavailableView(spanish ? "Movimiento no disponible" : "Activity unavailable", systemImage: "doc.text.magnifyingglass")
-                .toolbar(.visible, for: .navigationBar)
-        }
-    }
-
     private func heading(_ title: String, count: Int) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title).font(.headline)
+            Text(title).font(CuadraoTypography.section)
             Text(String(count)).font(.caption).foregroundStyle(.secondary)
         }.padding(.top, 20).padding(.bottom, 10).accessibilityAddTraits(.isHeader)
     }
-    private func resultRow(_ title: String, detail: String) -> some View {
+    private func resultRow(_ title: String, detail: String, date: Date? = nil, symbol: String? = nil, accountKind: CanvasAccountKind? = nil, category: CanvasExpenseCategory? = nil) -> some View {
         HStack(spacing: 16) {
+            if let accountKind { CanvasAccountIcon(kind: accountKind) }
+            else if let category { CuadraoExpenseCategoryIcon(category: category) }
+            else if let symbol {
+                Image(systemName: symbol).font(.body).foregroundStyle(WelcomePalette.pine)
+                    .frame(width: 42, height: 42).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 13)).accessibilityHidden(true)
+            }
             VStack(alignment: .leading, spacing: 6) {
-                Text(title).font(.body.weight(.medium))
+                Text(title).font(CuadraoTypography.action)
                 Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
+            if let date { CuadraoChatDate(date: date, spanish: spanish) }
+            else { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true) }
         }.frame(minHeight: 62).padding(.vertical, 8).contentShape(Rectangle())
     }
     private func matches(_ text: String) -> Bool {

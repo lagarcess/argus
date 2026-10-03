@@ -1,24 +1,19 @@
 import SwiftUI
 
-struct CuadraoAccountActions: View {
-    @Environment(\.dynamicTypeSize) private var typeSize
-    let account: CanvasAccount
+struct CuadraoArchiveAccountReview: View {
+    let data: CuadraoAccountsPreview
+    let id: UUID
     let spanish: Bool
-    let rename: () -> Void
-    let record: () -> Void
-    let archive: () -> Void
+    let archived: () -> Void
+    @Environment(\.dismiss) private var dismiss
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                CanvasAccountIcon(kind: account.kind)
-                Text(account.displayName(spanish)).font(.title3.weight(.medium))
-            }.padding(.bottom, 12)
-            CanvasActionRow(title: spanish ? "Cambiar nombre" : "Rename account", symbol: "pencil", action: rename)
-            Divider()
-            CanvasActionRow(title: spanish ? "Añadir movimiento" : "Add transaction", symbol: "plus", action: record)
-            Divider()
-            CanvasActionRow(title: spanish ? "Archivar" : "Archive", symbol: "archivebox", action: archive)
-        }.padding(28).presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.height(320)]).presentationDragIndicator(.visible)
+        VStack(alignment: .leading, spacing: 20) {
+            Text(spanish ? "¿Archivar esta cuenta?" : "Archive this account?").font(CuadraoTypography.feature)
+            Text(spanish ? "El historial se conserva. Puedes recuperarla en Cuentas archivadas." : "Its history stays intact. Restore it from Archived accounts.")
+            Button(spanish ? "Archivar" : "Archive") { data.archive(id, true); archived(); dismiss() }
+                .buttonStyle(.borderedProminent).tint(WelcomePalette.pine)
+            Button(spanish ? "Cancelar" : "Cancel") { dismiss() }
+        }.padding(28).presentationDetents([.medium, .large])
     }
 }
 

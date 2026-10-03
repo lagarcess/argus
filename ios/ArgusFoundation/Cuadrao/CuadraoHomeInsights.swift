@@ -12,21 +12,9 @@ struct CuadraoHomeInsights: View {
     @State private var distribution = false
     @State private var activity = false
     @State private var accountPath: [UUID] = []
-    @State private var tipSheet: InsightAccountSheet?
+    @State private var accountSheet: CanvasAccountSheet?
     @State private var chooseRecordingAccount = false
     @Environment(\.dismiss) private var dismiss
-
-    private enum InsightAccountSheet: Identifiable {
-        case actions(UUID), rename(UUID), record(UUID)
-        var id: String {
-            switch self {
-            case .actions(let id): "actions-\(id)"
-            case .rename(let id): "rename-\(id)"
-            case .record(let id): "record-\(id)"
-            }
-        }
-    }
-
     private func periodLabel(_ offset: Int) -> some View {
         Text(range.periodLabel(spanish: spanish, offset: offset))
             .font(CuadraoTypography.feature).foregroundStyle(WelcomePalette.ink)
@@ -50,22 +38,27 @@ struct CuadraoHomeInsights: View {
         CanvasBalancePeriod(accounts: accounts, observations: data.balanceObservations, range: range, offset: offset)
     }
     private func recordFirstExpense() {
-        if accounts.count == 1, let account = accounts.first { tipSheet = .record(account.id) }
+        if accounts.count == 1, let account = accounts.first { accountSheet = .record(account.id) }
         else { chooseRecordingAccount = true }
     }
     private func movePeriod(_ direction: Int) { periodOffset = min(0, max(oldest, periodOffset + direction)) }
+    private func chartContext(_ offset: Int) -> CanvasChartFocus {
+        CanvasChartFocus(spaceID: data.selectedSpaceID, spaceTitle: space, currency: currency,
+            interval: range.interval(offset: offset), periodTitle: range.periodLabel(spanish: spanish, offset: offset),
+            metric: activity ? .activity : .balance, presentation: distribution ? .distribution : .evolution)
+    }
     @ViewBuilder private func periodContent(_ offset: Int) -> some View {
         if activity {
             CuadraoSpendingChart(expenses: expenses, coverageStart: data.spendingCoverageStart(currency: currency), currency: currency,
-                spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset),
-                record: accounts.isEmpty ? nil : recordFirstExpense)
+                spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset), record: accounts.isEmpty ? nil : recordFirstExpense, context: chartContext(offset))
         } else if distribution {
             CuadraoHomeDistribution(accounts: balancePeriod(offset).closingAccounts, currency: currency, spanish: spanish, historical: offset < 0,
-                asOf: balancePeriod(offset).closing?.date)
+                asOf: balancePeriod(offset).closing?.date, context: chartContext(offset))
         } else {
             CuadraoHomeBalanceChart(accounts: accounts, observations: data.balanceObservations, currency: currency,
                 currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true,
                 range: $range, periodOffset: .constant(offset))
+            CanvasChartAsk(context: chartContext(offset), spanish: spanish)
         }
     }
     var body: some View {
@@ -97,7 +90,7 @@ struct CuadraoHomeInsights: View {
             }.background(WelcomePalette.background)
                 .navigationDestination(for: UUID.self) { id in
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
-                        actions: { tipSheet = .actions($0) }, record: { tipSheet = .record($0) })
+                        actions: { accountSheet = $0 }, record: { accountSheet = .record($0) })
                 }
                 .navigationTitle(space).navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -108,30 +101,13 @@ struct CuadraoHomeInsights: View {
                 }
         }.confirmationDialog(spanish ? "¿En qué cuenta?" : "Which account?", isPresented: $chooseRecordingAccount, titleVisibility: .visible) {
             ForEach(accounts) { account in
-                Button(account.displayName(spanish)) { tipSheet = .record(account.id) }
+                Button(account.displayName(spanish)) { accountSheet = .record(account.id) }
             }
-        }.sheet(item: $tipSheet) { selection in
-            switch selection {
-            case .actions(let id):
-                if let account = data.account(id) {
-                    CuadraoAccountActions(account: account, spanish: spanish,
-                        rename: { tipSheet = .rename(id) },
-                        record: { tipSheet = .record(id) },
-                        archive: {
-                            data.archive(id, true)
-                            tipSheet = nil
-                            accountPath = []
-                        })
-                }
-            case .rename(let id):
-                if let account = data.account(id) {
-                    CuadraoRenameAccount(data: data, account: account, spanish: spanish)
-                }
-            case .record(let id):
-                if let account = data.account(id) {
-                    CuadraoTransactionCanvas(data: data, account: account, spanish: spanish)
-                }
-            }
+        }.sheet(item: $accountSheet) { selection in
+            CuadraoAccountModal(data: data, selection: selection, spanish: spanish,
+                show: { accountSheet = $0 }, archived: { _ in
+                    accountSheet = nil; accountPath = []
+                })
         }.onChange(of: oldest) { _, value in periodOffset = max(value, periodOffset) }
             .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
     }

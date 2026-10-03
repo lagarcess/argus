@@ -90,3 +90,13 @@ struct CuadraoHouseholdSheet: View {
             .font(.footnote).foregroundStyle(.secondary)
     }
 }
+
+extension CuadraoAccountsPreview {
+    func acceptedHouseholdMembers(spanish: Bool) -> [PlanMember] {
+        var members = [PlanMember(id: UUID(uuidString: "00000000-0000-4000-8000-000000000001")!, name: spanish ? "Tú" : "You", symbol: "sun.max.fill")]
+        if case .joined(let name) = household {
+            members.append(PlanMember(id: UUID(uuidString: "00000000-0000-4000-8000-000000000002")!, name: name, symbol: "leaf.fill"))
+        }
+        return members
+    }
+}
