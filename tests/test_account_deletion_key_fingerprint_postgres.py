@@ -281,3 +281,83 @@ def test_an_apple_token_from_another_key_is_never_discarded(
     finally:
         _forget(made)
         apple.close()
+
+
+@pytest.mark.parametrize(("others", "alerts"), [(3, False), (4, True)])
+def test_the_already_revoked_spike_alerts_at_five_runs_in_24_hours(
+    lane,  # noqa: F811
+    world,  # noqa: F811
+    others,  # noqa: ANN001
+    alerts,  # noqa: ANN001
+):
+    """Note 4: the runbook says 5 or more runs updated in the last 24 hours
+    that saw an already-gone grant, any provider. Four (three others plus
+    this one) stay quiet; five alert. A run older than 24 hours never counts."""
+    from datetime import timedelta
+
+    from argus.domain.account_deletion.service import (
+        ALREADY_REVOKED_SPIKE,
+        ALREADY_REVOKED_WINDOW,
+    )
+    from loguru import logger
+
+    assert (ALREADY_REVOKED_SPIKE, ALREADY_REVOKED_WINDOW) == (5, timedelta(hours=24))
+    a = world["a"]
+    key = _box()
+    _seal(a, "plaid", key)
+    _seal(a, "gmail", key)
+    seen = '{"already_revoked": {"plaid": 1}}'
+    with psycopg.connect(DSN, autocommit=True) as c:
+        # Earlier tests' finished runs are moved out of the window meanwhile.
+        moved = [
+            r[0]
+            for r in c.execute(
+                "update argus_private.account_deletion_runs"
+                " set updated_at = updated_at - interval '3 days'"
+                " where steps ? 'already_revoked' and updated_at >= %s returning id",
+                (NOW - ALREADY_REVOKED_WINDOW,),
+            ).fetchall()
+        ]
+        made = [
+            r[0]
+            for r in c.execute(
+                "insert into argus_private.account_deletion_runs"
+                " (status, steps, updated_at, completed_at)"
+                " select 'done', %s::jsonb, %s - (g * interval '1 hour'), %s"
+                " from generate_series(0, %s) g returning id",
+                (seen, NOW, NOW, others),
+            ).fetchall()
+        ]
+        # The last one is 2 days old: outside the window.
+        c.execute(
+            "update argus_private.account_deletion_runs"
+            " set updated_at = %s - interval '2 days' where id = %s",
+            (NOW, made[-1]),
+        )
+    records: list[dict] = []
+    sink = logger.add(lambda m: records.append(m.record["extra"]), level="INFO")
+    try:
+        admin = SqlAuthAdmin()
+        outcome = _service(
+            lane, admin, _hub(lane, key, _Google(), _Plaid("ITEM_NOT_FOUND")), box=key
+        ).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+    finally:
+        logger.remove(sink)
+        with psycopg.connect(DSN, autocommit=True) as c:
+            c.execute(
+                "delete from argus_private.account_deletion_runs where id = any(%s)",
+                (made,),
+            )
+            c.execute(
+                "update argus_private.account_deletion_runs"
+                " set updated_at = updated_at + interval '3 days' where id = any(%s)",
+                (moved,),
+            )
+    assert outcome.status == "done"
+    spikes = [
+        r for r in records if r.get("metric") == "account_deletion.already_revoked_spike"
+    ]
+    assert bool(spikes) is alerts
+    if alerts:
+        assert spikes[0]["runs"] == 5 and spikes[0]["window_hours"] == 24
