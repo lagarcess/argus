@@ -38,14 +38,14 @@ struct CuadraoSpendingChart: View {
         guard story.covered else {
             return spanish ? "Este período tiene un historial incompleto." : "This period has incomplete history."
         }
-        // Only a period with no records is empty; records that add up to zero are a real 0 (#787).
-        guard !entries.isEmpty else { return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet." }
+        // A covered period with no spending is a known 0, so it still compares by amount.
         if let prior = story.previousTotal {
             let difference = total - prior
             if difference == 0 { return spanish ? "Has registrado el mismo gasto que en el período anterior." : "Your recorded spending matches the previous period." }
             let reference = periodOffset == 0 ? (spanish ? "al mismo punto del período anterior" : "at this point in the previous period") : (spanish ? "en el período anterior" : "in the previous period")
             return spanish ? "Llevas \(currency) \(money(abs(difference))) \(difference > 0 ? "más" : "menos") que \(reference)." : "You've spent \(currency) \(money(abs(difference))) \(difference > 0 ? "more" : "less") than \(reference)."
         }
+        guard !entries.isEmpty else { return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet." }
         guard let largest = categories.max(by: { categoryTotal($0) < categoryTotal($1) }) else {
             return spanish ? "Tus gastos registrados suman 0 en este período." : "Your recorded spending adds up to 0 this period."
         }
@@ -56,14 +56,15 @@ struct CuadraoSpendingChart: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    // Release rule (fc7650ea): no records shows Sin datos, never an invented zero.
-                    Text(entries.isEmpty ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
+                    // Founder decision (Oct 2): a covered period with no spending shows a known 0.
+                    // Missing coverage shows "—" with Sin datos; first use shows "—" with its welcome.
+                    Text(entries.isEmpty && !story.covered ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-spending-total")
                 }
                 Text(selectedSlot.map { range == .year ? $0.start.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) : story.periodText($0, spanish: spanish) } ?? (spanish ? "Gastos registrados" : "Recorded spending"))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                if story.state == .populated {
+                if story.state == .populated || (story.state == .emptyPeriod && story.previousTotal != nil) {
                     Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("home-spending-insight")
                 }
@@ -103,8 +104,8 @@ struct CuadraoSpendingChart: View {
     private var emptyTitle: String {
         switch story.state {
         case .firstUse: return spanish ? "Tu historia empieza aquí" : "Your story starts here"
-        case .unavailable: return spanish ? "Falta una parte de la historia" : "Part of the story is missing"
-        case .emptyPeriod: return spanish ? "Sin datos" : "No data"
+        case .unavailable: return spanish ? "Sin datos" : "No data"
+        case .emptyPeriod: return spanish ? "Sin gastos" : "No spending"
         case .populated: return ""
         }
     }

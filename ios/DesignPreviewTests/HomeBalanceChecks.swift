@@ -102,6 +102,12 @@ import Foundation
         check(!unknownStory.covered && unknownStory.previousTotal == nil && unknownStory.changedCategory == nil, "A recorded transaction never proves complete comparison coverage")
         let emptyStory = CanvasSpendingStory(expenses: [], range: .month, offset: 0, coverageStart: start, now: midday)
         check(emptyStory.covered && emptyStory.total == 0 && emptyStory.changedCategory == nil && emptyStory.largestExpense == nil, "Covered empty period has zero and no manufactured highlights")
+        let zeroPrior = CanvasSpendingStory(expenses: [storyRows[2]], range: .month, offset: 0, coverageStart: start, now: midday)
+        check(zeroPrior.comparison != nil && zeroPrior.previousTotal == 0 && zeroPrior.changedCategory == .food,
+              "A covered previous period with no spending is a known zero baseline")
+        let zeroCurrent = CanvasSpendingStory(expenses: [storyRows[0]], range: .month, offset: 0, coverageStart: start, now: midday)
+        check(zeroCurrent.state == .emptyPeriod && zeroCurrent.total == 0 && zeroCurrent.previousTotal == 10 && zeroCurrent.changedCategory == nil,
+              "A covered current period with no spending is a known zero that still compares by amount")
         let shortHistory = CanvasSpendingStory(expenses: storyRows, range: .month, offset: 0, coverageStart: currentMorning, now: midday)
         check(!shortHistory.covered && shortHistory.previousTotal == nil, "Partial current coverage suppresses comparisons")
         let monthEnd = calendar.date(from: DateComponents(year: 2026, month: 5, day: 31, hour: 12))!

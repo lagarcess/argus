@@ -75,13 +75,13 @@ struct CuadraoDesignGallery: View {
                             detail: spanish ? "Tus movimientos darán forma a este espacio." : "Your transactions will give this space its shape.")
                             .accessibilityIdentifier("gallery-empty-state")
                     }
-                    sample(spanish ? "Mes sin registros" : "Month without records") {
-                        CuadraoChartState(title: spanish ? "Sin datos" : "No data",
+                    sample(spanish ? "Mes cubierto sin gastos" : "Covered month without spending") {
+                        CuadraoChartState(title: spanish ? "Sin gastos" : "No spending",
                             detail: spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
                             .accessibilityIdentifier("gallery-empty-month")
                     }
                     sample(spanish ? "Historial incompleto" : "Incomplete history") {
-                        CuadraoChartState(title: spanish ? "Falta una parte de la historia" : "Part of the story is missing",
+                        CuadraoChartState(title: spanish ? "Sin datos" : "No data",
                             detail: spanish ? "El historial de este período está incompleto." : "This period's history is incomplete.")
                             .accessibilityIdentifier("gallery-unavailable-state")
                     }

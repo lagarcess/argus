@@ -48,7 +48,7 @@ counts the Mac run should match:
 | --- | --- |
 | `run_plan_preview.py` | Passed 58 Plan preview checks |
 | `run_group_preview.py` | Passed 50 group preview checks |
-| `run_home_balance.py` | Passed 76 Home balance projection checks |
+| `run_home_balance.py` | Passed 78 Home balance projection checks |
 | `run_receipt_preview.py` | Receipt preview checks passed: 44 |
 | `run_avatar_crop.py` | Avatar crop checks passed: 213 |
 | `run_temporary_chat.py` | 10 `PASS:` lines, Spanish and English |
@@ -111,12 +111,12 @@ The automation doesn't cover these. Record each result in #784.
    Search has no Memory perspective, through the same `CuadraoFirstRelease.shows(.memory)`
    gate. Notifications has no "Por correo". The preview sign-up and sign-in screens show no Apple
    or Google button, and password-recovery help doesn't mention Apple.
-4. **Chart truth.** A month with no records shows "Sin datos" and "—". A month whose
-   records add up to zero shows 0, and a comparison against it is an amount, never a
-   percent. A previous month with no records gets no comparison. **Pending founder
-   decision:** a month with confirmed coverage and no spending currently shows "Sin datos".
-   Lucas is deciding between 0 and "Sin datos", so record what you see without filing it as
-   a bug.
+4. **Chart truth (founder decision, Oct 2).** A month with confirmed coverage and no spending
+   is a known zero. It shows "0.00" and "Sin gastos", and a comparison against it is an amount
+   difference, never a percent. Only missing coverage shows "Sin datos" and "—". First use keeps
+   "Tu historia empieza aquí". `CuadraoHomeChartUITests.testSpendingEmptyAndUnavailable` and
+   `testComparisonAgainstCoveredZeroMonth` cover this (`--insights-empty-month`,
+   `--insights-empty-previous-month`, `--insights-no-coverage`).
 5. **Physical device (optional).** Scan, save for later and reopen a receipt. The design
    branch's founder check covered this on build 3419. This graft hasn't been on a device.
 

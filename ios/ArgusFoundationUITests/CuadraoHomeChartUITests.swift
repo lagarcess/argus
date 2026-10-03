@@ -240,10 +240,12 @@ final class CuadraoHomeChartUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch(extra: ["--insights-empty-month"])
         openActivity(app)
-        // Release rule (fc7650ea): a period with no records shows Sin datos, not a recorded zero.
-        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "—")
-        XCTAssertTrue(app.staticTexts["Sin datos"].exists)
+        // Founder decision (Oct 2): a covered month with no spending is a known 0, not Sin datos.
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        XCTAssertTrue(app.staticTexts["Sin gastos"].exists)
+        XCTAssertFalse(app.staticTexts["Sin datos"].exists)
         XCTAssertTrue(app.staticTexts["Aún no hay gastos registrados en este período."].exists)
+        assertAmountComparison(app, direction: "menos")
         XCTAssertTrue(app.otherElements.matching(identifier: "home-spending-chart").firstMatch.exists)
         app.buttons["home-view-distribution"].tap()
         XCTAssertTrue(app.staticTexts["Aún no hay gastos registrados en este período."].exists)
@@ -253,13 +255,42 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home-highlight-largest"].exists)
         shot(app, "story-empty-month-es")
         app.otherElements.matching(identifier: "home-spending-chart").firstMatch.swipeRight(velocity: .fast)
-        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "—")
+        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "0.00")
         app.terminate()
+        // Only missing coverage shows Sin datos and no amount.
         let unavailable = launch(extra: ["--insights-empty-month", "--insights-no-coverage"])
         openActivity(unavailable)
         XCTAssertEqual(unavailable.staticTexts["home-spending-total"].label, "—")
+        XCTAssertTrue(unavailable.staticTexts["Sin datos"].exists)
         XCTAssertTrue(unavailable.staticTexts["El historial de este período está incompleto. No lo contamos como cero."].exists)
         shot(unavailable, "story-unknown-month-es")
+    }
+    func testComparisonAgainstCoveredZeroMonth() {
+        continueAfterFailure = false
+        // The previous month is covered by the preview's recording window but has no spending.
+        let app = launch(extra: ["--insights-empty-previous-month"])
+        openActivity(app)
+        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        assertAmountComparison(app, direction: "más")
+        shot(app, "story-against-zero-month-es")
+        app.otherElements.matching(identifier: "home-spending-chart").firstMatch.swipeRight(velocity: .fast)
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        XCTAssertTrue(app.staticTexts["Sin gastos"].exists)
+        XCTAssertFalse(app.staticTexts["Sin datos"].exists)
+        shot(app, "story-covered-zero-month-es")
+    }
+    /// A comparison is an amount difference, never a percent. From the 29th on, a shorter previous
+    /// month may have no equivalent point, so only the no-percent rule is checked then.
+    private func assertAmountComparison(_ app: XCUIApplication, direction: String) {
+        let insight = app.staticTexts["home-spending-insight"]
+        guard Calendar.current.component(.day, from: .now) < 29 else {
+            if insight.exists { XCTAssertFalse(insight.label.contains("%"), insight.label) }
+            return
+        }
+        XCTAssertTrue(insight.waitForExistence(timeout: 3))
+        XCTAssertFalse(insight.label.contains("%"), insight.label)
+        let matches = insight.label.hasPrefix("Has registrado el mismo gasto")
+        XCTAssertTrue(matches || (insight.label.hasPrefix("Llevas ") && insight.label.contains(" \(direction) que ")), insight.label)
     }
     func testSpendingHighlightsLargeEnglish() {
         continueAfterFailure = false

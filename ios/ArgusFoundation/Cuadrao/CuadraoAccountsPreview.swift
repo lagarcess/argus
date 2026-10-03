@@ -132,6 +132,12 @@ struct CanvasActivity: Identifiable {
                 let month = Calendar.current.dateInterval(of: .month, for: Date.now)!
                 activity.removeAll { $0.date >= month.start }
             }
+            if ProcessInfo.processInfo.arguments.contains("--insights-empty-previous-month") {
+                // Covered by the recording window above, so the previous month is a known zero.
+                let month = Calendar.current.dateInterval(of: .month, for: Date.now)!
+                let previous = Calendar.current.dateInterval(of: .month, for: month.start.addingTimeInterval(-1))!
+                activity.removeAll { previous.contains($0.date) && $0.date < month.start }
+            }
             if ProcessInfo.processInfo.arguments.contains("--insights-first-use") {
                 activity = []; expenseCoverageStarts = [:]; balanceObservations = []
             }
