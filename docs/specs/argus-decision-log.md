@@ -320,22 +320,23 @@ user trials, no new growth analytics), scoped to invites only.
 - Implementation note, not a new decision: "no user id" above is implemented
   as "no id tied to the person". The foreign keys require a real `auth.users`
   row, so account deletion creates one nameless, banned placeholder user per
-  sharing scope and departed person (Yelena's call, October 2). A household is
-  one scope: every plan and membership-keyed row in it re-keys to that
-  household's single placeholder, because its members already knew it was one
-  person. A shared plan outside any household gets its own placeholder. No
-  placeholder spans more than one household or standalone plan. The
-  "Exmiembro" numbering stays per plan, because it is only a label. The steps
-  are in the
+  household or standalone shared group and departed person (Yelena's call,
+  October 2). A household is one scope: every plan and membership-keyed row in
+  it re-keys to that household's single placeholder, because its members
+  already knew it was one person. Every shared plan sits in a household,
+  because `household_plan_bindings.household_id` is `not null`. No placeholder
+  spans more than one household or group. The "Exmiembro" numbering stays per
+  plan, because it is only a label. The steps are in the
   [lane handoff](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion).
 - A shared debt plan whose owner deletes their account is not handed over,
   because nobody can own another person's debt account. It is archived
-  read-only under the placeholder of the plan's sharing scope. Contributions
-  keep their values and dates under "Exmiembro" / "Former member", and open balances show as a closed line. Participants see
-  Iris's banner on the archived plan and get the usual member note. This is the
-  Head of Engineering's (Yelena's) call on October 2, not a founder lock. It
-  follows decision 17 and Iris's frozen-balance rule. Yelena confirmed it as
-  the one exception to the plan handover in the bullet above.
+  read-only under the placeholder of the plan's household. Contributions keep
+  their values and dates under "Exmiembro" / "Former member", and open
+  balances show as a closed line. Participants see Iris's banner on the
+  archived plan and get the usual member note. This is the Head of
+  Engineering's (Yelena's) call on October 2, not a founder lock. It follows
+  decision 17 and Iris's frozen-balance rule. Yelena confirmed it as the one
+  exception to the plan handover in the bullet above.
 
 ### Outside services
 

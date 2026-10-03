@@ -440,7 +440,7 @@ They identify the missing content without pretending to be records.
 | --- | --- |
 | Current month with missing coverage | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
 | Historical period with missing coverage | Sin datos / No data and neutral past-period copy; keep period navigation |
-| Confirmed complete coverage with zero spending | Show the known zero; distinguish it from missing records. A comparison against it shows the amount difference, not a percent ([October 2 Home comparisons lock](../../../docs/specs/argus-decision-log.md#home-comparisons), clarified 10:18 PM CT) |
+| Confirmed complete coverage with zero spending | Show the known zero; distinguish it from missing coverage. A comparison against it shows the amount difference, not a percent ([October 2 Home comparisons lock](../../../docs/specs/argus-decision-log.md#home-comparisons), clarified 10:18 PM CT) |
 | First use with no history | Welcoming artwork and one working record-entry action |
 | Incomplete or unavailable history | Distinguish unknown from zero; omit unsupported comparison claims |
 | Real records, even one | Real chart immediately; leave future buckets empty |
@@ -852,10 +852,13 @@ Remove the **Por correo / By email** notification toggle. This does not remove
 email authentication or recovery. Household email invitations and update email
 are not in this pass (October 2 lock), so no email invitation delivery is implied.
 Hide Personalization, Security and sessions, Shared conversations, Removed
-activity, Usage, More options, conversation bulk actions and personal-photo
-controls in the initial native release. This list comes from Yelena's UI
-checklist, which the founder implemented in design commit `fc7650ea`. These are
-designed rows whose backend is still owed, not cuts. The first-release switch is
+activity, Memory, Usage, More options, conversation bulk actions and
+personal-photo controls in the initial native release. Design commit `fc7650ea`,
+from Yelena's UI checklist, hides Personalization, Security and sessions, Shared
+conversations, Removed activity and photos. Usage, More options and conversation
+bulk actions are hidden by #786 (`a20362d3`) as a Head of Engineering judgment
+call. Memory (`.memory`) is hidden until native memory arrives with its
+controls. These are designed rows whose backend is still owed, not cuts. The first-release switch is
 meant to hide them only in release builds; development builds show every row.
 Yelena is ordering their backends after chat. **Por correo / By email** stays
 removed because Updates go to the inbox and push only. Keep initials,

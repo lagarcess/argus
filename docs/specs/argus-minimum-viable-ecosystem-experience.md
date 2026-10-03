@@ -673,10 +673,13 @@ The September 28 mobile lock keeps Personal details above three groups: App (Pre
 
 For the October 2 native release pivot, identity uses initials and avatar themes.
 Hide personal photos, Personalization, Security and sessions, Shared
-conversations, Removed activity, Usage, More options and conversation bulk
-actions until their connected native features are assigned. This list comes from
-Yelena's UI checklist, which the founder implemented in design commit `fc7650ea`.
-These are designed rows whose backend is still owed, not cuts, and Yelena is
+conversations, Removed activity, Memory, Usage, More options and conversation
+bulk actions until their connected native features are assigned. Design commit
+`fc7650ea`, from Yelena's UI checklist, hides Personalization, Security and
+sessions, Shared conversations, Removed activity and photos. Usage, More options
+and conversation bulk actions are hidden by #786 (`a20362d3`) as a Head of
+Engineering judgment call. Memory (`.memory`) is hidden until native memory
+arrives with its controls. These are designed rows whose backend is still owed, not cuts, and Yelena is
 ordering their backends after chat. The first-release switch is meant to hide them
 only in release builds, with every row shown in development builds; today
 `CuadraoFirstRelease` hides them in every build. This does not remove them from
