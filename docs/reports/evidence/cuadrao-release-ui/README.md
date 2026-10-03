@@ -4,6 +4,37 @@ UI handoff, October 2, 2026. This checkpoint implements the founder's 17-item
 presentation scope and the subsequent avatar correction. It does not establish
 external TestFlight readiness or connected service acceptance.
 
+## Combined preview update for build 3420
+
+PR #786 is included through integration `0ea81a208668e0391aaf008412716f6cae38826c`.
+Reconciliation commit `a73c331f` includes the full Home, Search, Updates, Profile
+and Settings preview, alongside #790's release views. Source/test checkpoint
+`519cfa5f` passed the [combined native journeys](combined-preview-tests.json).
+
+The preview and connected Profile now use one avatar selection/renderer and one
+photo decoding/crop implementation. Photos are available in the full preview;
+none keeps the tab icon, while settings show the camera circle. The full profile
+editor retains name and preferred-name editing. Hold Home's greeting →
+**Revisión de lanzamiento / Release UI review** to inspect pending release flows.
+
+The confirmed-zero rule is reconciled across hero, comparison and averages.
+Explicit continuous coverage with no expenses means zero, even with no expense
+rows; missing coverage cannot manufacture zero. Comparisons report an amount,
+never a percentage. All 80 Home projection checks passed on the combined source.
+The 25 Updates and identity checks retain their unchanged-source evidence.
+Modularity and whitespace checks passed after reconciliation.
+
+- [Full Profile empty state](full-profile-empty-es.png)
+- [Full Profile selected avatar](full-profile-theme-es.png)
+- [Home with selected avatar](full-home-theme-es.png)
+- [Shared photo crop](combined-photo-crop-dark-en.png)
+- [Shared photo tab](combined-photo-tab-dark-en.png)
+
+The signed iPhone build 3420 succeeded for the existing Cuadrao Preview bundle.
+Wireless installation initially failed with Apple's RSD connection error; device
+installation is not yet claimed. No provisioning or trust settings were changed.
+The user's phone-unlock/reconnection response is pending.
+
 ## Review entry
 
 Build ArgusFoundation in Debug with `CUADRAO_DESIGN_PREVIEW=true`, then launch
@@ -75,7 +106,7 @@ not temporary-only evidence. This applies Prove It Works to the native result.
 | [Bill notice](bill-notice-es.png) / [data truth](no-data-moved-history-es.png) | Reminder detail and no-data/read-only specimens |
 | [AI consent](ai-consent-en.png) | Scoped sharing explanation and decline action |
 
-## Integration and review disposition
+## Initial integration and review disposition
 
 - Original integration base: `58ace0f74d81df41f23244a82ad98ad1c736f061`.
 - Current fetched integration: `900178b32df1b25a08f8d15bdbbe82485ae61c80`.

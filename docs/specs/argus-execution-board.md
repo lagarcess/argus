@@ -2767,7 +2767,12 @@ Do not replace them with `CuadraoHouseholdSheet`, fictional invite acceptance,
 preview branch to obtain the style.
 
 **Implementation base:** `58ace0f74d81df41f23244a82ad98ad1c736f061`, including
-shared foundations #783 and the updated six-lane contracts #782.
+shared foundations #783 and the updated six-lane contracts #782. The combined
+3420 preview now incorporates #786 at `0ea81a208`; #790 owns the release UI delta,
+shared avatar correction and confirmed-coverage zero-month reconciliation.
+Confirmed coverage with no spending counts as zero without requiring expense rows;
+missing coverage stays unknown. The linked evidence distinguishes simulator,
+signed build and physical installation status.
 
 Existing `ConnectedCuadraoAuthFlow` handles email auth; Apple is hidden and Google
 is not a connected native choice. The founder now explicitly chose **Apple and
