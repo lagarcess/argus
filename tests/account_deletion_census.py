@@ -126,24 +126,33 @@ class ForeignKey:
             )
         if all(c.endswith("membership_id") for c in owners):
             return (
-                "Keyed by membership id, not user id: it keeps pointing at the "
-                "placeholder membership row once that row's `user_id` is re-keyed "
-                "to the person's tombstone `auth.users` row (not nulled)."
+                "Keyed by membership id, not user id: re-point it to the "
+                "placeholder membership of its own plan, keyed to that plan's "
+                "placeholder `auth.users` row (never nulled)."
+            )
+        if len(self.columns) == 1:
+            return (
+                f"Single-column key to `{self.referenced.removeprefix('public.')}`, "
+                "not a composite owner key. The row follows that parent: it goes "
+                "with the person's own rows, or is re-pointed to a placeholder's "
+                "parent row."
             )
         if self.on_update == "CASCADE":
             return "Follows the parent's owner id through ON UPDATE CASCADE."
         if self.deferrable:
             return (
-                f"Composite owner key, ON UPDATE {self.on_update}, deferrable: both "
-                "sides can change owner id in one transaction. The new id must still "
+                f"Composite owner key, ON UPDATE {self.on_update}, deferrable: "
+                "copy the parent under the new owner, re-point the children and "
+                "delete the original in one transaction. The new id must still "
                 "reach `auth.users` through the parent."
             )
         return (
             f"Composite owner key, ON UPDATE {self.on_update}, not deferrable: "
             "neither side can change its owner id first. Moving it, to a new plan "
-            "owner or a placeholder, needs this key made DEFERRABLE INITIALLY "
-            "IMMEDIATE (not ON UPDATE CASCADE). The new id must also reach "
-            "`auth.users` through the parent."
+            "owner or a per-plan placeholder, needs this key made DEFERRABLE "
+            "INITIALLY IMMEDIATE (not ON UPDATE CASCADE): copy the parent under "
+            "the new owner, re-point the children, delete the original. The new "
+            "id must also reach `auth.users` through the parent."
         )
 
 

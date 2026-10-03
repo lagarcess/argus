@@ -709,6 +709,17 @@ def test_deleting_a_sharing_user_reports_every_blocker_and_cascade(lane):  # noq
         assert all(item.blocks for kind, item in blockers if kind == "fk")
         assert HANDOFF_BLOCKERS <= blocking_keys, HANDOFF_BLOCKERS - blocking_keys
         assert CATALOG_ONLY_RESTRICT not in blocking_keys
+        # The record-owner key is NO ACTION and initially deferred, so it fires
+        # only because the probe runs `set constraints all immediate`. If that
+        # line goes, the rolled-back delete never reaches the commit-time check.
+        deferred = {
+            item.name
+            for kind, item in blockers
+            if kind == "fk" and item.initially_deferred
+        }
+        assert (
+            "financial_activity_original_record_revision" in deferred
+        ), "no deferred key fired: the probe must run `set constraints all immediate`"
         kinds = {kind for kind, _ in blockers}
         # Beyond keys: the foreign-leg trigger and the active-household admin check.
         assert {"fk", "trigger", "check"} <= kinds
