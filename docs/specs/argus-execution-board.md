@@ -2739,7 +2739,14 @@ on integration. This register is the sole future-work queue.
 
 ### Cuadrao release UI landing order
 
-**Founder pivot, October 2, 2026. UI implementation in progress on `codex/cuadrao-release-ui`.**
+**Founder pivot, October 2, 2026. UI handoff implemented on `codex/cuadrao-release-ui`; connected graft remains open.**
+The [UI checkpoint and evidence](../reports/evidence/cuadrao-release-ui/README.md)
+records shared presentation states, native journeys and service dependencies.
+Review fixtures launch with `--cuadrao-release-ui` in DEBUG builds. The actual
+connected Profile uses the avatar editor and signed-in legal links; actual
+Household management uses the shared invitation/QR presentation. Pending auth,
+delete, admission, inbox delivery, moves, AI, sources and memory operations still
+require their service owners. This is not external-TestFlight acceptance.
 This is the current remaining-design queue. It refines C01–C10 below rather than
 creating another roadmap. Earlier preview screenshots and build 3419 acceptance
 remain valid historical evidence; they do not prove the release behaviors below.
