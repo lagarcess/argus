@@ -129,7 +129,7 @@ def _extras(lane, world):  # noqa: ANN001, F811
     solo = _plan_as(s1, a, amid, "bill", [], [(amid, "100")], _bill(aa))
 
     # C comes back to H1; B's plan has both A and C paying, so once both are
-    # deleted it shows "Exmiembro 1" and "Exmiembro 2".
+    # deleted it shows "Former member 1" and "Former member 2" ("Exmiembro").
     c = world["c"]
     cmid = accept(s1, c, invitation(s1, a))
     with psycopg.connect(DSN) as conn:
@@ -457,26 +457,38 @@ def test_deleting_a_sharing_person_keeps_everyone_elses_history(lane, world):  #
             ).fetchall()
         }
         assert {"member_deleted", "plan_handed_over"} <= events
-    # The handed-over plans are B's to edit, and A shows as Exmiembro.
+    # The handed-over plans are B's to edit, and A shows as a former member
+    # (B has no profile language, so English).
     snapshot = plans.snapshot(b, h1)
     owned = [p for p in snapshot["plans"] if p["is_owner"] and not p["read_only"]]
     assert len(owned) >= 4
     names = _names(snapshot)
-    assert "Alice" not in names and any(n.startswith("Exmiembro") for n in names), names
+    assert "Alice" not in names and any(
+        n.startswith("Former member") for n in names
+    ), names
 
     # C is deleted too: in the plan both of them were in, they are numbered.
     c_admin = SqlAuthAdmin(after_create=_side_effect_free)
     assert _service(lane, c_admin).delete_account(user_id=world["c"]).status == "done"
     world["placeholders"] += c_admin.created
-    pair = [
-        p
-        for p in plans.snapshot(b, h1)["plans"]
-        if p["ref"]["id"] == world["pair"]["ref"]["id"]
-    ][0]
-    assert {c["person"]["display_name"] for c in pair["contributions"]} == {
-        "Exmiembro 1",
-        "Exmiembro 2",
-    }
+
+    def pair_names() -> set[str]:
+        pair = [
+            p
+            for p in plans.snapshot(b, h1)["plans"]
+            if p["ref"]["id"] == world["pair"]["ref"]["id"]
+        ][0]
+        return {c["person"]["display_name"] for c in pair["contributions"]}
+
+    assert pair_names() == {"Former member 1", "Former member 2"}
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        conn.execute(
+            "insert into public.profiles(id,email,language)"
+            " select id,email,'es-419' from auth.users where id=%s"
+            " on conflict (id) do update set language='es-419'",
+            (b,),
+        )
+    assert pair_names() == {"Exmiembro 1", "Exmiembro 2"}
 
     # Rerunning is a no-op, and placeholders are refused.
     assert _service(lane, SqlAuthAdmin()).delete_account(user_id=a).status == "done"
@@ -726,20 +738,68 @@ def test_definers_need_the_deletion_writer_and_copies_keep_history(lane, world):
     assert before and set(before) <= set(after)
 
 
-def test_rejects_bad_ids_unknown_people_and_guests(lane):  # noqa: F811
+def test_rejects_bad_ids_and_unknown_people(lane):  # noqa: F811
     service = _service(lane, SqlAuthAdmin())
     for bad in ("", "not-a-uuid", str(uuid.uuid4())):
         with pytest.raises(AccountDeletionRejected):
             service.delete_account(user_id=bad)
+
+
+def test_a_guest_is_deleted_by_the_same_command(lane):  # noqa: F811
     guest = str(uuid.uuid4())
     with psycopg.connect(DSN, autocommit=True) as c:
         c.execute("insert into auth.users(id,is_anonymous) values (%s,true)", (guest,))
+        c.execute("insert into public.profiles(id) values (%s)", (guest,))
+        c.execute(
+            "insert into public.conversations(user_id,title) values (%s,'Guest')",
+            (guest,),
+        )
+    admin = SqlAuthAdmin()
     try:
-        with pytest.raises(AccountDeletionRejected, match="guest"):
-            service.delete_account(user_id=guest)
+        outcome = _service(lane, admin).delete_account(user_id=guest)
+        assert outcome.status == "done" and admin.creates == 0
+        with psycopg.connect(DSN) as c:
+            assert not c.execute(
+                "select 1 from auth.users where id=%s", (guest,)
+            ).fetchone()
+            assert _rows_holding(c, guest) == []
     finally:
         with psycopg.connect(DSN, autocommit=True) as c:
             c.execute("delete from auth.users where id=%s", (guest,))
+
+
+def test_duplicate_requests_reserve_one_placeholder_per_scope(lane, world):  # noqa: F811
+    import threading
+
+    a = world["a"]
+    admin = SqlAuthAdmin()
+    service = _service(lane, admin)
+    service._open_run(a, subject_hash(a))  # noqa: SLF001
+    errors: list[BaseException] = []
+
+    def reserve() -> None:
+        try:
+            service._reserve_placeholders(a, subject_hash(a))  # noqa: SLF001
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=reserve) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    world["placeholders"] += admin.created
+    assert errors == []
+    with psycopg.connect(DSN) as c:
+        rows = c.execute(
+            "select scope_kind, scope_id, count(*) from argus_private.account_deletion_placeholders"
+            " where subject_hash=%s group by 1, 2",
+            (subject_hash(a),),
+        ).fetchall()
+    assert rows and all(n == 1 for _, _, n in rows)
+    assert len(set(admin.created)) == len(rows)
+    # The run then finishes with the placeholders it reserved.
+    assert service.delete_account(user_id=a).status == "done"
 
 
 def test_auth_user_trigger_conditions_need_no_private_schema() -> None:

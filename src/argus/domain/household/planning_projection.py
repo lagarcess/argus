@@ -196,7 +196,7 @@ def person(people, mid):
 def public(
     c, repository, b, body, people, actor, mid, auth_version, access, canonical, today
 ):
-    people = store.plan_people(c, b, people)
+    people = store.plan_people(c, b, people, store.viewer_language(c, actor))
     claimed = links(c, b)
     actual = actuals(c, b, canonical, claimed)
     readonly = bool(b["departed_at"] or body["archived"])

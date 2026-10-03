@@ -103,11 +103,22 @@ def members(c: Any, hid: str) -> dict[str, dict]:
     }
 
 
-def plan_people(c: Any, b: dict, people: dict) -> dict:
-    """Former members (deleted accounts) are numbered per plan: "Exmiembro"
-    when the plan shows one, "Exmiembro 1", "Exmiembro 2" when it shows
-    several. Only former members the plan shows (as owner, contributor or
-    with a responsibility) count; ended participations are not shown."""
+FORMER_MEMBER = {"en": "Former member", "es-419": "Exmiembro"}
+
+
+def viewer_language(c: Any, user_id: str) -> str:
+    row = c.execute(
+        "select language from public.profiles where id = %s", (user_id,)
+    ).fetchone()
+    return row[0] if row and row[0] in FORMER_MEMBER else "en"
+
+
+def plan_people(c: Any, b: dict, people: dict, language: str = "en") -> dict:
+    """Former members (deleted accounts) are numbered per plan, in the
+    viewer's language: "Former member" / "Exmiembro" when the plan shows one,
+    "Former member 1", "Exmiembro 2" and so on when it shows several. Only
+    former members the plan shows (as owner, contributor or with a
+    responsibility) count; ended participations are not shown."""
 
     rows = c.execute(
         """select m.id from public.household_members m
@@ -133,7 +144,8 @@ def plan_people(c: Any, b: dict, people: dict) -> dict:
     renamed = dict(people)
     for number, (mid,) in enumerate(rows, start=1):
         if str(mid) in renamed:
-            name = "Exmiembro" if len(rows) == 1 else f"Exmiembro {number}"
+            label = FORMER_MEMBER.get(language, FORMER_MEMBER["en"])
+            name = label if len(rows) == 1 else f"{label} {number}"
             renamed[str(mid)] = dict(renamed[str(mid)], display_name=name)
     return renamed
 
