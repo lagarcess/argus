@@ -9,23 +9,32 @@ credentials. The Admin API is a fake that runs SQL on auth.users, here only.
 from __future__ import annotations
 
 import json
+import secrets
 import uuid
 
 import psycopg
 import pytest
 from argus.domain.account_deletion.auth_admin import PLACEHOLDER_DOMAIN
 from argus.domain.account_deletion.service import (
+    AccountDeletionIncomplete,
     AccountDeletionRejected,
     AccountDeletionService,
     subject_hash,
 )
+from argus.domain.apple_sign_in.client import AppleAuthClient
+from argus.domain.apple_sign_in.credentials import AppleCredentialService
+from argus.domain.apple_sign_in.credentials_postgres import (
+    PostgresAppleCredentialRepository,
+)
 from argus.domain.household.planning import SharedPlanningService
 from argus.domain.household.schemas import CreateHouseholdRequest
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
+from argus.domain.ingestion.secrets import SecretBox
 from argus.observability.analytics_deletion import RecordingAnalyticsDeletion
 from argus.observability.product_events import actor_hash_for_user
 from psycopg_pool import ConnectionPool
 
+from tests import apple_sign_in_support as apple_support
 from tests.account_deletion_census import sweep
 from tests.household.financial_fixtures import DSN, NOW, account, key
 from tests.household.financial_fixtures import command as household_command
@@ -52,8 +61,7 @@ class Crash(Exception):
 class SqlAuthAdmin:
     """Test-only stand-in for the Supabase Admin API."""
 
-    def __init__(self, *, providers=(), crash_on_delete=0, after_create=None):  # noqa: ANN001
-        self.providers = set(providers)
+    def __init__(self, *, crash_on_delete=0, after_create=None):  # noqa: ANN001
         self.crash_on_delete = crash_on_delete
         self.after_create = after_create
         self.created: list[str] = []
@@ -79,9 +87,6 @@ class SqlAuthAdmin:
                 c.execute("select 1 from auth.users where id=%s", (user_id,)).fetchone()
             )
 
-    def identity_providers(self, user_id: str) -> set[str]:
-        return set(self.providers)
-
     def delete_user(self, user_id: str) -> None:
         if self.crash_on_delete:
             self.crash_on_delete -= 1
@@ -101,12 +106,13 @@ class FakeRevoker:
         return "failed" if source in self.fail else "revoked"
 
 
-def _service(lane, admin, revoker=None, analytics=None):  # noqa: ANN001, F811
+def _service(lane, admin, revoker=None, analytics=None, apple=None):  # noqa: ANN001, F811
     return AccountDeletionService(
         households=lane[0]._repository,
         auth_admin=admin,
         revoker=revoker or FakeRevoker(),
         analytics=analytics or RecordingAnalyticsDeletion(),
+        apple=apple,
         clock=lambda: NOW,
     )
 
@@ -502,23 +508,184 @@ def test_a_crash_between_placeholders_and_the_auth_delete_resumes(lane, world): 
 
 def test_failed_provider_revokes_stay_pending_until_a_retry(lane, world):  # noqa: F811
     a = world["a"]
-    admin = SqlAuthAdmin(providers={"apple"})
+    admin = SqlAuthAdmin()
     outcome = _service(lane, admin, FakeRevoker(fail={"gmail"})).delete_account(user_id=a)
     world["placeholders"] += admin.created
     assert outcome.status == "auth_deleted"
-    assert sorted(outcome.pending) == ["apple", "gmail"]
+    assert outcome.pending == ["gmail"]
     with psycopg.connect(DSN) as conn:
         pending = conn.execute(
             "select provider, secret_ciphertext is not null from argus_private.account_deletion_revocations"
             " where subject_hash=%s and status='pending' order by provider",
             (subject_hash(a),),
         ).fetchall()
-        assert pending == [("apple", False), ("gmail", True)]
+        assert pending == [("gmail", True)]
     retry = FakeRevoker()
     outcome = _service(lane, SqlAuthAdmin(), retry).delete_account(user_id=a)
     assert [c[0] for c in retry.calls] == ["gmail"]
-    # Apple has no revoke path yet: it fails safe and stays owed.
-    assert outcome.status == "auth_deleted" and outcome.pending == ["apple"]
+    assert outcome.status == "done" and outcome.pending == []
+
+
+class _Apple:
+    """#793's real AppleCredentialService over the real table, with a scripted
+    Apple endpoint."""
+
+    def __init__(self, revoke_responses):  # noqa: ANN001
+        key = apple_support.generated_key()
+        self.fake = apple_support.FakeApple(
+            public_key=key.public_key(), revoke_responses=list(revoke_responses)
+        )
+        self.box = SecretBox(secrets.token_bytes(32))
+        self.pool = ConnectionPool(DSN, min_size=0, max_size=2, open=True)
+        self.service = AppleCredentialService(
+            PostgresAppleCredentialRepository(self.pool),
+            box=self.box,
+            client=AppleAuthClient(
+                apple_support.config(key),
+                transport=self.fake.transport(),
+                sleep=lambda _s: None,
+            ),
+            clock=lambda: NOW,
+        )
+
+    def store(self, user_id: str, *, box: SecretBox | None = None) -> None:
+        sealed = (box or self.box).seal(
+            "r.apple-refresh-0", source="apple_sign_in", connection_id=user_id
+        )
+        self.service.repository.upsert(
+            user_id=user_id,
+            client_id=apple_support.BUNDLE_ID,
+            secret_ciphertext=sealed,
+            now=NOW,
+        )
+
+    def close(self) -> None:
+        self.service.close()
+        self.pool.close()
+
+
+def _apple_state(user_id: str) -> tuple[bool, bool, str | None, str | None]:
+    with psycopg.connect(DSN) as conn:
+        stored = conn.execute(
+            "select 1 from public.apple_sign_in_credentials where user_id=%s", (user_id,)
+        ).fetchone()
+        user = conn.execute("select 1 from auth.users where id=%s", (user_id,)).fetchone()
+        run = conn.execute(
+            "select status, steps->>'apple_revoke' from argus_private.account_deletion_runs"
+            " where subject_hash=%s",
+            (subject_hash(user_id),),
+        ).fetchone()
+    return bool(stored), bool(user), run[0], run[1]
+
+
+@pytest.mark.parametrize(
+    ("answer", "step"),
+    [((200, None), "revoked"), ((400, {"error": "invalid_grant"}), "already_revoked")],
+)
+def test_apple_is_revoked_before_the_account_delete(lane, world, answer, step):  # noqa: F811
+    a = world["a"]
+    apple = _Apple([answer])
+    try:
+        apple.store(a)
+        admin = SqlAuthAdmin()
+        outcome = _service(lane, admin, apple=apple.service).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+    finally:
+        apple.close()
+    assert outcome.status == "done"
+    assert [path for path, _ in apple.fake.calls] == ["/auth/revoke"]
+    stored, user, status, recorded = _apple_state(a)
+    assert (stored, user, status, recorded) == (False, False, "done", step)
+
+
+def test_a_transient_apple_failure_holds_the_account_delete(lane, world):  # noqa: F811
+    a = world["a"]
+    apple = _Apple([(400, {"error": "invalid_request"})])
+    try:
+        apple.store(a)
+        admin = SqlAuthAdmin()
+        with pytest.raises(AccountDeletionIncomplete):
+            _service(lane, admin, apple=apple.service).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+        # The data is gone, the account waits for Apple, the token is kept.
+        assert _apple_state(a) == (True, True, "data_deleted", "pending")
+        assert admin.deleted == []
+        # No Apple service on this process: still pending, never dropped.
+        with pytest.raises(AccountDeletionIncomplete):
+            _service(lane, SqlAuthAdmin()).delete_account(user_id=a)
+        assert _apple_state(a)[:3] == (True, True, "data_deleted")
+        # The retry gets Apple's 200 and finishes.
+        retry = SqlAuthAdmin()
+        assert (
+            _service(lane, retry, apple=apple.service).delete_account(user_id=a).status
+            == "done"
+        )
+        assert retry.creates == 0
+    finally:
+        apple.close()
+    assert _apple_state(a) == (False, False, "done", "revoked")
+
+
+def test_an_unreadable_apple_token_is_recorded_unrecoverable(lane, world):  # noqa: F811
+    a = world["a"]
+    apple = _Apple([])
+    try:
+        # Sealed under a key this process no longer has: the key rotated.
+        apple.store(a, box=SecretBox(secrets.token_bytes(32)))
+        admin = SqlAuthAdmin()
+        with pytest.raises(AccountDeletionIncomplete, match="apple_discard_unavailable"):
+            _service(lane, admin, apple=apple.service).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+        assert apple.fake.calls == []
+        # TODO(#793 discard follow-up): once the owner-only discard function
+        # lands, the row is discarded here and the run finishes.
+        assert _apple_state(a) == (True, True, "data_deleted", "unrecoverable")
+        # Stand-in for that discard: once the row is gone the run finishes and
+        # keeps the unrecoverable record.
+        with psycopg.connect(DSN, autocommit=True) as conn:
+            conn.execute(
+                "delete from public.apple_sign_in_credentials where user_id=%s", (a,)
+            )
+        outcome = _service(lane, SqlAuthAdmin(), apple=apple.service).delete_account(
+            user_id=a
+        )
+        assert outcome.status == "done"
+        assert _apple_state(a) == (False, False, "done", "unrecoverable")
+    finally:
+        apple.close()
+
+
+def test_sender_refs_rotate_to_a_distinct_value_per_row(lane, world):  # noqa: F811
+    a = world["a"]
+    with psycopg.connect(DSN) as conn:
+        before = {
+            str(i): (str(ref), origin)
+            for i, ref, origin in conn.execute(
+                "select id, sender_ref, inviter_origin_id from public.invite_referrals"
+                " where sender_user_id=%s",
+                (a,),
+            ).fetchall()
+        }
+    assert len(before) >= 2
+    admin = SqlAuthAdmin()
+    _service(lane, admin).delete_account(user_id=a)
+    world["placeholders"] += admin.created
+    with psycopg.connect(DSN) as conn:
+        after = {
+            str(i): (str(ref), origin, sender)
+            for i, ref, origin, sender in conn.execute(
+                "select id, sender_ref, inviter_origin_id, sender_user_id"
+                " from public.invite_referrals where id = any(%s::uuid[])",
+                (list(before),),
+            ).fetchall()
+        }
+    assert set(after) == set(before)
+    refs = [ref for ref, _, _ in after.values()]
+    assert len(set(refs)) == len(refs)
+    old = {ref for ref, _ in before.values()}
+    for row, (ref, origin, sender) in after.items():
+        assert ref not in old and sender is None
+        assert origin == before[row][1]
 
 
 def test_definers_need_the_deletion_writer_and_copies_keep_history(lane, world):  # noqa: F811

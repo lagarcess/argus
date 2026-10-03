@@ -24,12 +24,14 @@ struct CuadraoCreateAccount: View {
                                 : "Your accounts and plans, in one place."))
                     Spacer(minLength: 64)
                     VStack(spacing: 14) {
-                        PreviewAppleButton(dark: colorScheme == .dark) {
-                            previewAction = spanish ? "Continuar con Apple" : "Continue with Apple"
+                        if CuadraoFirstRelease.showsSocialSignIn {
+                            PreviewAppleButton(dark: colorScheme == .dark) {
+                                previewAction = spanish ? "Continuar con Apple" : "Continue with Apple"
+                            }
+                            .id(colorScheme)
+                            .frame(height: 56)
+                            .accessibilityIdentifier(signingIn ? "cuadrao.signin.apple" : "cuadrao.signup.apple")
                         }
-                        .id(colorScheme)
-                        .frame(height: 56)
-                        .accessibilityIdentifier(signingIn ? "cuadrao.signin.apple" : "cuadrao.signup.apple")
                         NavigationLink {
                             if signingIn {
                                 CuadraoEmailSignIn(spanish: spanish)

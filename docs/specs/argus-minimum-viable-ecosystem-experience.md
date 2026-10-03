@@ -671,12 +671,20 @@ Own app preferences, notification preferences, security, data controls, export a
 
 The September 28 mobile lock keeps Personal details above three groups: App (Preferences, Personalization, Notifications), Account (Security, Data & privacy, Usage), and Support (Help & feedback). Language lives only in Preferences. Personal details offers an avatar theme or profile photo; response preferences remain distinct from remembered context and financial records. Light, Dark and System persist as appearance preferences.
 
-For the October 2 native release pivot (founder design direction, design commit
-`fc7650ea`), identity uses initials and avatar themes. Hide personal photos,
-Personalization, Security and sessions, Shared conversations, and Removed activity
-until their connected native features are assigned. This hides rows and the photo
-option in the first native release; it does not remove them from the September 28
-grouping. Remove only the notification preference named Por correo. This does not
+For the October 2 native release pivot, identity uses initials and avatar themes.
+Hide personal photos, Personalization, Security and sessions, Shared
+conversations, Removed activity, Memory, Usage, More options and conversation
+bulk actions until their connected native features are assigned. Design commit
+`fc7650ea`, from Yelena's UI checklist, hides Personalization, Security and
+sessions, Shared conversations, Removed activity and photos. Usage, More options
+and conversation bulk actions are hidden by #786 (`a20362d3`) as a Head of
+Engineering judgment call. Memory (`.memory`) is hidden until native memory
+arrives with its controls. These are designed rows whose backend is still owed, not cuts, and Yelena is
+ordering their backends after chat. The first-release switch is meant to hide them
+only in release builds, with every row shown in development builds; today
+`CuadraoFirstRelease` hides them in every build. This does not remove them from
+the September 28 grouping. Remove only the notification preference named Por
+correo, because Updates go to the inbox and push only. This does not
 remove email authentication or recovery. Household email invitations and update
 email are not in this pass, per the [October 2 lane
 locks](argus-decision-log.md#october-2-2026-cuadrao-lane-locks). Keep legal links
@@ -690,11 +698,13 @@ The founder's next UI assignment prioritizes external TestFlight readiness and
 invites/Household. It supersedes conflicting native preview choices, not current
 production web guest entry or technical contracts. New native users enter with an
 invitation code, link or QR; people without access can reach the cuadrao.ai waitlist.
-Existing admitted users retain sign-in/recovery. The founder's design direction
-adds Apple and Google alongside email. That is not yet recorded as a lock, and the
-[lane handoff](lanes/mvee-five-lane-handoff.md#still-open) still lists Sign in with
-Apple as open. Design their full states, and expose connected buttons only once
-the founder's choice and the connected path are both settled.
+Existing admitted users retain sign-in/recovery. Sign-in for TestFlight is Apple,
+Google and email ([October 2 founder
+decision](argus-decision-log.md#sign-in-for-testflight)). Email works with any
+address and has an in-app confirmation step; today's email sign-up instead ends on
+a confirmation link. Apple and Google are built behind default-off flags until the
+founder supplies the keys, and connected buttons stay hidden while a flag is off.
+Design their full states.
 
 Personal app invitations have a ten-invite quota. Household invitations are
 administrator-only, do not consume that quota, and also admit a new person to the
@@ -709,8 +719,11 @@ longest-standing remaining member (the household closes if no one is left), and
 removal of the household's locked copy of that owner's history. In plans other
 people own, the person's amounts stay under a nameless "Exmiembro" / "Former member"
 placeholder, open balances with them are frozen as a closed line, and shared plans
-they created pass to the longest-standing participant. These follow the October 2
-locks; the wording is Iris's founder-locked copy in the
+they created pass to the longest-standing participant. A shared debt plan they
+created is instead archived read-only with a banner, because nobody can own another
+person's debt account (the Head of Engineering's call, recorded in the [decision
+log](argus-decision-log.md#deleting-an-account-in-a-household)). These follow the
+October 2 locks; the wording is Iris's founder-locked copy in the
 [lane handoff](lanes/mvee-five-lane-handoff.md#copy-founder-locked-iriss-wording).
 Present only applicable consequences, then verification, confirmed completion and
 sign-out. This is requested behavior, not a claim that the existing support-request
@@ -719,14 +732,16 @@ the connected contract. Ordinary household leave/removal and financial archive
 retain their own semantics.
 
 Updates includes invitation acceptance, administrator handoff, owner-history
-removal and household closure. The lane contract so far assigns invitation
-acceptance and the account-deletion notices; administrator handoff and household
-closure notices still need a lane. Bill reminders occur three days before and on
+removal and household closure. The lane that causes an event writes its Updates
+entry: Household writes the closure when the last member leaves, and account
+deletion writes the administrator handoff and any closure it causes. The Updates
+lane owns only display and the push opt-in
+([lane contract](lanes/mvee-five-lane-handoff.md#contracts-between-lanes)). Bill reminders occur three days before and on
 the due date while still due; push previews contain no amounts. A moved account's
 authorized pre-move household history is read-only and visibly distinguished.
-Only a period with no records at all shows Sin datos. A month with a real zero is
-data and still shows, and a comparison with it uses an amount difference rather
-than a percent ([Home comparisons lock](argus-decision-log.md#home-comparisons)).
+A month with confirmed complete coverage and no spending is a known zero and shows
+0. Sin datos shows only when coverage is missing. A comparison with a known-zero
+month uses an amount difference rather than a percent ([Home comparisons lock](argus-decision-log.md#home-comparisons)).
 
 Explicit AI disclosure/consent must precede the first sharing of personal data
 with an external model. It ships with that feature, including if live chat lands

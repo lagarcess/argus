@@ -55,10 +55,10 @@ create index beta_invitations_sender_idx
 
 -- 3. A random, per-person sender reference. At account deletion the one
 -- Household-owned writer (argus_private.forget_invite_party, Lane 6) rotates
--- the deleted sender's sender_ref on their rows to one fresh value and drops
--- this mapping row, so the reference left on the record identifies nobody.
--- That intentionally ends the per-user invite count for the deleted sender;
--- their invites stay countable as one anonymous sender. Comment only: Lane 6
+-- sender_ref on the deleted sender's rows (a distinct fresh sender_ref per
+-- row; inviter_origin_id chain unchanged) and drops this mapping row, so
+-- nothing left identifies them or groups their invites. That intentionally
+-- ends the per-user invite count for the deleted sender. Comment only: Lane 6
 -- corrected the earlier claim that the kept reference preserves those counts.
 create table public.invite_sender_refs (
     user_id uuid primary key references auth.users(id) on delete cascade,

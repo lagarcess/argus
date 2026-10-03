@@ -2785,6 +2785,44 @@ well when it is closed.
 }
 ```
 
+## `POST /auth/apple/authorization-code`
+
+Default-off behind `ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED`. The native app
+calls it right after a Sign in with Apple through Supabase Auth's ID-token
+sign-in, under that new session, with Apple's one-time authorization code. The
+API exchanges the code at Apple, checks that the returned identity token's
+`sub` is the Apple identity Supabase linked to this user, and keeps only the
+refresh token, sealed with `ARGUS_INGESTION_SECRET_KEY`, so account deletion
+can revoke it (App Store Review Guideline 5.1.1(v)). The user id comes only
+from the verified session; the body accepts no other field.
+
+**Request:**
+```json
+{
+  "authorization_code": "Apple authorizationCode, 1–512 ASCII characters"
+}
+```
+
+**Response:** `204 No Content`. No response carries a token.
+
+| Status | `code` | Meaning |
+| --- | --- | --- |
+| 404 | `apple_token_capture_unavailable` | Flag off. Answered before authentication |
+| 503 | `apple_sign_in_unconfigured` | Flag on, but an Apple client-secret input, the credential key or durable storage is missing. Fails closed |
+| 401 / 403 | `unauthorized` / `account_conversion_required` | No session, or a guest session |
+| 409 | `apple_identity_missing` | The account has no Apple identity |
+| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple |
+| 400 | `apple_authorization_invalid` | Apple says the code expired, was used, or is malformed |
+| 429 | `too_many_requests` | Five attempts per user per ten minutes |
+| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple, and the next Apple sign-in sends a fresh code) |
+
+A later sign-in replaces the stored token without revoking the old one,
+because revoking any token ends the whole Apple authorization for the app.
+No route revokes. Account deletion (Lane 6) calls
+`AppleCredentialService.revoke`, which deletes the row only after Apple
+answers 200 and keeps it as the pending revoke otherwise. Storage is in
+[DATA_MODEL.md](DATA_MODEL.md#apple-sign-in-credentials).
+
 ## `POST /auth/logout`
 
 Clear Argus's mirrored cookies after the browser client has revoked its local

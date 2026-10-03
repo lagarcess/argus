@@ -81,6 +81,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/auth/apple/authorization-code:
+    post:
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppleAuthorizationCodeRequest'
+        required: true
+      responses:
+        '204':
+          description: Successful Response
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/auth/guest:
     post:
       tags:
@@ -8684,6 +8711,16 @@ components:
         computation route and never rewrites the stored answer. The run dossier is
 
         unchanged.'
+    AppleAuthorizationCodeRequest:
+      properties:
+        authorization_code:
+          type: string
+          maxLength: 512
+          minLength: 1
+      additionalProperties: false
+      type: object
+      required:
+      - authorization_code
     AssetChangeResponse:
       properties:
         version:
