@@ -27,10 +27,12 @@ def test_scheduled_pass_invokes_every_registered_ops_job() -> None:
         "guest_workspace_retention",
         "stale_backtest_jobs",
         "expired_access_welcome_claims",
+        "account_deletion_resume",
     ]
     assert jobs[0].argv[0] == "scripts/ops/cleanup_expired_guest_workspaces.py"
     assert jobs[1].argv[0] == "scripts/ops/stale_backtest_jobs.py"
     assert jobs[2].argv == ("scripts/ops/release_expired_access_welcome_claims.py",)
+    assert jobs[3].argv[0] == "scripts/ops/resume_account_deletions.py"
     for job in jobs:
         assert (ROOT / job.argv[0]).is_file()
 
@@ -65,6 +67,7 @@ def test_a_failed_retention_purge_does_not_hide_the_reconciler() -> None:
         "guest_workspace_retention",
         "stale_backtest_jobs",
         "expired_access_welcome_claims",
+        "account_deletion_resume",
     ]
     assert summary["status"] == "degraded"
     assert summary["failed_count"] == 1
@@ -89,7 +92,7 @@ def test_a_job_that_cannot_start_is_a_counted_failure_not_a_crash() -> None:
     outcomes = run_maintenance(_jobs(), runner=runner)
     summary = summarize(outcomes)
 
-    assert summary["failed_count"] == 3
+    assert summary["failed_count"] == 4
     assert all(outcome.error == "interpreter is gone" for outcome in outcomes)
 
 
@@ -99,7 +102,7 @@ def test_a_clean_pass_reports_ready_and_no_failures() -> None:
     assert summary["status"] == "ready"
     assert summary["failed_count"] == 0
     assert summary["failed_jobs"] == []
-    assert summary["job_count"] == 3
+    assert summary["job_count"] == 4
 
 
 def test_scheduler_carries_no_state_so_a_retry_repeats_the_same_pass() -> None:
@@ -133,7 +136,7 @@ def test_main_exits_nonzero_and_prints_a_machine_readable_summary(
     assert exit_code == 1
     assert summary["status"] == "degraded"
     assert summary["failed_jobs"] == ["stale_backtest_jobs"]
-    assert summary["job_count"] == 3
+    assert summary["job_count"] == 4
 
 
 def test_main_exits_zero_only_when_every_job_succeeded(monkeypatch, capsys) -> None:

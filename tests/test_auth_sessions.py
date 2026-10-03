@@ -67,7 +67,9 @@ def test_auth_session_verifier_accepts_matching_active_session() -> None:
     )
     assert "auth.sessions" in str(pool.cursor.query)
     assert "argus_private.account_placeholders" in str(pool.cursor.query)
-    assert pool.cursor.params == (session_id, user_id, user_id)
+    # A person whose deletion run is in flight is locked out too.
+    assert "argus_private.account_deletion_runs" in str(pool.cursor.query)
+    assert pool.cursor.params == (session_id, user_id, user_id, user_id)
 
 
 def test_auth_session_verifier_rejects_revoked_session() -> None:

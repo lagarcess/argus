@@ -75,16 +75,14 @@ def test_requires_a_session(enabled) -> None:  # noqa: ANN001
 
 def test_deletes_the_session_user_only(enabled) -> None:  # noqa: ANN001
     service = MagicMock()
-    service.delete_account.return_value = DeletionOutcome(
-        status="auth_deleted", pending=["gmail", "apple"]
-    )
+    service.delete_account.return_value = DeletionOutcome(status="done")
     with (
         patch.object(account_route, "current_user", _registered),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, json={"confirm": True})
     assert response.status_code == 200
-    assert response.json() == {"status": "auth_deleted", "pending": ["apple", "gmail"]}
+    assert response.json() == {"status": "done", "pending": []}
     service.delete_account.assert_called_once_with(user_id=USER_ID)
 
 
@@ -131,7 +129,6 @@ def test_a_guest_is_deleted_by_the_same_command(enabled) -> None:  # noqa: ANN00
     ("error", "status", "code"),
     [
         (AccountDeletionRejected("placeholder"), 403, "account_deletion_not_allowed"),
-        (AccountDeletionIncomplete("units_changed"), 503, "account_deletion_incomplete"),
         (RuntimeError("boom"), 503, "account_deletion_incomplete"),
     ],
 )
@@ -164,3 +161,62 @@ def test_feedback_no_longer_takes_deletion_requests() -> None:
 
     with pytest.raises(ValidationError):
         FeedbackRequest(type="account_deletion_request", message="delete me")
+
+
+@pytest.mark.parametrize(
+    ("error", "pending"),
+    [
+        (
+            AccountDeletionIncomplete("third_party_pending", ["plaid", "apple"]),
+            ["apple", "plaid"],
+        ),
+        (AccountDeletionIncomplete("units_changed"), []),
+    ],
+)
+def test_a_pending_third_party_is_in_progress_not_done(enabled, error, pending) -> None:  # noqa: ANN001
+    """The account is locked and the sweep finishes it: 202, never success."""
+    service = MagicMock()
+    service.delete_account.side_effect = error
+    with (
+        patch.object(account_route, "current_user", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(URL, json={"confirm": True})
+    assert response.status_code == 202
+    assert response.json() == {"status": "in_progress", "pending": pending}
+
+
+def test_deletion_does_not_need_the_households_surface(enabled, monkeypatch) -> None:  # noqa: ANN001
+    """Households (and accounts, ingestion, Apple capture) off, deletion on:
+    the command is still built, from deletion's own pool."""
+    from argus.api import account_deletion_runtime as runtime
+    from argus.api import households as households_api
+    from argus.api import state as api_state
+
+    monkeypatch.delenv("ARGUS_HOUSEHOLDS_ENABLED", raising=False)
+    monkeypatch.setattr(households_api, "_service", None)
+    monkeypatch.setattr(api_state, "PERSISTENCE_MODE", "supabase")
+    monkeypatch.setattr(api_state, "DATABASE_URL", "postgresql://deletion@db/argus")
+    monkeypatch.setattr(api_state, "supabase_gateway", MagicMock())
+    built = {}
+
+    def fake_build(**kwargs):  # noqa: ANN003, ANN202
+        built.update(kwargs)
+        service = MagicMock()
+        service.delete_account.return_value = DeletionOutcome(status="done")
+        return service
+
+    monkeypatch.setattr(runtime, "build_service", fake_build)
+    with patch.object(account_route, "current_user", _registered):
+        response = client.post(URL, json={"confirm": True})
+    assert households_api.households_service() is None
+    assert response.status_code == 200, response.text
+    assert built["database_url"] == "postgresql://deletion@db/argus"
+
+
+def test_the_deletion_repository_is_built_without_any_feature_service() -> None:
+    from argus.api.account_deletion_runtime import household_repository
+    from argus.domain.household.postgres import PostgresHouseholdRepository
+
+    repository = household_repository(MagicMock())
+    assert isinstance(repository, PostgresHouseholdRepository)

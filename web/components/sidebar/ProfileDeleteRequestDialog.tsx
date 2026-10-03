@@ -24,6 +24,7 @@ export type DeleteRequestState =
   | "idle"
   | "submitting"
   | "success"
+  | "in_progress"
   | "error"
   | "unavailable";
 
@@ -112,13 +113,21 @@ function ProfileDeleteRequestDialogSurface({
           </button>
         </div>
 
-        {state === "success" ? (
+        {state === "success" || state === "in_progress" ? (
           <>
-            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-              {t(
-                "settings.profile.request_deletion.success",
-                "Your account is deleted. You'll be signed out.",
-              )}
+            <p
+              className="text-[13px] leading-relaxed text-black/55 dark:text-white/55"
+              data-testid={`argus-delete-account-${state}`}
+            >
+              {state === "success"
+                ? t(
+                    "settings.profile.request_deletion.success",
+                    "Your account is deleted. You'll be signed out.",
+                  )
+                : t(
+                    "settings.profile.request_deletion.in_progress",
+                    "Your account is being deleted. You're signed out now, and we'll finish removing it shortly. You don't need to do anything.",
+                  )}
             </p>
             <div className="mt-5 flex justify-end">
               <button
@@ -135,7 +144,7 @@ function ProfileDeleteRequestDialogSurface({
             <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
               {t(
                 "settings.profile.request_deletion.body",
-                "This deletes your account and your data now, and signs you out. Households you run pass to the longest-standing member, or close if you're the only one. Amounts you added to other people's plans stay there as \"Exmiembro\", with no name. This can't be undone.",
+                "This deletes your account and your data now, and signs you out. Households you run pass to the longest-standing member, or close if you're the only one. Amounts you added to other people's plans stay there as \"Former member\", with no name. This can't be undone.",
               )}
             </p>
             {state === "error" && (

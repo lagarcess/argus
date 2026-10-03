@@ -26,6 +26,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountDeletionResponse'
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionResponse'
         '422':
           description: Validation Error
           content:
@@ -8344,7 +8350,7 @@ components:
           type: string
           enum:
           - done
-          - auth_deleted
+          - in_progress
         pending:
           items:
             type: string

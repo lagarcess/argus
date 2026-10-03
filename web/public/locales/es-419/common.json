@@ -1047,6 +1047,7 @@
         "confirm": "Eliminar cuenta",
         "submitting": "Eliminando...",
         "success": "Tu cuenta está eliminada. Se cerrará tu sesión.",
+        "in_progress": "Estamos eliminando tu cuenta. Ya cerraste sesión y terminaremos de eliminarla en breve. No tienes que hacer nada.",
         "error": "No pudimos terminar de eliminar tu cuenta. Inténtalo de nuevo para terminar.",
         "unavailable": "Todavía no se puede eliminar desde la app aquí. Soporte puede eliminar tu cuenta por ti.",
         "email_fallback": "Enviar correo a soporte",

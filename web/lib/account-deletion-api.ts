@@ -1,8 +1,11 @@
 import { apiFetch } from "./argus-api-transport";
 
 export type AccountDeletionResult = {
-  status: "done" | "auth_deleted";
-  /** Provider revocations still owed; the account is already gone. */
+  /** done: everything is deleted. in_progress (202): the account is locked and
+   * signed out, but a third party hasn't confirmed, so the server finishes the
+   * deletion later. Never show in_progress as done. */
+  status: "done" | "in_progress";
+  /** The third parties still owed (apple, gmail, plaid, analytics). */
   pending: string[];
 };
 

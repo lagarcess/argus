@@ -831,13 +831,21 @@ export default function ProfileMenu({
   };
 
   const handleSubmitDeleteRequest = useCallback(async () => {
-    if (deleteRequestState === "submitting" || deleteRequestState === "success") {
+    if (
+      deleteRequestState === "submitting" ||
+      deleteRequestState === "success" ||
+      deleteRequestState === "in_progress"
+    ) {
       return;
     }
     setDeleteRequestState("submitting");
     try {
-      await deleteAccount();
-      setDeleteRequestState("success");
+      const result = await deleteAccount();
+      // 202: locked and signed out, but not finished. Its own state, so the
+      // dialog never claims a deletion the server hasn't completed.
+      setDeleteRequestState(
+        result.status === "in_progress" ? "in_progress" : "success",
+      );
     } catch (err) {
       const status = (err as { status?: number }).status;
       // 404: the command is switched off here. Support still handles it.
@@ -845,9 +853,10 @@ export default function ProfileMenu({
     }
   }, [deleteRequestState]);
 
-  // The account is gone, so the session is dead: leaving the dialog signs out.
+  // The account is gone, or locked while it finishes, so the session is dead
+  // either way: leaving the dialog signs out.
   const handleCloseDeleteRequest = useCallback(() => {
-    if (deleteRequestState === "success") {
+    if (deleteRequestState === "success" || deleteRequestState === "in_progress") {
       onLogout();
       return;
     }

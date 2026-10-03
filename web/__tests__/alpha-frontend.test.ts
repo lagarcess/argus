@@ -2537,6 +2537,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(profileMenu).not.toContain("account_deletion_request");
     expect(profileMenu).toContain("onLogout();");
     expect(profileMenu).toContain('status === 404 ? "unavailable" : "error"');
+    // 202 in_progress is its own state, never shown as done.
+    expect(profileMenu).toContain('result.status === "in_progress" ? "in_progress" : "success"');
+    expect(deleteRequestDialog).toContain(
+      "settings.profile.request_deletion.in_progress",
+    );
     expect(detailsDialog).toContain("argus-profile-language-trigger");
     expect(detailsDialog).toContain("absolute right-0 top-full");
     // Both dialogs live in their own components, because a body-portaled
@@ -2569,6 +2574,8 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(en).toContain("This deletes your account and your data now");
     expect(en).toContain("Your account is deleted. You'll be signed out.");
+    expect(en).toContain("Your account is being deleted. You're signed out now");
+    expect(en).toContain('stay there as \\"Former member\\"');
     expect(en).not.toContain("Support will follow up by email.");
     expect(es).toContain('"title": "¿Eliminar tu cuenta?"');
     expect(es).toContain(
@@ -2576,6 +2583,7 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(es).toContain("Esto elimina tu cuenta y tus datos ahora");
     expect(es).toContain("Tu cuenta está eliminada. Se cerrará tu sesión.");
+    expect(es).toContain("Estamos eliminando tu cuenta.");
   });
 
   test("profile menu groups data controls preferences and legal links", () => {

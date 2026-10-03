@@ -57,6 +57,14 @@ def maintenance_jobs(*, guest_limit: int, stale_limit: int) -> tuple[Maintenance
             name="expired_access_welcome_claims",
             argv=("scripts/ops/release_expired_access_welcome_claims.py",),
         ),
+        MaintenanceJob(
+            name="account_deletion_resume",
+            argv=(
+                "scripts/ops/resume_account_deletions.py",
+                "--limit",
+                str(guest_limit),
+            ),
+        ),
     )
 
 

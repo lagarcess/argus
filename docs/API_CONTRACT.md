@@ -3184,21 +3184,31 @@ per household or standalone shared group, shown as "Former member" or
 "Exmiembro" in the viewer's language), deletes everything else of theirs,
 revokes provider tokens, and deletes the auth user. A retry resumes the same run.
 
-**Response `200`:**
+**Response `200`:** everything is deleted, every third party has confirmed,
+and the auth user is gone.
 
 ```json
 { "status": "done", "pending": [] }
 ```
 
-`status` is `auth_deleted` when the account is gone but a provider revocation is
-still owed. `pending` names those providers (for example `gmail`). The session is
-dead either way; clients sign out locally. A stored Sign in with Apple token
-(#793) is revoked before the account delete; while Apple can't confirm it, the
-account is not deleted yet and the answer is `503 account_deletion_incomplete`.
+**Response `202`:** deletion is in progress. The data step has run (or is
+being retried), and the account is locked: its sessions are refused from the
+moment the run opens and the auth user is banned, so clients sign out. A third
+party hasn't confirmed yet, so the auth delete waits. `pending` names it
+(`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
+itself is being retried. Every third-party step (Sign in with Apple through
+#793, Google/Gmail and Plaid tokens, PostHog person deletion) runs before the
+auth delete. The scheduled sweep (`scripts/ops/resume_account_deletions.py`)
+resumes the run; a repeat request resumes it too. Clients show "deletion in
+progress", never the finished state.
 
-**Errors:** `403 account_deletion_not_allowed`, `503 account_deletion_unavailable` (no
-Postgres surfaces), `503 account_deletion_incomplete` with `Retry-After`
-(a retry resumes the same run and finishes it).
+```json
+{ "status": "in_progress", "pending": ["plaid"] }
+```
+
+**Errors:** `403 account_deletion_not_allowed`, `503 account_deletion_unavailable`
+(no `DATABASE_URL` or Admin API client), `503 account_deletion_incomplete` with
+`Retry-After` (an unexpected failure; a retry resumes the same run).
 
 
 ## Supported Values

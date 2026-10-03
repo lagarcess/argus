@@ -794,9 +794,18 @@ poetry run python scripts/ops/scheduled_maintenance.py
 ```
 
 That pass runs guest workspace retention first, then stale and stranded
-backtest job reconciliation. Every job runs even when an earlier one fails, so
-one failure never hides another. The retention windows in `DATA_MODEL.md` hold
-only as often as an operator runs this command.
+backtest job reconciliation, expired access-welcome claims, and the account
+deletion sweep (`scripts/ops/resume_account_deletions.py`). Every job runs even
+when an earlier one fails, so one failure never hides another. The retention
+windows in `DATA_MODEL.md` hold only as often as an operator runs this command.
+
+The account deletion sweep resumes runs still waiting on a third party (Apple,
+Plaid, Gmail, PostHog). Those accounts are locked meanwhile and their auth
+delete waits, so they finish only as often as this pass (or the person's own
+retry) runs. It prints `resumed`/`done`/`pending`/`failed`; `pending` is a
+provider still down, `failed` exits nonzero. To revoke, the operator process
+also needs `ARGUS_INGESTION_SECRET_KEY`, the `PLAID_*` keys and the
+`ARGUS_APPLE_*` keys; without them those revocations stay pending.
 
 The pass exits nonzero if any job fails, and prints a final JSON summary line
 with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on
