@@ -37,14 +37,16 @@ struct CuadraoSpendingChart: View {
         guard story.covered else {
             return spanish ? "Este período tiene un historial incompleto." : "This period has incomplete history."
         }
-        guard total > 0 else { return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet." }
+        guard !entries.isEmpty else { return spanish ? "Sin datos en este período." : "No data in this period." }
         if let prior = story.previousTotal {
             let difference = total - prior
             if difference == 0 { return spanish ? "Has registrado el mismo gasto que en el período anterior." : "Your recorded spending matches the previous period." }
             let reference = periodOffset == 0 ? (spanish ? "al mismo punto del período anterior" : "at this point in the previous period") : (spanish ? "en el período anterior" : "in the previous period")
             return spanish ? "Llevas \(currency) \(money(abs(difference))) \(difference > 0 ? "más" : "menos") que \(reference)." : "You've spent \(currency) \(money(abs(difference))) \(difference > 0 ? "more" : "less") than \(reference)."
         }
-        guard let largest = categories.max(by: { categoryTotal($0) < categoryTotal($1) }) else { return "" }
+        guard let largest = categories.max(by: { categoryTotal($0) < categoryTotal($1) }) else {
+            return spanish ? "El gasto registrado en este período es cero." : "Recorded spending is zero this period."
+        }
         return spanish ? "\(largest.title(true)) se lleva la mayor parte este período." : "\(largest.title(false)) takes the largest share this period."
     }
     var body: some View {
@@ -52,7 +54,7 @@ struct CuadraoSpendingChart: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text(entries.isEmpty && !story.covered ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
+                    Text((inspected ?? entries).isEmpty ? (spanish ? "Sin datos" : "No data") : money(inspected.map(CanvasSpendingHistory.total) ?? total))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-spending-total")
                 }
@@ -87,12 +89,7 @@ struct CuadraoSpendingChart: View {
         switch story.state {
         case .firstUse: return spanish ? "Tu historia empieza aquí" : "Your story starts here"
         case .unavailable: return spanish ? "Falta una parte de la historia" : "Part of the story is missing"
-        case .emptyPeriod:
-            if periodOffset == 0 && range == .month {
-                let month = interval.start.formatted(.dateTime.month(.wide).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
-                return spanish ? "\(month.prefix(1).uppercased() + month.dropFirst()) empieza aquí" : "\(month) starts here"
-            }
-            return spanish ? "Un período sin gastos" : "A period without spending"
+        case .emptyPeriod: return spanish ? "Sin datos" : "No data"
         case .populated: return ""
         }
     }

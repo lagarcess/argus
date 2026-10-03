@@ -120,13 +120,21 @@ import Foundation
         check(average?.average == 175, "Twelve complete monthly totals have an exact arithmetic average")
         check(annualStory.completedMonths(count: 6)?.last?.interval.end == calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)), "Running month excluded from completed averages")
         let sparse = CanvasSpendingStory(expenses: [historyRows.last!], range: .month, offset: 0, coverageStart: coverage, now: january)
-        check(sparse.longitudinalInsights.first(where: { $0.category == nil && $0.months.count == 12 })?.average == Decimal(400) / 12, "Covered zero months stay in the average denominator")
+        check(sparse.completedMonths(count: 12) == nil, "Months without records never become zero in an average")
         check(!sparse.longitudinalInsights.contains(where: { $0.kind == .trend }), "An isolated expense does not claim a sustained category trend")
         check(unknownStory.longitudinalInsights.isEmpty, "Unknown coverage never produces longitudinal insight")
         check(emptyStory.longitudinalInsights.isEmpty, "All-zero history does not manufacture a pattern")
         let historical = CanvasSpendingStory(expenses: historyRows, range: .month, offset: -4, coverageStart: coverage, now: january)
         check(historical.completedMonths(count: 6)?.last?.interval.end == calendar.date(from: DateComponents(year: 2025, month: 10, day: 1)), "Past pages exclude later records from their average")
         check(historical.completedMonths(count: 12) == nil, "A window beginning before coverage is unavailable")
+        let noPriorRecords = CanvasSpendingStory(expenses: [historyRows.last!], range: .month, offset: -1, coverageStart: coverage, now: january)
+        check(noPriorRecords.previousTotal == nil, "A prior month without records has no comparison")
+        let zeroRows = historyRows.map { entry in
+            CanvasActivity(accountID: entry.accountID, title: entry.title, amount: 0, date: entry.date, income: false, category: entry.category)
+        }
+        let recordedZeros = CanvasSpendingStory(expenses: zeroRows, range: .month, offset: -1, coverageStart: coverage, now: january)
+        check(recordedZeros.previousTotal == 0 && recordedZeros.state == .populated, "Recorded zeros remain real observations")
+        check(recordedZeros.completedMonths(count: 6)?.allSatisfy { $0.amount == 0 } == true, "Recorded zero months remain present in complete series")
         let annualHistorical = CanvasSpendingStory(expenses: historyRows, range: .year, offset: -1, coverageStart: coverage, now: january)
         check(annualHistorical.completedMonths(count: 12)?.last?.amount == 400, "A completed historical year includes its December")
         let october = calendar.date(from: DateComponents(year: 2026, month: 10, day: 15, hour: 12))!

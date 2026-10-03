@@ -51,13 +51,21 @@ struct CuadraoNavigationBar: View {
     @Binding var selection: CuadraoTab
     let compact: Bool
     let spanish: Bool
+    var avatar: CuadraoAvatarSelection = .none
+    var profileName: String = ""
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(CuadraoTab.allCases) { tab in
                 Button { selection = tab } label: {
-                    tab.image(selected: selection == tab)
+                    Group {
+                        if tab == .profile, avatar != .none {
+                            CuadraoIdentityAvatar(selection: avatar, name: profileName, size: 28, presentation: .navigation)
+                        } else {
+                            tab.image(selected: selection == tab)
+                        }
+                    }
                         .environment(\.symbolVariants, .none)
                         .font(.system(size: 25, weight: .regular))
                         .frame(maxWidth: .infinity)
