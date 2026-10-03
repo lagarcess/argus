@@ -413,3 +413,43 @@ def test_weighted_window_refund_gives_back_the_newest_matching_spend():
     window.refund("k", 1, window=60)
     assert window.spend("k", 1, limit=2, window=60) is None
     window.refund("missing", 1, window=60)  # nothing to give back is a no-op
+
+
+def test_secrets_load_through_pydantic_settings_and_never_show(monkeypatch):
+    """Codex P1 on #794: the secrets come from one validated settings model."""
+    from argus.domain.household.invite_codes import (
+        CODE_SECRET_ENV,
+        CODE_SECRET_PREVIOUS_ENV,
+        InviteCodeSecretSettings,
+    )
+
+    old = "previous-invite-code-secret-0123456789abcdef"
+    monkeypatch.setenv(CODE_SECRET_PREVIOUS_ENV, old)
+    settings = InviteCodeSecretSettings()
+    assert settings.secret is not None
+    assert settings.secret.get_secret_value() == TEST_CODE_SECRET
+    assert settings.secret_previous is not None
+    assert settings.secret_previous.get_secret_value() == old
+    assert TEST_CODE_SECRET not in repr(settings) and old not in repr(settings)
+    hasher = CodeHasher.from_env()
+    assert hasher.current == CodeHasher.from_secrets(TEST_CODE_SECRET).current
+    assert hasher.previous is not None
+    monkeypatch.delenv(CODE_SECRET_ENV)
+    assert InviteCodeSecretSettings().secret is None
+    with pytest.raises(InviteCodesUnavailable):
+        CodeHasher.from_env()
+
+
+def test_hasher_reads_only_the_settings_model(monkeypatch):
+    """No raw environment read: from_env uses whatever the settings model loads."""
+    from argus.domain.household import invite_codes
+    from pydantic import SecretStr
+
+    loaded = "settings-model-invite-code-secret-0123456789"
+
+    class _Loaded(invite_codes.InviteCodeSecretSettings):
+        def __init__(self) -> None:
+            super().__init__(secret=SecretStr(loaded), secret_previous=None)
+
+    monkeypatch.setattr(invite_codes, "InviteCodeSecretSettings", _Loaded)
+    assert CodeHasher.from_env() == CodeHasher.from_secrets(loaded)

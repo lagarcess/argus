@@ -23,6 +23,9 @@ import re
 import secrets
 from dataclasses import dataclass, field
 
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from argus.domain.household.errors import InviteCodesUnavailable
 
 CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -34,6 +37,7 @@ BETA_INVITE_QUOTA = 10
 TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 _CONFUSABLE = str.maketrans({"O": "0", "I": "1", "L": "1", "U": "V"})
 
+# Read by InviteCodeSecretSettings (env_prefix + field name).
 CODE_SECRET_ENV = "ARGUS_INVITE_CODE_SECRET"
 CODE_SECRET_PREVIOUS_ENV = "ARGUS_INVITE_CODE_SECRET_PREVIOUS"
 MIN_SECRET_LENGTH = 32
@@ -61,6 +65,23 @@ def normalize_code(raw: str) -> str | None:
 
 def format_code(code: str) -> str:
     return "-".join(code[i : i + CODE_GROUP] for i in range(0, len(code), CODE_GROUP))
+
+
+class InviteCodeSecretSettings(BaseSettings):
+    """``ARGUS_INVITE_CODE_SECRET`` and ``ARGUS_INVITE_CODE_SECRET_PREVIOUS``.
+
+    Read fresh on each call (like the surface flags), never from a file, and
+    kept as ``SecretStr`` so a repr or log line cannot show a value. Length
+    and presence are checked by ``CodeHasher.from_secrets``, which fails closed.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="ARGUS_INVITE_CODE_", extra="ignore")
+    secret: SecretStr | None = None
+    secret_previous: SecretStr | None = None
+
+
+def _reveal(value: SecretStr | None) -> str | None:
+    return value.get_secret_value() if value is not None else None
 
 
 @dataclass(frozen=True)
@@ -109,8 +130,9 @@ class CodeHasher:
 
     @classmethod
     def from_env(cls) -> CodeHasher:
+        settings = InviteCodeSecretSettings()
         return cls.from_secrets(
-            os.getenv(CODE_SECRET_ENV), os.getenv(CODE_SECRET_PREVIOUS_ENV)
+            _reveal(settings.secret), _reveal(settings.secret_previous)
         )
 
     def digest(self, code: str) -> str:
