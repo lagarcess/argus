@@ -100,6 +100,9 @@ class SourceConnection:
     updated_at: datetime
     disconnected_at: datetime | None
     version: int
+    # Which key sealed ``secret`` (``SecretBox.key_id``), stored next to it.
+    # None for rows sealed before Lane 6 or with no secret.
+    secret_key: str | None = None
 
 
 class ConnectionRepository(Protocol):
@@ -113,6 +116,7 @@ class ConnectionRepository(Protocol):
         now: datetime,
         secret: bytes | None = None,
         connection_id: str | None = None,
+        secret_key: str | None = None,
     ) -> SourceConnection: ...
 
     def get(self, *, user_id: str, connection_id: str) -> SourceConnection: ...
@@ -130,6 +134,7 @@ class ConnectionRepository(Protocol):
         secret: bytes,
         status: ConnectionStatus,
         now: datetime,
+        secret_key: str | None = None,
     ) -> SourceConnection: ...
 
     def lease(
@@ -208,6 +213,7 @@ class InMemoryConnectionRepository:
         now: datetime,
         secret: bytes | None = None,
         connection_id: str | None = None,
+        secret_key: str | None = None,
     ) -> SourceConnection:
         external_ref, label = checked_ref(external_ref), checked_label(label)
         with self._lock:
@@ -240,6 +246,7 @@ class InMemoryConnectionRepository:
                 updated_at=now,
                 disconnected_at=None,
                 version=1,
+                secret_key=secret_key if secret is not None else None,
             )
             self._rows[row.id] = row
             return row
@@ -270,6 +277,7 @@ class InMemoryConnectionRepository:
         secret: bytes,
         status: ConnectionStatus,
         now: datetime,
+        secret_key: str | None = None,
     ) -> SourceConnection:
         with self._lock:
             row = self._live(connection_id)
@@ -277,6 +285,7 @@ class InMemoryConnectionRepository:
                 replace(
                     row,
                     secret=secret,
+                    secret_key=secret_key,
                     status=status,
                     last_error_code=None,
                     attention_code=None,
@@ -417,6 +426,7 @@ class InMemoryConnectionRepository:
                     row,
                     status="disconnected",
                     secret=None,
+                    secret_key=None,
                     cursor=None,
                     attention_code=None,
                     attention_at=None,

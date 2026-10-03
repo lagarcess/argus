@@ -30,7 +30,7 @@ from argus.domain.ingestion.contract import SourceKind
 
 _COLUMNS = (
     "id::text, user_id::text, source, status, label, external_ref, sync_cursor, "
-    "secret_ciphertext, last_success_at, last_attempt_at, last_error_code, "
+    "secret_ciphertext, secret_key_fingerprint, last_success_at, last_attempt_at, last_error_code, "
     "attention_code, attention_at, "
     "lease_holder, lease_until, created_at, updated_at, disconnected_at, version"
 )
@@ -51,16 +51,27 @@ class PostgresConnectionRepository:
         now: datetime,
         secret: bytes | None = None,
         connection_id: str | None = None,
+        secret_key: str | None = None,
     ) -> SourceConnection:
         external_ref, label = checked_ref(external_ref), checked_label(label)
         try:
             row = self._one(
                 f"""insert into public.financial_source_connections
                     (id, user_id, source, external_ref, label, secret_ciphertext,
-                     created_at, updated_at)
-                values (coalesce(%s::uuid, gen_random_uuid()), %s, %s, %s, %s, %s, %s, %s)
+                     secret_key_fingerprint, created_at, updated_at)
+                values (coalesce(%s::uuid, gen_random_uuid()), %s, %s, %s, %s, %s, %s, %s, %s)
                 returning {_COLUMNS}""",
-                (connection_id, user_id, source, external_ref, label, secret, now, now),
+                (
+                    connection_id,
+                    user_id,
+                    source,
+                    external_ref,
+                    label,
+                    secret,
+                    secret_key if secret is not None else None,
+                    now,
+                    now,
+                ),
             )
         except errors.UniqueViolation:
             existing = self._one(
@@ -113,15 +124,17 @@ class PostgresConnectionRepository:
         secret: bytes,
         status: ConnectionStatus,
         now: datetime,
+        secret_key: str | None = None,
     ) -> SourceConnection:
         row = self._one(
             f"""update public.financial_source_connections
-            set secret_ciphertext = %s, status = %s, last_error_code = null,
+            set secret_ciphertext = %s, secret_key_fingerprint = %s,
+                status = %s, last_error_code = null,
                 attention_code = null, attention_at = null,
                 updated_at = %s, version = version + 1
             where id = %s::uuid and {_LIVE}
             returning {_COLUMNS}""",
-            (secret, status, now, _uuid(connection_id)),
+            (secret, secret_key, status, now, _uuid(connection_id)),
         )
         if row is None:
             raise ConnectionNotFound()
@@ -248,7 +261,8 @@ class PostgresConnectionRepository:
     ) -> SourceConnection:
         row = self._one(
             f"""update public.financial_source_connections
-            set status = 'disconnected', secret_ciphertext = null, sync_cursor = null,
+            set status = 'disconnected', secret_ciphertext = null,
+                secret_key_fingerprint = null, sync_cursor = null,
                 attention_code = null, attention_at = null, lease_holder = null, lease_until = null, disconnected_at = %s,
                 updated_at = %s, version = version + 1
             where id = %s::uuid and user_id = %s and {_LIVE}
@@ -301,4 +315,5 @@ def _row(row: dict[str, Any]) -> SourceConnection:
         updated_at=row["updated_at"],
         disconnected_at=row["disconnected_at"],
         version=row["version"],
+        secret_key=row["secret_key_fingerprint"],
     )

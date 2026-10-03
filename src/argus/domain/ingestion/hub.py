@@ -28,7 +28,7 @@ Revocation = Literal["revoked", "failed", "not_applicable"]
 # Account deletion also learns when the provider no longer held the grant
 # (``already_revoked``) and when a credential does not open under this key
 # (``unreadable``: a wrong key and a truly dead credential look the same here;
-# the deletion run's key check tells them apart).
+# the deletion run's key check tells them apart by the stored key fingerprint).
 DeletionRevocation = Literal[
     "revoked", "already_revoked", "failed", "not_applicable", "unreadable"
 ]

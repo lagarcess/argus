@@ -63,6 +63,8 @@ def test_callback_creates_a_connection_with_digest_ref_masked_label_and_sealed_t
     refresh = connector.hub.credential(row)
     assert refresh in fake.refresh_tokens
     assert refresh.encode() not in row.secret
+    # Which key sealed it, for account deletion's key check (Priya B1).
+    assert row.secret_key == box.key_id and len(row.secret_key) == 32
     assert row.cursor is None and row.last_success_at is None
     assert [s.sender for s in result.senders] == [
         "alerts@card-example.test",
@@ -178,6 +180,22 @@ def test_reconnect_same_mailbox_replaces_the_credential_without_a_duplicate():
     assert new != old and new in fake.refresh_tokens
     # senders=None keeps the allowlist chosen at first connect.
     assert len(again.senders) == 2
+
+
+def test_reconnect_records_the_key_that_sealed_the_new_token():
+    """A row from before the key fingerprint, or sealed under another key,
+    carries this key's fingerprint once this process re-seals it."""
+    fake = FakeGoogle()
+    connector = make_connector(fake)
+    first = connect(connector, fake, ALICE).connection
+    repo = connector.hub.connections
+    repo.set_secret(
+        connection_id=first.id, secret=first.secret, status="needs_reauth",
+        now=connector.hub.clock(), secret_key=None,
+    )  # fmt: skip
+    assert repo.get(user_id=ALICE, connection_id=first.id).secret_key is None
+    again = connect(connector, fake, ALICE, senders=None).connection
+    assert again.secret_key == connector.hub.box.key_id
 
 
 def test_concurrent_callback_race_resolves_to_the_existing_connection(monkeypatch):

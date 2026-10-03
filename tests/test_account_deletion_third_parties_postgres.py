@@ -11,6 +11,7 @@ import psycopg
 import pytest
 from argus.domain.account_deletion.service import (
     AccountDeletionIncomplete,
+    AccountDeletionRejected,
     subject_hash,
 )
 from argus.domain.apple_sign_in.client import AppleAuthClient
@@ -19,7 +20,7 @@ from argus.domain.apple_sign_in.credentials_postgres import (
     PostgresAppleCredentialRepository,
 )
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
-from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
+from argus.domain.ingestion.secrets import SecretBox
 from psycopg_pool import ConnectionPool
 
 from tests import apple_sign_in_support as apple_support
@@ -43,8 +44,10 @@ pytestmark = pytest.mark.skipif(not DSN, reason="Disposable PostgreSQL required"
 
 
 def _other_credential(box: SecretBox, user_id: str) -> str:
-    """Someone else's Gmail connection sealed under box, stored last: the
-    evidence key_check reads."""
+    """Someone else's Gmail connection, sealed under box by a process holding
+    it (so with box's key fingerprint), stored last. Since Priya's B1 it is
+    evidence of nothing for anyone else's credential; the tests keep it to
+    show that."""
     repo = PostgresConnectionRepository(ConnectionPool(DSN, min_size=0, max_size=1))
     try:
         made = repo.create(
@@ -60,10 +63,36 @@ def _other_credential(box: SecretBox, user_id: str) -> str:
     with psycopg.connect(DSN, autocommit=True) as c:
         c.execute(
             "update public.financial_source_connections"
-            " set secret_ciphertext=%s, updated_at=now() + interval '1 day' where id=%s",
-            (box.seal("r.other", source="gmail", connection_id=made.id), made.id),
+            " set secret_ciphertext=%s, secret_key_fingerprint=%s,"
+            "     updated_at=now() + interval '1 day' where id=%s",
+            (
+                box.seal("r.other", source="gmail", connection_id=made.id),
+                box.key_id,
+                made.id,
+            ),
         )
     return made.id
+
+
+def _seal(
+    user_id: str, source: str, box: SecretBox, *, token: str = "access-live", key_id=...
+) -> tuple[str, bytes]:  # noqa: ANN001
+    """Seal the person's own Plaid or Gmail credential under box, the way a
+    process holding box does: with box's fingerprint (or key_id, to model a
+    damaged envelope or a row sealed before the fingerprint existed)."""
+    with psycopg.connect(DSN, autocommit=True) as c:
+        row = c.execute(
+            "select id from public.financial_source_connections"
+            " where user_id=%s and source=%s order by created_at limit 1",
+            (user_id, source),
+        ).fetchone()[0]
+        sealed = box.seal(token, source=source, connection_id=str(row))
+        c.execute(
+            "update public.financial_source_connections"
+            " set secret_ciphertext=%s, secret_key_fingerprint=%s where id=%s",
+            (sealed, box.key_id if key_id is ... else key_id, row),
+        )
+    return str(row), sealed
 
 
 def _revocations(user_id: str) -> list[tuple]:
@@ -77,115 +106,39 @@ def _revocations(user_id: str) -> list[tuple]:
 
 
 def test_a_wrong_or_missing_key_never_drops_a_live_token(lane, world):  # noqa: F811
-    """B1: a credential that does not open is dropped only under the verified
-    current key. The sweep with no key, or with a different one, keeps it
-    pending with its ciphertext; the right key records it unrecoverable."""
-    a, b = world["a"], world["b"]
+    """B1: a credential that does not open is given up only when its key
+    fingerprint is the running key's. No key, or a different one, keeps it
+    pending with its ciphertext; the key that sealed it records it
+    unrecoverable."""
+    a = world["a"]
     current = SecretBox(secrets.token_bytes(32))
-    other = _other_credential(current, b)
-    try:
-        admin = SqlAuthAdmin()
-        # No key on this process.
-        with pytest.raises(AccountDeletionIncomplete) as raised:
-            _service(lane, admin, FakeRevoker(unreadable={"plaid"})).delete_account(
-                user_id=a
-            )
-        world["placeholders"] += admin.created
-        assert raised.value.pending == ["plaid"]
-        assert ("plaid", "pending", True, "key_unavailable") in _revocations(a)
-        # A different key: the sweep runs with the wrong ARGUS_INGESTION_SECRET_KEY.
-        wrong = _service(
-            lane,
-            SqlAuthAdmin(),
-            FakeRevoker(unreadable={"plaid"}),
-            box=SecretBox(secrets.token_bytes(32)),
-            clock=lambda: NOW + timedelta(hours=1),
-        )
-        _age(a)
-        assert wrong.resume_pending()["pending"] == 1
-        assert ("plaid", "pending", True, "key_mismatch") in _revocations(a)
-        assert _locked(a) == (True, True)
-        # The current key opens the newest credential anyone else stored: only
-        # now is the token known to be dead, and the run finishes.
-        run_id = _run_id(a)
-        outcome = _service(
-            lane, SqlAuthAdmin(), FakeRevoker(unreadable={"plaid"}), box=current
-        ).delete_account(user_id=a)
-        assert outcome.status == "done"
-        assert _run(run_id)[4]["revocations"]["plaid"] == {"unrecoverable": 1}
-    finally:
-        with psycopg.connect(DSN, autocommit=True) as c:
-            c.execute(
-                "delete from public.financial_source_connections where id=%s", (other,)
-            )
-
-
-def test_a_rotated_away_key_never_drops_a_token_sealed_after_its_evidence(lane, world):  # noqa: F811
-    """Marcus re-check S1: the evidence is the newest credential anyone else
-    *sealed*, not the newest row touched. Someone else's token is sealed
-    under key A; the deployment rotates to key B and the person's Plaid token
-    is sealed under B; then a status or lease update touches the old A row.
-    A process still on key A opens that row, but it was sealed before the
-    person's token, so it proves nothing: the run stays pending with the
-    ciphertext kept."""
-    a, b = world["a"], world["b"]
-    old_key, new_key = (
-        SecretBox(secrets.token_bytes(32)),
-        SecretBox(secrets.token_bytes(32)),
+    _seal(a, "plaid", current)
+    admin = SqlAuthAdmin()
+    # No key on this process.
+    with pytest.raises(AccountDeletionIncomplete) as raised:
+        _service(lane, admin, FakeRevoker(unreadable={"plaid"})).delete_account(user_id=a)
+    world["placeholders"] += admin.created
+    assert raised.value.pending == ["plaid"]
+    assert ("plaid", "pending", True, "key_unavailable") in _revocations(a)
+    # A different key: the sweep runs with the wrong ARGUS_INGESTION_SECRET_KEY.
+    wrong = _service(
+        lane,
+        SqlAuthAdmin(),
+        FakeRevoker(unreadable={"plaid"}),
+        box=SecretBox(secrets.token_bytes(32)),
+        clock=lambda: NOW + timedelta(hours=1),
     )
-    made = [_other_credential(old_key, b)]
-    other = made[0]
-    try:
-        with psycopg.connect(DSN, autocommit=True) as c:
-            plaid = c.execute(
-                "select id from public.financial_source_connections"
-                " where user_id=%s and source='plaid' limit 1",
-                (a,),
-            ).fetchone()[0]
-            sealed = new_key.seal("access-live", source="plaid", connection_id=str(plaid))
-            c.execute(
-                "update public.financial_source_connections set secret_ciphertext=%s"
-                " where id=%s",
-                (sealed, plaid),
-            )
-            stamp = "select secret_sealed_at from public.financial_source_connections where id=%s"
-            before = c.execute(stamp, (other,)).fetchone()[0]
-            # A status/lease/attention update on the old row, no re-seal; a
-            # writer cannot set the stamp by hand either.
-            c.execute(
-                "update public.financial_source_connections"
-                " set status='error', updated_at=now() + interval '2 days',"
-                "     secret_sealed_at=now() + interval '2 days'"
-                " where id=%s",
-                (other,),
-            )
-            assert c.execute(stamp, (other,)).fetchone()[0] == before
-            assert before < c.execute(stamp, (plaid,)).fetchone()[0]
-        with pytest.raises(SecretUnreadable):
-            old_key.open(sealed, source="plaid", connection_id=str(plaid))
-        admin = SqlAuthAdmin()
-        with pytest.raises(AccountDeletionIncomplete) as raised:
-            _service(
-                lane, admin, FakeRevoker(unreadable={"plaid"}), box=old_key
-            ).delete_account(user_id=a)
-        world["placeholders"] += admin.created
-        assert raised.value.pending == ["plaid"]
-        assert ("plaid", "pending", True, "key_unproven") in _revocations(a)
-        assert _locked(a) == (True, True)
-        # The live token is still there for a process on key B, which revokes it.
-        made.append(_other_credential(new_key, b))
-        revoker = FakeRevoker()
-        outcome = _service(lane, SqlAuthAdmin(), revoker, box=new_key).delete_account(
-            user_id=a
-        )
-        assert outcome.status == "done"
-        assert ("plaid", str(plaid), sealed) in revoker.calls
-    finally:
-        with psycopg.connect(DSN, autocommit=True) as c:
-            c.execute(
-                "delete from public.financial_source_connections where id = any(%s::uuid[])",
-                (made,),
-            )
+    _age(a)
+    assert wrong.resume_pending()["pending"] == 1
+    assert ("plaid", "pending", True, "key_unproven") in _revocations(a)
+    assert _locked(a) == (True, True)
+    # The key that sealed it can't open it either: only now is it dead.
+    run_id = _run_id(a)
+    outcome = _service(
+        lane, SqlAuthAdmin(), FakeRevoker(unreadable={"plaid"}), box=current
+    ).delete_account(user_id=a)
+    assert outcome.status == "done"
+    assert _run(run_id)[4]["revocations"]["plaid"] == {"unrecoverable": 1}
 
 
 def test_the_recording_fake_is_never_done_outside_tests(lane, world):  # noqa: F811
@@ -209,10 +162,33 @@ def test_the_recording_fake_is_never_done_outside_tests(lane, world):  # noqa: F
         service.force_complete_step(
             user_id=a, step="analytics", reason=" ", operator="ops"
         )
-    service.force_complete_step(
-        user_id=a, step="analytics", reason="PostHog adapter not shipped", operator="ops"
+    forced = {"user_id": a, "step": "analytics", "operator": "ops"}
+    forced["reason"] = "PostHog adapter not shipped"
+    # Note 2: refused until the step has waited 7 days, even with confirm.
+    with pytest.raises(AccountDeletionRejected, match="step_pending_under_7_days"):
+        service.force_complete_step(**forced, confirm=True)
+    with pytest.raises(AccountDeletionRejected, match="step_not_pending"):
+        service.force_complete_step(**{**forced, "step": "plaid"}, confirm=True)
+    later = _service(
+        lane,
+        SqlAuthAdmin(),
+        allow_fake=False,
+        clock=lambda: NOW + timedelta(days=7, minutes=1),
     )
-    assert service.delete_account(user_id=a).status == "done"
+    # Without confirm it only reports.
+    assert later.force_complete_step(**forced) == {
+        "step": "analytics",
+        "pending_days": 7,
+        "last_error": "analytics_adapter_unconfigured",
+        "dry_run": True,
+        "forced": False,
+    }
+    assert _run(run_id)[4]["analytics"] == "pending"
+    assert "forced" not in _run(run_id)[4]
+    report = later.force_complete_step(**forced, confirm=True)
+    assert report["forced"] is True
+    assert report["revoke_attempt"] == "analytics_adapter_unconfigured"
+    assert later.delete_account(user_id=a).status == "done"
     steps = _run(run_id)[4]
     assert steps["analytics"] == "operator_forced"
     assert steps["forced"]["analytics"]["reason"] == "PostHog adapter not shipped"
@@ -240,7 +216,9 @@ class _Apple:
             clock=lambda: NOW,
         )
 
-    def store(self, user_id: str, *, box: SecretBox | None = None) -> None:
+    def store(self, user_id: str, *, box: SecretBox | None = None, key_id=...) -> None:  # noqa: ANN001
+        """As capture stores it: sealed under box with box's fingerprint, or
+        key_id (None: stored before the fingerprint existed)."""
         sealed = (box or self.box).seal(
             "r.apple-refresh-0", source="apple_sign_in", connection_id=user_id
         )
@@ -249,6 +227,7 @@ class _Apple:
             client_id=apple_support.BUNDLE_ID,
             secret_ciphertext=sealed,
             now=NOW,
+            key_id=(box or self.box).key_id if key_id is ... else key_id,
         )
 
     def close(self) -> None:
@@ -362,12 +341,17 @@ def test_an_apple_step_pending_a_week_needs_an_operator(lane, world):  # noqa: F
             service.force_complete_step(
                 user_id=a, step="email", reason="x", operator="ops"
             )
-        service.force_complete_step(
+        report = service.force_complete_step(
             user_id=a,
             step="apple",
             reason="Person removed the app in Apple ID settings (TN3107)",
             operator="ops",
+            confirm=True,
         )
+        # Note 2: one more revoke first, recorded, and only then dropped.
+        assert [p for p, _ in apple.fake.calls] == ["/auth/revoke"] * 3
+        assert report["revoke_attempt"] == "invalid_request"
+        assert report["forced"] is True
         assert service.delete_account(user_id=a).status == "done"
     finally:
         logger.remove(sink)
@@ -378,22 +362,15 @@ def test_an_apple_step_pending_a_week_needs_an_operator(lane, world):  # noqa: F
     assert _apple_state(a, run_id)[:3] == (False, False, "done")
 
 
-def test_an_unreadable_apple_token_is_discarded_only_under_the_verified_key(lane, world):  # noqa: F811
-    a, b = world["a"], world["b"]
+def test_an_unreadable_apple_token_is_discarded_only_under_its_own_key(lane, world):  # noqa: F811
+    """A damaged Apple token this key sealed: a process on another key keeps
+    it (key_unproven); the key whose fingerprint it carries discards it via
+    #802's discard_unreadable. Fails if upsert drops the fingerprint."""
+    a = world["a"]
     apple = _Apple([])
     try:
-        # Sealed under a key the deployment no longer has: the key rotated.
-        apple.store(a, box=SecretBox(secrets.token_bytes(32)))
-        # Someone else signed in with Apple since, under the current key.
-        apple.store(b)
-        with psycopg.connect(DSN, autocommit=True) as c:
-            c.execute(
-                "update public.apple_sign_in_credentials"
-                " set updated_at = now() + interval '1 day' where user_id=%s",
-                (b,),
-            )
+        apple.store(a, box=SecretBox(secrets.token_bytes(32)), key_id=apple.box.key_id)
         admin = SqlAuthAdmin()
-        # A process with the wrong key keeps the token and alerts.
         with pytest.raises(AccountDeletionIncomplete) as raised:
             _service(
                 lane, admin, apple=apple.service, box=SecretBox(secrets.token_bytes(32))
@@ -403,16 +380,11 @@ def test_an_unreadable_apple_token_is_discarded_only_under_the_verified_key(lane
         assert apple.fake.calls == []
         run_id = _run_id(a)
         assert _apple_state(a) == (True, True, "data_deleted", "pending")
-        assert _run(run_id)[4]["last_error"] == {"apple": "key_mismatch"}
-        # Under the current key, #802's discard_unreadable drops it.
+        assert _run(run_id)[4]["last_error"] == {"apple": "key_unproven"}
         outcome = _service(
             lane, SqlAuthAdmin(), apple=apple.service, box=apple.box
         ).delete_account(user_id=a)
         assert outcome.status == "done"
         assert _apple_state(a, run_id) == (False, False, "done", "unrecoverable")
     finally:
-        with psycopg.connect(DSN, autocommit=True) as c:
-            c.execute(
-                "delete from public.apple_sign_in_credentials where user_id=%s", (b,)
-            )
         apple.close()

@@ -24,6 +24,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 KEY_ENV = "ARGUS_INGESTION_SECRET_KEY"
 _VERSION = b"\x01"
 _NONCE_BYTES = 12
+_KEY_ID_LABEL = b"argus-ingestion-key-id:v1"
 
 
 class SecretBoxUnavailable(RuntimeError):
@@ -51,6 +52,17 @@ class SecretBox:
         except (binascii.Error, ValueError):
             raise SecretBoxUnavailable(f"{KEY_ENV} is not base64") from None
         return cls(key)
+
+    @property
+    def key_id(self) -> str:
+        """Non-secret fingerprint of this key, stored next to every envelope it
+        seals (``secret_key_fingerprint``): an HMAC-SHA256 of a fixed label
+        under the key, truncated to 128 bits. It names which key sealed a row
+        without revealing anything about the key, so account deletion can tell
+        "sealed under the key I hold, and it still doesn't open" (dead) from
+        "sealed under some other key" (keep it: Lane 6)."""
+
+        return hmac.new(self._key, _KEY_ID_LABEL, hashlib.sha256).hexdigest()[:32]
 
     def seal(self, plaintext: str, *, source: str, connection_id: str) -> bytes:
         nonce = secrets.token_bytes(_NONCE_BYTES)

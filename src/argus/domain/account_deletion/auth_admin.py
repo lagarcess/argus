@@ -46,8 +46,10 @@ class SupabaseAuthAdmin:
                 "email": email,
                 "email_confirm": True,
                 # GoTrue sets banned_until = now + this duration. No password
-                # and no phone; user metadata is explicitly empty, so the one
-                # email identity holds only the random email and the id.
+                # and no phone. We send no user metadata; GoTrue's email
+                # confirm writes {"email_verified": true} there, and the one
+                # email identity holds the random email, the id and the
+                # email_verified/phone_verified flags. Nothing personal.
                 "ban_duration": PLACEHOLDER_BAN,
                 "app_metadata": {"placeholder": True},
                 "user_metadata": {},
