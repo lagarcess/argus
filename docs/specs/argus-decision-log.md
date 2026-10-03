@@ -225,12 +225,34 @@ user trials, no new growth analytics), scoped to invites only.
 - Apple's first beta review must be scheduled before the first outside
   distribution.
 
+### Sign-in for TestFlight
+
+- Sign-in for TestFlight is Apple, Google and email. Email works with any
+  address and has an in-app confirmation step. The founder added Google because
+  people will likely want to sign up with their Gmail address. (Founder
+  decision, 10:06 to 10:07 PM CT.)
+- Engineering (Yelena) builds Apple and Google sign-in behind default-off flags.
+  They stay off until the founder supplies the keys: for Apple, Sign in with
+  Apple enabled on the app ID, a Services ID and a .p8 key; for Google, a
+  sign-in client.
+- Because the app offers Sign in with Apple, deleting an account also revokes
+  the person's Apple tokens. Deletion also revokes every Google token Argus
+  holds, Gmail source tokens included (Yelena's call, October 2). Native Google
+  sign-in exchanges an ID token and stores no Google refresh token, so there is
+  nothing to revoke for it. The steps are in the
+  [lane handoff](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion).
+
 ### Home comparisons
 
-- A month with a real zero is data, so the comparison still shows. When the
-  earlier period is zero, the difference is shown as an amount (for example
-  "RD$4,500 more than last month"), not a percent.
-- Only a period with no records at all shows as no data.
+- A month with confirmed complete coverage and no spending is a known zero. It
+  shows 0, and the comparison still shows. When the earlier period is zero, the
+  difference is shown as an amount (for example "RD$4,500 more than last
+  month"), not a percent.
+- "Sin datos" (no data) shows only when coverage for the period is missing.
+- (Founder clarification, 10:18 PM CT. This restores the wording of design
+  commit `fc7650ea`. It replaces the reading in #787 that tied no data to a
+  period with no records and called a zero a period whose records add up to
+  zero.)
 
 ### Updates
 
@@ -295,6 +317,26 @@ user trials, no new growth analytics), scoped to invites only.
   in the [lane handoff copy](lanes/mvee-five-lane-handoff.md#copy-founder-locked-iriss-wording).
   This replaces the Head of Engineering's draft to anonymise or delete those
   rows. (Iris's proposal, founder lock at 8:53 PM CT.)
+- Implementation note, not a new decision: "no user id" above is implemented
+  as "no id tied to the person". The foreign keys require a real `auth.users`
+  row, so account deletion creates one nameless, banned placeholder user per
+  household or standalone shared group and departed person (Yelena's call,
+  October 2). A household is one scope: every plan and membership-keyed row in
+  it re-keys to that household's single placeholder, because its members
+  already knew it was one person. Every shared plan sits in a household,
+  because `household_plan_bindings.household_id` is `not null`. No placeholder
+  spans more than one household or group. The "Exmiembro" numbering stays per
+  plan, because it is only a label. The steps are in the
+  [lane handoff](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion).
+- A shared debt plan whose owner deletes their account is not handed over,
+  because nobody can own another person's debt account. It is archived
+  read-only under the placeholder of the plan's household. Contributions keep
+  their values and dates under "Exmiembro" / "Former member", and open
+  balances show as a closed line. Participants see Iris's banner on the
+  archived plan and get the usual member note. This is the Head of
+  Engineering's (Yelena's) call on October 2, not a founder lock. It follows
+  decision 17 and Iris's frozen-balance rule. Yelena confirmed it as the one
+  exception to the plan handover in the bullet above.
 
 ### Outside services
 
