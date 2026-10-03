@@ -506,6 +506,44 @@ def test_expired_or_revoked_group_link_admits_no_one(lane):
         lane.group_link(4, label="Same key", key=key)
 
 
+def test_group_link_closed_mid_redeem_is_not_counted_as_full(lane, monkeypatch):
+    """Codex P2: a revoke or expiry after the open check is not overflow."""
+    revoked = lane.group_link(5, label="Revoked mid-tap")
+    expiring = lane.group_link(5, days=1, label="Expires mid-tap")
+    a, b = lane.users[1:3]
+    original = lane.store._check_open
+    action = {}
+
+    def check_then_close(revoked_at, expires_at):  # noqa: ANN001, ANN202
+        original(revoked_at, expires_at)
+        action.pop("run")()
+
+    monkeypatch.setattr(lane.store, "_check_open", check_then_close)
+
+    def revoke() -> None:
+        # Another connection revokes between the open check and the guarded update.
+        lane.store.revoke_group_link(user_id=lane.founder, link_id=revoked.id)
+
+    def expire() -> None:
+        lane.clock.now += timedelta(days=2)
+
+    action["run"] = revoke
+    with pytest.raises(InvitationRevoked):
+        lane.store.redeem(user_id=a, token=None, code=revoked.code)
+    action["run"] = expire
+    with pytest.raises(InvitationExpired):
+        lane.store.redeem(user_id=b, token=expiring.token, code=None)
+    for link in (revoked, expiring):
+        assert lane.row(
+            "select use_count,overflow_count from public.beta_invitations where id=%s",
+            link.id,
+        ) == (0, 0)
+    assert lane.row(
+        "select count(*) from public.beta_admissions where user_id=any(%s::uuid[])",
+        [a, b],
+    ) == (0,)
+
+
 def test_blank_group_link_label_is_refused_before_insert(lane):
     """Codex P2: a whitespace label is a validation error, never a 500."""
     with pytest.raises(pydantic.ValidationError):

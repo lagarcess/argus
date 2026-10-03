@@ -410,6 +410,19 @@ class PostgresInviteStore:
             (iid, now),
         ).fetchone()
         if taken is None:
+            # The guarded update can miss for three reasons. Read the locked row
+            # to tell them apart: only a full link counts as overflow.
+            revoked_at, expires_at, use_count, max_uses = c.execute(
+                "select revoked_at,expires_at,use_count,max_uses"
+                " from public.beta_invitations where id=%s for update",
+                (iid,),
+            ).fetchone()
+            if revoked_at is not None:
+                raise InvitationRevoked()
+            if expires_at <= now:
+                raise InvitationExpired()
+            if use_count < max_uses:  # pragma: no cover - the update would have won
+                raise InviteRuleViolation("The link changed. Try again.")
             c.execute(
                 "update public.beta_invitations set overflow_count=overflow_count+1"
                 " where id=%s",
