@@ -838,7 +838,8 @@ What the logs and run record tell you:
   counted, and more than 5 in 24 hours logs an alert worth a look.
 - **PostHog.** Outside tests and local dev the step stays pending
   (`analytics_adapter_unconfigured`) until a real deletion adapter ships
-  (#805). Don't turn on `ARGUS_ACCOUNT_DELETION_ENABLED` before then.
+  (#806). Don't turn on `ARGUS_ACCOUNT_DELETION_ENABLED` before then, nor
+  before #805 (decision 17's closed-line balance).
 - **The 7-day alert.** A step pending for 7 days logs
   `account_deletion.needs_operator` (with the step and its last error, no user
   id). Decide whether it can still finish. If it can't (Apple keeps answering
