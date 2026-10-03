@@ -671,6 +671,71 @@ Own app preferences, notification preferences, security, data controls, export a
 
 The September 28 mobile lock keeps Personal details above three groups: App (Preferences, Personalization, Notifications), Account (Security, Data & privacy, Usage), and Support (Help & feedback). Language lives only in Preferences. Personal details offers an avatar theme or profile photo; response preferences remain distinct from remembered context and financial records. Light, Dark and System persist as appearance preferences.
 
+For the October 2 native release pivot (founder design direction, design commit
+`fc7650ea`), identity uses initials and avatar themes. Hide personal photos,
+Personalization, Security and sessions, Shared conversations, and Removed activity
+until their connected native features are assigned. This hides rows and the photo
+option in the first native release; it does not remove them from the September 28
+grouping. Remove only the notification preference named Por correo. This does not
+remove email authentication or recovery. Household email invitations and update
+email are not in this pass, per the [October 2 lane
+locks](argus-decision-log.md#october-2-2026-cuadrao-lane-locks). Keep legal links
+reachable while signed in and provide in-app account deletion. Native memory
+off/reset and source Disconnect controls arrive with those features. Existing web
+availability is unchanged.
+
+### Native release access and account lifecycle, October 2
+
+The founder's next UI assignment prioritizes external TestFlight readiness and
+invites/Household. It supersedes conflicting native preview choices, not current
+production web guest entry or technical contracts. New native users enter with an
+invitation code, link or QR; people without access can reach the cuadrao.ai waitlist.
+Existing admitted users retain sign-in/recovery. The founder's design direction
+adds Apple and Google alongside email. That is not yet recorded as a lock, and the
+[lane handoff](lanes/mvee-five-lane-handoff.md#still-open) still lists Sign in with
+Apple as open. Design their full states, and expose connected buttons only once
+the founder's choice and the connected path are both settled.
+
+Personal app invitations have a ten-invite quota. Household invitations are
+administrator-only, do not consume that quota, and also admit a new person to the
+beta. Only the founder creates a capped, expiring group access link. It is beta-only,
+never grants household membership, and is distinct from a household or financial
+plan invitation. Membership never automatically shares financial records. Under
+the lane contract, group-link redemptions do not use anyone's personal quota.
+
+The assigned account-deletion experience explains removal of the person's data,
+retention of an anonymous invite record, administrator succession to the
+longest-standing remaining member (the household closes if no one is left), and
+removal of the household's locked copy of that owner's history. In plans other
+people own, the person's amounts stay under a nameless "Exmiembro" / "Former member"
+placeholder, open balances with them are frozen as a closed line, and shared plans
+they created pass to the longest-standing participant. These follow the October 2
+locks; the wording is Iris's founder-locked copy in the
+[lane handoff](lanes/mvee-five-lane-handoff.md#copy-founder-locked-iriss-wording).
+Present only applicable consequences, then verification, confirmed completion and
+sign-out. This is requested behavior, not a claim that the existing support-request
+endpoint implements deletion or anonymization. Retention and completion facts need
+the connected contract. Ordinary household leave/removal and financial archive
+retain their own semantics.
+
+Updates includes invitation acceptance, administrator handoff, owner-history
+removal and household closure. The lane contract so far assigns invitation
+acceptance and the account-deletion notices; administrator handoff and household
+closure notices still need a lane. Bill reminders occur three days before and on
+the due date while still due; push previews contain no amounts. A moved account's
+authorized pre-move household history is read-only and visibly distinguished.
+Only a period with no records at all shows Sin datos. A month with a real zero is
+data and still shows, and a comparison with it uses an amount difference rather
+than a percent ([Home comparisons lock](argus-decision-log.md#home-comparisons)).
+
+Explicit AI disclosure/consent must precede the first sharing of personal data
+with an external model, so no model call happens before consent. It ships with that feature, including if live chat lands
+before document reading. Local capture and save-for-later do not require model
+processing. [Cuadrao's guide](../../.agent/designs/cuadrao/DESIGN.md#13-release-readiness-interaction-rules)
+owns interaction details. The [main roadmap](argus-execution-board.md#cuadrao-release-ui-landing-order)
+owns the landing order and evidence. Build Household/Connected UI changes on
+integration's existing owners rather than the older preview sheets.
+
 ## 4. Information ingestion: one destination, several entry methods
 
 The product must work with incomplete banking connectivity. Users may mix input methods without creating competing copies of their finances.

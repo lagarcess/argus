@@ -169,6 +169,7 @@ Lucas settled the two earlier open items on 2 October. Whether a beta invite is 
 
 1. **How the code gate fits the existing access gate.** `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` and the `private_alpha_allowlist` table already decide who can sign up and sign in, and the [API contract](../../API_CONTRACT.md) says public registration has been open in production since 12 August 2026. Turning that flag off to gate the beta would also close web registration. The code gate gets its own flag and does not flip the existing one. The exact way a redeemed code admits a person is a technical design item in the Household PR, under Codex review.
 2. **Sign in with Apple revocation on deletion.** The Sign in with Apple button exists in the app as a preview and does not sign anyone in. Lucas has not yet decided whether it is connected before external TestFlight or hidden. If he says yes, account deletion also revokes the person's Apple tokens through Apple's REST API, as Apple requires for apps that use Sign in with Apple. If he says no, the button is hidden and that step is dropped. Only that step in [Lane 6](#lane-6-account-deletion) waits.
+3. **Web account deletion.** The web deletion-request dialog in `web/components/sidebar/ProfileMenu.tsx` still sends `account_deletion_request` to `POST /api/v1/feedback`, which emails support. It stays live. Web will use the same [Lane 6](#lane-6-account-deletion) deletion command as every other client, as guest accounts already do. The support-email path and the dialog are retired only in the Lane 6 PR that moves web onto that command. Only that retirement waits.
 
 ## Next steps for Lucas
 
@@ -265,14 +266,14 @@ Two kinds of move, both under decision 10.
 ### Move invariants
 
 - Do not rewrite historical balances, opening balances, corrections, or settlements. Do not copy them onto the destination.
-- Each move is an event: account id, kind (space or departure), source, destination, actor, time, and an idempotency key. The owner creates space moves through the move command. Departure events come only from the system departure function. The account id does not change. `space_id` is the current assignment only.
+- Each move is an event: account id, kind (`space_move`, `departure`, or `deletion`), source, destination, actor, time, and an idempotency key. The owner creates space moves through the move command. Departure events come only from the system departure function, and deletion events only from the Lane 6 account-deletion function. The account id does not change. `space_id` is the current assignment only.
 - The same idempotency key replayed is a no-op that returns the first result. A failed move leaves one end state, source or destination, with history intact.
 - Home series and comparisons are recomputed from canonical history. They are not a snapshot copied onto the new space.
 - Locked household history pins revisions. It never references a revision written after the cut-off.
 
 ### Access rules per role
 
-New tables follow the household pattern: RLS on, all client privileges revoked, and the API checks the role on every route. Locked history and move events are append-only, and the service role gets select only on them, with insert revoked. Only three functions write them: the system departure function inserts departure events and the locked copy, the owner's move command inserts space-move events, and the account-deletion function from Lane 6 removes the deleting user's rows and the household's locked copy of their history. The writers are SECURITY DEFINER functions in the `argus_private` schema, owned by `postgres` and executable only by `service_role`, and each sets a transaction-local `argus.locked_history_writer` value (`departure`, `space_move`, or `deletion`) with `set_config(..., true)` before it writes; the trigger allows a write only when `current_user = 'postgres'` and that value permits the operation, the same pattern `argus.owner_transfer` uses in `20260724211312_guest_workspace_handoffs.sql` and `20260726185021_harden_guest_lifecycle_ownership.sql`. The trigger rejects every update, and every insert or delete that does not come from those functions, for every role, ordinary service-role writes included, because the service role bypasses RLS. Nothing else can add, change, or remove them.
+New tables follow the household pattern: RLS on, all client privileges revoked, and the API checks the role on every route. Locked history and move events are append-only, and the service role gets select only on them, with insert revoked. Only three functions write them: the system departure function inserts departure events and the locked copy, the owner's move command inserts space-move events, and the account-deletion function from Lane 6 removes the deleting user's rows and the household's locked copy of their history. The writers are SECURITY DEFINER functions in the `argus_private` schema, owned by `postgres` and executable only by `service_role`, and each sets a transaction-local `argus.locked_history_writer` value (`departure`, `space_move`, or `deletion`) with `set_config(..., true)` before it writes; the trigger allows a write only when `current_user = 'postgres'` and that value permits the operation, the same pattern `argus.owner_transfer` uses in `20260724211312_guest_workspace_handoffs.sql` and `20260726185021_harden_guest_lifecycle_ownership.sql`. Each writer may write one event kind only: the departure function writes `departure` events, the deletion function writes `deletion` events, and the move command writes `space_move` events. The trigger rejects an event whose kind does not match the writer value. All three functions declare `set search_path = ''` and schema-qualify every name they use. The user id a writer acts for comes only from the API's verified JWT, and the API passes it in. A null `auth.uid()` never counts as ownership, and no writer falls back to it. Yelena (Head of Engineering) approved the move command as the third writer on October 2. That is a delivery call, not a founder lock. The trigger rejects every update, and every insert or delete that does not come from those functions, for every role, ordinary service-role writes included, because the service role bypasses RLS. Nothing else can add, change, or remove them.
 
 | Role | Move events | Locked household history | Live account |
 | --- | --- | --- | --- |
@@ -281,9 +282,9 @@ New tables follow the household pattern: RLS on, all client privileges revoked, 
 | Member who had an explicit grant at the cut-off | None. Never writes them | Read. No create, edit, or delete | None after departure |
 | Member with no grant at the cut-off | None | None | None |
 | Anyone else | None, `404` | None, `404` | None |
-| System departure function, SECURITY DEFINER | Insert the departure event once per idempotency key | Insert at the cut-off only | None |
-| Move command function, SECURITY DEFINER | Insert the owner's space move once per idempotency key, after checking that the caller owns the account (`auth.uid()`, or the verified user id the API passes in) | None | None |
-| Account-deletion function from Lane 6, SECURITY DEFINER | Remove the deleting user's events | Remove the household's locked copy of that user's history | Remove that user's rows |
+| System departure function, SECURITY DEFINER, `set search_path = ''` | Insert the departure event once per idempotency key. Writes `departure` events only | Insert at the cut-off only | None |
+| Move command function, SECURITY DEFINER, `set search_path = ''` | Insert the owner's space move once per idempotency key, after checking that the user owns the account. The user id comes only from the API's verified JWT, which the API passes in. A null `auth.uid()` never counts as ownership. Writes `space_move` events only | None | None |
+| Account-deletion function from Lane 6, SECURITY DEFINER, `set search_path = ''` | Remove the deleting user's events. Writes `deletion` events only, with no user id | Remove the household's locked copy of that user's history | Remove that user's rows |
 | Other service-role writes | Select only. No insert, update, or delete | Select only. No insert, update, or delete | Existing writes |
 
 Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and `financial_record_revisions_owner_select` in `supabase/migrations/20260928200000_financial_accounts_first_slice.sql`; `is_active_household_member` and `household_account_grants_member_select` in `20261001090000_household_membership.sql`; the client-privilege revoke in `20261001120000_household_consent_recovery.sql`; `household_command_receipts` for idempotency; and the revision-pinning pattern of `household_plan_archived_activities` in `20261002020000_shared_plan_retained_revision_scope.sql`, which already pins exact activity revisions when a shared plan's owner departs.
@@ -299,7 +300,7 @@ Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and
 - Home series and the comparison read after the move match a fresh computation from canonical history for the destination space.
 - Household grants, budget rows, and goal rows keep their ids.
 - After a departure, an update or delete on locked history fails for the owner, the admin, and ordinary service-role writes.
-- A stray service-role insert into locked history or move events, outside the departure function, the move command, and the deletion function, fails. This includes a direct insert of a move event. The move command rejects a caller who does not own the account.
+- A stray service-role insert into locked history or move events, outside the departure function, the move command, and the deletion function, fails. This includes a direct insert of a move event. The move command rejects a caller who does not own the account, and rejects a call with no verified user id even when `auth.uid()` is null. A writer that inserts an event of another kind, such as the departure function writing `space_move`, fails.
 - After a departure, a member or admin who had no grant to the account at the cut-off reads no locked history for it.
 - Replaying the departure with the same key writes no second event and no second cut-off.
 - The account-deletion function removes the deleting owner's move events and the household's locked copy of their history, and nothing else. The Lane 6 eval covers the rest of the deletion.
@@ -485,14 +486,14 @@ iOS, by Lucas's local agent: relaunch shows the same unread and read rows. Engli
 
 ### Journey and completion
 
-A signed-in person opens Delete account in the app, sees what will be deleted, and confirms. The server runs the steps below in order. When it finishes, the app signs out and that account can no longer sign in. If the person was a household admin, the admin role has passed to the longest-standing remaining member, or the household has closed if no one is left. The other members see a short note that a member deleted their account, without naming them. In plans other people own, the person's amounts stay under a nameless former-member placeholder, and any open balance with them shows as a closed line. Shared plans they created pass to the longest-standing participant in each, who gets a message saying so. The anonymous invite record and the network counts stay. The wording is in [Copy](#copy-founder-locked-iriss-wording).
+A signed-in person opens Delete account in the app, sees what will be deleted, and confirms. The server runs the steps below in order. When it finishes, the app signs out and that account can no longer sign in. If the person was a household admin, the admin role has passed to the longest-standing remaining member, or the household has closed if no one is left. The other members see a short note that a member deleted their account, without naming them. In plans other people own, the person's amounts stay under a nameless former-member placeholder, and any open balance with them shows as a closed line. Shared plans they created pass to the longest-standing participant in each, as live plans that person can edit, and that person gets a message saying so. The anonymous invite record and the network counts stay. The wording is in [Copy](#copy-founder-locked-iriss-wording).
 
 Completion is a real deletion against Postgres of a user who has their own plans, a part in a plan another member owns, a household membership as admin, a membership as a member, a Gmail or Plaid connection, a document, an accepted invite, and saved feedback. Nothing that identifies them is left, and the other members' balances are unchanged.
 
 ### What exists today
 
 - Deletion is a support request. `account_deletion_request` on `POST /api/v1/feedback`, in `src/argus/api/routers/feedback.py`, saves a feedback row with the account email and the user id in its context and emails `support@get-argus.com`. There is no in-app deletion function. `delete_auth_user` in `src/argus/domain/supabase_guest_accounts.py` is used only for guest cleanup.
-- A plain delete of the auth user would fail for anyone who has ever made a plan. In `supabase/migrations/20261002000000_shared_household_planning.sql`, `financial_plan_definition_revisions.owner_id` and `actor_id` and `household_plan_receipts.actor_id` reference `auth.users` with `on delete restrict`. `household_members.user_id` cascades from `auth.users`, but `household_plan_bindings`, `household_plan_participants`, `financial_plan_responsibilities`, `household_plan_receipts`, and the `contributor_membership_id` columns on `financial_plan_links` and `financial_goal_allocations` reference that membership row with `on delete restrict`. In `20261002020000_shared_plan_retained_revision_scope.sql`, `household_plan_bindings.first_shared_revision` and `household_plan_archived_activities`, the #773 archive, also restrict. This comes from reading the migrations. A real deletion test against Postgres comes first in this lane.
+- A plain delete of the auth user would fail for anyone who has ever made a plan. In `supabase/migrations/20261002000000_shared_household_planning.sql`, `financial_plan_definition_revisions.owner_id` and `actor_id` and `household_plan_receipts.actor_id` reference `auth.users` with `on delete restrict`. `household_members.user_id` cascades from `auth.users`, but `household_plan_bindings`, `household_plan_participants`, `financial_plan_responsibilities`, `household_plan_receipts`, and the `contributor_membership_id` columns on `financial_plan_links` and `financial_goal_allocations` reference that membership row with `on delete restrict`. In `20261002020000_shared_plan_retained_revision_scope.sql`, `household_plan_bindings.first_shared_revision` and `household_plan_archived_activities`, the #773 archive, also restrict. This comes from reading the migrations. The full list is in [Foreign keys and user-id columns](#foreign-keys-and-user-id-columns). A real deletion test against Postgres comes first in this lane.
 - When a member leaves, `retain_membership` in `src/argus/domain/household/planning_retention.py` pins their contributions to plans other people own into `household_plan_archived_claims` and `household_plan_archived_allocations`, against exact activity and allocation revisions. The `retain_foreign_activity` trigger in `20261002010000_shared_money_original_leg_owners.sql` refuses to delete an activity group while it holds a leg recorded by another owner.
 - Where a delete does go through, it skips other domains. `financial_source_connections` cascades, so the stored credential is dropped without revoking access at Google or Plaid. `household_invitations.created_by` and `accepted_by` are set to null. The feedback row's `user_id` is set to null and the email in its context stays. PostHog events stay under the person's distinct id.
 - `disconnect` in `src/argus/domain/ingestion/hub.py` revokes at Google and Plaid and is idempotent. If revocation fails, it reports `provider_revocation: failed` and deletes the local credential anyway, so nothing is left to retry with.
@@ -500,25 +501,29 @@ Completion is a real deletion against Postgres of a user who has their own plans
 
 ### Steps, in order
 
-1. **Household leave and admin handoff.** If the person is a household admin, the admin role passes to the longest-standing remaining member, or the household closes if no one is left (decision 15). Longest-standing means the earliest `joined_at` on `household_members`, and a tie goes to the lowest membership id. Then the existing leave rules run for each membership, so grants are revoked, `retain_membership` pins the person's contributions, and shared plans are archived as they are when someone leaves.
-2. **Revoke every connected source.** Revoke Gmail and Plaid at the provider for each source connection, and delete the credential only after the provider confirms. If a revocation fails, the run keeps a pending revocation for that source, with the encrypted credential it needs, and retries it. It does not delete the credential silently and move on, as `disconnect` does today. The pending revocation is held in the run record, not in the person's connection row, so it survives step 7. The run does not report done while a revocation is pending.
+1. **Admin handoff, plan handover, then household leave.** For each of the person's households, in this order:
+   1. If the person is the household admin, the admin role passes to the longest-standing remaining member, or the household closes if no one is left (decision 15). Longest-standing means the earliest `joined_at` on `household_members`, and a tie goes to the lowest membership id.
+   2. Each shared plan the person owns that has another participant passes to that plan's longest-standing participant (decision 17), who gets the new-owner message. This runs before the leave rules. The plan's binding, definition, and owner-keyed rows move to the new owner's user id and membership, and the plan stays live and editable, with the same name. It gets no `departed_at`, and it is not turned into the #773 read-only archive. The new owner can edit it as soon as the run finishes. Shared plans with no other participant are not handed over. Step 5.2 deletes them.
+   3. Then the existing leave rules run for the membership. Grants are revoked, and `retain_membership` pins the person's contributions to plans other people own, including the plans just handed over. The leave archive, `departed_at` and the #773 read-only archive, never applies to a plan handed over in step 1.2, because the person no longer owns it when the leave runs.
+2. **Revoke every connected source.** Revoke Gmail and Plaid at the provider for each source connection, and delete the credential only after the provider confirms. If a revocation fails, the run keeps a pending revocation for that source, with the encrypted credential it needs, and retries it. The encrypted credential is kept only while that revocation is pending, and it is deleted when the revocation succeeds. It is not deleted silently while the revocation is still owed, as `disconnect` does today. The pending revocation is held in the run record, not in the person's connection row, so it survives step 7. The run does not report done while a revocation is pending.
 3. **Delete Storage files.** After #778 moves document bytes into a private Supabase Storage bucket, delete each of the person's Storage objects. A database cascade does not remove them. Until #778 lands, document bytes are database rows and go with the person's rows.
 4. **Clear invite ids and keep the anonymous record.** Clear the live sender and acceptor ids on the who-invited-whom record from Lane 1, and keep the anonymous row, so the counts and the invite chain survive (decision 3). This is an explicit step. It does not rely on `on delete set null`.
 5. **Shared plans and protected plan history (decision 17, founder lock at 8:53 PM CT).** In this order:
    1. **Plans other people own.** The person's amounts keep their values and dates under a nameless placeholder: "Exmiembro" in Spanish and "Former member" in English, numbered "Exmiembro 1", "Exmiembro 2" ("Former member 1", "Former member 2") when more than one person has left that plan. The placeholder has no user id, name, avatar, or email. Their receipts, photos, and free-text notes on those amounts are deleted. Amount, date, and category stay. Open balances with them are frozen: not marked settled and not forgiven. They come out of the active totals and show as a closed line. A member can later mark that line settled, which is recorded as a new event. Their future responsibilities go back to the plan's owner, who gets an Update to reassign or re-split them. Past legs stay as they are.
-   2. **Shared plans they owned.** Each one, including its #773 archive, passes to the plan's longest-standing participant, who gets the new-owner message. If nobody else is in the plan, it is deleted. The plan name stays.
+   2. **Shared plans they owned.** Each one with another participant was already handed over in step 1.2, so its new owner has a live, editable plan with the same name. Here the function deletes only the shared plans where nobody else is a participant, with their bindings and revisions. A #773 archive left by an earlier departure passes as it is, still read-only, to the longest-standing participant of that plan. The deletion never creates a new archive.
    3. **Their own remaining plans.** Delete the person's personal plan definitions and their `financial_plan_definition_revisions`, explicitly, inside this function.
    4. **Locked copy.** Once account moves has landed, also remove the household's locked copy of the person's history and their move events (decision 14), under the trigger exception in Lane 2.
 
    The other members then see the note in [Copy](#copy-founder-locked-iriss-wording).
 
    **Engineering note, not a product decision.** The design for this step is in the lane PR, under Codex review. It has to cover:
-   - How the placeholder gets past `retain_foreign_activity`, which refuses to delete an activity group that holds another owner's leg, and past the `on delete restrict` references to the person's `household_members` row from `household_plan_bindings`, `household_plan_participants`, `financial_plan_responsibilities`, `household_plan_receipts`, and the `contributor_membership_id` columns. One reading is that the membership row stays as the placeholder with its user id cleared. Today `household_members.user_id` is `not null` and cascades from `auth.users`, so that needs a migration.
-   - The columns that require an `auth.users` id today: `financial_plan_definition_revisions.owner_id` and `actor_id`, and `household_plan_receipts.actor_id`, which is a command receipt for idempotency, not a purchase receipt.
+   - Every row in [Foreign keys and user-id columns](#foreign-keys-and-user-id-columns), with the action the table gives it.
+   - How the placeholder gets past `retain_foreign_activity`, which refuses to delete an activity group that holds another owner's leg, and past the `on delete restrict` references to the person's `household_members` row. One reading is that the membership row stays as the placeholder with its user id cleared. Today `household_members.user_id` is `not null` and cascades from `auth.users`, so that needs a migration.
+   - How the activity, record, and allocation revisions that other people's plans still reference stop holding the person's user id. Those references are composite keys that include the owner's user id (`activity_owner_id`, `record_owner_id`, `account_owner_id`, `goal_owner_id`), so the revisions cannot simply be deleted, and acceptance says no row may hold the user id afterward.
    - The rows `retain_membership` pinned in `household_plan_archived_claims` and `household_plan_archived_allocations`, and the activity and allocation revisions they pin, which stay as the placeholder's amounts.
-   - Moving ownership of a shared plan, and its #773 archive in `household_plan_archived_activities`, to the new owner across the owner-keyed columns, including `household_plan_bindings.owner_user_id` and `owner_membership_id` and the `first_shared_revision` reference from `20261002020000_shared_plan_retained_revision_scope.sql`.
+   - Moving ownership of a shared plan in step 1.2, and an existing #773 archive in `household_plan_archived_activities` in step 5.2, to the new owner across the owner-keyed columns, including `household_plan_bindings.owner_user_id` and `owner_membership_id` and the `first_shared_revision` reference from `20261002020000_shared_plan_retained_revision_scope.sql`.
    - Where receipts, photos, and notes attached to those amounts are stored, so they can be deleted while amount, date, and category stay.
-   - How "longest-standing participant" is measured for a plan. A tie goes to the lowest membership id, as for the admin handoff.
+   - "Longest-standing participant" for a plan. Lane 6 adds `joined_at` to `household_plan_participants`. It is backfilled from the `recorded_at` of the earliest plan definition revision that added the participant, else the row's created time. The table has no created-time column today, so the lane PR states which time it uses where no revision is found. A tie goes to the lowest membership id. This rule is deterministic but arbitrary: it always picks the same person, but nobody chose that person.
    - The reassign Update, the member note, and the new-owner message are written as events this lane owns. Updates lands later, in slot 7, and reads them as its source, following [Contracts between lanes](#contracts-between-lanes).
 6. **Clear the email from feedback.** Clear the account email and the user id from the context of the person's saved feedback rows. This runs before the auth user is deleted, because `feedback.user_id` is set to null at that point and the rows could then only be found by the email itself. The copy already emailed to support through Resend cannot be cleared by this function.
 7. **Delete the auth user.** This runs after the steps above, so no restricting row blocks it.
@@ -528,7 +533,70 @@ Completion is a real deletion against Postgres of a user who has their own plans
 
 The whole run is idempotent and can resume after a partial failure. A retry continues from the first step that did not finish. The run record is keyed by a hash of the user id and never stores the user id itself. It keeps the PostHog distinct id, which is already a hash, and any pending revocation until those steps finish.
 
-When Lane 6 ships, the support-email deletion path, `account_deletion_request` on `POST /api/v1/feedback`, is retired. Deletion goes through the in-app route.
+The web deletion request stays live, and it is open ([Still open](#still-open) item 3). Today the web profile menu offers a deletion-request dialog that sends `type: "account_deletion_request"` (`web/components/sidebar/ProfileMenu.tsx`, line 838) through the feedback client typed in `web/lib/argus-api.ts` (line 1232) to `POST /api/v1/feedback` (`src/argus/api/routers/feedback.py` and `src/argus/api/schemas.py`). Web will use the same Lane 6 deletion command as every other client. Guest accounts already go through it. The `account_deletion_request` path and the web dialog are retired only in the Lane 6 PR that moves web onto that command. Until then they keep working.
+
+### Foreign keys and user-id columns
+
+This is every foreign key and direct user-id column a deleted user can touch, found by searching `supabase/migrations/` for `references auth.users`, `references public.household_members`, `references public.profiles` (`profiles.id` cascades from `auth.users` in `20260424000001_alpha_core.sql`), and `*_owner_id`, `*_user_id`, and `*_by` columns. "On delete" is what Postgres does when the referenced row goes. "None" means the column has no foreign key of its own.
+
+The Lane 6 PR opens with a real-Postgres test that deletes a user who has a row behind every entry below. That test comes before any deletion code.
+
+**Direct references to `auth.users`**
+
+| Column | On delete | What Lane 6 does |
+| --- | --- | --- |
+| `profiles.id` | cascade | Goes in step 7. The older Argus tables at the end of this list go with it |
+| `user_id` on `financial_accounts`, `financial_account_idempotency`, `financial_activity_groups`, `financial_expectations`, `financial_plan_selections`, `financial_plan_links`, `financial_plan_receipts`, `financial_budgets`, `financial_goals`, `financial_debt_plans`, `financial_asset_details`, `financial_asset_changes`, `financial_import_events`, `financial_document_extractions` | cascade | Rows of a plan handed over in step 1.2 move to the new owner first. The rest go in step 7. A restrict reference below that still points at one of these rows stops the cascade |
+| `user_id` on `financial_source_connections`, `financial_source_gmail_senders`, `financial_shortcut_device_tokens` | cascade | Step 2 revokes each source at the provider first. The rows go in step 7 |
+| `household_members.user_id` | cascade | Step 1 hands over the admin role and runs the leave. A membership row that a restrict column below still references stays as the placeholder with `user_id` cleared, which needs a migration because the column is `not null`. Other membership rows go in step 7 |
+| `household_command_receipts.actor_id` | cascade | Goes in step 7 |
+| `households.admin_user_id` | set null | Step 1 sets the new admin, or closes the household, before step 7 |
+| `households.created_by` | set null | Goes null in step 7 |
+| `household_invitations.created_by`, `accepted_by` | set null | Step 4 clears them explicitly. It does not rely on the set null |
+| `financial_record_revisions.recorded_by` | set null | Goes null in step 7. On revisions kept as the placeholder's amounts, null is the expected value |
+| `guest_workspace_handoffs.destination_user_id` | set null (changed from restrict in `20260812183000_guest_account_signup_handoffs.sql`) | Goes null in step 7. `source_user_id` cascades from `guest_workspaces` |
+| `financial_plan_definition_revisions.owner_id` | restrict | Moves to the new owner for plans handed over in step 1.2. Deleted in step 5.2 for shared plans with no other participant, and in step 5.3 for personal plans |
+| `financial_plan_definition_revisions.actor_id` (nullable) | restrict | Cleared to null in step 5 on revisions the person wrote in plans they no longer own |
+| `household_plan_receipts.actor_id` | restrict | The person's command receipts are deleted in step 5. They are idempotency records, not purchase receipts |
+
+**References to `household_members`**
+
+| Column | On delete | What Lane 6 does |
+| --- | --- | --- |
+| `household_invitations.accepted_membership_id` | set null | Cleared in step 4 with the invite ids |
+| `household_account_grants`, owner and recipient membership keys | cascade | Revoked by the leave in step 1.3. Any left go with the membership row |
+| `household_command_receipts.membership_id` | set null | Goes null with the membership row |
+| `household_plan_bindings.owner_membership_id` with `owner_user_id` | restrict | Moved to the new owner in step 1.2. Deleted in step 5.2 for plans with no other participant |
+| `household_plan_participants.membership_id` | restrict | Rows in plans other people own stay, pointing at the placeholder membership (step 5.1). Lane 6 adds `joined_at` to this table for the handover |
+| `financial_plan_responsibilities.membership_id` | restrict | Past rows stay on the placeholder. Future responsibilities go back to the plan's owner (step 5.1) |
+| `household_plan_receipts.membership_id` | restrict | Deleted with the person's command receipts in step 5 |
+| `financial_plan_links.contributor_membership_id` | restrict | Stays, pointing at the placeholder (step 5.1) |
+| `financial_goal_allocations.contributor_membership_id` | restrict | Stays, pointing at the placeholder (step 5.1) |
+| `financial_goal_allocation_revisions.contributor_membership_id` | restrict | Stays, pointing at the placeholder (step 5.1) |
+
+**User-keyed columns that reach `auth.users` through a composite key**
+
+| Column | On delete | What Lane 6 does |
+| --- | --- | --- |
+| `financial_plan_links.activity_owner_id`, through `(activity_id, activity_revision, activity_owner_id)` to `financial_activity_revisions` | restrict | The person's activity revisions that another person's plan claims stay as the placeholder's amounts (step 5.1), without the person's user id |
+| `household_plan_archived_claims.activity_owner_id`, same key | restrict | Same as above. These are the rows `retain_membership` pinned |
+| `household_plan_archived_activities.activity_owner_id`, same key, the #773 archive | restrict | An archive from an earlier departure passes as it is in step 5.2. The pinned revisions stay, without the person's user id |
+| `financial_goal_allocations.goal_owner_id` and `account_owner_id`, to `financial_goals` and `financial_accounts` | cascade, and `goal_owner_id` also restrict through `binding_id` | Goal side moves with a plan handed over in step 1.2. Account side, the person's account funding another person's goal, stays as the placeholder's amount (step 5.1) |
+| `financial_goal_allocation_revisions.goal_owner_id` and `account_owner_id` | restrict | Same split as the allocation rows above |
+| `financial_activity_memberships.record_owner_id`, to `financial_record_revisions` | none (no action) | A leg the person recorded inside another owner's activity stays as the placeholder's amount. `retain_foreign_activity` in `20261002010000_shared_money_original_leg_owners.sql` refuses to delete a group that holds such a leg |
+| `financial_record_revisions.reversal_of_owner_id`, to `financial_activity_revisions` | none (no action), deferrable initially deferred | Checked at commit. A reversal that points at a revision of the person's fails at commit unless that revision stays |
+| `household_plan_bindings.owner_user_id` and `financial_plan_responsibilities.owner_id`, through the plan definition keys | restrict | Moved in step 1.2, or deleted in step 5.2 |
+| `household_account_grants.owner_user_id`, through the account and membership keys | cascade | Revoked by the leave in step 1.3 |
+| `user_id` on `financial_records`, `financial_record_revisions`, `financial_observation_coverage`, `financial_operation_receipts`, `financial_activity_memberships`, `financial_activity_receipts`, `financial_activity_revisions`, `financial_import_observations`, `financial_import_account_links`, through their `(id, user_id)` parent keys | cascade | Go in step 7, except the revisions kept as the placeholder's amounts in step 5.1 |
+| `financial_asset_changes.recorded_by` | none | Goes with its account row in step 7. The test checks no row keeps the id |
+
+**Older Argus tables that reference `public.profiles`**
+
+| Column | On delete | What Lane 6 does |
+| --- | --- | --- |
+| The user or owner column on `conversations`, `messages`, `conversation_read_states`, `ideas`, `idea_versions`, `strategies`, `collections`, `collection_strategies`, `backtest_jobs`, `backtest_runs`, `chat_turn_lifecycles`, `context_packets`, `run_context_packets`, `decision_notes`, `evidence_artifacts`, `refusal_observations`, `usage_counters`, `public_excerpt_snapshots`, `guest_workspaces.user_id`, and the `memory_*` tables | cascade | Go in step 7. If a memory retrieval provider outside Postgres holds copies, the lane PR names it and how they are removed |
+| `feedback.user_id` | set null | Step 6 clears the email and user id from the context first |
+| `cost_ledger_entries.user_id`, `route_receipts.user_id`, `guest_workspaces.claimed_by` | set null | Go null in step 7 |
 
 ### What is new
 
@@ -539,7 +607,7 @@ When Lane 6 ships, the support-email deletion path, `account_deletion_request` o
 - The admin handoff on deletion, inside the Household owner.
 - A PostHog deletion adapter with a recording fake, behind `ARGUS_ANALYTICS_DELETION_ENABLED`. See [Outside services](#outside-services-fakes-behind-default-off-flags).
 - The note the other members see.
-- Retiring `account_deletion_request`.
+- Moving web onto the deletion command, and in that same PR retiring `account_deletion_request` and the web dialog.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
 
@@ -548,7 +616,7 @@ When Lane 6 ships, the support-email deletion path, `account_deletion_request` o
 
 ### Allowed files
 
-A new deletion module under `src/argus/domain/` and one router, `src/argus/domain/household/` for the admin handoff, the leave call, the former-member placeholder, frozen balances, and plan ownership transfer, `src/argus/domain/ingestion/hub.py` for the deletion revocation path only, `src/argus/observability/` for the PostHog deletion adapter, the feedback router, schema, and store for clearing the email and retiring `account_deletion_request`, one new migration, the account and Household deletion sections of the API contract and data model when this lane is landing, the iOS profile row and confirmation screen, and the tests for all of these.
+A new deletion module under `src/argus/domain/` and one router, `src/argus/domain/household/` for the admin handoff, the leave call, the former-member placeholder, frozen balances, and plan ownership transfer, `src/argus/domain/ingestion/hub.py` for the deletion revocation path only, `src/argus/observability/` for the PostHog deletion adapter, the feedback router, schema, and store for clearing the email, and, in the PR that moves web onto the deletion command, retiring `account_deletion_request` together with `web/components/sidebar/ProfileMenu.tsx`, `web/lib/argus-api.ts`, and their web tests, one new migration, the account and Household deletion sections of the API contract and data model when this lane is landing, the iOS profile row and confirmation screen, and the tests for all of these.
 
 No-touch: what `disconnect` does for an ordinary disconnect, `resend_email.py`, invitation token storage, Plan math, and the design branch files.
 
@@ -576,7 +644,8 @@ After deletion:
 - The who-invited-whom counts and chain are unchanged and hold no id.
 - Their feedback rows hold no email or user id.
 - The PostHog fake recorded a deletion for their distinct id with events included.
-- `account_deletion_request` is no longer accepted.
+- The new owner of a handed-over plan can edit it right after the run. It has no `departed_at` and no #773 archive from this deletion.
+- In the PR that moves web onto the deletion command, web deletion uses that command and `account_deletion_request` is no longer accepted. Before that PR, the web dialog still works.
 - A guest account is deleted by the same command.
 - Replaying the deletion changes nothing. Stopping the run after any step and retrying reaches the same end state.
 - With `ARGUS_ACCOUNT_DELETION_ENABLED` off, the route answers `404` before auth.
