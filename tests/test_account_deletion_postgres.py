@@ -573,3 +573,24 @@ def test_rejects_bad_ids_unknown_people_and_guests(lane):  # noqa: F811
     finally:
         with psycopg.connect(DSN, autocommit=True) as c:
             c.execute("delete from auth.users where id=%s", (guest,))
+
+
+def test_auth_user_trigger_conditions_need_no_private_schema() -> None:
+    """GoTrue writes auth.users as supabase_auth_admin, which can't reach
+    argus_private. A WHEN clause that calls into it fails every sign-up."""
+    with psycopg.connect(DSN) as c:
+        rows = c.execute(
+            "select tgname, pg_get_triggerdef(oid) from pg_trigger"
+            " where tgrelid = 'auth.users'::regclass and not tgisinternal"
+        ).fetchall()
+    conditions = {
+        name: definition.split(" WHEN ", 1)[1].split(" EXECUTE ", 1)[0]
+        for name, definition in rows
+        if " WHEN " in definition
+    }
+    assert {"bind_guest_signup_handoff", "finalize_linked_guest_identity"} <= set(
+        conditions
+    )
+    for name, condition in conditions.items():
+        assert "argus_private" not in condition, name
+        assert "placeholder" in condition, name
