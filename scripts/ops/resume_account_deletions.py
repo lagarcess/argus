@@ -1,9 +1,11 @@
-"""Resume account deletion runs still in flight (Lane 6 sweep).
+"""Resume account deletion runs still in flight (Lane 6, operator-run sweep).
 
 A run stays in flight while a third party (Apple, Plaid, Gmail, PostHog) hasn't
 confirmed; the account is locked meanwhile and its auth delete waits. This pass
 resumes each idle run through the same command the route runs, so the sweep
-and a person's own retry can't diverge. Registered in scheduled_maintenance.py.
+and a person's own retry can't diverge. A run another pass holds is counted
+``busy`` and left alone. It runs inside scheduled_maintenance.py, which an
+operator runs (PRIVATE_LAUNCH_RUNBOOK.md has the cadence); nothing schedules it.
 """
 
 from __future__ import annotations

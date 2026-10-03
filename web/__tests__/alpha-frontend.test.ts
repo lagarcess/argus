@@ -2531,14 +2531,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(detailsDialog).toContain("ENABLED_LANGUAGES");
     expect(detailsDialog).toContain("languageDisplayAbbreviation");
     expect(profileMenu).toContain("localeForLanguage");
-    // Lane 6: the delete button runs the deletion command, not a support
-    // request, and leaving the dialog after success signs out.
-    expect(profileMenu).toContain("deleteAccount");
-    expect(profileMenu).not.toContain("account_deletion_request");
+    // Lane 6: the delete button runs the deletion command; with the command
+    // off (404) it falls back to the support ticket. Leaving the dialog after
+    // success or in_progress signs out. Outcomes: account-deletion-api.test.ts.
+    expect(profileMenu).toContain("requestAccountDeletion(currentLanguage)");
     expect(profileMenu).toContain("onLogout();");
-    expect(profileMenu).toContain('status === 404 ? "unavailable" : "error"');
-    // 202 in_progress is its own state, never shown as done.
-    expect(profileMenu).toContain('result.status === "in_progress" ? "in_progress" : "success"');
     expect(deleteRequestDialog).toContain(
       "settings.profile.request_deletion.in_progress",
     );
@@ -2555,13 +2552,18 @@ describe("Argus Alpha frontend contract", () => {
       "overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]",
     );
     expect(profileMenu).not.toContain('profile?.language ?? "en"');
-    expect(api).not.toContain("account_deletion_request");
+    expect(api).toContain('"account_deletion_request"');
     const deletionApi = readFileSync(
       join(root, "lib/account-deletion-api.ts"),
       "utf-8",
     );
     expect(deletionApi).toContain('"/account/delete"');
     expect(deletionApi).toContain("JSON.stringify({ confirm: true })");
+    expect(deletionApi).toContain('type: "account_deletion_request"');
+    expect(deletionApi).toContain('code === "account_deletion_incomplete"');
+    expect(deleteRequestDialog).toContain(
+      "settings.profile.request_deletion.requested",
+    );
     expect(deleteRequestDialog).toContain(
       "settings.profile.request_deletion.confirm",
     );

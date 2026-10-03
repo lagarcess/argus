@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts.ops import scheduled_maintenance
 from scripts.ops.scheduled_maintenance import (
     MaintenanceJob,
@@ -51,6 +53,20 @@ def test_bounded_batch_arguments_reach_each_job() -> None:
         "--limit",
         "7",
     )
+    assert jobs[3].argv[1:] == ("--limit", "25")
+    tuned = maintenance_jobs(guest_limit=40, stale_limit=7, deletion_limit=3)
+    assert tuned[0].argv[-1] == "40" and tuned[3].argv[1:] == ("--limit", "3")
+
+
+def test_deletion_limit_is_its_own_bounded_flag() -> None:
+    from scripts.ops.scheduled_maintenance import _build_parser
+
+    parser = _build_parser()
+    args = parser.parse_args(["--guest-limit", "40", "--deletion-limit", "9"])
+    assert (args.guest_limit, args.deletion_limit) == (40, 9)
+    for bad in ("0", "101"):
+        with pytest.raises(SystemExit):
+            parser.parse_args(["--deletion-limit", bad])
 
 
 def test_a_failed_retention_purge_does_not_hide_the_reconciler() -> None:

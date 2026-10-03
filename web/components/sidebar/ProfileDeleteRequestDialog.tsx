@@ -10,9 +10,10 @@ import { useModalSurface } from "../layout/useModalSurface";
 /**
  * In-app account deletion (Lane 6), lifted out of the profile menu.
  *
- * Confirming runs the deletion command. Once it succeeds the session is dead,
- * so leaving the dialog signs out. When the command is switched off on this
- * server (404), support still handles the request by email.
+ * Confirming runs the deletion command. Once it succeeds, or the account is
+ * locked while it finishes (in_progress), the session is dead, so leaving the
+ * dialog signs out. When the command is switched off on this server (404),
+ * support gets a ticket instead (requested), or by email if that fails too.
  *
  * It portals to the body, outside the menu it opens from, so the menu's focus
  * trap never contained it and system back dismissed the menu or the drawer
@@ -25,6 +26,7 @@ export type DeleteRequestState =
   | "submitting"
   | "success"
   | "in_progress"
+  | "requested"
   | "error"
   | "unavailable";
 
@@ -113,7 +115,7 @@ function ProfileDeleteRequestDialogSurface({
           </button>
         </div>
 
-        {state === "success" || state === "in_progress" ? (
+        {state === "success" || state === "in_progress" || state === "requested" ? (
           <>
             <p
               className="text-[13px] leading-relaxed text-black/55 dark:text-white/55"
@@ -124,10 +126,15 @@ function ProfileDeleteRequestDialogSurface({
                     "settings.profile.request_deletion.success",
                     "Your account is deleted. You'll be signed out.",
                   )
-                : t(
-                    "settings.profile.request_deletion.in_progress",
-                    "Your account is being deleted. You're signed out now, and we'll finish removing it shortly. You don't need to do anything.",
-                  )}
+                : state === "in_progress"
+                  ? t(
+                      "settings.profile.request_deletion.in_progress",
+                      "Your account is being deleted. You're signed out now, and we'll finish removing it within a few days. You don't need to do anything.",
+                    )
+                  : t(
+                      "settings.profile.request_deletion.requested",
+                      "Request sent. Support will delete your account and follow up by email.",
+                    )}
             </p>
             <div className="mt-5 flex justify-end">
               <button
@@ -151,7 +158,7 @@ function ProfileDeleteRequestDialogSurface({
               <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
                 {t(
                   "settings.profile.request_deletion.error",
-                  "We couldn't finish deleting your account. Try again to finish.",
+                  "We couldn't delete your account just now. Try again.",
                 )}{" "}
                 <a className="underline" href={supportMailto}>
                   {t(

@@ -951,8 +951,9 @@ class MarketSessionResponse(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    # Account deletion is the in-app command (POST /account/delete), not feedback.
-    type: Literal["bug", "feature", "general"]
+    # account_deletion_request: the support-ticket fallback while the in-app
+    # command (POST /account/delete) is off.
+    type: Literal["bug", "feature", "general", "account_deletion_request"]
     message: str = Field(min_length=1, max_length=MAX_FEEDBACK_MESSAGE_LENGTH)
     context: dict[str, Any] = Field(default_factory=dict)
 

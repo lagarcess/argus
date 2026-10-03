@@ -12322,6 +12322,7 @@ components:
           - bug
           - feature
           - general
+          - account_deletion_request
         message:
           type: string
           maxLength: 5000

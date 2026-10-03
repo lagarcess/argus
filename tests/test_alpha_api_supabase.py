@@ -1070,8 +1070,7 @@ def test_registered_profile_exposes_a_default_avatar_theme_but_guest_does_not():
     assert "avatar_theme" not in guest.model_dump(mode="json")["user"]
 
 
-def test_feedback_rejects_account_deletion_request(mock_gateway):
-    # Account deletion is the in-app command (POST /account/delete) now.
+def test_feedback_accepts_account_deletion_request_and_enriches_context(mock_gateway):
     response = client.post(
         "/api/v1/feedback",
         json={
@@ -1082,8 +1081,20 @@ def test_feedback_rejects_account_deletion_request(mock_gateway):
         headers={"Authorization": "Bearer test-token"},
     )
 
-    assert response.status_code == 422
-    mock_gateway.create_feedback.assert_not_called()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {"success": True}
+    mock_gateway.create_feedback.assert_called_once()
+    call = mock_gateway.create_feedback.call_args.kwargs
+    assert call["feedback_type"] == "account_deletion_request"
+    assert call["user_id"] == "00000000-0000-0000-0000-000000000001"
+    assert call["message"] == "Private alpha account deletion requested."
+    context = call["context"]
+    assert context["source"] == "profile_modal"
+    assert context["account_email"] == "developer@argus.local"
+    assert context["profile_language"] == "en"
+    assert context["request_user_id"] == "00000000-0000-0000-0000-000000000001"
+    assert isinstance(context["requested_at"], str)
 
 
 def test_create_conversation_uses_dev_memory_fallback_when_supabase_fails(

@@ -799,13 +799,63 @@ deletion sweep (`scripts/ops/resume_account_deletions.py`). Every job runs even
 when an earlier one fails, so one failure never hides another. The retention
 windows in `DATA_MODEL.md` hold only as often as an operator runs this command.
 
+### Account deletion runs (Lane 6)
+
 The account deletion sweep resumes runs still waiting on a third party (Apple,
-Plaid, Gmail, PostHog). Those accounts are locked meanwhile and their auth
-delete waits, so they finish only as often as this pass (or the person's own
-retry) runs. It prints `resumed`/`done`/`pending`/`failed`; `pending` is a
-provider still down, `failed` exits nonzero. To revoke, the operator process
-also needs `ARGUS_INGESTION_SECRET_KEY`, the `PLAID_*` keys and the
-`ARGUS_APPLE_*` keys; without them those revocations stay pending.
+Plaid, Gmail, PostHog). Those accounts are locked meanwhile (signed out, every
+route but `POST /account/delete` refuses them) and their auth delete waits, so
+they finish only when the person retries or an operator runs this pass. Nothing
+runs it on a schedule. **Cadence: while any run is in flight, run
+`scheduled_maintenance.py` at least daily.** To see whether any is:
+
+```sql
+select status, count(*), min(created_at)
+  from argus_private.account_deletion_runs
+ where status <> 'done'
+ group by status;
+```
+
+`--deletion-limit` (1-100, default 25) bounds how many runs one pass resumes,
+apart from `--guest-limit`. The sweep prints
+`resumed`/`done`/`pending`/`failed`/`busy`: `pending` is a step still owed,
+`busy` a run another pass or request holds right now (left alone), and `failed`
+exits nonzero. To revoke, the operator process also needs
+`ARGUS_INGESTION_SECRET_KEY`, the `PLAID_*` keys and the `ARGUS_APPLE_*` keys;
+without them those revocations stay pending, never done.
+
+What the logs and run record tell you:
+
+- **The key check.** A stored token that won't open is discarded as
+  `unrecoverable` (or Apple's through `discard_unreadable`) only when this
+  process's `ARGUS_INGESTION_SECRET_KEY` is proven current: it opens the newest
+  token anyone else stored. `key_mismatch`, `key_unproven` or `key_unavailable`
+  in `steps.last_error` means the process has the wrong key or none: fix the
+  environment and rerun. Nothing was dropped.
+- **Apple.** No stored credential records `apple_revoke: none` (nothing to
+  revoke). `apple_unconfigured` means this process has no `ARGUS_APPLE_*`
+  config: the step stays pending, never silently done. `already_revoked` means
+  Apple says the token was already dead (the person removed the app); it is
+  counted, and more than 5 in 24 hours logs an alert worth a look.
+- **PostHog.** Outside tests and local dev the step stays pending
+  (`analytics_adapter_unconfigured`) until a real deletion adapter ships
+  (#805). Don't turn on `ARGUS_ACCOUNT_DELETION_ENABLED` before then.
+- **The 7-day alert.** A step pending for 7 days logs
+  `account_deletion.needs_operator` (with the step and its last error, no user
+  id). Decide whether it can still finish. If it can't (Apple keeps answering
+  `invalid_request` because the person removed the app, a provider is gone for
+  good), force it:
+
+```bash
+poetry run python scripts/ops/force_account_deletion_step.py \
+  --user-id <uuid> --step apple|plaid|gmail|analytics \
+  --reason "Apple invalid_request for 7 days; app removed" --operator <your name>
+```
+
+It records the step `operator_forced` with the reason and your name in the run
+record, which outlives the deletion, then resumes the run. **The reason must
+not contain personal data**: no name, email or account details (the script
+refuses an `@`). There is no route for this. Get the user id from the support
+request or the person's account, never from logs (they carry none).
 
 The pass exits nonzero if any job fails, and prints a final JSON summary line
 with `status`, `failed_count`, and `failed_jobs`. Alert on a nonzero exit or on

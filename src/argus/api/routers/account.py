@@ -4,7 +4,8 @@
 person. It is off unless ``ARGUS_ACCOUNT_DELETION_ENABLED`` is on, and while off
 it answers 404 before any authentication. The user id comes only from the
 verified session, never from the request body. A guest session is deleted
-the same way.
+the same way. A person whose run is in flight (locked out of every other
+route) may call it again to resume their own run (``account_deletion_auth``).
 """
 
 from __future__ import annotations
@@ -17,7 +18,9 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
 from argus.api import state as api_state
-from argus.api.dependencies import current_user, problem
+from argus.api.account_deletion_auth import deletion_requester
+from argus.api.dependencies import problem
+from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import User
 from argus.domain.account_deletion.service import (
     AccountDeletionIncomplete,
@@ -28,6 +31,12 @@ from argus.domain.account_deletion.service import (
 FLAG = "ARGUS_ACCOUNT_DELETION_ENABLED"
 
 router = APIRouter(prefix="/api/v1", tags=["account"])
+
+# Per account: a retry loop can't hammer the Admin API or the providers. A
+# guest create-then-delete loop makes a new account each time, so it is bounded
+# where guests are made (captcha and the per-visitor guest limits), not here.
+_per_account = SlidingWindowLimiter()
+_PER_ACCOUNT = (6, 60)
 
 
 def account_deletion_enabled() -> bool:
@@ -45,9 +54,10 @@ class AccountDeletionRequest(BaseModel):
 class AccountDeletionResponse(BaseModel):
     # done: everything is deleted and every third party settled.
     # in_progress (202): the run is open and the account is locked (signed
-    # out, its tokens refused), but a third party (``pending``: apple, gmail,
-    # plaid, analytics) hasn't confirmed yet, so the account delete waits. The
-    # scheduled sweep resumes the run; nothing is asked of the person.
+    # out, its tokens refused everywhere but here), but a step hasn't finished
+    # (``pending``: apple, gmail, plaid, analytics; empty when another request
+    # holds the run or the data step must be retried). A retry of this route
+    # or the operator-run sweep resumes it; nothing is asked of the person.
     status: Literal["done", "in_progress"]
     pending: list[str]
 
@@ -77,7 +87,7 @@ def account_deletion_service() -> AccountDeletionService | None:
 
 
 def _deleting_user(request: Request) -> User:
-    # The flag is checked before current_user, so a disabled route says
+    # The flag is checked before any session check, so a disabled route says
     # nothing about sessions.
     if not account_deletion_enabled():
         raise problem(
@@ -87,7 +97,21 @@ def _deleting_user(request: Request) -> User:
             title="Not Found",
             detail="Not found.",
         )
-    return current_user(request)
+    user = deletion_requester(request)
+    limit, seconds = _PER_ACCOUNT
+    retry = _per_account.record_or_retry_after(
+        keys=(user.id,), limit=limit, window_seconds=seconds
+    )
+    if retry is not None:
+        raise problem(
+            request,
+            status_code=429,
+            code="too_many_requests",
+            title="Too Many Requests",
+            detail="Wait a moment before trying again.",
+            headers={"Retry-After": str(retry)},
+        )
+    return user
 
 
 @router.post(
@@ -113,7 +137,11 @@ def delete_account(
         )
     try:
         outcome = service.delete_account(user_id=user.id)
-    except AccountDeletionRejected:
+    except AccountDeletionRejected as exc:
+        if str(exc) == "unknown_user":
+            # The session was verified a moment ago, so the person existed:
+            # another request finished the run in between. Done.
+            return AccountDeletionResponse(status="done", pending=[])
         raise problem(
             request,
             status_code=403,
@@ -122,7 +150,9 @@ def delete_account(
             detail="This account can't be deleted here.",
         ) from None
     except AccountDeletionIncomplete as exc:
-        # Accepted, not failed: the account is locked and the sweep finishes.
+        # Accepted, not failed: the account is locked, and a retry or the
+        # operator-run sweep finishes it. ``in_progress`` from the service
+        # means another request holds the run right now.
         response.status_code = 202
         return AccountDeletionResponse(status="in_progress", pending=exc.pending)
     except Exception as exc:
@@ -133,6 +163,8 @@ def delete_account(
             status_code=503,
             code="account_deletion_incomplete",
             title="Account Deletion Incomplete",
+            # The run may be open and the account locked; a retry of this
+            # route resumes it (the web treats this as in progress).
             detail="Deletion did not finish. Try again to finish it.",
             headers={"Retry-After": "5"},
         ) from None

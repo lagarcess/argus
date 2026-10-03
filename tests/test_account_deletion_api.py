@@ -57,10 +57,17 @@ def enabled(monkeypatch):  # noqa: ANN001, ANN201
     monkeypatch.setenv(account_route.FLAG, "true")
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rate_limit():  # noqa: ANN202
+    account_route._per_account.reset()
+    yield
+    account_route._per_account.reset()
+
+
 def test_off_by_default_answers_404_before_auth(monkeypatch) -> None:  # noqa: ANN001
     monkeypatch.delenv(account_route.FLAG, raising=False)
     auth = MagicMock(side_effect=AssertionError("auth must not run"))
-    with patch.object(account_route, "current_user", auth):
+    with patch.object(account_route, "deletion_requester", auth):
         response = client.post(URL, json={"confirm": True})
     assert response.status_code == 404
     auth.assert_not_called()
@@ -77,7 +84,7 @@ def test_deletes_the_session_user_only(enabled) -> None:  # noqa: ANN001
     service = MagicMock()
     service.delete_account.return_value = DeletionOutcome(status="done")
     with (
-        patch.object(account_route, "current_user", _registered),
+        patch.object(account_route, "deletion_requester", _registered),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, json={"confirm": True})
@@ -93,7 +100,7 @@ def test_deletes_the_session_user_only(enabled) -> None:  # noqa: ANN001
 def test_body_is_only_a_confirmation(enabled, body) -> None:  # noqa: ANN001
     service = MagicMock()
     with (
-        patch.object(account_route, "current_user", _registered),
+        patch.object(account_route, "deletion_requester", _registered),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, json=body)
@@ -104,7 +111,7 @@ def test_body_is_only_a_confirmation(enabled, body) -> None:  # noqa: ANN001
 def test_form_post_is_refused(enabled) -> None:  # noqa: ANN001
     service = MagicMock()
     with (
-        patch.object(account_route, "current_user", _registered),
+        patch.object(account_route, "deletion_requester", _registered),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, data={"confirm": "true"})
@@ -116,7 +123,7 @@ def test_a_guest_is_deleted_by_the_same_command(enabled) -> None:  # noqa: ANN00
     service = MagicMock()
     service.delete_account.return_value = DeletionOutcome(status="done", pending=[])
     with (
-        patch.object(account_route, "current_user", _guest),
+        patch.object(account_route, "deletion_requester", _guest),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, json={"confirm": True})
@@ -136,7 +143,7 @@ def test_failures_map_to_problems(enabled, error, status, code) -> None:  # noqa
     service = MagicMock()
     service.delete_account.side_effect = error
     with (
-        patch.object(account_route, "current_user", _registered),
+        patch.object(account_route, "deletion_requester", _registered),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, json={"confirm": True})
@@ -147,7 +154,7 @@ def test_failures_map_to_problems(enabled, error, status, code) -> None:  # noqa
 
 def test_unavailable_without_postgres_surfaces(enabled) -> None:  # noqa: ANN001
     with (
-        patch.object(account_route, "current_user", _registered),
+        patch.object(account_route, "deletion_requester", _registered),
         patch.object(account_route, "account_deletion_service", return_value=None),
     ):
         response = client.post(URL, json={"confirm": True})
@@ -155,12 +162,56 @@ def test_unavailable_without_postgres_surfaces(enabled) -> None:  # noqa: ANN001
     assert response.json()["code"] == "account_deletion_unavailable"
 
 
-def test_feedback_no_longer_takes_deletion_requests() -> None:
+def test_feedback_still_takes_deletion_requests_while_the_command_is_off() -> None:
+    """Marcus S4: with the flag off the route is 404 and the web files the old
+    support ticket instead (tests/test_alpha_api_supabase.py covers the
+    enrichment)."""
     from argus.api.schemas import FeedbackRequest
-    from pydantic import ValidationError
 
-    with pytest.raises(ValidationError):
-        FeedbackRequest(type="account_deletion_request", message="delete me")
+    assert FeedbackRequest(type="account_deletion_request", message="delete me")
+
+
+def test_another_request_holding_the_run_is_in_progress(enabled) -> None:  # noqa: ANN001
+    service = MagicMock()
+    service.delete_account.side_effect = AccountDeletionIncomplete("in_progress")
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(URL, json={"confirm": True})
+    assert response.status_code == 202
+    assert response.json() == {"status": "in_progress", "pending": []}
+
+
+def test_a_run_finished_by_another_request_is_done(enabled) -> None:  # noqa: ANN001
+    """The session was verified, so the person existed a moment ago: a run
+    that no longer knows them was finished in between."""
+    service = MagicMock()
+    service.delete_account.side_effect = AccountDeletionRejected("unknown_user")
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(URL, json={"confirm": True})
+    assert response.status_code == 200
+    assert response.json() == {"status": "done", "pending": []}
+
+
+def test_the_route_is_rate_limited_per_account(enabled) -> None:  # noqa: ANN001
+    service = MagicMock()
+    service.delete_account.side_effect = AccountDeletionIncomplete(
+        "third_party_pending", ["apple"]
+    )
+    limit = account_route._PER_ACCOUNT[0]
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        codes = [
+            client.post(URL, json={"confirm": True}).status_code for _ in range(limit + 1)
+        ]
+    assert codes == [202] * limit + [429]
+    assert service.delete_account.call_count == limit
 
 
 @pytest.mark.parametrize(
@@ -178,7 +229,7 @@ def test_a_pending_third_party_is_in_progress_not_done(enabled, error, pending) 
     service = MagicMock()
     service.delete_account.side_effect = error
     with (
-        patch.object(account_route, "current_user", _registered),
+        patch.object(account_route, "deletion_requester", _registered),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, json={"confirm": True})
@@ -207,7 +258,7 @@ def test_deletion_does_not_need_the_households_surface(enabled, monkeypatch) -> 
         return service
 
     monkeypatch.setattr(runtime, "build_service", fake_build)
-    with patch.object(account_route, "current_user", _registered):
+    with patch.object(account_route, "deletion_requester", _registered):
         response = client.post(URL, json={"confirm": True})
     assert households_api.households_service() is None
     assert response.status_code == 200, response.text

@@ -28,8 +28,8 @@ def test_refuses_without_an_explicit_target(monkeypatch) -> None:  # noqa: ANN00
 @pytest.mark.parametrize(
     ("result", "code"),
     [
-        ({"resumed": 2, "done": 1, "pending": 1, "failed": 0}, 0),
-        ({"resumed": 1, "done": 0, "pending": 0, "failed": 1}, 1),
+        ({"resumed": 2, "done": 1, "pending": 1, "failed": 0, "busy": 1}, 0),
+        ({"resumed": 1, "done": 0, "pending": 0, "failed": 1, "busy": 0}, 1),
     ],
 )
 def test_resumes_through_the_command_and_fails_only_on_errors(

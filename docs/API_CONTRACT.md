@@ -3198,6 +3198,17 @@ per household or standalone shared group, shown as "Former member" or
 "Exmiembro" in the viewer's language), deletes everything else of theirs,
 revokes provider tokens, and deletes the auth user. A retry resumes the same run.
 
+**Who may call it.** Every other route refuses a person whose run is in flight
+(the account is locked). This route alone accepts them, so a retry resumes
+their own run: GoTrue refuses a banned account's token, so the API verifies it
+itself (signature against the project's JWKS, or `SUPABASE_JWT_SECRET` for
+HS256; expiry; audience), then requires a live `auth.sessions` row for its
+session, a run in flight for its subject, and a subject that is not a
+placeholder. Anyone not locked goes through the usual session check. The route
+is rate limited per account (6 a minute, `429 too_many_requests` with
+`Retry-After`). A guest create-then-delete loop makes a new account each time,
+so it is bounded where guests are made (captcha and the guest limits).
+
 **Response `200`:** everything is deleted, every third party has confirmed,
 and the auth user is gone.
 
@@ -3212,17 +3223,25 @@ party hasn't confirmed yet, so the auth delete waits. `pending` names it
 (`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
 itself is being retried. Every third-party step (Sign in with Apple through
 #793, Google/Gmail and Plaid tokens, PostHog person deletion) runs before the
-auth delete. The scheduled sweep (`scripts/ops/resume_account_deletions.py`)
-resumes the run; a repeat request resumes it too. Clients show "deletion in
-progress", never the finished state.
+auth delete. A repeat request resumes the run, and so does the operator-run
+sweep (`scripts/ops/resume_account_deletions.py` inside
+`scheduled_maintenance.py`; nothing runs it on a schedule, see
+PRIVATE_LAUNCH_RUNBOOK.md for the cadence). `pending` is also empty when
+another request holds the run at that moment. Clients show "deletion in
+progress", sign out, and never show the finished state.
 
 ```json
 { "status": "in_progress", "pending": ["plaid"] }
 ```
 
-**Errors:** `403 account_deletion_not_allowed`, `503 account_deletion_unavailable`
-(no `DATABASE_URL` or Admin API client), `503 account_deletion_incomplete` with
-`Retry-After` (an unexpected failure; a retry resumes the same run).
+A request after another one finished the run answers `200` `done`: the session
+was verified, so the person existed a moment ago.
+
+**Errors:** `403 account_deletion_not_allowed`, `429 too_many_requests`,
+`503 account_deletion_unavailable` (no `DATABASE_URL` or Admin API client;
+nothing happened), `503 account_deletion_incomplete` with `Retry-After` (an
+unexpected failure; the run may be open and the account locked, so clients
+treat it as in progress, and a retry resumes the same run).
 
 
 ## Supported Values
@@ -6919,7 +6938,10 @@ profile language, message, and the sanitized context above, and adds no contact
 details the submission did not already carry. A missing credential or a failed
 delivery is logged and never changes the response or the saved feedback.
 
-Account deletion is not a feedback type. It is `POST /account/delete`.
+`account_deletion_request` is the support-ticket fallback while the in-app
+command (`POST /account/delete`) is off: the web sends it when that route
+answers `404`. The API adds `source` (default `profile_modal`), the account
+email, profile language, user id and request time to its context.
 
 ---
 

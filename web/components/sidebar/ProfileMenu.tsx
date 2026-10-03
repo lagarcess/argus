@@ -50,7 +50,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import { deleteAccount } from "@/lib/account-deletion-api";
+import { requestAccountDeletion } from "@/lib/account-deletion-api";
 import { type ApiUser } from "@/lib/argus-api";
 import {
   readProfile,
@@ -371,7 +371,12 @@ export default function ProfileMenu({
       return;
     }
     if (isDeleteRequestOpen) {
-      if (deleteRequestState !== "submitting") setIsDeleteRequestOpen(false);
+      // Deleted or locked: the session is dead, so leaving signs out.
+      if (deleteRequestState === "success" || deleteRequestState === "in_progress") {
+        onLogout();
+      } else if (deleteRequestState !== "submitting") {
+        setIsDeleteRequestOpen(false);
+      }
       return;
     }
     closeProfileModal();
@@ -382,6 +387,7 @@ export default function ProfileMenu({
     isAvatarPickerOpen,
     isDeleteRequestOpen,
     isLanguagePickerOpen,
+    onLogout,
   ]);
 
 
@@ -834,24 +840,21 @@ export default function ProfileMenu({
     if (
       deleteRequestState === "submitting" ||
       deleteRequestState === "success" ||
-      deleteRequestState === "in_progress"
+      deleteRequestState === "in_progress" ||
+      deleteRequestState === "requested"
     ) {
       return;
     }
     setDeleteRequestState("submitting");
     try {
-      const result = await deleteAccount();
-      // 202: locked and signed out, but not finished. Its own state, so the
-      // dialog never claims a deletion the server hasn't completed.
-      setDeleteRequestState(
-        result.status === "in_progress" ? "in_progress" : "success",
-      );
+      // 202 and a post-lock 503 are in_progress, never shown as done or as a
+      // failure; 404 (command off here) falls back to a support ticket.
+      setDeleteRequestState(await requestAccountDeletion(currentLanguage));
     } catch (err) {
-      const status = (err as { status?: number }).status;
-      // 404: the command is switched off here. Support still handles it.
-      setDeleteRequestState(status === 404 ? "unavailable" : "error");
+      console.error("Account deletion failed", err);
+      setDeleteRequestState("error");
     }
-  }, [deleteRequestState]);
+  }, [currentLanguage, deleteRequestState]);
 
   // The account is gone, or locked while it finishes, so the session is dead
   // either way: leaving the dialog signs out.

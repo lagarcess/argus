@@ -61,6 +61,47 @@ class AuthSessionVerifier:
                 row = cursor.fetchone()
         return bool(row and row[0])
 
+    def deletion_in_flight(self, *, token: str, user_id: str) -> bool:
+        """True when this live session's person has a deletion run in flight:
+        the one case POST /account/delete accepts a locked account, so the
+        person can resume their own run. Never true for a placeholder."""
+        identity = _session_identity(token=token, user_id=user_id)
+        if identity is None:
+            return False
+        session_id, auth_user_id = identity
+
+        with self.pool.connection(
+            timeout=_AUTH_SESSION_ACQUIRE_TIMEOUT_SECONDS
+        ) as connection:
+            row = connection.execute(
+                """
+                select exists (
+                    select 1 from auth.sessions where id = %s and user_id = %s
+                )
+                and not exists (
+                    select 1 from argus_private.account_placeholders where id = %s
+                )
+                and exists (
+                    select 1 from argus_private.account_deletion_runs
+                    where user_id = %s and status <> 'done'
+                )
+                """,
+                (session_id, auth_user_id, auth_user_id, auth_user_id),
+            ).fetchone()
+        return bool(row and row[0])
+
+
+def deletion_in_flight(*, database_url: str, token: str, user_id: str) -> bool:
+    if not database_url:
+        raise AuthSessionVerificationUnavailable
+    try:
+        return _auth_session_verifier(database_url).deletion_in_flight(
+            token=token, user_id=user_id
+        )
+    except Exception as exc:
+        logger.warning("Deletion session check failed: {}", type(exc).__name__)
+        raise AuthSessionVerificationUnavailable from exc
+
 
 def auth_session_is_active(*, database_url: str, token: str, user_id: str) -> bool:
     if not database_url:

@@ -390,32 +390,8 @@ def dev_memory_fallback_enabled() -> bool:
     return os.getenv("ARGUS_DEV_MEMORY_FALLBACK", "").strip().lower() == "true"
 
 
-def current_user(request: Request) -> User:
-    if (
-        os.getenv("NEXT_PUBLIC_MOCK_AUTH", "").strip().lower() == "true"
-        or os.getenv("ARGUS_MOCK_AUTH", "").strip().lower() == "true"
-    ):
-        if api_state.supabase_gateway is not None:
-            try:
-                user = api_state.supabase_gateway.get_or_create_mock_user()
-                store_account_context(request, registered_account_context(user.id))
-                return user
-            except Exception:
-                if not dev_memory_fallback_enabled():
-                    raise
-        user = api_state.store.get_or_create_dev_user()
-        store_account_context(request, registered_account_context(user.id))
-        return user
-
-    if api_state.supabase_gateway is None:
-        raise problem(
-            request,
-            status_code=500,
-            code="internal_error",
-            title="Internal Error",
-            detail="Supabase persistence is required for non-mock authentication.",
-        )
-
+def request_access_token(request: Request) -> str | None:
+    """The bearer token, or the Supabase session cookie's access token."""
     auth_header = request.headers.get("Authorization")
     token = None
     if auth_header and auth_header.startswith("Bearer "):
@@ -445,6 +421,37 @@ def current_user(request: Request) -> User:
                 token = token_value
                 break
 
+    return token
+
+
+def current_user(request: Request) -> User:
+    if (
+        os.getenv("NEXT_PUBLIC_MOCK_AUTH", "").strip().lower() == "true"
+        or os.getenv("ARGUS_MOCK_AUTH", "").strip().lower() == "true"
+    ):
+        if api_state.supabase_gateway is not None:
+            try:
+                user = api_state.supabase_gateway.get_or_create_mock_user()
+                store_account_context(request, registered_account_context(user.id))
+                return user
+            except Exception:
+                if not dev_memory_fallback_enabled():
+                    raise
+        user = api_state.store.get_or_create_dev_user()
+        store_account_context(request, registered_account_context(user.id))
+        return user
+
+    if api_state.supabase_gateway is None:
+        raise problem(
+            request,
+            status_code=500,
+            code="internal_error",
+            title="Internal Error",
+            detail="Supabase persistence is required for non-mock authentication.",
+        )
+
+    token = request_access_token(request)
+
     if not token:
         raise problem(
             request,
@@ -467,9 +474,11 @@ def current_user(request: Request) -> User:
 
     auth_user_id = str(auth_user.get("id") or "")
     try:
-        # Also false for any sub in argus_private.account_placeholders. A
-        # deletion placeholder is banned and has no sessions, so this is
-        # defense in depth: its token is refused even if one were minted.
+        # Also false for an account-deletion placeholder (banned with no
+        # sessions, so defense in depth) and for a person whose deletion run
+        # is in flight: that account is locked until the run finishes. Only
+        # POST /account/delete accepts the latter, to resume its own run
+        # (argus.api.account_deletion_auth).
         session_is_active = auth_session_is_active(
             database_url=api_state.DATABASE_URL,
             token=token,
@@ -497,17 +506,12 @@ def current_user(request: Request) -> User:
             user_id=auth_user_id,
             at=datetime.now(timezone.utc),
         )
-        if (
-            workspace is None
-            and request.scope.get("path") == "/api/v1/auth/guest/signup"
-        ):
+        if workspace is None and request.scope.get("path") == "/api/v1/auth/guest/signup":
             # A claim can commit before its response reaches the browser. Keep
             # that source session valid only for the replay-safe signup route.
-            workspace = (
-                api_state.supabase_gateway.get_guest_workspace_for_signup_retry(
-                    user_id=auth_user_id,
-                    at=datetime.now(timezone.utc),
-                )
+            workspace = api_state.supabase_gateway.get_guest_workspace_for_signup_retry(
+                user_id=auth_user_id,
+                at=datetime.now(timezone.utc),
             )
         if workspace is None:
             raise problem(

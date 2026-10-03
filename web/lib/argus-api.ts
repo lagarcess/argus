@@ -1229,7 +1229,7 @@ export async function searchDiscovery(
 }
 
 export async function postFeedback(payload: {
-  type: "bug" | "feature" | "general";
+  type: "bug" | "feature" | "general" | "account_deletion_request";
   message: string;
   context?: Record<string, unknown>;
 }) {

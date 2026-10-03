@@ -36,7 +36,9 @@ def deletion_pool(database_url: str) -> Any:
             pool = ConnectionPool(
                 database_url,
                 min_size=0,
-                max_size=2,
+                # A request and a sweep pass, or two requests, each need a
+                # connection for the run and one for the Apple service.
+                max_size=4,
                 open=True,
                 name="argus-account-deletion",
             )
@@ -140,13 +142,26 @@ def build_service(
 ) -> Any:
     from argus.domain.account_deletion.auth_admin import SupabaseAuthAdmin
     from argus.domain.account_deletion.service import AccountDeletionService
-    from argus.observability.analytics_deletion import analytics_deletion_from_env
+    from argus.domain.ingestion.secrets import SecretBox, SecretBoxUnavailable
+    from argus.observability.analytics_deletion import (
+        analytics_deletion_from_env,
+        fake_analytics_allowed,
+    )
 
     pool = deletion_pool(database_url)
+    try:
+        # Only for the key check: with no key, an unreadable token is never
+        # treated as unrecoverable; it stays pending and alerts.
+        box: SecretBox | None = SecretBox.from_env()
+    except SecretBoxUnavailable:
+        box = None
     return AccountDeletionService(
         households=household_repository(pool),
         auth_admin=SupabaseAuthAdmin(supabase_client),
         revoker=revoker or standalone_revoker(),
         analytics=analytics_deletion_from_env(),
         apple=apple or standalone_apple(pool),
+        secret_box=box,
+        # The recording fake finishes a run only in tests and local dev.
+        allow_fake_analytics=fake_analytics_allowed(),
     )

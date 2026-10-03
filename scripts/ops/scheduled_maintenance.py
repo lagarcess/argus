@@ -33,7 +33,9 @@ class JobOutcome:
         return {"name": self.name, "exit_code": self.exit_code, "error": self.error}
 
 
-def maintenance_jobs(*, guest_limit: int, stale_limit: int) -> tuple[MaintenanceJob, ...]:
+def maintenance_jobs(
+    *, guest_limit: int, stale_limit: int, deletion_limit: int = 25
+) -> tuple[MaintenanceJob, ...]:
     """Retention first: it has a documented deadline and shrinks the stale scan."""
     return (
         MaintenanceJob(
@@ -62,7 +64,7 @@ def maintenance_jobs(*, guest_limit: int, stale_limit: int) -> tuple[Maintenance
             argv=(
                 "scripts/ops/resume_account_deletions.py",
                 "--limit",
-                str(guest_limit),
+                str(deletion_limit),
             ),
         ),
     )
@@ -123,13 +125,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--guest-limit", type=int, default=25, choices=range(1, 101))
     parser.add_argument("--stale-limit", type=int, default=100)
+    parser.add_argument("--deletion-limit", type=int, default=25, choices=range(1, 101))
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     outcomes = run_maintenance(
-        maintenance_jobs(guest_limit=args.guest_limit, stale_limit=args.stale_limit)
+        maintenance_jobs(
+            guest_limit=args.guest_limit,
+            stale_limit=args.stale_limit,
+            deletion_limit=args.deletion_limit,
+        )
     )
     summary = summarize(outcomes)
     print(json.dumps(summary, sort_keys=True), flush=True)
