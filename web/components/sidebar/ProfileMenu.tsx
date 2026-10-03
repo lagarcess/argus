@@ -50,7 +50,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import { deleteAccount, type ApiUser } from "@/lib/argus-api";
+import { deleteAccount } from "@/lib/account-deletion-api";
+import { type ApiUser } from "@/lib/argus-api";
 import {
   readProfile,
   saveProfile,

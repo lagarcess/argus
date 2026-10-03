@@ -2551,8 +2551,12 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(profileMenu).not.toContain('profile?.language ?? "en"');
     expect(api).not.toContain("account_deletion_request");
-    expect(api).toContain('"/account/delete"');
-    expect(api).toContain("JSON.stringify({ confirm: true })");
+    const deletionApi = readFileSync(
+      join(root, "lib/account-deletion-api.ts"),
+      "utf-8",
+    );
+    expect(deletionApi).toContain('"/account/delete"');
+    expect(deletionApi).toContain("JSON.stringify({ confirm: true })");
     expect(deleteRequestDialog).toContain(
       "settings.profile.request_deletion.confirm",
     );
