@@ -72,6 +72,18 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
     }
     var responseState = CanvasChatResponseState.complete
     private var suspended: CanvasChatThread?
+    private var contextPresentations: [UUID] = []
+    var voiceContextOwner: UUID? { contextPresentations.last }
+    func presentContext(_ id: UUID) {
+        if !contextPresentations.contains(id) { contextPresentations.append(id) }
+    }
+    func dismissContext(_ id: UUID) {
+        if voiceContextOwner == id {
+            if voice.active { voice.presentation = .compact }
+            if voiceMessage.state == .recording { voiceMessage.cancel() }
+        }
+        contextPresentations.removeAll { $0 == id }
+    }
 
     init(spanish: Bool, includeExamples: Bool = true) {
         self.spanish = spanish

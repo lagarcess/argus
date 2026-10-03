@@ -71,16 +71,18 @@ private struct CuadraoContextPresentation: ViewModifier {
     @Binding var focus: CanvasChatFocus?
     let spanish: Bool
     @State private var presented = false
+    @State private var presentationID = UUID()
     func body(content: Content) -> some View {
         content
             .onChange(of: focus) { _, value in
                 guard let value, let chat else { return }
                 chat.selectFocus(value)
+                chat.presentContext(presentationID)
                 presented = true
             }
-            .sheet(isPresented: $presented, onDismiss: { focus = nil }) {
+            .sheet(isPresented: $presented, onDismiss: { chat?.dismissContext(presentationID); focus = nil }) {
                 if let chat {
-                    CuadraoContextConversation(chat: chat, receipts: receipts, spanish: spanish)
+                    CuadraoContextConversation(chat: chat, receipts: receipts, spanish: spanish, presentationID: presentationID)
                         .presentationDetents([.large]).presentationDragIndicator(.visible)
                 }
             }
@@ -90,6 +92,7 @@ private struct CuadraoContextConversation: View {
     let chat: CuadraoChatPreview
     let receipts: ReceiptWorkspace?
     let spanish: Bool
+    let presentationID: UUID
     @State private var editing = false
     @State private var receiptRoute: ReceiptRoute?
     @Environment(\.dismiss) private var dismiss
@@ -102,6 +105,9 @@ private struct CuadraoContextConversation: View {
         CuadraoChatCanvas(store: chat, spanish: spanish, editing: $editing, contextual: true, close: { dismiss() })
             .environment(\.receiptWorkspace, workspace)
             .receiptPresentation(route: $receiptRoute, workspace: workspace, spanish: spanish)
+            .cuadraoVoicePresentation(chat: chat, spanish: spanish, ownsPresentation: chat.voiceContextOwner == presentationID,
+                keyboard: { chat.voice.presentation = .keyboard })
+            .interactiveDismissDisabled(chat.voiceMessage.state == .recording)
             .tint(WelcomePalette.pine)
     }
 }

@@ -4,7 +4,7 @@ struct CuadraoLiveVoiceCanvas: View {
     let chat: CuadraoChatPreview
     let spanish: Bool
     let keyboard: () -> Void
-    let showProposal: () -> Void
+    let showProposal: (() -> Void)?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var choosingVoice = false
     @State private var previewDetails = false
@@ -39,7 +39,7 @@ struct CuadraoLiveVoiceCanvas: View {
             .sheet(isPresented: $choosingVoice) { CuadraoVoicePicker(spanish: es) }
             .confirmationDialog(es ? "Vista previa de diseño" : "Design preview",
                                 isPresented: $previewDetails, titleVisibility: .visible) {
-                Button(es ? "Ver propuesta de ejemplo" : "Show example proposal", action: showProposal)
+                if let showProposal { Button(es ? "Ver propuesta de ejemplo" : "Show example proposal", action: showProposal) }
                 Button(es ? "Probar escucha" : "Preview listening") { voice.phase = .listening }
                 Button(es ? "Probar respuesta" : "Preview speaking") { voice.phase = .speaking }
             } message: {

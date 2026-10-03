@@ -7,7 +7,6 @@ struct CuadraoHomeCanvas: View {
     @State private var selectedTab: CuadraoTab = .home
     @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
         includeExamples: CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
-    @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var plans = CuadraoPlanPreview(
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
@@ -99,7 +98,7 @@ struct CuadraoHomeCanvas: View {
         }
         .cuadraoScrollBar(edge: .bottom) {
             VStack(spacing: 0) {
-            if selectedTab != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
+            if chat.voiceContextOwner == nil && selectedTab != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
                 CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
             }
             if (accountPath.isEmpty || selectedTab != .home) &&
@@ -119,20 +118,8 @@ struct CuadraoHomeCanvas: View {
             }
         }
         .cuadraoSoftScrollEdges()
-        .overlay(alignment: .bottom) {
-            if chat.voiceMessage.state == .recording {
-                GeometryReader { geometry in
-                    CuadraoVoiceRecordingOverlay(message: chat.voiceMessage, spanish: spanish)
-                        .frame(height: typeSize.isAccessibilitySize ? geometry.size.height : min(460, geometry.size.height))
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                }.ignoresSafeArea(edges: .bottom)
-                    .allowsHitTesting(chat.voiceMessage.locked && !chat.voiceMessage.held)
-            }
-        }
-        .fullScreenCover(isPresented: Binding(
-            get: { chat.voice.active && chat.voice.presentation == .expanded },
-            set: { if !$0 && chat.voice.active && chat.voice.presentation == .expanded { chat.voice.presentation = .compact } })) {
-            CuadraoLiveVoiceCanvas(chat: chat, spanish: spanish, keyboard: {
+        .cuadraoVoicePresentation(chat: chat, spanish: spanish, ownsPresentation: chat.voiceContextOwner == nil,
+            keyboard: {
                 selectedTab = .assistant
                 chat.voice.presentation = .keyboard
             }, showProposal: {
@@ -140,7 +127,6 @@ struct CuadraoHomeCanvas: View {
                 selectedTab = .plan
                 chat.voice.presentation = .compact
             })
-        }
         .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
             isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {
             Button(spanish ? "Terminar y salir" : "End and leave", role: .destructive) {
