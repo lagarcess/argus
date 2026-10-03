@@ -68,6 +68,102 @@ final class CuadraoSupportUITests: XCTestCase {
         XCTAssertTrue(plan.exists)
     }
 
+    func testActivityDetailsReturnToSearchAndAccount() {
+        let app = launch()
+        app.buttons["cuadrao-tab-3"].tap()
+        let query = app.textFields["cuadrao.search.query"]
+        query.tap(); query.typeText("Almuerzo\n")
+        let result = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "cuadrao.search.activity.")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 3)); result.tap()
+        XCTAssertEqual(app.staticTexts["activity-detail-title"].label, "Almuerzo")
+        let amount = app.staticTexts["activity-detail-amount"].label
+        XCTAssertTrue(amount.hasPrefix("DOP −"))
+        XCTAssertTrue(app.staticTexts["Comida"].exists)
+        app.buttons["activity-detail-account"].tap()
+        XCTAssertTrue(app.staticTexts["account-detail-title"].waitForExistence(timeout: 3))
+        let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "account-detail-activity.", "Almuerzo")).firstMatch
+        reveal(app, entry); entry.tap()
+        XCTAssertEqual(app.staticTexts["activity-detail-title"].label, "Almuerzo")
+        XCTAssertEqual(app.staticTexts["activity-detail-amount"].label, amount)
+        shot(app, "activity-shared-detail-es")
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["account-detail-title"].exists)
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["activity-detail-title"].exists)
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertEqual(query.value as? String, "Almuerzo")
+        XCTAssertTrue(result.exists)
+    }
+
+    func testHomeActivityReturnsToSameRow() {
+        let app = launch()
+        let entry = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-activity.")).firstMatch
+        reveal(app, entry)
+        let identifier = entry.identifier
+        entry.tap()
+        XCTAssertTrue(app.staticTexts["activity-detail-title"].waitForExistence(timeout: 3))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(app.buttons[identifier].isHittable)
+        XCTAssertTrue(app.buttons["cuadrao-tab-0"].isHittable)
+        shot(app, "activity-home-return-es")
+    }
+
+    func testGroupSearchFiltersArchiveAndReturn() {
+        let app = launch()
+        app.buttons["cuadrao-tab-3"].tap()
+        let query = app.textFields["cuadrao.search.query"]
+        query.tap(); query.typeText("Samaná con los panas\n")
+        let group = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "cuadrao.search.group.")).firstMatch
+        XCTAssertTrue(group.waitForExistence(timeout: 3)); group.tap()
+        XCTAssertTrue(app.segmentedControls["group-sections"].waitForExistence(timeout: 3))
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertEqual(query.value as? String, "Samaná con los panas")
+        app.buttons["cuadrao.search.filters"].tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Incluir,")).firstMatch.tap()
+        app.buttons["Hogar"].tap()
+        app.buttons["Listo"].tap()
+        XCTAssertFalse(group.exists)
+        app.buttons["cuadrao.search.reset"].tap()
+        XCTAssertTrue(group.exists)
+        app.buttons["cuadrao.search.filters"].tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Moneda,")).firstMatch.tap()
+        app.buttons["USD"].tap()
+        app.buttons["Listo"].tap()
+        XCTAssertFalse(group.exists)
+        app.buttons["cuadrao.search.reset"].tap()
+        group.tap()
+        app.buttons["group-options"].tap()
+        app.buttons["Archivar"].tap()
+        XCTAssertEqual(query.value as? String, "Samaná con los panas")
+        XCTAssertTrue(group.label.contains("Archivado"))
+        group.tap()
+        XCTAssertTrue(app.segmentedControls["group-sections"].exists)
+        shot(app, "search-group-archived-es")
+    }
+
+    func testFirstUseSavedChatAppearsInSearch() {
+        let app = launch(extra: ["--plan-empty"])
+        app.staticTexts["home-greeting"].press(forDuration: 1)
+        app.buttons["Vista previa: primer uso"].tap()
+        app.buttons["cuadrao-tab-3"].tap()
+        app.buttons["cuadrao.search.kind.chats"].tap()
+        XCTAssertTrue(app.staticTexts["Sin chats todavía"].waitForExistence(timeout: 3))
+        app.buttons["cuadrao-tab-2"].tap()
+        if app.buttons["chat-composer-entry"].exists { app.buttons["chat-composer-entry"].tap() }
+        let composer = app.descendants(matching: .any)["chat-composer"].firstMatch
+        composer.tap(); composer.typeText("Mi primera pregunta guardada")
+        app.buttons["chat-send"].tap()
+        app.buttons["cuadrao-tab-3"].tap()
+        let query = app.textFields["cuadrao.search.query"]
+        query.tap(); query.typeText("Mi primera pregunta guardada\n")
+        let result = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Mi primera pregunta guardada")).firstMatch
+        XCTAssertTrue(result.waitForExistence(timeout: 3)); result.tap()
+        XCTAssertTrue(app.buttons["cuadrao.search.return"].waitForExistence(timeout: 3))
+        app.buttons["cuadrao.search.return"].tap()
+        XCTAssertEqual(query.value as? String, "Mi primera pregunta guardada")
+        shot(app, "search-first-use-saved-chat-es")
+    }
+
     func testUpdatesReadStateDetailBackAndPreferences() {
         let app = launch()
         let bell = app.buttons["cuadrao.updates.open"]

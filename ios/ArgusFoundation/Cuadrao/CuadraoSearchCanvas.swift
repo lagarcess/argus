@@ -6,6 +6,7 @@ struct CuadraoSearchCanvas: View {
     let spanish: Bool
     let includeExamples: Bool
     let plans: CuadraoPlanPreview
+    let groups: CuadraoGroupPreview
     let chat: CuadraoChatPreview
     let openChat: (CanvasChatThread) -> Void
     let actions: (CanvasAccountSheet) -> Void
@@ -19,7 +20,7 @@ struct CuadraoSearchCanvas: View {
 
     private typealias Kind = CanvasSearchKind
     private enum Scope: CaseIterable { case all, personal, household }
-    private enum Route: Hashable { case account(UUID), activity(UUID), plan(UUID), reference(String) }
+    private enum Route: Hashable { case account(UUID), activity(UUID), plan(UUID), group(UUID), reference(String) }
 
     private var availableAccounts: [CanvasAccount] {
         data.accounts.filter { account in
@@ -38,16 +39,28 @@ struct CuadraoSearchCanvas: View {
         }.sorted { $0.date > $1.date }
     }
     private var references: [CanvasSearchReference] {
-        guard includeExamples, scope != .household else { return [] }
-        return (CanvasSearchReference.examples(spanish).filter { $0.kind == .files || $0.kind == .memory } + chat.references(spanish))
+        guard scope != .household else { return [] }
+        let examples = includeExamples ? CanvasSearchReference.examples(spanish).filter { $0.kind == .files || $0.kind == .memory } : []
+        return (examples + chat.references(spanish))
             .filter { matches($0.title + " " + $0.detail + " " + $0.content) }
     }
     private var matchingPlans: [CanvasPlan] {
         plans.plans.filter { plan in
             planIsAvailable(plan)
+            && (currency.isEmpty || plan.currency == currency)
             && (scope == .all || (scope == .household ? plan.spaceID == CanvasSpace.householdID : plan.spaceID != CanvasSpace.householdID))
             && matches(plan.name + " " + plan.kind.title(spanish) + " " + PlanFormat.space(plan.spaceID, accounts: data, spanish: spanish))
         }
+    }
+    private var matchingGroups: [PlanGroup] {
+        guard scope == .all else { return [] }
+        return groups.groups.filter {
+            (currency.isEmpty || $0.currency == currency)
+            && matches($0.name + " " + $0.kind.title(spanish))
+        }
+    }
+    private var availableCurrencies: [String] {
+        Array(Set(data.accounts.map(\.currency) + plans.plans.map(\.currency) + groups.groups.map(\.currency))).sorted()
     }
     private func planIsAvailable(_ plan: CanvasPlan) -> Bool {
         !data.spaces.contains { $0.id == plan.spaceID && $0.deleted }
@@ -56,7 +69,7 @@ struct CuadraoSearchCanvas: View {
         (kind == .all || kind == .accounts ? accounts.count : 0)
         + (kind == .all || kind == .activity ? activity.count : 0)
         + references.filter { kind == .all || kind == $0.kind }.count
-        + (kind == .all || kind == .plans ? matchingPlans.count : 0)
+        + (kind == .all || kind == .plans ? matchingPlans.count + matchingGroups.count : 0)
     }
     private var filterCount: Int { (scope == .all ? 0 : 1) + (currency.isEmpty ? 0 : 1) }
 
@@ -84,19 +97,26 @@ struct CuadraoSearchCanvas: View {
                                     resultRow(entry.title, detail: account.displayName(spanish) + " · " + account.currency + " "
                                         + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
                                         symbol: entry.income ? "arrow.down.left" : nil, category: entry.income ? nil : entry.category)
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.search.activity.\(entry.id)")
                                 Divider().foregroundStyle(WelcomePalette.separator)
                             }
                         }
                     }
-                    if (kind == .all || kind == .plans) && !matchingPlans.isEmpty {
-                        heading(title(.plans), count: matchingPlans.count)
+                    if (kind == .all || kind == .plans) && (!matchingPlans.isEmpty || !matchingGroups.isEmpty) {
+                        heading(title(.plans), count: matchingPlans.count + matchingGroups.count)
                         ForEach(matchingPlans) { plan in
                             NavigationLink(value: Route.plan(plan.id)) {
                                 resultRow(plan.name, detail: [plan.kind.title(spanish),
                                     PlanFormat.space(plan.spaceID, accounts: data, spanish: spanish),
                                     plan.archived ? (spanish ? "Archivado" : "Archived") : nil].compactMap { $0 }.joined(separator: " · "), symbol: plan.look.symbol)
                             }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.search.plan.\(plan.id)")
+                            Divider()
+                        }
+                        ForEach(matchingGroups) { group in
+                            NavigationLink(value: Route.group(group.id)) {
+                                resultRow(group.name, detail: [group.kind.title(spanish), group.currency,
+                                    group.archived ? (spanish ? "Archivado" : "Archived") : nil].compactMap { $0 }.joined(separator: " · "), symbol: group.look.symbol)
+                            }.buttonStyle(.plain).accessibilityIdentifier("cuadrao.search.group.\(group.id)")
                             Divider()
                         }
                     }
@@ -158,12 +178,19 @@ struct CuadraoSearchCanvas: View {
                 case .account(let id):
                     CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish, actions: actions, record: record)
                 case .activity(let id):
-                    activityDetail(id)
+                    CuadraoActivityDetail(data: data, activityID: id, spanish: spanish, actions: actions, record: record)
                 case .plan(let id):
                     if let plan = plans.plan(id), planIsAvailable(plan) {
                         CuadraoPlanDetail(store: plans, accounts: data, planID: id, spanish: spanish)
                     } else {
                         ContentUnavailableView(spanish ? "Plan no disponible" : "Plan unavailable", systemImage: "calendar")
+                            .toolbar(.visible, for: .navigationBar)
+                    }
+                case .group(let id):
+                    if groups.group(id) != nil {
+                        CuadraoGroupDetail(store: groups, groupID: id, spanish: spanish)
+                    } else {
+                        ContentUnavailableView(spanish ? "Plan no disponible" : "Plan unavailable", systemImage: "person.2")
                             .toolbar(.visible, for: .navigationBar)
                     }
                 case .reference(let id):
@@ -248,38 +275,17 @@ struct CuadraoSearchCanvas: View {
                 }
                 Picker(spanish ? "Moneda" : "Currency", selection: $currency) {
                     Text(spanish ? "Todas" : "All").tag("")
-                    ForEach(Array(Set(data.accounts.map(\.currency))).sorted(), id: \.self) { Text($0).tag($0) }
+                    ForEach(availableCurrencies, id: \.self) { Text($0).tag($0) }
                 }
                 Section {
                     Button(spanish ? "Restablecer filtros" : "Reset filters") { scope = .all; currency = "" }
                 } footer: {
-                    Text(spanish ? "Solo yo incluye lo que no has compartido. Hogar incluye las cuentas compartidas y sus movimientos. Chats, archivos y memoria siguen siendo privados. La moneda filtra solo cuentas y movimientos."
-                         : "Only me includes what you haven't shared. Household includes shared accounts and their activity. Chats, files and memory remain private. Currency filters only accounts and activity.")
+                    Text(spanish ? "Solo yo incluye lo que no has compartido. Hogar incluye las cuentas compartidas y sus movimientos. Chats, archivos y memoria siguen siendo privados. Los planes en grupo aparecen en Todo. La moneda filtra cuentas, movimientos y planes."
+                         : "Only me includes what you haven't shared. Household includes shared accounts and their activity. Chats, files and memory remain private. Group plans appear in All. Currency filters accounts, activity and plans.")
                 }
             }.navigationTitle(spanish ? "Filtros" : "Filters").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { filters = false } } }
         }.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
-    }
-
-    @ViewBuilder private func activityDetail(_ id: UUID) -> some View {
-        if let entry = data.activity.first(where: { $0.id == id }), let account = data.account(entry.accountID) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    Text(entry.title).font(CuadraoTypography.feature)
-                    Text(account.currency + " " + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                        .font(CuadraoTypography.amount)
-                    LabeledContent(spanish ? "Tipo" : "Type", value: entry.income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
-                    LabeledContent(spanish ? "Fecha" : "Date") { Text(entry.date, format: .dateTime.day().month(.wide).year()) }
-                    NavigationLink(value: Route.account(account.id)) {
-                        resultRow(account.displayName(spanish), detail: subtitle(account), accountKind: account.kind)
-                    }.buttonStyle(.plain)
-                }.padding(24)
-            }.background(WelcomePalette.background).navigationTitle(spanish ? "Movimiento" : "Activity")
-                .navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
-        } else {
-            ContentUnavailableView(spanish ? "Movimiento no disponible" : "Activity unavailable", systemImage: "doc.text.magnifyingglass")
-                .toolbar(.visible, for: .navigationBar)
-        }
     }
 
     private func heading(_ title: String, count: Int) -> some View {

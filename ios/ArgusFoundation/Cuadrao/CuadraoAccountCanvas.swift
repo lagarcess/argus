@@ -7,6 +7,7 @@ struct CuadraoAccountCanvas: View {
     let actions: (CanvasAccountSheet) -> Void
     let record: (UUID) -> Void
     @State private var showingBalanceInfo = false
+    @State private var chatFocus: CanvasChatFocus?
 
     var body: some View {
         if let account = data.account(accountID) {
@@ -50,19 +51,23 @@ struct CuadraoAccountCanvas: View {
                             }.padding(.vertical, 18)
                         } else {
                             ForEach(entries) { entry in
-                                HStack(spacing: 14) {
-                                    Image(systemName: entry.income ? "arrow.down.left" : "arrow.up.right")
-                                        .frame(width: 38, height: 38)
-                                        .background(WelcomePalette.surface, in: Circle()).accessibilityHidden(true)
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(entry.title).font(.body)
-                                        Text(entry.date, format: .dateTime.day().month(.abbreviated))
-                                            .font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Text((entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                                        .font(CuadraoTypography.rowAmount)
-                                }.padding(.vertical, 10)
+                                NavigationLink {
+                                    CuadraoActivityDetail(data: data, activityID: entry.id, spanish: spanish, actions: actions, record: record)
+                                } label: {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: entry.income ? "arrow.down.left" : "arrow.up.right")
+                                            .frame(width: 38, height: 38)
+                                            .background(WelcomePalette.surface, in: Circle()).accessibilityHidden(true)
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text(entry.title).font(.body)
+                                            Text(entry.date, format: .dateTime.day().month(.abbreviated))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Text((entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
+                                            .font(CuadraoTypography.rowAmount)
+                                    }.padding(.vertical, 10)
+                                }.buttonStyle(.plain).accessibilityIdentifier("account-detail-activity.\(entry.id)")
                                 Divider()
                             }
                         }
@@ -79,6 +84,7 @@ struct CuadraoAccountCanvas: View {
                         ToolbarItem(placement: .topBarTrailing) { moreButton }
                     }
                 }
+                .contextualCuadrao(focus: $chatFocus, spanish: spanish)
                 .alert(spanish ? "Comprobar balance" : "Check balance", isPresented: $showingBalanceInfo) {
                     Button(spanish ? "Entendido" : "Got it", role: .cancel) { }
                 } message: {
@@ -89,6 +95,11 @@ struct CuadraoAccountCanvas: View {
     }
     private var moreButton: some View {
         Menu {
+            if let account = data.account(accountID) {
+                Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") {
+                    chatFocus = .account(id: accountID, title: account.displayName(spanish))
+                }.accessibilityIdentifier("account-detail-ask")
+            }
             Button(spanish ? "Cambiar nombre" : "Rename account", systemImage: "pencil") { actions(.rename(accountID)) }
             Button(spanish ? "Añadir movimiento" : "Add transaction", systemImage: "plus") { record(accountID) }
             Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { actions(.archive(accountID)) }
@@ -96,6 +107,7 @@ struct CuadraoAccountCanvas: View {
             Image(systemName: "ellipsis").frame(width: 44, height: 44)
         }.buttonStyle(.plain)
             .accessibilityLabel(spanish ? "Opciones de cuenta" : "Account actions")
+            .accessibilityIdentifier("account-detail-options")
     }
 
 }
