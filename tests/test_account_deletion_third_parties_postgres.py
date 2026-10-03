@@ -19,7 +19,7 @@ from argus.domain.apple_sign_in.credentials_postgres import (
     PostgresAppleCredentialRepository,
 )
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
-from argus.domain.ingestion.secrets import SecretBox
+from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 from psycopg_pool import ConnectionPool
 
 from tests import apple_sign_in_support as apple_support
@@ -117,6 +117,74 @@ def test_a_wrong_or_missing_key_never_drops_a_live_token(lane, world):  # noqa: 
         with psycopg.connect(DSN, autocommit=True) as c:
             c.execute(
                 "delete from public.financial_source_connections where id=%s", (other,)
+            )
+
+
+def test_a_rotated_away_key_never_drops_a_token_sealed_after_its_evidence(lane, world):  # noqa: F811
+    """Marcus re-check S1: the evidence is the newest credential anyone else
+    *sealed*, not the newest row touched. Someone else's token is sealed
+    under key A; the deployment rotates to key B and the person's Plaid token
+    is sealed under B; then a status or lease update touches the old A row.
+    A process still on key A opens that row, but it was sealed before the
+    person's token, so it proves nothing: the run stays pending with the
+    ciphertext kept."""
+    a, b = world["a"], world["b"]
+    old_key, new_key = (
+        SecretBox(secrets.token_bytes(32)),
+        SecretBox(secrets.token_bytes(32)),
+    )
+    made = [_other_credential(old_key, b)]
+    other = made[0]
+    try:
+        with psycopg.connect(DSN, autocommit=True) as c:
+            plaid = c.execute(
+                "select id from public.financial_source_connections"
+                " where user_id=%s and source='plaid' limit 1",
+                (a,),
+            ).fetchone()[0]
+            sealed = new_key.seal("access-live", source="plaid", connection_id=str(plaid))
+            c.execute(
+                "update public.financial_source_connections set secret_ciphertext=%s"
+                " where id=%s",
+                (sealed, plaid),
+            )
+            stamp = "select secret_sealed_at from public.financial_source_connections where id=%s"
+            before = c.execute(stamp, (other,)).fetchone()[0]
+            # A status/lease/attention update on the old row, no re-seal; a
+            # writer cannot set the stamp by hand either.
+            c.execute(
+                "update public.financial_source_connections"
+                " set status='error', updated_at=now() + interval '2 days',"
+                "     secret_sealed_at=now() + interval '2 days'"
+                " where id=%s",
+                (other,),
+            )
+            assert c.execute(stamp, (other,)).fetchone()[0] == before
+            assert before < c.execute(stamp, (plaid,)).fetchone()[0]
+        with pytest.raises(SecretUnreadable):
+            old_key.open(sealed, source="plaid", connection_id=str(plaid))
+        admin = SqlAuthAdmin()
+        with pytest.raises(AccountDeletionIncomplete) as raised:
+            _service(
+                lane, admin, FakeRevoker(unreadable={"plaid"}), box=old_key
+            ).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+        assert raised.value.pending == ["plaid"]
+        assert ("plaid", "pending", True, "key_unproven") in _revocations(a)
+        assert _locked(a) == (True, True)
+        # The live token is still there for a process on key B, which revokes it.
+        made.append(_other_credential(new_key, b))
+        revoker = FakeRevoker()
+        outcome = _service(lane, SqlAuthAdmin(), revoker, box=new_key).delete_account(
+            user_id=a
+        )
+        assert outcome.status == "done"
+        assert ("plaid", str(plaid), sealed) in revoker.calls
+    finally:
+        with psycopg.connect(DSN, autocommit=True) as c:
+            c.execute(
+                "delete from public.financial_source_connections where id = any(%s::uuid[])",
+                (made,),
             )
 
 

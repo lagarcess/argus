@@ -3111,8 +3111,10 @@ row per person who signed in with Apple while
 verified session's user), `client_id` (the Apple client the token was issued
 to, the bundle id for the native app), `secret_ciphertext` (Apple's refresh
 token sealed with AES-256-GCM under `ARGUS_INGESTION_SECRET_KEY`, bound to
-`apple_sign_in:<user_id>`), `captured_at` and `updated_at`. A later sign-in
-replaces the row.
+`apple_sign_in:<user_id>`), `captured_at`, `updated_at` and
+`secret_sealed_at`. A later sign-in replaces the row. `secret_sealed_at` (Lane 6,
+`20261004090000_account_deletion.sql`) is stamped by a trigger whenever the
+ciphertext changes and at no other time; the deletion run's key check uses it.
 
 RLS is on with no policy, and every client privilege is revoked: no client
 role can read or write any column. The API's service role is the only writer.
@@ -3154,7 +3156,10 @@ never backs two people's connections; webhooks resolve by the same pair.
 Cursor advances are compare-and-set under the lease; failures never clear
 `last_success_at` or the cursor, and recording a failure releases the lease so
 a sync already in flight cannot report success over it. A check constraint keeps disconnected rows free
-of credential, cursor and lease.
+of credential, cursor and lease. `secret_sealed_at` (Lane 6) is stamped by a
+trigger whenever `secret_ciphertext` changes, never by status, attention or
+lease updates, and is null with no credential; the account-deletion key check
+reads it to know which credential was sealed last.
 
 Registered owners may `SELECT` only the non-secret columns (column grant); no
 client role can read `secret_ciphertext`, `sync_cursor` or the lease, or write

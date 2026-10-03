@@ -2833,7 +2833,8 @@ the token still can't be opened, and returns `discarded`, `nothing_stored` or
 `readable`, so the user can be deleted. Apple's authorization for the app then
 stays until the person removes it in their Apple ID settings. Lane 6 calls it
 only after its key check proves this process holds the deployment's current
-key (the key opens the newest credential anyone else stored); a missing, wrong
+key (the key opens the credential anyone else most recently sealed, and that
+seal is not older than this token's, by `secret_sealed_at`); a missing, wrong
 or unproven key keeps the row as a pending revoke and alerts. Storage is in
 [DATA_MODEL.md](DATA_MODEL.md#apple-sign-in-credentials).
 

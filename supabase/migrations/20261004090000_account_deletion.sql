@@ -18,6 +18,8 @@
 --      is refused to everyone else.
 --   6. The Household-owned invite function, the locked-column guard and the
 --      deletion definers.
+--   7. secret_sealed_at on every sealed provider credential, stamped by the
+--      database whenever the ciphertext changes, for the key check.
 --
 -- 20261003140000 says the kept sender reference preserves per-user invite
 -- counts. Since Lane 6 that is no longer true for a deleted sender:
@@ -251,7 +253,9 @@ create table argus_private.account_deletion_runs (
 -- A household is one scope, so every plan and membership-keyed row of the
 -- person inside one household moves to that household's single placeholder.
 -- An activity group shared outside any plan belongs to no household and gets
--- its own. No placeholder spans two scopes. Deleted when the run completes.
+-- its own. A placeholder owns rows in one scope only; another household may
+-- hold a read-only reference to it (decision c, section 6). Deleted when the
+-- run completes.
 create table argus_private.account_deletion_placeholders (
     subject_hash text not null
         references argus_private.account_deletion_runs (subject_hash) on delete cascade,
@@ -275,9 +279,11 @@ create table argus_private.account_deletion_placeholders (
 --                      Google invalid_token, Plaid item gone): counted apart
 --                      and alerted on spikes;
 --   'unrecoverable'    the credential does not open under the verified current
---                      key (key_check: that key opens the newest credential
---                      anyone else stored). A key or config read failure is
---                      never this: the row stays pending with its ciphertext;
+--                      key (key_check: that key opens the credential anyone
+--                      else most recently sealed, and that seal is not older
+--                      than this one; see section 7). A key or config read
+--                      failure is never this: the row stays pending with its
+--                      ciphertext;
 --   'operator_forced'  an operator closed it, with a logged reason.
 -- The rows are deleted when the run completes; the run keeps the counts.
 create table argus_private.account_deletion_revocations (
@@ -287,6 +293,7 @@ create table argus_private.account_deletion_revocations (
     source_ref uuid not null,
     external_ref text,
     secret_ciphertext bytea,
+    secret_sealed_at timestamptz,
     status text not null default 'pending'
         check (status in ('pending', 'revoked', 'already_revoked', 'unrecoverable', 'operator_forced')),
     attempts integer not null default 0 check (attempts >= 0),
@@ -1431,3 +1438,47 @@ revoke all on function
     argus_private.deletion_auth_blockers(uuid),
     argus_private.deletion_activity_household(uuid)
   from service_role;
+
+
+-- 7. Seal time for the key check (Marcus re-check S1, Oct 3) ---------------------
+-- SecretBox carries no key id, so the key check needs to know *when* each
+-- credential was sealed: the newest seal anyone else holds was made under the
+-- deployment's current key. updated_at cannot say that: status, attention and
+-- lease updates move it without re-sealing, so after a rotation a row sealed
+-- under the old key could look newest. secret_sealed_at moves only when the
+-- ciphertext itself changes, and the database stamps it, so no writer can
+-- forget it or set it by hand. Rows sealed before this migration stay null and
+-- never count as evidence (fails closed: the step stays pending).
+alter table public.financial_source_connections add column secret_sealed_at timestamptz;
+alter table public.apple_sign_in_credentials add column secret_sealed_at timestamptz;
+
+create function argus_private.stamp_secret_sealed_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+    if new.secret_ciphertext is null then
+        new.secret_sealed_at := null;
+    elsif tg_op = 'INSERT' or new.secret_ciphertext is distinct from old.secret_ciphertext then
+        new.secret_sealed_at := pg_catalog.clock_timestamp();
+    else
+        new.secret_sealed_at := old.secret_sealed_at;
+    end if;
+    return new;
+end;
+$$;
+
+revoke all on function argus_private.stamp_secret_sealed_at() from public;
+
+create trigger financial_source_connections_stamp_sealed_at
+    before insert or update on public.financial_source_connections
+    for each row execute function argus_private.stamp_secret_sealed_at();
+
+create trigger apple_sign_in_credentials_stamp_sealed_at
+    before insert or update on public.apple_sign_in_credentials
+    for each row execute function argus_private.stamp_secret_sealed_at();
+
+create index financial_source_connections_sealed_idx
+    on public.financial_source_connections (secret_sealed_at desc)
+    where secret_sealed_at is not null and source in ('plaid', 'gmail');

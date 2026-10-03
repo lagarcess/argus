@@ -613,7 +613,7 @@ After deletion:
 - The Apple fake recorded a revoke of their token. The stored token is gone after the revoke succeeds, and is kept while the fake fails.
 - The provider fake recorded a revoke for every Google token Argus held for them, the Gmail source token included. A person who signed in with Google through an ID token had no Google refresh token stored, so nothing else was revoked for that sign-in.
 - Their shared debt plan is archived read-only under the placeholder of its household, with the same values, dates, and closed balance line. The debt plan and their debt account are both re-keyed to that placeholder. Its participant sees the banner and the member note. It was not handed over.
-- Each placeholder is a nameless, banned `auth.users` row with no id tied to the person, one per household or standalone shared group and departed person, and the API rejects a JWT for it. All of the person's rows in one household, across every plan in it, point at that household's single placeholder. No placeholder spans two households or groups.
+- Each placeholder is a nameless, banned `auth.users` row with no id tied to the person, one per household or standalone shared group and departed person, and the API rejects a JWT for it. All of the person's rows in one household, across every plan in it, point at that household's single placeholder. A placeholder owns rows in one household or group only; another household may hold a read-only reference to it under decision c.
 - Their feedback rows hold no email or user id.
 - The PostHog fake recorded a deletion for their distinct id with events included.
 - The new owner of a handed-over plan can edit it right after the run. It has no `departed_at` and no #773 archive from this deletion.

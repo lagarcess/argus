@@ -35,7 +35,8 @@ Order, matching ``docs/specs/lanes/account-deletion-fk-census.md``:
    in the run record (``force_complete_step``). There is no user-facing
    bypass.
    A credential that does not open is given up only when ``key_check`` proves
-   this process holds the deployment's current key: then a Plaid or Gmail one
+   this process holds the deployment's current key, checked against that
+   credential's own seal time (``secret_sealed_at``): then a Plaid or Gmail one
    is recorded ``unrecoverable`` and an Apple one goes through #802's
    ``discard_unreadable``. A missing, wrong or unproven key keeps every
    credential pending with its ciphertext and alerts. No token is ever logged.
@@ -222,7 +223,7 @@ class AccountDeletionService:
             )
             raise AccountDeletionIncomplete("third_party_pending", list(pending))
         self._settle_late_writes(user_id, subject)
-        counts = self._delete_auth_user(user_id, run["id"])
+        counts = self._delete_auth_user(user_id, run["id"], run["claim"])
         return DeletionOutcome(status="done", counts=counts, run_id=run["id"])
 
     # -- the sweep ----------------------------------------------------------------
@@ -396,6 +397,22 @@ class AccountDeletionService:
             )
         return {"id": str(run_id), "status": status, "steps": steps or {}, "claim": claim}
 
+    def _renew(self, run_id: str, claim: str) -> None:
+        """Extend this pass's claim before the account delete (Marcus re-check
+        N1): third-party calls can take most of CLAIM_SECONDS, and a pass whose
+        claim lapsed and was taken stops here instead of racing the new one."""
+
+        now = self._clock()
+        with self._households.connection() as connection, connection.transaction():
+            renewed = connection.execute(
+                "update argus_private.account_deletion_runs"
+                " set claimed_until = %s"
+                " where id = %s and claim_id = %s and claimed_until > %s returning 1",
+                (now + timedelta(seconds=CLAIM_SECONDS), run_id, claim, now),
+            ).fetchone()
+        if renewed is None:
+            raise AccountDeletionIncomplete("in_progress")
+
     def _release(self, run_id: str, claim: str) -> None:
         with self._households.connection() as connection, connection.transaction():
             connection.execute(
@@ -544,13 +561,15 @@ class AccountDeletionService:
         # 2: capture every provider credential, then remove the sources.
         captured = connection.execute(
             """insert into argus_private.account_deletion_revocations
-                 (subject_hash, provider, source_ref, external_ref, secret_ciphertext)
-               select %s, source, id, external_ref, secret_ciphertext
+                 (subject_hash, provider, source_ref, external_ref, secret_ciphertext,
+                  secret_sealed_at)
+               select %s, source, id, external_ref, secret_ciphertext, secret_sealed_at
                  from public.financial_source_connections
                 where user_id = %s and source in ('plaid', 'gmail')
                   and secret_ciphertext is not null
                on conflict (subject_hash, provider, source_ref) do update
                  set secret_ciphertext = excluded.secret_ciphertext,
+                     secret_sealed_at = excluded.secret_sealed_at,
                      external_ref = excluded.external_ref
                returning 1""",
             (subject, user_id),
@@ -655,7 +674,13 @@ class AccountDeletionService:
         return None
 
     def _discard_unreadable_apple(self, user_id: str, subject: str) -> str | None:
-        check = self._key_check(user_id, "apple")
+        with self._households.connection() as connection:
+            row = connection.execute(
+                "select secret_sealed_at from public.apple_sign_in_credentials"
+                " where user_id = %s",
+                (user_id,),
+            ).fetchone()
+        check = self._key_check(user_id, "apple", sealed_at=row[0] if row else None)
         if check != "verified":
             self._record_step(subject, "apple_revoke", "pending")
             return f"key_{check}"
@@ -671,9 +696,13 @@ class AccountDeletionService:
         self._record_step(subject, "apple_revoke", "unrecoverable")
         return None
 
-    def _key_check(self, user_id: str, step: str) -> KeyCheck:
+    def _key_check(
+        self, user_id: str, step: str, *, sealed_at: datetime | None
+    ) -> KeyCheck:
         with self._households.connection() as connection:
-            check = check_current_key(connection, self._box, user_id=user_id)
+            check = check_current_key(
+                connection, self._box, user_id=user_id, sealed_at=sealed_at
+            )
         if check != "verified":
             # The credential is kept: a wrong or missing key must never drop
             # a live token. Someone has to look at the key configuration.
@@ -824,7 +853,8 @@ class AccountDeletionService:
             )
             raise AccountDeletionIncomplete("late_write", pending) from None
 
-    def _delete_auth_user(self, user_id: str, run_id: str) -> dict[str, int]:
+    def _delete_auth_user(self, user_id: str, run_id: str, claim: str) -> dict[str, int]:
+        self._renew(run_id, claim)
         self._auth.delete_user(user_id)
         with self._households.connection() as connection:
             subject = subject_hash(user_id)
@@ -858,16 +888,21 @@ class AccountDeletionService:
                 by = revocations.setdefault(str(provider), {})
                 by[str(status)] = by.get(str(status), 0) + int(n)
             # Done: the id and both hashes go, so the record names nobody.
-            steps = connection.execute(
+            # Fenced on the claim: if it was lost meanwhile, this transaction
+            # rolls back and the pass that holds it finishes the run.
+            done = connection.execute(
                 "update argus_private.account_deletion_runs"
                 " set status = 'done', user_id = null, subject_hash = null,"
                 "     analytics_distinct_id = null, claim_id = null, claimed_until = null,"
                 "     updated_at = %s, completed_at = %s,"
                 "     steps = (steps - 'pending_since' - 'last_error')"
                 "       || jsonb_build_object('storage', 'not_applicable', 'revocations', %s::jsonb)"
-                " where id = %s returning steps",
-                (now, now, json.dumps(revocations), run_id),
-            ).fetchone()[0]
+                " where id = %s and claim_id = %s returning steps",
+                (now, now, json.dumps(revocations), run_id, claim),
+            ).fetchone()
+            if done is None:
+                raise AccountDeletionIncomplete("in_progress")
+            steps = done[0]
         return dict((steps or {}).get("counts", {}))
 
     # -- 4. providers and analytics, before the account delete -------------------
@@ -878,15 +913,15 @@ class AccountDeletionService:
 
         with self._households.connection() as connection:
             rows = connection.execute(
-                "select provider, source_ref, external_ref, secret_ciphertext"
+                "select provider, source_ref, external_ref, secret_ciphertext,"
+                "       secret_sealed_at"
                 " from argus_private.account_deletion_revocations"
                 " where subject_hash = %s and status = 'pending'"
                 "   and provider in ('plaid', 'gmail') order by provider, source_ref",
                 (subject,),
             ).fetchall()
         pending: dict[str, str] = {}
-        key: KeyCheck | None = None
-        for provider, source_ref, external_ref, ciphertext in rows:
+        for provider, source_ref, external_ref, ciphertext, sealed_at in rows:
             error: str | None = None
             if self._revoker is None:
                 outcome = "failed"
@@ -904,9 +939,10 @@ class AccountDeletionService:
                 status = "already_revoked"
                 self._note_already_revoked(subject, str(provider))
             elif outcome == "unreadable":
-                # Given up only under the verified current key; otherwise the
+                # Given up only under the verified current key, checked
+                # against this credential's own seal time; otherwise the
                 # ciphertext is kept for a pass that holds the right key.
-                key = key or self._key_check(user_id, str(provider))
+                key = self._key_check(user_id, str(provider), sealed_at=sealed_at)
                 status = "unrecoverable" if key == "verified" else "pending"
                 error = None if key == "verified" else f"key_{key}"
             else:
