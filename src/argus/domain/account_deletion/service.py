@@ -163,17 +163,16 @@ class AccountDeletionService:
             if row is not None:
                 return {"status": row[0], "steps": row[1] or {}}
             user = connection.execute(
-                "select is_anonymous, raw_app_meta_data from auth.users where id = %s",
+                "select raw_app_meta_data from auth.users where id = %s",
                 (user_id,),
             ).fetchone()
             if user is None:
                 raise AccountDeletionRejected("unknown_user")
-            if user[0]:
-                # A guest has no account to delete; the guest workspace has its own expiry.
-                raise AccountDeletionRejected("guest")
+            # A guest is deleted by this same command (Lane 6 acceptance); it
+            # simply has no household, plan or provider rows to move.
             placeholder = connection.execute(
                 "select argus_private.is_account_placeholder(%s, %s::jsonb)",
-                (user_id, json.dumps(user[1] or {})),
+                (user_id, json.dumps(user[0] or {})),
             ).fetchone()[0]
             if placeholder:
                 raise AccountDeletionRejected("placeholder")
@@ -205,6 +204,13 @@ class AccountDeletionService:
     def _reserve_placeholders(self, user_id: str, subject: str) -> None:
         with self._households.connection() as connection:
             with connection.transaction():
+                # Serializes duplicate requests: the second waits here, then
+                # sees the first one's reservations instead of racing them.
+                connection.execute(
+                    "select 1 from argus_private.account_deletion_runs"
+                    " where subject_hash = %s for update",
+                    (subject,),
+                )
                 scopes = set(self._units(connection, user_id).values())
                 known = {
                     (str(kind), str(scope))
@@ -236,9 +242,14 @@ class AccountDeletionService:
         for (pid,) in pending:
             pid = str(pid)
             if not self._auth.user_exists(pid):
-                self._auth.create_placeholder(
-                    user_id=pid, email=placeholder_email(str(uuid.uuid4()))
-                )
+                try:
+                    self._auth.create_placeholder(
+                        user_id=pid, email=placeholder_email(str(uuid.uuid4()))
+                    )
+                except Exception:
+                    # A concurrent request created the same reserved id first.
+                    if not self._auth.user_exists(pid):
+                        raise
             with self._households.connection() as connection, connection.transaction():
                 connection.execute(
                     "update argus_private.account_deletion_placeholders set created = true"
