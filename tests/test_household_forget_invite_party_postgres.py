@@ -1,5 +1,8 @@
 """Household-owned: argus_private.forget_invite_party (account deletion step 4).
 
+At the top level so the real-PostgreSQL CI matrix (tests/test_*_postgres.py)
+gates it.
+
 The function ships in Lane 6's migration, but its rules belong to Household
 (Yelena, HoE, signed off Oct 3). It clears the person's ids from every invite
 table, keeps every anonymous row, rotates sender_ref to a distinct fresh value
