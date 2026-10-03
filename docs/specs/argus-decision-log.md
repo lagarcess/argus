@@ -29,8 +29,8 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-27 | Lock copy-link household invitations, user-shared WhatsApp links, do-blitz as the short-link integration direction, and Resend email delivery; no incentives. Detailed owner: [MVEE invitation delivery](argus-minimum-viable-ecosystem-experience.md#invitation-delivery-founder-locked-september-27-2026). Contact discovery and implementation contracts are not implied. Narrowed on 2026-10-02: do-blitz no longer handles invite links; see [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
 | 2026-09-28, clarified 2026-09-29 | Revenue, pricing, paywalls and billing remain deferred; existing usage and cost safeguards remain. The current user-trial boundary permits founder dogfooding and physical-phone demonstrations. Detailed owner: [documentation authority — founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral). | Lucas |
 | 2026-09-29 | The [private iPhone delivery and execution lock](#september-29-2026-private-iphone-delivery-and-execution-lock) owns the current delivery decision and supersedes the batch instructions below. | Lucas |
-| 2026-10-01 | Lock Household permission policy: creator administers invitations/membership and may transfer administration or close before departure; members see the member list and may leave; shared accounts start view-only with editing only via explicit grant; edit grants do not confer ownership, membership administration or resharing; leave/removal revokes membership and that member's account grants while owners retain records/history; invitations are revocable, single-use, seven-day links with safe same-recipient acceptance retries; create ≠ invite ≠ share account and acceptance is membership only. MVEE consent and financial-meaning boundaries remain. Owners: [execution board Household lane](argus-execution-board.md#connected-spaces-and-household-lane), [MVEE section 12](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), [lane contract](lanes/household-permission-policy.md). Narrowed on 2026-10-02: rule 5's departure behavior now follows the [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas (Project orchestrator recorded) |
-| 2026-10-02 | Lock the invitation, TestFlight beta-gate, Home comparison, Updates, plan-export and account-move rules for the five Cuadrao lanes. Detailed record: [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
+| 2026-10-01 | Lock Household permission policy: creator administers invitations/membership and may transfer administration or close before departure; members see the member list and may leave; shared accounts start view-only with editing only via explicit grant; edit grants do not confer ownership, membership administration or resharing; leave/removal revokes membership and that member's account grants while owners retain records/history; invitations are revocable, single-use, seven-day links with safe same-recipient acceptance retries; create ≠ invite ≠ share account and acceptance is membership only. MVEE consent and financial-meaning boundaries remain. Owners: [execution board Household lane](argus-execution-board.md#connected-spaces-and-household-lane), [MVEE section 12](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), [lane contract](lanes/household-permission-policy.md). Narrowed on 2026-10-02: rule 5's departure behavior, and rule 1's admin handoff when the admin deletes their account, now follow the [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas (Project orchestrator recorded) |
+| 2026-10-02 | Lock the invitation (beta versus household invites, 10 beta invites per user), TestFlight beta-gate, Home comparison, Updates, plan-export, account-move and account-deletion-in-a-household rules for the five Cuadrao lanes. Detailed record: [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
 
 ## Superseded coordination instructions (historical only)
 
@@ -200,15 +200,17 @@ user trials, no new growth analytics), scoped to invites only.
 
 - The cuadrao.ai landing page collects a waitlist, and the founder rolls access
   out personally. He onboards the first users himself.
-- Each user starts with 3 invites; the founder can add more. Still open: how
-  this per-user quota fits October 1 rule 1, where only the household creator
-  administers invitations. Are beta invites and household invites separate
-  kinds?
+- There are two kinds of invitation. Any user can send a beta invite; each
+  user has 10 for TestFlight, and the founder can add more. Only the household
+  admin sends household invites. These don't use any of the 10, and they also
+  let the invitee into the beta. This keeps October 1 rule 1: only the
+  household creator administers household invitations. (Founder lock, 8:04 PM
+  CT; the split is Iris's proposal, with the quota raised from 3 to 10.)
 - A TestFlight public link only installs the app. The in-app invite code is the
   real gate. Anyone without a code is sent to the cuadrao.ai waitlist.
 - Three network numbers are tracked from the start: invites sent per user, the
   share of invites accepted, and the share of invitees who go on to invite
-  someone.
+  someone. Household invites are counted separately from beta invites.
 - Apple's first beta review must be scheduled before the first outside
   distribution.
 
@@ -246,6 +248,19 @@ user trials, no new growth analytics), scoped to invites only.
   settlements. A move is recorded as an event, replaying it changes nothing, and
   access rules block creating, editing or deleting the locked history. Home is
   recomputed from history.
+
+### Deleting an account in a household
+
+- When an owner deletes their account, the household's locked copy of that
+  owner's account history is deleted too, and the other members see a short
+  note that it was removed. This is the one exception to members keeping
+  history after a departure (see the section on leaving a household above).
+- When the household admin deletes their account, the admin role passes
+  automatically to the longest-standing remaining member. If no one is left,
+  the household closes. This narrows October 1 rule 1, where the admin
+  transfers administration or closes the household before leaving: account
+  deletion does not wait for a manual transfer.
+- Both are founder locks (8:04 PM CT) of Iris's proposals.
 
 ### Outside services
 
