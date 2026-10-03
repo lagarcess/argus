@@ -155,6 +155,31 @@ final class ReleaseUIJourneyTests: XCTestCase {
         XCTAssertTrue(app.buttons["identity.gallery.ai"].waitForExistence(timeout: 3))
     }
 
+    func testFullPreviewSharesProfileAvatarWithNavigation() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--cuadrao-design", "--cuadrao-home", "-AppleLanguages", "(es)", "-AppleLocale", "es_DO"]
+        app.launch()
+        XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 8))
+        app.buttons["header.profile"].tap()
+        XCTAssertTrue(app.buttons["cuadrao.profile.identity"].waitForExistence(timeout: 4))
+        capture(app, "full-profile-empty-es")
+        app.buttons["cuadrao.profile.identity"].tap()
+        XCTAssertTrue(app.buttons["cuadrao.profile.photo.choose"].waitForExistence(timeout: 3))
+        let moon = app.buttons["cuadrao.profile.avatar.moon"]
+        reveal(moon, in: app); moon.tap()
+        app.buttons["cuadrao.profile.save"].tap()
+        capture(app, "full-profile-theme-es")
+        app.buttons["cuadrao.profile.identity"].tap()
+        let selected = app.buttons["cuadrao.profile.avatar.moon"]
+        reveal(selected, in: app)
+        XCTAssertTrue(selected.isSelected)
+        app.buttons["cuadrao.profile.cancel"].tap()
+        app.buttons["tab.home"].tap()
+        XCTAssertTrue(app.staticTexts["home-greeting"].waitForExistence(timeout: 3))
+        capture(app, "full-home-theme-es")
+    }
+
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
         for _ in 0..<8 {
             if element.exists && element.isHittable { return }
