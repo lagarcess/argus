@@ -95,8 +95,11 @@ struct CuadraoPasswordRecovery: View {
             Button(spanish ? "¿No encuentras el correo?" : "Can’t find the email?") { showHelp.toggle() }
                 .font(.subheadline).frame(minHeight: 44).padding(.top, 24)
             if showHelp {
-                Text(spanish ? "Revisa la carpeta de correo no deseado y comprueba la dirección. Si usas Apple para entrar, vuelve y elige Continuar con Apple."
-                    : "Check your spam folder and the email address. If you sign in with Apple, go back and choose Continue with Apple.")
+                Text(CuadraoFirstRelease.showsSocialSignIn
+                    ? (spanish ? "Revisa la carpeta de correo no deseado y comprueba la dirección. Si usas Apple para entrar, vuelve y elige Continuar con Apple."
+                        : "Check your spam folder and the email address. If you sign in with Apple, go back and choose Continue with Apple.")
+                    : (spanish ? "Revisa la carpeta de correo no deseado y comprueba la dirección."
+                        : "Check your spam folder and the email address."))
                     .font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
             }
