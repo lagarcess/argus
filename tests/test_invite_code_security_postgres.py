@@ -208,6 +208,15 @@ def test_no_client_role_can_ever_read_a_code_digest(lane):
                 with conn.transaction():
                     conn.execute(f"set local role {role}")
                     conn.execute("select * from argus_private.invite_code_digests")
+        # service_role reaches the schema (earlier migrations grant usage for
+        # other tables) but holds no privilege on this table.
+        assert conn.execute(
+            "select has_schema_privilege('service_role','argus_private','usage')"
+        ).fetchone() == (True,)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with conn.transaction():
+                conn.execute("set local role service_role")
+                conn.execute("select * from argus_private.invite_code_digests")
         # Even if someone later granted schema usage and SELECT, RLS with no
         # policy returns nothing to the invite's own sender.
         try:
@@ -322,3 +331,66 @@ def test_revoke_in_flight_on_a_full_link_is_not_counted_as_overflow(lane):
         "select use_count,overflow_count from public.beta_invitations where id=%s",
         link.id,
     ) == (1, 0)
+
+
+@pytest.mark.parametrize("locked", [True, False], ids=["row_lock", "guard_only"])
+def test_household_accept_refuses_an_invitation_revoked_under_it(
+    lane, monkeypatch, locked
+):
+    """Priya: the household accept row-count guard had no test.
+
+    A revoke of the invitation is in flight (row locked, not yet committed).
+    With the row lock, accept waits and answers revoked. With the lock cleared
+    (``_household_accept_lock``), accept reads the old row, adds the member and
+    then its guarded update waits and misses: the row-count check must refuse
+    and roll the membership back. Without that check the revoked invitation
+    was accepted.
+    """
+    import time
+
+    from argus.domain.household.errors import InvitationRevoked
+
+    if not locked:
+        monkeypatch.setattr(PostgresHouseholdRepository, "_household_accept_lock", "")
+    admin, joiner = lane.users[1:3]
+    hid = lane.household(admin)
+    invite = lane.households.invite(user_id=admin, household_id=hid)
+    outcome: dict[str, object] = {}
+
+    def accept() -> None:
+        try:
+            outcome["result"] = lane.households.accept(user_id=joiner, code=invite.code)
+        except (InvitationRevoked, InvitationConsumed) as error:
+            outcome["result"] = type(error).__name__
+
+    with psycopg.connect(DSN, autocommit=False) as revoker:
+        revoker.execute(
+            "update public.household_invitations set revoked_at=now() where id=%s",
+            (invite.id,),
+        )
+        worker = threading.Thread(target=accept)
+        worker.start()
+        with psycopg.connect(DSN, autocommit=True) as probe:
+            deadline = time.monotonic() + 10
+            waiting = 0
+            while time.monotonic() < deadline and not waiting:
+                waiting = probe.execute(
+                    "select count(*) from pg_stat_activity"
+                    " where wait_event_type='Lock' and pid<>%s",
+                    (revoker.info.backend_pid,),
+                ).fetchone()[0]
+                time.sleep(0.02)
+        assert waiting, "the accept never waited on the in-flight revoke"
+        revoker.commit()
+    worker.join(timeout=10)
+    expected = "InvitationRevoked" if locked else "InvitationConsumed"
+    assert outcome.get("result") == expected, outcome
+    assert lane.row(
+        "select count(*) from public.household_members"
+        " where household_id=%s and user_id=%s",
+        hid,
+        joiner,
+    ) == (0,)
+    assert lane.row(
+        "select accepted_at from public.household_invitations where id=%s", invite.id
+    ) == (None,)

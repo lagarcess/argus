@@ -5,9 +5,11 @@
 --    public.household_invitations.code_hash and public.beta_invitations.code_hash,
 --    beside owner-scoped SELECT policies. No client role has SELECT on either
 --    table today, but one later grant would have exposed them. They now live in
---    argus_private, which anon and authenticated cannot even reach, with RLS on
---    and no policy for any role, and no privilege for anon, authenticated or
---    service_role. Only the backend database owner reads and writes it.
+--    argus_private, which anon and authenticated cannot even reach. service_role
+--    does have usage on that schema (granted by earlier migrations for other
+--    tables) but gets no privilege on this table. RLS is on with no policy for
+--    any role, and anon, authenticated and service_role hold no table grant.
+--    Only the backend database owner reads and writes it.
 -- 2. Digests are HMAC-SHA-256 under a server secret (ARGUS_INVITE_CODE_SECRET)
 --    and say which key made them: v2.<key id>.<hex>. The check below refuses
 --    anything else, so an unkeyed digest can never be written again.
@@ -34,7 +36,7 @@ create table argus_private.invite_code_digests (
 );
 
 comment on table argus_private.invite_code_digests is
-    'Keyed (HMAC-SHA-256) digests of typed invite codes. Backend only: no client or service_role privilege, RLS on with no policy.';
+    'Keyed (HMAC-SHA-256) digests of typed invite codes. Backend only: no table grant to anon, authenticated or service_role (service_role has schema usage only), RLS on with no policy.';
 
 alter table argus_private.invite_code_digests enable row level security;
 revoke all on argus_private.invite_code_digests

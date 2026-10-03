@@ -58,6 +58,11 @@ def _utcnow() -> datetime:
 
 
 class PostgresHouseholdRepository:
+    # Accept locks the invitation row, then claims it with a guarded update whose
+    # row count is checked. Tests clear the lock to prove the check alone still
+    # refuses an invitation that changed underneath the read.
+    _household_accept_lock = " for update"
+
     def __init__(
         self,
         pool: ConnectionPool,
@@ -234,7 +239,7 @@ class PostgresHouseholdRepository:
             row = c.execute(
                 "select id,expires_at,revoked_at,accepted_by,accepted_at,accepted_membership_id"
                 + where
-                + " for update",
+                + self._household_accept_lock,
                 (digest,),
             ).fetchone()
             if row[4] is not None:

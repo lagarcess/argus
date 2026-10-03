@@ -41,8 +41,8 @@ from fastapi.testclient import TestClient
 
 from tests.household.conftest import ALICE, TEST_CODE_SECRET
 
-SECRET_A = "a" * 40
-SECRET_B = "b" * 40
+SECRET_A = "test-secret-a-7Qm2Vx9Lp4Rt8Wz3Ny6Kb1Hd5"
+SECRET_B = "test-secret-b-3Fj8Ns2Gc7Yq5Ue9Ta4Lw6Mx1"
 
 
 # -- Digests ------------------------------------------------------------------
@@ -112,6 +112,35 @@ def test_short_previous_secret_also_fails_closed():
         CodeHasher.from_secrets(SECRET_A, "too-short")
 
 
+@pytest.mark.parametrize(
+    "placeholder",
+    ["a" * 32, "a" * 64, "ab" * 24, "changeme" * 6, "secret12" * 5],
+)
+def test_placeholder_secrets_are_refused(placeholder, monkeypatch):
+    """Priya: a long but trivial secret must not pass the length check alone."""
+    assert len(placeholder) >= 32
+    with pytest.raises(InviteCodesUnavailable, match="placeholder"):
+        CodeHasher.from_secrets(placeholder)
+    with pytest.raises(InviteCodesUnavailable, match="placeholder"):
+        CodeHasher.from_secrets(SECRET_A, placeholder)
+    monkeypatch.setenv("ARGUS_INVITE_CODE_SECRET", placeholder)
+    from argus.domain.household.invite_codes import code_secret_problem
+
+    assert "placeholder" in (code_secret_problem() or "")
+
+
+@pytest.mark.parametrize(
+    "generated",
+    [
+        "3q2+7wB9xY0kLmN4pQrStUvWxYz1A2b3C4d5E6f7G8h9I0jK1lM2nO3pQ4rS5tU6",  # base64
+        "9f86d081884c7d659a2feaa0c55ad015",  # 32 hex characters
+        TEST_CODE_SECRET,
+    ],
+)
+def test_generated_secrets_pass_the_floor(generated):
+    assert CodeHasher.from_secrets(generated).current.key_id
+
+
 # -- Entropy ------------------------------------------------------------------
 
 
@@ -163,6 +192,92 @@ def test_readiness_fails_when_a_code_flag_is_on_without_the_secret(monkeypatch):
     assert check["reason"] == "invite_code_secret_unusable"
     monkeypatch.setenv("ARGUS_INVITE_CODE_SECRET", TEST_CODE_SECRET)
     assert _invite_code_check()["status"] == "ready"
+
+
+def test_beta_invites_start_closed_without_the_secret(monkeypatch):
+    """Priya: start_invites (beta, group link, gate) must fail closed too."""
+    monkeypatch.setenv("ARGUS_BETA_INVITES_ENABLED", "true")
+    monkeypatch.setattr(api_state, "PERSISTENCE_MODE", "supabase")
+    monkeypatch.setattr(api_state, "DATABASE_URL", "postgresql://unused/argus")
+    pools: list[object] = []
+
+    def _pool(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        pools.append(args)
+        return MagicMock()
+
+    monkeypatch.setattr("psycopg_pool.ConnectionPool", _pool)
+    application = MagicMock()
+    try:
+        monkeypatch.delenv("ARGUS_INVITE_CODE_SECRET", raising=False)
+        surface.start_invites(application)
+        assert surface.invites_store() is None and pools == []
+
+        monkeypatch.setenv("ARGUS_INVITE_CODE_SECRET", "a" * 40)  # placeholder
+        surface.start_invites(application)
+        assert surface.invites_store() is None and pools == []
+
+        # Control: with a usable secret the same start does open the store.
+        monkeypatch.setenv("ARGUS_INVITE_CODE_SECRET", TEST_CODE_SECRET)
+        surface.start_invites(application)
+        assert surface.invites_store() is not None and len(pools) == 1
+    finally:
+        surface.configure_invites_store(None)
+
+
+def test_readiness_runs_the_invite_code_check(monkeypatch):
+    """Priya: prove /internal/readiness itself calls _invite_code_check."""
+    from types import SimpleNamespace
+
+    from argus.api.routers import ops
+
+    gateway = MagicMock()
+    gateway.health_check.return_value = {"status": "ready", "duration_ms": 1}
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setattr(api_state, "get_agent_runtime_workflow", lambda request: None)
+    monkeypatch.setattr(
+        ops,
+        "warm_asset_universe",
+        lambda force: SimpleNamespace(
+            status="ready",
+            duration_ms=1,
+            provider_mode="test",
+            alias_count=0,
+            required_symbols=(),
+            resolved_symbols=(),
+            missing_symbols=(),
+        ),
+    )
+    monkeypatch.setenv("ARGUS_OPS_TOKEN", "test-ops-token")
+    monkeypatch.setenv("ARGUS_HOUSEHOLDS_ENABLED", "true")
+    monkeypatch.delenv("ARGUS_INVITE_CODE_SECRET", raising=False)
+    calls: list[object] = []
+    real_check = ops._invite_code_check  # noqa: SLF001
+
+    def _spy():  # noqa: ANN202
+        result = real_check()
+        calls.append(result)
+        return result
+
+    monkeypatch.setattr(ops, "_invite_code_check", _spy)
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer test-ops-token"}
+
+    response = client.get("/internal/readiness", headers=headers)
+    assert calls, "readiness never ran the invite code check"
+    assert response.status_code == 503
+    checks = {check["name"]: check for check in response.json()["checks"]}
+    assert checks["invite_codes"]["status"] == "degraded"
+    assert checks["invite_codes"]["reason"] == "invite_code_secret_unusable"
+    assert all(
+        check["status"] == "ready"
+        for name, check in checks.items()
+        if name != "invite_codes"
+    )
+
+    monkeypatch.setenv("ARGUS_INVITE_CODE_SECRET", TEST_CODE_SECRET)
+    response = client.get("/internal/readiness", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
 
 
 def test_secret_removed_after_start_answers_503(client, alice, bob, monkeypatch):

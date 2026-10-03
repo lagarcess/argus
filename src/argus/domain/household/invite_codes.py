@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import os
 import re
 import secrets
+from collections import Counter
 from dataclasses import dataclass, field
 
 from pydantic import SecretStr
@@ -41,6 +43,12 @@ _CONFUSABLE = str.maketrans({"O": "0", "I": "1", "L": "1", "U": "V"})
 CODE_SECRET_ENV = "ARGUS_INVITE_CODE_SECRET"
 CODE_SECRET_PREVIOUS_ENV = "ARGUS_INVITE_CODE_SECRET_PREVIOUS"
 MIN_SECRET_LENGTH = 32
+# A placeholder like "a" * 32 or "changeme" repeated is refused. This is a
+# floor against obvious mistakes, not a strength proof: generate the secret
+# with `openssl rand -base64 48` (about 288 bits; random hex of 32 characters,
+# about 115 by this estimate, also passes).
+MIN_SECRET_DISTINCT = 10
+MIN_SECRET_BITS = 96
 DIGEST_VERSION = "v2"
 DIGEST_PATTERN = re.compile(r"^v2\.[0-9a-f]{8}\.[0-9a-f]{64}$")
 # Flags that turn on a surface which makes or looks up codes.
@@ -98,6 +106,13 @@ class CodeKey:
             raise InviteCodesUnavailable(
                 f"The invite code secret must be at least {MIN_SECRET_LENGTH} characters."
             )
+        if _estimated_bits(value) < MIN_SECRET_BITS or (
+            len(set(value)) < MIN_SECRET_DISTINCT
+        ):
+            raise InviteCodesUnavailable(
+                "The invite code secret looks like a placeholder; generate one"
+                " with `openssl rand -base64 48`."
+            )
         secret = value.encode("utf-8")
         key_id = hmac.new(secret, b"argus-invite-code-key-id", hashlib.sha256)
         return cls(key_id=key_id.hexdigest()[:8], secret=secret)
@@ -109,6 +124,14 @@ class CodeKey:
             hashlib.sha256,
         )
         return f"{DIGEST_VERSION}.{self.key_id}.{mac.hexdigest()}"
+
+
+def _estimated_bits(value: str) -> float:
+    """Length times the per-character Shannon entropy of the value itself."""
+    counts = Counter(value)
+    total = len(value)
+    per_char = -sum(n / total * math.log2(n / total) for n in counts.values())
+    return per_char * total
 
 
 @dataclass(frozen=True)

@@ -7493,7 +7493,9 @@ Without it, none of `ARGUS_HOUSEHOLDS_ENABLED`, `ARGUS_BETA_INVITES_ENABLED` or
 `ARGUS_BETA_INVITE_GATE_ENABLED` may be turned on in a hosted environment.
 
 **Keyed digests.** A code is stored only as HMAC-SHA-256 under
-`ARGUS_INVITE_CODE_SECRET` (at least 32 characters; generate with
+`ARGUS_INVITE_CODE_SECRET` (at least 32 characters, and not an obvious
+placeholder such as one repeated character: at least 10 distinct characters and
+about 96 bits by a per-character entropy estimate; generate with
 `openssl rand -base64 48`), written `v2.<key id>.<hex>`, where the key id is
 derived from the secret and does not reveal it. The digests live in
 `argus_private.invite_code_digests`: anon and authenticated cannot reach the
@@ -7503,8 +7505,8 @@ expose a digest. A database check refuses any other digest shape. Link tokens
 are 256 random bits and stay plain SHA-256 digests on the invitation rows; a
 key would add nothing to that much entropy.
 
-**Fail closed.** With any of those three flags on and the secret missing or
-shorter than 32 characters, the surface does not start (households answer
+**Fail closed.** With any of those three flags on and the secret missing,
+shorter than 32 characters or a placeholder, the surface does not start (households answer
 `404 households_unavailable`, invites `404 invites_unavailable`), and
 `/internal/readiness` reports an `invite_codes` check as `degraded` (503), so
 the release warmup (`.github/warmup-render.sh`) fails. `/health` is unchanged. If the secret disappears while running, making or
@@ -7524,7 +7526,7 @@ previous secret: every outstanding code stops at once and links still work.
 Digests still under a key: `select split_part(digest,'.',2), count(*) from
 argus_private.invite_code_digests group by 1`. The 8-character `v1` digests of
 #788 were unkeyed and cannot be re-hashed (a digest cannot be turned back into
-its code), so migration `20261003150000` drops them. Those invitations keep
+its code), so migration `20261003150100` drops them. Those invitations keep
 their links.
 
 **Lookup limits.** Household preview and accept and beta preview and redeem,
@@ -7540,8 +7542,9 @@ Each lookup reserves one failure in every budget before it runs, and the
 reservation is given back once it found an invitation (even an expired, revoked
 or used one) or never ran (an idempotent replay), so concurrent guesses cannot
 run past a budget. A spent budget answers `429 invite_rate_limited` with
-`Retry-After`, before the lookup. The counters are per process, like
-every limiter in this API. Production runs one Render instance with one worker;
+`Retry-After`, before the lookup. The counters are per process and in memory, like
+every limiter in this API, so they reset when the process restarts or a deploy
+rolls out. Production runs one Render instance with one worker;
 with N processes an attacker gets at most N times the budget, which the code
 length absorbs.
 

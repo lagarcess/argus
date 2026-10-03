@@ -1974,7 +1974,7 @@ The short typed code is not stored on this table: its keyed digest lives in
 `argus_private.invite_code_digests` (below), and plaintext is returned once.
 
 `argus_private.invite_code_digests` (migration
-`20261003150000_invite_code_digests_private.sql`, #789) holds one row per typed
+`20261003150100_invite_code_digests_private.sql`, #789) holds one row per typed
 code: `digest` (primary key, `v2.<key id>.<HMAC-SHA-256 hex>` under
 `ARGUS_INVITE_CODE_SECRET`, enforced by a check), exactly one of
 `household_invitation_id` or `beta_invitation_id` (unique, cascading), `created_at`
