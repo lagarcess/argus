@@ -240,7 +240,9 @@ final class CuadraoHomeChartUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch(extra: ["--insights-empty-month"])
         openActivity(app)
-        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        // Release rule (fc7650ea): a period with no records shows Sin datos, not a recorded zero.
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "—")
+        XCTAssertTrue(app.staticTexts["Sin datos"].exists)
         XCTAssertTrue(app.staticTexts["Aún no hay gastos registrados en este período."].exists)
         XCTAssertTrue(app.otherElements.matching(identifier: "home-spending-chart").firstMatch.exists)
         app.buttons["home-view-distribution"].tap()
@@ -251,7 +253,7 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home-highlight-largest"].exists)
         shot(app, "story-empty-month-es")
         app.otherElements.matching(identifier: "home-spending-chart").firstMatch.swipeRight(velocity: .fast)
-        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "—")
         app.terminate()
         let unavailable = launch(extra: ["--insights-empty-month", "--insights-no-coverage"])
         openActivity(unavailable)
