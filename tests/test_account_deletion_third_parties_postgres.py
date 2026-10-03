@@ -1,0 +1,350 @@
+"""Lane 6 on real PostgreSQL: the third-party steps (provider keys, PostHog,
+Apple) of the account deletion command, over the same world as
+test_account_deletion_postgres.py."""
+
+from __future__ import annotations
+
+import secrets
+from datetime import timedelta
+
+import psycopg
+import pytest
+from argus.domain.account_deletion.service import (
+    AccountDeletionIncomplete,
+    subject_hash,
+)
+from argus.domain.apple_sign_in.client import AppleAuthClient
+from argus.domain.apple_sign_in.credentials import AppleCredentialService
+from argus.domain.apple_sign_in.credentials_postgres import (
+    PostgresAppleCredentialRepository,
+)
+from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
+from argus.domain.ingestion.secrets import SecretBox
+from psycopg_pool import ConnectionPool
+
+from tests import apple_sign_in_support as apple_support
+from tests.household.financial_fixtures import DSN, NOW, key
+from tests.household.financial_fixtures import lane as lane  # noqa: F401 - fixture
+from tests.test_account_deletion_fk_census_postgres import (
+    _invite_code_secret,  # noqa: F401 - autouse fixture (#794 invite codes)
+)
+from tests.test_account_deletion_postgres import (
+    FakeRevoker,
+    SqlAuthAdmin,
+    _age,
+    _locked,
+    _run,
+    _run_id,
+    _service,
+    world,  # noqa: F401 - fixture
+)
+
+pytestmark = pytest.mark.skipif(not DSN, reason="Disposable PostgreSQL required")
+
+
+def _other_credential(box: SecretBox, user_id: str) -> str:
+    """Someone else's Gmail connection sealed under box, stored last: the
+    evidence key_check reads."""
+    repo = PostgresConnectionRepository(ConnectionPool(DSN, min_size=0, max_size=1))
+    try:
+        made = repo.create(
+            user_id=user_id,
+            source="gmail",
+            external_ref="mbx-" + key(),
+            label="Gmail",
+            now=NOW,
+            secret=b"x",
+        )
+    finally:
+        repo._pool.close()  # noqa: SLF001
+    with psycopg.connect(DSN, autocommit=True) as c:
+        c.execute(
+            "update public.financial_source_connections"
+            " set secret_ciphertext=%s, updated_at=now() + interval '1 day' where id=%s",
+            (box.seal("r.other", source="gmail", connection_id=made.id), made.id),
+        )
+    return made.id
+
+
+def _revocations(user_id: str) -> list[tuple]:
+    with psycopg.connect(DSN) as c:
+        return c.execute(
+            "select provider, status, secret_ciphertext is not null, last_error"
+            " from argus_private.account_deletion_revocations"
+            " where subject_hash=%s order by provider",
+            (subject_hash(user_id),),
+        ).fetchall()
+
+
+def test_a_wrong_or_missing_key_never_drops_a_live_token(lane, world):  # noqa: F811
+    """B1: a credential that does not open is dropped only under the verified
+    current key. The sweep with no key, or with a different one, keeps it
+    pending with its ciphertext; the right key records it unrecoverable."""
+    a, b = world["a"], world["b"]
+    current = SecretBox(secrets.token_bytes(32))
+    other = _other_credential(current, b)
+    try:
+        admin = SqlAuthAdmin()
+        # No key on this process.
+        with pytest.raises(AccountDeletionIncomplete) as raised:
+            _service(lane, admin, FakeRevoker(unreadable={"plaid"})).delete_account(
+                user_id=a
+            )
+        world["placeholders"] += admin.created
+        assert raised.value.pending == ["plaid"]
+        assert ("plaid", "pending", True, "key_unavailable") in _revocations(a)
+        # A different key: the sweep runs with the wrong ARGUS_INGESTION_SECRET_KEY.
+        wrong = _service(
+            lane,
+            SqlAuthAdmin(),
+            FakeRevoker(unreadable={"plaid"}),
+            box=SecretBox(secrets.token_bytes(32)),
+            clock=lambda: NOW + timedelta(hours=1),
+        )
+        _age(a)
+        assert wrong.resume_pending()["pending"] == 1
+        assert ("plaid", "pending", True, "key_mismatch") in _revocations(a)
+        assert _locked(a) == (True, True)
+        # The current key opens the newest credential anyone else stored: only
+        # now is the token known to be dead, and the run finishes.
+        run_id = _run_id(a)
+        outcome = _service(
+            lane, SqlAuthAdmin(), FakeRevoker(unreadable={"plaid"}), box=current
+        ).delete_account(user_id=a)
+        assert outcome.status == "done"
+        assert _run(run_id)[4]["revocations"]["plaid"] == {"unrecoverable": 1}
+    finally:
+        with psycopg.connect(DSN, autocommit=True) as c:
+            c.execute(
+                "delete from public.financial_source_connections where id=%s", (other,)
+            )
+
+
+def test_the_recording_fake_is_never_done_outside_tests(lane, world):  # noqa: F811
+    """Priya 2: deleted nothing at PostHog, so where the fake is not explicitly
+    the adapter the step stays pending; only an operator can close it, with a
+    reason kept in the run record."""
+    a = world["a"]
+    admin = SqlAuthAdmin()
+    with pytest.raises(AccountDeletionIncomplete) as raised:
+        _service(lane, admin, allow_fake=False).delete_account(user_id=a)
+    world["placeholders"] += admin.created
+    assert raised.value.pending == ["analytics"]
+    run_id = _run_id(a)
+    assert _run(run_id)[4]["last_error"] == {
+        "analytics": "analytics_adapter_unconfigured"
+    }
+    with pytest.raises(AccountDeletionIncomplete):
+        _service(lane, SqlAuthAdmin(), allow_fake=False).delete_account(user_id=a)
+    service = _service(lane, SqlAuthAdmin(), allow_fake=False)
+    with pytest.raises(ValueError, match="reason"):
+        service.force_complete_step(
+            user_id=a, step="analytics", reason=" ", operator="ops"
+        )
+    service.force_complete_step(
+        user_id=a, step="analytics", reason="PostHog adapter not shipped", operator="ops"
+    )
+    assert service.delete_account(user_id=a).status == "done"
+    steps = _run(run_id)[4]
+    assert steps["analytics"] == "operator_forced"
+    assert steps["forced"]["analytics"]["reason"] == "PostHog adapter not shipped"
+
+
+class _Apple:
+    """#793's real AppleCredentialService over the real table, with a scripted
+    Apple endpoint."""
+
+    def __init__(self, revoke_responses):  # noqa: ANN001
+        key = apple_support.generated_key()
+        self.fake = apple_support.FakeApple(
+            public_key=key.public_key(), revoke_responses=list(revoke_responses)
+        )
+        self.box = SecretBox(secrets.token_bytes(32))
+        self.pool = ConnectionPool(DSN, min_size=0, max_size=2, open=True)
+        self.service = AppleCredentialService(
+            PostgresAppleCredentialRepository(self.pool),
+            box=self.box,
+            client=AppleAuthClient(
+                apple_support.config(key),
+                transport=self.fake.transport(),
+                sleep=lambda _s: None,
+            ),
+            clock=lambda: NOW,
+        )
+
+    def store(self, user_id: str, *, box: SecretBox | None = None) -> None:
+        sealed = (box or self.box).seal(
+            "r.apple-refresh-0", source="apple_sign_in", connection_id=user_id
+        )
+        self.service.repository.upsert(
+            user_id=user_id,
+            client_id=apple_support.BUNDLE_ID,
+            secret_ciphertext=sealed,
+            now=NOW,
+        )
+
+    def close(self) -> None:
+        self.service.close()
+        self.pool.close()
+
+
+def _apple_state(
+    user_id: str, run_id: str | None = None
+) -> tuple[bool, bool, str | None, str | None]:
+    with psycopg.connect(DSN) as conn:
+        stored = conn.execute(
+            "select 1 from public.apple_sign_in_credentials where user_id=%s", (user_id,)
+        ).fetchone()
+        user = conn.execute("select 1 from auth.users where id=%s", (user_id,)).fetchone()
+        run = conn.execute(
+            "select status, steps->>'apple_revoke' from argus_private.account_deletion_runs"
+            " where subject_hash=%s or id=%s",
+            (subject_hash(user_id), run_id),
+        ).fetchone()
+    return bool(stored), bool(user), run[0], run[1]
+
+
+@pytest.mark.parametrize(
+    ("answer", "step"),
+    [((200, None), "revoked"), ((400, {"error": "invalid_grant"}), "already_revoked")],
+)
+def test_apple_is_revoked_before_the_account_delete(lane, world, answer, step):  # noqa: F811
+    a = world["a"]
+    apple = _Apple([answer])
+    try:
+        apple.store(a)
+        admin = SqlAuthAdmin()
+        outcome = _service(lane, admin, apple=apple.service).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+    finally:
+        apple.close()
+    assert outcome.status == "done"
+    assert [path for path, _ in apple.fake.calls] == ["/auth/revoke"]
+    stored, user, status, recorded = _apple_state(a, outcome.run_id)
+    assert (stored, user, status, recorded) == (False, False, "done", step)
+    already = _run(outcome.run_id)[4].get("already_revoked")
+    assert already == ({"apple": 1} if step == "already_revoked" else None)
+
+
+def test_a_transient_apple_failure_holds_the_account_delete(lane, world):  # noqa: F811
+    a = world["a"]
+    apple = _Apple([(400, {"error": "invalid_request"})])
+    try:
+        apple.store(a)
+        admin = SqlAuthAdmin()
+        with pytest.raises(AccountDeletionIncomplete):
+            _service(lane, admin, apple=apple.service).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+        run_id = _run_id(a)
+        # The data is gone, the account waits for Apple, the token is kept.
+        assert _apple_state(a) == (True, True, "data_deleted", "pending")
+        assert admin.deleted == []
+        # No Apple service on this process: still pending, never dropped.
+        with pytest.raises(AccountDeletionIncomplete):
+            _service(lane, SqlAuthAdmin()).delete_account(user_id=a)
+        assert _apple_state(a)[:3] == (True, True, "data_deleted")
+        assert _run(run_id)[4]["last_error"] == {"apple": "apple_unconfigured"}
+        # The retry gets Apple's 200 and finishes.
+        retry = SqlAuthAdmin()
+        assert (
+            _service(lane, retry, apple=apple.service).delete_account(user_id=a).status
+            == "done"
+        )
+        assert retry.creates == 0
+    finally:
+        apple.close()
+    assert _apple_state(a, run_id) == (False, False, "done", "revoked")
+
+
+def test_an_apple_step_pending_a_week_needs_an_operator(lane, world):  # noqa: F811
+    """Priya (#802 eval): Apple invalid_request (the person revoked the app,
+    TN3107) never turns into a 200. After 7 days the run alerts; only an
+    operator force-completes it, and the reason stays in the run record."""
+    from loguru import logger
+
+    a = world["a"]
+    alerts: list[dict] = []
+    sink = logger.add(lambda m: alerts.append(m.record["extra"]), level="ERROR")
+    apple = _Apple([(400, {"error": "invalid_request"})] * 3)
+    try:
+        apple.store(a)
+        admin = SqlAuthAdmin()
+        with pytest.raises(AccountDeletionIncomplete):
+            _service(lane, admin, apple=apple.service).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+        run_id = _run_id(a)
+        assert not [
+            x for x in alerts if x.get("metric") == "account_deletion.needs_operator"
+        ]
+        later = NOW + timedelta(days=7, minutes=1)
+        with pytest.raises(AccountDeletionIncomplete):
+            _service(
+                lane, SqlAuthAdmin(), apple=apple.service, clock=lambda: later
+            ).delete_account(user_id=a)
+        needs = [
+            x for x in alerts if x.get("metric") == "account_deletion.needs_operator"
+        ]
+        assert needs and needs[0]["step"] == "apple" and needs[0]["pending_days"] == 7
+        service = _service(lane, SqlAuthAdmin(), apple=apple.service, clock=lambda: later)
+        with pytest.raises(ValueError):
+            service.force_complete_step(
+                user_id=a, step="apple", reason="", operator="ops"
+            )
+        with pytest.raises(ValueError):
+            service.force_complete_step(
+                user_id=a, step="email", reason="x", operator="ops"
+            )
+        service.force_complete_step(
+            user_id=a,
+            step="apple",
+            reason="Person removed the app in Apple ID settings (TN3107)",
+            operator="ops",
+        )
+        assert service.delete_account(user_id=a).status == "done"
+    finally:
+        logger.remove(sink)
+        apple.close()
+    steps = _run(run_id)[4]
+    assert steps["apple_revoke"] == "operator_forced"
+    assert steps["forced"]["apple"]["reason"].startswith("Person removed the app")
+    assert _apple_state(a, run_id)[:3] == (False, False, "done")
+
+
+def test_an_unreadable_apple_token_is_discarded_only_under_the_verified_key(lane, world):  # noqa: F811
+    a, b = world["a"], world["b"]
+    apple = _Apple([])
+    try:
+        # Sealed under a key the deployment no longer has: the key rotated.
+        apple.store(a, box=SecretBox(secrets.token_bytes(32)))
+        # Someone else signed in with Apple since, under the current key.
+        apple.store(b)
+        with psycopg.connect(DSN, autocommit=True) as c:
+            c.execute(
+                "update public.apple_sign_in_credentials"
+                " set updated_at = now() + interval '1 day' where user_id=%s",
+                (b,),
+            )
+        admin = SqlAuthAdmin()
+        # A process with the wrong key keeps the token and alerts.
+        with pytest.raises(AccountDeletionIncomplete) as raised:
+            _service(
+                lane, admin, apple=apple.service, box=SecretBox(secrets.token_bytes(32))
+            ).delete_account(user_id=a)
+        assert raised.value.pending == ["apple"]
+        world["placeholders"] += admin.created
+        assert apple.fake.calls == []
+        run_id = _run_id(a)
+        assert _apple_state(a) == (True, True, "data_deleted", "pending")
+        assert _run(run_id)[4]["last_error"] == {"apple": "key_mismatch"}
+        # Under the current key, #802's discard_unreadable drops it.
+        outcome = _service(
+            lane, SqlAuthAdmin(), apple=apple.service, box=apple.box
+        ).delete_account(user_id=a)
+        assert outcome.status == "done"
+        assert _apple_state(a, run_id) == (False, False, "done", "unrecoverable")
+    finally:
+        with psycopg.connect(DSN, autocommit=True) as c:
+            c.execute(
+                "delete from public.apple_sign_in_credentials where user_id=%s", (b,)
+            )
+        apple.close()
