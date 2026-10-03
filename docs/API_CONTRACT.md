@@ -2831,7 +2831,10 @@ and keeps it as the pending revoke otherwise. When revoke reports
 calls `AppleCredentialService.discard_unreadable`. It deletes the row only while
 the token still can't be opened, and returns `discarded`, `nothing_stored` or
 `readable`, so the user can be deleted. Apple's authorization for the app then
-stays until the person removes it in their Apple ID settings. Storage is in
+stays until the person removes it in their Apple ID settings. Lane 6 calls it
+only after its key check proves this process holds the deployment's current
+key (the key opens the newest credential anyone else stored); a missing, wrong
+or unproven key keeps the row as a pending revoke and alerts. Storage is in
 [DATA_MODEL.md](DATA_MODEL.md#apple-sign-in-credentials).
 
 ## `POST /auth/logout`
