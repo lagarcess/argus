@@ -1687,7 +1687,7 @@ here when work starts. Close an entry only against its stated remaining gap.
 
 | ID / topic | Disposition and existing baseline | Remaining work and closure evidence | Existing responsibility |
 | --- | --- | --- | --- |
-| **C01 — Scan and itemized bills** | **UI preview delivered (October 2, build 3415).** Native source adapters, durable local drafts, shared Chat/Plan review, editable items, equal/item splits and repeat-safe confirmation are implemented. Real extraction and connected posting remain unassigned. | Retain the verified local capture/review/split journey below. Physical camera capture and location permission acceptance remain to be exercised on the unlocked phone. Real extraction, shared storage and connected posting require the intake contracts. | Intake D08 + Planning/Home D06; Household D07 for shared access |
+| **C01 — Scan and itemized bills** | **UI preview delivered (October 2, build 3415).** Native source adapters, durable local drafts, shared Chat/Plan review, editable items, equal/item splits and repeat-safe confirmation are implemented. Real extraction and connected posting remain unassigned. | Retain the verified local capture/review/split journey below. The founder verified physical scan → Later → reopen on build 3419. Native simulator checks cover location allow/remove and denial recovery; physical GPS/VoiceOver acceptance remains distinct. Real extraction, shared storage and connected posting require the intake contracts. | Intake D08 + Planning/Home D06; Household D07 for shared access |
 | **C02 — Shared plans and invitations** | **UI baseline preserved; connection outstanding.** Para ti / En grupo, trip estimates, recorded expenses, own share versus group total, shared savings, local invitation/guest preview and sample QR exist. Short-lived groups are distinct from durable Spaces. | Resolve group membership/guest access, link expiry/revocation, permissions and canonical expense/contribution/repayment ownership before connecting. Estimates must stay separate from actuals; repayments must not imply a bank transfer. Verify two participants, partial repayments, correction/recovery and no duplicate personal spending. | Planning/Home D06 + Household D07 + Financial core D03/D04 |
 | **C03 — Forecasts and calculators** | **Preview built; canonical connection outstanding.** Spending-pace playground, low point, editable assumptions and goal/debt projections exist with illustrative data. | Reuse existing Argus forecast/calculation owners for Home, Plan and chat. Carry forward the Stake-style editable compound-interest assumptions and contribution/earnings curve as future UI work, with disclosed rate/cadence assumptions. Verify chart/readout agreement and actual versus projected values. Retain Apple Card-inspired explanations of upcoming payment and interest consequences as design input to the existing debt owner. A short contextual explanation may help; a blog/tips destination is not required. | Planning/Home D05/D06 + Conversation D09; domain series owners |
 | **C04 — Voice and chat continuity** | **Interaction preview built; runtime outstanding.** Immersive/minimized voice, swipe-down, voice-choice carousel, short-message hold/lock/cancel/review, native dictation coexistence, temporary mode and Recents gestures are already previewed. | Connect xAI live voice through the existing chat brain; inherit agentic app actions only under D14 activation. Reuse existing Argus dynamic greeting logic. Resolve audio/transcript retention, Temporary context, actual provider voices/selection, interruptions and background/locked-screen policy. Verify one session across surfaces, draft recovery, mute/end, real capture and truthful progress. | Conversation/voice D09/D13/D14 + Native continuity |
@@ -1696,7 +1696,7 @@ here when work starts. Close an entry only against its stated remaining gap.
 | **C07 — Profile and Updates** | **UI support pass verified October 2; connected owners outstanding.** Profile grouping, shared identity, avatar themes, native settings and source-linked Updates with read/unread behavior exist. See support acceptance below. | Local photo selection, structured feedback drafts and Settings navigation clearance are UI-verified; see follow-up acceptance below. Connect auth/security, settings, usage, data controls, help/feedback and notification preferences through their owners. Design Updates around actual domain events with source links, avoiding duplicate invitation reminders. Verify language/accessibility and working controls, not static menus alone. | Native continuity D12 + Planning/Home D11 |
 | **C08 — Identity and social discovery** | **Local avatar UI verified October 2; connected identity decisions outstanding.** Native profile-photo selection supports Save/Cancel, replacement and removal in the preview. Group covers, local avatars and sample invitation QR do not imply server upload, live profile QR or contacts discovery. | The founder deferred personal QR codes, usernames and public profile discovery on October 2; QR scope stays with plan invitations. Resolve avatar storage/upload and guest identity before connected implementation; validate QR legibility and scan reliability. Contacts matching needs explicit opt-in and a data/access contract. Native sharing can hand off a link to WhatsApp; no automatic contact upload or WhatsApp integration is implied. Keep this separate from required household membership and parked growth work. | Native continuity D12 + Household D07; founder for unresolved product scope |
 | **C09 — Extra Plan refinements** | **Unassigned refinements/research, not promised capabilities.** Art, customization and gentle progress already inform Plan. | Exact target-date entry and personal cover photos remain refinements; group cover photos already exist. Forecast uncertainty bands require a valid model, not decorative precision. Habit/streak ideas need a helpful, non-punitive purpose. Rotating savings (“san” / Egyptian-style circles) remains research: sequence, missed contributions, custody and consent are unresolved. Existing shared savings does not implement a rotating pool or payouts. | Planning/Home D06; founder for additional scope |
-| **C10 — Consistency and phone handoff** | **Ongoing acceptance/connection work.** Accounts and Plan now share typography roles and one money-editing implementation; their contextual layouts remain distinct. New plan/group amounts begin empty. A living Cuadrao guide and native reference gallery own consistency. Both plan/group currency choices are fixed at creation. | Preserve welcome/sign-in/recovery UI and connect it to the existing auth/session owner. Final branding/assistant mark remain unresolved. Verify shared styling, approved icons, navigation/edge blur, Spanish-first/English parity, long values, Dynamic Type, VoiceOver, Reduce Motion, light/dark and physical touch. Diagnose the retained unlocated keyboard invalid-frame warning before claiming it resolved. Adapt preview views to canonical owners through the existing delivery lane; retain separate identities and truthful device evidence. | Native continuity D01/D15 + Device/release; domain owners for money/input contracts |
+| **C10 — Consistency and phone handoff** | **Ongoing acceptance/connection work.** Accounts and Plan now share typography roles and one money-editing implementation; their contextual layouts remain distinct. New plan/group amounts begin empty. A living Cuadrao guide and native reference gallery own consistency. Both plan/group currency choices are fixed at creation. | Preserve welcome/sign-in/recovery UI and connect it to the existing auth/session owner. Final branding/assistant mark remain unresolved. Verify shared styling, approved icons, navigation/edge blur, Spanish-first/English parity, long values, Dynamic Type, VoiceOver, Reduce Motion, light/dark and physical touch. The October 2 continuity pass traced the keyboard invalid-frame warning to SwiftUI keyboard accessory sizing and removed the duplicate toolbar path; retain the native acceptance evidence below. Adapt preview views to canonical owners through the existing delivery lane; retain separate identities and truthful device evidence. | Native continuity D01/D15 + Device/release; domain owners for money/input contracts |
 
 ### C01 — Native Scan and receipt split
 
@@ -1704,7 +1704,8 @@ Signed **3415** is installed and version-verified on the founder's iPhone. Nativ
 simulator journeys, calculation checks and retained screenshots are recorded in the
 [receipt UI checkpoint](../reports/evidence/cuadrao-native-design/receipts-2026-10-02/README.md).
 The phone was locked during launch, so this is not physical camera/location
-acceptance. The unlocated keyboard invalid-frame warning remains in C10.
+acceptance. The keyboard warning retained at that checkpoint is traced and repaired in the
+October 2 continuity acceptance below.
 
 The founder assigned the receipt UI pillar on October 2, 2026. Personal Chat,
 group Chat and Plan share one saved receipt draft and one review experience.
@@ -1792,18 +1793,20 @@ acceptance, not connected membership or physical interaction acceptance.
 **October 2 founder lock:** the first three contextual-entry rules are owned by
 [the Cuadrao guide](../../.agent/designs/cuadrao/DESIGN.md#contextual-conversation-entry).
 Keep lists quiet, use relevant detail actions, and show a removable selected-record
-chip in the composer. These are design decisions, not evidence that global app
-context or the shared chip is connected. The People polish only relocates the
-existing group-thread entry into its existing detail menu with explicit wording.
+chip in the composer. The UI chip carries a typed reference; this is not evidence that global app
+context or record permissions are connected. The People action remains in the existing group detail menu. The shared preview
+now points at that group without creating a dedicated group conversation.
 
-**Continuity recommendation, still under discussion:** open contextual Cuadrao as
-a dismissible presentation over the originating detail. Preserve the source's
-selected tab, filters and scroll position. Preserve any unfinished chat message,
-send nothing automatically, and keep the main Chat entry predictable. Use the same
-conversation owner; do not build a second assistant or force a conversation per
-plan. Before implementation, settle how an existing draft receives new focus and
-how the presentation rejoins full Chat. Verify cancel/return and draft recovery
-on-device rather than inferring persistence from reference screenshots.
+**October 2 continuity decision, approved for implementation:** contextual Cuadrao
+opens over the originating detail. Closing it preserves that detail's tab, filters
+and scroll position. The main Chat tab reads the same conversation owner. Selecting
+new focus replaces only the removable composer chip; unfinished text and attachments
+remain intact and nothing sends automatically. Sent turns retain their selected
+focus. Switching regular conversations retains unfinished drafts in Recents.
+Temporary mode keeps its existing context permission and discard rules. This is
+local preview continuity, not a new assistant, one chat per plan, or a claim of
+process-relaunch persistence for chat. Verify return and draft retention through
+native journeys. Connected context still requires record-owner permission checks.
 
 Mobbin's [Fabric Ask AI flow](https://mobbin.com/flows/a9096ee9-967b-4110-a738-d77acb704671)
 shows selected-item context and a close control.
@@ -1814,6 +1817,15 @@ provides another contained presentation reference. These images support the
 presentation recommendation; they do not prove draft persistence or exact return
 behavior. Implementation and connected context remain with D09/D10/D14 and the
 existing record owners. No provider or backend work is activated by this lock.
+
+**Build 3419 continuity delivery:** contextual record/chart chips, retained regular
+chat drafts, same-owner return paths, activity detail routing, group Search and
+native form keyboard repair are implemented. The founder verified physical
+**Scan → Later → reopen** on the installed build. The
+[continuity checkpoint](../reports/evidence/cuadrao-native-design/continuity-2026-10-02/README.md)
+records source heads, native acceptance, accessibility scope and device readback.
+The connected assistant, extraction and financial posting remain with their
+existing owners; this closes the assigned UI follow-ups, not those integrations.
 
 ### Cuadrao consistency pass and Home chart follow-up
 
@@ -2061,12 +2073,17 @@ must not silently reorder another member's view or alter shared financial record
 Physical touch/VoiceOver acceptance and older-runtime behavior remain device
 acceptance work; simulator and state evidence describe their exact tested scope.
 
-**Future surface-connectivity pass — broader audit remains open:** the October 2
-support pass closes preview Search-to-plan, Search-to-chat return and
-Updates-to-account/plan round trips. Audit
-Home, Plan, Accounts, Chat and Search for meaningful row/action destinations,
-return paths, preserved space/currency/selection/scroll/draft context, and stale or
-unavailable records. Reuse existing destination and state owners. Include chart
+**October 2 surface-connectivity UI pass:** the audited gaps now use existing
+owners: Home/Account/Search activity rows open one detail, Search includes shared
+and archived groups, first-use Search finds saved chats, and conversation switches
+retain unfinished drafts. Contextual Chat returns to the same plan, receipt or
+chart; existing Search and Updates return paths remain acceptance surfaces.
+[Continuity evidence](../reports/evidence/cuadrao-native-design/continuity-2026-10-02/README.md)
+records the scoped source review, native journeys and phone readback.
+
+**Connected-history follow-up:** preserve scope, currency, selection, scroll and
+draft context when replacing preview owners with connected records. Reuse existing
+destination/state owners and retain unavailable-record recovery. For chart
 inspection consistency: Home's preview has sparse observations (3–4 days recently,
 weekly further back), while Plan's example has daily points. Distinguish data
 resolution from gesture feedback; do not invent recorded daily balances to make a

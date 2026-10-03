@@ -531,9 +531,18 @@ remains available; selecting a record tells Cuadrao what the person means.
    its selected period and filters. This is a focus reference, not a separate
    group messaging destination or a requirement for one conversation per plan.
 
-These are approved interaction rules. The current group callback still opens the
-existing preview thread; the shared composer chip is not yet implemented.
-The continuity decision and implementation gaps remain in
+4. Open contextual Cuadrao over the active detail. Closing it reveals the same
+   source, selection and scroll position. The main Chat tab uses the same
+   conversation and unfinished message.
+5. Selecting context changes only the removable chip. Preserve existing text and
+   attachments; never send automatically. Removing the chip leaves the message
+   intact. A sent message retains its original context reference.
+6. Keep unfinished regular conversations reachable when switching chats. Temporary
+   conversations keep their existing discard rules; selecting a record does not
+   silently enable broader app context or turn Temporary off.
+
+The founder approved completing this continuity behavior on October 2. UI delivery
+and connected context contracts remain in
 [roadmap C04](../../../docs/specs/argus-execution-board.md#c04--contextual-conversation-handoff).
 
 Mobbin references inspected October 2:

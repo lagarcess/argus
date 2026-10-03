@@ -1,0 +1,198 @@
+{
+  "application_source": "219323e6",
+  "build": 3419,
+  "runs": [
+    {
+      "run": "first",
+      "head": "d9af268a",
+      "tests": [
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptPermissionUITests",
+          "test": "testAllowedLocationCanBeRemoved",
+          "result": "passed",
+          "seconds": 45.52
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptPermissionUITests",
+          "test": "testDeniedLocationKeepsReceiptUsable",
+          "result": "failed",
+          "seconds": 37.482
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testActivityDetailsReturnToSearchAndAccount",
+          "result": "failed",
+          "seconds": 11.221
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testFirstUseSavedChatAppearsInSearch",
+          "result": "passed",
+          "seconds": 23.342
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testGroupSearchFiltersArchiveAndReturn",
+          "result": "failed",
+          "seconds": 22.922
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testHomeActivityReturnsToSameRow",
+          "result": "passed",
+          "seconds": 14.073
+        }
+      ],
+      "invalid_frame_warning_count": 0
+    },
+    {
+      "run": "second",
+      "head": "f714daab",
+      "tests": [
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testChartContextKeepsPeriodAndDistributionSelection",
+          "result": "passed",
+          "seconds": 23.239
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testContextVoiceReturnsToConversation",
+          "result": "failed",
+          "seconds": 29.196
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testGroupContextPreservesDraftAttachmentsAndReturn",
+          "result": "passed",
+          "seconds": 51.688
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testReceiptContextReturnsToSameReview",
+          "result": "failed",
+          "seconds": 23.135
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptPermissionUITests",
+          "test": "testDeniedLocationKeepsReceiptUsable",
+          "result": "passed",
+          "seconds": 41.347
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptUITests",
+          "test": "testExpenseEditsSurviveReceiptCapture",
+          "result": "failed",
+          "seconds": 22.101
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptUITests",
+          "test": "testGroupChatUsesSameReceiptAsPlanAndSource",
+          "result": "passed",
+          "seconds": 46.104
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptUITests",
+          "test": "testGroupReceiptLaterRelaunchItemsAndConfirm",
+          "result": "failed",
+          "seconds": 54.23
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testActivityDetailsReturnToSearchAndAccount",
+          "result": "failed",
+          "seconds": 15.267
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testGroupSearchFiltersArchiveAndReturn",
+          "result": "passed",
+          "seconds": 28.627
+        }
+      ],
+      "invalid_frame_warning_count": 0
+    },
+    {
+      "run": "final",
+      "head": "219323e6",
+      "tests": [
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testChartContextKeepsPeriodAndDistributionSelection",
+          "result": "passed",
+          "seconds": 22.975
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testContextVoiceReturnsToConversation",
+          "result": "passed",
+          "seconds": 36.47
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testGroupContextPreservesDraftAttachmentsAndReturn",
+          "result": "passed",
+          "seconds": 52.887
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoContextUITests",
+          "test": "testReceiptContextReturnsToSameReview",
+          "result": "passed",
+          "seconds": 34.152
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptUITests",
+          "test": "testExpenseEditsSurviveReceiptCapture",
+          "result": "passed",
+          "seconds": 43.585
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoReceiptUITests",
+          "test": "testGroupReceiptLaterRelaunchItemsAndConfirm",
+          "result": "passed",
+          "seconds": 101.907
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testActivityDetailsReturnToSearchAndAccount",
+          "result": "passed",
+          "seconds": 15.971
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testSearchPlansChatReturnAndRecovery",
+          "result": "passed",
+          "seconds": 31.005
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoSupportUITests",
+          "test": "testUpdatesReadStateDetailBackAndPreferences",
+          "result": "passed",
+          "seconds": 65.655
+        },
+        {
+          "suite": "ArgusFoundationUITests.CuadraoVoiceDesignUITests",
+          "test": "testVoiceStaysAvailableAcrossSheetsAndSurfaces",
+          "result": "passed",
+          "seconds": 22.143
+        }
+      ],
+      "invalid_frame_warning_count": 0
+    }
+  ],
+  "distinct_passing_native_journeys": 16,
+  "receipt_state_checks": 44,
+  "chat_state_checks": "passed in Spanish and English, including nested voice ownership",
+  "modularity": "passed",
+  "final_delta_review": "clean",
+  "device": {
+    "model": "iPhone 15",
+    "os": "27.0.1",
+    "version": "0.1.0",
+    "build": "3419",
+    "install_sequence": 2232,
+    "launch_pid": 6551,
+    "physical_capture": "Founder confirmed Scan, Later, and reopen work"
+  },
+  "retained_evidence": "Earlier passing journeys retained after scoped review: final source adds context voice presentation ownership and account row hit target; final native suite rechecks those affected paths. Documentation-only commits do not change the app."
+}
