@@ -10,7 +10,8 @@ final class CuadraoReceiptPermissionUITests: XCTestCase {
         app.buttons["receipt-later"].tap()
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "receipt-card-")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 5)); card.tap()
-        XCTAssertTrue(app.buttons["receipt-confirm"].waitForExistence(timeout: 5))
+        reveal(app, app.buttons["receipt-confirm"])
+        XCTAssertTrue(app.buttons["receipt-confirm"].isEnabled)
     }
 
     func testAllowedLocationCanBeRemoved() {
