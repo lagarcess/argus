@@ -36,11 +36,12 @@ on the connected create-account and sign-in screen, above "Continue with email".
 | --- | --- |
 | `ARGUS_APPLE_SIGN_IN_ENABLED` | `true` to show the system Sign in with Apple button |
 | `ARGUS_GOOGLE_SIGN_IN_ENABLED` | `true` to show the official Google button |
-| `ARGUS_GOOGLE_IOS_CLIENT_ID` | The iOS OAuth client, `<number>-<id>.apps.googleusercontent.com` |
-| `ARGUS_GOOGLE_WEB_CLIENT_ID` | Optional: the web OAuth client Supabase also lists |
-| `ARGUS_GOOGLE_IOS_URL_SCHEME` | The iOS client's reversed id, `com.googleusercontent.apps.<number>-<id>` |
+| `GOOGLE_SIGN_IN_IOS_CLIENT_ID` | The iOS OAuth client, `<number>-<id>.apps.googleusercontent.com` |
+| `GOOGLE_SIGN_IN_WEB_CLIENT_ID` | Optional: the web OAuth client Supabase also lists |
+| `GOOGLE_SIGN_IN_IOS_URL_SCHEME` | The iOS client's reversed id, `com.googleusercontent.apps.<number>-<id>` |
 
-All are public identifiers; no secret belongs in the app. The Google button stays
+All are public identifiers; no secret belongs in the app. These sign-in clients
+are separate from the Gmail source's `GOOGLE_OAUTH_CLIENT_ID`; never reuse it here. The Google button stays
 hidden unless the URL scheme matches the client id, because Google Sign-In crashes
 the app when its callback scheme is missing.
 
@@ -51,7 +52,9 @@ the app when its callback scheme is missing.
   capability is enabled, use `CODE_SIGN_ENTITLEMENTS = Config/SignInWithApple.entitlements`
   in the ignored `Device.local.xcconfig` (see its example) and test on a device.
 - **Google** uses GoogleSignIn-iOS **9.2.0** (pinned in the project) with the same
-  nonce pattern, then clears Google's own on-device sign-in state.
+  nonce pattern, then clears Google's own on-device sign-in state. Native ID-token
+  sign-in stores no Google refresh token anywhere, so account deletion has nothing
+  to revoke at Google. Apple revocation stays required.
 - Both exchange the ID token through Supabase Auth (`signInWithIdToken`) and land
   in the same session path as email. The private-alpha allowlist still applies at
   `/me`; a refused account is signed out at once.
@@ -78,11 +81,13 @@ placeholder), `<ref>` the Supabase project ref and `<web>` the web origin.
 - **Google Cloud.**
   - **N, W:** OAuth consent screen with app name, support email, privacy and terms
     links and the `openid`, `email`, `profile` scopes, published to production.
+  - Create new sign-in clients; don't reuse the Gmail source's web client
+    (`GOOGLE_OAUTH_CLIENT_ID`).
   - **N:** OAuth client of type iOS for `<bundle-id>`. It gives
-    `ARGUS_GOOGLE_IOS_CLIENT_ID` and `ARGUS_GOOGLE_IOS_URL_SCHEME`.
+    `GOOGLE_SIGN_IN_IOS_CLIENT_ID` and `GOOGLE_SIGN_IN_IOS_URL_SCHEME`.
   - **W:** OAuth client of type Web with JavaScript origin `<web>` and redirect URI
     `https://<ref>.supabase.co/auth/v1/callback`. Its id may also be set as
-    `ARGUS_GOOGLE_WEB_CLIENT_ID`.
+    `GOOGLE_SIGN_IN_WEB_CLIENT_ID`.
 - **Supabase → Authentication → Providers.**
   - **Apple, N:** enable, Client IDs `<bundle-id>`. **W:** add the Services ID
     (comma-separated) and a secret key JWT generated from the `.p8`, renewed

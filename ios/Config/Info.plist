@@ -34,14 +34,14 @@
     <key>ARGUS_CAPTCHA_URL</key><string>$(ARGUS_CAPTCHA_URL)</string>
     <key>ARGUS_APPLE_SIGN_IN_ENABLED</key><string>$(ARGUS_APPLE_SIGN_IN_ENABLED)</string>
     <key>ARGUS_GOOGLE_SIGN_IN_ENABLED</key><string>$(ARGUS_GOOGLE_SIGN_IN_ENABLED)</string>
-    <key>ARGUS_GOOGLE_IOS_CLIENT_ID</key><string>$(ARGUS_GOOGLE_IOS_CLIENT_ID)</string>
-    <key>ARGUS_GOOGLE_WEB_CLIENT_ID</key><string>$(ARGUS_GOOGLE_WEB_CLIENT_ID)</string>
+    <key>GOOGLE_SIGN_IN_IOS_CLIENT_ID</key><string>$(GOOGLE_SIGN_IN_IOS_CLIENT_ID)</string>
+    <key>GOOGLE_SIGN_IN_WEB_CLIENT_ID</key><string>$(GOOGLE_SIGN_IN_WEB_CLIENT_ID)</string>
     <!-- Google Sign-In callback: the iOS client's reversed id. Inert placeholder by default. -->
     <key>CFBundleURLTypes</key><array>
         <dict>
             <key>CFBundleTypeRole</key><string>Editor</string>
             <key>CFBundleURLName</key><string>google-sign-in</string>
-            <key>CFBundleURLSchemes</key><array><string>$(ARGUS_GOOGLE_IOS_URL_SCHEME)</string></array>
+            <key>CFBundleURLSchemes</key><array><string>$(GOOGLE_SIGN_IN_IOS_URL_SCHEME)</string></array>
         </dict>
     </array>
     <key>NSCameraUsageDescription</key><string>Scan a receipt when you choose Scan Receipt.</string>

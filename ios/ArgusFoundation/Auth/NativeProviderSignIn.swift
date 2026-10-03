@@ -32,11 +32,11 @@ struct NativeProviderConfiguration: Equatable {
             return value
         }
         var google: Google?
-        if flag("ARGUS_GOOGLE_SIGN_IN_ENABLED"), let clientID = value("ARGUS_GOOGLE_IOS_CLIENT_ID"),
+        if flag("ARGUS_GOOGLE_SIGN_IN_ENABLED"), let clientID = value("GOOGLE_SIGN_IN_IOS_CLIENT_ID"),
            let scheme = googleCallbackScheme(clientID), registeredSchemes(bundle).contains(scheme) {
             // GIDSignIn raises an Objective-C exception (a crash) when the reversed client id
             // isn't a registered URL scheme, so a half-configured build hides the button.
-            let server = value("ARGUS_GOOGLE_WEB_CLIENT_ID").flatMap { googleCallbackScheme($0) == nil ? nil : $0 }
+            let server = value("GOOGLE_SIGN_IN_WEB_CLIENT_ID").flatMap { googleCallbackScheme($0) == nil ? nil : $0 }
             google = Google(clientID: clientID, serverClientID: server)
         }
         return Self(apple: flag("ARGUS_APPLE_SIGN_IN_ENABLED"), google: google)
