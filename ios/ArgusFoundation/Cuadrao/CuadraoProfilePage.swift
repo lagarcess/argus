@@ -65,7 +65,7 @@ struct CuadraoProfilePage: View {
                 }
             } header: { Text(spanish ? "Región y moneda" : "Region and currency") }
               footer: { Text(spanish ? "Elegir una moneda no convierte ni combina tus balances." : "Choosing a currency does not convert or combine your balances.") }
-            Section { link(.voice) }
+            if CuadraoDesignPreview.voiceSelection { Section { link(.voice) } }
         }
     }
 

@@ -8,4 +8,7 @@ enum CuadraoDesignPreview {
     /// straight into the populated Home canvas. Integration's xcconfig keeps it `false`.
     static let standalone = Bundle.main.object(forInfoDictionaryKey: "CUADRAO_DESIGN_PREVIEW") as? String == "true"
     static let isActive = ProcessInfo.processInfo.arguments.contains("--cuadrao-design") || standalone
+    /// Voice selection plays bundled sample clips, which stay out until their licensing is settled.
+    /// It has its own default-off switch inside the preview: `--cuadrao-voice-selection`.
+    static let voiceSelection = isActive && ProcessInfo.processInfo.arguments.contains("--cuadrao-voice-selection")
 }
