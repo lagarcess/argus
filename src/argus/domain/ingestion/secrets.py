@@ -1,6 +1,7 @@
 """Provider credentials at rest: one key, one envelope, bound to its connection.
 
-Plaid access tokens and Google refresh tokens are server-side only. They are
+Plaid access tokens, Google refresh tokens and Sign in with Apple refresh
+tokens (``argus.domain.apple_sign_in``) are server-side only. They are
 sealed with AES-256-GCM under ``ARGUS_INGESTION_SECRET_KEY`` (32 random bytes,
 URL-safe base64) and the associated data binds each ciphertext to its
 ``source:connection_id``, so a row copied onto another connection fails to

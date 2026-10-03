@@ -17,13 +17,26 @@
 --   5. The auth.users triggers skip placeholders.
 --   6. The Household-owned invite function and the deletion definers.
 --
--- Placeholders (Yelena, HoE, Oct 2, after Priya's #791 review): each
--- (shared plan or group, departed person) pair gets its own nameless
--- auth.users row, `exmiembro+<random uuid>@cuadrao.invalid`, banned, with
--- app_metadata {"placeholder": true}. Decision 17's "no user id" means no id
--- tied to the person: the FKs need a real auth.users row, and no placeholder is
--- shared across plans. Placeholders are created and deleted through the
--- Supabase Admin API, never by DML on auth.users here.
+-- Placeholders (Yelena, HoE, Oct 2, 11:06 PM CT rule, matching #796): one per
+-- (household or standalone shared group, departed person); every plan and
+-- membership-keyed row of the person in one household goes to that
+-- household's placeholder. Each is a nameless auth.users row created through
+-- the Supabase Admin API as `exmiembro+<random uuid>@cuadrao.invalid`, email
+-- confirmed, app_metadata {"placeholder": true}, user metadata {}, no phone,
+-- no password, banned by ban_duration (GoTrue sets banned_until). Decision
+-- 17's "no user id" means no id tied to the person: the FKs need a real
+-- auth.users row. Never DML on auth.users here.
+--
+-- Method: move in place under the DEFERRABLE INITIALLY IMMEDIATE keys, plus
+-- account copies (one per scope), not copy, re-point, delete. Deferral does
+-- not relax three row rules, so each statement must satisfy them:
+--   * shared claim must retain its canonical binding (shared_claim_binding):
+--     financial_plan_links.user_id is the binding owner, so a binding moves
+--     before its claims;
+--   * shared allocation must retain true owner and consent
+--     (shared_allocation_binding on financial_goal_allocations);
+--   * financial_record_revisions.reversal_of_owner_id is generated and
+--     changes only through details, which the writer rewrites.
 
 -- 1. Keys the deletion re-keys ------------------------------------------------
 
@@ -277,10 +290,11 @@ execute function argus_private.finalize_linked_guest_identity();
 -- 6a. Household-owned invite cleanup (step 4, decision 3) ------------------------------
 
 -- The only writer Lane 6 uses on the invite tables. It clears the person's live
--- ids, keeps every anonymous row, rotates the person's sender reference to one
--- fresh uuid (their sent invites stay grouped for the chain, under a reference
--- tied to no one, which intentionally ends the per-user count for them),
--- revokes their unused beta invites, and writes no event. Idempotent.
+-- ids, keeps every anonymous row, and rotates sender_ref: a distinct fresh
+-- sender_ref per row; inviter_origin_id chain unchanged (Priya, Oct 3). No
+-- value left groups the person's invites, which intentionally ends the
+-- per-user count for them. It revokes their unused beta invites and writes no
+-- event. Idempotent.
 create function argus_private.forget_invite_party(p_user_id uuid)
 returns void
 language plpgsql
@@ -289,14 +303,13 @@ set search_path = ''
 as $$
 declare
   v_ref uuid;
-  v_rotated uuid := gen_random_uuid();
 begin
   if p_user_id is null then
     raise exception 'account_deletion_user_required' using errcode = '22023';
   end if;
   select ref into v_ref from public.invite_sender_refs where user_id = p_user_id;
   update public.invite_referrals
-     set sender_ref = v_rotated
+     set sender_ref = gen_random_uuid()  -- volatile: a new value for each row
    where sender_user_id = p_user_id
       or (v_ref is not null and sender_ref = v_ref);
   update public.invite_referrals set sender_user_id = null where sender_user_id = p_user_id;

@@ -14,11 +14,19 @@ Order, matching ``docs/specs/lanes/account-deletion-fk-census.md``:
    (4), future responsibilities returned, each unit moved to its placeholder
    (5.1, 5.2), the person's own plans deleted (5.3), feedback stripped (6),
    then a check that nothing still holds the id.
-4. The auth user is deleted through the Admin API (7); unused placeholders are
+4. Apple (2, #793): a stored Sign in with Apple token is revoked before the
+   account delete, because ``apple_sign_in_credentials.user_id`` is ON DELETE
+   RESTRICT. Revoked, or ``invalid_grant`` (already revoked): the row is gone
+   or is deleted and the run continues. A transient failure keeps the run at
+   ``data_deleted`` for a retry, and step 7 waits. ``credential_unreadable``
+   (key rotated): nothing can be revoked; the run records
+   ``apple_revoke: unrecoverable``, and the row is to go through #793's
+   owner-only discard function (a #793 follow-up, not landed: TODO below).
+   No token is ever logged.
+5. The auth user is deleted through the Admin API (7); unused placeholders are
    deleted; the id and the placeholder map are scrubbed from the run.
-5. Every provider token Cuadrao holds is revoked from the captured
-   ciphertext: Plaid access tokens and Gmail (Google) refresh tokens. Apple is
-   recorded as owed. PostHog person deletion (8) runs last. A provider that
+6. Plaid access tokens and Gmail (Google) refresh tokens are revoked from the
+   captured ciphertext. PostHog person deletion (8) runs last. A provider that
    fails stays pending and the run stays ``auth_deleted`` until a retry
    clears it.
 """
@@ -36,6 +44,7 @@ from typing import Any, Literal, Protocol
 from loguru import logger
 
 from argus.domain.account_deletion.auth_admin import AuthAdmin, placeholder_email
+from argus.domain.apple_sign_in.credentials import AppleRevocationPending
 from argus.domain.household import deletion as household_deletion
 from argus.observability.analytics_deletion import AnalyticsDeletion
 from argus.observability.product_events import actor_hash_for_user
@@ -63,25 +72,17 @@ class ProviderRevoker(Protocol):
     ) -> str: ...
 
 
-class AppleRevoker(Protocol):
-    def revoke(self, *, identity_id: str) -> bool:
-        """True only when Apple confirmed the revoke."""
+class AppleCredentials(Protocol):
+    """#793's ``AppleCredentialService``: its ``revoke`` and its repository."""
+
+    repository: Any
+
+    def revoke(self, *, user_id: str) -> Any:
+        """Raises ``AppleRevocationPending`` while the token is kept."""
         ...
 
 
-class AppleRevocationUnavailable:
-    """No Sign in with Apple revoke exists on this base: no Apple token is held.
-    Fails safe: the Apple revocation stays pending on the run.
-
-    TODO(#793): #793 adds ``apple_sign_in_credentials`` (``user_id`` ON DELETE
-    RESTRICT) and a revoke function. When it lands, step 2 moves the stored
-    token into the pending ``apple`` revocation (ciphertext, like Gmail and
-    Plaid) and deletes that row before step 7, and this class is replaced by
-    an adapter over #793's revoke function. The census must then cover the
-    table too."""
-
-    def revoke(self, *, identity_id: str) -> bool:
-        return False
+AppleRevokeStep = Literal["none", "revoked", "already_revoked", "unrecoverable"]
 
 
 @dataclass
@@ -114,7 +115,7 @@ class AccountDeletionService:
         auth_admin: AuthAdmin,
         revoker: ProviderRevoker | None,
         analytics: AnalyticsDeletion,
-        apple: AppleRevoker | None = None,
+        apple: AppleCredentials | None = None,
         clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         # The household repository owns the pool and binds one connection per
@@ -123,7 +124,7 @@ class AccountDeletionService:
         self._auth = auth_admin
         self._revoker = revoker
         self._analytics = analytics
-        self._apple = apple or AppleRevocationUnavailable()
+        self._apple = apple
         self._clock = clock
 
     # -- entry point -------------------------------------------------------------
@@ -143,6 +144,7 @@ class AccountDeletionService:
                         raise AccountDeletionIncomplete("units_changed") from None
             run["status"] = "data_deleted"
         if run["status"] == "data_deleted":
+            self._revoke_apple(user_id, subject)
             self._delete_auth_user(user_id, subject)
             run["status"] = "auth_deleted"
         if run["status"] == "auth_deleted":
@@ -248,7 +250,6 @@ class AccountDeletionService:
 
     def _delete_data(self, user_id: str, subject: str) -> None:
         now = self._clock()
-        apple = "apple" in self._auth.identity_providers(user_id)
         with self._households.connection() as connection:
             with connection.transaction():
                 connection.execute(
@@ -284,7 +285,6 @@ class AccountDeletionService:
                     user_id=user_id,
                     subject=subject,
                     units={unit: scopes[scope] for unit, scope in units.items()},
-                    apple=apple,
                     now=now,
                 )
                 connection.execute(
@@ -302,7 +302,6 @@ class AccountDeletionService:
         user_id: str,
         subject: str,
         units: dict[tuple[str, str], str],
-        apple: bool,
         now: datetime,
     ) -> dict[str, int]:
         # 1.1 to 1.3, and 5.2 for archives left by earlier departures.
@@ -324,15 +323,6 @@ class AccountDeletionService:
                returning 1""",
             (subject, user_id),
         ).fetchall()
-        if apple:
-            # Apple sign-in leaves no token with Cuadrao; the revoke is owed
-            # to Apple and stays pending until a revoke path exists.
-            connection.execute(
-                "insert into argus_private.account_deletion_revocations"
-                " (subject_hash, provider, source_ref) values (%s, 'apple', %s)"
-                " on conflict do nothing",
-                (subject, str(uuid.uuid5(uuid.NAMESPACE_URL, f"apple:{subject}"))),
-            )
         connection.execute(
             "delete from public.financial_source_connections where user_id = %s",
             (user_id,),
@@ -377,7 +367,79 @@ class AccountDeletionService:
             "events": len(events),
         }
 
-    # -- 4. the auth user --------------------------------------------------------
+    # -- 4. Apple, before the account delete ------------------------------------
+
+    def _revoke_apple(self, user_id: str, subject: str) -> None:
+        """Raises ``AccountDeletionIncomplete`` while the Apple row must stay:
+        the RESTRICT key would refuse step 7 anyway."""
+
+        with self._households.connection() as connection:
+            stored = connection.execute(
+                "select 1 from public.apple_sign_in_credentials where user_id = %s",
+                (user_id,),
+            ).fetchone()
+        if stored is None:
+            # Never stored, or revoked by an earlier attempt of this run.
+            self._record_step(subject, "apple_revoke", None, keep_existing=True)
+            return
+        if self._apple is None:
+            self._record_step(subject, "apple_revoke", "pending")
+            raise AccountDeletionIncomplete("apple_revoke_unavailable")
+        try:
+            self._apple.revoke(user_id=user_id)
+            outcome: AppleRevokeStep = "revoked"
+        except AppleRevocationPending as exc:
+            if exc.reason == "invalid_grant":
+                # Apple no longer holds the grant: nothing is left to revoke.
+                row = self._apple.repository.get(user_id=user_id)
+                if row is not None and not self._apple.repository.delete_if_unchanged(
+                    user_id=user_id, secret_ciphertext=row.secret_ciphertext
+                ):
+                    # A sign-in replaced the token meanwhile; revoke that one.
+                    self._record_step(subject, "apple_revoke", "pending")
+                    raise AccountDeletionIncomplete("apple_revoke_pending") from None
+                outcome = "already_revoked"
+            elif exc.reason == "credential_unreadable":
+                # The key rotated: the token can't be opened, so it can never
+                # be revoked. Recorded, never logged.
+                self._record_step(subject, "apple_revoke", "unrecoverable")
+                # TODO(#793 discard follow-up): call #793's owner-only discard
+                # function here to delete the unreadable row, then continue to
+                # step 7. Until it lands the run stays data_deleted and the
+                # RESTRICT key holds the account delete.
+                raise AccountDeletionIncomplete("apple_discard_unavailable") from None
+            else:
+                self._record_step(subject, "apple_revoke", "pending")
+                logger.warning("Apple revoke pending", reason=exc.reason)
+                raise AccountDeletionIncomplete("apple_revoke_pending") from None
+        self._record_step(subject, "apple_revoke", outcome)
+
+    def _record_step(
+        self,
+        subject: str,
+        name: str,
+        value: str | None,
+        *,
+        keep_existing: bool = False,
+    ) -> None:
+        with self._households.connection() as connection, connection.transaction():
+            if keep_existing:
+                # "none" only when no earlier attempt recorded an outcome.
+                connection.execute(
+                    "update argus_private.account_deletion_runs"
+                    " set steps = jsonb_build_object(%s::text, 'none') || steps"
+                    " where subject_hash = %s",
+                    (name, subject),
+                )
+                return
+            connection.execute(
+                "update argus_private.account_deletion_runs"
+                " set steps = steps || jsonb_build_object(%s::text, %s::text), updated_at = %s"
+                " where subject_hash = %s",
+                (name, value, self._clock(), subject),
+            )
+
+    # -- 5. the auth user --------------------------------------------------------
 
     def _delete_auth_user(self, user_id: str, subject: str) -> None:
         self._auth.delete_user(user_id)
@@ -409,7 +471,7 @@ class AccountDeletionService:
                 (self._clock(), subject),
             )
 
-    # -- 5. providers and analytics ---------------------------------------------
+    # -- 6. providers and analytics ---------------------------------------------
 
     def _settle_external(self, subject: str) -> DeletionOutcome:
         with self._households.connection() as connection:
@@ -425,10 +487,7 @@ class AccountDeletionService:
                 (subject,),
             ).fetchone()
         for provider, source_ref, external_ref, ciphertext in rows:
-            if provider == "apple":
-                done = self._apple.revoke(identity_id=str(source_ref))
-                error = None if done else "apple_revoke_unavailable"
-            elif self._revoker is None:
+            if self._revoker is None:
                 done, error = False, "connector_unavailable"
             else:
                 outcome = self._revoker.revoke_for_deletion(

@@ -25,8 +25,6 @@ class AuthAdmin(Protocol):
 
     def user_exists(self, user_id: str) -> bool: ...
 
-    def identity_providers(self, user_id: str) -> set[str]: ...
-
     def delete_user(self, user_id: str) -> None:
         """Delete the auth user. Deleting a user that is already gone is a no-op."""
         ...
@@ -42,8 +40,12 @@ class SupabaseAuthAdmin:
                 "id": user_id,
                 "email": email,
                 "email_confirm": True,
+                # GoTrue sets banned_until = now + this duration. No password
+                # and no phone; user metadata is explicitly empty, so the one
+                # email identity holds only the random email and the id.
                 "ban_duration": PLACEHOLDER_BAN,
                 "app_metadata": {"placeholder": True},
+                "user_metadata": {},
             }
         )
 
@@ -58,16 +60,6 @@ class SupabaseAuthAdmin:
 
     def user_exists(self, user_id: str) -> bool:
         return self._get(user_id) is not None
-
-    def identity_providers(self, user_id: str) -> set[str]:
-        user = self._get(user_id)
-        if user is None:
-            return set()
-        return {
-            str(identity.provider)
-            for identity in (getattr(user, "identities", None) or [])
-            if getattr(identity, "provider", None)
-        }
 
     def delete_user(self, user_id: str) -> None:
         if self._get(user_id) is None:
