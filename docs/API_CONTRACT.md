@@ -3167,7 +3167,8 @@ Argus supports English and Spanish (Latin America) in Alpha.
 
 ## `POST /account/delete`
 
-Deletes the signed-in person's account, in the app. Off unless
+Deletes the signed-in person's account, in the app. A guest session is deleted
+by the same command. Off unless
 `ARGUS_ACCOUNT_DELETION_ENABLED` is on; while off it answers `404` before any
 authentication. The account is always the session's. The body is only a
 confirmation, and any other field is a `422`:
@@ -3178,8 +3179,9 @@ confirmation, and any other field is a `422`:
 
 The command runs the Lane 6 order (`docs/specs/lanes/account-deletion-fk-census.md`
 and #787). It hands over or closes the person's households and plans, keeps their
-amounts in other people's plans under a nameless "Exmiembro" placeholder (one per
-household or standalone shared group), deletes everything else of theirs,
+amounts in other people's plans under a nameless former-member placeholder (one
+per household or standalone shared group, shown as "Former member" or
+"Exmiembro" in the viewer's language), deletes everything else of theirs,
 revokes provider tokens, and deletes the auth user. A retry resumes the same run.
 
 **Response `200`:**
@@ -3194,8 +3196,7 @@ dead either way; clients sign out locally. A stored Sign in with Apple token
 (#793) is revoked before the account delete; while Apple can't confirm it, the
 account is not deleted yet and the answer is `503 account_deletion_incomplete`.
 
-**Errors:** `403 account_conversion_required` (guest session),
-`403 account_deletion_not_allowed`, `503 account_deletion_unavailable` (no
+**Errors:** `403 account_deletion_not_allowed`, `503 account_deletion_unavailable` (no
 Postgres surfaces), `503 account_deletion_incomplete` with `Retry-After`
 (a retry resumes the same run and finishes it).
 

@@ -3,7 +3,8 @@
 ``POST /api/v1/account/delete`` runs the whole deletion command for the signed-in
 person. It is off unless ``ARGUS_ACCOUNT_DELETION_ENABLED`` is on, and while off
 it answers 404 before any authentication. The user id comes only from the
-verified session, never from the request body.
+verified session, never from the request body. A guest session is deleted
+the same way.
 """
 
 from __future__ import annotations
@@ -17,7 +18,6 @@ from pydantic import BaseModel, ConfigDict
 
 from argus.api import state as api_state
 from argus.api.dependencies import current_user, problem
-from argus.api.guest_access import account_context
 from argus.api.schemas import User
 from argus.domain.account_deletion.service import (
     AccountDeletionIncomplete,
@@ -96,14 +96,7 @@ def delete_account(
     request: Request,
     user: User = Depends(_deleting_user),  # noqa: B008
 ) -> AccountDeletionResponse:
-    if account_context(request).kind != "registered":
-        raise problem(
-            request,
-            status_code=403,
-            code="account_conversion_required",
-            title="Account Required",
-            detail="A temporary guest session has no account to delete.",
-        )
+    # A guest session is deleted by the same command (Lane 6 acceptance).
     service = account_deletion_service()
     if service is None:
         raise problem(

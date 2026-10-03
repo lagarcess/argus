@@ -114,16 +114,17 @@ def test_form_post_is_refused(enabled) -> None:  # noqa: ANN001
     service.delete_account.assert_not_called()
 
 
-def test_guest_has_no_account_to_delete(enabled) -> None:  # noqa: ANN001
+def test_a_guest_is_deleted_by_the_same_command(enabled) -> None:  # noqa: ANN001
     service = MagicMock()
+    service.delete_account.return_value = DeletionOutcome(status="done", pending=[])
     with (
         patch.object(account_route, "current_user", _guest),
         patch.object(account_route, "account_deletion_service", return_value=service),
     ):
         response = client.post(URL, json={"confirm": True})
-    assert response.status_code == 403
-    assert response.json()["code"] == "account_conversion_required"
-    service.delete_account.assert_not_called()
+    assert response.status_code == 200
+    assert response.json() == {"status": "done", "pending": []}
+    service.delete_account.assert_called_once_with(user_id=USER_ID)
 
 
 @pytest.mark.parametrize(
