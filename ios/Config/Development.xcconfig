@@ -28,6 +28,15 @@ ARGUS_SUPABASE_URL =
 ARGUS_SUPABASE_ANON_KEY =
 ARGUS_WEB_URL =
 ARGUS_CAPTCHA_URL =
+// Native Apple and Google sign-in. Both default off; see ../AUTH_SETUP.md. Public ids only.
+ARGUS_APPLE_SIGN_IN_ENABLED = false
+ARGUS_GOOGLE_SIGN_IN_ENABLED = false
+// <number>-<id>.apps.googleusercontent.com (iOS client) and the web client used by Supabase.
+GOOGLE_SIGN_IN_IOS_CLIENT_ID =
+GOOGLE_SIGN_IN_WEB_CLIENT_ID =
+// The iOS client's reversed id (com.googleusercontent.apps.<number>-<id>). The inert default
+// keeps the URL type valid; the Google button stays hidden until it matches the client id.
+GOOGLE_SIGN_IN_IOS_URL_SCHEME = argus-google-sign-in-unconfigured
 // Optional ignored overrides for local development; never put secrets here.
 #include? "Local.xcconfig"
 // Opt-in device overrides belong to the approved local signing setup.

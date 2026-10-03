@@ -3102,6 +3102,29 @@ metadata/link type validation is serialized with details writes. Existing
 owner-scoped native financial journals persist pending account creation and
 asset commands until an accepted response or explicit failure resolution.
 
+## Apple sign-in credentials
+
+`public.apple_sign_in_credentials`
+(`supabase/migrations/20261003150000_apple_sign_in_credentials.sql`) holds one
+row per person who signed in with Apple while
+`ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` was on: `user_id` (primary key, the
+verified session's user), `client_id` (the Apple client the token was issued
+to, the bundle id for the native app), `secret_ciphertext` (Apple's refresh
+token sealed with AES-256-GCM under `ARGUS_INGESTION_SECRET_KEY`, bound to
+`apple_sign_in:<user_id>`), `captured_at` and `updated_at`. A later sign-in
+replaces the row.
+
+RLS is on with no policy, and every client privilege is revoked: no client
+role can read or write any column. The API's service role is the only writer.
+No SECURITY DEFINER function is involved.
+
+`user_id` references `auth.users` with `on delete restrict`. An auth user who
+still has an unrevoked Apple token cannot be deleted, so no deletion path can
+drop the token without revoking it at Apple. The account-deletion run revokes
+first, deletes this row only after Apple confirms, then deletes the user. The
+row is the pending revoke until then, which matches the contract that the
+encrypted credential is kept only while a revoke is pending.
+
 ## Connected financial sources
 
 Default-off with `ARGUS_INGESTION_ENABLED`. Lane spec:
