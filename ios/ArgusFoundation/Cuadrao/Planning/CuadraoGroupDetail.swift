@@ -6,6 +6,7 @@ struct CuadraoGroupDetail: View {
     let groupID: UUID
     let spanish: Bool
     var bottomSpace: CGFloat = 90
+    @State private var chatFocus: CanvasChatFocus?
     @State private var section = 0
     @State private var sheet: GroupSheet?
     @State private var people = 8.0
@@ -39,8 +40,8 @@ struct CuadraoGroupDetail: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
-                                if let workspace = receiptWorkspace {
-                                    Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") { workspace.groupChat(group.id) }
+                                if receiptWorkspace != nil {
+                                    Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") { chatFocus = .group(id: group.id, title: group.name) }
                                         .accessibilityIdentifier("group-open-chat")
                                 }
                                 if store.canManage { Button(spanish ? "Editar grupo" : "Edit group", systemImage: "pencil") { sheet = .edit } }
@@ -60,6 +61,7 @@ struct CuadraoGroupDetail: View {
                     .onAppear { people = Double(group.expectedPeople) }
             }
         }.navigationTitle("").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
+            .contextualCuadrao(focus: $chatFocus, spanish: spanish)
             .sensoryFeedback(.success, trigger: didSave) { _, new in new }
     }
     private func hero(_ group: PlanGroup) -> some View {

@@ -11,7 +11,6 @@ struct ReceiptWorkspace {
     let chat: CuadraoChatPreview
     let capture: (ReceiptOrigin, ReceiptSourceChoice) -> Void
     let open: (UUID) -> Void
-    let groupChat: (UUID) -> Void
 }
 private struct ReceiptWorkspaceKey: EnvironmentKey {
     static let defaultValue: ReceiptWorkspace? = nil

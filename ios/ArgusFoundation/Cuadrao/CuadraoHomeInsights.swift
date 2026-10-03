@@ -42,17 +42,23 @@ struct CuadraoHomeInsights: View {
         else { chooseRecordingAccount = true }
     }
     private func movePeriod(_ direction: Int) { periodOffset = min(0, max(oldest, periodOffset + direction)) }
+    private func chartContext(_ offset: Int) -> CanvasChartFocus {
+        CanvasChartFocus(spaceID: data.selectedSpaceID, spaceTitle: space, currency: currency,
+            interval: range.interval(offset: offset), periodTitle: range.periodLabel(spanish: spanish, offset: offset),
+            metric: activity ? .activity : .balance, presentation: distribution ? .distribution : .evolution)
+    }
     @ViewBuilder private func periodContent(_ offset: Int) -> some View {
         if activity {
             CuadraoSpendingChart(expenses: expenses, coverageStart: data.spendingCoverageStart(currency: currency), currency: currency,
-                spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset), record: accounts.isEmpty ? nil : recordFirstExpense)
+                spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset), record: accounts.isEmpty ? nil : recordFirstExpense, context: chartContext(offset))
         } else if distribution {
             CuadraoHomeDistribution(accounts: balancePeriod(offset).closingAccounts, currency: currency, spanish: spanish, historical: offset < 0,
-                asOf: balancePeriod(offset).closing?.date)
+                asOf: balancePeriod(offset).closing?.date, context: chartContext(offset))
         } else {
             CuadraoHomeBalanceChart(accounts: accounts, observations: data.balanceObservations, currency: currency,
                 currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true,
                 range: $range, periodOffset: .constant(offset))
+            CanvasChartAsk(context: chartContext(offset), spanish: spanish)
         }
     }
     var body: some View {

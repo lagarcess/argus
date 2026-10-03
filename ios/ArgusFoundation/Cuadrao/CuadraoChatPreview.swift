@@ -7,13 +7,14 @@ import Observation
     var title: String
     var turns: [CanvasChatTurn] = []
     var receiptIDs: [UUID] = []
-    var groupID: UUID?
+    var focus: CanvasChatFocus?
     var draft = ""
     var attachments: [CanvasChatAttachment] = []
     var pinned = false
     var archived = false
     var deleted = false
     var unread = false
+    var example = false
     var lastMessageDate: Date? { turns.last?.createdAt }
     init(id: String = UUID().uuidString, title: String = "") { self.id = id; self.title = title }
 }
@@ -30,6 +31,7 @@ struct CanvasChatTurn: Identifiable {
     let attachments: [CanvasChatAttachment]
     let example: CanvasChatExample?
     var createdAt: Date = .now
+    var focus: CanvasChatFocus? = nil
 }
 
 enum CanvasChatExample: String, CaseIterable, Identifiable {
@@ -57,6 +59,9 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
     let voice = CuadraoVoicePreview()
     let voiceMessage = CuadraoVoiceMessagePreview()
     var threads: [CanvasChatThread] = []
+    private let spanish: Bool
+    var includeExamples: Bool
+    var visibleThreads: [CanvasChatThread] { threads.filter { includeExamples || !$0.example } }
     var current = CanvasChatThread()
     var temporary = false
     private var contextEnabled = false
@@ -68,9 +73,12 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
     var responseState = CanvasChatResponseState.complete
     private var suspended: CanvasChatThread?
 
-    init(spanish: Bool) {
+    init(spanish: Bool, includeExamples: Bool = true) {
+        self.spanish = spanish
+        self.includeExamples = includeExamples
         for (index, item) in CanvasSearchReference.examples(spanish).filter({ $0.kind == .chats }).enumerated() {
             let thread = CanvasChatThread(id: item.id, title: item.title)
+            thread.example = true
             thread.turns = [CanvasChatTurn(question: item.content, attachments: [],
                 example: item.id == "chat-cd" ? .certificate : nil,
                 createdAt: Calendar.current.date(byAdding: .day, value: -index, to: .now)!)]
@@ -87,22 +95,25 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
         for thread in threads { thread.receiptIDs.removeAll { $0 == id } }
         current.receiptIDs.removeAll { $0 == id }
     }
-    func openGroup(_ id: UUID, name: String) {
-        if temporary { endTemporary() }
-        if let existing = threads.first(where: { $0.groupID == id }) { open(existing) }
-        else {
-            let thread = CanvasChatThread(title: name); thread.groupID = id
-            threads.append(thread); open(thread)
+    func selectFocus(_ focus: CanvasChatFocus) { current.focus = focus }
+    private func retainDraft() {
+        guard !temporary, !current.deleted, !current.archived,
+              !current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !current.attachments.isEmpty || current.focus != nil,
+              !threads.contains(where: { $0.id == current.id }) else { return }
+        if current.title.isEmpty {
+            current.title = String(current.draft.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+            if current.title.isEmpty { current.title = current.attachments.first?.name ?? current.focus?.title(spanish) ?? "" }
         }
+        threads.insert(current, at: 0)
     }
     var hasTemporaryContent: Bool {
-        temporary && (!current.turns.isEmpty || !current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !current.attachments.isEmpty || voiceMessage.state != .idle)
+        temporary && (!current.turns.isEmpty || !current.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !current.attachments.isEmpty || current.focus != nil || voiceMessage.state != .idle)
     }
-    func newChat() { voice.end(); voiceMessage.cancel(); current = CanvasChatThread(); responseState = .complete }
-    func open(_ thread: CanvasChatThread) { if current.id != thread.id { voice.end(); voiceMessage.cancel() }; current = thread; thread.unread = false; responseState = .complete }
+    func newChat() { retainDraft(); voice.end(); voiceMessage.cancel(); current = CanvasChatThread(); responseState = .complete }
+    func open(_ thread: CanvasChatThread) { if current.id != thread.id { retainDraft(); voice.end(); voiceMessage.cancel() }; current = thread; thread.unread = false; responseState = .complete }
     func startTemporary() {
         guard !temporary else { return }
-        suspended = current; temporary = true; contextEnabled = false; newChat()
+        retainDraft(); suspended = current; temporary = true; contextEnabled = false; newChat()
     }
     func endTemporary() {
         guard temporary else { return }
@@ -135,16 +146,16 @@ enum CanvasChatResponseState: String, CaseIterable { case complete, waiting, fai
         let text = example?.question(spanish) ?? current.draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty || !current.attachments.isEmpty else { return }
         if current.title.isEmpty { current.title = String(text.prefix(80)) }
-        current.turns.append(CanvasChatTurn(question: text, attachments: current.attachments, example: example ?? (current.attachments.isEmpty ? nil : .document), createdAt: now))
+        current.turns.append(CanvasChatTurn(question: text, attachments: current.attachments, example: example ?? (current.attachments.isEmpty ? nil : .document), createdAt: now, focus: current.focus))
         current.draft = ""; current.attachments = []; responseState = .complete
         if !temporary && !threads.contains(where: { $0.id == current.id }) { threads.insert(current, at: 0) }
     }
     func references(_ es: Bool) -> [CanvasSearchReference] {
-        threads.filter { !$0.deleted }.map { thread in
+        visibleThreads.filter { !$0.deleted }.map { thread in
             CanvasSearchReference(id: thread.id, kind: .chats, title: thread.title,
                 detail: thread.archived ? (es ? "Chat archivado · Solo yo" : "Archived chat · Only me")
                     : (es ? "Conversación · Solo yo" : "Conversation · Only me"),
-                content: thread.turns.last?.question ?? "", source: es ? "Conversación de ejemplo" : "Example conversation")
+                content: thread.turns.last?.question ?? thread.draft, source: es ? "Conversación" : "Conversation")
         }
     }
 }

@@ -18,7 +18,7 @@ struct CuadraoChatHistory: View {
 
     private var rows: [CanvasChatThread] {
         let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return store.threads.filter {
+        return store.visibleThreads.filter {
             (scope == .deleted ? $0.deleted : !$0.deleted && $0.archived == (scope == .archived))
                 && (search.isEmpty || $0.title.localizedStandardContains(search))
         }.sorted { ($0.lastMessageDate ?? .distantPast) > ($1.lastMessageDate ?? .distantPast) }

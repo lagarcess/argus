@@ -17,6 +17,7 @@ struct CuadraoReceiptReview: View {
 private struct ReceiptEditor: View {
     let workspace: ReceiptWorkspace
     let spanish: Bool
+    @State private var chatFocus: CanvasChatFocus?
     @State private var draft: ReceiptDraft
     @State private var error = ""
     @State private var amountErrors: [String: String] = [:]
@@ -61,6 +62,11 @@ private struct ReceiptEditor: View {
                 Button { showSource = true } label: {
                     Label(es ? "Ver recibo original" : "View original receipt", systemImage: "doc.text.image").frame(minHeight: 44)
                 }.accessibilityIdentifier("receipt-source")
+                if !draft.prepared {
+                    Button { askCuadrao() } label: {
+                        Label(es ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble").frame(minHeight: 44)
+                    }.accessibilityIdentifier("receipt-open-chat")
+                }
                 if draft.prepared {
                     DisclosureGroup(es ? "Corregir datos" : "Correct details", isExpanded: $details) {
                         TextField(es ? "Comercio" : "Merchant", text: $draft.merchant).accessibilityIdentifier("receipt-merchant")
@@ -155,7 +161,7 @@ private struct ReceiptEditor: View {
                     Label(es ? "Gasto guardado" : "Expense saved", systemImage: "checkmark.seal.fill").foregroundStyle(WelcomePalette.pine).accessibilityIdentifier("receipt-confirmed")
                 }
             }
-        }.scrollContentBackground(.hidden).background(WelcomePalette.background)
+        }.cuadraoFormKeyboard().scrollContentBackground(.hidden).background(WelcomePalette.background)
             .navigationTitle(es ? "Revisar recibo" : "Review receipt").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showSource) { ReceiptSourceViewer(draft: draft, store: workspace.receipts, spanish: es) }
             .sheet(item: $editingLine) { line in
@@ -168,6 +174,7 @@ private struct ReceiptEditor: View {
                     }
                 }
             }
+            .contextualCuadrao(focus: $chatFocus, spanish: es)
             .onChange(of: draft) { old, value in
                 guard old.prepared, value.prepared, value != workspace.receipts.receipt(value.id) else { return }
                 do { try workspace.receipts.update(value); error = "" } catch { show(error) }
@@ -186,13 +193,17 @@ private struct ReceiptEditor: View {
                 if draft.prepared {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
+                            Button(es ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") { askCuadrao() }
+                                .accessibilityIdentifier("receipt-open-chat")
                             Button(es ? "Descartar recibo" : "Discard receipt", systemImage: "trash", role: .destructive) { discard = true }
                         } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
                             .accessibilityLabel(es ? "Opciones del recibo" : "Receipt options")
                     }
                 }
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button(es ? "Listo" : "Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
             }
+    }
+    private func askCuadrao() {
+        chatFocus = .receipt(id: draft.id, title: draft.merchant.isEmpty ? (es ? "Tu recibo" : "Your receipt") : draft.merchant)
     }
     private var destination: some View {
         Section(es ? "Dónde guardarlo" : "Save to") {
@@ -248,6 +259,9 @@ private struct ReceiptEditor: View {
                             Text(money(shares[member.id] ?? 0)).font(CuadraoTypography.rowAmount)
                         }.frame(minHeight: 44).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("receipt-member-\(index)")
+                        .accessibilityLabel(member.name)
+                        .accessibilityValue((draft.participants.contains(member.id) ? (es ? "Incluido" : "Included") : (es ? "Excluido" : "Excluded")) + ", " + money(shares[member.id] ?? 0))
+                        .accessibilityAddTraits(draft.participants.contains(member.id) ? .isSelected : [])
                 }
                 if draft.split == .items {
                     ForEach(draft.lines) { line in
@@ -296,6 +310,9 @@ private struct ReceiptEditor: View {
                         .padding(.horizontal, 8).frame(minHeight: 44)
                         .background(line.members.contains(member.id) ? WelcomePalette.sage : .clear, in: Capsule())
                 }.buttonStyle(.plain).accessibilityIdentifier("receipt-assign-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)-\(group.activeMembers.firstIndex(where: { $0.id == member.id }) ?? 0)")
+                    .accessibilityLabel("\(line.name), \(member.name)")
+                    .accessibilityValue(line.members.contains(member.id) ? (es ? "Asignado" : "Assigned") : (es ? "Sin asignar" : "Not assigned"))
+                    .accessibilityAddTraits(line.members.contains(member.id) ? .isSelected : [])
             }
         }
     }

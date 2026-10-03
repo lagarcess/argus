@@ -23,12 +23,59 @@ import Foundation
             dateStore.send(spanish: spanish, now: midnight)
             precondition(datedThread.lastMessageDate == midnight)
 
+            let contextStore = CuadraoChatPreview(spanish: spanish, includeExamples: false)
+            precondition(contextStore.references(spanish).isEmpty)
+            let draftThread = contextStore.current
+            let contextAttachment = CanvasChatAttachment(name: "receipt.pdf", symbol: "doc")
+            draftThread.draft = "Keep this question"
+            draftThread.attachments = [contextAttachment]
+            let accountFocus = CanvasChatFocus.account(id: UUID(), title: "Cuenta corriente")
+            let planFocus = CanvasChatFocus.plan(id: UUID(), title: "Samaná")
+            contextStore.selectFocus(accountFocus)
+            contextStore.selectFocus(planFocus)
+            precondition(contextStore.current === draftThread && draftThread.draft == "Keep this question")
+            precondition(draftThread.attachments.first?.id == contextAttachment.id && draftThread.turns.isEmpty)
+            draftThread.focus = nil
+            precondition(draftThread.draft == "Keep this question" && !draftThread.attachments.isEmpty)
+            contextStore.selectFocus(accountFocus)
+            contextStore.newChat()
+            precondition(contextStore.references(spanish).contains { $0.id == draftThread.id })
+            contextStore.open(draftThread)
+            contextStore.send(spanish: spanish)
+            precondition(draftThread.turns.last?.focus == accountFocus)
+            contextStore.selectFocus(planFocus)
+            precondition(draftThread.turns.last?.focus == accountFocus, "Sent context is a snapshot")
+            precondition(draftThread.focus == planFocus && draftThread.draft.isEmpty && draftThread.attachments.isEmpty)
+            let chart = CanvasChartFocus(spaceID: "personal", spaceTitle: "Personal", currency: "DOP",
+                interval: DateInterval(start: yesterday, end: midnight), periodTitle: "Mar 8–9", metric: .activity, presentation: .distribution,
+                selection: .expenseCategory(id: "food", title: "Comida"))
+            contextStore.newChat()
+            contextStore.selectFocus(.chart(chart))
+            let chartThread = contextStore.current
+            contextStore.open(draftThread)
+            precondition(chartThread.title.contains(spanish ? "Actividad" : "Activity"))
+            precondition(chartThread.focus == .chart(chart))
+            contextStore.startTemporary()
+            contextStore.selectFocus(planFocus)
+            precondition(contextStore.temporary && !contextStore.useContext && contextStore.hasTemporaryContent)
+            let privateID = contextStore.current.id
+            contextStore.current.draft = "Only this selected plan"
+            contextStore.send(spanish: spanish)
+            precondition(!contextStore.useContext && contextStore.current.turns.last?.focus == planFocus)
+            contextStore.endTemporary()
+            precondition(!contextStore.references(spanish).contains { $0.id == privateID })
+            contextStore.includeExamples = true
+            precondition(contextStore.references(spanish).count > 2)
+            contextStore.includeExamples = false
+            precondition(contextStore.references(spanish).count == 2, "First use hides examples, not actual drafts")
+            print("PASS: focus replacement/removal, draft/attachment continuity, turn snapshots, chart scope, temporary privacy and first-use examples (\(spanish ? "es" : "en"))")
+
             let receiptChat = CuadraoChatPreview(spanish: spanish)
-            let originID = receiptChat.retainReceiptOrigin()
+            let originID = receiptChat.current.id
             let originThread = receiptChat.current
-            receiptChat.newChat()
             let receiptID = UUID()
             receiptChat.attachReceipt(receiptID, to: originID)
+            receiptChat.newChat()
             receiptChat.attachReceipt(receiptID, to: originID)
             precondition(originThread.receiptIDs == [receiptID] && receiptChat.current.receiptIDs.isEmpty,
                          "Capture callback updates its originating thread once, never the new current thread")
@@ -54,8 +101,8 @@ import Foundation
             previous.draft = originalDraft
             let attachment = CanvasChatAttachment(name: "sample.pdf", symbol: "doc")
             previous.attachments = [attachment]
-            let originalIDs = store.references(spanish).map(\.id)
             store.startTemporary()
+            let originalIDs = store.references(spanish).map(\.id)
             precondition(store.temporary && !store.useContext && !store.contextLocked)
             precondition(!store.hasTemporaryContent && store.current.id != previous.id)
             store.current.draft = " \n "
@@ -181,7 +228,7 @@ import Foundation
             store.leaveTemporary(for: .returnToRegular)
             precondition(!store.voice.active && store.current.id == regularID)
             store.voice.start()
-            store.open(store.threads[1])
+            store.open(store.threads.first { $0.id != regularID }!)
             precondition(!store.voice.active)
             store.voice.start()
             store.newChat()

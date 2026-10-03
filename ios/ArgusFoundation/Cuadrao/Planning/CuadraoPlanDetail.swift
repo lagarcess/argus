@@ -7,6 +7,7 @@ struct CuadraoPlanDetail: View {
     let planID: UUID
     let spanish: Bool
     var bottomSpace: CGFloat = 90
+    @State private var chatFocus: CanvasChatFocus?
     @State private var draftAmount: Double?
     @State private var sliderCeiling: Double = 0
     @State private var editing: PlanEditorRoute?
@@ -49,6 +50,8 @@ struct CuadraoPlanDetail: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
+                            Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") { chatFocus = .plan(id: plan.id, title: plan.name) }
+                                .accessibilityIdentifier("plan-open-chat")
                             Button { editing = .init(plan: plan) } label: { Label(spanish ? "Editar plan" : "Edit plan", systemImage: "pencil") }
                             Button { archive = true } label: { Label(spanish ? "Archivar" : "Archive", systemImage: "archivebox") }
                         } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
@@ -77,6 +80,7 @@ struct CuadraoPlanDetail: View {
         }
         .sheet(isPresented: $people) { CuadraoHouseholdSheet(data: accounts, spanish: spanish) }
         .onChange(of: plan) { _, _ in draftAmount = nil; sliderCeiling = 0 }
+        .contextualCuadrao(focus: $chatFocus, spanish: spanish)
         .sensoryFeedback(.success, trigger: saved) { _, new in new }
     }
 

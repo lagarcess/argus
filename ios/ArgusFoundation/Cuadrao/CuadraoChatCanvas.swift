@@ -8,6 +8,8 @@ struct CuadraoChatCanvas: View {
     let store: CuadraoChatPreview
     let spanish: Bool
     @Binding var editing: Bool
+    var contextual = false
+    var close: (() -> Void)?
     @State private var sheet: CanvasChatSheet?
     @State private var tray = false
     @State private var ending = false
@@ -38,7 +40,7 @@ struct CuadraoChatCanvas: View {
             composer(thread: $thread.draft)
         }
         .cuadraoSoftScrollEdges()
-        .safeAreaPadding(.bottom, focused ? 0 : 80)
+        .safeAreaPadding(.bottom, focused || contextual ? 0 : 80)
         .background(WelcomePalette.background)
         .foregroundStyle(WelcomePalette.ink)
         .toolbar(.hidden, for: .tabBar)
@@ -73,7 +75,7 @@ struct CuadraoChatCanvas: View {
                             pendingReceipt = .capture(ReceiptOrigin(groupID: origin.groupID, threadID: store.current.id), source)
                             savedReceipts = false
                         },
-                        open: { id in savedReceipts = false; pendingReceipt = .review(id) }, groupChat: workspace.groupChat), groupID: store.current.groupID, spanish: es)
+                        open: { id in savedReceipts = false; pendingReceipt = .review(id) }), groupID: store.current.focus?.groupID, spanish: es)
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button(es ? "Listo" : "Done") { savedReceipts = false } } }
                 }
             }
@@ -91,6 +93,9 @@ struct CuadraoChatCanvas: View {
 
     private var header: some View {
         HStack(spacing: 0) {
+            if let close {
+                control("xmark", es ? "Cerrar Cuadrao" : "Close Cuadrao", id: "chat-context-close", action: close)
+            }
             control("clock.arrow.circlepath", es ? "Chats recientes" : "Recent chats", id: "chat-history") { sheet = .history }
             if active || store.temporary {
                 Button {
@@ -164,7 +169,7 @@ struct CuadraoChatCanvas: View {
                         }
                     } else {
                         CuadraoBrand().scaleEffect(0.85).accessibilityLabel("Cuadrao")
-                        Text(store.current.groupID.flatMap { receiptWorkspace?.groups.group($0)?.name } ?? (es ? "¿Qué vemos hoy?" : "What shall we look at?"))
+                        Text(store.current.focus?.groupID.flatMap { receiptWorkspace?.groups.group($0)?.name } ?? (es ? "¿Qué vemos hoy?" : "What shall we look at?"))
                             .font(CuadraoTypography.screen).multilineTextAlignment(.center)
                     }
                     Spacer(minLength: 32)
@@ -186,7 +191,7 @@ struct CuadraoChatCanvas: View {
                         }.frame(maxWidth: .infinity, minHeight: 44)
                     }
                     if let workspace = receiptWorkspace {
-                        if let groupID = store.current.groupID, let group = workspace.groups.group(groupID) {
+                        if let groupID = store.current.focus?.groupID, let group = workspace.groups.group(groupID) {
                             Text(group.name).font(CuadraoTypography.section)
                         }
                         ForEach(store.current.receiptIDs, id: \.self) { id in
@@ -198,6 +203,7 @@ struct CuadraoChatCanvas: View {
                     ForEach(store.current.turns) { turn in
                         VStack(alignment: .leading, spacing: 24) {
                             VStack(alignment: .trailing, spacing: 8) {
+                                if let focus = turn.focus { CanvasChatFocusChip(focus: focus, spanish: es) }
                                 ForEach(turn.attachments) { item in CanvasChatAttachmentChip(item: item, spanish: es) }
                                 if !turn.question.isEmpty {
                                     Text(turn.question).font(.body).textSelection(.enabled)
@@ -243,7 +249,7 @@ struct CuadraoChatCanvas: View {
 
     private func composer(thread: Binding<String>) -> some View {
         VStack(spacing: 10) {
-            if !active && !store.temporary && !focused && !tray && !store.voice.active && voiceMessage.state == .idle {
+            if !active && store.current.focus == nil && !store.temporary && !focused && !tray && !store.voice.active && voiceMessage.state == .idle {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(CanvasChatExample.allCases) { sample in
@@ -256,6 +262,9 @@ struct CuadraoChatCanvas: View {
                 }
             }
             VStack(alignment: .leading, spacing: 12) {
+                if let focus = store.current.focus {
+                    CanvasChatFocusChip(focus: focus, spanish: es) { store.current.focus = nil }
+                }
                 if store.voice.active {
                     CuadraoVoiceBar(voice: store.voice, spanish: es, embedded: true)
                     Divider().overlay(WelcomePalette.pine.opacity(0.12))
@@ -354,7 +363,7 @@ struct CuadraoChatCanvas: View {
             tray = false
             if symbol == "doc.viewfinder", let workspace = receiptWorkspace {
                 if store.temporary { temporaryReceipt = true }
-                else { workspace.capture(ReceiptOrigin(groupID: store.current.groupID, threadID: store.current.id), .scan) }
+                else { workspace.capture(ReceiptOrigin(groupID: store.current.focus?.groupID, threadID: store.current.id), .scan) }
             } else { sheet = .attachment(symbol) }
         } label: {
             VStack(spacing: 9) { Image(systemName: symbol).font(.title3); Text(title).font(.caption) }

@@ -5,7 +5,8 @@ struct CuadraoHomeCanvas: View {
     @AppStorage("cuadrao.design.home-section-order") private var homeOrder = CuadraoHomeSection.defaultOrder
     @State private var populated = (CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
     @State private var selectedTab: CuadraoTab = .home
-    @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
+    @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
+        includeExamples: CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var plans = CuadraoPlanPreview(
@@ -31,7 +32,8 @@ struct CuadraoHomeCanvas: View {
     @State private var data = CuadraoAccountsPreview(
         populated: (CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated")),
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"))
-    @State private var accountPath: [UUID] = []
+    private enum HomeRoute: Hashable { case account(UUID), activity(UUID) }
+    @State private var accountPath: [HomeRoute] = []
     @State private var archivedID: UUID?
     private let navigationBarHeight: CGFloat = 72
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
@@ -78,9 +80,15 @@ struct CuadraoHomeCanvas: View {
                 .background(WelcomePalette.background)
                 .navigationTitle("").navigationBarTitleDisplayMode(.inline)
                 .toolbar(.hidden, for: .navigationBar)
-                .navigationDestination(for: UUID.self) { id in
-                    CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
-                        actions: { sheet = .account($0) }, record: { sheet = .account(.record($0)) })
+                .navigationDestination(for: HomeRoute.self) { route in
+                    switch route {
+                    case .account(let id):
+                        CuadraoAccountCanvas(data: data, accountID: id, spanish: spanish,
+                            actions: { sheet = .account($0) }, record: { sheet = .account(.record($0)) })
+                    case .activity(let id):
+                        CuadraoActivityDetail(data: data, activityID: id, spanish: spanish,
+                            actions: { sheet = .account($0) }, record: { sheet = .account(.record($0)) })
+                    }
                 }
             }
             .toolbar(.hidden, for: .tabBar)
@@ -143,8 +151,9 @@ struct CuadraoHomeCanvas: View {
         } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
         .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
-        .environment(\.receiptWorkspace, receiptWorkspace)
         .receiptPresentation(route: $receiptRoute, workspace: receiptWorkspace, spanish: spanish)
+        .environment(\.receiptWorkspace, receiptWorkspace)
+        .environment(\.cuadraoChat, chat)
         .task {
             do { try receipts.reconcile(groups: groups, accounts: data) }
             catch { receiptRecoveryError = true }
@@ -152,6 +161,7 @@ struct CuadraoHomeCanvas: View {
         .alert(spanish ? "No pudimos recuperar un recibo" : "A receipt could not be recovered", isPresented: $receiptRecoveryError) {
             Button(spanish ? "Listo" : "OK") {}
         } message: { Text(spanish ? "Los archivos siguen en este dispositivo. Revisa tus recibos guardados." : "The files remain on this device. Check your saved receipts.") }
+        .onChange(of: populated) { _, value in chat.includeExamples = value }
         .onChange(of: selectedTab) { _, tab in
             if tab != .assistant { searchChatOrigin = false }
         }
@@ -254,7 +264,7 @@ struct CuadraoHomeCanvas: View {
             }
             CuadraoOrderedCollection(items: data.active, spanish: spanish, spacing: 0,
                 identifier: { "home-account-" + $0.id.uuidString },
-                open: { accountPath.append($0.id) }, edit: { sheet = .account(.rename($0.id)) },
+                open: { accountPath.append(.account($0.id)) }, edit: { sheet = .account(.rename($0.id)) },
                 archive: { data.archive($0.id, true); archivedID = $0.id }, reorder: data.reorder) { account in
                     CanvasAccountRow(account: account, spanish: spanish)
                         .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5).padding(.leading, 54) }
@@ -280,9 +290,11 @@ struct CuadraoHomeCanvas: View {
             Text(spanish ? "Hoy" : "Today").font(.footnote).foregroundStyle(.secondary)
             ForEach(data.visibleActivity.prefix(3)) { entry in
                 if let account = data.account(entry.accountID) {
-                    feedRow(entry.title, detail: account.displayName(spanish),
-                        amount: (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
-                        icon: entry.income ? "arrow.down.left" : "arrow.up.right")
+                    NavigationLink(value: HomeRoute.activity(entry.id)) {
+                        feedRow(entry.title, detail: account.displayName(spanish),
+                            amount: (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
+                            icon: entry.income ? "arrow.down.left" : "arrow.up.right")
+                    }.buttonStyle(.plain).accessibilityIdentifier("home-activity.\(entry.id.uuidString)")
                 }
             }
         }
@@ -318,14 +330,13 @@ struct CuadraoHomeCanvas: View {
 
     private var receiptWorkspace: ReceiptWorkspace {
         ReceiptWorkspace(receipts: receipts, groups: groups, accounts: data, chat: chat,
-                         capture: { receiptRoute = .capture($0, $1) }, open: { receiptRoute = .review($0) },
-                         groupChat: { id in chat.openGroup(id, name: groups.group(id)?.name ?? ""); selectedTab = .assistant })
+                         capture: { receiptRoute = .capture($0, $1) }, open: { receiptRoute = .review($0) })
     }
 
     @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
         if tab == .search {
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
-                plans: plans, chat: chat, openChat: { thread in chat.open(thread); searchChatOrigin = true; selectedTab = .assistant },
+                plans: plans, groups: groups, chat: chat, openChat: { thread in chat.open(thread); searchChatOrigin = true; selectedTab = .assistant },
                 actions: { sheet = .account($0) }, record: { sheet = .account(.record($0)) })
         } else if tab == .assistant {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
