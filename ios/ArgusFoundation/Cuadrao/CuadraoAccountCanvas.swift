@@ -4,26 +4,28 @@ struct CuadraoAccountCanvas: View {
     let data: CuadraoAccountsPreview
     let accountID: UUID
     let spanish: Bool
-    let actions: (UUID) -> Void
+    let actions: (CanvasAccountSheet) -> Void
     let record: (UUID) -> Void
     @State private var showingBalanceInfo = false
+    @State private var chatFocus: CanvasChatFocus?
 
     var body: some View {
         if let account = data.account(accountID) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 30) {
+                LazyVStack(alignment: .leading, spacing: 30) {
                     VStack(alignment: .leading, spacing: 18) {
                         CanvasAccountIcon(kind: account.kind, size: 30)
                             .frame(width: 58, height: 58)
                             .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 18))
-                        Text(account.displayName(spanish)).font(.system(.largeTitle, design: .serif))
+                        Text(account.displayName(spanish)).font(CuadraoTypography.screen)
+                            .accessibilityIdentifier("account-detail-title")
                             .fixedSize(horizontal: false, vertical: true)
                         VStack(alignment: .leading, spacing: 9) {
                             Text(account.balanceLabel(spanish)).font(.subheadline).foregroundStyle(.secondary)
                             HStack(alignment: .firstTextBaseline, spacing: 9) {
                                 Text(account.currency).font(.subheadline).foregroundStyle(.secondary)
                                 Text(account.balance.map { CanvasMoney.format($0, currency: account.currency) } ?? "—")
-                                    .font(.system(size: 38, weight: .medium, design: .rounded))
+                                    .font(CuadraoTypography.amount)
                                     .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
                             }
                             Text(account.balance == nil ? (spanish ? "Sin balance registrado" : "No balance recorded")
@@ -33,13 +35,14 @@ struct CuadraoAccountCanvas: View {
                     }
                     VStack(spacing: 12) {
                         RegistrationButton(title: spanish ? "Añadir movimiento" : "Add transaction") { record(accountID) }
+                            .accessibilityIdentifier("account-detail-record")
                         Button(spanish ? "Comprobar balance" : "Check balance") { showingBalanceInfo = true }
                             .font(.system(size: 13, weight: .medium)).padding(.horizontal, 16).frame(minHeight: 44)
-                            .overlay { Capsule().stroke(Color(white: 0.8), lineWidth: 1) }
+                            .overlay { Capsule().stroke(WelcomePalette.border, lineWidth: 1) }
                     }
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text(spanish ? "Movimientos" : "Activity").font(.system(.title2, design: .serif))
-                        let entries = data.activity.filter { $0.accountID == accountID }
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        Text(spanish ? "Movimientos" : "Activity").font(CuadraoTypography.section)
+                        let entries = data.activity.filter { $0.accountID == accountID }.sorted { $0.date > $1.date }
                         if entries.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(spanish ? "Aún no hay movimientos." : "No activity yet.").font(.body)
@@ -48,25 +51,29 @@ struct CuadraoAccountCanvas: View {
                             }.padding(.vertical, 18)
                         } else {
                             ForEach(entries) { entry in
-                                HStack(spacing: 14) {
-                                    Image(systemName: entry.income ? "arrow.down.left" : "arrow.up.right")
-                                        .frame(width: 38, height: 38)
-                                        .background(Color(white: 0.96), in: Circle()).accessibilityHidden(true)
-                                    VStack(alignment: .leading, spacing: 5) {
-                                        Text(entry.title).font(.body)
-                                        Text(entry.date, format: .dateTime.day().month(.abbreviated))
-                                            .font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Text((entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                                        .font(.subheadline).monospacedDigit()
-                                }.padding(.vertical, 10)
+                                NavigationLink {
+                                    CuadraoActivityDetail(data: data, activityID: entry.id, spanish: spanish, actions: actions, record: record)
+                                } label: {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: entry.income ? "arrow.down.left" : "arrow.up.right")
+                                            .frame(width: 38, height: 38)
+                                            .background(WelcomePalette.surface, in: Circle()).accessibilityHidden(true)
+                                        VStack(alignment: .leading, spacing: 5) {
+                                            Text(entry.title).font(.body)
+                                            Text(entry.date, format: .dateTime.day().month(.abbreviated))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Text((entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
+                                            .font(CuadraoTypography.rowAmount)
+                                    }.padding(.vertical, 10).contentShape(Rectangle())
+                                }.buttonStyle(.plain).accessibilityIdentifier("account-detail-activity.\(entry.id)")
                                 Divider()
                             }
                         }
                     }
                 }.padding(24).padding(.bottom, 32)
-            }.background(Color.white)
+            }.background(WelcomePalette.background)
                 .navigationTitle("").navigationBarTitleDisplayMode(.inline)
                 .toolbar(.visible, for: .navigationBar)
                 .toolbar {
@@ -77,6 +84,7 @@ struct CuadraoAccountCanvas: View {
                         ToolbarItem(placement: .topBarTrailing) { moreButton }
                     }
                 }
+                .contextualCuadrao(focus: $chatFocus, spanish: spanish)
                 .alert(spanish ? "Comprobar balance" : "Check balance", isPresented: $showingBalanceInfo) {
                     Button(spanish ? "Entendido" : "Got it", role: .cancel) { }
                 } message: {
@@ -86,10 +94,20 @@ struct CuadraoAccountCanvas: View {
         }
     }
     private var moreButton: some View {
-        Button { actions(accountID) } label: {
+        Menu {
+            if let account = data.account(accountID) {
+                Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") {
+                    chatFocus = .account(id: accountID, title: account.displayName(spanish))
+                }.accessibilityIdentifier("account-detail-ask")
+            }
+            Button(spanish ? "Cambiar nombre" : "Rename account", systemImage: "pencil") { actions(.rename(accountID)) }
+            Button(spanish ? "Añadir movimiento" : "Add transaction", systemImage: "plus") { record(accountID) }
+            Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { actions(.archive(accountID)) }
+        } label: {
             Image(systemName: "ellipsis").frame(width: 44, height: 44)
         }.buttonStyle(.plain)
             .accessibilityLabel(spanish ? "Opciones de cuenta" : "Account actions")
+            .accessibilityIdentifier("account-detail-options")
     }
 
 }
@@ -114,11 +132,11 @@ struct CuadraoTransactionCanvas: View {
                 VStack(alignment: .leading, spacing: 28) {
                     HStack(spacing: 12) {
                         CanvasAccountIcon(kind: account.kind)
-                        Text(account.displayName(spanish)).font(.body.weight(.medium))
+                        Text(account.displayName(spanish)).font(CuadraoTypography.action)
                     }.padding(.top, 8)
                     if reviewing {
                         Text((income ? "+" : "−") + CanvasMoney.format(Decimal(string: amount) ?? 0, currency: account.currency))
-                            .font(.system(size: 38, weight: .medium, design: .rounded)).monospacedDigit()
+                            .font(CuadraoTypography.amount).monospacedDigit()
                         LabeledContent(spanish ? "Moneda" : "Currency", value: account.currency)
                         LabeledContent(spanish ? "Tipo" : "Type", value: income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
                         if !title.isEmpty { LabeledContent(spanish ? "Concepto" : "Description", value: title) }
@@ -134,7 +152,7 @@ struct CuadraoTransactionCanvas: View {
                         DatePicker(spanish ? "Fecha" : "Date", selection: $date, in: ...Date.now, displayedComponents: .date)
                     }
                 }.padding(24)
-            }.background(Color.white)
+            }.background(WelcomePalette.background)
                 .navigationTitle(reviewing ? (spanish ? "Revisar movimiento" : "Review transaction") : (spanish ? "Añadir movimiento" : "Add transaction"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -155,7 +173,7 @@ struct CuadraoTransactionCanvas: View {
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                             reviewing = true
                         }
-                    }.padding(24).background(Color.white)
+                    }.padding(24).background(WelcomePalette.background)
                 }
         }.tint(WelcomePalette.pine).onAppear { currency = account.currency }
     }

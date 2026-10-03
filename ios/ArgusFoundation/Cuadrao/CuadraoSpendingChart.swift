@@ -11,6 +11,7 @@ struct CuadraoSpendingChart: View {
     @Binding var periodOffset: Int
     var record: (() -> Void)?
     var controls: CuadraoInsightControls?
+    var context: CanvasChartFocus?
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var selectedPosition: String?
     @State private var selectedCategory: CanvasExpenseCategory?
@@ -37,14 +38,17 @@ struct CuadraoSpendingChart: View {
         guard story.covered else {
             return spanish ? "Este período tiene un historial incompleto." : "This period has incomplete history."
         }
-        guard total > 0 else { return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet." }
+        // Only a period with no records is empty; records that add up to zero are a real 0 (#787).
+        guard !entries.isEmpty else { return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet." }
         if let prior = story.previousTotal {
             let difference = total - prior
             if difference == 0 { return spanish ? "Has registrado el mismo gasto que en el período anterior." : "Your recorded spending matches the previous period." }
             let reference = periodOffset == 0 ? (spanish ? "al mismo punto del período anterior" : "at this point in the previous period") : (spanish ? "en el período anterior" : "in the previous period")
             return spanish ? "Llevas \(currency) \(money(abs(difference))) \(difference > 0 ? "más" : "menos") que \(reference)." : "You've spent \(currency) \(money(abs(difference))) \(difference > 0 ? "more" : "less") than \(reference)."
         }
-        guard let largest = categories.max(by: { categoryTotal($0) < categoryTotal($1) }) else { return "" }
+        guard let largest = categories.max(by: { categoryTotal($0) < categoryTotal($1) }) else {
+            return spanish ? "Tus gastos registrados suman 0 en este período." : "Your recorded spending adds up to 0 this period."
+        }
         return spanish ? "\(largest.title(true)) se lleva la mayor parte este período." : "\(largest.title(false)) takes the largest share this period."
     }
     var body: some View {
@@ -52,7 +56,8 @@ struct CuadraoSpendingChart: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text(entries.isEmpty && !story.covered ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
+                    // Release rule (fc7650ea): no records shows Sin datos, never an invented zero.
+                    Text(entries.isEmpty ? "—" : money(inspected.map(CanvasSpendingHistory.total) ?? total))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-spending-total")
                 }
@@ -69,30 +74,37 @@ struct CuadraoSpendingChart: View {
             } else { emptyState }
             ForEach(categories) { category in categoryRow(category) }
             CuadraoSpendingHighlights(story: story, currency: currency, spanish: spanish)
+            if let context {
+                CanvasChartAsk(context: selectedContext(context), spanish: spanish)
+            }
         }.onChange(of: range) { _, _ in clearSelection() }
             .onChange(of: periodOffset) { _, _ in clearSelection() }
             .onChange(of: distribution) { _, _ in clearSelection() }
             .sensoryFeedback(.selection, trigger: selectedSlot?.start)
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
+    private func selectedContext(_ context: CanvasChartFocus) -> CanvasChartFocus {
+        var selected = context
+        selected.selection = selectedCategory.map { .expenseCategory(id: $0.rawValue, title: $0.title(spanish)) }
+        selected.inspectedInterval = selectedSlot
+        selected.inspectedTitle = selectedSlot.map { story.periodText($0, spanish: spanish) }
+        return selected
+    }
     private var emptyState: some View {
         CuadraoChartState(title: emptyTitle, detail: emptyDetail,
-            actionTitle: story.state == .firstUse && record != nil ? (spanish ? "Registrar un gasto" : "Record an expense") : nil,
-            action: story.state == .firstUse ? record : nil)
+            actionTitle: recordsHere && record != nil ? (spanish ? "Registrar un gasto" : "Record an expense") : nil,
+            action: recordsHere ? record : nil)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("home-spending-chart")
             .accessibilityValue(String(periodOffset))
     }
+    /// First use and the current period with no records offer one record-entry action.
+    private var recordsHere: Bool { story.state == .firstUse || (story.state == .emptyPeriod && periodOffset == 0) }
     private var emptyTitle: String {
         switch story.state {
         case .firstUse: return spanish ? "Tu historia empieza aquí" : "Your story starts here"
         case .unavailable: return spanish ? "Falta una parte de la historia" : "Part of the story is missing"
-        case .emptyPeriod:
-            if periodOffset == 0 && range == .month {
-                let month = interval.start.formatted(.dateTime.month(.wide).locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
-                return spanish ? "\(month.prefix(1).uppercased() + month.dropFirst()) empieza aquí" : "\(month) starts here"
-            }
-            return spanish ? "Un período sin gastos" : "A period without spending"
+        case .emptyPeriod: return spanish ? "Sin datos" : "No data"
         case .populated: return ""
         }
     }
@@ -100,7 +112,10 @@ struct CuadraoSpendingChart: View {
         switch story.state {
         case .firstUse: return spanish ? "Registra tu primer gasto para empezar a ver tu ritmo." : "Record your first expense to start seeing your rhythm."
         case .unavailable: return spanish ? "El historial de este período está incompleto. No lo contamos como cero." : "This period's history is incomplete. We don't count it as zero."
-        case .emptyPeriod: return spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet."
+        case .emptyPeriod:
+            return periodOffset == 0
+                ? (spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
+                : (spanish ? "No hay gastos registrados en este período." : "No expenses were recorded in this period.")
         case .populated: return ""
         }
     }
