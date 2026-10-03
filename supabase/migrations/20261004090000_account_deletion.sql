@@ -174,7 +174,7 @@ create table argus_private.account_deletion_runs (
     user_id uuid unique,
     analytics_distinct_id text not null,
     status text not null default 'started'
-        check (status in ('started', 'data_deleted', 'auth_deleted', 'done')),
+        check (status in ('started', 'data_deleted', 'done')),
     steps jsonb not null default '{}'::jsonb check (jsonb_typeof(steps) = 'object'),
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
@@ -204,6 +204,9 @@ create table argus_private.account_deletion_placeholders (
 -- is dropped as soon as the provider confirms. 'gmail' rows are every Google
 -- token Cuadrao holds: the Gmail source's sealed refresh tokens. Google
 -- sign-in through Supabase leaves no provider token with us.
+-- Every revocation settles before the account delete (step 7). 'unrecoverable'
+-- is a credential sealed under a key no longer held: it can never be opened,
+-- so its ciphertext is dropped and the run goes on.
 create table argus_private.account_deletion_revocations (
     subject_hash text not null
         references argus_private.account_deletion_runs (subject_hash) on delete cascade,
@@ -211,7 +214,8 @@ create table argus_private.account_deletion_revocations (
     source_ref uuid not null,
     external_ref text,
     secret_ciphertext bytea,
-    status text not null default 'pending' check (status in ('pending', 'revoked')),
+    status text not null default 'pending'
+        check (status in ('pending', 'revoked', 'unrecoverable')),
     attempts integer not null default 0 check (attempts >= 0),
     last_error text check (char_length(last_error) <= 200),
     updated_at timestamptz not null default now(),

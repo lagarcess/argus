@@ -4,7 +4,9 @@ Order, matching ``docs/specs/lanes/account-deletion-fk-census.md``:
 
 1. Open or reuse the run. The run is keyed on a hash of the user id; the id
    itself is held only while the run is in flight, so a retry finds the same
-   run and reuses the same placeholders.
+   run and reuses the same placeholders. From here the account is locked: the
+   session check rejects any JWT whose user has a run in flight, and the auth
+   user is banned through the Admin API so no refresh or sign-in succeeds.
 2. Reserve one placeholder id per sharing scope the person's rows are pinned
    in (a household, or an activity group shared outside any plan), then
    create each placeholder through the Admin API. Ids are
@@ -14,21 +16,20 @@ Order, matching ``docs/specs/lanes/account-deletion-fk-census.md``:
    (4), future responsibilities returned, each unit moved to its placeholder
    (5.1, 5.2), the person's own plans deleted (5.3), feedback stripped (6),
    then a check that nothing still holds the id.
-4. Apple (2, #793): a stored Sign in with Apple token is revoked before the
-   account delete, because ``apple_sign_in_credentials.user_id`` is ON DELETE
-   RESTRICT. Revoked, or ``invalid_grant`` (already revoked): the row is gone
-   or is deleted and the run continues. A transient failure keeps the run at
-   ``data_deleted`` for a retry, and step 7 waits. ``credential_unreadable``
-   (key rotated): nothing can be revoked; the run records
-   ``apple_revoke: unrecoverable``, and the row is to go through #793's
-   owner-only discard function (a #793 follow-up, not landed: TODO below).
-   No token is ever logged.
+4. Every third-party step runs before the account delete, inside the run:
+   Sign in with Apple (#793), then the captured Plaid access tokens and Gmail
+   (Google) refresh tokens, then PostHog person deletion (8). Revoked, or
+   already revoked (``invalid_grant`` / ``invalid_token`` / Plaid's item gone),
+   counts as done. A transient failure leaves that step pending: the run stays
+   ``data_deleted``, the account stays locked, the auth delete waits, and the
+   scheduled sweep (``resume_pending_deletions``) or the person's own retry
+   resumes it. A credential that can't be opened (key rotated) can never be
+   revoked: a Plaid or Gmail one is recorded ``unrecoverable`` and its
+   ciphertext dropped; an Apple one goes through #802's ``discard_unreadable``
+   (TODO below until #802 lands). No token is ever logged.
 5. The auth user is deleted through the Admin API (7); unused placeholders are
-   deleted; the id and the placeholder map are scrubbed from the run.
-6. Plaid access tokens and Gmail (Google) refresh tokens are revoked from the
-   captured ciphertext. PostHog person deletion (8) runs last. A provider that
-   fails stays pending and the run stays ``auth_deleted`` until a retry
-   clears it.
+   deleted; the id and the placeholder map are scrubbed from the run, which
+   ends ``done``.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ import json
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Protocol
 
 from loguru import logger
@@ -49,8 +50,10 @@ from argus.domain.household import deletion as household_deletion
 from argus.observability.analytics_deletion import AnalyticsDeletion
 from argus.observability.product_events import actor_hash_for_user
 
-RunStatus = Literal["started", "data_deleted", "auth_deleted", "done"]
+RunStatus = Literal["started", "data_deleted", "done"]
 _ATTEMPTS = 3
+# A run the sweep may resume: one no request has touched for this long.
+SWEEP_IDLE_SECONDS = 120
 
 
 class AccountDeletionRejected(Exception):
@@ -58,7 +61,16 @@ class AccountDeletionRejected(Exception):
 
 
 class AccountDeletionIncomplete(Exception):
-    """The data step could not finish; the run stays resumable."""
+    """The run is open and the account locked, but a step could not finish yet.
+
+    ``pending`` names the third-party steps still owed (``apple``, ``gmail``,
+    ``plaid``, ``analytics``); it is empty when the data step itself must be
+    retried. The sweep or a retry resumes the same run."""
+
+    def __init__(self, reason: str, pending: list[str] | None = None) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.pending = sorted(set(pending or []))
 
 
 class ProviderRevoker(Protocol):
@@ -133,6 +145,11 @@ class AccountDeletionService:
         user_id = _uuid(user_id)
         subject = subject_hash(user_id)
         run = self._open_run(user_id, subject)
+        if run["status"] == "done":
+            return DeletionOutcome(status="done", counts=run["steps"].get("counts", {}))
+        # Idempotent: every attempt re-applies the ban, so a refresh token
+        # issued before the run can't outlive it.
+        self._auth.lock_user(user_id)
         if run["status"] == "started":
             for attempt in range(_ATTEMPTS):
                 self._reserve_placeholders(user_id, subject)
@@ -143,13 +160,63 @@ class AccountDeletionService:
                     if attempt == _ATTEMPTS - 1:
                         raise AccountDeletionIncomplete("units_changed") from None
             run["status"] = "data_deleted"
-        if run["status"] == "data_deleted":
-            self._revoke_apple(user_id, subject)
-            self._delete_auth_user(user_id, subject)
-            run["status"] = "auth_deleted"
-        if run["status"] == "auth_deleted":
-            return self._settle_external(subject)
-        return DeletionOutcome(status="done", counts=run["steps"].get("counts", {}))
+        # Every third-party step is attempted on each pass, so one provider's
+        # outage doesn't hide another's; the account delete waits for all.
+        pending: list[str] = []
+        if self._revoke_apple(user_id, subject):
+            pending.append("apple")
+        pending += self._revoke_providers(subject)
+        if self._delete_analytics(subject):
+            pending.append("analytics")
+        if pending:
+            logger.warning("Account deletion waiting on third parties", pending=pending)
+            raise AccountDeletionIncomplete("third_party_pending", pending)
+        counts = self._delete_auth_user(user_id, subject)
+        return DeletionOutcome(status="done", counts=counts)
+
+    # -- the sweep ----------------------------------------------------------------
+
+    def resume_pending(
+        self, *, limit: int = 25, idle_seconds: int = SWEEP_IDLE_SECONDS
+    ) -> dict[str, int]:
+        """Resume every run still in flight that no request has touched for
+        ``idle_seconds``, through the same command, so the sweep and a
+        person's own retry can't diverge."""
+
+        cutoff = self._clock() - timedelta(seconds=idle_seconds)
+        with self._households.connection() as connection:
+            user_ids = [
+                str(uid)
+                for (uid,) in connection.execute(
+                    "select user_id from argus_private.account_deletion_runs"
+                    " where status in ('started', 'data_deleted') and updated_at < %s"
+                    " order by updated_at limit %s",
+                    (cutoff, limit),
+                ).fetchall()
+            ]
+        result = {"resumed": 0, "done": 0, "pending": 0, "failed": 0}
+        for uid in user_ids:
+            result["resumed"] += 1
+            try:
+                self.delete_account(user_id=uid)
+                result["done"] += 1
+                continue
+            except AccountDeletionIncomplete:
+                result["pending"] += 1
+            except Exception as exc:
+                # No user id in logs: the run is keyed on a hash for that reason.
+                logger.error(
+                    "Account deletion sweep failed", failure_mode=type(exc).__name__
+                )
+                result["failed"] += 1
+            # Touched, so the next pass reaches the stalest runs first.
+            with self._households.connection() as connection, connection.transaction():
+                connection.execute(
+                    "update argus_private.account_deletion_runs set updated_at = %s"
+                    " where user_id = %s",
+                    (self._clock(), uid),
+                )
+        return result
 
     # -- 1. the run --------------------------------------------------------------
 
@@ -380,9 +447,9 @@ class AccountDeletionService:
 
     # -- 4. Apple, before the account delete ------------------------------------
 
-    def _revoke_apple(self, user_id: str, subject: str) -> None:
-        """Raises ``AccountDeletionIncomplete`` while the Apple row must stay:
-        the RESTRICT key would refuse step 7 anyway."""
+    def _revoke_apple(self, user_id: str, subject: str) -> bool:
+        """True while the Apple row must stay: the RESTRICT key would refuse
+        step 7 anyway."""
 
         with self._households.connection() as connection:
             stored = connection.execute(
@@ -392,38 +459,40 @@ class AccountDeletionService:
         if stored is None:
             # Never stored, or revoked by an earlier attempt of this run.
             self._record_step(subject, "apple_revoke", None, keep_existing=True)
-            return
+            return False
         if self._apple is None:
             self._record_step(subject, "apple_revoke", "pending")
-            raise AccountDeletionIncomplete("apple_revoke_unavailable")
+            return True
         try:
             self._apple.revoke(user_id=user_id)
             outcome: AppleRevokeStep = "revoked"
         except AppleRevocationPending as exc:
             if exc.reason == "invalid_grant":
-                # Apple no longer holds the grant: nothing is left to revoke.
+                # Apple no longer holds the grant: already revoked.
                 row = self._apple.repository.get(user_id=user_id)
                 if row is not None and not self._apple.repository.delete_if_unchanged(
                     user_id=user_id, secret_ciphertext=row.secret_ciphertext
                 ):
                     # A sign-in replaced the token meanwhile; revoke that one.
                     self._record_step(subject, "apple_revoke", "pending")
-                    raise AccountDeletionIncomplete("apple_revoke_pending") from None
+                    return True
                 outcome = "already_revoked"
             elif exc.reason == "credential_unreadable":
                 # The key rotated: the token can't be opened, so it can never
                 # be revoked. Recorded, never logged.
                 self._record_step(subject, "apple_revoke", "unrecoverable")
-                # TODO(#793 discard follow-up): call #793's owner-only discard
-                # function here to delete the unreadable row, then continue to
-                # step 7. Until it lands the run stays data_deleted and the
-                # RESTRICT key holds the account delete.
-                raise AccountDeletionIncomplete("apple_discard_unavailable") from None
+                # TODO(#802): call ``self._apple.discard_unreadable(user_id=...)``
+                # here (#802's owner-only discard: deletes the row only while
+                # it still can't be opened) and continue to step 7 on
+                # ``discarded`` or ``nothing_stored``. Until #802 lands the
+                # step stays pending and the RESTRICT key holds the delete.
+                return True
             else:
                 self._record_step(subject, "apple_revoke", "pending")
                 logger.warning("Apple revoke pending", reason=exc.reason)
-                raise AccountDeletionIncomplete("apple_revoke_pending") from None
+                return True
         self._record_step(subject, "apple_revoke", outcome)
+        return False
 
     def _record_step(
         self,
@@ -452,7 +521,7 @@ class AccountDeletionService:
 
     # -- 5. the auth user --------------------------------------------------------
 
-    def _delete_auth_user(self, user_id: str, subject: str) -> None:
+    def _delete_auth_user(self, user_id: str, subject: str) -> dict[str, int]:
         self._auth.delete_user(user_id)
         with self._households.connection() as connection:
             unused = [
@@ -465,6 +534,7 @@ class AccountDeletionService:
             ]
         for pid in unused:
             self._auth.delete_user(pid)
+        now = self._clock()
         with self._households.connection() as connection, connection.transaction():
             connection.execute(
                 "delete from argus_private.account_deletion_placeholders where subject_hash = %s",
@@ -475,31 +545,34 @@ class AccountDeletionService:
                     "delete from argus_private.account_placeholders where id = any(%s::uuid[])",
                     (unused,),
                 )
-            connection.execute(
+            steps = connection.execute(
                 "update argus_private.account_deletion_runs"
-                " set status = 'auth_deleted', user_id = null, updated_at = %s"
-                " where subject_hash = %s",
-                (self._clock(), subject),
-            )
+                " set status = 'done', user_id = null, updated_at = %s, completed_at = %s,"
+                '     steps = steps || \'{"storage": "not_applicable"}\'::jsonb'
+                " where subject_hash = %s returning steps",
+                (now, now, subject),
+            ).fetchone()[0]
+        return dict((steps or {}).get("counts", {}))
 
-    # -- 6. providers and analytics ---------------------------------------------
+    # -- 4. providers and analytics, before the account delete -------------------
 
-    def _settle_external(self, subject: str) -> DeletionOutcome:
+    def _revoke_providers(self, subject: str) -> list[str]:
+        """Plaid and Gmail tokens captured by the data step. Returns the
+        providers still pending."""
+
         with self._households.connection() as connection:
             rows = connection.execute(
                 "select provider, source_ref, external_ref, secret_ciphertext"
                 " from argus_private.account_deletion_revocations"
-                " where subject_hash = %s and status = 'pending' order by provider, source_ref",
+                " where subject_hash = %s and status = 'pending'"
+                "   and provider in ('plaid', 'gmail') order by provider, source_ref",
                 (subject,),
             ).fetchall()
-            run = connection.execute(
-                "select analytics_distinct_id, steps from argus_private.account_deletion_runs"
-                " where subject_hash = %s",
-                (subject,),
-            ).fetchone()
+        pending: list[str] = []
         for provider, source_ref, external_ref, ciphertext in rows:
             if self._revoker is None:
-                done, error = False, "connector_unavailable"
+                outcome = "failed"
+                error = "connector_unavailable"
             else:
                 outcome = self._revoker.revoke_for_deletion(
                     source=provider,
@@ -507,57 +580,45 @@ class AccountDeletionService:
                     external_ref=external_ref or "",
                     envelope=bytes(ciphertext) if ciphertext is not None else None,
                 )
-                done = outcome in ("revoked", "not_applicable")
-                error = None if done else "provider_revoke_failed"
-            self._record_revocation(subject, provider, str(source_ref), done, error)
-        steps = dict(run[1] or {})
-        # Storage (3): no object store holds per-person files before #778.
-        steps["storage"] = "not_applicable"
-        if steps.get("analytics") not in ("deleted", "recorded_by_fake"):
-            steps["analytics"] = self._analytics.delete_person(run[0])
-        with self._households.connection() as connection, connection.transaction():
-            pending = [
-                str(p)
-                for (p,) in connection.execute(
-                    "select provider from argus_private.account_deletion_revocations"
-                    " where subject_hash = %s and status = 'pending' order by provider",
-                    (subject,),
-                ).fetchall()
-            ]
-            if steps["analytics"] == "failed":
-                pending.append("analytics")
-            status: RunStatus = "auth_deleted" if pending else "done"
-            connection.execute(
-                "update argus_private.account_deletion_runs"
-                " set status = %s, steps = %s::jsonb, updated_at = %s,"
-                "     completed_at = case when %s = 'done' then %s else completed_at end"
+                error = None if outcome != "failed" else "provider_revoke_failed"
+            if outcome in ("revoked", "not_applicable"):
+                status = "revoked"
+            elif outcome == "unreadable":
+                # Sealed under a key we no longer hold: it can never be opened,
+                # so it can never be revoked. Drop it and record that.
+                status = "unrecoverable"
+            else:
+                status = "pending"
+                pending.append(str(provider))
+            self._record_revocation(subject, provider, str(source_ref), status, error)
+        return pending
+
+    def _delete_analytics(self, subject: str) -> bool:
+        """True while the PostHog person deletion is still owed."""
+
+        with self._households.connection() as connection:
+            distinct_id, steps = connection.execute(
+                "select analytics_distinct_id, steps from argus_private.account_deletion_runs"
                 " where subject_hash = %s",
-                (
-                    status,
-                    json.dumps(steps),
-                    self._clock(),
-                    status,
-                    self._clock(),
-                    subject,
-                ),
-            )
-        if pending:
-            logger.warning("Account deletion left provider work pending", pending=pending)
-        return DeletionOutcome(
-            status=status, pending=pending, counts=steps.get("counts", {})
-        )
+                (subject,),
+            ).fetchone()
+        if (steps or {}).get("analytics") in ("deleted", "recorded_by_fake"):
+            return False
+        outcome = self._analytics.delete_person(distinct_id)
+        self._record_step(subject, "analytics", outcome)
+        return outcome == "failed"
 
     def _record_revocation(
-        self, subject: str, provider: str, source_ref: str, done: bool, error: str | None
+        self, subject: str, provider: str, source_ref: str, status: str, error: str | None
     ) -> None:
         with self._households.connection() as connection, connection.transaction():
-            if done:
+            if status != "pending":
                 connection.execute(
                     "update argus_private.account_deletion_revocations"
-                    " set status = 'revoked', secret_ciphertext = null, external_ref = null,"
+                    " set status = %s, secret_ciphertext = null, external_ref = null,"
                     "     attempts = attempts + 1, last_error = null, updated_at = now()"
                     " where subject_hash = %s and provider = %s and source_ref = %s",
-                    (subject, provider, source_ref),
+                    (status, subject, provider, source_ref),
                 )
             else:
                 connection.execute(

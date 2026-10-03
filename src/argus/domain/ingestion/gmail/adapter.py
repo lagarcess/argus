@@ -33,7 +33,11 @@ class GmailAdapter:
         try:
             self.client.revoke(credential)
         except GmailError as exc:
-            if exc.status == 400 and "invalid_token" in exc.reasons:
+            # Google answers a token it no longer holds with invalid_token
+            # (or invalid_grant): already revoked, nothing left to do.
+            if exc.status == 400 and {"invalid_token", "invalid_grant"} & set(
+                exc.reasons
+            ):
                 return
             raise GmailRevocationUnavailable(exc.reason) from None
 

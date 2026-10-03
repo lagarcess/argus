@@ -51,7 +51,7 @@ def test_gmail_and_plaid_tokens_are_opened_and_revoked():
         assert adapter.revoked == [token]
 
 
-def test_a_failed_or_unreadable_revoke_stays_pending():
+def test_a_failed_revoke_stays_pending_and_an_unreadable_one_is_named():
     gmail = _Adapter("gmail", fail=True)
     hub = _hub(gmail)
     envelope = hub.box.seal("t", source="gmail", connection_id="c-1")
@@ -61,13 +61,22 @@ def test_a_failed_or_unreadable_revoke_stays_pending():
         )
         == "failed"
     )
-    # Sealed for another connection: does not open, so nothing is revoked.
+    # Sealed under another key (rotated) or for another connection: it never
+    # opens, so nothing is revoked and no retry can change that.
+    other = _Adapter("gmail")
     assert (
-        _hub(_Adapter("gmail")).revoke_for_deletion(
+        _hub(other).revoke_for_deletion(
+            source="gmail", connection_id="c-1", external_ref="x", envelope=envelope
+        )
+        == "unreadable"
+    )
+    assert (
+        _hub(gmail).revoke_for_deletion(
             source="gmail", connection_id="c-2", external_ref="x", envelope=envelope
         )
-        == "failed"
+        == "unreadable"
     )
+    assert other.revoked == []
     # A connector that is switched off cannot revoke: pending, not success.
     assert (
         _hub().revoke_for_deletion(
@@ -81,3 +90,26 @@ def test_a_failed_or_unreadable_revoke_stays_pending():
         )
         == "not_applicable"
     )
+
+
+class _GoogleSaying:
+    def __init__(self, status: int, error: str) -> None:
+        self.status, self.error = status, error
+
+    def revoke(self, token: str) -> None:
+        from argus.domain.ingestion.gmail.client import GmailError
+
+        raise GmailError(status=self.status, reason=self.error)
+
+
+def test_google_answering_invalid_grant_or_invalid_token_counts_as_revoked():
+    import pytest
+    from argus.domain.ingestion.gmail.adapter import (
+        GmailAdapter,
+        GmailRevocationUnavailable,
+    )
+
+    for error in ("invalid_grant", "invalid_token"):
+        GmailAdapter(_GoogleSaying(400, error), senders=None).revoke(None, "refresh")  # type: ignore[arg-type]
+    with pytest.raises(GmailRevocationUnavailable):
+        GmailAdapter(_GoogleSaying(503, "backend"), senders=None).revoke(None, "refresh")  # type: ignore[arg-type]

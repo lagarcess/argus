@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import secrets
 import uuid
+from datetime import timedelta
 
 import psycopg
 import pytest
@@ -58,6 +59,9 @@ class Crash(Exception):
     pass
 
 
+BANNED: set[str] = set()
+
+
 class SqlAuthAdmin:
     """Test-only stand-in for the Supabase Admin API."""
 
@@ -67,6 +71,7 @@ class SqlAuthAdmin:
         self.created: list[str] = []
         self.creates = 0
         self.deleted: list[str] = []
+        self.locked: list[str] = []
 
     def create_placeholder(self, *, user_id: str, email: str) -> None:
         assert email.startswith("exmiembro+") and email.endswith("@" + PLACEHOLDER_DOMAIN)
@@ -87,6 +92,11 @@ class SqlAuthAdmin:
                 c.execute("select 1 from auth.users where id=%s", (user_id,)).fetchone()
             )
 
+    def lock_user(self, user_id: str) -> None:
+        # The test auth schema has no banned_until; the ban is recorded here.
+        BANNED.add(user_id)
+        self.locked.append(user_id)
+
     def delete_user(self, user_id: str) -> None:
         if self.crash_on_delete:
             self.crash_on_delete -= 1
@@ -97,13 +107,35 @@ class SqlAuthAdmin:
 
 
 class FakeRevoker:
-    def __init__(self, fail=()):  # noqa: ANN001
+    def __init__(self, fail=(), unreadable=()):  # noqa: ANN001
         self.fail = set(fail)
+        self.unreadable = set(unreadable)
         self.calls: list[tuple[str, str, bytes | None]] = []
 
     def revoke_for_deletion(self, *, source, connection_id, external_ref, envelope):  # noqa: ANN001
         self.calls.append((source, connection_id, envelope))
+        if source in self.unreadable:
+            return "unreadable"
         return "failed" if source in self.fail else "revoked"
+
+
+class FailingAnalytics(RecordingAnalyticsDeletion):
+    def delete_person(self, distinct_id):  # noqa: ANN001, ANN201
+        self.calls.append({"distinct_id": distinct_id, "delete_events": True})
+        return "failed"
+
+
+def _locked(user_id: str) -> tuple[bool, bool]:
+    """(the auth user is banned, the run holds the id so sessions are refused)."""
+    with psycopg.connect(DSN) as c:
+        banned = user_id in BANNED and c.execute(
+            "select 1 from auth.users where id=%s", (user_id,)
+        ).fetchone()
+        held = c.execute(
+            "select 1 from argus_private.account_deletion_runs where user_id=%s",
+            (user_id,),
+        ).fetchone()
+    return bool(banned), bool(held)
 
 
 def _service(lane, admin, revoker=None, analytics=None, apple=None):  # noqa: ANN001, F811
@@ -518,24 +550,123 @@ def test_a_crash_between_placeholders_and_the_auth_delete_resumes(lane, world): 
         assert _rows_holding(conn, a) == []
 
 
-def test_failed_provider_revokes_stay_pending_until_a_retry(lane, world):  # noqa: F811
+def test_a_failed_provider_revoke_holds_the_account_delete(lane, world):  # noqa: F811
+    """Third parties go before the auth delete: while Gmail fails the run stays
+    data_deleted, the account stays locked, and the auth user is kept."""
     a = world["a"]
     admin = SqlAuthAdmin()
-    outcome = _service(lane, admin, FakeRevoker(fail={"gmail"})).delete_account(user_id=a)
+    revoker = FakeRevoker(fail={"gmail"})
+    with pytest.raises(AccountDeletionIncomplete) as raised:
+        _service(lane, admin, revoker).delete_account(user_id=a)
     world["placeholders"] += admin.created
-    assert outcome.status == "auth_deleted"
-    assert outcome.pending == ["gmail"]
+    assert raised.value.pending == ["gmail"]
+    # Plaid was still revoked on the same pass.
+    assert {c[0] for c in revoker.calls} == {"plaid", "gmail"}
+    assert admin.deleted == [] and admin.locked == [a]
+    assert _locked(a) == (True, True)
     with psycopg.connect(DSN) as conn:
-        pending = conn.execute(
-            "select provider, secret_ciphertext is not null from argus_private.account_deletion_revocations"
-            " where subject_hash=%s and status='pending' order by provider",
+        rows = conn.execute(
+            "select provider, status, secret_ciphertext is not null"
+            " from argus_private.account_deletion_revocations"
+            " where subject_hash=%s order by provider",
             (subject_hash(a),),
         ).fetchall()
-        assert pending == [("gmail", True)]
+        assert ("gmail", "pending", True) in rows
+        assert all(r[1] == "revoked" and not r[2] for r in rows if r[0] == "plaid")
+        status = conn.execute(
+            "select status from argus_private.account_deletion_runs where subject_hash=%s",
+            (subject_hash(a),),
+        ).fetchone()[0]
+        assert status == "data_deleted"
     retry = FakeRevoker()
     outcome = _service(lane, SqlAuthAdmin(), retry).delete_account(user_id=a)
     assert [c[0] for c in retry.calls] == ["gmail"]
     assert outcome.status == "done" and outcome.pending == []
+    with psycopg.connect(DSN) as conn:
+        assert not conn.execute("select 1 from auth.users where id=%s", (a,)).fetchone()
+        assert _rows_holding(conn, a) == []
+
+
+def test_an_unreadable_provider_token_is_dropped_as_unrecoverable(lane, world):  # noqa: F811
+    a = world["a"]
+    admin = SqlAuthAdmin()
+    outcome = _service(lane, admin, FakeRevoker(unreadable={"plaid"})).delete_account(
+        user_id=a
+    )
+    world["placeholders"] += admin.created
+    assert outcome.status == "done"
+    with psycopg.connect(DSN) as conn:
+        rows = conn.execute(
+            "select provider, status, secret_ciphertext is null"
+            " from argus_private.account_deletion_revocations where subject_hash=%s",
+            (subject_hash(a),),
+        ).fetchall()
+    assert rows and all(dropped for _, _, dropped in rows)
+    assert {status for provider, status, _ in rows if provider == "plaid"} == {
+        "unrecoverable"
+    }
+
+
+def test_failed_analytics_deletion_holds_the_account_delete(lane, world):  # noqa: F811
+    a = world["a"]
+    admin = SqlAuthAdmin()
+    with pytest.raises(AccountDeletionIncomplete) as raised:
+        _service(lane, admin, analytics=FailingAnalytics()).delete_account(user_id=a)
+    world["placeholders"] += admin.created
+    assert raised.value.pending == ["analytics"]
+    assert admin.deleted == [] and _locked(a) == (True, True)
+    analytics = RecordingAnalyticsDeletion()
+    assert (
+        _service(lane, SqlAuthAdmin(), analytics=analytics)
+        .delete_account(user_id=a)
+        .status
+        == "done"
+    )
+    assert len(analytics.calls) == 1
+
+
+def test_the_sweep_resumes_idle_pending_runs(lane, world):  # noqa: F811
+    a = world["a"]
+    admin = SqlAuthAdmin()
+    with pytest.raises(AccountDeletionIncomplete):
+        _service(lane, admin, FakeRevoker(fail={"gmail"})).delete_account(user_id=a)
+    world["placeholders"] += admin.created
+
+    def age() -> None:
+        with psycopg.connect(DSN, autocommit=True) as c:
+            c.execute(
+                "update argus_private.account_deletion_runs set updated_at = %s"
+                " where subject_hash=%s",
+                (NOW - timedelta(hours=1), subject_hash(a)),
+            )
+
+    # A run a request touched just now is left to that request.
+    failing = _service(lane, SqlAuthAdmin(), FakeRevoker(fail={"gmail"}))
+    assert failing.resume_pending()["resumed"] == 0
+    age()
+    # Still failing: counted pending, the account stays locked.
+    assert failing.resume_pending() == {
+        "resumed": 1,
+        "done": 0,
+        "pending": 1,
+        "failed": 0,
+    }
+    assert _locked(a) == (True, True)
+    age()
+    healthy = _service(lane, SqlAuthAdmin(), FakeRevoker())
+    assert healthy.resume_pending() == {
+        "resumed": 1,
+        "done": 1,
+        "pending": 0,
+        "failed": 0,
+    }
+    with psycopg.connect(DSN) as conn:
+        assert not conn.execute("select 1 from auth.users where id=%s", (a,)).fetchone()
+        assert conn.execute(
+            "select status, user_id from argus_private.account_deletion_runs"
+            " where subject_hash=%s",
+            (subject_hash(a),),
+        ).fetchone() == ("done", None)
 
 
 class _Apple:
@@ -645,12 +776,13 @@ def test_an_unreadable_apple_token_is_recorded_unrecoverable(lane, world):  # no
         # Sealed under a key this process no longer has: the key rotated.
         apple.store(a, box=SecretBox(secrets.token_bytes(32)))
         admin = SqlAuthAdmin()
-        with pytest.raises(AccountDeletionIncomplete, match="apple_discard_unavailable"):
+        with pytest.raises(AccountDeletionIncomplete) as raised:
             _service(lane, admin, apple=apple.service).delete_account(user_id=a)
+        assert raised.value.pending == ["apple"]
         world["placeholders"] += admin.created
         assert apple.fake.calls == []
-        # TODO(#793 discard follow-up): once the owner-only discard function
-        # lands, the row is discarded here and the run finishes.
+        # TODO(#802): once discard_unreadable lands, the row is discarded
+        # here and the run finishes.
         assert _apple_state(a) == (True, True, "data_deleted", "unrecoverable")
         # Stand-in for that discard: once the row is gone the run finishes and
         # keeps the unrecoverable record.
