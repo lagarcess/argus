@@ -282,7 +282,7 @@ New tables follow the household pattern: RLS on, all client privileges revoked, 
 | Member with no grant at the cut-off | None | None | None |
 | Anyone else | None, `404` | None, `404` | None |
 | System departure function, SECURITY DEFINER | Insert the departure event once per idempotency key | Insert at the cut-off only | None |
-| Move command function, SECURITY DEFINER | Insert the owner's space move once per idempotency key | None | None |
+| Move command function, SECURITY DEFINER | Insert the owner's space move once per idempotency key, after checking that the caller owns the account (`auth.uid()`, or the verified user id the API passes in) | None | None |
 | Account-deletion function from Lane 6, SECURITY DEFINER | Remove the deleting user's events | Remove the household's locked copy of that user's history | Remove that user's rows |
 | Other service-role writes | Select only. No insert, update, or delete | Select only. No insert, update, or delete | Existing writes |
 
@@ -299,7 +299,7 @@ Reused: `financial_accounts_owner_select`, `financial_records_owner_select`, and
 - Home series and the comparison read after the move match a fresh computation from canonical history for the destination space.
 - Household grants, budget rows, and goal rows keep their ids.
 - After a departure, an update or delete on locked history fails for the owner, the admin, and ordinary service-role writes.
-- A stray service-role insert into locked history or move events, outside the departure function, the move command, and the deletion function, fails.
+- A stray service-role insert into locked history or move events, outside the departure function, the move command, and the deletion function, fails. This includes a direct insert of a move event. The move command rejects a caller who does not own the account.
 - After a departure, a member or admin who had no grant to the account at the cut-off reads no locked history for it.
 - Replaying the departure with the same key writes no second event and no second cut-off.
 - The account-deletion function removes the deleting owner's move events and the household's locked copy of their history, and nothing else. The Lane 6 eval covers the rest of the deletion.
