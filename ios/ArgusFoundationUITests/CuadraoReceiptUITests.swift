@@ -124,7 +124,7 @@ final class CuadraoReceiptUITests: XCTestCase {
         app.buttons["Done"].tap()
         tap(app, "receipt-later")
         let id = receiptCard(app).identifier
-        tap(app, "cuadrao-tab-1")
+        tap(app, "chat-context-close")
         app.segmentedControls["group-sections"].buttons["Expenses"].tap()
         XCTAssertTrue(app.buttons[id].waitForExistence(timeout: 5))
         app.buttons[id].tap()
@@ -317,6 +317,8 @@ final class CuadraoReceiptUITests: XCTestCase {
     private func dismissKeyboard(_ app: XCUIApplication) {
         if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }
         if app.toolbars.buttons["Done"].exists { app.toolbars.buttons["Done"].tap() }
+        if app.keyboards.buttons["Listo"].exists { app.keyboards.buttons["Listo"].tap() }
+        if app.keyboards.buttons["Done"].exists { app.keyboards.buttons["Done"].tap() }
     }
     private func shot(_ app: XCUIApplication, _ name: String) {
         let attachment = XCTAttachment(screenshot: app.screenshot())
