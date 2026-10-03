@@ -14,6 +14,8 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var household: HouseholdModel?
     @Published private(set) var financialSearch: FinancialSearchModel?
     let configuration: NativeAuthConfiguration?
+    /// Native Apple and Google buttons; `.off` unless email auth is configured too.
+    let providers: NativeProviderConfiguration
     private let controller: SessionController?
     private var started = false
 
@@ -33,6 +35,7 @@ final class ProfileAuthModel: ObservableObject {
         }
         configuration = loadedConfiguration
         controller = loadedController
+        providers = loadedController == nil ? .off : NativeProviderConfiguration.load()
         state = initialState
         if let loadedController {
             financialSearch = FinancialSearchModel(controller: loadedController, prefix: (loadedConfiguration?.session.storagePrefix ?? "") + ".search.")
@@ -94,6 +97,31 @@ final class ProfileAuthModel: ObservableObject {
         } catch {
             accept(await controller.snapshot())
             errorKey = Self.messageKey(error)
+        }
+    }
+
+    /// Native Apple or Google sign-in through Supabase's id_token grant. Lands in the same
+    /// session path as email sign-in. Returns false on failure (errorKey is set).
+    @discardableResult
+    func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil) async -> Bool {
+        guard let controller, !busy, state == .signedOut else { return false }
+        busy = true
+        errorKey = nil
+        confirmationRequired = false
+        defer { busy = false }
+        do {
+            let snapshot = try await controller.signIn(with: credential)
+            accept(snapshot)
+            if let appleAuthorizationCode {
+                // Best effort, for Apple token revocation at account deletion. The server
+                // answers 404 while capture is off; sign-in never depends on it.
+                Task { try? await controller.captureAppleAuthorizationCode(appleAuthorizationCode, expectedIdentity: snapshot) }
+            }
+            return true
+        } catch {
+            accept(await controller.snapshot())
+            errorKey = Self.messageKey(error)
+            return false
         }
     }
 

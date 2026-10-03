@@ -53,6 +53,39 @@ public actor SessionController {
         return .authenticated(try await adopt(credentials))
     }
 
+    /// Native Apple or Google sign-in. The provider's ID token and the raw nonce go to
+    /// Supabase Auth's id_token grant on an isolated in-memory client; the issued tokens
+    /// then take the same journaled adoption path as email sign-in (pending journal,
+    /// setSession, then the canonical /me profile). If Argus refuses the new session
+    /// (for example the private-alpha allowlist at /me), it is revoked before returning.
+    public func signIn(with credential: IdentityTokenCredential) async throws -> SessionSnapshot {
+        try beginMutation(); defer { mutating = false }
+        try requireEntry()
+        guard credential.wellFormed else { throw SessionFailure.invalidResponse }
+        let exchange = makeAuth(storage: ExchangeStorage(), fetch: transport.sdkFetch(origin: configuration.supabaseURL))
+        let issued: Session
+        do {
+            issued = try await exchange.signInWithIdToken(credentials: OpenIDConnectCredentials(
+                provider: credential.provider == .apple ? .apple : .google, idToken: credential.idToken,
+                accessToken: credential.accessToken, nonce: credential.nonce.raw))
+        } catch {
+            if case let AuthError.api(_, code, _, response) = error {
+                if response.statusCode >= 500 { throw SessionFailure.unavailable }
+                throw SessionFailure.rejected(status: response.statusCode, code: bounded(code.rawValue))
+            }
+            throw safe(error)
+        }
+        guard !issued.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
+        do {
+            return try await adopt(Credentials(accessToken: issued.accessToken, refreshToken: issued.refreshToken))
+        } catch {
+            // adopt() has journaled the issued session as pending; revoke it now so a
+            // refused provider account doesn't leave the person on the sign-out screen.
+            _ = try? await performPendingRevoke()
+            throw error
+        }
+    }
+
     public func profile() async throws -> SessionSnapshot {
         guard !mutating else { throw SessionFailure.busy }
         if try vault.pending() != nil { throw SessionFailure.pendingSignOut }
@@ -268,11 +301,11 @@ public actor SessionController {
         if status >= 500 { return .unavailable }
         struct Problem: Decodable { let code: String? }
         let raw = (try? JSONDecoder().decode(Problem.self, from: data))?.code
-        // Only a bounded identifier reaches UI, never arbitrary server detail.
-        let code = raw.flatMap { value in
-            value.count <= 80 && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") } ? value : nil
-        }
-        return .rejected(status: status, code: code)
+        return .rejected(status: status, code: raw.flatMap(bounded))
+    }
+    /// Only a bounded identifier reaches UI, never arbitrary server detail.
+    private func bounded(_ value: String) -> String? {
+        value.count <= 80 && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") } ? value : nil
     }
     private func safe(_ error: any Error) -> SessionFailure {
         if let failure = error as? SessionFailure { return failure }
