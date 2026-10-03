@@ -143,10 +143,25 @@ async def run_readiness_checks(request: Request, *, force: bool) -> dict[str, An
             )
         )
 
+    invite_codes = _invite_code_check()
+    if invite_codes is not None:
+        checks.append(invite_codes)
+
     status = (
         "ready" if all(check["status"] == "ready" for check in checks) else "degraded"
     )
     return {"status": status, "checks": checks}
+
+
+def _invite_code_check() -> dict[str, Any] | None:
+    """With a code surface on, a missing or short secret makes readiness fail."""
+    from argus.domain.household.invite_codes import code_secret_problem, code_surface_on
+
+    if not code_surface_on():
+        return None
+    if code_secret_problem() is None:
+        return _check("invite_codes", "ready", 0)
+    return _check("invite_codes", "degraded", 0, reason="invite_code_secret_unusable")
 
 
 @router.get("/internal/readiness")

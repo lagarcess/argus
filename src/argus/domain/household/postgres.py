@@ -25,12 +25,18 @@ from argus.domain.household.errors import (
     MemberNotFound,
     MustTransferOrClose,
 )
-from argus.domain.household.invite_codes import format_code, unique_code
+from argus.domain.household.invite_codes import (
+    CodeHasher,
+    format_code,
+    store_code,
+    unique_code,
+)
 from argus.domain.household.repository import (
     INVITE_TTL,
     FinancialAccountLookup,
+    code_hasher,
     hash_token,
-    secret_lookup,
+    locate_secret,
 )
 from argus.domain.household.schemas import (
     AcceptanceResult,
@@ -52,16 +58,23 @@ def _utcnow() -> datetime:
 
 
 class PostgresHouseholdRepository:
+    # Accept locks the invitation row, then claims it with a guarded update whose
+    # row count is checked. Tests clear the lock to prove the check alone still
+    # refuses an invitation that changed underneath the read.
+    _household_accept_lock = " for update"
+
     def __init__(
         self,
         pool: ConnectionPool,
         accounts: FinancialAccountLookup,
         *,
         clock=_utcnow,  # noqa: ANN001
+        code_hasher: CodeHasher | None = None,
     ) -> None:
         self._pool = pool
         self._accounts = accounts
         self._clock = clock
+        self._hasher = code_hasher
         self._current_connection = ContextVar("household_connection", default=None)
 
     @contextmanager
@@ -125,23 +138,23 @@ class PostgresHouseholdRepository:
                 )
                 now = self._clock()
                 token = secrets.token_urlsafe(32)
-                code, code_digest = unique_code(connection)
+                code, code_digest = unique_code(connection, code_hasher(self._hasher))
                 invite_id = str(uuid4())
                 expires = now + INVITE_TTL
                 connection.execute(
                     "insert into public.household_invitations"
-                    " (id, household_id, token_hash, code_hash, created_by, created_at,"
-                    " expires_at) values (%s, %s, %s, %s, %s, %s, %s)",
+                    " (id, household_id, token_hash, created_by, created_at,"
+                    " expires_at) values (%s, %s, %s, %s, %s, %s)",
                     (
                         invite_id,
                         household_id,
                         hash_token(token),
-                        code_digest,
                         user_id,
                         now,
                         expires,
                     ),
                 )
+                store_code(connection, code_digest, household_invitation_id=invite_id)
                 invite_record.record_sent(
                     connection,
                     kind="household",
@@ -186,8 +199,8 @@ class PostgresHouseholdRepository:
     def preview_invitation(
         self, *, user_id: str, token: str | None = None, code: str | None = None
     ) -> InvitationPreview:
-        column, digest = secret_lookup(token, code)
         with self.connection() as c:
+            column, digest = locate_secret(c, token, code, self._hasher)
             row = c.execute(
                 "select h.name,i.expires_at,i.revoked_at,i.accepted_at,h.status from public.household_invitations i join public.households h on h.id=i.household_id where i."  # noqa: S608
                 + column
@@ -213,9 +226,9 @@ class PostgresHouseholdRepository:
         display_name: str = "Member",
         code: str | None = None,
     ) -> AcceptanceResult:
-        column, digest = secret_lookup(token, code)
-        where = " from public.household_invitations where " + column + "=%s"
         with self.connection() as c, c.transaction():
+            column, digest = locate_secret(c, token, code, self._hasher)
+            where = " from public.household_invitations where " + column + "=%s"
             located = c.execute("select household_id" + where, (digest,)).fetchone()
             if not located:
                 raise InvitationNotFound()
@@ -226,7 +239,7 @@ class PostgresHouseholdRepository:
             row = c.execute(
                 "select id,expires_at,revoked_at,accepted_by,accepted_at,accepted_membership_id"
                 + where
-                + " for update",
+                + self._household_accept_lock,
                 (digest,),
             ).fetchone()
             if row[4] is not None:
@@ -260,10 +273,16 @@ class PostgresHouseholdRepository:
                     (mid, hid, user_id, self._clock(), display_name),
                 )
             accepted_at = self._clock()
-            c.execute(
-                "update public.household_invitations set accepted_by=%s,accepted_at=%s,accepted_membership_id=%s where id=%s",
+            claimed = c.execute(
+                "update public.household_invitations set accepted_by=%s,accepted_at=%s,"
+                "accepted_membership_id=%s where id=%s and accepted_at is null"
+                " and revoked_at is null",
                 (user_id, accepted_at, mid, row[0]),
-            )
+            ).rowcount
+            if claimed != 1:
+                # Behind the row lock this cannot miss; if it ever does, the
+                # whole acceptance (membership included) rolls back.
+                raise InvitationConsumed()
             # Accepting a household invite also lets the person into the beta.
             invite_record.record_household_accepted(
                 c, invitation_id=str(row[0]), acceptor=user_id, at=accepted_at
