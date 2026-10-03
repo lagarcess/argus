@@ -675,7 +675,54 @@ Notifications should invite a return without exposing financial amounts in push/
 
 Own app preferences, notification preferences, security, data controls, export and the Argus login account. Keep this separate from Accounts and Home so “my profile” does not ambiguously mean “my finances.” Financial space organization and household invitations/membership remain at their existing space controls, without duplicate Settings entries.
 
-The September 28 mobile lock keeps Personal details above three groups: App (Preferences, Personalization, Notifications), Account (Security, Data & privacy, Usage), and Support (Help & feedback). Language lives only in Preferences. Personal details offers an avatar theme or profile photo; response preferences remain distinct from remembered context and financial records. Light, Dark and System persist as appearance preferences.
+Personal details stays above the App, Account and Support groups. Language lives
+only in Preferences. Light, Dark and System persist as appearance preferences.
+For the October 2 native release pivot, identity uses initials and avatar themes.
+Hide personal photos, Personalization, Security and sessions, Shared conversations,
+and Removed activity until their connected native features are assigned. Remove
+only the notification preference named Por correo; this does not remove email
+authentication, recovery or invitation delivery. Keep legal links reachable while
+signed in and provide in-app account deletion. Native memory off/reset and source
+Disconnect controls arrive with those features. Existing web availability is unchanged.
+
+### Native release access and account lifecycle, October 2
+
+The founder's next UI assignment prioritizes external TestFlight readiness and
+invites/Household. It supersedes conflicting native preview choices, not current
+production web guest entry or technical contracts. New native users enter with an
+invitation code, link or QR; people without access can reach the cuadrao.ai waitlist.
+Existing admitted users retain sign-in/recovery. The founder selected Apple and
+Google alongside email. Design their full states before exposing connected buttons.
+
+Personal app invitations have a ten-invite quota. Household invitations are
+administrator-only and do not consume that quota. A capped, expiring group access
+link is distinct from a household or financial plan invitation. Membership never
+automatically shares financial records. The relation between group-link capacity
+and personal quota remains a contract decision.
+
+The assigned account-deletion experience explains removal of the person's data,
+retention of an anonymous invite record, administrator succession to the
+longest-standing eligible member, and removal of the household's locked copy of
+that owner's history. Present only applicable consequences, then verification,
+confirmed completion and sign-out. This is requested behavior, not a claim that
+the existing support-request endpoint implements deletion or anonymization.
+No-successor handling and retention/completion facts need the connected contract.
+Ordinary household leave/removal and financial archive retain their own semantics.
+
+Updates includes invitation acceptance, administrator handoff, owner-history
+removal and household closure. Bill reminders occur three days before and on
+the due date while still due; push previews contain no amounts. A moved account's
+authorized pre-move household history is read-only and visibly distinguished.
+Missing records show Sin datos; comparison with known zero uses an amount
+difference rather than a percent.
+
+Explicit AI disclosure/consent must precede the first sharing of personal data
+with an external model. It ships with that feature, including if live chat lands
+before document reading. Local capture and save-for-later do not require model
+processing. [Cuadrao's guide](../../.agent/designs/cuadrao/DESIGN.md#13-release-readiness-interaction-rules)
+owns interaction details. The [main roadmap](argus-execution-board.md#cuadrao-release-ui-landing-order)
+owns the landing order and evidence. Build Household/Connected UI changes on
+integration's existing owners rather than the older preview sheets.
 
 ## 4. Information ingestion: one destination, several entry methods
 

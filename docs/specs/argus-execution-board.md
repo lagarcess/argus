@@ -1678,9 +1678,66 @@ and [voice evidence](../reports/evidence/cuadrao-native-design/voice-simple/READ
 retain what was actually built. Preview fixtures/local state are not durable
 production records, real audio, real invitations or money movement.
 
+### Cuadrao release UI landing order
+
+**Founder pivot, October 2, 2026. Requested UI scope; implementation pending.**
+This is the current remaining-design queue. It refines C01–C10 below rather than
+creating another roadmap. Earlier preview screenshots and build 3419 acceptance
+remain valid historical evidence; they do not prove the release behaviors below.
+[Cuadrao's guide](../../.agent/designs/cuadrao/DESIGN.md#13-release-readiness-interaction-rules)
+owns interaction rules and inspected Mobbin references. The
+[MVEE amendment](argus-minimum-viable-ecosystem-experience.md#native-release-access-and-account-lifecycle-october-2)
+owns the native product changes. No backend implementation, deployment or hosted
+change is assigned by this documentation checkpoint.
+
+**Starting point verified:** integration `2185aefe8390490f7edf7dc2f127b3a9d71f2e98`,
+compared with design `2558f86666d2c9a0fb2336225a02aed4f18077b2`. Their inspected
+merge base is `7c29b2a9b3f4680f6804a2abc8378df45b05540c`. Integration contains the
+four `ios/ArgusFoundation/Connected/` files and ten `Household/` files missing
+from the design checkpoint. Start the next implementation checkpoint from current
+integration, recheck its head, and adapt approved design components to those owners.
+Do not replace them with `CuadraoHouseholdSheet`, fictional invite acceptance,
+`CanvasProfileDraft` or preview sign-out. Do not wholesale merge the divergent
+preview branch to obtain the style.
+
+Existing `ConnectedCuadraoAuthFlow` handles email auth; Apple is hidden and Google
+is not a connected native choice. The founder now explicitly chose **Apple and
+Google** for the release design. `HouseholdManagement` owns member/invitation
+management and explicit account consent; `HouseholdPlanPeople` owns shared-plan
+permissions. Current login deletion is a support request, and account archive
+is not an account move. The team connecting each checkpoint owns those contract
+gaps; simulated UI acceptance must stay distinguished from connected acceptance.
+
+| Landing checkpoint | User items | UI deliverable | Closure evidence and existing responsibility |
+| --- | --- | --- | --- |
+| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English | Ordinary member, admin and financial-owner variants; no false success or deletion of another owner's data. C07/C10, identity and Household owners |
+| 1. Trust and profile | 2 | Signed-in Privacy and Terms destinations | Actual approved links, return to Settings, both languages. C07, native identity/support |
+| 1. Trust and profile | 3 | Apple and Google auth alongside email | Loading, cancellation, error, missing-name recovery and return to invitation; connected credentials/session and deletion revocation acceptance owned by auth. C07/C10 |
+| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows and photo avatars, retain initials/themes | Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
+| 2. Access and Household | 4 | Invitation gate after install and cuadrao.ai waitlist | Valid, invalid, expired, already-used, cancelled auth and admitted-user return. Preserve link intent/manual code recovery. C02/C08 plus auth |
+| 2. Access and Household | 5–6 | Personal invitation link/code/QR, remaining quota out of ten and accepted notice | Sharing is not acceptance; counter and notice derive from canonical status; QR scans. C02/C08, access owner |
+| 2. Access and Household | 7 | Administrator-only household invitation without personal quota charge | Existing integration invitation preview/accept and account-sharing boundaries preserved. C02/C05, Household |
+| 2. Access and Household | 8 | Group access link creation, cap, expiry, usage and full/waitlist states | Capacity race/expiry recovery; confirmed enrollment before joined-waitlist wording. Group capacity vs personal quota needs its contract. C02/C08, access owner |
+| 2. Access and Household | 9 | Admin handoff, owner-history removal and household-closed notices | Authorized target or clear terminal explanation, including stale notice after deletion. No-successor handling remains a contract gap. C05/C07, Household and Updates |
+| 3. Home and Updates | 10 | Monetary difference from zero baseline and Sin datos for absent records | Known zero, missing history and covered comparison specimens in both languages. C05, financial history |
+| 3. Home and Updates | 11 | Bill reminders three days before/on due date; contextual push opt-in | Paid/cancelled occurrence suppressed; denied permission preserves inbox; no amounts in push. C07, planning/Updates/native delivery |
+| 3. Home and Updates | 12 | Read-only pre-move household history | Existing owner and cutoff supplied by move contract; lock/read-only text and readable muted style; no hidden edit gestures. C05, financial core/Household |
+| With first external model processing | 15 | AI disclosure and explicit consent across chat/voice/document entry | No personal data sent before consent; decline preserves draft and local capture. May be a first-TestFlight dependency if live AI is enabled. C01/C04/C07, intake/conversation |
+| With source activation | 16 | Connected sources and Disconnect | Actual connections, errors/retry and distinction between future access and retained imports. Existing intake/source owner |
+| With native memory | 17 | Memory off and reset | Distinct pause vs deletion consequences, permission and recovery. C06/C07, existing memory owner |
+
+Each checkpoint includes shared typography/components, light/dark, Spanish/English,
+large text, accessible controls and actual navigation/return checks. Carry over
+working state owners and tests. The phone is disconnected; continue simulator
+acceptance and record physical checks when available. A UI handoff includes its
+state variants, integration base, screenshots and the exact service facts still
+needed. External TestFlight readiness requires connected acceptance, not UI-only
+success screens. Provide reviewer access to the invitation-gated build.
+
 ### Follow-up ownership and disposition
 
-C01–C10 identify this session's follow-ups under the existing D01–D15 work map,
+The release UI landing order above is the current assignment. C01–C10 retain
+follow-up ownership under the existing D01–D15 work map,
 not a parallel delivery team. Owners below are responsibility areas, not a claim
 that a named worker has been dispatched. Link the assigned lane and its evidence
 here when work starts. Close an entry only against its stated remaining gap.
@@ -1692,9 +1749,9 @@ here when work starts. Close an entry only against its stated remaining gap.
 | **C03 — Forecasts and calculators** | **Preview built; canonical connection outstanding.** Spending-pace playground, low point, editable assumptions and goal/debt projections exist with illustrative data. | Reuse existing Argus forecast/calculation owners for Home, Plan and chat. Carry forward the Stake-style editable compound-interest assumptions and contribution/earnings curve as future UI work, with disclosed rate/cadence assumptions. Verify chart/readout agreement and actual versus projected values. Retain Apple Card-inspired explanations of upcoming payment and interest consequences as design input to the existing debt owner. A short contextual explanation may help; a blog/tips destination is not required. | Planning/Home D05/D06 + Conversation D09; domain series owners |
 | **C04 — Voice and chat continuity** | **Interaction preview built; runtime outstanding.** Immersive/minimized voice, swipe-down, voice-choice carousel, short-message hold/lock/cancel/review, native dictation coexistence, temporary mode and Recents gestures are already previewed. | Connect xAI live voice through the existing chat brain; inherit agentic app actions only under D14 activation. Reuse existing Argus dynamic greeting logic. Resolve audio/transcript retention, Temporary context, actual provider voices/selection, interruptions and background/locked-screen policy. Verify one session across surfaces, draft recovery, mute/end, real capture and truthful progress. | Conversation/voice D09/D13/D14 + Native continuity |
 | **C05 — Home, Accounts and household** | **Structure locked; detailed acceptance/connection outstanding.** Personal / Hogar / +, Movimientos / Próximamente, Ordenar Inicio, approved icons, cold starts and Personas-owned invitation status are preserved. | Finish Panorama meaning, realistic empty/unknown/loading/failure/long-content states and assembled account detail/correction/reconciliation presentation. Use existing financial semantics, including balance checks; do not invent another ledger. Connect household auth/install/acceptance/sharing/leave/remove flows under the MVEE. Inviting does not require an account first, expose private accounts or warrant a nagging Home banner. Verify relevant journeys and permission boundaries. | Planning/Home D05 + Financial core D02/D03/D04 + Household D07 |
-| **C06 — Search, Files and Memory** | **Preview destinations preserved; remaining owner connections outstanding.** Keep Chats, Files and Memory alongside financial results. | Connect the authorized record owners, destination/reopen flows, filters and recovery. Respect permissions, Temporary exclusions and memory consent/retention. Search and Profile read the same owners; this is not approval for generic RAG or new memory storage. | Native continuity D10 + Conversation D09 + Intake D08 |
-| **C07 — Profile and Updates** | **UI support pass verified October 2; connected owners outstanding.** Profile grouping, shared identity, avatar themes, native settings and source-linked Updates with read/unread behavior exist. See support acceptance below. | Local photo selection, structured feedback drafts and Settings navigation clearance are UI-verified; see follow-up acceptance below. Connect auth/security, settings, usage, data controls, help/feedback and notification preferences through their owners. Design Updates around actual domain events with source links, avoiding duplicate invitation reminders. Verify language/accessibility and working controls, not static menus alone. | Native continuity D12 + Planning/Home D11 |
-| **C08 — Identity and social discovery** | **Local avatar UI verified October 2; connected identity decisions outstanding.** Native profile-photo selection supports Save/Cancel, replacement and removal in the preview. Group covers, local avatars and sample invitation QR do not imply server upload, live profile QR or contacts discovery. | The founder deferred personal QR codes, usernames and public profile discovery on October 2; QR scope stays with plan invitations. Resolve avatar storage/upload and guest identity before connected implementation; validate QR legibility and scan reliability. Contacts matching needs explicit opt-in and a data/access contract. Native sharing can hand off a link to WhatsApp; no automatic contact upload or WhatsApp integration is implied. Keep this separate from required household membership and parked growth work. | Native continuity D12 + Household D07; founder for unresolved product scope |
+| **C06 — Search, Files and Memory** | **Preview destinations preserved; remaining owner connections outstanding.** Keep supported Chats and Files alongside financial results; expose Memory only with its connected native feature and controls. | Connect the authorized record owners, destination/reopen flows, filters and recovery. Respect permissions, Temporary exclusions and memory consent/retention. Search and Profile read the same owners; this is not approval for generic RAG or new memory storage. | Native continuity D10 + Conversation D09 + Intake D08 |
+| **C07 — Profile and Updates** | **UI support pass verified October 2; connected owners outstanding.** Profile grouping, shared identity, avatar themes, native settings and source-linked Updates with read/unread behavior exist. See support acceptance below. | Historical photo editing, feedback drafts and Settings clearance remain UI-verified. The release pivot hides personal photos and unsupported settings rows, removes the email-notification toggle, and prioritizes deletion, legal access, social auth and Updates; use the landing table above. Connect only the assigned visible controls through their existing owners. Design Updates around actual domain events with source links, avoiding duplicate invitation reminders. Verify language/accessibility and working controls, not static menus alone. | Native continuity D12 + Planning/Home D11 |
+| **C08 — Identity and social discovery** | **Local avatar UI verified October 2; connected identity decisions outstanding.** Native profile-photo selection supports Save/Cancel, replacement and removal in the preview. Group covers, local avatars and sample invitation QR do not imply server upload, live profile QR or contacts discovery. | The release pivot retains initials/themes and hides personal-photo controls; avatar upload is no longer an assigned release requirement. App-access and household invitation QR now join plan QR in scope. Public profile QR, usernames and discovery remain deferred. Use the landing table for quota, admission and guest-identity contracts; validate QR legibility and scan reliability. Contacts matching needs explicit opt-in and a data/access contract. Native sharing can hand off a link to WhatsApp; no automatic contact upload or WhatsApp integration is implied. Keep this separate from required household membership and parked growth work. | Native continuity D12 + Household D07; founder for unresolved product scope |
 | **C09 — Extra Plan refinements** | **Unassigned refinements/research, not promised capabilities.** Art, customization and gentle progress already inform Plan. | Exact target-date entry and personal cover photos remain refinements; group cover photos already exist. Forecast uncertainty bands require a valid model, not decorative precision. Habit/streak ideas need a helpful, non-punitive purpose. Rotating savings (“san” / Egyptian-style circles) remains research: sequence, missed contributions, custody and consent are unresolved. Existing shared savings does not implement a rotating pool or payouts. | Planning/Home D06; founder for additional scope |
 | **C10 — Consistency and phone handoff** | **Ongoing acceptance/connection work.** Accounts and Plan now share typography roles and one money-editing implementation; their contextual layouts remain distinct. New plan/group amounts begin empty. A living Cuadrao guide and native reference gallery own consistency. Both plan/group currency choices are fixed at creation. | Preserve welcome/sign-in/recovery UI and connect it to the existing auth/session owner. Final branding/assistant mark remain unresolved. Verify shared styling, approved icons, navigation/edge blur, Spanish-first/English parity, long values, Dynamic Type, VoiceOver, Reduce Motion, light/dark and physical touch. The October 2 continuity pass traced the keyboard invalid-frame warning to SwiftUI keyboard accessory sizing and removed the duplicate toolbar path; retain the native acceptance evidence below. Adapt preview views to canonical owners through the existing delivery lane; retain separate identities and truthful device evidence. | Native continuity D01/D15 + Device/release; domain owners for money/input contracts |
 
@@ -1843,8 +1900,10 @@ review is clean. Signed build **3412** is installed and its version verified on
 the founder’s iPhone; automatic launch was blocked by the locked device.
 [Acceptance evidence](../reports/evidence/cuadrao-native-design/support-surfaces/README.md)
 records the tested scope. Profile drafts and inbox read state remain session-local;
-connected identity, durable read state, photo upload and push delivery remain
-future work under the existing Search/Profile/Updates owner.
+connected identity, durable read state, photo upload and push delivery were still
+future work at this historical checkpoint. The release pivot above now hides
+personal photos. Other connected work retains the existing Search/Profile/Updates
+owner.
 
 
 **Profile follow-up — UI verified October 2, 2026:** source `55baed872` adds

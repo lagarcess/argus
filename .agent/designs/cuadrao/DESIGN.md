@@ -2,8 +2,11 @@
 
 Approved native baseline, October 2, 2026. The founder approved consolidating the native
 preview's typography, money editing and reference gallery before receipt splitting.
-This guide owns Cuadrao's shared visual/interaction conventions. It does not change
-production Argus web styling, financial contracts, providers or the connected app.
+This guide owns Cuadrao's native visual and interaction conventions, including
+approved behavior to apply to the connected app. It does not implement that
+behavior or change production Argus web styling, financial contracts or providers.
+The October 2 release-readiness pivot below supersedes conflicting preview rules.
+Read a rule as approved direction, not proof that it is shipped.
 The [main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-design-dispositions)
 continues to own unfinished work and delivery status. Existing approved account,
 chat, voice and Plan behavior is preserved unless this guide explicitly revises it.
@@ -426,8 +429,9 @@ They identify the missing content without pretending to be records.
 
 | State | Presentation and behavior |
 | --- | --- |
-| Covered current month with no expenses | Recorded zero, compact artwork and a localized month-specific line such as Octubre empieza aquí; explain that no expenses are recorded |
-| Covered historical period with no expenses | Recorded zero and neutral past-period copy; don't call it a new beginning |
+| Current month with no records | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
+| Historical period with no records | Sin datos / No data and neutral past-period copy; keep period navigation |
+| Confirmed complete coverage with zero spending | Show the known zero; distinguish it from missing records |
 | First use with no history | Welcoming artwork and one working record-entry action |
 | Incomplete or unavailable history | Distinguish unknown from zero; omit unsupported comparison claims |
 | Real records, even one | Real chart immediately; leave future buckets empty |
@@ -633,25 +637,22 @@ The row's shared contextual actions are exposed through Apple's
 
 ### Search and Profile boundaries
 
-Search retains its Accounts, Activity, Plans, Chats, Files and Memory perspectives.
+Search retains its supported Accounts, Activity, Plans, Chats and Files perspectives.
+Memory appears only with the enabled native memory feature and its controls.
 Financial currency filters do not filter nonfinancial content. Household excludes
 private chats, source files and memory; a preview filter is not authorization.
 The October 2 support-surface assignment reopens Profile polish within the existing
 identity and App, Account, Support groups. Settings keep literal native headings.
-Avatar themes use the existing palette and icon family. A personal photo uses
-Apple's image picker, a circular preview, replacement/removal and the same editor
-Save/Cancel boundary. One avatar value owns the active initial, theme or photo;
-loading a photo cannot replace a newer choice. The preview retains only a small
-re-encoded working source and derived avatar, without source metadata, for the
-session. Crop/reposition uses a circular preview with native pan/zoom; an accepted
-crop changes only the editor draft until profile Save. Crop Cancel and profile
-Cancel retain their separate boundaries. Reopening the crop uses the retained
-working source, so repeated edits do not repeatedly crop the thumbnail. Home reads the same
-preferred-name value. Appearance retains its existing preference owner. Server
-upload and connected account operations remain separate work. The October 2
-scope decision keeps QR codes attached to plan invitations. Profile QR, usernames
-and public profile discovery are deferred; Profile needs no extra entry point.
-Keep the existing avatar family and native identity typography.
+Current release identity uses initials and the existing avatar themes. Hide personal
+photo selection, crop, replacement and upload controls. The previously verified
+photo editor is historical preview work, not a remaining release requirement.
+Group covers are a separate feature. Home reads the same preferred name and
+avatar owner; Appearance retains its existing preference owner.
+
+Invitation QR codes may represent app access, a household invitation or a plan
+invitation. The card must name its purpose. This does not enable public profile
+QR codes, usernames or contacts discovery. Keep those deferred. The release
+rules below distinguish counters and permissions before sharing visual components.
 
 A plan code card inherits its plan's artwork or selected cover, name and member
 context. The QR sits on an opaque light panel with a clear four-module margin;
@@ -701,7 +702,160 @@ in spoken output. Art is decorative unless it conveys information absent from te
 Verify real screens in both appearances and larger text. Component previews alone do
 not prove keyboard, navigation, scrolling, focus or gesture continuity.
 
-## 13. Implementation owners
+## 13. Release-readiness interaction rules
+
+**Founder direction, October 2, 2026. Design requirements, not delivered screens.**
+The [main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-release-ui-landing-order)
+owns checkpoint order, implementation gaps and acceptance. These rules refine the
+native release. They do not remove existing production web capabilities.
+
+### Integration is the starting point
+
+Household and Connected changes start from current integration's existing screens,
+models and permission checks. The design preview supplies style and accepted
+interaction details, not a replacement household store or auth flow. Preserve
+create, accept, consent, transfer, leave, remove, close and recovery behavior.
+Administrator authority over membership is separate from ownership of money.
+A household membership does not expose accounts, files or conversations by itself.
+
+### Account deletion and legal access
+
+Use **Eliminar cuenta / Delete account**, distinct from deleting a financial
+account, leaving a household or removing a member. Put Privacy and Terms in a
+stable signed-in Help or Account destination. Opening either preserves the user's
+place in Settings. Legal content must use approved URLs and remain reachable
+from authentication as appropriate.
+
+Use one readable consequences screen, followed by one deliberate verification
+step. Show the applicable consequences together rather than a series of retention
+screens. Use native titles, body type and the shared destructive action treatment.
+
+- Explain removal of the account and its data, with the retained anonymous invite
+  record as the stated exception. This copy must match the connected deletion and
+  retention contract before release; the UI cannot certify anonymization itself.
+- If the person administers a household, explain succession to its longest-standing
+  eligible member. Show the actual successor only when resolved by the owner.
+- If the person owns shared history, explain that deletion removes the household's
+  locked copy of that history. Do not describe deleting another member's records.
+- Reuse supported identity verification, such as a code sent to an existing verified
+  channel. Cover incorrect/expired code, resend, cancellation, in-progress and
+  retry states without requiring a support conversation.
+- Show **Cuenta eliminada / Account deleted** and the signed-out destination only
+  after confirmed completion. A queued operation gets an honest pending state.
+  A failure retains a recoverable state and does not pretend deletion succeeded.
+
+No-successor handling and deletion completion/retention facts belong to the
+connected contract. Ordinary leave, removal and archive keep their distinct
+history rules. Account deletion must not silently redefine them.
+
+### Authentication and invitation purpose
+
+The founder chose **Apple and Google**, alongside the existing email path.
+Both social flows need loading, user cancellation, recoverable error and return
+to the intended invitation. Use Apple's native authorization treatment. Request
+a preferred name only if it is missing; reuse a supplied or saved name. A private
+relay email is valid and does not imply that the name is missing. Cancellation
+returns quietly to the same form. Do not expose a provider button as working until
+its connected path is ready.
+
+App access is invitation-gated for this native release. A valid link or QR can
+supply the code; do not make people retype it. Manual entry supports paste,
+validation, retry and invalid/expired/used-code states. People without access can
+open the cuadrao.ai waitlist. Existing admitted users retain Sign in and recovery.
+Preserve the invitation across installation/authentication when supported; manual
+code entry remains the recovery path. Visiting the waitlist is not proof of joining.
+
+| Invitation purpose | What it grants | Visible rules |
+| --- | --- | --- |
+| Invite someone to Cuadrao | App admission | Share link, copy code and QR represent one invitation; show the returned quota, such as 7 de 10 disponibles / 7 of 10 left |
+| Invite to a household | Membership after acceptance | Only the administrator sends it; it does not consume the personal ten; account sharing remains a separate consent |
+| Capped group access link | App admission for several invitees | Create with a cap and expiry; show actual usage, full, expired and revoked states; do not silently create a household or financial plan |
+| Invite to a plan | Participation in that specific plan | Preserve the plan's membership and permission rules; do not treat it as app admission |
+
+A cap, a remaining personal quota and a member count are different values. Read
+them from their owners. Opening or sharing a link does not count as acceptance.
+The relation between group-link capacity and personal quota needs its contract;
+never guess it in a counter. If a household invite also admits a new user, carry
+both purposes through validation without charging the personal quota.
+
+A full link explains the limit and offers the waitlist. Show **Estás en la lista /
+You're on the waitlist** only after enrollment is confirmed. Use one invite-card
+composition with purpose, identity/theme, code, QR and native sharing. Keep QR art
+outside its quiet zone and test scan reliability. Public profile QR stays deferred.
+
+### Updates, chart truth and historical access
+
+Use the existing Updates inbox for invitation acceptance, administrator handoff,
+owner deletion with history removal, and household closure. Each notice explains
+what changed and opens the relevant authorized destination. A closed household
+opens an explanation, not a broken detail. Do not leave deleted financial history
+readable through an old notification.
+
+Bill reminders appear three days before the due date and on the due date. The
+bill owner determines whether an occurrence is still due, paid or cancelled.
+Explain push value in context, then request native permission. Declining push
+preserves the inbox. A denied permission offers system Settings when the person
+asks to enable it again. Push text never includes amounts or sensitive detail.
+An example is **Tienes un pago próximo / You have an upcoming payment**.
+
+A zero comparison baseline produces a monetary difference, never an infinite or
+invented percentage. No records produces **Sin datos / No data**. Unknown,
+partially covered and confirmed zero periods remain different states. Keep the
+quiet chart and established category colors, icons and typography.
+
+After an account move, the previous household's authorized pre-move history is
+muted and read-only. Pair color with a lock and **Solo lectura / Read-only** plus
+an explanation of the move. Keep readable contrast and hide editing gestures.
+Do not show new activity in the old scope. An archive, move, withdrawal of access
+and deletion are different operations; the backend must resolve which history
+remains authorized. An owner deletion removes its retained copy as stated above.
+
+### Profile visibility and feature-timed controls
+
+Remove the **Por correo / By email** notification toggle. This is not a decision
+to remove email authentication, recovery or household invitation delivery.
+Hide Personalization, Security and sessions, Shared conversations, Removed
+activity and personal-photo controls in the initial native release. Keep initials,
+themes, supported preferences, help, legal links, deletion and sign-out. Avoid
+empty destinations, unavailable rows and new Coming soon settings sections.
+
+Before a live chat, voice or document-reading action shares personal data with
+an external model, disclose the data, recipient and purpose and obtain explicit
+consent. Preserve the draft when declined; do not send or automatically process
+an attachment. Local capture/save-for-later remains usable. This control must
+ship with the first feature that transmits data, even if that precedes the other
+later controls. Temporary mode is not a substitute for this consent.
+
+Connected sources and Disconnect arrive with Gmail/Plaid activation, under the
+existing source owner. Explain stopping future access separately from deleting
+previous imports. Memory controls arrive with native memory, including off and
+reset as distinct actions; switching off must not falsely claim deletion.
+
+### Research and interpretation
+
+Mobbin references were visually inspected on October 2. They are curated examples,
+not evidence of a verified App Store ranking or proof of backend behavior.
+
+| Reference | Borrow for Cuadrao | Avoid copying |
+| --- | --- | --- |
+| [Revolut account closure](https://mobbin.com/flows/c6abd5fc-c863-4a79-8388-f9ef0debebda) | Reachable legal links, explicit consequences and verification recovery | Multiple retention pitches and bank-specific retention claims |
+| [Places invitation code](https://mobbin.com/flows/bf0f3d56-76ea-4605-92ed-9e50cd3afc67) | Warm invitation entry with focused code input | Its Skip bypass; Cuadrao's access gate must remain truthful |
+| [WHOOP join by code](https://mobbin.com/flows/f1c6102e-f9d6-48ed-96c4-5109ae0b3ca9) | Explain the code's purpose and show invalid-code feedback beside input | Team membership as a substitute for app admission |
+| [Discord invitation settings](https://mobbin.com/flows/a53ad8f2-6e22-409b-b6f6-783ceed2a44d) | Expiry and maximum uses together, followed by native sharing | Discord's visual density and temporary membership model |
+| [LINE invitations](https://mobbin.com/flows/e605fc4e-9bd4-4f54-81fc-72f4b4a689ab) | Shareable invitation/QR identity | Contacts upload or discovery scope |
+| [Monzo notification settings](https://mobbin.com/flows/bd14662f-e114-4479-908c-35c7f242a3b2) | Separate useful notification purposes and clear settings groups | Its email controls or unrelated products |
+
+Apple's [deletion guidance](https://developer.apple.com/support/offering-account-deletion-in-your-app/)
+allows identity confirmation and requires an accessible deletion path with truthful
+completion. [Review guidelines](https://developer.apple.com/app-store/review/guidelines/)
+cover TestFlight, privacy access, login options and consent before third-party AI
+sharing. These requirements do not establish Cuadrao's retention implementation.
+Apple's [sign-in guidance](https://developer.apple.com/videos/play/wwdc2022/10122/)
+explains first-authorization name delivery; its [notification guidance](https://developer.apple.com/documentation/usernotifications/asking-permission-to-use-notifications)
+favors permission requests in context.
+
+<a id="13-implementation-owners"></a>
+## 14. Implementation owners
 
 | Shared decision | Single code owner | Usage |
 | --- | --- | --- |
@@ -718,7 +872,8 @@ not prove keyboard, navigation, scrolling, focus or gesture continuity.
 | Account management | [CuadraoAccountsCollection.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoAccountsCollection.swift) | Native ordering and archive recovery over the existing shared account model. |
 | Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift) | Uses real shared components. Access from a hold on Home's greeting → Guía visual / Visual guide, or launch with `--design-gallery`. Preview-only. |
 
-## 14. Reference gallery and evolution
+<a id="14-reference-gallery-and-evolution"></a>
+## 15. Reference gallery and evolution
 
 The gallery offers Spanish/English, light/dark and large-text controls. It contains
 headings, amounts, a row, a disabled action, working Account/Plan input fields,
