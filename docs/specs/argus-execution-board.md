@@ -50,8 +50,9 @@ change is assigned by this documentation checkpoint.
 **Starting point.** The design commit verified integration `2185aefe` against design
 `2558f866`, with merge base `7c29b2a9`. Since then, #783 adopted the shared design
 foundation from checkpoint `2558f866` (1 of 4), #782 landed the six-lane handoff,
-and #785 adopted plans, groups, receipts and contextual Cuadrao (2 of 4), so
-integration is now `900178b3`. Design PR 3 of 4 is open as #786. Integration keeps the four
+#785 adopted plans, groups, receipts and contextual Cuadrao (2 of 4), and #786
+adopted Home, Search, Updates, Profile and Settings (3 of 4). Integration is now
+`0ea81a20`, which also includes the Lane 1 backend from #788. Integration keeps the four
 `ios/ArgusFoundation/Connected/` files and ten `Household/` files that the design
 checkpoint lacks. Start each implementation checkpoint from current integration,
 recheck its head, and adapt approved design components to those owners. Do not

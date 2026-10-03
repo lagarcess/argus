@@ -202,9 +202,9 @@ avatar stack sits left-aligned between spaces and the amount. It includes the ow
 and accepted members only; pending invitations never count as members. Tapping it
 opens People. The current preview roster supports the owner and one companion.
 The greeting's context menu holds the preview reset tools (first use, household
-with no shared accounts, with activity); they are on integration in
-`CuadraoHomeCanvas.swift`. On the design branch the same menu also opens the
-gallery. The gallery is not on integration yet; it comes with design PR 3 (#786).
+with no shared accounts, with activity) and opens the gallery (Guía visual /
+Visual guide). Both are on integration in `CuadraoHomeCanvas.swift`, since #786
+(design PR 3) for the gallery entry.
 
 ### Home account and activity shortcuts
 
@@ -486,9 +486,9 @@ its basis and be explicitly applied; no such recommendation is implemented here.
 
 `CuadraoOrderedCollection` is the shared interaction for Home account rows,
 personal plans and group cards. On integration it came with #783. Since #785
-(design PR 2), personal plans and group cards use it, inside the design preview
-only, and nothing on Home reaches them yet. Home account rows adopt it, and Home
-opens plans and groups, with design PR 3 (#786). Tap opens detail; swipe right reveals Edit
+(design PR 2), personal plans and group cards use it. Since #786 (design PR 3),
+Home account rows use it and Home opens plans and groups, all inside the design
+preview only. Tap opens detail; swipe right reveals Edit
 (including rename); swipe left reveals Archive. Neither swipe executes on a full
 swipe. Hold and drag reorders directly in place, without a context menu or an
 ordering tray. Sheets are for actual editing, invitation and review flows.
@@ -812,7 +812,7 @@ Use the existing Updates inbox for invitation acceptance, administrator handoff,
 owner deletion with history removal, and household closure. Use Iris's
 founder-locked wording for the deletion note and the new-owner message. Of these,
 the lane contract so far gives Updates the invitation-accepted row and the Lane 6
-deletion events; administrator handoff and household closure notices still need
+deletion notices; administrator handoff and household closure notices still need
 a lane. Each notice explains
 what changed and opens the relevant authorized destination. A closed household
 opens an explanation, not a broken detail. Do not leave deleted financial history
@@ -890,7 +890,7 @@ favors permission requests in context.
 | --- | --- | --- |
 | Typography roles | [CuadraoTypography.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoTypography.swift) | Use named roles for expressive headings and amounts. Native navigation titles, text bodies and system controls retain their semantic text styles. |
 | Adaptive palette | [WelcomePalette](../../../ios/ArgusFoundation/Cuadrao/CuadraoCanvas.swift) | Pine, sage, background, surface, ink, borders and positive input text. The historical type name remains; do not create a competing Cuadrao palette. Adaptive light/dark values are gated behind the design-preview flag, `CuadraoDesignPreview.isActive` (`--cuadrao-design`, or a build whose Info.plist sets `CUADRAO_DESIGN_PREVIEW` to `true`); every other launch keeps the shipped tokens. |
-| Money parsing and caret behavior | [CanvasDecimalInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasDecimalInput.swift) | Accounts uses this native text editor on integration. Since #785 (design PR 2), Plan uses the same editor through `PlanAmountInput` and `CanvasMoneyValueInput`, inside the design preview only; Home reaches Plan with design PR 3 (#786). |
+| Money parsing and caret behavior | [CanvasDecimalInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasDecimalInput.swift) | Accounts uses this native text editor on integration. Since #785 (design PR 2), Plan uses the same editor through `PlanAmountInput` and `CanvasMoneyValueInput`, inside the design preview only; Home reaches Plan since #786 (design PR 3). |
 | Currency precision, formatting and limits | [CanvasMoney.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoney.swift) | Derive preview limits and formatting here; currency selection/immutability retains its plan/group owner. |
 | Numeric preview bridge | [CanvasMoneyValueInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoneyValueInput.swift) | Adapts existing numeric preview models to decimal editing text; it is not a new financial store. |
 | Plan amount composition | [PlanAmountInput.swift](../../../ios/ArgusFoundation/Cuadrao/Planning/PlanAmountInput.swift), on integration since #785 (design PR 2), design preview only | Currency, rounded amount, focus underline and inline error. Accounts keeps its approved bordered, right-aligned composition around the same editor. |
@@ -898,14 +898,14 @@ favors permission requests in context.
 | Balance period and account changes | [CuadraoBalancePeriod.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoBalancePeriod.swift) | One observed opening/closing pair, signed contributions and matching allocation; reuses `CanvasBalanceHistory`. |
 | Empty and loading treatment | [CuadraoChartState.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChartState.swift) | Shared decorative forms; `CanvasSpendingStory` classifies financial states. Loading is a gallery specimen until a real operation needs it. |
 | Expanded chart controls | [CuadraoChartControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChartControls.swift) | Icon view choice and localized period choice, including selected accessibility state. |
-| Account management | `CuadraoAccountsCollection.swift`, not on integration yet, coming with design PR 3 (#786) ([design branch at `fc7650ea`](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/ios/ArgusFoundation/Cuadrao/CuadraoAccountsCollection.swift)) | Native ordering and archive recovery over the existing shared account model. |
-| Reference gallery | `CuadraoDesignGallery.swift`, not on integration yet, coming with design PR 3 (#786) ([design branch at `fc7650ea`](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift)) | Uses real shared components. Preview-only. On the design branch it opens from a hold on Home's greeting → Guía visual / Visual guide, or with `--design-gallery`. Neither #783 nor #785 brought that routing to integration; it comes with the gallery in design PR 3 (#786). |
+| Account management | [CuadraoAccountsCollection.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoAccountsCollection.swift), on integration since #786 (design PR 3), design preview only | Native ordering and archive recovery over the existing shared account model. |
+| Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift), on integration since #786 (design PR 3) | Uses real shared components. Preview-only. It opens from a hold on Home's greeting → Guía visual / Visual guide, or with `--design-gallery`. That routing came to integration with #786. |
 
 <a id="14-reference-gallery-and-evolution"></a>
 ## 15. Reference gallery and evolution
 
-The gallery is not on integration yet. It comes with design PR 3 (#786). The rules
-below describe it as it exists on the design branch. The gallery offers Spanish/English, light/dark and large-text controls. It contains
+The gallery is on integration since #786 (design PR 3), inside the design preview
+only. The gallery offers Spanish/English, light/dark and large-text controls. It contains
 headings, amounts, a row, a disabled action, working Account/Plan input fields,
 and the real shared choice, add and chart controls.
 Use it to compare states, then verify the actual surfaces: isolated components do
