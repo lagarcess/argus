@@ -14,9 +14,7 @@ This is product copy written to match those docs. It is not legal advice.
 
 | # | Open item | Owner |
 | --- | --- | --- |
-| P1 | Deleting an account also clears your email from saved feedback and deletes your person record in PostHog analytics. Yelena recommends this. | Lucas to confirm |
-| P2 | If the household admin deletes their account, the role passes to the longest-standing member, or the household closes if nobody is left. | Lucas to lock |
-| P3 | When an owner deletes their account, the household's locked copy of their history is deleted too, and members see a short note. | Lucas to lock |
+| P1 | Sign in with Apple: Lucas says the iOS UI supports it. If it ships, the account section names it and deletion also revokes the Apple sign-in. | Eng to confirm whether it ships for TestFlight |
 | P4 | Operating entity, country and governing law. | Lucas (Iris drafts) |
 | P5 | Cuadrao support address. Only the get-argus.com one exists today. | Lucas |
 | P6 | Where these are published. Yelena recommends cuadrao.ai/privacy and cuadrao.ai/terms as the App Store URLs, plus an in-app link while signed in. The cookie section applies to the web app only. | Lucas to confirm the domain |
@@ -154,9 +152,13 @@ esté activa. [Pendiente P7]
 documentos, conversaciones, planes y fuentes conectadas, y revocamos esas
 conexiones. Solo conservamos un registro anónimo de que se envió y se aceptó
 una invitación, sin tu nombre ni ningún identificador.
-[Pendiente P1: también borramos tu correo de los comentarios guardados y tu registro en la analítica]
-[Pendiente P2: si administrabas un hogar]
-[Pendiente P3: el historial que el hogar conservaba de tus cuentas]
+También borramos tu correo de los comentarios que nos enviaste y tu registro en
+la analítica de producto.
+[Pendiente P1: también se revoca tu inicio de sesión con Apple]
+Si administrabas un hogar, el rol pasa al miembro con más tiempo en él; si no
+queda nadie, el hogar se cierra.
+También se borra la copia del historial de tus cuentas que conservaba tu hogar,
+y los demás miembros ven una nota breve de que se eliminó.
 
 **Venta de información.** Cuadrao no vende ni comparte tu información personal
 y no la usa para publicidad dirigida. Si eso cambia, esta política se
@@ -288,9 +290,13 @@ is active. [Pending P7]
 documents, conversations, plans and connected sources, and revoke those
 connections. The only thing we keep is an anonymous record that an invitation
 was sent and accepted, with no name or identifier.
-[Pending P1: we also remove your email from saved feedback and your analytics record]
-[Pending P2: if you administered a household]
-[Pending P3: the history a household kept of your accounts]
+We also remove your email from feedback you sent us and delete your record in
+product analytics.
+[Pending P1: your Sign in with Apple is also revoked]
+If you were a household's admin, the role passes to the longest-standing
+member; if no one is left, the household closes.
+The copy of your accounts' history your household kept is also deleted, and
+the other members see a short note that it was removed.
 
 **Sale of information.** Cuadrao does not sell or share your personal
 information and does not use it for targeted advertising. If that changes, this
