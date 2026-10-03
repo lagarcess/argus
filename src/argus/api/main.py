@@ -8,6 +8,7 @@ from argus.api import state as api_state
 from argus.api.routers import (
     agent,
     auth,
+    auth_apple,
     backtest,
     computations,
     conversation_activity,
@@ -49,6 +50,7 @@ def health() -> dict[str, str]:
 
 for api_router in (
     auth.router,
+    auth_apple.router,
     profile.router,
     conversations.router,
     computations.router,
