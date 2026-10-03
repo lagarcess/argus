@@ -24,7 +24,9 @@ for delivery; this file for the locked permission package.
    invitations are synthetic; no email, WhatsApp, or external delivery is
    required for acceptance proof.
 7. **Three separate operations:** create household ≠ invite ≠ share account.
-   Accepting an invitation grants **membership only** — never an automatic joint
+   Accepting an invitation grants **membership only** (since the
+   [October 2 lane locks](../argus-decision-log.md#october-2-2026-cuadrao-lane-locks),
+   a household invite also admits the person to the beta) — never an automatic joint
    account, private-account share, money move, or private-space reassignment.
 
 ## Consent boundaries (unchanged)

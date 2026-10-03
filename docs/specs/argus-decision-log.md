@@ -30,7 +30,7 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-28, clarified 2026-09-29 | Revenue, pricing, paywalls and billing remain deferred; existing usage and cost safeguards remain. The current user-trial boundary permits founder dogfooding and physical-phone demonstrations. Detailed owner: [documentation authority — founder deferral](../DOCUMENTATION_AUTHORITY.md#founder-deferral). | Lucas |
 | 2026-09-29 | The [private iPhone delivery and execution lock](#september-29-2026-private-iphone-delivery-and-execution-lock) owns the current delivery decision and supersedes the batch instructions below. | Lucas |
 | 2026-10-01 | Lock Household permission policy: creator administers invitations/membership and may transfer administration or close before departure; members see the member list and may leave; shared accounts start view-only with editing only via explicit grant; edit grants do not confer ownership, membership administration or resharing; leave/removal revokes membership and that member's account grants while owners retain records/history; invitations are revocable, single-use, seven-day links with safe same-recipient acceptance retries; create ≠ invite ≠ share account and acceptance is membership only. MVEE consent and financial-meaning boundaries remain. Owners: [execution board Household lane](argus-execution-board.md#connected-spaces-and-household-lane), [MVEE section 12](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), [lane contract](lanes/household-permission-policy.md). Narrowed on 2026-10-02: rule 5's departure behavior, and rule 1's admin handoff when the admin deletes their account, now follow the [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas (Project orchestrator recorded) |
-| 2026-10-02 | Lock the invitation (beta versus household invites, 10 beta invites per user), TestFlight beta-gate, Home comparison, Updates, plan-export, account-move and account-deletion-in-a-household rules for the five Cuadrao lanes. Detailed record: [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
+| 2026-10-02 | Lock the invitation (beta versus household invites, 10 beta invites per user, and a founder group link as the one exception to single-use codes), TestFlight beta-gate, Home comparison, Updates, plan-export, account-move and account-deletion-in-a-household rules for the five Cuadrao lanes, including what happens to a deleted person's part in shared plans (8:53 PM CT). Detailed record: [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
 
 ## Superseded coordination instructions (historical only)
 
@@ -171,7 +171,7 @@ them.
 ### Invitations
 
 - An invitation produces a share link, an invite code and a QR code.
-  Household email invitations are out of scope for this pass. A Resend adapter
+  Household email invitations are not in this pass. A Resend adapter
   already exists, sending from the get-argus.com address; what is missing is a
   Cuadrao sending domain.
 - The invite link is a universal link on cuadrao.ai that opens the app. The
@@ -205,7 +205,7 @@ user trials, no new growth analytics), scoped to invites only.
   user has 10 for TestFlight, and the founder can add more. Only the household
   admin sends household invites. These don't use any of the 10, and they also
   let the invitee into the beta. This keeps October 1 rule 1: only the
-  household creator administers household invitations. (Founder lock, 8:04 PM
+  household admin administers household invitations. (Founder lock, 8:04 PM
   CT; the split is Iris's proposal, with the quota raised from 3 to 10.)
 - The founder, and only the founder, can create a group link that many people
   can use. He sets a cap (for example 50) and an expiry date. Redemption is
@@ -213,7 +213,8 @@ user trials, no new growth analytics), scoped to invites only.
   anyone who taps the link lands on the cuadrao.ai waitlist and is told so on
   screen. Each group link is its own source in the network numbers, and the
   who-invited-whom record shows the link as the inviter. This is an exception
-  to the single-use rule. The link can be forwarded beyond the chat it was
+  to the single-use rule. The group link is beta-only: redeeming it never
+  grants household membership. The link can be forwarded beyond the chat it was
   posted in; the cap and the expiry date limit that spread. (Iris's proposal,
   Yelena's build note, founder lock at 8:06 PM CT.)
 - A TestFlight public link only installs the app. The in-app invite code is the
@@ -244,7 +245,9 @@ user trials, no new growth analytics), scoped to invites only.
 
 - Exporting joint plans is deferred until after TestFlight. The read-only
   archive from [#773](https://github.com/lagarcess/argus/pull/773) stays until
-  its owner deletes it.
+  its owner deletes it. If the owner deletes their account, the archive passes
+  to the plan's longest-standing participant instead (see the section on
+  deleting an account below).
 
 ### Leaving a household and moving accounts
 
@@ -272,12 +275,32 @@ user trials, no new growth analytics), scoped to invites only.
   deletion does not wait for a manual transfer.
 - Both are founder locks (8:04 PM CT) of Iris's proposals.
 - Deleting any account also clears that person's email from saved feedback
-  and deletes their person record in PostHog. (Yelena's recommendation, founder
-  lock at 8:04 PM CT.)
+  and deletes the person in PostHog by distinct id, including their events.
+  (Yelena's recommendation, founder lock at 8:04 PM CT. The PostHog wording
+  was clarified Oct 2 via #782.)
+- When a person deletes their account, in plans other people own their
+  amounts keep their values and dates under a nameless placeholder:
+  "Exmiembro" in Spanish and "Former member" in English, numbered
+  ("Exmiembro 1", "Exmiembro 2") when more than one person leaves a plan. The
+  placeholder has no user id, name, avatar or email. Their receipts, photos
+  and free-text notes are deleted; amount, date and category stay. Open
+  balances with them are frozen: not marked settled and not forgiven. They
+  come out of the active totals and show as a closed line, and a member can
+  later mark it settled, which is recorded as a new event. Their future
+  responsibilities go back to the plan's owner, who gets an Update to reassign
+  or re-split them. Past legs stay as they are. Shared plans they owned, and
+  the #773 archive, pass to the plan's longest-standing participant; if nobody
+  else is in the plan, it is deleted. The plan name stays. The confirmation,
+  member-note and new-owner wording in Spanish and English is Iris's, and lives
+  in the [lane handoff copy](lanes/mvee-five-lane-handoff.md#copy-founder-locked-iriss-wording).
+  This replaces the Head of Engineering's draft to anonymise or delete those
+  rows. (Iris's proposal, founder lock at 8:53 PM CT.)
 
 ### Outside services
 
-- Email, the universal link and push are not built yet. Each will be built
-  behind a default-off flag with a fake and stay off until the founder connects
-  the real service, so turning one on later is configuration only. The domain, keys and links the founder will
-  supply are not recorded here.
+- The universal link and push are not built yet. Each will be built behind a
+  default-off flag with a fake and stay off until the founder connects the real
+  service, so turning one on later is configuration only. Household email
+  invitations and update email are not in this pass, so nothing is built for
+  email. The domain, keys and links the founder will supply are not recorded
+  here.
