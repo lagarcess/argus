@@ -3112,9 +3112,12 @@ verified session's user), `client_id` (the Apple client the token was issued
 to, the bundle id for the native app), `secret_ciphertext` (Apple's refresh
 token sealed with AES-256-GCM under `ARGUS_INGESTION_SECRET_KEY`, bound to
 `apple_sign_in:<user_id>`), `captured_at`, `updated_at` and
-`secret_sealed_at`. A later sign-in replaces the row. `secret_sealed_at` (Lane 6,
-`20261004090000_account_deletion.sql`) is stamped by a trigger whenever the
-ciphertext changes and at no other time; the deletion run's key check uses it.
+`secret_key_fingerprint`. A later sign-in replaces the row.
+`secret_key_fingerprint` (Lane 6, `20261004090000_account_deletion.sql`) names
+the key that sealed the token without revealing it (`SecretBox.key_id`: 32 hex
+characters of HMAC-SHA256 of a fixed label under the key); capture sets it, and
+rows stored before Lane 6 have none. A token that doesn't open is discarded
+only when its fingerprint is the running key's.
 
 RLS is on with no policy, and every client privilege is revoked: no client
 role can read or write any column. The API's service role is the only writer.
@@ -3156,10 +3159,12 @@ never backs two people's connections; webhooks resolve by the same pair.
 Cursor advances are compare-and-set under the lease; failures never clear
 `last_success_at` or the cursor, and recording a failure releases the lease so
 a sync already in flight cannot report success over it. A check constraint keeps disconnected rows free
-of credential, cursor and lease. `secret_sealed_at` (Lane 6) is stamped by a
-trigger whenever `secret_ciphertext` changes, never by status, attention or
-lease updates, and is null with no credential; the account-deletion key check
-reads it to know which credential was sealed last.
+of credential, cursor and lease. `secret_key_fingerprint` (Lane 6) names the
+key that sealed `secret_ciphertext` (`SecretBox.key_id`, 32 hex characters,
+non-secret); every sealing path sets it (Plaid link and update-mode reconnect,
+Gmail connect and reconnect), it is null with no credential, and rows sealed
+before Lane 6 have none. Account deletion gives up on a credential that does
+not open only when its fingerprint is the running key's.
 
 Registered owners may `SELECT` only the non-secret columns (column grant); no
 client role can read `secret_ciphertext`, `sync_cursor` or the lease, or write

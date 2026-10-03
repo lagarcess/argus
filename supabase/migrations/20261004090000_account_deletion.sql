@@ -18,8 +18,8 @@
 --      is refused to everyone else.
 --   6. The Household-owned invite function, the locked-column guard and the
 --      deletion definers.
---   7. secret_sealed_at on every sealed provider credential, stamped by the
---      database whenever the ciphertext changes, for the key check.
+--   7. secret_key_fingerprint next to every sealed provider credential: which
+--      key sealed it, for the key check.
 --
 -- 20261003140000 says the kept sender reference preserves per-user invite
 -- counts. Since Lane 6 that is no longer true for a deleted sender:
@@ -33,8 +33,10 @@
 -- membership-keyed row of the person in one household goes to that
 -- household's placeholder. Each is a nameless auth.users row created through
 -- the Supabase Admin API as `exmiembro+<random uuid>@cuadrao.invalid`, email
--- confirmed, app_metadata {"placeholder": true}, user metadata {}, no phone,
--- no password, banned by ban_duration (GoTrue sets banned_until). Decision
+-- confirmed, app_metadata {"placeholder": true}, no phone, no password, and
+-- no user metadata of ours (GoTrue's email confirm writes only
+-- {"email_verified": true}), banned by ban_duration (GoTrue sets
+-- banned_until). Decision
 -- 17's "no user id" means no id tied to the person: the FKs need a real
 -- auth.users row. Never DML on auth.users here.
 --
@@ -278,12 +280,11 @@ create table argus_private.account_deletion_placeholders (
 --   'already_revoked'  the provider no longer held the grant (invalid_grant,
 --                      Google invalid_token, Plaid item gone): counted apart
 --                      and alerted on spikes;
---   'unrecoverable'    the credential does not open under the verified current
---                      key (key_check: that key opens the credential anyone
---                      else most recently sealed, and that seal is not older
---                      than this one; see section 7). A key or config read
---                      failure is never this: the row stays pending with its
---                      ciphertext;
+--   'unrecoverable'    the credential was sealed under this process's key (its
+--                      secret_key_fingerprint equals the key's, section 7) and
+--                      still does not open. A different, missing or unknown
+--                      fingerprint, or no key, is never this: the row stays
+--                      pending with its ciphertext;
 --   'operator_forced'  an operator closed it, with a logged reason.
 -- The rows are deleted when the run completes; the run keeps the counts.
 create table argus_private.account_deletion_revocations (
@@ -293,14 +294,15 @@ create table argus_private.account_deletion_revocations (
     source_ref uuid not null,
     external_ref text,
     secret_ciphertext bytea,
-    secret_sealed_at timestamptz,
+    secret_key_fingerprint text check (secret_key_fingerprint ~ '^[0-9a-f]{32}$'),
     status text not null default 'pending'
         check (status in ('pending', 'revoked', 'already_revoked', 'unrecoverable', 'operator_forced')),
     attempts integer not null default 0 check (attempts >= 0),
     last_error text check (char_length(last_error) <= 200),
     updated_at timestamptz not null default now(),
     primary key (subject_hash, provider, source_ref),
-    check (status = 'pending' or (secret_ciphertext is null and external_ref is null))
+    check (status = 'pending' or (secret_ciphertext is null and external_ref is null)),
+    check (secret_ciphertext is not null or secret_key_fingerprint is null)
 );
 
 -- Events this lane owns. Updates (slot 7) reads them as its source. No amounts
@@ -1440,45 +1442,29 @@ revoke all on function
   from service_role;
 
 
--- 7. Seal time for the key check (Marcus re-check S1, Oct 3) ---------------------
--- SecretBox carries no key id, so the key check needs to know *when* each
--- credential was sealed: the newest seal anyone else holds was made under the
--- deployment's current key. updated_at cannot say that: status, attention and
--- lease updates move it without re-sealing, so after a rotation a row sealed
--- under the old key could look newest. secret_sealed_at moves only when the
--- ciphertext itself changes, and the database stamps it, so no writer can
--- forget it or set it by hand. Rows sealed before this migration stay null and
--- never count as evidence (fails closed: the step stays pending).
-alter table public.financial_source_connections add column secret_sealed_at timestamptz;
-alter table public.apple_sign_in_credentials add column secret_sealed_at timestamptz;
-
-create function argus_private.stamp_secret_sealed_at()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-begin
-    if new.secret_ciphertext is null then
-        new.secret_sealed_at := null;
-    elsif tg_op = 'INSERT' or new.secret_ciphertext is distinct from old.secret_ciphertext then
-        new.secret_sealed_at := pg_catalog.clock_timestamp();
-    else
-        new.secret_sealed_at := old.secret_sealed_at;
-    end if;
-    return new;
-end;
-$$;
-
-revoke all on function argus_private.stamp_secret_sealed_at() from public;
-
-create trigger financial_source_connections_stamp_sealed_at
-    before insert or update on public.financial_source_connections
-    for each row execute function argus_private.stamp_secret_sealed_at();
-
-create trigger apple_sign_in_credentials_stamp_sealed_at
-    before insert or update on public.apple_sign_in_credentials
-    for each row execute function argus_private.stamp_secret_sealed_at();
-
-create index financial_source_connections_sealed_idx
-    on public.financial_source_connections (secret_sealed_at desc)
-    where secret_sealed_at is not null and source in ('plaid', 'gmail');
+-- 7. Which key sealed a credential (Priya, Oct 3) ---------------------------------
+-- SecretBox carries no key id inside its envelope, so a credential that does not
+-- open looks the same whether it is dead (sealed under this key and damaged, or
+-- under a key rotated away) or live for a process holding another key. Seal
+-- time can't tell them apart either: during a rolling rotation an old-key
+-- process can seal after a new-key one. Every sealing path (Plaid link and
+-- re-auth, Gmail connect and reconnect, Apple capture) now stores the
+-- fingerprint of the key it sealed with, SecretBox.key_id: HMAC-SHA256 of a
+-- fixed label under the key, truncated to 128 bits, which reveals nothing about
+-- the key. The deletion run copies it with the captured ciphertext. A
+-- credential is given up only when its fingerprint equals the running key's and
+-- it still does not open; a different or missing fingerprint (rows sealed
+-- before this migration) keeps it pending. No trigger: a re-seal under the
+-- same key keeps a correct fingerprint, and the application sets it with every
+-- seal. The one gap is the deploy that ships this: a process still on the old
+-- code re-seals without touching the column, which is wrong only if it also
+-- holds another key. So ARGUS_INGESTION_SECRET_KEY must not rotate in the
+-- deploy that ships this migration (runbook).
+alter table public.financial_source_connections
+    add column secret_key_fingerprint text
+        check (secret_key_fingerprint ~ '^[0-9a-f]{32}$'),
+    add constraint financial_source_connections_fingerprint_needs_secret
+        check (secret_ciphertext is not null or secret_key_fingerprint is null);
+alter table public.apple_sign_in_credentials
+    add column secret_key_fingerprint text
+        check (secret_key_fingerprint ~ '^[0-9a-f]{32}$');

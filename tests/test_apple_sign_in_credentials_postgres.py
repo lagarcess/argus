@@ -6,7 +6,8 @@ table, RLS is on with no policy, the service role can, the restrict key keeps
 an auth user with an unrevoked token from being deleted, the full capture
 and revoke run against the migration, and the two ways a row ends without a
 200 from Apple: ``invalid_grant`` (already revoked) and ``discard_unreadable``
-after the secret key was rotated.
+for a token this key sealed that no longer opens. A token sealed under another
+key, or with no key fingerprint, is kept (Priya B1).
 """
 
 from __future__ import annotations
@@ -170,16 +171,25 @@ def test_the_service_role_reads_and_writes(users) -> None:  # noqa: ANN001
 
 
 @pytest.mark.parametrize(
-    ("client_id", "ciphertext"),
-    [("", b"\x01" + b"a" * 40), ("bad id", b"\x01" + b"a" * 40), (BUNDLE_ID, b"short")],
+    ("client_id", "ciphertext", "key_id"),
+    [
+        ("", b"\x01" + b"a" * 40, None),
+        ("bad id", b"\x01" + b"a" * 40, None),
+        (BUNDLE_ID, b"short", None),
+        # The fingerprint is 32 hex characters, never anything key-like.
+        (BUNDLE_ID, b"\x01" + b"a" * 40, "k" * 32),
+    ],
 )
-def test_constraints_refuse_malformed_rows(repo, users, client_id, ciphertext) -> None:  # noqa: ANN001
+def test_constraints_refuse_malformed_rows(
+    repo, users, client_id, ciphertext, key_id
+) -> None:  # noqa: ANN001
     with pytest.raises(psycopg.errors.CheckViolation):
         repo.upsert(
             user_id=users["apple"],
             client_id=client_id,
             secret_ciphertext=ciphertext,
             now=NOW,
+            key_id=key_id,
         )
 
 
@@ -216,6 +226,7 @@ def test_capture_then_revoke_against_the_migration(repo, users) -> None:  # noqa
     service.capture(user_id=user, apple_subject=SUBJECT, authorization_code="c.code")
     row = repo.get(user_id=user)
     assert refresh.encode() not in row.secret_ciphertext
+    assert row.key_id == box.key_id  # secret_key_fingerprint, read back
     assert box.open(row.secret_ciphertext, source=SOURCE, connection_id=user) == refresh
 
     apple.revoke_responses += [(400, {"error": "invalid_client"})]
@@ -262,25 +273,49 @@ def test_invalid_grant_on_revoke_deletes_the_row_and_frees_the_user(repo, users)
     assert not _auth_user_exists(user)
 
 
-def test_a_rotated_key_row_is_discarded_and_the_user_can_be_deleted(repo, users) -> None:  # noqa: ANN001
+@pytest.mark.parametrize("sealed_by", ["rotated_away_key", "no_fingerprint"])
+def test_a_row_another_key_may_open_is_kept(repo, users, sealed_by) -> None:  # noqa: ANN001
+    """Priya B1: the key rotated, or a process on the old key is still
+    running. The row may be live for the key that sealed it, so it is kept
+    and the restrict key still holds the auth user."""
     user = users["apple"]
     old_box = SecretBox(os.urandom(32))
     repo.upsert(
         user_id=user,
         client_id=BUNDLE_ID,
-        secret_ciphertext=old_box.seal(
-            "r.under-old-key", source=SOURCE, connection_id=user
-        ),
+        secret_ciphertext=old_box.seal("r.live", source=SOURCE, connection_id=user),
         now=NOW,
+        key_id=old_box.key_id if sealed_by == "rotated_away_key" else None,
     )
-    # ARGUS_INGESTION_SECRET_KEY rotated: the service now holds another key.
     service, apple = _service(repo, SecretBox(os.urandom(32)))
 
     with pytest.raises(AppleRevocationPending) as pending:
         service.revoke(user_id=user)
     assert pending.value.reason == "credential_unreadable"
+    with pytest.raises(AppleRevocationPending) as pending:
+        service.discard_unreadable(user_id=user)
+    assert pending.value.reason == "key_unproven"
+    assert repo.get(user_id=user) is not None
+    assert apple.calls == []
     with pytest.raises(psycopg.errors.ForeignKeyViolation):
         _delete_auth_user(user)
+
+
+def test_an_unreadable_row_this_key_sealed_is_discarded(repo, users) -> None:  # noqa: ANN001
+    """Sealed under this key (the fingerprint round-trips through the table)
+    and it still doesn't open: dead, so discarded, and the user can go."""
+    user = users["apple"]
+    box = SecretBox(os.urandom(32))
+    damaged = SecretBox(os.urandom(32)).seal("r.x", source=SOURCE, connection_id=user)
+    repo.upsert(
+        user_id=user,
+        client_id=BUNDLE_ID,
+        secret_ciphertext=damaged,
+        now=NOW,
+        key_id=box.key_id,
+    )
+    assert repo.get(user_id=user).key_id == box.key_id
+    service, apple = _service(repo, box)
 
     assert service.discard_unreadable(user_id=user) is DiscardOutcome.DISCARDED
     assert repo.get(user_id=user) is None

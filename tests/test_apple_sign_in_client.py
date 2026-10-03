@@ -445,11 +445,16 @@ def _logged(records: list) -> str:  # noqa: ANN001
 def test_discard_removes_only_an_unreadable_row_and_logs_no_token(service, apple) -> None:  # noqa: ANN001
     from loguru import logger
 
+    # Sealed under this service's key (its key id says so) and damaged: dead.
     stale = SecretBox(os.urandom(32)).seal(
         "r.under-old-key", source=SOURCE, connection_id=USER
     )
     service.repository.upsert(
-        user_id=USER, client_id=BUNDLE_ID, secret_ciphertext=stale, now=NOW
+        user_id=USER,
+        client_id=BUNDLE_ID,
+        secret_ciphertext=stale,
+        now=NOW,
+        key_id=service._box.key_id,
     )
     with pytest.raises(AppleRevocationPending) as raised:
         service.revoke(user_id=USER)
@@ -467,9 +472,29 @@ def test_discard_removes_only_an_unreadable_row_and_logs_no_token(service, apple
     assert service.discard_unreadable(user_id=USER) is DiscardOutcome.NOTHING_STORED
 
 
+@pytest.mark.parametrize("sealed_by", ["another_key", "no_key_id"])
+def test_discard_keeps_a_token_another_key_may_open(service, apple, sealed_by) -> None:  # noqa: ANN001
+    """Priya B1: during a rolling rotation the token may be live for a process
+    on the other key. Only this key's own fingerprint proves it dead."""
+    other = SecretBox(os.urandom(32))
+    service.repository.upsert(
+        user_id=USER,
+        client_id=BUNDLE_ID,
+        secret_ciphertext=other.seal("r.live", source=SOURCE, connection_id=USER),
+        now=NOW,
+        key_id=other.key_id if sealed_by == "another_key" else None,
+    )
+    with pytest.raises(AppleRevocationPending) as raised:
+        service.discard_unreadable(user_id=USER)
+    assert raised.value.reason == "key_unproven"
+    assert service.repository.get(user_id=USER) is not None
+    assert apple.calls == []
+
+
 def test_discard_never_drops_a_token_that_can_still_be_revoked(service, apple) -> None:  # noqa: ANN001
     apple.grant()
     service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    assert service.repository.get(user_id=USER).key_id == service._box.key_id
     assert service.discard_unreadable(user_id=USER) is DiscardOutcome.READABLE
     assert service.repository.get(user_id=USER) is not None
 

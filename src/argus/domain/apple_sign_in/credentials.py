@@ -36,6 +36,7 @@ here logs a token.
 
 from __future__ import annotations
 
+import hmac
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -96,11 +97,19 @@ class StoredAppleCredential:
     secret_ciphertext: bytes = field(repr=False)
     captured_at: datetime
     updated_at: datetime
+    # ``SecretBox.key_id`` of the key that sealed it; None before Lane 6.
+    key_id: str | None = None
 
 
 class AppleCredentialRepository(Protocol):
     def upsert(
-        self, *, user_id: str, client_id: str, secret_ciphertext: bytes, now: datetime
+        self,
+        *,
+        user_id: str,
+        client_id: str,
+        secret_ciphertext: bytes,
+        now: datetime,
+        key_id: str | None = None,
     ) -> None: ...
 
     def get(self, *, user_id: str) -> StoredAppleCredential | None: ...
@@ -116,7 +125,13 @@ class InMemoryAppleCredentialRepository:
         self._lock = Lock()
 
     def upsert(
-        self, *, user_id: str, client_id: str, secret_ciphertext: bytes, now: datetime
+        self,
+        *,
+        user_id: str,
+        client_id: str,
+        secret_ciphertext: bytes,
+        now: datetime,
+        key_id: str | None = None,
     ) -> None:
         with self._lock:
             existing = self._rows.get(user_id)
@@ -126,6 +141,7 @@ class InMemoryAppleCredentialRepository:
                 secret_ciphertext=secret_ciphertext,
                 captured_at=existing.captured_at if existing else now,
                 updated_at=now,
+                key_id=key_id,
             )
 
     def get(self, *, user_id: str) -> StoredAppleCredential | None:
@@ -179,6 +195,7 @@ class AppleCredentialService:
                     grant.refresh_token, source=SOURCE, connection_id=user_id
                 ),
                 now=self._clock(),
+                key_id=self._box.key_id,
             )
         except Exception as exc:  # noqa: BLE001 - any storage failure loses the token
             self._discard(grant.refresh_token, reason="storage_unavailable")
@@ -260,11 +277,15 @@ class AppleCredentialService:
     def discard_unreadable(self, *, user_id: str) -> DiscardOutcome:
         """Delete this user's row only while its token can't be opened.
 
-        For Lane 6 after ``revoke`` raised ``credential_unreadable`` (the key
-        was rotated). Apple's authorization for the app then stays until the
-        person removes it in their Apple ID settings; no token here could end
-        it. Compare-and-delete, so a token captured meanwhile is kept and
-        reported ``READABLE``.
+        For Lane 6 after ``revoke`` raised ``credential_unreadable``. Apple's
+        authorization for the app then stays until the person removes it in
+        their Apple ID settings; no token here could end it. Compare-and-delete,
+        so a token captured meanwhile is kept and reported ``READABLE``.
+
+        Only a token this key sealed (its stored ``key_id`` equals this key's)
+        and that still doesn't open is dead. One sealed under another key, or
+        with no key id (stored before Lane 6), may be live for a process that
+        holds that key, so it is kept: ``AppleRevocationPending("key_unproven")``.
         """
 
         for _ in range(3):
@@ -279,6 +300,10 @@ class AppleCredentialService:
                 pass
             else:
                 return DiscardOutcome.READABLE
+            if row.key_id is None or not hmac.compare_digest(
+                row.key_id, self._box.key_id
+            ):
+                raise AppleRevocationPending("key_unproven")
             if self.repository.delete_if_unchanged(
                 user_id=user_id, secret_ciphertext=row.secret_ciphertext
             ):

@@ -19,18 +19,26 @@ class PostgresAppleCredentialRepository:
         self._pool = pool
 
     def upsert(
-        self, *, user_id: str, client_id: str, secret_ciphertext: bytes, now: datetime
+        self,
+        *,
+        user_id: str,
+        client_id: str,
+        secret_ciphertext: bytes,
+        now: datetime,
+        key_id: str | None = None,
     ) -> None:
         with self._pool.connection() as connection:
             connection.execute(
                 """insert into public.apple_sign_in_credentials
-                    (user_id, client_id, secret_ciphertext, captured_at, updated_at)
-                values (%s::uuid, %s, %s, %s, %s)
+                    (user_id, client_id, secret_ciphertext, secret_key_fingerprint,
+                     captured_at, updated_at)
+                values (%s::uuid, %s, %s, %s, %s, %s)
                 on conflict (user_id) do update
                 set client_id = excluded.client_id,
                     secret_ciphertext = excluded.secret_ciphertext,
+                    secret_key_fingerprint = excluded.secret_key_fingerprint,
                     updated_at = excluded.updated_at""",
-                (user_id, client_id, secret_ciphertext, now, now),
+                (user_id, client_id, secret_ciphertext, key_id, now, now),
             )
 
     def get(self, *, user_id: str) -> StoredAppleCredential | None:
@@ -38,7 +46,7 @@ class PostgresAppleCredentialRepository:
             with connection.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
                     """select user_id::text, client_id, secret_ciphertext,
-                        captured_at, updated_at
+                        captured_at, updated_at, secret_key_fingerprint
                     from public.apple_sign_in_credentials where user_id = %s::uuid""",
                     (user_id,),
                 )
@@ -51,6 +59,7 @@ class PostgresAppleCredentialRepository:
             secret_ciphertext=bytes(row["secret_ciphertext"]),
             captured_at=row["captured_at"],
             updated_at=row["updated_at"],
+            key_id=row["secret_key_fingerprint"],
         )
 
     def delete_if_unchanged(self, *, user_id: str, secret_ciphertext: bytes) -> bool:

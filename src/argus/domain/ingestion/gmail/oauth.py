@@ -226,6 +226,7 @@ class GmailOAuth:
                     refresh_token, source="gmail", connection_id=connection_id
                 ),
                 connection_id=connection_id,
+                secret_key=box.key_id,
             )
         except DuplicateConnection as duplicate:
             if duplicate.elsewhere:
@@ -250,6 +251,7 @@ class GmailOAuth:
             secret=self.hub.box.seal(refresh_token, source="gmail", connection_id=row.id),
             status="active",
             now=self.hub.clock(),
+            secret_key=self.hub.box.key_id,
         )
 
     def _discard(self, token: str) -> None:
