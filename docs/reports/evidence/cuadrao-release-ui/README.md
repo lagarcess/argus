@@ -30,10 +30,17 @@ Modularity and whitespace checks passed after reconciliation.
 - [Shared photo crop](combined-photo-crop-dark-en.png)
 - [Shared photo tab](combined-photo-tab-dark-en.png)
 
-The signed iPhone build 3420 succeeded for the existing Cuadrao Preview bundle.
-Wireless installation initially failed with Apple's RSD connection error; device
-installation is not yet claimed. No provisioning or trust settings were changed.
-The user's phone-unlock/reconnection response is pending.
+Cuadrao Preview **3420 is installed on the physical iPhone 15**. The device
+readback confirmed name, bundle and build after installation. The signed build
+uses the existing bundle `local.cuadrao.design.47R3855RTJ`, auth disabled and
+`CUADRAO_DESIGN_PREVIEW=true`. A device-only copy of the canonical Info.plist sets
+`CFBundleDisplayName` to Cuadrao Preview; no production configuration was changed.
+
+The initial wireless RSD failure recovered after the user made the phone ready.
+Remote launch was subsequently denied because the device locked. Installation
+is confirmed; opening and interacting with this build on the physical phone is
+not claimed. The user can tap the installed app. See [delivery record](device-3420.json).
+No provisioning or trust settings were changed.
 
 ## Review entry
 
@@ -71,7 +78,7 @@ both surfaces, applying Model the Domain rather than competing optional fields.
 
 ## Verification and evidence
 
-- iPhone 18 Pro simulator, iOS 27. No physical-phone installation in this checkpoint.
+- Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
 - Nine distinct native journeys have passing evidence. The integrated run passed
   eight and missed the photo picker with a fixed-coordinate tap. The test now
   waits for the native photo image accessibility element. All three avatar journeys
@@ -119,7 +126,7 @@ not temporary-only evidence. This applies Prove It Works to the native result.
   analytics or model instruction changed in this lane. The full nine-journey run
   followed reconciliation; the final avatar delta reran its three affected journeys.
 - No merge to integration, deployment, hosted operation, live OAuth/deletion/AI,
-  physical-phone test or external TestFlight submission was performed.
+  physical-phone journey or external TestFlight submission was performed.
 - GitHub CI status belongs to the PR. This is a UI handoff, not a READY report.
 
 The [main execution board](../../../specs/argus-execution-board.md#cuadrao-release-ui-landing-order)
