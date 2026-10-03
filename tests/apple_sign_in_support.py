@@ -54,8 +54,14 @@ class FakeApple:
     revoke_responses: list[tuple[int, object]] = field(default_factory=list)
     calls: list[tuple[str, dict[str, str]]] = field(default_factory=list)
     issued: list[str] = field(default_factory=list)
+    # The httpx timeout each request carried, in call order.
+    timeouts: list[dict[str, float | None]] = field(default_factory=list)
+    # Raised (not an HTTP answer) on a revoke call: an unexpected client failure.
+    revoke_raises: Exception | None = None
 
-    def grant(self, *, sub: str = SUBJECT, aud: str = BUNDLE_ID) -> str:
+    def grant(
+        self, *, sub: str = SUBJECT, aud: str = BUNDLE_ID, iss: str = ISSUER
+    ) -> str:
         refresh = f"r.apple-refresh-{len(self.issued)}"
         self.issued.append(refresh)
         self.token_responses.append(
@@ -66,7 +72,7 @@ class FakeApple:
                     "token_type": "Bearer",
                     "expires_in": 3600,
                     "refresh_token": refresh,
-                    "id_token": id_token(sub=sub, aud=aud),
+                    "id_token": id_token(sub=sub, aud=aud, iss=iss),
                 },
             )
         )
@@ -75,6 +81,9 @@ class FakeApple:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         form = {k: v[0] for k, v in parse_qs(request.content.decode()).items()}
         self.calls.append((request.url.path, form))
+        self.timeouts.append(dict(request.extensions.get("timeout") or {}))
+        if request.url.path == "/auth/revoke" and self.revoke_raises is not None:
+            raise self.revoke_raises
         secret = jwt.decode(
             form["client_secret"],
             self.public_key,
