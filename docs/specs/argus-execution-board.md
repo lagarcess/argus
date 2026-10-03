@@ -1751,6 +1751,9 @@ without currency until an explicit one-time choice during review. Group currency
 remains fixed. Generic Chat attachments remain separate. The native acceptance and
 phone delivery status are recorded in the
 [direct-capture checkpoint](../reports/evidence/cuadrao-native-design/receipts-2026-10-02/README.md#direct-capture-build-3417).
+The [build 3418 presentation correction](../reports/evidence/cuadrao-native-design/receipts-2026-10-02/README.md#single-capture-presentation-build-3418)
+removes the intermediate tray under native acquisition, preserves the review sheet,
+and keeps unfinished expense edits when capture returns.
 [ZARA's Add receipt flow](https://mobbin.com/flows/5719cb3d-02c1-4d2a-924a-efb8bcebac86)
 shows direct camera entry, though it scans receipt QR codes rather than performing
 Cuadrao's document extraction.

@@ -172,3 +172,48 @@ The existing receipt keyboard frame warning remains under C10. Vision extraction
 automatic categorization, connected financial posting and shared source access
 remain future connected work in the main roadmap. Context-chip and return/draft
 continuity work remains under C01/C04; this checkpoint does not implement it.
+
+## Single capture presentation, build 3418
+
+App source: `57a4d39745b54c84325620b5abe0f13b2a857127`. Build **3418**
+installed on the iPhone and installed-version readback confirmed it. Launch was
+blocked by the locked phone. [Device evidence](tray-device.json).
+
+The receipt flow opened a sheet containing another sheet for the native picker.
+The first tray appeared before capture and remained visible above it. The
+[before screenshot](tray-before-photos.png) reproduces that same presentation
+with the native Photos picker. Capture now embeds its native picker directly in
+one full-screen cover. The [after screenshot](tray-after-photos.png) shows no
+intermediate tray. Only after capture closes does the saved receipt open in the
+[existing review sheet](tray-review-preserved.png).
+
+Model the Domain shaped one presenter that derives capture and review from
+ReceiptRoute. Both entry hosts use it. The expense editor initializes once, so
+returning from full-screen capture preserves unsaved fields and participant choices.
+
+Six distinct native simulator journeys passed across the
+[initial run](tray-initial-journeys.json) and the
+[final expense-return run](tray-final-expense-journey.json). Five initial passes
+cover Photos and Files cancellation, group photo currency, personal photo import
+and relaunch, group receipt continuity between Chat and Plan, and unavailable
+scanner recovery. The final run verifies both native cancellation and Later
+return to an unfinished expense with its text and excluded participant intact.
+See [the preserved expense](tray-expense-edits-preserved.png).
+
+The initial expense test selected the underlying form's Cancel control instead
+of the native picker. An attempted visibility predicate was unsupported by
+XCTest. The final test targets the observed Photos navigation bar and taps the
+center of its Cancel control; it passed with no app-code changes. Other initial
+passes are retained because only test selectors and assertions changed afterward.
+
+Signed device build, diff check and modularity budget passed. Independent review
+returned no findings; comment review found no additions or required deletions.
+The known keyboard frame warning remains under C10. No receipt store, extraction
+or financial posting logic changed, so the prior deterministic checks are retained.
+
+Physical scanner automation could not start because Xcode has no account or
+development profile for the UI-test runner. App signing and installation worked.
+The simulator cannot operate the physical document camera. The single presenter
+is verified with native Photos and Files, but a physical scanner journey is not
+claimed. The committed physical test does not reset preview data and can run when
+the runner signing setup is available.

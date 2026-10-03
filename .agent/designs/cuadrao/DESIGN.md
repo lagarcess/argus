@@ -569,7 +569,10 @@ Choose a receipt source once. Chat **Escanear / Scan** opens the native scanner.
 The group's and existing Saved receipts view's **Añadir recibo / Add receipt**
 menus offer Scan, Photos and Files, then open the chosen native picker immediately. Do not insert a second source
 chooser, currency form or promotional landing page before acquisition.
-Cancel before acquisition returns to the originating screen without a receipt.
+Capture has one full-screen presentation containing the native picker. Do not open
+a receipt tray underneath it. After the original is saved, close capture before
+opening the review sheet. Cancel before acquisition returns to the originating
+screen without a receipt. An unfinished expense keeps its edits on return.
 
 Capture saves a draft and opens a compact review. **Después / Later** lets the person
 leave immediately; leaving never confirms an expense. A personal import can remain

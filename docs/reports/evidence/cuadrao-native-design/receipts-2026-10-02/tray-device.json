@@ -1,0 +1,12 @@
+{
+  "build": "3418",
+  "version": "0.1.0",
+  "bundleIdentifier": "local.cuadrao.design.47R3855RTJ",
+  "signedBuild": "succeeded",
+  "installation": "succeeded",
+  "installedVersionReadback": "3418",
+  "launch": "blocked: device locked",
+  "physicalScannerVerified": false,
+  "physicalTestBlocker": "No Apple account or development profile available for UI-test runner bundle; app signing and installation succeeded.",
+  "appSource": "57a4d39745b54c84325620b5abe0f13b2a857127"
+}
