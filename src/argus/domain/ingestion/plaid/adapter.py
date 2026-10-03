@@ -5,7 +5,8 @@ Plaid's access and billing for the Item. Transient failures (unreachable,
 429 / ``RATE_LIMIT_EXCEEDED``, 5xx) are retried a bounded number of times with
 growing backoff, because a failed revocation leaves a live grant the person
 believes is gone. An Item Plaid no longer knows is already revoked, so that
-answer counts as success; any other failure raises and the hub reports it
+answer counts as success, reported as ``already_revoked``; any other failure
+raises and the hub reports it
 while still deleting the local credential.
 """
 
@@ -35,16 +36,16 @@ class PlaidAdapter:
         self.client = client
         self.sleep = sleep
 
-    def revoke(self, connection: SourceConnection, credential: str | None) -> None:
+    def revoke(self, connection: SourceConnection, credential: str | None) -> str | None:
         if not credential:
             raise PlaidRevocationUnavailable("no readable access token")
         for attempt in range(ATTEMPTS):
             try:
                 self.client.item_remove(credential)
-                return
+                return None
             except PlaidError as exc:
                 if exc.error_code in _ALREADY_GONE:
-                    return
+                    return "already_revoked"
                 if not is_transient(exc) or attempt == ATTEMPTS - 1:
                     raise PlaidRevocationUnavailable(exc.error_code) from None
                 self.sleep(BACKOFF_SECONDS[attempt])

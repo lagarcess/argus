@@ -14,8 +14,17 @@
 --   3. household_members.former_member_number for the "Exmiembro" placeholder.
 --   4. argus_private.account_placeholders, the run record, its in-flight
 --      placeholder map and its pending revocations.
---   5. The auth.users triggers skip placeholders.
---   6. The Household-owned invite function and the deletion definers.
+--   5. The auth.users triggers skip placeholders, and the placeholder domain
+--      is refused to everyone else.
+--   6. The Household-owned invite function, the locked-column guard and the
+--      deletion definers.
+--
+-- 20261003140000 says the kept sender reference preserves per-user invite
+-- counts. Since Lane 6 that is no longer true for a deleted sender:
+-- forget_invite_party (6a) rotates sender_ref to a distinct fresh value per
+-- row (inviter_origin_id chain unchanged) and drops the mapping row, so
+-- nothing groups their invites and their per-user count intentionally ends.
+-- The note lives here because landed migrations are immutable.
 --
 -- Placeholders (Yelena, HoE, Oct 2, 11:06 PM CT rule, matching #796): one per
 -- (household or standalone shared group, departed person); every plan and
@@ -141,6 +150,48 @@ create trigger reset_plan_participant_seniority
 before update on public.household_plan_participants
 for each row execute function argus_private.reset_plan_participant_seniority();
 
+-- 2b. Claim seniority (Lucas, Oct 3, decision c) ---------------------------------------
+
+-- An activity two households' plans pin goes to the placeholder of the
+-- household whose claim on it is oldest (claim created_at, then claim id).
+-- Claims made before this migration all carry its time and fall to the id.
+-- An archived claim keeps its live claim's time.
+alter table public.financial_plan_links
+    add column created_at timestamptz not null default now();
+
+alter table public.household_plan_archived_claims
+    add column claim_created_at timestamptz;
+
+update public.household_plan_archived_claims c
+   set claim_created_at = l.created_at
+  from public.financial_plan_links l
+ where l.binding_id = c.binding_id and l.claim_id = c.claim_id;
+
+create function argus_private.stamp_archived_claim_created_at()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.claim_created_at is null then
+    select l.created_at into new.claim_created_at
+      from public.financial_plan_links l
+     where l.binding_id = new.binding_id and l.claim_id = new.claim_id
+     limit 1;
+    new.claim_created_at := coalesce(new.claim_created_at, now());
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function argus_private.stamp_archived_claim_created_at()
+  from public, anon, authenticated;
+
+create trigger stamp_archived_claim_created_at
+before insert on public.household_plan_archived_claims
+for each row execute function argus_private.stamp_archived_claim_created_at();
+
 -- 3. The former-member placeholder ------------------------------------------------
 
 -- One placeholder membership per (household, deleted person). The number
@@ -165,28 +216,42 @@ create table argus_private.account_placeholders (
     created_at timestamptz not null default now()
 );
 
--- The resumable run. user_id is held only while the run is in flight, with a
--- unique constraint so a retry finds the same run and reuses its placeholders.
--- It is cleared once the auth user is gone. After that the row keeps only the
--- hash, the analytics distinct id (already a hash), the status and the counts.
+-- The resumable run. user_id, subject_hash and analytics_distinct_id are held
+-- only while the run is in flight (unique, so a retry finds the same run and
+-- reuses its placeholders). subject_hash and the analytics id are unsalted
+-- hashes of the user id, so all three are cleared once the auth user is gone.
+-- A done run keeps only its own random id, the status, the step outcomes and
+-- the counts: nothing that names or re-derives the person.
+--
+-- claim_id/claimed_until is the run's claim (Marcus S3, Priya 3): one pass
+-- at a time, whether a request, a retry or the sweep. A pass claims the row
+-- before it does anything and releases it at the end; a crashed pass's claim
+-- lapses at claimed_until.
 create table argus_private.account_deletion_runs (
-    subject_hash text primary key check (subject_hash ~ '^[0-9a-f]{64}$'),
+    id uuid primary key default gen_random_uuid(),
+    subject_hash text unique check (subject_hash ~ '^[0-9a-f]{64}$'),
     user_id uuid unique,
-    analytics_distinct_id text not null,
+    analytics_distinct_id text,
     status text not null default 'started'
         check (status in ('started', 'data_deleted', 'done')),
     steps jsonb not null default '{}'::jsonb check (jsonb_typeof(steps) = 'object'),
+    claim_id uuid,
+    claimed_until timestamptz,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     completed_at timestamptz,
-    check ((status in ('started', 'data_deleted')) = (user_id is not null))
+    check ((status in ('started', 'data_deleted')) = (user_id is not null)),
+    check ((status = 'done') = (subject_hash is null)),
+    check ((status = 'done') = (analytics_distinct_id is null)),
+    check ((claim_id is null) = (claimed_until is null)),
+    check (status <> 'done' or claim_id is null)
 );
 
 -- The in-flight map from the run to its placeholders: one per sharing scope.
 -- A household is one scope, so every plan and membership-keyed row of the
 -- person inside one household moves to that household's single placeholder.
 -- An activity group shared outside any plan belongs to no household and gets
--- its own. No placeholder spans two scopes. Scrubbed when the run completes.
+-- its own. No placeholder spans two scopes. Deleted when the run completes.
 create table argus_private.account_deletion_placeholders (
     subject_hash text not null
         references argus_private.account_deletion_runs (subject_hash) on delete cascade,
@@ -204,9 +269,17 @@ create table argus_private.account_deletion_placeholders (
 -- is dropped as soon as the provider confirms. 'gmail' rows are every Google
 -- token Cuadrao holds: the Gmail source's sealed refresh tokens. Google
 -- sign-in through Supabase leaves no provider token with us.
--- Every revocation settles before the account delete (step 7). 'unrecoverable'
--- is a credential sealed under a key no longer held: it can never be opened,
--- so its ciphertext is dropped and the run goes on.
+-- Every revocation settles before the account delete (step 7):
+--   'revoked'          the provider confirmed;
+--   'already_revoked'  the provider no longer held the grant (invalid_grant,
+--                      Google invalid_token, Plaid item gone): counted apart
+--                      and alerted on spikes;
+--   'unrecoverable'    the credential does not open under the verified current
+--                      key (key_check: that key opens the newest credential
+--                      anyone else stored). A key or config read failure is
+--                      never this: the row stays pending with its ciphertext;
+--   'operator_forced'  an operator closed it, with a logged reason.
+-- The rows are deleted when the run completes; the run keeps the counts.
 create table argus_private.account_deletion_revocations (
     subject_hash text not null
         references argus_private.account_deletion_runs (subject_hash) on delete cascade,
@@ -215,7 +288,7 @@ create table argus_private.account_deletion_revocations (
     external_ref text,
     secret_ciphertext bytea,
     status text not null default 'pending'
-        check (status in ('pending', 'revoked', 'unrecoverable')),
+        check (status in ('pending', 'revoked', 'already_revoked', 'unrecoverable', 'operator_forced')),
     attempts integer not null default 0 check (attempts >= 0),
     last_error text check (char_length(last_error) <= 200),
     updated_at timestamptz not null default now(),
@@ -272,28 +345,61 @@ revoke all on function argus_private.is_account_placeholder(uuid, jsonb)
   from public, anon, authenticated;
 grant execute on function argus_private.is_account_placeholder(uuid, jsonb) to service_role;
 
--- The triggers test app_metadata only. GoTrue writes auth.users as
--- supabase_auth_admin, which has no access to argus_private, so a WHEN clause
--- calling the function above fails every sign-up. app_metadata is writable only
--- with the service role, and every placeholder is created with
--- {"placeholder": true} after its id is registered.
+-- GoTrue's admin create (supabase/auth internal/api/admin.go,
+-- adminUserCreate) INSERTs the auth.users row first, with app_metadata
+-- {"provider": "email", "providers": ["email"]}, then in the same
+-- transaction UPDATEs app_metadata, confirms the email and sets the ban. So
+-- at INSERT time a placeholder carries no {"placeholder": true} yet: the
+-- triggers also key on the placeholder email, which only placeholders may use
+-- (refuse_placeholder_email below). GoTrue writes auth.users as
+-- supabase_auth_admin, which has no access to argus_private, so no WHEN clause
+-- may call into it; a trigger function may.
 drop trigger if exists bind_guest_signup_handoff on auth.users;
 create trigger bind_guest_signup_handoff
 after insert on auth.users
 for each row
-when (coalesce(new.raw_app_meta_data ->> 'placeholder', '') <> 'true')
+when (coalesce(new.raw_app_meta_data ->> 'placeholder', '') <> 'true'
+      and coalesce(new.email, '') not like 'exmiembro+%@cuadrao.invalid')
 execute function argus_private.bind_guest_signup_handoff();
 
 drop trigger if exists finalize_linked_guest_identity on auth.users;
 create trigger finalize_linked_guest_identity
 after update of email, is_anonymous on auth.users
 for each row
-when (coalesce(new.raw_app_meta_data ->> 'placeholder', '') <> 'true')
+when (coalesce(new.raw_app_meta_data ->> 'placeholder', '') <> 'true'
+      and coalesce(new.email, '') not like 'exmiembro+%@cuadrao.invalid')
 execute function argus_private.finalize_linked_guest_identity();
+
+-- Nobody but a registered placeholder may hold an address at the placeholder
+-- domain: a public sign-up or email change to it is refused.
+create function argus_private.refuse_placeholder_email()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from argus_private.account_placeholders where id = new.id) then
+    raise exception 'placeholder_domain_reserved' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function argus_private.refuse_placeholder_email() from public, anon, authenticated;
+
+create trigger refuse_placeholder_email
+before insert or update of email on auth.users
+for each row
+when (lower(coalesce(new.email, '')) like '%@cuadrao.invalid')
+execute function argus_private.refuse_placeholder_email();
 
 -- 6a. Household-owned invite cleanup (step 4, decision 3) ------------------------------
 
--- The only writer Lane 6 uses on the invite tables. It clears the person's live
+-- Owned by Household, not Lane 6: it ships in this migration, but its rules
+-- and tests (tests/household) belong to the Household lane, whose owner
+-- (Yelena, HoE) signed off on Oct 3. The only writer Lane 6 uses on the
+-- invite tables. It clears the person's live
 -- ids, keeps every anonymous row, and rotates sender_ref: a distinct fresh
 -- sender_ref per row; inviter_origin_id chain unchanged (Priya, Oct 3). No
 -- value left groups the person's invites, which intentionally ends the
@@ -382,6 +488,15 @@ $$;
 
 revoke all on function argus_private.defer_deletion_keys() from public, anon, authenticated;
 
+-- The deletion writer is the pair (Marcus S1): argus.locked_history_writer =
+-- 'deletion' (any session can set a custom setting) and current_user =
+-- 'postgres'. Inside each SECURITY DEFINER writer current_user is its owner,
+-- so the inlined check pins the writers to postgres-owned definitions; a
+-- trigger fired by a writer's statements also sees postgres, while a direct
+-- write from a service_role or authenticated session sees that role. The
+-- pair is checked inline in every writer, in the guard trigger below, and
+-- here.
+--
 -- A re-key at deletion is not a plan edit: when the deletion writer moves a
 -- debt plan to its placeholder's copy of the debt account, the canonical row
 -- changes without a new revision. Otherwise identical to 20261002040000.
@@ -390,6 +505,7 @@ set search_path = '' as $$
 begin
  if TG_OP='UPDATE' and OLD.body=NEW.body then return NEW; end if;
  if TG_OP='UPDATE' and current_setting('argus.locked_history_writer', true) = 'deletion'
+    and current_user = 'postgres'
     and (NEW.body->>'version') = (OLD.body->>'version') then
   return NEW;
  end if;
@@ -416,13 +532,55 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if coalesce(current_setting('argus.locked_history_writer', true), '') <> 'deletion' then
+  if coalesce(current_setting('argus.locked_history_writer', true), '') <> 'deletion'
+     or current_user <> 'postgres' then
     raise exception 'account_deletion_writer_required' using errcode = '42501';
   end if;
 end;
 $$;
 
 revoke all on function argus_private.require_deletion_writer() from public, anon, authenticated;
+
+-- Locked history: the owner columns of these tables change only inside the
+-- deletion writer (Marcus S2). Every other update of them is refused.
+create function argus_private.guard_locked_owner_columns()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('argus.locked_history_writer', true), '') <> 'deletion'
+     or current_user <> 'postgres' then
+    raise exception 'locked_history_owner_columns: %', TG_TABLE_NAME using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function argus_private.guard_locked_owner_columns() from public, anon, authenticated;
+
+create trigger guard_locked_owner_columns
+before update of user_id on public.financial_record_revisions
+for each row when (old.user_id is distinct from new.user_id)
+execute function argus_private.guard_locked_owner_columns();
+
+create trigger guard_locked_owner_columns
+before update of activity_owner_id on public.household_plan_archived_claims
+for each row when (old.activity_owner_id is distinct from new.activity_owner_id)
+execute function argus_private.guard_locked_owner_columns();
+
+create trigger guard_locked_owner_columns
+before update of activity_owner_id on public.household_plan_archived_activities
+for each row when (old.activity_owner_id is distinct from new.activity_owner_id)
+execute function argus_private.guard_locked_owner_columns();
+
+create trigger guard_locked_owner_columns
+before update of goal_owner_id, account_owner_id, contributor_membership_id
+on public.financial_goal_allocation_revisions
+for each row when (old.goal_owner_id is distinct from new.goal_owner_id
+                   or old.account_owner_id is distinct from new.account_owner_id
+                   or old.contributor_membership_id is distinct from new.contributor_membership_id)
+execute function argus_private.guard_locked_owner_columns();
 
 -- Moves one binding, its definition, revisions, responsibilities, claims and
 -- allocations from one owner to another (step 1.2, a #773 archive in step 5.2,
@@ -444,6 +602,9 @@ declare
   v_binding public.household_plan_bindings%rowtype;
 begin
   perform argus_private.require_deletion_writer();
+  if current_user <> 'postgres' then
+    raise exception 'account_deletion_writer_required' using errcode = '42501';
+  end if;
   select * into v_binding
     from public.household_plan_bindings
    where id = p_binding_id and owner_user_id = p_from
@@ -521,6 +682,9 @@ set search_path = ''
 as $$
 begin
   perform argus_private.require_deletion_writer();
+  if current_user <> 'postgres' then
+    raise exception 'account_deletion_writer_required' using errcode = '42501';
+  end if;
   if not exists (
     select 1 from public.household_plan_bindings where id = p_binding_id and owner_user_id = p_owner
   ) then
@@ -559,6 +723,9 @@ declare
   v_successor record;
 begin
   perform argus_private.require_deletion_writer();
+  if current_user <> 'postgres' then
+    raise exception 'account_deletion_writer_required' using errcode = '42501';
+  end if;
   for v_binding in
     select b.id, b.kind
       from public.household_plan_bindings b
@@ -607,6 +774,9 @@ declare
   v_successor record;
 begin
   perform argus_private.require_deletion_writer();
+  if current_user <> 'postgres' then
+    raise exception 'account_deletion_writer_required' using errcode = '42501';
+  end if;
   for v_binding in
     select b.id, b.kind, b.departed_at
       from public.household_plan_bindings b
@@ -640,6 +810,37 @@ end;
 $$;
 
 revoke all on function argus_private.deletion_pass_on_archives(uuid)
+  from public, anon, authenticated;
+
+-- The household whose plan claimed this activity first (decision c): the
+-- oldest claim, live or archived, by claim created_at and then claim id. An
+-- archive with no claim (a refund pinned with its purchase) comes last.
+create function argus_private.deletion_activity_household(p_activity_id uuid)
+returns uuid
+language sql
+stable
+set search_path = ''
+as $$
+  select b.household_id
+    from (
+      select l.binding_id, l.created_at as claimed_at, l.claim_id as claim_ref
+        from public.financial_plan_links l
+       where l.activity_id = p_activity_id and l.binding_id is not null
+      union all
+      select c.binding_id, coalesce(c.claim_created_at, 'infinity'), c.claim_id
+        from public.household_plan_archived_claims c
+       where c.activity_id = p_activity_id
+      union all
+      select a.binding_id, 'infinity'::timestamptz, a.binding_id
+        from public.household_plan_archived_activities a
+       where a.activity_id = p_activity_id
+    ) c
+    join public.household_plan_bindings b on b.id = c.binding_id
+   order by c.claimed_at, c.claim_ref
+   limit 1;
+$$;
+
+revoke all on function argus_private.deletion_activity_household(uuid)
   from public, anon, authenticated;
 
 -- The units that need a placeholder: every plan binding that holds any of the
@@ -691,26 +892,21 @@ as $$
   select 'plan'::text, p.id, 'household'::text, b.household_id
     from plans p join public.household_plan_bindings b on b.id = p.id
   union all
-  -- A group a household plan claims or archives belongs to that household's
-  -- scope (the plan's link names its legs and accounts); any other group is
-  -- shared outside a plan and is its own scope.
+  -- A group a household plan claims or archives belongs to the scope of the
+  -- household that claimed it first (decision c; the plan's link names its
+  -- legs and accounts); any other group is shared outside a plan and is its
+  -- own scope.
   select 'group'::text, g.id,
          case when h.household_id is null then 'group' else 'household' end,
          coalesce(h.household_id, g.id)
     from groups g
-    left join lateral (
-      select b.household_id from public.household_plan_bindings b
-       where b.id in (
-         select binding_id from public.financial_plan_links where activity_id = g.id and binding_id is not null
-         union select binding_id from public.household_plan_archived_claims where activity_id = g.id
-         union select binding_id from public.household_plan_archived_activities where activity_id = g.id)
-       order by b.household_id limit 1
-    ) h on true;
+    cross join lateral (
+      select argus_private.deletion_activity_household(g.id) as household_id
+    ) h;
 $$;
 
 revoke all on function argus_private.deletion_placeholder_units(uuid)
   from public, anon, authenticated;
-grant execute on function argus_private.deletion_placeholder_units(uuid) to service_role;
 
 -- Rewrites ids inside a jsonb document (claim attribution, record details).
 create function argus_private.deletion_rewrite_ids(p_doc jsonb, p_from uuid[], p_to uuid[])
@@ -736,11 +932,16 @@ $$;
 revoke all on function argus_private.deletion_rewrite_ids(jsonb, uuid[], uuid[])
   from public, anon, authenticated;
 
--- Step 5.1 for one unit. Copies the person's rows that the unit pins under the
--- unit's own placeholder, re-points the unit's children to the copies, and
--- leaves the originals to go with the person. Kept copies hold amount, date,
--- category and currency only: notes and source ids are dropped, account
--- nicknames cleared, and recorded_by nulled. Returns true if the unit used its
+-- Step 5.1 for one unit. The person's activities and records the unit pins
+-- move in place to the unit's placeholder (same ids, revisions and
+-- timestamps); the accounts they sit in are copied under it, because an
+-- account also holds rows that go with the person, and those originals go
+-- with the person. Kept history holds amount, date, category and currency
+-- only: notes and source ids are dropped, account nicknames cleared, and
+-- recorded_by nulled. An activity two households' plans pin moves only with
+-- the household that claimed it first (decision c); every other claim or
+-- archive on it, in any plan, then names that placeholder as a read-only
+-- reference that still resolves. Returns true if the unit used its
 -- placeholder.
 create function argus_private.deletion_place_unit(
   p_user_id uuid,
@@ -765,6 +966,9 @@ declare
   v_used boolean := false;
 begin
   perform argus_private.require_deletion_writer();
+  if current_user <> 'postgres' then
+    raise exception 'account_deletion_writer_required' using errcode = '42501';
+  end if;
   if not exists (select 1 from argus_private.account_placeholders where id = p_placeholder_id)
      or not exists (select 1 from auth.users where id = p_placeholder_id) then
     raise exception 'account_deletion_placeholder_missing' using errcode = 'P0002';
@@ -794,6 +998,7 @@ begin
       union select activity_id from public.household_plan_archived_activities
        where binding_id = p_unit_id and activity_owner_id = p_user_id
     ) s
+    where argus_private.deletion_activity_household(a) = v_binding.household_id
     on conflict do nothing;
     insert into pg_temp.deletion_unit_ids
     select 'account', a from (
@@ -921,6 +1126,28 @@ begin
      set record_owner_id = p_placeholder_id
    where record_id in (select old_id from pg_temp.deletion_unit_ids where kind = 'record')
      and record_owner_id = p_user_id;
+
+  -- Every claim or archive on a moved activity, in any plan, follows it now:
+  -- the activity's key holds it immediate at the end of this call. In another
+  -- household's plan it is the read-only reference of decision c. The
+  -- person's own personal claims on it go with them (5.3 deletes the rest).
+  delete from public.financial_plan_links
+   where binding_id is null and user_id = p_user_id
+     and activity_id in (select old_id from pg_temp.deletion_unit_ids where kind = 'activity');
+  update public.financial_plan_links l
+     set activity_owner_id = p_placeholder_id,
+         attribution = argus_private.deletion_rewrite_ids(l.attribution, v_from, v_to)
+   where l.binding_id is not null and l.binding_id is distinct from p_unit_id
+     and l.activity_owner_id = p_user_id
+     and l.activity_id in (select old_id from pg_temp.deletion_unit_ids where kind = 'activity');
+  update public.household_plan_archived_claims c
+     set activity_owner_id = p_placeholder_id
+   where c.binding_id is distinct from p_unit_id and c.activity_owner_id = p_user_id
+     and c.activity_id in (select old_id from pg_temp.deletion_unit_ids where kind = 'activity');
+  update public.household_plan_archived_activities c
+     set activity_owner_id = p_placeholder_id
+   where c.binding_id is distinct from p_unit_id and c.activity_owner_id = p_user_id
+     and c.activity_id in (select old_id from pg_temp.deletion_unit_ids where kind = 'activity');
 
   v_used := exists (select 1 from pg_temp.deletion_unit_ids);
 
@@ -1051,6 +1278,9 @@ declare
   v_blocker text;
 begin
   perform argus_private.require_deletion_writer();
+  if current_user <> 'postgres' then
+    raise exception 'account_deletion_writer_required' using errcode = '42501';
+  end if;
   perform argus_private.defer_deletion_keys();
   select email into v_email from auth.users where id = p_user_id;
 
@@ -1146,11 +1376,58 @@ $$;
 revoke all on function argus_private.deletion_finish(uuid, text)
   from public, anon, authenticated;
 
--- The deletion command runs as the API's server role. Each writer still
--- refuses to run unless argus.locked_history_writer = 'deletion'.
-grant execute on function
+-- Right before the Admin API delete (Priya 4): every RESTRICT or NO ACTION
+-- key to auth.users outside the auth schema that still holds the person.
+-- Read from the catalog, not a list, so a key added later is covered too. A
+-- late write (a plan edit that committed after the data step) shows here;
+-- the caller re-runs deletion_finish once and checks again.
+create function argus_private.deletion_auth_blockers(p_user_id uuid)
+returns setof text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_key record;
+  v_held boolean;
+begin
+  for v_key in
+    select c.conrelid::regclass as tbl, a.attname as col
+      from pg_catalog.pg_constraint c
+      join pg_catalog.pg_class r on r.oid = c.conrelid
+      join pg_catalog.pg_namespace n on n.oid = r.relnamespace
+      join pg_catalog.pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
+     where c.contype = 'f' and c.confrelid = 'auth.users'::regclass
+       and c.confdeltype in ('a', 'r') and array_length(c.conkey, 1) = 1
+       and n.nspname <> 'auth'
+     order by 1, 2
+  loop
+    execute format('select exists (select 1 from %s where %I = $1)', v_key.tbl, v_key.col)
+      into v_held using p_user_id;
+    if v_held then
+      return next v_key.tbl::text || '.' || v_key.col;
+    end if;
+  end loop;
+end;
+$$;
+
+revoke all on function argus_private.deletion_auth_blockers(uuid)
+  from public, anon, authenticated;
+
+-- No grant to service_role: the deletion command runs on the API's own
+-- database connection as postgres, the writers' owner, so nothing else needs
+-- to call them. With no grant, a service_role or authenticated session can't
+-- reach a writer even with the GUC set (S1); the inline current_user check
+-- inside each writer additionally pins them to postgres-owned definitions.
+revoke all on function
+    argus_private.deletion_rekey_binding(uuid, uuid, uuid, uuid, uuid),
+    argus_private.deletion_drop_binding(uuid, uuid),
     argus_private.deletion_hand_over_plans(uuid, uuid),
     argus_private.deletion_pass_on_archives(uuid),
+    argus_private.deletion_placeholder_units(uuid),
     argus_private.deletion_place_unit(uuid, text, uuid, uuid),
-    argus_private.deletion_finish(uuid, text)
-  to service_role;
+    argus_private.deletion_finish(uuid, text),
+    argus_private.deletion_auth_blockers(uuid),
+    argus_private.deletion_activity_household(uuid)
+  from service_role;

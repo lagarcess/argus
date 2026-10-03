@@ -69,6 +69,10 @@ services:
         value: "false"
       - key: ARGUS_INGESTION_SECRET_KEY
         sync: false
+      - key: ARGUS_INVITE_CODE_SECRET
+        sync: false
+      - key: ARGUS_INVITE_CODE_SECRET_PREVIOUS
+        sync: false
       - key: GOOGLE_OAUTH_CLIENT_ID
         sync: false
       - key: GOOGLE_OAUTH_CLIENT_SECRET

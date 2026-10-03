@@ -27,9 +27,11 @@ from argus.domain.household.errors import (
     VerifiedUserRequired,
 )
 from argus.domain.household.invite_codes import (
+    CodeHasher,
     InviteSettings,
     format_code,
     invite_link,
+    store_code,
     unique_code,
 )
 from argus.domain.household.invite_schemas import (
@@ -49,7 +51,12 @@ from argus.domain.household.invite_schemas import (
     SentInvite,
     SentInvitesResponse,
 )
-from argus.domain.household.repository import INVITE_TTL, hash_token, secret_lookup
+from argus.domain.household.repository import (
+    INVITE_TTL,
+    code_hasher,
+    hash_token,
+    locate_secret,
+)
 from argus.domain.recording.errors import IdempotencyConflict
 
 GROUP_LINK_MAX_LIFETIME = timedelta(days=365)
@@ -93,16 +100,23 @@ def _state(accepted_at, revoked_at, expires_at, now) -> str:  # noqa: ANN001
 
 
 class PostgresInviteStore:
+    # The single-use path locks the row, then claims the use with a guarded
+    # update whose row count is checked. Tests drop the lock to prove the
+    # guarded update alone still admits one person.
+    _single_use_lock = " for update"
+
     def __init__(
         self,
         pool: ConnectionPool,
         *,
         settings: InviteSettings | None = None,
         clock=_utcnow,  # noqa: ANN001
+        code_hasher: CodeHasher | None = None,
     ) -> None:
         self._pool = pool
         self.settings = settings or InviteSettings.from_env()
         self._clock = clock
+        self._hasher = code_hasher
 
     # -- Gate -------------------------------------------------------------
     def access(self, *, user_id: str) -> BetaAccess:
@@ -196,17 +210,16 @@ class PostgresInviteStore:
     ) -> BetaInviteCreated:
         now = self._clock()
         token = secrets.token_urlsafe(32)
-        code, code_digest = unique_code(c)
+        code, code_digest = unique_code(c, code_hasher(self._hasher))
         iid = str(uuid4())
         c.execute(
-            "insert into public.beta_invitations(id,kind,token_hash,code_hash,created_by,"
+            "insert into public.beta_invitations(id,kind,token_hash,created_by,"
             "source_label,max_uses,created_at,expires_at,idempotency_key,request_hash)"
-            " values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            " values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 iid,
                 kind,
                 hash_token(token),
-                code_digest,
                 user_id,
                 source_label,
                 max_uses,
@@ -216,6 +229,7 @@ class PostgresInviteStore:
                 request_hash,
             ),
         )
+        store_code(c, code_digest, beta_invitation_id=iid)
         if kind == "beta":
             record.record_sent(
                 c, kind="beta", sender=user_id, at=now, beta_invitation_id=iid
@@ -283,9 +297,9 @@ class PostgresInviteStore:
 
     # -- Preview and redeem ----------------------------------------------
     def preview(self, *, token: str | None, code: str | None) -> InvitePreview:
-        column, digest = secret_lookup(token, code)
         now = self._clock()
         with self._pool.connection() as c:
+            column, digest = locate_secret(c, token, code, self._hasher)
             row = c.execute(
                 f"select kind,expires_at,revoked_at,use_count,max_uses"  # noqa: S608
                 f" from public.beta_invitations where {column}=%s",
@@ -319,10 +333,10 @@ class PostgresInviteStore:
         self, *, user_id: str, token: str | None, code: str | None
     ) -> RedeemResult:
         user_id = verified_user(user_id)
-        column, digest = secret_lookup(token, code)
         full = False
         with self._pool.connection() as c, c.transaction():
             _lock(c, user_id + ":beta-redeem")
+            column, digest = locate_secret(c, token, code, self._hasher)
             row = c.execute(
                 f"select id,kind from public.beta_invitations where {column}=%s",  # noqa: S608
                 (digest,),
@@ -352,7 +366,7 @@ class PostgresInviteStore:
     def _redeem_single(self, c, user_id: str, iid: str) -> RedeemResult:  # noqa: ANN001
         use_count, revoked_at, expires_at = c.execute(
             "select use_count,revoked_at,expires_at from public.beta_invitations"
-            " where id=%s for update",
+            " where id=%s" + self._single_use_lock,
             (iid,),
         ).fetchone()
         if use_count > 0:
@@ -371,10 +385,14 @@ class PostgresInviteStore:
             # Already in: the invite stays unused for someone else.
             return RedeemResult(admitted=True, outcome="already_admitted", kind="beta")
         now = self._clock()
-        c.execute(
+        claimed = c.execute(
             "update public.beta_invitations set use_count=1 where id=%s and use_count=0",
             (iid,),
-        )
+        ).rowcount
+        if claimed != 1:
+            # Second guard behind the row lock: someone else took the one use.
+            # Raising rolls back, so nothing below runs for the loser.
+            raise InvitationConsumed()
         rid = c.execute(
             "update public.invite_referrals set acceptor_user_id=%s,accepted_at=%s"
             " where beta_invitation_id=%s and kind='beta' returning id",

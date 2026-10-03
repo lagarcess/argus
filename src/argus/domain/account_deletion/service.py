@@ -2,15 +2,20 @@
 
 Order, matching ``docs/specs/lanes/account-deletion-fk-census.md``:
 
-1. Open or reuse the run. The run is keyed on a hash of the user id; the id
-   itself is held only while the run is in flight, so a retry finds the same
-   run and reuses the same placeholders. From here the account is locked: the
-   session check rejects any JWT whose user has a run in flight, and the auth
-   user is banned through the Admin API so no refresh or sign-in succeeds.
+1. Claim the run, opening it on the first request. The run is keyed on a hash
+   of the user id; the id itself is held only while the run is in flight, so a
+   retry finds the same run and reuses the same placeholders. Every pass (a
+   request, a retry, the sweep) first takes the run's claim and releases it at
+   the end, so two passes never revoke or delete in parallel; a pass that
+   finds the claim held gets ``AccountDeletionIncomplete("in_progress")``.
+   From here the account is locked: the session check rejects any JWT whose
+   user has a run in flight (except on the delete route itself, so the person
+   can resume), and the auth user is banned through the Admin API so no
+   refresh or sign-in succeeds.
 2. Reserve one placeholder id per sharing scope the person's rows are pinned
    in (a household, or an activity group shared outside any plan), then
-   create each placeholder through the Admin API. Ids are
-   registered before the create, so the auth triggers already skip them.
+   create each placeholder through the Admin API. Ids are registered before
+   the create, so the auth triggers already skip them.
 3. One database transaction: steps 1.1 to 1.3 per household, archives passed
    on, sources captured for revocation and removed (2), invite ids forgotten
    (4), future responsibilities returned, each unit moved to its placeholder
@@ -18,18 +23,27 @@ Order, matching ``docs/specs/lanes/account-deletion-fk-census.md``:
    then a check that nothing still holds the id.
 4. Every third-party step runs before the account delete, inside the run:
    Sign in with Apple (#793), then the captured Plaid access tokens and Gmail
-   (Google) refresh tokens, then PostHog person deletion (8). Revoked, or
-   already revoked (``invalid_grant`` / ``invalid_token`` / Plaid's item gone),
-   counts as done. A transient failure leaves that step pending: the run stays
-   ``data_deleted``, the account stays locked, the auth delete waits, and the
-   scheduled sweep (``resume_pending_deletions``) or the person's own retry
-   resumes it. A credential that can't be opened (key rotated) can never be
-   revoked: a Plaid or Gmail one is recorded ``unrecoverable`` and its
-   ciphertext dropped; an Apple one goes through #802's ``discard_unreadable``
-   (TODO below until #802 lands). No token is ever logged.
-5. The auth user is deleted through the Admin API (7); unused placeholders are
-   deleted; the id and the placeholder map are scrubbed from the run, which
-   ends ``done``.
+   (Google) refresh tokens, then PostHog person deletion (8). Revoked counts as
+   done; a provider that no longer held the grant (``invalid_grant``, Google
+   ``invalid_token``, Plaid's item gone; #802 for Apple) is recorded
+   ``already_revoked`` and counted for the spike alert. A transient failure
+   leaves that step pending: the run stays ``data_deleted``, the account stays
+   locked, the auth delete waits, and the operator-run resume sweep
+   (``scripts/ops/resume_account_deletions.py`` inside scheduled_maintenance)
+   or the person's own retry resumes it. A step pending for 7 days raises an
+   operator alert; only an operator can force-complete it, with a reason kept
+   in the run record (``force_complete_step``). There is no user-facing
+   bypass.
+   A credential that does not open is given up only when ``key_check`` proves
+   this process holds the deployment's current key: then a Plaid or Gmail one
+   is recorded ``unrecoverable`` and an Apple one goes through #802's
+   ``discard_unreadable``. A missing, wrong or unproven key keeps every
+   credential pending with its ciphertext and alerts. No token is ever logged.
+5. Right before the auth delete, every RESTRICT key to auth.users is read from
+   the catalog; a late write that still holds the person is scrubbed once more.
+   The auth user is deleted through the Admin API (7); unused placeholders are
+   deleted; the run drops the user id, both hashes, the placeholder map and the
+   revocation rows, keeping only counts, and ends ``done``.
 """
 
 from __future__ import annotations
@@ -42,11 +56,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Protocol
 
+import psycopg
 from loguru import logger
 
 from argus.domain.account_deletion.auth_admin import AuthAdmin, placeholder_email
+from argus.domain.account_deletion.key_check import KeyCheck, check_current_key
 from argus.domain.apple_sign_in.credentials import AppleRevocationPending
 from argus.domain.household import deletion as household_deletion
+from argus.domain.ingestion.secrets import SecretBox
 from argus.observability.analytics_deletion import AnalyticsDeletion
 from argus.observability.product_events import actor_hash_for_user
 
@@ -54,10 +71,20 @@ RunStatus = Literal["started", "data_deleted", "done"]
 _ATTEMPTS = 3
 # A run the sweep may resume: one no request has touched for this long.
 SWEEP_IDLE_SECONDS = 120
+# A pass's claim on its run lapses after this, should the pass die mid-way.
+CLAIM_SECONDS = 900
+# A third-party step pending this long needs an operator (Priya, #802 eval).
+ESCALATE_AFTER = timedelta(days=7)
+# already_revoked in this many runs within the window is a spike worth a look:
+# a token we hold should normally still be live when the person deletes.
+ALREADY_REVOKED_SPIKE = 5
+ALREADY_REVOKED_WINDOW = timedelta(hours=24)
+FORCEABLE_STEPS = ("apple", "plaid", "gmail", "analytics")
 
 
 class AccountDeletionRejected(Exception):
-    """The request names no deletable account (bad id, guest, placeholder)."""
+    """The request names no deletable account (bad id, unknown user,
+    placeholder)."""
 
 
 class AccountDeletionIncomplete(Exception):
@@ -65,7 +92,8 @@ class AccountDeletionIncomplete(Exception):
 
     ``pending`` names the third-party steps still owed (``apple``, ``gmail``,
     ``plaid``, ``analytics``); it is empty when the data step itself must be
-    retried. The sweep or a retry resumes the same run."""
+    retried. ``in_progress`` means another pass holds the run's claim. The
+    sweep or a retry resumes the same run."""
 
     def __init__(self, reason: str, pending: list[str] | None = None) -> None:
         super().__init__(reason)
@@ -85,7 +113,7 @@ class ProviderRevoker(Protocol):
 
 
 class AppleCredentials(Protocol):
-    """#793's ``AppleCredentialService``: its ``revoke`` and its repository."""
+    """#793's ``AppleCredentialService`` with #802's ``discard_unreadable``."""
 
     repository: Any
 
@@ -93,8 +121,9 @@ class AppleCredentials(Protocol):
         """Raises ``AppleRevocationPending`` while the token is kept."""
         ...
 
-
-AppleRevokeStep = Literal["none", "revoked", "already_revoked", "unrecoverable"]
+    def discard_unreadable(self, *, user_id: str) -> Any:
+        """Deletes the row only while it still does not open."""
+        ...
 
 
 @dataclass
@@ -102,6 +131,7 @@ class DeletionOutcome:
     status: RunStatus
     pending: list[str] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)
+    run_id: str | None = None
 
 
 def subject_hash(user_id: str) -> str:
@@ -119,6 +149,10 @@ def _uuid(value: str) -> str:
         raise AccountDeletionRejected("invalid_user_id") from None
 
 
+def _value(outcome: Any) -> str:
+    return str(getattr(outcome, "value", outcome))
+
+
 class AccountDeletionService:
     def __init__(
         self,
@@ -128,6 +162,8 @@ class AccountDeletionService:
         revoker: ProviderRevoker | None,
         analytics: AnalyticsDeletion,
         apple: AppleCredentials | None = None,
+        secret_box: SecretBox | None = None,
+        allow_fake_analytics: bool = False,
         clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         # The household repository owns the pool and binds one connection per
@@ -137,6 +173,12 @@ class AccountDeletionService:
         self._revoker = revoker
         self._analytics = analytics
         self._apple = apple
+        # The credential key, for key_check only; it never opens a token here.
+        self._box = secret_box
+        # The recording fake counts as done only where it is explicitly the
+        # adapter (tests, local dev). Anywhere else the PostHog step stays
+        # pending until a real deletion adapter ships.
+        self._allow_fake_analytics = allow_fake_analytics
         self._clock = clock
 
     # -- entry point -------------------------------------------------------------
@@ -144,9 +186,13 @@ class AccountDeletionService:
     def delete_account(self, *, user_id: str) -> DeletionOutcome:
         user_id = _uuid(user_id)
         subject = subject_hash(user_id)
-        run = self._open_run(user_id, subject)
-        if run["status"] == "done":
-            return DeletionOutcome(status="done", counts=run["steps"].get("counts", {}))
+        run = self._claim(user_id, subject)
+        try:
+            return self._run(user_id, subject, run)
+        finally:
+            self._release(run["id"], run["claim"])
+
+    def _run(self, user_id: str, subject: str, run: dict[str, Any]) -> DeletionOutcome:
         # Idempotent: every attempt re-applies the ban, so a refresh token
         # issued before the run can't outlive it.
         self._auth.lock_user(user_id)
@@ -159,20 +205,25 @@ class AccountDeletionService:
                 except _UnitsChanged:
                     if attempt == _ATTEMPTS - 1:
                         raise AccountDeletionIncomplete("units_changed") from None
-            run["status"] = "data_deleted"
         # Every third-party step is attempted on each pass, so one provider's
         # outage doesn't hide another's; the account delete waits for all.
-        pending: list[str] = []
-        if self._revoke_apple(user_id, subject):
-            pending.append("apple")
-        pending += self._revoke_providers(subject)
-        if self._delete_analytics(subject):
-            pending.append("analytics")
+        pending: dict[str, str] = {}
+        apple = self._revoke_apple(user_id, subject)
+        if apple is not None:
+            pending["apple"] = apple
+        pending.update(self._revoke_providers(user_id, subject))
+        analytics = self._delete_analytics(subject)
+        if analytics is not None:
+            pending["analytics"] = analytics
+        self._track_pending(subject, pending)
         if pending:
-            logger.warning("Account deletion waiting on third parties", pending=pending)
-            raise AccountDeletionIncomplete("third_party_pending", pending)
-        counts = self._delete_auth_user(user_id, subject)
-        return DeletionOutcome(status="done", counts=counts)
+            logger.warning(
+                "Account deletion waiting on third parties", pending=sorted(pending)
+            )
+            raise AccountDeletionIncomplete("third_party_pending", list(pending))
+        self._settle_late_writes(user_id, subject)
+        counts = self._delete_auth_user(user_id, run["id"])
+        return DeletionOutcome(status="done", counts=counts, run_id=run["id"])
 
     # -- the sweep ----------------------------------------------------------------
 
@@ -180,34 +231,42 @@ class AccountDeletionService:
         self, *, limit: int = 25, idle_seconds: int = SWEEP_IDLE_SECONDS
     ) -> dict[str, int]:
         """Resume every run still in flight that no request has touched for
-        ``idle_seconds``, through the same command, so the sweep and a
-        person's own retry can't diverge."""
+        ``idle_seconds`` and nobody holds, through the same command, so the
+        sweep and a person's own retry can't diverge. A run another pass
+        claimed meanwhile is counted ``busy`` and left alone."""
 
-        cutoff = self._clock() - timedelta(seconds=idle_seconds)
+        now = self._clock()
+        cutoff = now - timedelta(seconds=idle_seconds)
         with self._households.connection() as connection:
             user_ids = [
                 str(uid)
                 for (uid,) in connection.execute(
                     "select user_id from argus_private.account_deletion_runs"
                     " where status in ('started', 'data_deleted') and updated_at < %s"
+                    "   and (claim_id is null or claimed_until < %s)"
                     " order by updated_at limit %s",
-                    (cutoff, limit),
+                    (cutoff, now, limit),
                 ).fetchall()
             ]
-        result = {"resumed": 0, "done": 0, "pending": 0, "failed": 0}
+        result = {"resumed": 0, "done": 0, "pending": 0, "failed": 0, "busy": 0}
         for uid in user_ids:
-            result["resumed"] += 1
             try:
                 self.delete_account(user_id=uid)
+                result["resumed"] += 1
                 result["done"] += 1
                 continue
-            except AccountDeletionIncomplete:
+            except AccountDeletionIncomplete as exc:
+                if exc.reason == "in_progress":
+                    result["busy"] += 1
+                    continue
+                result["resumed"] += 1
                 result["pending"] += 1
             except Exception as exc:
                 # No user id in logs: the run is keyed on a hash for that reason.
                 logger.error(
                     "Account deletion sweep failed", failure_mode=type(exc).__name__
                 )
+                result["resumed"] += 1
                 result["failed"] += 1
             # Touched, so the next pass reaches the stalest runs first.
             with self._households.connection() as connection, connection.transaction():
@@ -218,38 +277,133 @@ class AccountDeletionService:
                 )
         return result
 
-    # -- 1. the run --------------------------------------------------------------
+    # -- operator only -------------------------------------------------------------
 
-    def _open_run(self, user_id: str, subject: str) -> dict[str, Any]:
+    def force_complete_step(
+        self, *, user_id: str, step: str, reason: str, operator: str
+    ) -> None:
+        """Close one third-party step an operator has decided can't complete
+        (Apple ``invalid_request`` after the person revoked the app, a provider
+        down for good). The reason and operator stay in the run record. Only
+        ``scripts/ops/force_account_deletion_step.py`` calls this; no route
+        does. The next pass of the run then finishes the deletion."""
+
+        user_id = _uuid(user_id)
+        if step not in FORCEABLE_STEPS:
+            raise ValueError(f"step must be one of {', '.join(FORCEABLE_STEPS)}")
+        reason = (reason or "").strip()
+        operator = (operator or "").strip()
+        if not reason or len(reason) > 200:
+            raise ValueError("a reason of 1 to 200 characters is required")
+        if not operator or len(operator) > 80:
+            raise ValueError("the operator's name is required")
+        subject = subject_hash(user_id)
+        now = self._clock()
         with self._households.connection() as connection, connection.transaction():
             row = connection.execute(
-                "select status, steps from argus_private.account_deletion_runs"
+                "select id, status, claim_id, claimed_until"
+                " from argus_private.account_deletion_runs"
                 " where subject_hash = %s for update",
                 (subject,),
             ).fetchone()
-            if row is not None:
-                return {"status": row[0], "steps": row[1] or {}}
-            user = connection.execute(
-                "select raw_app_meta_data from auth.users where id = %s",
-                (user_id,),
-            ).fetchone()
-            if user is None:
-                raise AccountDeletionRejected("unknown_user")
-            # A guest is deleted by this same command (Lane 6 acceptance); it
-            # simply has no household, plan or provider rows to move.
-            placeholder = connection.execute(
-                "select argus_private.is_account_placeholder(%s, %s::jsonb)",
-                (user_id, json.dumps(user[0] or {})),
-            ).fetchone()[0]
-            if placeholder:
-                raise AccountDeletionRejected("placeholder")
+            if row is None or row[1] != "data_deleted":
+                raise AccountDeletionRejected("no_run_awaiting_third_parties")
+            if row[2] is not None and row[3] > now:
+                raise AccountDeletionIncomplete("in_progress")
+            if step == "apple":
+                connection.execute(
+                    "delete from public.apple_sign_in_credentials where user_id = %s",
+                    (user_id,),
+                )
+                marker = {"apple_revoke": "operator_forced"}
+            elif step == "analytics":
+                marker = {"analytics": "operator_forced"}
+            else:
+                connection.execute(
+                    "update argus_private.account_deletion_revocations"
+                    " set status = 'operator_forced', secret_ciphertext = null,"
+                    "     external_ref = null, last_error = null, updated_at = %s"
+                    " where subject_hash = %s and provider = %s and status = 'pending'",
+                    (now, subject, step),
+                )
+                marker = {}
+            forced = {
+                step: {"reason": reason, "operator": operator, "at": now.isoformat()}
+            }
             connection.execute(
-                "insert into argus_private.account_deletion_runs"
-                " (subject_hash, user_id, analytics_distinct_id, status)"
-                " values (%s, %s, %s, 'started')",
-                (subject, user_id, actor_hash_for_user(user_id)),
+                "update argus_private.account_deletion_runs"
+                " set steps = steps || %s::jsonb || jsonb_build_object('forced',"
+                "     coalesce(steps -> 'forced', '{}'::jsonb) || %s::jsonb),"
+                "     updated_at = %s"
+                " where id = %s",
+                (json.dumps(marker), json.dumps(forced), now, row[0]),
             )
-            return {"status": "started", "steps": {}}
+        logger.warning(
+            "Account deletion step force-completed by an operator",
+            step=step,
+            operator=operator,
+        )
+
+    # -- 1. the run and its claim --------------------------------------------------
+
+    def _claim(self, user_id: str, subject: str) -> dict[str, Any]:
+        """Open the run if this is the first request (idempotent: two first
+        requests open one run), then take its claim for this pass."""
+
+        now = self._clock()
+        select = (
+            "select id, status, steps, claim_id, claimed_until"
+            " from argus_private.account_deletion_runs"
+            " where subject_hash = %s for update"
+        )
+        with self._households.connection() as connection, connection.transaction():
+            row = connection.execute(select, (subject,)).fetchone()
+            if row is None:
+                user = connection.execute(
+                    "select raw_app_meta_data from auth.users where id = %s",
+                    (user_id,),
+                ).fetchone()
+                if user is None:
+                    raise AccountDeletionRejected("unknown_user")
+                # A guest is deleted by this same command (Lane 6 acceptance);
+                # it simply has no household, plan or provider rows to move.
+                placeholder = connection.execute(
+                    "select argus_private.is_account_placeholder(%s, %s::jsonb)",
+                    (user_id, json.dumps(user[0] or {})),
+                ).fetchone()[0]
+                if placeholder:
+                    raise AccountDeletionRejected("placeholder")
+                # A concurrent first request waits here on the unique keys,
+                # then inserts nothing and locks the row the other one made.
+                connection.execute(
+                    "insert into argus_private.account_deletion_runs"
+                    " (subject_hash, user_id, analytics_distinct_id, status)"
+                    " values (%s, %s, %s, 'started') on conflict do nothing",
+                    (subject, user_id, actor_hash_for_user(user_id)),
+                )
+                row = connection.execute(select, (subject,)).fetchone()
+                if row is None:
+                    # Finished by another pass in between.
+                    raise AccountDeletionIncomplete("in_progress")
+            run_id, status, steps, claim_id, claimed_until = row
+            if claim_id is not None and claimed_until > now:
+                raise AccountDeletionIncomplete("in_progress")
+            claim = str(uuid.uuid4())
+            connection.execute(
+                "update argus_private.account_deletion_runs"
+                " set claim_id = %s, claimed_until = %s where id = %s",
+                (claim, now + timedelta(seconds=CLAIM_SECONDS), run_id),
+            )
+        return {"id": str(run_id), "status": status, "steps": steps or {}, "claim": claim}
+
+    def _release(self, run_id: str, claim: str) -> None:
+        with self._households.connection() as connection, connection.transaction():
+            connection.execute(
+                "update argus_private.account_deletion_runs"
+                " set claim_id = null, claimed_until = null"
+                " where id = %s and claim_id = %s",
+                (run_id, claim),
+            )
 
     # -- 2. placeholders ---------------------------------------------------------
 
@@ -429,6 +583,23 @@ class AccountDeletionService:
                     (pid,),
                 )
         household_deletion.write_events(connection, events)
+        # Decision c: claims or archives in another household's plan that now
+        # name this run's placeholder as a read-only reference.
+        cross_scope = connection.execute(
+            """select count(*) from (
+                 select binding_id, activity_owner_id from public.financial_plan_links
+                  where binding_id is not null
+                 union all
+                 select binding_id, activity_owner_id from public.household_plan_archived_claims
+                 union all
+                 select binding_id, activity_owner_id from public.household_plan_archived_activities
+               ) r
+               join public.household_plan_bindings b on b.id = r.binding_id
+               join argus_private.account_deletion_placeholders p
+                 on p.placeholder_id = r.activity_owner_id and p.subject_hash = %s
+              where p.scope_kind = 'household' and p.scope_id <> b.household_id""",
+            (subject,),
+        ).fetchone()[0]
         # 5.3, 6 and the rows outside the FKs, then the no-blocker check.
         connection.execute(
             "select argus_private.deletion_finish(%s, %s)",
@@ -443,13 +614,14 @@ class AccountDeletionService:
             "placeholders_used": len(used),
             "credentials_captured": len(captured),
             "events": len(events),
+            "cross_scope_references": int(cross_scope),
         }
 
     # -- 4. Apple, before the account delete ------------------------------------
 
-    def _revoke_apple(self, user_id: str, subject: str) -> bool:
-        """True while the Apple row must stay: the RESTRICT key would refuse
-        step 7 anyway."""
+    def _revoke_apple(self, user_id: str, subject: str) -> str | None:
+        """The reason while the Apple row must stay (the RESTRICT key would
+        refuse step 7 anyway), or None once it is gone."""
 
         with self._households.connection() as connection:
             stored = connection.execute(
@@ -457,42 +629,61 @@ class AccountDeletionService:
                 (user_id,),
             ).fetchone()
         if stored is None:
-            # Never stored, or revoked by an earlier attempt of this run.
+            # Never stored (no capture, or a sign-in before #793), or revoked
+            # by an earlier attempt of this run.
             self._record_step(subject, "apple_revoke", None, keep_existing=True)
-            return False
+            return None
         if self._apple is None:
+            # No Apple service on this process: fail safe, never skip.
             self._record_step(subject, "apple_revoke", "pending")
-            return True
+            return "apple_unconfigured"
         try:
-            self._apple.revoke(user_id=user_id)
-            outcome: AppleRevokeStep = "revoked"
+            outcome = _value(self._apple.revoke(user_id=user_id))
         except AppleRevocationPending as exc:
-            if exc.reason == "invalid_grant":
-                # Apple no longer holds the grant: already revoked.
-                row = self._apple.repository.get(user_id=user_id)
-                if row is not None and not self._apple.repository.delete_if_unchanged(
-                    user_id=user_id, secret_ciphertext=row.secret_ciphertext
-                ):
-                    # A sign-in replaced the token meanwhile; revoke that one.
-                    self._record_step(subject, "apple_revoke", "pending")
-                    return True
-                outcome = "already_revoked"
-            elif exc.reason == "credential_unreadable":
-                # The key rotated: the token can't be opened, so it can never
-                # be revoked. Recorded, never logged.
-                self._record_step(subject, "apple_revoke", "unrecoverable")
-                # TODO(#802): call ``self._apple.discard_unreadable(user_id=...)``
-                # here (#802's owner-only discard: deletes the row only while
-                # it still can't be opened) and continue to step 7 on
-                # ``discarded`` or ``nothing_stored``. Until #802 lands the
-                # step stays pending and the RESTRICT key holds the delete.
-                return True
-            else:
+            if exc.reason != "credential_unreadable":
                 self._record_step(subject, "apple_revoke", "pending")
                 logger.warning("Apple revoke pending", reason=exc.reason)
-                return True
-        self._record_step(subject, "apple_revoke", outcome)
-        return False
+                return exc.reason
+            return self._discard_unreadable_apple(user_id, subject)
+        if outcome == "already_revoked":
+            self._record_step(subject, "apple_revoke", "already_revoked")
+            self._note_already_revoked(subject, "apple")
+        elif outcome == "nothing_stored":
+            self._record_step(subject, "apple_revoke", None, keep_existing=True)
+        else:
+            self._record_step(subject, "apple_revoke", "revoked")
+        return None
+
+    def _discard_unreadable_apple(self, user_id: str, subject: str) -> str | None:
+        check = self._key_check(user_id, "apple")
+        if check != "verified":
+            self._record_step(subject, "apple_revoke", "pending")
+            return f"key_{check}"
+        try:
+            discarded = _value(self._apple.discard_unreadable(user_id=user_id))
+        except AppleRevocationPending as exc:
+            self._record_step(subject, "apple_revoke", "pending")
+            return exc.reason
+        if discarded == "readable":
+            # A token captured meanwhile opens: the next pass revokes it.
+            self._record_step(subject, "apple_revoke", "pending")
+            return "credential_readable"
+        self._record_step(subject, "apple_revoke", "unrecoverable")
+        return None
+
+    def _key_check(self, user_id: str, step: str) -> KeyCheck:
+        with self._households.connection() as connection:
+            check = check_current_key(connection, self._box, user_id=user_id)
+        if check != "verified":
+            # The credential is kept: a wrong or missing key must never drop
+            # a live token. Someone has to look at the key configuration.
+            logger.error(
+                "Account deletion credential kept: key not verified",
+                metric="account_deletion.key_check_failed",
+                step=step,
+                key_check=check,
+            )
+        return check
 
     def _record_step(
         self,
@@ -519,11 +710,124 @@ class AccountDeletionService:
                 (name, value, self._clock(), subject),
             )
 
-    # -- 5. the auth user --------------------------------------------------------
+    def _note_already_revoked(self, subject: str, provider: str) -> None:
+        """Counted per run and kept after it is done, for the spike alert."""
 
-    def _delete_auth_user(self, user_id: str, subject: str) -> dict[str, int]:
+        now = self._clock()
+        with self._households.connection() as connection, connection.transaction():
+            connection.execute(
+                "update argus_private.account_deletion_runs"
+                " set steps = steps || jsonb_build_object('already_revoked',"
+                "     coalesce(steps -> 'already_revoked', '{}'::jsonb)"
+                "     || jsonb_build_object(%s::text,"
+                "          coalesce((steps -> 'already_revoked' ->> %s)::int, 0) + 1))"
+                " where subject_hash = %s",
+                (provider, provider, subject),
+            )
+            runs = connection.execute(
+                "select count(*) from argus_private.account_deletion_runs"
+                " where steps ? 'already_revoked' and updated_at >= %s",
+                (now - ALREADY_REVOKED_WINDOW,),
+            ).fetchone()[0]
+        logger.info(
+            "Account deletion credential already revoked",
+            metric="account_deletion.already_revoked",
+            provider=provider,
+        )
+        if runs >= ALREADY_REVOKED_SPIKE:
+            logger.error(
+                "Account deletion already_revoked spike",
+                metric="account_deletion.already_revoked_spike",
+                runs=int(runs),
+                window_hours=int(ALREADY_REVOKED_WINDOW.total_seconds() // 3600),
+            )
+
+    def _track_pending(self, subject: str, pending: dict[str, str]) -> None:
+        """When each third-party step started waiting and why; an operator
+        alert once one has waited ``ESCALATE_AFTER``."""
+
+        now = self._clock()
+        with self._households.connection() as connection, connection.transaction():
+            steps = (
+                connection.execute(
+                    "select steps from argus_private.account_deletion_runs"
+                    " where subject_hash = %s for update",
+                    (subject,),
+                ).fetchone()[0]
+                or {}
+            )
+            since = {
+                step: (steps.get("pending_since") or {}).get(step, now.isoformat())
+                for step in pending
+            }
+            connection.execute(
+                "update argus_private.account_deletion_runs"
+                " set steps = (steps - 'pending_since' - 'last_error')"
+                "     || jsonb_build_object('pending_since', %s::jsonb, 'last_error', %s::jsonb)"
+                " where subject_hash = %s",
+                (json.dumps(since), json.dumps(pending), subject),
+            )
+        for step, started in sorted(since.items()):
+            waited = now - datetime.fromisoformat(started)
+            if waited >= ESCALATE_AFTER:
+                logger.error(
+                    "Account deletion step needs an operator",
+                    metric="account_deletion.needs_operator",
+                    step=step,
+                    error=pending[step],
+                    pending_days=waited.days,
+                )
+
+    # -- 5. late writes and the auth user ------------------------------------------
+
+    def _settle_late_writes(self, user_id: str, subject: str) -> None:
+        """Every RESTRICT key to auth.users, read from the catalog. A write
+        that committed after the data step (a plan edit already in flight) is
+        scrubbed once more by deletion_finish; anything still holding the
+        person keeps the run pending instead of failing the Admin API delete."""
+
+        query = "select argus_private.deletion_auth_blockers(%s)"
+        try:
+            with self._households.connection() as connection, connection.transaction():
+                blockers = [
+                    r[0] for r in connection.execute(query, (user_id,)).fetchall()
+                ]
+                if not blockers:
+                    return
+                logger.warning(
+                    "Account deletion re-scrubbing late writes", blockers=blockers
+                )
+                connection.execute(
+                    "select set_config('argus.locked_history_writer', 'deletion', true)"
+                )
+                connection.execute(
+                    "select argus_private.deletion_finish(%s, %s)",
+                    (user_id, actor_hash_for_user(user_id)),
+                )
+                blockers = [
+                    r[0] for r in connection.execute(query, (user_id,)).fetchall()
+                ]
+                if blockers:
+                    raise _LateWrite(blockers)
+        except (_LateWrite, psycopg.Error) as exc:
+            if (
+                isinstance(exc, psycopg.Error)
+                and getattr(exc, "sqlstate", None) != "55000"
+            ):
+                raise
+            blockers = exc.blockers if isinstance(exc, _LateWrite) else []
+            logger.error("Account deletion held by a late write", blockers=blockers)
+            pending = (
+                ["apple"]
+                if "public.apple_sign_in_credentials.user_id" in blockers
+                else []
+            )
+            raise AccountDeletionIncomplete("late_write", pending) from None
+
+    def _delete_auth_user(self, user_id: str, run_id: str) -> dict[str, int]:
         self._auth.delete_user(user_id)
         with self._households.connection() as connection:
+            subject = subject_hash(user_id)
             unused = [
                 str(pid)
                 for (pid,) in connection.execute(
@@ -545,20 +849,32 @@ class AccountDeletionService:
                     "delete from argus_private.account_placeholders where id = any(%s::uuid[])",
                     (unused,),
                 )
+            revocations: dict[str, dict[str, int]] = {}
+            for provider, status, n in connection.execute(
+                "delete from argus_private.account_deletion_revocations"
+                " where subject_hash = %s returning provider, status, 1",
+                (subject,),
+            ).fetchall():
+                by = revocations.setdefault(str(provider), {})
+                by[str(status)] = by.get(str(status), 0) + int(n)
+            # Done: the id and both hashes go, so the record names nobody.
             steps = connection.execute(
                 "update argus_private.account_deletion_runs"
-                " set status = 'done', user_id = null, updated_at = %s, completed_at = %s,"
-                '     steps = steps || \'{"storage": "not_applicable"}\'::jsonb'
-                " where subject_hash = %s returning steps",
-                (now, now, subject),
+                " set status = 'done', user_id = null, subject_hash = null,"
+                "     analytics_distinct_id = null, claim_id = null, claimed_until = null,"
+                "     updated_at = %s, completed_at = %s,"
+                "     steps = (steps - 'pending_since' - 'last_error')"
+                "       || jsonb_build_object('storage', 'not_applicable', 'revocations', %s::jsonb)"
+                " where id = %s returning steps",
+                (now, now, json.dumps(revocations), run_id),
             ).fetchone()[0]
         return dict((steps or {}).get("counts", {}))
 
     # -- 4. providers and analytics, before the account delete -------------------
 
-    def _revoke_providers(self, subject: str) -> list[str]:
+    def _revoke_providers(self, user_id: str, subject: str) -> dict[str, str]:
         """Plaid and Gmail tokens captured by the data step. Returns the
-        providers still pending."""
+        providers still pending, with the reason."""
 
         with self._households.connection() as connection:
             rows = connection.execute(
@@ -568,8 +884,10 @@ class AccountDeletionService:
                 "   and provider in ('plaid', 'gmail') order by provider, source_ref",
                 (subject,),
             ).fetchall()
-        pending: list[str] = []
+        pending: dict[str, str] = {}
+        key: KeyCheck | None = None
         for provider, source_ref, external_ref, ciphertext in rows:
+            error: str | None = None
             if self._revoker is None:
                 outcome = "failed"
                 error = "connector_unavailable"
@@ -580,33 +898,46 @@ class AccountDeletionService:
                     external_ref=external_ref or "",
                     envelope=bytes(ciphertext) if ciphertext is not None else None,
                 )
-                error = None if outcome != "failed" else "provider_revoke_failed"
             if outcome in ("revoked", "not_applicable"):
                 status = "revoked"
+            elif outcome == "already_revoked":
+                status = "already_revoked"
+                self._note_already_revoked(subject, str(provider))
             elif outcome == "unreadable":
-                # Sealed under a key we no longer hold: it can never be opened,
-                # so it can never be revoked. Drop it and record that.
-                status = "unrecoverable"
+                # Given up only under the verified current key; otherwise the
+                # ciphertext is kept for a pass that holds the right key.
+                key = key or self._key_check(user_id, str(provider))
+                status = "unrecoverable" if key == "verified" else "pending"
+                error = None if key == "verified" else f"key_{key}"
             else:
                 status = "pending"
-                pending.append(str(provider))
+                error = error or "provider_revoke_failed"
+            if status == "pending":
+                pending[str(provider)] = error or "provider_revoke_failed"
             self._record_revocation(subject, provider, str(source_ref), status, error)
         return pending
 
-    def _delete_analytics(self, subject: str) -> bool:
-        """True while the PostHog person deletion is still owed."""
+    def _delete_analytics(self, subject: str) -> str | None:
+        """The reason while the PostHog person deletion is still owed."""
 
+        done = {"deleted", "operator_forced"}
+        if self._allow_fake_analytics:
+            done.add("recorded_by_fake")
         with self._households.connection() as connection:
             distinct_id, steps = connection.execute(
                 "select analytics_distinct_id, steps from argus_private.account_deletion_runs"
                 " where subject_hash = %s",
                 (subject,),
             ).fetchone()
-        if (steps or {}).get("analytics") in ("deleted", "recorded_by_fake"):
-            return False
+        if (steps or {}).get("analytics") in done:
+            return None
         outcome = self._analytics.delete_person(distinct_id)
+        if outcome == "recorded_by_fake" and not self._allow_fake_analytics:
+            # Nothing was deleted at PostHog. Never counted as done here.
+            self._record_step(subject, "analytics", "pending")
+            return "analytics_adapter_unconfigured"
         self._record_step(subject, "analytics", outcome)
-        return outcome == "failed"
+        return "analytics_delete_failed" if outcome == "failed" else None
 
     def _record_revocation(
         self, subject: str, provider: str, source_ref: str, status: str, error: str | None
@@ -631,3 +962,9 @@ class AccountDeletionService:
 
 class _UnitsChanged(Exception):
     pass
+
+
+class _LateWrite(Exception):
+    def __init__(self, blockers: list[str]) -> None:
+        super().__init__(", ".join(blockers))
+        self.blockers = blockers

@@ -55,6 +55,8 @@ def start_invites(app) -> None:  # noqa: ANN001
     configure_invites_store(None)
     if not invites_enabled():
         return
+    if not _code_secret_ready("Beta invites"):
+        return
     if api_state.PERSISTENCE_MODE != "supabase" or not api_state.DATABASE_URL:
         logger.warning(
             "Beta invites need DATABASE_URL in supabase mode; surface stays off"
@@ -73,6 +75,21 @@ def start_invites(app) -> None:  # noqa: ANN001
         configure_invites_store(None)
 
 
+def _code_secret_ready(surface: str) -> bool:
+    """Fail closed: a surface that makes or looks up codes needs the secret."""
+    from argus.domain.household.invite_codes import code_secret_problem
+
+    reason = code_secret_problem()
+    if reason is None:
+        return True
+    logger.error(
+        "{} stay off: invite code secret unusable ({}). Set ARGUS_INVITE_CODE_SECRET.",
+        surface,
+        reason,
+    )
+    return False
+
+
 def configure_households_service(service: HouseholdService | None) -> None:
     global _service
     _service = service
@@ -81,6 +98,9 @@ def configure_households_service(service: HouseholdService | None) -> None:
 def start_households(app) -> None:  # noqa: ANN001
     start_invites(app)
     if not households_enabled():
+        configure_households_service(None)
+        return
+    if not _code_secret_ready("Households"):
         configure_households_service(None)
         return
     from argus.api.financial_accounts import financial_accounts_service
@@ -233,6 +253,7 @@ _STATUS = {
     "beta_invite_required": 403,
     "invite_request_invalid": 422,
     "verified_user_required": 401,
+    "invite_codes_unavailable": 503,
 }
 _WAITLIST_CODES = frozenset(
     {

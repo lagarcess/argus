@@ -2807,20 +2807,34 @@ from the verified session; the body accepts no other field.
 
 | Status | `code` | Meaning |
 | --- | --- | --- |
-| 404 | `apple_token_capture_unavailable` | Flag off. Answered before authentication |
+| 404 | none: body `{"detail": "Not Found"}` | Flag off. The plain answer of a route that doesn't exist, given before the body is read or the session checked, so invalid JSON, no session and a valid call all get it |
 | 503 | `apple_sign_in_unconfigured` | Flag on, but an Apple client-secret input, the credential key or durable storage is missing. Fails closed |
 | 401 / 403 | `unauthorized` / `account_conversion_required` | No session, or a guest session |
 | 409 | `apple_identity_missing` | The account has no Apple identity |
-| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple |
+| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple in one short attempt. The answer is 409 whatever that revoke returns |
 | 400 | `apple_authorization_invalid` | Apple says the code expired, was used, or is malformed |
 | 429 | `too_many_requests` | Five attempts per user per ten minutes |
-| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple, and the next Apple sign-in sends a fresh code) |
+| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple in one short attempt, and the next Apple sign-in sends a fresh code). The answer is 503 whatever that revoke returns, never 500 |
 
 A later sign-in replaces the stored token without revoking the old one,
 because revoking any token ends the whole Apple authorization for the app.
-No route revokes. Account deletion (Lane 6) calls
-`AppleCredentialService.revoke`, which deletes the row only after Apple
-answers 200 and keeps it as the pending revoke otherwise. Storage is in
+The compensating revoke on the 409 and 503 paths is a single attempt with no
+retry, 2 seconds in total, and the request waits at most 4 seconds for it
+however slowly Apple answers. The code exchange before it keeps its 30-second
+limit.
+
+No route revokes or discards. Account deletion (Lane 6) calls
+`AppleCredentialService.revoke`. It deletes the row after Apple answers 200
+(`revoked`) or `invalid_grant` (`already_revoked`: the token is already dead),
+and keeps it as the pending revoke otherwise. When revoke reports
+`credential_unreadable` because `ARGUS_INGESTION_SECRET_KEY` was rotated, Lane 6
+calls `AppleCredentialService.discard_unreadable`. It deletes the row only while
+the token still can't be opened, and returns `discarded`, `nothing_stored` or
+`readable`, so the user can be deleted. Apple's authorization for the app then
+stays until the person removes it in their Apple ID settings. Lane 6 calls it
+only after its key check proves this process holds the deployment's current
+key (the key opens the newest credential anyone else stored); a missing, wrong
+or unproven key keeps the row as a pending revoke and alerts. Storage is in
 [DATA_MODEL.md](DATA_MODEL.md#apple-sign-in-credentials).
 
 ## `POST /auth/logout`
@@ -7467,9 +7481,11 @@ UTC days, can be revoked, and have one acceptor. Same-recipient acceptance
 retries return their original membership outcome even after departure/closure
 or later rejoin. A fresh invitation creates a new membership incarnation.
 
-The `code` is 8 Crockford base32 characters shown as `XXXX-XXXX`; input
-ignores case, spaces and dashes. Only its hash is stored, beside `token_hash`,
-with the same single use, expiry and revoke rules. `link` is
+The `code` is 12 Crockford base32 characters (60 bits) shown as
+`XXXX-XXXX-XXXX`; input ignores case, spaces and dashes and folds look-alike
+letters. Only a keyed digest is stored, outside every client-readable table,
+with the same single use, expiry and revoke rules (see
+[Invite code security](#invite-code-security)). `link` is
 `https://cuadrao.ai/invite#<token>` when `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED`
 is on, otherwise today's `argus-household://invite#<token>`. The QR is drawn on
 the device from `link`; no QR image is stored. Accepting a household invitation
@@ -7525,6 +7541,79 @@ the migration ran are admitted. The caller is always the verified JWT subject;
 a missing or null subject (as under `service_role`) owns nothing, is never the
 founder, and is refused with `401 verified_user_required`. Row-level security on
 the new tables likewise matches no row when `auth.uid()` is null.
+
+## Invite code security
+
+Applies to household invitation codes and to beta and group-link codes (#789).
+Without it, none of `ARGUS_HOUSEHOLDS_ENABLED`, `ARGUS_BETA_INVITES_ENABLED` or
+`ARGUS_BETA_INVITE_GATE_ENABLED` may be turned on in a hosted environment.
+
+**Keyed digests.** A code is stored only as HMAC-SHA-256 under
+`ARGUS_INVITE_CODE_SECRET` (at least 32 characters, and not an obvious
+placeholder such as one repeated character: at least 10 distinct characters and
+about 96 bits by a per-character entropy estimate; generate with
+`openssl rand -base64 48`), written `v2.<key id>.<hex>`, where the key id is
+derived from the secret and does not reveal it. The digests live in
+`argus_private.invite_code_digests`: anon and authenticated cannot reach the
+schema, the table has row-level security with no policy for any role, and no
+privilege for anon, authenticated or service_role, so no select policy can ever
+expose a digest. A database check refuses any other digest shape. Link tokens
+are 256 random bits and stay plain SHA-256 digests on the invitation rows; a
+key would add nothing to that much entropy.
+
+**Fail closed.** With any of those three flags on and the secret missing,
+shorter than 32 characters or a placeholder, the surface does not start (households answer
+`404 households_unavailable`, invites `404 invites_unavailable`), and
+`/internal/readiness` reports an `invite_codes` check as `degraded` (503), so
+the release warmup (`.github/warmup-render.sh`) fails. `/health` is unchanged. If the secret disappears while running, making or
+looking up a code answers `503 invite_codes_unavailable`. There is no unkeyed
+fallback. Link tokens keep working.
+
+**Rotation.** Set `ARGUS_INVITE_CODE_SECRET_PREVIOUS` to the old secret and
+`ARGUS_INVITE_CODE_SECRET` to the new one, then deploy. New codes use the new
+secret; a code is looked up under the new secret first and then the old one, and
+a code found under the old secret is re-hashed to the new one on that lookup
+(`rehashed_at`). Keep the old secret for at least the longest remaining code
+lifetime: seven days when no group link is live, otherwise until the last live
+group link expires (at most a year), or revoke and re-issue those links. Then
+remove `ARGUS_INVITE_CODE_SECRET_PREVIOUS`; any code still under the old key
+stops working, and its link keeps working. If a secret leaks, rotate without the
+previous secret: every outstanding code stops at once and links still work.
+Digests still under a key: `select split_part(digest,'.',2), count(*) from
+argus_private.invite_code_digests group by 1`. The 8-character `v1` digests of
+#788 were unkeyed and cannot be re-hashed (a digest cannot be turned back into
+its code), so migration `20261003150100` drops them. Those invitations keep
+their links.
+
+**Lookup limits.** Household preview and accept and beta preview and redeem,
+by code or token, are limited per client IP (`resolve_client_ip`, the trusted
+`CF-Connecting-IP` header) and per account, with no founder or admin bypass:
+
+| Budget | Per IP | Per account |
+| --- | --- | --- |
+| Lookups of any outcome | 30 per minute | 30 per minute |
+| Lookups that named no invitation | 20 per hour, 60 per day | 10 per hour, 30 per day |
+
+Each lookup reserves one failure in every budget before it runs, and the
+reservation is given back once it found an invitation (even an expired, revoked
+or used one) or never ran (an idempotent replay), so concurrent guesses cannot
+run past a budget. A spent budget answers `429 invite_rate_limited` with
+`Retry-After`, before the lookup. The counters are per process and in memory, like
+every limiter in this API, so they reset when the process restarts or a deploy
+rolls out. Production runs one Render instance with one worker;
+with N processes an attacker gets at most N times the budget, which the code
+length absorbs.
+
+**Why 12 characters.** 32^12 = 2^60, about 1.15 x 10^18 codes. Assume an
+attacker with 10,000 IP addresses (and about 20,000 accounts) holding every IP
+at its daily failure cap on 4 processes for a year: about 8.8 x 10^8 guesses.
+Against 100,000 live codes the expected number of hits is about 8 x 10^-5 a
+year. With #788's 8 characters (40 bits) the same attack would expect about 80
+hits; with 10 characters (50 bits), about 0.08. Hitting one particular
+seven-day household code that way has odds of about 1.5 x 10^-11. Even with no
+limiter at all, 1,000 guesses a second for a year expects about 0.003 hits. So
+the limiter is defense in depth, and per-process counting is enough. The shape
+stays in the `XXXX-XXXX` family as three groups of four.
 
 ## Explicit account consent
 

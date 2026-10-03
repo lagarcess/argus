@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from argus.api import state as api_state
 from argus.api.apple_sign_in import apple_credentials_service, capture_enabled
@@ -46,13 +47,9 @@ class AppleAuthorizationCodeRequest(BaseModel):
 
 def require_apple_capture_surface(request: Request) -> AppleCredentialService:
     if not capture_enabled():
-        raise problem(
-            request,
-            status_code=404,
-            code="apple_token_capture_unavailable",
-            title="Not Found",
-            detail="Apple token capture is not available.",
-        )
+        # Backstop only: AppleCaptureFlagGateMiddleware answers first, with
+        # this same plain 404 of an unmatched route.
+        raise StarletteHTTPException(status_code=404, detail="Not Found")
     service = apple_credentials_service()
     if service is None:
         raise problem(
@@ -65,7 +62,36 @@ def require_apple_capture_surface(request: Request) -> AppleCredentialService:
     return service
 
 
-@router.post("/auth/apple/authorization-code", status_code=204)
+def _problem(description: str) -> dict:  # type: ignore[type-arg]
+    return {
+        "description": description,
+        "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
+        },
+    }
+
+
+@router.post(
+    "/auth/apple/authorization-code",
+    status_code=204,
+    responses={
+        400: _problem(
+            "`apple_authorization_invalid`: Apple says the code expired, was used, or is malformed."
+        ),
+        404: {
+            "description": (
+                'Capture is off: `{"detail": "Not Found"}`, the plain answer of '
+                "a route that doesn't exist, before the body or session is read."
+            )
+        },
+        409: _problem(
+            "`apple_identity_missing`: the account has no Apple identity. "
+            "`apple_identity_mismatch`: the code belongs to another Apple ID; "
+            "nothing is stored and the exchanged token is revoked at Apple."
+        ),
+        429: _problem("`too_many_requests`: five attempts per user per ten minutes."),
+    },
+)
 def capture_apple_authorization_code(
     request: Request,
     body: AppleAuthorizationCodeRequest,

@@ -26,9 +26,11 @@ DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 def test_codes_normalize_typing_and_reject_garbage():
     code = new_code()
     assert normalize_code(format_code(code).lower()) == code
-    assert normalize_code(" abcd-efgh ") == "ABCDEFGH"
-    assert normalize_code("oiLu-0000") == "011V0000"
-    assert normalize_code("ABC") is None and normalize_code("ABCD-EFG!") is None
+    assert normalize_code(" abcd-efgh-jkmn ") == "ABCDEFGHJKMN"
+    assert normalize_code("oiLu-0000-0000") == "011V00000000"
+    assert normalize_code("ABC") is None and normalize_code("ABCD-EFGH-JKM!") is None
+    # The 8-character codes of #788 are no longer a valid shape.
+    assert normalize_code("ABCD-EFGH") is None
 
 
 def test_null_or_missing_caller_is_never_an_owner_or_the_founder():

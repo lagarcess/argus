@@ -25,15 +25,21 @@ from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 from argus.domain.ingestion.sink import CandidateSink
 
 Revocation = Literal["revoked", "failed", "not_applicable"]
-# Account deletion also learns when a credential can never be opened.
-DeletionRevocation = Literal["revoked", "failed", "not_applicable", "unreadable"]
+# Account deletion also learns when the provider no longer held the grant
+# (``already_revoked``) and when a credential does not open under this key
+# (``unreadable``: a wrong key and a truly dead credential look the same here;
+# the deletion run's key check tells them apart).
+DeletionRevocation = Literal[
+    "revoked", "already_revoked", "failed", "not_applicable", "unreadable"
+]
 
 
 class SourceAdapter(Protocol):
     source: SourceKind
 
-    def revoke(self, connection: SourceConnection, credential: str | None) -> None:
-        """Revoke provider-side access. Raise on failure; never log the credential."""
+    def revoke(self, connection: SourceConnection, credential: str | None) -> str | None:
+        """Revoke provider-side access. Raise on failure; never log the credential.
+        May return ``"already_revoked"`` when the provider no longer held it."""
         ...
 
 
@@ -137,7 +143,9 @@ class IngestionHub:
         Unlike ``disconnect`` it touches no connection row: the caller holds the
         encrypted credential in the deletion run and drops it only after this
         returns ``revoked``. ``failed`` keeps the revocation pending for a retry;
-        ``unreadable`` means the credential can't be opened and never will be.
+        ``already_revoked`` means the provider no longer held the grant;
+        ``unreadable`` means the credential does not open under this process's
+        key, which the caller must not take as proof it never will.
         """
         adapter = self._adapters.get(source)
         if envelope is None:
@@ -169,11 +177,11 @@ class IngestionHub:
         try:
             credential = self.credential(connection)
         except SecretUnreadable:
-            # Sealed under a key this process no longer holds: it can never be
-            # opened, so no retry will revoke it.
+            # Not openable under this process's key: a wrong or missing key
+            # looks the same as a dead credential, so the caller decides.
             return "unreadable"
         try:
-            adapter.revoke(connection, credential)
+            result = adapter.revoke(connection, credential)
         except Exception as exc:
             logger.warning(
                 "Deletion revocation failed; the credential stays pending",
@@ -181,4 +189,4 @@ class IngestionHub:
                 failure_mode=type(exc).__name__,
             )
             return "failed"
-        return "revoked"
+        return "already_revoked" if result == "already_revoked" else "revoked"
