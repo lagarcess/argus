@@ -22,7 +22,7 @@ struct CuadraoChartState: View {
                     }
                 }
                 if !loading {
-                    CuadraoChartLandscape().frame(width: 84, height: 76).offset(x: 4, y: 12)
+                    PlanLandscape(look: .coast).frame(width: 84, height: 76).offset(x: 4, y: 12)
                 }
             }.frame(height: 150).opacity(loading && breathing ? 0.45 : 1)
                 .accessibilityHidden(true).allowsHitTesting(false)
@@ -41,42 +41,5 @@ struct CuadraoChartState: View {
                     withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) { breathing = true }
                 }
             }
-    }
-}
-
-/// Quiet cover art for empty/loading chart shells. Lives next to chart state so
-/// design-preview Home does not import the parked Plan visuals module.
-private struct CuadraoChartLandscape: View {
-    var body: some View {
-        GeometryReader { g in
-            ZStack {
-                Circle().fill(WelcomePalette.pine.opacity(0.10)).frame(width: g.size.width * 0.8)
-                Circle().fill(WelcomePalette.pine.opacity(0.24))
-                    .frame(width: g.size.width * 0.29, height: g.size.width * 0.29)
-                    .offset(x: g.size.width * 0.16, y: -g.size.height * 0.19)
-                ForEach(0..<3) { index in
-                    CuadraoChartWave(crest: CGFloat(index) * 0.12)
-                        .fill(WelcomePalette.pine.opacity(0.12 + Double(index) * 0.09))
-                        .frame(height: g.size.height * 0.5)
-                        .offset(y: g.size.height * 0.15 + CGFloat(index) * 9)
-                }
-                Image(systemName: "water.waves").font(.system(size: 27, weight: .light))
-                    .foregroundStyle(WelcomePalette.pine).offset(x: -g.size.width * 0.13, y: g.size.height * 0.02)
-            }.clipShape(RoundedRectangle(cornerRadius: 30))
-        }.accessibilityHidden(true)
-    }
-}
-
-private struct CuadraoChartWave: Shape {
-    let crest: CGFloat
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: 0, y: rect.height * (0.4 + crest)))
-            path.addCurve(to: CGPoint(x: rect.maxX, y: rect.height * 0.3),
-                control1: CGPoint(x: rect.width * 0.4, y: -rect.height * 0.7),
-                control2: CGPoint(x: rect.width * 0.7, y: rect.height))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: 0, y: rect.maxY)); path.closeSubpath()
-        }
     }
 }
