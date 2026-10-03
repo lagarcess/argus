@@ -38,30 +38,75 @@ def service(monkeypatch):  # noqa: ANN001, ANN201
     return built
 
 
-def test_forces_the_step_then_resumes_the_run(service, capsys) -> None:  # noqa: ANN001
-    service.delete_account.return_value = DeletionOutcome(status="done", counts={})
+PLAN = {"step": "apple", "pending_days": 8, "last_error": "invalid_request"}
+
+
+def _last(capsys) -> dict:  # noqa: ANN001
+    return json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+
+
+def test_a_dry_run_by_default_changes_nothing(service, capsys) -> None:  # noqa: ANN001
+    """Note 2: without --confirm it only reports the plan."""
+    service.force_complete_step.return_value = {
+        **PLAN,
+        "dry_run": True,
+        "forced": False,
+    }
     assert force.main([*ARGS, "--reason", "Apple invalid_request for 7 days"]) == 0
     service.force_complete_step.assert_called_once_with(
         user_id=USER,
         step="apple",
         reason="Apple invalid_request for 7 days",
         operator="lucas",
+        confirm=False,
     )
-    service.delete_account.assert_called_once_with(user_id=USER)
-    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {
+    service.delete_account.assert_not_called()
+    assert _last(capsys)["dry_run"] is True
+
+
+def test_confirm_forces_the_step_then_resumes_the_run(service, capsys) -> None:  # noqa: ANN001
+    service.force_complete_step.return_value = {
+        **PLAN,
+        "dry_run": False,
+        "revoke_attempt": "invalid_request",
         "forced": True,
-        "status": "done",
     }
+    service.delete_account.return_value = DeletionOutcome(status="done", counts={})
+    args = [*ARGS, "--reason", "Apple invalid_request for 7 days", "--confirm"]
+    assert force.main(args) == 0
+    assert service.force_complete_step.call_args.kwargs["confirm"] is True
+    service.delete_account.assert_called_once_with(user_id=USER)
+    assert _last(capsys) == {"forced": True, "status": "done"}
+
+
+def test_a_revoke_that_now_succeeds_is_not_forced(service, capsys) -> None:  # noqa: ANN001
+    service.force_complete_step.return_value = {
+        **PLAN,
+        "dry_run": False,
+        "revoke_attempt": "completed",
+        "forced": False,
+    }
+    service.delete_account.return_value = DeletionOutcome(status="done", counts={})
+    assert force.main([*ARGS, "--reason", "app removed", "--confirm"]) == 0
+    assert _last(capsys) == {"forced": False, "status": "done"}
+
+
+def test_a_step_pending_under_7_days_is_refused(service, capsys) -> None:  # noqa: ANN001
+    service.force_complete_step.side_effect = AccountDeletionRejected(
+        "step_pending_under_7_days"
+    )
+    assert force.main([*ARGS, "--reason", "app removed", "--confirm"]) == 1
+    service.delete_account.assert_not_called()
+    assert _last(capsys) == {"forced": False, "reason": "step_pending_under_7_days"}
 
 
 def test_still_pending_elsewhere_is_reported(service, capsys) -> None:  # noqa: ANN001
+    service.force_complete_step.return_value = {**PLAN, "forced": True}
     service.delete_account.side_effect = AccountDeletionIncomplete(
         "third_party_pending", ["plaid"]
     )
-    assert force.main([*ARGS, "--reason", "app removed"]) == 0
-    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["pending"] == [
-        "plaid"
-    ]
+    assert force.main([*ARGS, "--reason", "app removed", "--confirm"]) == 0
+    assert _last(capsys)["pending"] == ["plaid"]
 
 
 def test_refuses_an_email_in_the_reason_and_unknown_steps(service) -> None:  # noqa: ANN001
@@ -79,5 +124,5 @@ def test_no_run_waiting_is_a_failure(service, capsys) -> None:  # noqa: ANN001
     service.force_complete_step.side_effect = AccountDeletionRejected(
         "no_run_awaiting_third_parties"
     )
-    assert force.main([*ARGS, "--reason", "app removed"]) == 1
+    assert force.main([*ARGS, "--reason", "app removed", "--confirm"]) == 1
     service.delete_account.assert_not_called()

@@ -114,10 +114,52 @@ def _deleting_user(request: Request) -> User:
     return user
 
 
+def _problem(description: str) -> dict:  # type: ignore[type-arg]
+    return {
+        "description": description,
+        "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
+        },
+    }
+
+
+# The same POST starts a deletion and resumes one in flight (a locked person
+# retrying), so one list covers both (Priya #801 note 7).
+_RESPONSES: dict = {  # type: ignore[type-arg]
+    202: {
+        "model": AccountDeletionResponse,
+        "description": (
+            "`in_progress`: the run is open and the account locked, but a step "
+            "hasn't finished (`pending`). A retry of this route, or the "
+            "operator-run sweep, resumes it."
+        ),
+    },
+    401: _problem(
+        "No valid session: missing or invalid token, an ended session, or on "
+        "resume a token that doesn't name the person's own live session (or "
+        "lacks `sub`, `exp` or `session_id`)."
+    ),
+    403: _problem(
+        "`account_deletion_not_allowed`: the account can't be deleted here "
+        "(an account placeholder)."
+    ),
+    404: _problem(
+        "`not_found`: `ARGUS_ACCOUNT_DELETION_ENABLED` is off; answered before "
+        "any session check."
+    ),
+    429: _problem(
+        "`too_many_requests`: six requests per account per minute; see Retry-After."
+    ),
+    # 503 (account_deletion_incomplete, account_deletion_unavailable and the
+    # shared session-verification one) is declared in openapi_compat, which
+    # rewrites every authenticated operation's 503.
+}
+
+
 @router.post(
     "/account/delete",
     response_model=AccountDeletionResponse,
-    responses={202: {"model": AccountDeletionResponse}},
+    responses=_RESPONSES,
 )
 def delete_account(
     payload: AccountDeletionRequest,

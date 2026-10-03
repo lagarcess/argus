@@ -2574,17 +2574,17 @@ describe("Argus Alpha frontend contract", () => {
     expect(en).toContain(
       "Permanently delete your Argus account and your data.",
     );
-    expect(en).toContain("This deletes your account and your data now");
-    expect(en).toContain("Your account is deleted. You'll be signed out.");
+    expect(en).toContain("Your account and your data will be deleted, and this");
+    expect(en).toContain("Your account is deleted. You're signed out.");
     expect(en).toContain("Your account is being deleted. You're signed out now");
-    expect(en).toContain('stay there as \\"Former member\\"');
+    expect(en).toContain('show as \\"Former member.\\"');
     expect(en).not.toContain("Support will follow up by email.");
     expect(es).toContain('"title": "¿Eliminar tu cuenta?"');
     expect(es).toContain(
       "Elimina para siempre tu cuenta de Argus y tus datos.",
     );
-    expect(es).toContain("Esto elimina tu cuenta y tus datos ahora");
-    expect(es).toContain("Tu cuenta está eliminada. Se cerrará tu sesión.");
+    expect(es).toContain("Tu cuenta y tus datos se eliminarán, y no");
+    expect(es).toContain("Tu cuenta está eliminada. Ya cerraste sesión.");
     expect(es).toContain("Estamos eliminando tu cuenta.");
   });
 
@@ -2919,7 +2919,7 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(logoutHandler).toContain("settings.logout_error");
-    expect(logoutHandler).toContain('result.revocation === "failed"');
+    expect(logoutHandler).toContain('result?.revocation === "failed"');
     expect(logoutHandler).toContain("resetToEmptyChatSurface()");
     expect(logoutHandler).toContain("clearHistory()");
     expect(logoutHandler.indexOf("resetToEmptyChatSurface()")).toBeLessThan(

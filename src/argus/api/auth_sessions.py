@@ -64,7 +64,12 @@ class AuthSessionVerifier:
     def deletion_in_flight(self, *, token: str, user_id: str) -> bool:
         """True when this live session's person has a deletion run in flight:
         the one case POST /account/delete accepts a locked account, so the
-        person can resume their own run. Never true for a placeholder."""
+        person can resume their own run. Never true for a placeholder.
+
+        Live means the session row exists and has not passed ``not_after``
+        (GoTrue's session time-box; null when none is configured). This door
+        is verified here rather than by GoTrue's /user, so it enforces the
+        session end GoTrue would (Priya #801 note 6)."""
         identity = _session_identity(token=token, user_id=user_id)
         if identity is None:
             return False
@@ -76,7 +81,9 @@ class AuthSessionVerifier:
             row = connection.execute(
                 """
                 select exists (
-                    select 1 from auth.sessions where id = %s and user_id = %s
+                    select 1 from auth.sessions
+                    where id = %s and user_id = %s
+                      and (not_after is null or not_after > now())
                 )
                 and not exists (
                     select 1 from argus_private.account_placeholders where id = %s

@@ -1043,10 +1043,11 @@
       "title": "Perfil",
       "request_deletion": {
         "title": "¿Eliminar tu cuenta?",
-        "body": "Esto elimina tu cuenta y tus datos ahora, y cierra tu sesión. Los hogares que administras pasan al miembro con más antigüedad, o se cierran si eres el único. Los montos que agregaste a planes de otras personas se quedan ahí como \"Exmiembro\", sin nombre. No se puede deshacer.",
+        "body": "Tu cuenta y tus datos se eliminarán, y no se puede deshacer. Los hogares que administras pasan al miembro con más antigüedad, o se cierran si eres el único.",
+        "shared_plans": "En los planes que compartes, tus montos se quedan para que las cuentas de los demás sigan cuadrando, pero sin tu nombre: aparecerás como «Exmiembro». Tus recibos y notas se borran. Lo que debes o te deben queda cerrado en la app, no marcado como pagado. Los planes que creaste pasan a la persona que lleva más tiempo en cada uno, salvo los planes de deuda compartidos, que se cierran y quedan solo para consulta.",
         "confirm": "Eliminar cuenta",
         "submitting": "Eliminando...",
-        "success": "Tu cuenta está eliminada. Se cerrará tu sesión.",
+        "success": "Tu cuenta está eliminada. Ya cerraste sesión.",
         "in_progress": "Estamos eliminando tu cuenta. Ya cerraste sesión y terminaremos de eliminarla en unos días. No tienes que hacer nada.",
         "requested": "Solicitud enviada. Soporte eliminará tu cuenta y te escribirá por correo electrónico.",
         "error": "No pudimos eliminar tu cuenta en este momento. Inténtalo de nuevo.",

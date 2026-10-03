@@ -31,21 +31,28 @@ export type AccountDeletionOutcome =
 /** The account is gone, or locked while it finishes: the session is dead either
  * way, so the browser signs out as soon as this result arrives, not when the
  * dialog closes (Marcus #801 re-check N2). The dialog stays up as the
- * signed-out confirmation; its Done finishes the sign-out and leaves. */
+ * signed-out confirmation; its Done only cleans up and leaves. */
 export function deletionEndsSession(
   outcome: AccountDeletionOutcome | string,
 ): boolean {
   return outcome === "success" || outcome === "in_progress";
 }
 
-/** Passed to onLogout when the account was just deleted: sign this browser
- * out now, but keep the current surface (the confirmation dialog) mounted. */
-export type LogoutOptions = { afterAccountDeletion?: boolean };
+/** Passed to onLogout after the account was just deleted.
+ * afterAccountDeletion: sign this browser out now (the one logout call), but
+ * keep the current surface (the confirmation dialog) mounted.
+ * sessionEnded: Done or back on that confirmation; the sign-out already
+ * happened, so only clear this browser's state and leave, never a second
+ * logout call. */
+export type LogoutOptions = { afterAccountDeletion?: boolean; sessionEnded?: boolean };
 
 /** The account was just deleted: end this browser's session now. The chat's
  * account boundary is told first, so the sign-out doesn't swap the surface
  * for the account-changed screen and the dialog stays as the signed-out
- * confirmation. Its Done comes back through the ordinary logout and leaves. */
+ * confirmation. This is the only logout call: its Done passes sessionEnded,
+ * which clears local state and leaves without signing out again. If this
+ * call fails, the server still refuses the session (the account is gone or
+ * locked), so nothing is gained by a second one. */
 export async function endSessionKeepingSurface(
   boundary: { beginConversion: () => void },
   signOut: () => Promise<unknown> = logoutFromApi,

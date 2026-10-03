@@ -3207,7 +3207,8 @@ their own run: GoTrue refuses a banned account's token, so the API verifies it
 itself (signature against the project's JWKS, or `SUPABASE_JWT_SECRET` for
 HS256; expiry; audience; `exp`, `sub` and `session_id` must all be present),
 then requires a live `auth.sessions` row for its session that belongs to its
-subject, a run in flight for that subject, and a subject that is not a
+subject (live: not past its `not_after`, GoTrue's session time-box, when one is
+set), a run in flight for that subject, and a subject that is not a
 placeholder. Anything else is `401`. Anyone not locked goes through the usual session check. The route
 is rate limited per account (6 a minute, `429 too_many_requests` with
 `Retry-After`). A guest create-then-delete loop makes a new account each time,
@@ -3233,7 +3234,8 @@ sweep (`scripts/ops/resume_account_deletions.py` inside
 PRIVATE_LAUNCH_RUNBOOK.md for the cadence). `pending` is also empty when
 another request holds the run at that moment. Clients sign out as soon as
 this response (or `200`) arrives, keep showing "deletion in progress" as the
-signed-out confirmation, and never show the finished state.
+signed-out confirmation, and never show the finished state. The web signs out
+once, on the result; closing the confirmation only clears local state.
 
 ```json
 { "status": "in_progress", "pending": ["plaid"] }
@@ -3242,11 +3244,15 @@ signed-out confirmation, and never show the finished state.
 A request after another one finished the run answers `200` `done`: the session
 was verified, so the person existed a moment ago.
 
-**Errors:** `403 account_deletion_not_allowed`, `429 too_many_requests`,
+**Errors** (the same for a first request and a resume; all listed in
+`docs/api/openapi.yaml`): `401` (no valid session, or on resume a token that
+doesn't name the person's own live session), `403 account_deletion_not_allowed`,
+`404 not_found` (flag off), `429 too_many_requests`,
 `503 account_deletion_unavailable` (no `DATABASE_URL` or Admin API client;
 nothing happened), `503 account_deletion_incomplete` with `Retry-After` (an
 unexpected failure; the run may be open and the account locked, so clients
-treat it as in progress, and a retry resumes the same run).
+treat it as in progress, and a retry resumes the same run), and the shared
+`503 auth_session_verification_unavailable`.
 
 
 ## Supported Values

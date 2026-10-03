@@ -827,17 +827,33 @@ without them those revocations stay pending, never done.
 
 What the logs and run record tell you:
 
-- **The key check.** A stored token that won't open is discarded as
-  `unrecoverable` (or Apple's through `discard_unreadable`) only when this
-  process's `ARGUS_INGESTION_SECRET_KEY` is proven current: it opens the newest
-  token anyone else stored. `key_mismatch`, `key_unproven` or `key_unavailable`
-  in `steps.last_error` means the process has the wrong key or none: fix the
-  environment and rerun. Nothing was dropped.
+- **The key check.** Every stored token carries the fingerprint of the key
+  that sealed it (`secret_key_fingerprint`, non-secret). A token that won't
+  open is discarded as `unrecoverable` (or Apple's through
+  `discard_unreadable`) only when its fingerprint is this process's
+  `ARGUS_INGESTION_SECRET_KEY`'s: that key sealed it and can't open it.
+  `key_unproven` in `steps.last_error` means another key sealed it (a rolling
+  rotation, a stale environment) or it predates Lane 6 and has no
+  fingerprint; `key_unavailable` means this process has no key. Nothing was
+  dropped: rerun from a process with the key that sealed it. A token sealed
+  under a key no process holds any more stays pending; after 7 days force it
+  (below), which tries one more revoke first.
+- **Key rotation.** Don't rotate `ARGUS_INGESTION_SECRET_KEY` in the deploy
+  that ships the Lane 6 migration (`20261004090000`): a process still on the
+  old code re-seals without updating the fingerprint, which is only wrong if it
+  also holds a different key. Any later rotation is safe for deletion: tokens
+  sealed under the old key are held, never dropped.
 - **Apple.** No stored credential records `apple_revoke: none` (nothing to
   revoke). `apple_unconfigured` means this process has no `ARGUS_APPLE_*`
   config: the step stays pending, never silently done. `already_revoked` means
-  Apple says the token was already dead (the person removed the app); it is
-  counted, and more than 5 in 24 hours logs an alert worth a look.
+  Apple says the token was already dead (the person removed the app).
+- **The already_revoked spike.** Apple `invalid_grant`, Google
+  `invalid_grant`/`invalid_token` and Plaid `ITEM_NOT_FOUND`/
+  `INVALID_ACCESS_TOKEN` are recorded `already_revoked` and counted per run,
+  with an `account_deletion.already_revoked` metric each. When 5 or more runs
+  updated in the last 24 hours have seen one (any provider), the run logs
+  `account_deletion.already_revoked_spike` (with the count): worth a look, a
+  provider may be revoking grants on its own.
 - **PostHog.** Outside tests and local dev the step stays pending
   (`analytics_adapter_unconfigured`) until a real deletion adapter ships
   (#806). Don't turn on `ARGUS_ACCOUNT_DELETION_ENABLED` before then, nor
@@ -846,16 +862,25 @@ What the logs and run record tell you:
   `account_deletion.needs_operator` (with the step and its last error, no user
   id). Decide whether it can still finish. If it can't (Apple keeps answering
   `invalid_request` because the person removed the app, a provider is gone for
-  good), force it:
+  good, a token sealed under a key nobody holds any more), force it. Run it
+  first without `--confirm`: that is a dry run that prints the step, how many
+  days it has waited and its last error, and changes nothing. Then add
+  `--confirm`:
 
 ```bash
 poetry run python scripts/ops/force_account_deletion_step.py \
   --user-id <uuid> --step apple|plaid|gmail|analytics \
-  --reason "Apple invalid_request for 7 days; app removed" --operator <your name>
+  --reason "Apple invalid_request for 7 days; app removed" --operator <your name> \
+  [--confirm]
 ```
 
-It records the step `operator_forced` with the reason and your name in the run
-record, which outlives the deletion, then resumes the run. **The reason must
+It refuses a step pending for less than 7 days (`step_pending_under_7_days`)
+or not pending at all (`step_not_pending`). With `--confirm`, an Apple, Plaid
+or Gmail step first gets one more revoke attempt, recorded in the run like any
+pass (`revoke_attempt` in the output); if that finishes the step nothing is
+forced. Otherwise it records the step `operator_forced` with the reason and
+your name in the run record, which outlives the deletion, then resumes the
+run. **The reason must
 not contain personal data**: no name, email or account details (the script
 refuses an `@`). There is no route for this. Get the user id from the support
 request or the person's account, never from logs (they carry none).

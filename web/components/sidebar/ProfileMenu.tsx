@@ -375,9 +375,9 @@ export default function ProfileMenu({
       return;
     }
     if (isDeleteRequestOpen) {
-      // Deleted or locked: already signed out on the result; leaving finishes.
+      // Deleted or locked: signed out on the result; leaving only cleans up.
       if (deletionEndsSession(deleteRequestState)) {
-        onLogout();
+        onLogout({ sessionEnded: true });
       } else if (deleteRequestState !== "submitting") {
         setIsDeleteRequestOpen(false);
       }
@@ -866,10 +866,11 @@ export default function ProfileMenu({
     if (deletionEndsSession(outcome)) onLogout({ afterAccountDeletion: true });
   }, [currentLanguage, deleteRequestState, onLogout]);
 
-  // Already signed out on the result; Done finishes the sign-out and leaves.
+  // Signed out on the result already, so Done never calls logout again: it
+  // only clears this browser's state and leaves (Priya #801 note 10).
   const handleCloseDeleteRequest = useCallback(() => {
     if (deletionEndsSession(deleteRequestState)) {
-      onLogout();
+      onLogout({ sessionEnded: true });
       return;
     }
     setIsDeleteRequestOpen(false);

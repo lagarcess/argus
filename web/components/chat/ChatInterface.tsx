@@ -1788,8 +1788,8 @@ export default function ChatInterface() {
   const handleLogout = async (options: LogoutOptions = {}) => {
     if (options.afterAccountDeletion) return endSessionKeepingSurface(accountBoundary);
     try {
-      const result = await logoutFromApi();
-      if (result.revocation === "failed") {
+      const result = options.sessionEnded ? null : await logoutFromApi();
+      if (result?.revocation === "failed") {
         showToast(
           t(
             "settings.logout_error",

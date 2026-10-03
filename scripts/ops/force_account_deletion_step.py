@@ -2,9 +2,16 @@
 
 For a step an operator has decided can never complete: Apple answers
 ``invalid_request`` because the person already removed the app in their Apple ID
-settings, or a provider is gone for good. The step is recorded
-``operator_forced`` with the reason and the operator's name in the run record,
-and the run is resumed at once so the account delete can finish.
+settings, a provider is gone for good, or a token was sealed under a key no
+process holds any more (``key_unproven``).
+
+A dry run by default: it prints the step, how long it has waited and why, and
+changes nothing. ``--confirm`` acts. Either way it is refused unless the step
+has been pending for at least 7 days. With ``--confirm``, an Apple, Plaid or
+Gmail step first gets one more revoke attempt, recorded in the run like any
+pass; only what is still pending after it is recorded ``operator_forced``, with
+the reason and the operator's name in the run record. The run is then resumed
+at once so the account delete can finish.
 
 The reason is kept in the run record after the deletion: write what happened
 ("Apple invalid_request for 7 days, app removed by the person"), never the
@@ -48,6 +55,11 @@ def _parser() -> argparse.ArgumentParser:
         help="1-200 characters, kept in the run record; no personal data.",
     )
     parser.add_argument("--operator", required=True)
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Act. Without it this is a dry run that changes nothing.",
+    )
     return parser
 
 
@@ -80,26 +92,38 @@ def main(argv: Sequence[str] | None = None) -> int:
         supabase_client=SupabaseGateway.from_env().client,
     )
     try:
-        service.force_complete_step(
+        report = service.force_complete_step(
             user_id=args.user_id,
             step=args.step,
             reason=args.reason,
             operator=args.operator,
+            confirm=args.confirm,
         )
     except ValueError as exc:
         parser.error(str(exc))
     except (AccountDeletionRejected, AccountDeletionIncomplete) as exc:
+        # Includes step_not_pending and step_pending_under_7_days.
         print(json.dumps({"forced": False, "reason": str(exc)}), flush=True)
         return 1
+    if not args.confirm:
+        print(json.dumps({**report, "next": "re-run with --confirm to act"}), flush=True)
+        return 0
+    print(json.dumps(report), flush=True)
     try:
         outcome = service.delete_account(user_id=args.user_id)
     except AccountDeletionIncomplete as exc:
         print(
-            json.dumps({"forced": True, "status": "in_progress", "pending": exc.pending}),
+            json.dumps(
+                {
+                    "forced": report["forced"],
+                    "status": "in_progress",
+                    "pending": exc.pending,
+                }
+            ),
             flush=True,
         )
         return 0
-    print(json.dumps({"forced": True, "status": outcome.status}), flush=True)
+    print(json.dumps({"forced": report["forced"], "status": outcome.status}), flush=True)
     return 0
 
 

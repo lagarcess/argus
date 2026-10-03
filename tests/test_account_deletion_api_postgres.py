@@ -238,3 +238,27 @@ def test_a_token_missing_its_subject_or_expiry_is_refused(lane, world, route, sh
         token = _token(world["a"], session, exp=False)
     _refused(route, token)
     _still_locked_then_finish(lane, world)
+
+
+def test_a_session_past_its_not_after_never_unlocks(lane, world, route):  # noqa: ANN001, F811
+    """Note 6: GoTrue's time-boxed session ends at not_after. The lock door
+    is verified locally, so it must refuse an ended session itself."""
+    from argus.api.auth_sessions import deletion_in_flight
+
+    session = _lock(lane, world, route)
+    token = _token(world["a"], session)
+    assert deletion_in_flight(database_url=DSN, token=token, user_id=world["a"])
+    with psycopg.connect(DSN, autocommit=True) as c:
+        c.execute(
+            "update auth.sessions set not_after = now() + interval '1 hour' where id=%s",
+            (session,),
+        )
+    assert deletion_in_flight(database_url=DSN, token=token, user_id=world["a"])
+    with psycopg.connect(DSN, autocommit=True) as c:
+        c.execute(
+            "update auth.sessions set not_after = now() - interval '1 second' where id=%s",
+            (session,),
+        )
+    assert not deletion_in_flight(database_url=DSN, token=token, user_id=world["a"])
+    _refused(route, token)
+    _still_locked_then_finish(lane, world)

@@ -12,9 +12,11 @@ import { useModalSurface } from "../layout/useModalSurface";
  *
  * Confirming runs the deletion command. Once it succeeds, or the account is
  * locked while it finishes (in_progress), the session is dead, so the browser
- * signs out on that result and this dialog stays as the signed-out
- * confirmation; Done leaves. When the command is switched off on this server (404),
- * support gets a ticket instead (requested), or by email if that fails too.
+ * signs out on that result (the one logout call) and this dialog stays as
+ * the signed-out confirmation; Done only cleans up and leaves. When the
+ * command is switched off on this server (404), support gets a ticket instead
+ * (requested), or by email if that fails too, so the confirmation never says
+ * the account is deleted "now".
  *
  * It portals to the body, outside the menu it opens from, so the menu's focus
  * trap never contained it and system back dismissed the menu or the drawer
@@ -125,7 +127,7 @@ function ProfileDeleteRequestDialogSurface({
               {state === "success"
                 ? t(
                     "settings.profile.request_deletion.success",
-                    "Your account is deleted. You'll be signed out.",
+                    "Your account is deleted. You're signed out.",
                   )
                 : state === "in_progress"
                   ? t(
@@ -149,10 +151,23 @@ function ProfileDeleteRequestDialogSurface({
           </>
         ) : (
           <>
+            {/* General and household lines first, then Iris's locked block
+                (handoff "Copy", item 1) word for word in its own key. Nothing
+                here says "now": with the command off this becomes a support
+                request, and the result says so. */}
             <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
               {t(
                 "settings.profile.request_deletion.body",
-                "This deletes your account and your data now, and signs you out. Households you run pass to the longest-standing member, or close if you're the only one. Amounts you added to other people's plans stay there as \"Former member\", with no name. This can't be undone.",
+                "Your account and your data will be deleted, and this can't be undone. Households you run pass to the longest-standing member, or close if you're the only one.",
+              )}
+            </p>
+            <p
+              className="mt-2 text-[13px] leading-relaxed text-black/55 dark:text-white/55"
+              data-testid="argus-delete-account-shared-plans"
+            >
+              {t(
+                "settings.profile.request_deletion.shared_plans",
+                "In plans you share, your amounts stay so everyone else's numbers still add up, but without your name: you'll show as \"Former member.\" Your receipts and notes are deleted. Anything you owe or are owed is closed in the app, not marked as paid. Plans you created pass to whoever has been in each one longest, except shared debt plans, which are closed and stay view-only.",
               )}
             </p>
             {state === "error" && (
