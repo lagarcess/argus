@@ -467,6 +467,9 @@ def current_user(request: Request) -> User:
 
     auth_user_id = str(auth_user.get("id") or "")
     try:
+        # Also false for any sub in argus_private.account_placeholders. A
+        # deletion placeholder is banned and has no sessions, so this is
+        # defense in depth: its token is refused even if one were minted.
         session_is_active = auth_session_is_active(
             database_url=api_state.DATABASE_URL,
             token=token,

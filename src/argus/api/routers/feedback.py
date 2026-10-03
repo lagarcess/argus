@@ -9,7 +9,6 @@ from argus.api.feedback_context import sanitize_feedback_context
 from argus.api.feedback_notification import notify_feedback_submitted
 from argus.api.guest_access import account_context
 from argus.api.schemas import FeedbackRequest, SuccessResponse, User
-from argus.domain.store import utcnow
 from argus.domain.supabase_gateway import QuotaExceededError
 from argus.domain.usage_limits import FEEDBACK_USAGE_RESOURCE, allowance_windows
 
@@ -25,17 +24,6 @@ def feedback(
 ) -> SuccessResponse:
     account = account_context(request)
     context = sanitize_feedback_context(payload.context)
-    if payload.type == "account_deletion_request":
-        context.update(
-            {
-                "source": str(context.get("source") or "profile_modal"),
-                "account_email": user.email,
-                "profile_language": user.language,
-                "request_user_id": user.id,
-                "requested_at": utcnow().isoformat(),
-            }
-        )
-
     if api_state.supabase_gateway is not None:
         if account.kind == "guest":
             outcome = api_state.supabase_gateway.create_feedback_settling_usage(

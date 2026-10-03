@@ -1012,7 +1012,7 @@
       "default_user": "Usuario",
       "edit_display_name": "Editar nombre para mostrar",
       "delete_account": "Eliminar cuenta",
-      "delete_account_note": "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
+      "delete_account_note": "Elimina para siempre tu cuenta de Argus y tus datos.",
       "display_name_save_error": "No pudimos guardar ese nombre todavía.",
       "display_name_too_long": "Usa {{count}} caracteres o menos.",
       "preferred_name": "¿Cómo quieres que Argus te llame?",
@@ -1042,16 +1042,17 @@
       "close": "Cerrar perfil",
       "title": "Perfil",
       "request_deletion": {
-        "title": "Solicitar eliminación de cuenta",
-        "body": "Soporte gestiona la eliminación de cuentas. Verificaremos la titularidad, procesaremos los datos de tu cuenta y te contactaremos por correo electrónico. Las eliminaciones completadas no se pueden deshacer.",
-        "contact_support": "Contactar soporte",
-        "submitting": "Enviando...",
-        "success": "Solicitud enviada. Te contactaremos por correo electrónico.",
-        "error": "No pudimos enviar esa solicitud todavía.",
+        "title": "¿Eliminar tu cuenta?",
+        "body": "Esto elimina tu cuenta y tus datos ahora, y cierra tu sesión. Los hogares que administras pasan al miembro con más antigüedad, o se cierran si eres el único. Los montos que agregaste a planes de otras personas se quedan ahí como \"Exmiembro\", sin nombre. No se puede deshacer.",
+        "confirm": "Eliminar cuenta",
+        "submitting": "Eliminando...",
+        "success": "Tu cuenta está eliminada. Se cerrará tu sesión.",
+        "error": "No pudimos terminar de eliminar tu cuenta. Inténtalo de nuevo para terminar.",
+        "unavailable": "Todavía no se puede eliminar desde la app aquí. Soporte puede eliminar tu cuenta por ti.",
         "email_fallback": "Enviar correo a soporte",
         "email_subject": "Solicitud de eliminación de cuenta de Argus",
         "email_body": "Ayúdame a solicitar la eliminación de mi cuenta de Argus{{account_hint}}.",
-        "close": "Cerrar solicitud de eliminación"
+        "close": "Cerrar eliminación de cuenta"
       }
     },
     "subscription": {

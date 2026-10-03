@@ -2497,7 +2497,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(sidebar).toContain("if (isProfileMenuOpen) return");
   });
 
-  test("profile modal uses gated language shortcuts and deletion support request", () => {
+  test("profile modal uses gated language shortcuts and the in-app deletion command", () => {
     const profileMenu = readFileSync(
       join(root, "components/sidebar/ProfileMenu.tsx"),
       "utf-8",
@@ -2531,9 +2531,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(detailsDialog).toContain("ENABLED_LANGUAGES");
     expect(detailsDialog).toContain("languageDisplayAbbreviation");
     expect(profileMenu).toContain("localeForLanguage");
-    expect(profileMenu).toContain("postFeedback");
-    expect(profileMenu).toContain('type: "account_deletion_request"');
-    expect(profileMenu).toContain('source: "profile_modal"');
+    // Lane 6: the delete button runs the deletion command, not a support
+    // request, and leaving the dialog after success signs out.
+    expect(profileMenu).toContain("deleteAccount");
+    expect(profileMenu).not.toContain("account_deletion_request");
+    expect(profileMenu).toContain("onLogout();");
+    expect(profileMenu).toContain('status === 404 ? "unavailable" : "error"');
     expect(detailsDialog).toContain("argus-profile-language-trigger");
     expect(detailsDialog).toContain("absolute right-0 top-full");
     // Both dialogs live in their own components, because a body-portaled
@@ -2547,23 +2550,28 @@ describe("Argus Alpha frontend contract", () => {
       "overflow-hidden rounded-[10px] border border-black/5 bg-black/[0.015]",
     );
     expect(profileMenu).not.toContain('profile?.language ?? "en"');
-    expect(api).toContain('"account_deletion_request"');
-    expect(en).toContain("Request account deletion");
+    expect(api).not.toContain("account_deletion_request");
+    expect(api).toContain('"/account/delete"');
+    expect(api).toContain("JSON.stringify({ confirm: true })");
+    expect(deleteRequestDialog).toContain(
+      "settings.profile.request_deletion.confirm",
+    );
+    expect(deleteRequestDialog).toContain(
+      "settings.profile.request_deletion.unavailable",
+    );
+    expect(en).toContain('"title": "Delete your account?"');
     expect(en).toContain(
-      "Request permanent deletion of your Argus account. Support will follow up by email.",
+      "Permanently delete your Argus account and your data.",
     );
-    expect(en).toContain("Support handles account deletion. We'll verify");
-    expect(en).toContain("Request sent. We'll follow up by email.");
-    expect(es).toContain("Solicitar eliminación de cuenta");
+    expect(en).toContain("This deletes your account and your data now");
+    expect(en).toContain("Your account is deleted. You'll be signed out.");
+    expect(en).not.toContain("Support will follow up by email.");
+    expect(es).toContain('"title": "¿Eliminar tu cuenta?"');
     expect(es).toContain(
-      "Solicita la eliminación permanente de tu cuenta de Argus. Soporte te contactará por correo electrónico.",
+      "Elimina para siempre tu cuenta de Argus y tus datos.",
     );
-    expect(es).toContain(
-      "Soporte gestiona la eliminación de cuentas. Verificaremos",
-    );
-    expect(es).toContain(
-      "Solicitud enviada. Te contactaremos por correo electrónico.",
-    );
+    expect(es).toContain("Esto elimina tu cuenta y tus datos ahora");
+    expect(es).toContain("Tu cuenta está eliminada. Se cerrará tu sesión.");
   });
 
   test("profile menu groups data controls preferences and legal links", () => {

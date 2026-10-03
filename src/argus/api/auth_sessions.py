@@ -25,6 +25,8 @@ class AuthSessionVerifier:
     pool: Any
 
     def is_active(self, *, token: str, user_id: str) -> bool:
+        """True for a live session of a real person. An account-deletion
+        placeholder (Lane 6) is never active, whatever its sessions."""
         identity = _session_identity(token=token, user_id=user_id)
         if identity is None:
             return False
@@ -41,8 +43,13 @@ class AuthSessionVerifier:
                         from auth.sessions
                         where id = %s and user_id = %s
                     )
+                    and not exists (
+                        select 1
+                        from argus_private.account_placeholders
+                        where id = %s
+                    )
                     """,
-                    (session_id, auth_user_id),
+                    (session_id, auth_user_id, auth_user_id),
                 )
                 row = cursor.fetchone()
         return bool(row and row[0])

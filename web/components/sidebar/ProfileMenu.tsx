@@ -11,7 +11,9 @@ import {
 import { createPortal } from "react-dom";
 import { useModalSurface } from "../layout/useModalSurface";
 import { useOverlayLayer } from "../layout/overlayStack";
-import ProfileDeleteRequestDialog from "./ProfileDeleteRequestDialog";
+import ProfileDeleteRequestDialog, {
+  type DeleteRequestState,
+} from "./ProfileDeleteRequestDialog";
 import ProfileDetailsDialog from "./ProfileDetailsDialog";
 import ProfileSettingsPanels, {
   type SettingsPanel,
@@ -48,7 +50,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import { postFeedback, type ApiUser } from "@/lib/argus-api";
+import { deleteAccount, type ApiUser } from "@/lib/argus-api";
 import {
   readProfile,
   saveProfile,
@@ -107,7 +109,6 @@ type ActiveModal = null | SettingsPanel | "profile";
 
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
 
-type DeleteRequestState = "idle" | "submitting" | "success" | "error";
 
 type ProfileQuickJumpItem = {
   id: string;
@@ -834,20 +835,23 @@ export default function ProfileMenu({
     }
     setDeleteRequestState("submitting");
     try {
-      await postFeedback({
-        type: "account_deletion_request",
-        message: "Private alpha account deletion requested.",
-        context: {
-          source: "profile_modal",
-          profile_language: currentLanguage,
-        },
-      });
+      await deleteAccount();
       setDeleteRequestState("success");
     } catch (err) {
-      console.error("Failed to submit account deletion request", err);
-      setDeleteRequestState("error");
+      const status = (err as { status?: number }).status;
+      // 404: the command is switched off here. Support still handles it.
+      setDeleteRequestState(status === 404 ? "unavailable" : "error");
     }
-  }, [currentLanguage, deleteRequestState]);
+  }, [deleteRequestState]);
+
+  // The account is gone, so the session is dead: leaving the dialog signs out.
+  const handleCloseDeleteRequest = useCallback(() => {
+    if (deleteRequestState === "success") {
+      onLogout();
+      return;
+    }
+    setIsDeleteRequestOpen(false);
+  }, [deleteRequestState, onLogout]);
 
   const accountHint = profile?.email ? ` (${profile.email})` : "";
   const supportMailto = `mailto:${supportEmail}?subject=${encodeURIComponent(
@@ -867,7 +871,7 @@ export default function ProfileMenu({
     <ProfileDeleteRequestDialog
       state={deleteRequestState}
       supportMailto={supportMailto}
-      onClose={() => setIsDeleteRequestOpen(false)}
+      onClose={handleCloseDeleteRequest}
       onSubmit={handleSubmitDeleteRequest}
       returnFocusRef={anchorRef}
     />
@@ -1117,7 +1121,7 @@ export default function ProfileMenu({
               <span className="pl-6 text-[11px] leading-snug text-black/35 dark:text-white/35">
                 {t(
                   "settings.profile.delete_account_note",
-                  "Request permanent deletion of your Argus account. Support will follow up by email.",
+                  "Permanently delete your Argus account and your data.",
                 )}
               </span>
             </button>

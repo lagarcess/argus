@@ -2426,8 +2426,9 @@ user-keyed milestone would re-fire on every renewal. Like
 
 # 15. feedback
 
-Stores user-submitted bug reports, feature requests, general feedback, and
-private-alpha support requests such as account deletion requests.
+Stores user-submitted bug reports, feature requests, and general feedback.
+Rows from the retired `account_deletion_request` type may remain; new account
+deletion is the in-app command (`POST /account/delete`).
 
 ### Fields
 - `id`: `uuid` (Primary Key)
@@ -2438,7 +2439,7 @@ private-alpha support requests such as account deletion requests.
 - `created_at`: `timestamptz`
 
 ### Enums
-- **type**: `bug`, `feature`, `general`, `account_deletion_request`
+- **type**: `bug`, `feature`, `general` (older rows may hold `account_deletion_request`)
 ---
 
 # 16. Soft Delete & Archive Rules

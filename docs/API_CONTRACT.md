@@ -3127,6 +3127,39 @@ Update profile preferences. Partial update semantics are supported.
 
 Argus supports English and Spanish (Latin America) in Alpha.
 
+## `POST /account/delete`
+
+Deletes the signed-in person's account, in the app. Off unless
+`ARGUS_ACCOUNT_DELETION_ENABLED` is on; while off it answers `404` before any
+authentication. The account is always the session's. The body is only a
+confirmation, and any other field is a `422`:
+
+```json
+{ "confirm": true }
+```
+
+The command runs the Lane 6 order (`docs/specs/lanes/account-deletion-fk-census.md`
+and #787). It hands over or closes the person's households and plans, keeps their
+amounts in other people's plans under a nameless "Exmiembro" placeholder (one per
+household or standalone shared group), deletes everything else of theirs,
+revokes provider tokens, and deletes the auth user. A retry resumes the same run.
+
+**Response `200`:**
+
+```json
+{ "status": "done", "pending": [] }
+```
+
+`status` is `auth_deleted` when the account is gone but a provider revocation is
+still owed. `pending` names those providers (for example `apple`). The session is
+dead either way; clients sign out locally.
+
+**Errors:** `403 account_conversion_required` (guest session),
+`403 account_deletion_not_allowed`, `503 account_deletion_unavailable` (no
+Postgres surfaces), `503 account_deletion_incomplete` with `Retry-After`
+(a retry resumes the same run and finishes it).
+
+
 ## Supported Values
 - **language:** `en`, `es-419`
 - **locale:** `en-US`, `es-419`
@@ -6783,7 +6816,6 @@ retain the existing refusal shape. No production client holds a direct write gra
 - `bug`
 - `feature`
 - `general`
-- `account_deletion_request`
 
 `message` is capped at 5,000 characters.
 
@@ -6822,10 +6854,7 @@ profile language, message, and the sanitized context above, and adds no contact
 details the submission did not already carry. A missing credential or a failed
 delivery is logged and never changes the response or the saved feedback.
 
-For `account_deletion_request`, clients send a one-click support request from
-the account surface. The backend enriches `context` with authenticated account
-metadata such as account email, profile language, request user id, and request
-timestamp before persistence. The frontend must not render the internal user id.
+Account deletion is not a feedback type. It is `POST /account/delete`.
 
 ---
 
