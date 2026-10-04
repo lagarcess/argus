@@ -39,7 +39,7 @@ design_tests=(
   CuadraoGroupDesignUITests CuadraoHistoryDesignUITests CuadraoPlanCurrencyUITests
   CuadraoPlanDesignUITests CuadraoPolishUITests CuadraoProfileFollowupUITests
   CuadraoReceiptPermissionUITests CuadraoReceiptUITests CuadraoSignInPresentationUITests
-  CuadraoSupportUITests CuadraoVoiceDesignUITests
+  CuadraoSupportUITests CuadraoVoiceDesignUITests ReleaseUIJourneyTests
 )
 
 # Each runner is non-fatal so one broken check can't hide the others, the tests or the screens.
@@ -47,7 +47,7 @@ run_checks() {
   local runner failed=0
   {
     for runner in run_home_balance run_plan_preview run_group_preview run_receipt_preview \
-                  run_temporary_chat run_avatar_crop; do
+                  run_temporary_chat run_avatar_crop run_release_updates run_release_identity; do
       echo "== $runner"
       python3 "$ios_dir/DesignPreviewTests/$runner.py" || { echo "FAILED $runner"; failed=1; }
     done
