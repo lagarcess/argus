@@ -172,8 +172,14 @@ final class InvitationsTests: XCTestCase {
         let draft = try GroupLinkDraft(label: "  Cena  ", cap: 10_000, expiresAt: now.addingTimeInterval(365 * 86_400), now: now)
         XCTAssertEqual(draft.label, "Cena")
         XCTAssertEqual(draft.expires, "2027-10-01T00:00:00Z")
+        // The server counts code points: one family emoji is one character but seven scalars.
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}"
+        XCTAssertEqual(family.count, 1)
+        let fullest = String(repeating: family, count: 11) + "abc"
+        XCTAssertEqual(try GroupLinkDraft(label: fullest, cap: 5, expiresAt: week, now: now).label, fullest)
         let refused: [(String, Int, Date, GroupLinkDraft.Invalid)] = [
             ("   ", 5, week, .label), (String(repeating: "a", count: 81), 5, week, .label),
+            (String(repeating: family, count: 12), 5, week, .label),
             ("Cena", 0, week, .cap), ("Cena", 10_001, week, .cap),
             ("Cena", 5, now, .expiry), ("Cena", 5, now.addingTimeInterval(365 * 86_400 + 1), .expiry),
         ]

@@ -160,6 +160,7 @@ struct GroupLinkList: Decodable { let links: [GroupLink] }
 /// The founder's group-link form, held to the server's limits before any request.
 public struct GroupLinkDraft: Equatable, Sendable {
     public enum Invalid: Error, Equatable, Sendable { case label, cap, expiry }
+    /// Counted in Unicode scalars, as the server's `max_length` counts code points.
     public static let labelLimit = 80
     public static let capLimit = 10_000
     public static let longestLifetime: TimeInterval = 365 * 86_400
@@ -170,7 +171,7 @@ public struct GroupLinkDraft: Equatable, Sendable {
 
     public init(label: String, cap: Int, expiresAt: Date, now: Date = Date()) throws {
         let name = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, name.count <= Self.labelLimit else { throw Invalid.label }
+        guard !name.isEmpty, name.unicodeScalars.count <= Self.labelLimit else { throw Invalid.label }
         guard (1...Self.capLimit).contains(cap) else { throw Invalid.cap }
         guard expiresAt > now, expiresAt <= now.addingTimeInterval(Self.longestLifetime) else { throw Invalid.expiry }
         self.label = name; self.cap = cap; expires = InvitationDates.string(expiresAt)
