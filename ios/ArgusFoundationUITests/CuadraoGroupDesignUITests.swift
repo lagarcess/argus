@@ -172,6 +172,9 @@ final class CuadraoGroupDesignUITests: XCTestCase {
     }
     private func replace(_ field: XCUIElement, with text: String) {
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (field.value as? String ?? "").count)); field.typeText(text)
+        let typed = NSPredicate { _, _ in (field.value as? String)?.replacingOccurrences(of: ",", with: "") == text }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: typed, object: nil)], timeout: 3), .completed,
+                       "\(field) holds '\(field.value as? String ?? "")' after replacing it with '\(text)'")
     }
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
         for _ in 0..<7 {
