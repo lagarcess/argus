@@ -682,9 +682,10 @@ sessions, Shared conversations, Removed activity and photos. Usage, More options
 and conversation bulk actions are hidden by #786 (`a20362d3`) as a Head of
 Engineering judgment call. Memory (`.memory`) is hidden until native memory
 arrives with its controls. These are designed rows whose backend is still owed, not cuts, and Yelena is
-ordering their backends after chat. The first-release switch is meant to hide them
-only in release builds, with every row shown in development builds; today
-`CuadraoFirstRelease` hides them in every build. This does not remove them from
+ordering their backends after chat. `CuadraoFirstRelease` hides them only in
+release builds and shows every row, including personal-photo selection, in
+development builds. The founder retained the photo picker in the design; release
+builds hide it until hosted avatar storage is connected. This does not remove them from
 the September 28 grouping. Remove only the notification preference named Por
 correo, because Updates go to the inbox and push only. This does not
 remove email authentication or recovery. Household email invitations and update

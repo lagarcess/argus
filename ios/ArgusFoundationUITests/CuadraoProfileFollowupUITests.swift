@@ -39,10 +39,7 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         shot(app, "feedback-general-draft")
     }
 
-    func testPhotoPickerSaveCancelAndRemove() throws {
-        // First release hides the personal-photo option (CuadraoFirstRelease.showsPersonalPhoto = false);
-        // its code is kept, so this journey stays and runs again when the flag flips.
-        try XCTSkipIf(true, "First release hides personal-photo selection (fc7650ea, #787)")
+    func testPhotoPickerSaveCancelAndRemove() {
         let app = launch()
         app.buttons["header.profile"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
@@ -51,7 +48,7 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         app.buttons["cuadrao.profile.cancel"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
         XCTAssertFalse(app.buttons["cuadrao.profile.photo.remove"].exists)
-        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.initial"].isSelected)
+        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.none"].isSelected)
         pickPhoto(app)
         XCTAssertTrue(app.buttons["cuadrao.profile.photo.remove"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["cuadrao.profile.save"].isEnabled)
@@ -60,7 +57,7 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         app.buttons["cuadrao.profile.identity"].tap()
         XCTAssertTrue(app.buttons["cuadrao.profile.photo.remove"].exists)
         app.buttons["cuadrao.profile.photo.remove"].tap()
-        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.initial"].isSelected)
+        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.none"].isSelected)
         app.buttons["cuadrao.profile.cancel"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
         XCTAssertTrue(app.buttons["cuadrao.profile.photo.remove"].exists)
@@ -68,20 +65,17 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         app.buttons["cuadrao.profile.save"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
         XCTAssertFalse(app.buttons["cuadrao.profile.photo.remove"].exists)
-        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.initial"].isSelected)
+        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.none"].isSelected)
     }
 
-    func testPhotoCropCancelPanZoomAndReedit() throws {
-        // First release hides the personal-photo option (CuadraoFirstRelease.showsPersonalPhoto = false);
-        // its code is kept, so this journey stays and runs again when the flag flips.
-        try XCTSkipIf(true, "First release hides personal-photo selection (fc7650ea, #787)")
+    func testPhotoCropCancelPanZoomAndReedit() {
         let app = launch()
         app.buttons["header.profile"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
         pickPhoto(app, accept: false)
         app.buttons["cuadrao.profile.crop.cancel"].tap()
         XCTAssertFalse(app.buttons["cuadrao.profile.photo.remove"].exists)
-        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.initial"].isSelected)
+        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.none"].isSelected)
         pickPhoto(app)
         app.buttons["cuadrao.profile.save"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
@@ -122,6 +116,28 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         app.buttons["cuadrao.profile.photo.edit"].tap()
         XCTAssertTrue(viewport.waitForExistence(timeout: 3))
         XCTAssertEqual(viewport.value as? String, centered)
+    }
+
+    func testReleaseGatesHideUnfinishedRowsAndPhotos() {
+        let unfinished = ["personalization", "security", "usage"]
+        let debug = launch()
+        debug.buttons["header.profile"].tap()
+        for route in unfinished {
+            XCTAssertTrue(debug.buttons["cuadrao.profile.\(route)"].waitForExistence(timeout: 3), "DEBUG shows \(route)")
+        }
+        debug.buttons["cuadrao.profile.identity"].tap()
+        XCTAssertTrue(debug.buttons["cuadrao.profile.photo.choose"].waitForExistence(timeout: 3))
+        debug.terminate()
+        let release = launch(extra: ["--cuadrao-release-gates"])
+        release.buttons["header.profile"].tap()
+        XCTAssertTrue(release.buttons["cuadrao.profile.preferences"].waitForExistence(timeout: 3))
+        for route in unfinished {
+            XCTAssertFalse(release.buttons["cuadrao.profile.\(route)"].exists, "Release gates hide \(route)")
+        }
+        shot(release, "profile-release-gates")
+        release.buttons["cuadrao.profile.identity"].tap()
+        XCTAssertTrue(release.buttons["cuadrao.profile.avatar.none"].waitForExistence(timeout: 3))
+        XCTAssertFalse(release.buttons["cuadrao.profile.photo.choose"].exists)
     }
 
     private func verifyNavigation(extra: [String]) {
@@ -193,10 +209,14 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
 
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
         for _ in 0..<10 {
-            if element.isHittable && element.frame.maxY < app.frame.maxY - 100 { return }
+            // A drag that starts on the keyboard never scrolls the form, so stay above it.
+            let keyboard = app.keyboards.firstMatch
+            let floor = keyboard.exists ? keyboard.frame.minY : app.frame.maxY - 100
+            if element.isHittable && element.frame.maxY < floor { return }
             let downward = !element.exists || element.frame.minY > app.frame.midY
-            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: downward ? 0.7 : 0.3))
-            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: downward ? 0.35 : 0.65))
+            let top = min(0.7, floor / app.frame.height - 0.05)
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: downward ? top : 0.3))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: downward ? top - 0.35 : 0.65))
             start.press(forDuration: 0.01, thenDragTo: end)
         }
         XCTAssertTrue(element.isHittable)

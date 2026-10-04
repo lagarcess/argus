@@ -12,15 +12,19 @@ struct CuadraoTemporaryChatSettings: View {
             VStack(alignment: .leading, spacing: 18) {
                 explanation("clock", es ? "Fuera de tu historial" : "Outside your history",
                     es ? "No aparece en Chats ni en Buscar." : "Does not appear in Chats or Search.")
-                explanation("brain", es ? "Sin nuevas memorias" : "No new memories",
-                    es ? "Lo que hables aquí no se añade a tus memorias." : "What you discuss here is not added to your memories.")
+                if CuadraoFirstRelease.shows(.memory) {
+                    explanation("brain", es ? "Sin nuevas memorias" : "No new memories",
+                        es ? "Lo que hables aquí no se añade a tus memorias." : "What you discuss here is not added to your memories.")
+                }
             }
             Divider()
             VStack(alignment: .leading, spacing: 12) {
                 Toggle(es ? "Usar mi contexto" : "Use my context", isOn: $store.useContext)
                     .font(CuadraoTypography.action).disabled(store.contextLocked)
                     .accessibilityIdentifier("temporary-context")
-                Text(es ? "Tus memorias, preferencias de respuesta y registros financieros a los que tienes acceso." : "Your memories, response preferences and financial records you can access.")
+                Text(CuadraoFirstRelease.shows(.memory)
+                    ? (es ? "Tus memorias, preferencias de respuesta y registros financieros a los que tienes acceso." : "Your memories, response preferences and financial records you can access.")
+                    : (es ? "Tus preferencias de respuesta y registros financieros a los que tienes acceso." : "Your response preferences and financial records you can access."))
                     .font(.subheadline).foregroundStyle(.secondary)
                 if store.contextLocked {
                     Label(es ? "La elección queda fija en este chat. Inicia otro chat temporal para cambiarla." : "This choice is fixed for this chat. Start another temporary chat to change it.", systemImage: "lock")

@@ -66,15 +66,22 @@ enum CanvasProfileRoute: Hashable {
     }
 }
 
-/// Feature-dependent routes remain hidden; personal photos stay local to the preview.
+/// Release builds hide designed controls whose backend is still owed. DEBUG builds show all of
+/// them unless launched with `--cuadrao-release-gates`, which previews the release set.
 enum CuadraoFirstRelease {
-    static let hiddenProfileRoutes: Set<CanvasProfileRoute> = [
+    static let unfinishedProfileRoutes: Set<CanvasProfileRoute> = [
         .personalization, .security, .shared, .removed, .memory, .usage, .advanced
     ]
-    static let showsPersonalPhoto = true
-    static let showsConversationBulkActions = false
+    #if DEBUG
+    static let hidesUnfinished = ProcessInfo.processInfo.arguments.contains("--cuadrao-release-gates")
+    #else
+    static let hidesUnfinished = true
+    #endif
+    static var showsPersonalPhoto: Bool { !hidesUnfinished }
+    static var showsConversationBulkActions: Bool { !hidesUnfinished }
     static func shows(_ route: CanvasProfileRoute) -> Bool {
-        route == .voice ? CuadraoDesignPreview.voiceSelection : !hiddenProfileRoutes.contains(route)
+        if route == .voice { return CuadraoDesignPreview.voiceSelection }
+        return !(hidesUnfinished && unfinishedProfileRoutes.contains(route))
     }
 }
 

@@ -1,8 +1,7 @@
 import Foundation
 
 extension CuadraoFirstRelease {
-    /// Apple and Google sign-in stay hidden in the preview until the founder's choice and the
-    /// connected path are both settled (#787, Authentication). The preview's Apple control and
-    /// its recovery copy stay in code behind this switch.
+    /// The preview's own Apple control stays hidden. Connected Apple and Google sign-in (decision 18, #795)
+    /// is `ConnectedProviderButtons`, gated by ARGUS_APPLE_SIGN_IN_ENABLED and ARGUS_GOOGLE_SIGN_IN_ENABLED.
     static let showsSocialSignIn = false
 }
