@@ -64,7 +64,7 @@ struct ReleaseFounderGroupInvitationView: View {
     let onCreate: (String, Int, Date) -> Void
     @State private var label = ""
     @State private var cap = ""
-    @State private var expiry = Date()
+    @State private var expiry = Date().addingTimeInterval(7 * 86_400)
 
     var body: some View {
         ReleaseInvitationPage(title: spanish ? "Una invitación,\nvarios lugares." : "One invitation,\nseveral places.",

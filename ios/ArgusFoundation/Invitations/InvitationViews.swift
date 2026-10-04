@@ -79,6 +79,8 @@ struct InvitationPendingNotice: View {
             }
             .padding(.horizontal, 20).padding(.vertical, 8)
             .background(WelcomePalette.surface)
+            .foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("invites.pending")
         }
     }

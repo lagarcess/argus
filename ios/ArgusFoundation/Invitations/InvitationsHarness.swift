@@ -138,6 +138,12 @@ struct InvitationsHarness: View {
                 signIn
             }
         }
+        .overlay(alignment: .bottom) {
+            if householdInput != nil {
+                Text("Household join opened").padding().background(.thinMaterial, in: Capsule())
+                    .accessibilityIdentifier("harness.household.opened")
+            }
+        }
         .invitationLinks(model)
         .tint(WelcomePalette.pine)
         .preferredColorScheme(arguments.contains("--harness-dark") ? .dark : .light)
@@ -157,9 +163,6 @@ struct InvitationsHarness: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Cuadrao").font(CuadraoTypography.screen).accessibilityIdentifier("harness.app")
-                    if householdInput != nil {
-                        Text("Household join opened").accessibilityIdentifier("harness.household.opened")
-                    }
                     VStack(spacing: 0) { InvitationsProfileRow(model: model) }
                         .padding(.horizontal, 16)
                         .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
