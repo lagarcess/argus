@@ -13,7 +13,8 @@ commits finish the handoff's ten pickup items. Code head for this run: `c82f093d
 Simulator: iPhone 18 Pro Max, Xcode 27. This run does not certify connected or
 physical-device journeys, TestFlight readiness or any service behaviour.
 
-- `CuadraoFirstRelease` hides the unfinished Profile rows, photo selection and
+- `CuadraoFirstRelease` hides the unfinished Profile rows, the avatar-editing entry
+  ([decision of October 3, 2026](../../../specs/argus-decision-log.md#october-3-2026-avatar-editing-in-release)) and
   conversation bulk actions only in release builds. DEBUG builds show all of them,
   and `--cuadrao-release-gates` previews the release set in DEBUG.
 - Temporary-chat memory copy follows `CuadraoFirstRelease.shows(.memory)`.
@@ -168,7 +169,7 @@ Summaries of the runs are in [2026-10-03-w1b](2026-10-03-w1b/).
   invitation full/quota presentation, Updates/no-data/read-only and AI decline.
   Correction, October 3, 2026: `testUpdatesNoDataAndReadOnlyHistory` does not pass.
   It failed in the full suite at `860a6044`, in the focused reruns at `c82f093d` and
-  `e9195b58`, and on the review-fix tree; see "Review fixes, October 3, 2026" below.
+  `e9195b58`, and on the review-fix tree; see "Review fixes, October 3, 2026" above.
   The avatar journeys above predate the release rule in `26055a28`, which hides avatar
   editing and photos in release builds.
 - 25 Updates checks, 79 Home projection checks and identity-state checks passed.
