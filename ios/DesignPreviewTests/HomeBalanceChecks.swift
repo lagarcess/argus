@@ -120,6 +120,7 @@ import Foundation
         check(average?.average == 175, "Twelve complete monthly totals have an exact arithmetic average")
         check(annualStory.completedMonths(count: 6)?.last?.interval.end == calendar.date(from: DateComponents(year: 2026, month: 1, day: 1)), "Running month excluded from completed averages")
         let sparse = CanvasSpendingStory(expenses: [historyRows.last!], range: .month, offset: 0, coverageStart: coverage, now: january)
+        check(sparse.longitudinalInsights.first(where: { $0.category == nil && $0.months.count == 12 })?.average == Decimal(400) / 12, "Covered zero months stay in the average denominator")
         check(sparse.completedMonths(count: 12)?.filter { $0.amount == 0 }.count == 11, "Confirmed coverage includes months with no spending as zero")
         check(!sparse.longitudinalInsights.contains(where: { $0.kind == .trend }), "An isolated expense does not claim a sustained category trend")
         check(unknownStory.longitudinalInsights.isEmpty, "Unknown coverage never produces longitudinal insight")
