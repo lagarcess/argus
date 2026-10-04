@@ -142,7 +142,7 @@ struct HouseholdIntroduction: View {
     @State private var name = ""
     @State private var displayName = ""
     @State private var token = ""
-    @State private var previewOnEntry = false
+    @State private var handedOver = ""
     var body: some View {
         Group {
             Section {
@@ -167,7 +167,7 @@ struct HouseholdIntroduction: View {
             if mode == "join" {
                 Section("household.join") {
                     TextField("household.pasteInvite", text: $token).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("household.invite.input").onChange(of: token) { _, value in
-                        if previewOnEntry { previewOnEntry = false; Task { await model.previewInvitation(value) } } else { model.cancelInvitationReview() }
+                        if value != handedOver { handedOver = ""; model.cancelInvitationReview() }
                     }
                     HouseholdInvitationEntryHint()
                     Button("household.reviewInvite") { Task { await model.previewInvitation(token) } }.disabled(token.isEmpty).accessibilityIdentifier("household.invite.preview")
@@ -187,7 +187,10 @@ struct HouseholdIntroduction: View {
         }.onAppear {
             displayName = model.identity?.profile?.displayName ?? ""
             if !model.pendingInvitationToken.isEmpty {
-                previewOnEntry = true; token = model.pendingInvitationToken; mode = "join"; model.pendingInvitationToken = ""
+                // A handed-over code is previewed at once; joining still needs a name and a tap.
+                let input = model.pendingInvitationToken
+                handedOver = input; token = input; mode = "join"; model.pendingInvitationToken = ""
+                Task { await model.previewInvitation(input) }
             }
         }
     }

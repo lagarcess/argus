@@ -102,7 +102,11 @@ final class HouseholdModel: ObservableObject {
         do {
             let value = try await controller.householdResponse(HouseholdAccountDetail.self, path: path(selectedId, "/accounts/" + id.uuidString), expectedIdentity: identity)
             guard current(ticket, identity) else { return }; detail = value
-        } catch { await failed(error, ticket, identity, householdId: selectedId) }
+        } catch {
+            await failed(error, ticket, identity, householdId: selectedId)
+            // Still a member: reload so an account that is no longer shared leaves the list.
+            if current(ticket, identity), self.selectedId == selectedId, errorKey == "household.changed" { await refresh(); errorKey = "household.changed" }
+        }
     }
     func back() { detail = nil; history = []; highlightActivityId = nil }
     func openSearchHit(_ hit: HouseholdSearchHit) async {
@@ -137,7 +141,7 @@ final class HouseholdModel: ObservableObject {
         } catch {
             guard current(ticket, identity), searchGeneration == searchTicket else { return }
             searchState = .unavailable
-            handleAccessFailure(error, householdId: selectedId)
+            _ = await resolveAccessFailure(error, householdId: selectedId)
         }
     }
     /// A pasted link, a scanned QR's link or a typed code previews the same invitation.
@@ -229,7 +233,7 @@ final class HouseholdModel: ObservableObject {
             guard current(ticket, identity) else { return }
             let accessFailure: Bool
             if case .plan(let id, _) = operation { accessFailure = await handlePlanAccessFailure(error, householdId: id) }
-            else { accessFailure = handleAccessFailure(error, householdId: requestHouseholdId(write.path)) }
+            else { accessFailure = await resolveAccessFailure(error, householdId: requestHouseholdId(write.path)) }
             guard current(ticket, identity) else { return }
             if availability != .disabled {
                 if write.path == "/invitations/accept", Self.invitationOutcomes.contains(InvitationProblem(error)) { invitationProblem = InvitationProblem(error) }
@@ -244,7 +248,7 @@ final class HouseholdModel: ObservableObject {
                             let explained = invitationProblem != nil && write.path == "/invitations/accept"
                             clear()
                             if write.path == "/invitations/accept", selectedId != nil { await refresh() }
-                            if current(ticket, identity) || write.path == "/invitations/accept" { errorKey = explained ? nil : "household.changed" }
+                            errorKey = explained ? nil : "household.changed"
                         }
                     }
                 } else { errorKey = "household.uncertain" }
@@ -350,6 +354,23 @@ final class HouseholdModel: ObservableObject {
         }
         return true
     }
+    /// `household_not_found` also answers for an account or grant that is gone, so only the
+    /// membership read ends membership.
+    private func resolveAccessFailure(_ error: Error, householdId: UUID?) async -> Bool {
+        guard case SessionFailure.rejected(404, "household_not_found") = error, let householdId, householdId == selectedId, let identity else {
+            return handleAccessFailure(error, householdId: householdId)
+        }
+        let ticket = generation
+        do {
+            _ = try await controller.householdResponse(Household.self, path: path(householdId), expectedIdentity: identity)
+            guard current(ticket, identity) else { return true }
+            errorKey = "household.changed"
+        } catch let membership {
+            guard current(ticket, identity) else { return true }
+            if !handleAccessFailure(membership, householdId: householdId) { errorKey = "household.loadError" }
+        }
+        return true
+    }
     private func suspend(_ state: Availability) {
         clear(); lastSearchQuery = nil; availability = state; households = []; household = nil; preparedInvitation = nil
         showManagement = false; cancelInvitationReview(); pendingInvitationToken = ""
@@ -358,7 +379,7 @@ final class HouseholdModel: ObservableObject {
     }
     private func failed(_ error: Error, _ ticket: UUID, _ session: SessionSnapshot, householdId: UUID?, discovery: Bool = false) async {
         guard current(ticket, session) else { return }
-        if !handleAccessFailure(error, householdId: householdId) {
+        if !(await resolveAccessFailure(error, householdId: householdId)) {
             if discovery { suspend(.unavailable) }
             else { errorKey = "household.loadError" }
         }

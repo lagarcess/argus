@@ -208,6 +208,7 @@ public enum InvitationProblem: Error, Equatable, Sendable {
         case "beta_invite_required": .invitationRequired
         case "invites_unavailable", "households_unavailable": .surfaceUnavailable
         case "account_conversion_required", "verified_user_required": .signedOut
+        case "invite_request_invalid", "household_admin_required", "idempotency_conflict", "idempotency_key_required": .refused
         default: status == 429 ? .rateLimited : status >= 500 ? .unavailable : .refused
         }
     }

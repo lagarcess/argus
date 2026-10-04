@@ -147,7 +147,7 @@ final class InvitationsTests: XCTestCase {
             (409, "household_invitation_requires_accept", .householdInvitation),
             (409, "beta_invite_quota_exhausted", .quotaExhausted), (403, "founder_required", .founderOnly),
             (403, "beta_invite_required", .invitationRequired), (404, "invites_unavailable", .surfaceUnavailable),
-            (422, "invite_request_invalid", .refused), (409, "idempotency_conflict", .refused),
+            (422, "invite_request_invalid", .refused), (409, "idempotency_conflict", .refused), (403, "household_admin_required", .refused),
             (400, "idempotency_key_required", .refused), (500, nil, .unavailable),
             (403, "account_conversion_required", .signedOut),
         ]
