@@ -437,8 +437,8 @@ them writes saved balances. The env inventory is in the master plan's
 - Grok voice is the provider for the chat voice-call feature. The feature is
   new and not wired yet, so it has no setting name today. Once built it gets a
   server-only key, and the phone never holds it.
-- Perplexity is kept, for finance search. The agent work in
-  [#813](https://github.com/lagarcess/argus/pull/813) wires it in.
+- Perplexity is kept, for finance search. Cuadrao integration requires a separately assigned runtime slice;
+  [#813](https://github.com/lagarcess/argus/pull/813) records the delivery sequence.
 
 ### Space model timing
 

@@ -4,7 +4,7 @@
 
 **Sources:** Lucas's two October 4 documents, recorded verbatim as [go to market vision](../research/2026-10-04-cuadrao-gtm-vision-source.md) (cited as **GTM**) and [product and business architecture](../research/2026-10-04-cuadrao-product-business-architecture-source.md) (cited as **Blueprint**). Repo facts were read on integration `codex/private-alpha-next` at `a8c37d3a` (Oct 3, 6:09 AM CT). Open issues and PRs are as of October 4. Lucas approved keeping both source records public as recorded, with no summaries (Oct 4, 2:22 PM CT).
 
-**Related open PRs:** [#813](https://github.com/lagarcess/argus/pull/813) (draft, execution board Oct 4 roadmap lock) and [#808](https://github.com/lagarcess/argus/pull/808) (profile hidden rows backend; touches the decision log, MVEE, board, handoff, FK census, `DATA_MODEL.md` and `API_CONTRACT.md`). This plan doesn't edit the execution board.
+**Related documentation:** [#813](https://github.com/lagarcess/argus/pull/813) (execution board Oct 4 roadmap lock) and [#808](https://github.com/lagarcess/argus/pull/808) (profile hidden rows backend; touches the decision log, MVEE, board, handoff, FK census, `DATA_MODEL.md` and `API_CONTRACT.md`). This plan doesn't edit the execution board.
 
 ## How to read this plan
 
@@ -44,7 +44,7 @@ Where integration code and docs differ from this rule is listed in [canon rows 1
 
 1. **OpenRouter** is kept, for the chat models (GPT and Grok) and for vision extraction.
 2. **Grok voice** is the provider for the chat voice-call feature. It's new and not wired yet. Once built it gets a server-only key; the phone never holds it.
-3. **Perplexity** is kept, for finance search. The agent work in #813 wires it in.
+3. **Perplexity** is kept, for finance search. Cuadrao integration requires a separately assigned runtime slice; #813 records the delivery sequence.
 
 **Space model timing (Lucas, Oct 4, 2:21 PM CT, relayed by Iris):** the space-model change lands before TestFlight, which is a few days out. This settles [conflict row 5](#where-the-two-halves-disagree). Which migration steps that covers is Yelena's sequencing (§B2.3). The model itself, including roles and the business retention rule, still needs Lucas's lock (§B9 question 1).
 
@@ -660,12 +660,12 @@ The server is the real boundary in both flavors. A consumer build that called bu
 - **Known violation:** `agent_runtime/calculation_rows.py` `dollar_rate` converts amounts at Argus's latest close against the dollar, in the frozen Argus web chat only (the market counterfactual row; `docs/API_CONTRACT.md` about L5748). It breaks Lucas's no-conversion rule. Nothing new may build on it, it goes away with the chat retirement, and it isn't a TestFlight blocker.
 
 
-**Perplexity [fact]: Keep. It's wired into the backend, but not into the Cuadrao app yet.** `PERPLEXITY_API_KEY` is read via `domain/research/credentials.py` `perplexity_api_key()`. The research rail (`domain/research/perplexity_agent.py`, `ARGUS_RESEARCH_RAIL_ENABLED=true` on Render) serves the Argus web chat. Memory embeddings reuse the same key (`llm/memory_embedding.py:301`). The iOS Cuadrao chat doesn't call it yet; the Cuadrao agent lane (#813) has to wire it for one-off outside-finance questions.
+**Perplexity [fact]: Keep. It's wired into the backend, but not into the Cuadrao app yet.** `PERPLEXITY_API_KEY` is read via `domain/research/credentials.py` `perplexity_api_key()`. The research rail (`domain/research/perplexity_agent.py`, `ARGUS_RESEARCH_RAIL_ENABLED=true` on Render) serves the Argus web chat. Memory embeddings reuse the same key (`llm/memory_embedding.py:301`). The iOS Cuadrao chat doesn't call it yet; a separately assigned Cuadrao runtime slice must connect it for finance search. #813 records the delivery sequence, not that implementation.
 
 **AI providers (Lucas, locked Oct 4, 2:20 PM CT, relayed by Yelena).** All three stay behind the server, and none of them writes saved balances.
 - **OpenRouter: Keep**, for the chat models (GPT and Grok) and for vision extraction.
 - **Grok voice: Keep (planned)**, the provider for the chat voice-call feature. It's new and not wired yet, so it has no env name today. Once built it gets a server-only key; the phone never holds it.
-- **Perplexity: Keep**, for finance search. The agent work in #813 wires it in.
+- **Perplexity: Keep**, for finance search. Cuadrao integration requires a separately assigned runtime slice; #813 records the delivery sequence.
 
 | name | where read | provider | call | reason |
 |---|---|---|---|---|
@@ -713,7 +713,7 @@ The server is the real boundary in both flavors. A consumer build that called bu
 | `NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN` | `web/lib/guest-captcha.ts` | Cloudflare | Keep →C | **Not guest-only.** iOS sign-up captcha goes `web/app/auth/native-captcha` → `lib/native-captcha.ts` → `guest-captcha.ts`. Rename the file before the guest deletion PR. |
 | `ARGUS_CAPTCHA_URL` | `NativeAuthConfiguration.swift`, Info.plist | Cloudflare | Keep →C | iOS captcha page URL |
 | **Perplexity** | | | | |
-| `PERPLEXITY_API_KEY` | `domain/research/credentials.py`, `research/search/selection.py`, `llm/memory_embedding.py` | Perplexity | Keep | Finance search (Lucas's Oct 4 lock); the #813 agent work wires it in (see above) |
+| `PERPLEXITY_API_KEY` | `domain/research/credentials.py`, `research/search/selection.py`, `llm/memory_embedding.py` | Perplexity | Keep | Finance search (Lucas's Oct 4 lock); Cuadrao runtime integration remains separately assigned (see above) |
 | `ARGUS_RESEARCH_RAIL_ENABLED`, `ARGUS_RESEARCH_BACKGROUND_DEADLINE_SECONDS` | `domain/research/config.py` | Perplexity | Keep →C | Research rail |
 | `ARGUS_REGISTERED_DAILY_RESEARCH_CEILING`, `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` | `domain/usage_limits.py` | Perplexity | Keep →C | Cost caps |
 | `ARGUS_GROUNDED_DISCOVERY_ENABLED`, `ARGUS_DISCOVERY_{SEARCH_PROVIDER,SEARCH_TIMEOUT_SECONDS,MAX_CANDIDATES,HOURLY_LIMIT,DAILY_LIMIT,GLOBAL_DAILY_CEILING,OPENROUTER_SEARCH_MODEL}` (8) | `domain/research/search/config.py`, `selection.py`, `domain/usage_limits.py` | Perplexity/OpenRouter | Drop (blocked) | Asset discovery for backtests ("5-symbol run cap") |
@@ -723,7 +723,7 @@ The server is the real boundary in both flavors. A consumer build that called bu
 | `ARGUS_VISION_MODEL`, `ARGUS_OPENROUTER_DOCUMENT_EXTRACTION_TIMEOUT_SECONDS` | `llm/openrouter_model_env.py`, `llm/openrouter.py:244` (name built from the task) | OpenRouter | Keep →C | Business Inbox extraction. **`ARGUS_VISION_MODEL` isn't in `render.yaml`**, so extraction fails with `missing_vision_model` (`extractor.py:224`) until it's set. |
 | `ARGUS_DOCUMENT_EXTRACTION_ENABLED` | `ingestion/documents/config.py` | own | Keep →C | Stays off until #778 |
 | `ARGUS_DOCUMENT_EXTRACTION_MAX_BYTES`, `_MAX_PAGES` | `.env.example` only; no reader | none | Drop | Documented but unread |
-| `ARGUS_{CHAT,CONTEXT,READOUT,STRUCTURED,UTILITY}_MODEL` + `_FALLBACK_MODEL` (10), `ARGUS_{CAPABILITY,STRUCTURED}_REASONING_EFFORT` (2) | `llm/openrouter_model_env.py`, `llm/openrouter.py` | OpenRouter | Drop (blocked) | Argus chat tiers. If the #813 agent lane adopts the tier scheme, rename instead. The provider itself stays: Lucas's Oct 4 lock keeps OpenRouter for the Cuadrao chat models (GPT and Grok). |
+| `ARGUS_{CHAT,CONTEXT,READOUT,STRUCTURED,UTILITY}_MODEL` + `_FALLBACK_MODEL` (10), `ARGUS_{CAPABILITY,STRUCTURED}_REASONING_EFFORT` (2) | `llm/openrouter_model_env.py`, `llm/openrouter.py` | OpenRouter | Drop (blocked) | Argus chat tiers. If the separately assigned Cuadrao runtime adopts the tier scheme, rename instead. The provider itself stays: Lucas's Oct 4 lock keeps OpenRouter for the Cuadrao chat models (GPT and Grok). |
 | `ARGUS_OPENROUTER_<TASK>_TIMEOUT_SECONDS` for 13 chat tasks (`INTERPRETATION_REPAIR`, `ASSET_MENTION_PREFLIGHT`, `FIELD_FIDELITY`, `CAPABILITY_CONFLICT`, `CLARIFICATION`, `RESULT_SUMMARY`, `NAME_SUGGESTION`, `DISCOVERY_{EXTRACTION,VOICING,MODEL_KNOWLEDGE}`, `KNOWLEDGE_{ROUTE,VOICING}`, `MEMORY_SENSITIVITY`), plus `INTERPRETATION` and `CHAT_COMPOSER` (no such task) | `llm/openrouter.py:244`, `llm/openrouter_tasks.py` | OpenRouter | Drop (13 blocked; 2 dead now) | Chat stages |
 | `ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY` | `llm/openrouter_key_policy.py` | OpenRouter | Drop (blocked) | Guest flow. Revoke the key at OpenRouter after the guest deletion. |
 | **Grok voice (planned)** | | | | |
@@ -952,7 +952,7 @@ Stream (c) touches (b) only at the invoice record and its fiscal-state fields, s
 
 **Size:** `docs/reports/evidence/` is ~4,950 files, 2,195 of them PNGs. Consider moving dated evidence out of the main tree (an archive branch or release assets) while keeping the links. `docs/maintenance/docs-classification-inventory.md` already exists as a starting point.
 
-**PR conflicts Maya will hit:** #813 and #808 each **conflict with #790** in `docs/specs/argus-execution-board.md` (`git merge-tree`, Oct 4). #813 and #808 merge cleanly with each other. #790 now merges cleanly with integration; the DESIGN.md conflict in the handoff is gone. #808 L620 (`account_deletion_request`) is left for Lucas to amend.
+**PR conflicts Maya will hit:** #813 and #808 each **conflict with #790** in `docs/specs/argus-execution-board.md` (`git merge-tree`, Oct 4). #813 and #808 merge cleanly with each other. #790 now merges cleanly with integration; the DESIGN.md conflict in the handoff is gone. #808 at `a1ebf4b4` already records the founder-approved flag-off support fallback; no further product decision is needed for it.
 
 ---
 

@@ -4,9 +4,11 @@
 **Read at:** integration `a8c37d3a182fbdb3228f6003272418e65286bc1a`.
 **Product owner:** [MVEE Profile](../argus-minimum-viable-ecosystem-experience.md#profile-control-argus). The [execution board](../argus-execution-board.md#cuadrao-release-ui-landing-order) owns status and order.
 
-`CuadraoFirstRelease.hiddenProfileRoutes` in `ios/ArgusFoundation/Cuadrao/CuadraoProfileCanvas.swift` hides seven Profile rows: `.personalization`, `.security`, `.shared`, `.removed`, `.memory`, `.usage` and `.advanced`. Their screens are in `ios/ArgusFoundation/Cuadrao/CuadraoProfilePage.swift` and are preview-only: no row calls the API. The MVEE calls them designed rows whose backend is still owed, ordered after chat.
+At the integration baseline above, `CuadraoFirstRelease.hiddenProfileRoutes` in `ios/ArgusFoundation/Cuadrao/CuadraoProfileCanvas.swift` hides seven Profile rows: `.personalization`, `.security`, `.shared`, `.removed`, `.memory`, `.usage` and `.advanced`. Their screens are in `ios/ArgusFoundation/Cuadrao/CuadraoProfilePage.swift` and are preview-only: no row calls the API. The MVEE calls them designed rows whose backend is still owed, ordered after chat.
 
-This file lists, for each row, the backend it needs, what integration already has, and what is missing. "Chat" means the connected native conversation client (board work ID D09), which is not on integration. Every row below comes after it.
+The verified #790 candidate renames that inventory to `unfinishedProfileRoutes` and shows the complete editor in development builds. Release still gates unfinished rows and avatar editing until selections persist. This candidate behavior has not landed on integration; the [current mobile roadmap](../argus-execution-board.md#current-mobile-roadmap-october-4-founder-lock) owns its status.
+
+This file lists, for each row, the backend it needs, what integration already has, and what is missing. The original dependency was the connected native conversation client (board work ID D09). The current mobile roadmap also requires a bounded Cuadrao runtime assignment. Existing Argus APIs below are reusable inventory, not approval to copy its runtime or allowance model into Cuadrao. These Profile backends remain ordered after chat.
 
 ## Proposed order after chat
 
