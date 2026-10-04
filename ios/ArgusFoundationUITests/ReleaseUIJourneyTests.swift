@@ -123,6 +123,28 @@ final class ReleaseUIJourneyTests: XCTestCase {
         capture(app, "personal-invitation-es")
     }
 
+    func testInvitationProminentLabelsLightAndDark() {
+        for dark in [false, true] {
+            let app = launch(spanish: true, dark: dark)
+            let suffix = dark ? "dark-es" : "light-es"
+            app.buttons["release.review.invites"].tap()
+            let personal = app.buttons["release.invites.gallery.personal"]
+            reveal(personal, in: app); personal.tap()
+            let personalCreate = app.buttons["release.personalInvites.create"]
+            XCTAssertTrue(personalCreate.waitForExistence(timeout: 3))
+            reveal(personalCreate, in: app)
+            XCTAssertTrue(personalCreate.isEnabled)
+            capture(app, "invitation-create-" + suffix)
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+            let group = app.buttons["release.invites.gallery.group.create"]
+            reveal(group, in: app); group.tap()
+            let create = app.buttons["release.groupInvite.create"]
+            reveal(create, in: app)
+            capture(app, "invitation-group-link-" + suffix)
+            app.terminate()
+        }
+    }
+
     func testUpdatesNoDataAndReadOnlyHistory() {
         let app = launch(spanish: true)
         app.buttons["release.review.updates"].tap()
