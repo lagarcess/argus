@@ -163,18 +163,36 @@ final class HouseholdModelTests: XCTestCase {
         reopened.bind(identity)
         XCTAssertEqual(reopened.selectedId, HouseholdServer.household)
     }
-    /// The reload after an account refusal can end membership or lose its answer; its message stands.
+    /// The reload after an account refusal can end membership, lose its answer or find the surface off; its message stands.
     func testTheReloadAfterAnAccountRefusalKeepsItsOwnMessage() async throws {
-        for (reload, expected) in [("departed", "household.accessEnded"), ("offline", "household.loadError")] {
+        let cases: [(reload: String, expected: String?)] = [("departed", "household.accessEnded"), ("offline", "household.loadError"), ("disabled", nil)]
+        for (reload, expected) in cases {
             let fixture = try HouseholdFixture()
             _ = try await fixture.login()
             await fixture.model.select(HouseholdServer.household)
             await fixture.server.fail("GET /api/v1/households/" + HouseholdServer.household.uuidString + "/accounts/" + HouseholdServer.account.uuidString, 404, code: "household_not_found")
-            if reload == "departed" { await fixture.server.depart() } else { await fixture.server.offline("GET /api/v1/households") }
+            switch reload {
+            case "departed": await fixture.server.depart()
+            case "offline": await fixture.server.offline("GET /api/v1/households")
+            default: await fixture.server.fail("GET /api/v1/households", 404, code: "households_unavailable")
+            }
             await fixture.model.open(HouseholdServer.account)
             XCTAssertEqual(fixture.model.errorKey, expected, reload)
             XCTAssertEqual(fixture.model.selectedId == nil, reload == "departed", reload)
         }
+    }
+    /// Unsharing bumps the Household version, so the reload starts a new access generation; the person still learns why the account left.
+    func testAnUnsharedAccountLeavesTheListAndSaysPermissionsChanged() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        await fixture.server.revokeAccount()
+        await fixture.server.fail("GET /api/v1/households/" + HouseholdServer.household.uuidString + "/accounts/" + HouseholdServer.account.uuidString, 404, code: "household_not_found")
+        await fixture.model.open(HouseholdServer.account)
+        XCTAssertEqual(fixture.model.errorKey, "household.changed")
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertEqual(fixture.model.snapshot?.authorizationVersion, 2)
+        XCTAssertEqual(fixture.model.snapshot?.accounts.isEmpty, true)
     }
     func testANonAdminInvitationRefusalKeepsMembershipAndSaysPermissionsChanged() async throws {
         let fixture = try HouseholdFixture()

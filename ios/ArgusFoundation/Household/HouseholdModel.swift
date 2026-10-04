@@ -107,7 +107,8 @@ final class HouseholdModel: ObservableObject {
             // Still a member: reload so an account that is no longer shared leaves the list.
             guard current(ticket, identity), self.selectedId == selectedId, errorKey == "household.changed" else { return }
             await refresh()
-            if current(ticket, identity), self.selectedId == selectedId, errorKey == nil { errorKey = "household.changed" }
+            // An unshare bumps the version, so the reload rotates the generation; compare the session instead.
+            if sameSession(identity), isAvailable, self.selectedId == selectedId, errorKey == nil { errorKey = "household.changed" }
         }
     }
     func back() { detail = nil; history = []; highlightActivityId = nil }
@@ -319,8 +320,9 @@ final class HouseholdModel: ObservableObject {
         path.split(separator: "/").first.flatMap { UUID(uuidString: String($0)) }
     }
     func path(_ id: UUID, _ suffix: String = "") -> String { "/" + id.uuidString + suffix }
-    func current(_ ticket: UUID, _ session: SessionSnapshot) -> Bool { ticket == generation && identity?.revision == session.revision && identity?.profile?.id == session.profile?.id }
-    func accessEnded() {
+    func current(_ ticket: UUID, _ session: SessionSnapshot) -> Bool { ticket == generation && sameSession(session) }
+    private func sameSession(_ session: SessionSnapshot) -> Bool { identity?.revision == session.revision && identity?.profile?.id == session.profile?.id }
+    private func accessEnded() {
         availability = .available
         clear(); household = nil; selectedId = nil; preparedInvitation = nil
         showManagement = false; cancelInvitationReview(); pendingInvitationToken = ""
