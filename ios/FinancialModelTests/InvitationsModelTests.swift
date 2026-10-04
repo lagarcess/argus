@@ -77,7 +77,7 @@ final class InvitationsModelTests: XCTestCase {
         await model.refreshAccess()
         XCTAssertEqual(model.admission, .unanswered)
         XCTAssertFalse(model.showsInvitations)
-        await stub.fail(Wire.access, .rejected(status: 500, code: nil))
+        await stub.fail(Wire.access, .unauthorized)
         await model.refreshAccess()
         XCTAssertEqual(model.admission, .unanswered)
         await stub.reply(Wire.access, Wire.access(admitted: false))
@@ -94,7 +94,7 @@ final class InvitationsModelTests: XCTestCase {
             XCTAssertEqual(answer, admitted ? .admitted(destinations) : .required(destinations))
             await stub.fail(Wire.access, .unavailable)
             await model.refreshAccess()
-            await stub.fail(Wire.access, .rejected(status: 503, code: nil))
+            await stub.fail(Wire.access, .unauthorized)
             await model.refreshAccess()
             XCTAssertEqual(model.admission, answer)
         }

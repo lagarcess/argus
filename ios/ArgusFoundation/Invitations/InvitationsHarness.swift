@@ -73,7 +73,7 @@ actor InvitationsStubServer: InvitesTransport {
                 return try json(["kind": "household", "available": true, "expires_at": InvitationDates.string(Date().addingTimeInterval(86_400)), "household_name": "Casa"])
             }
             let found = try lookup(secret)
-            return try json(["kind": "beta", "available": found == nil, "expires_at": InvitationDates.string(Date().addingTimeInterval(86_400)), "household_name": NSNull()])
+            return try json(["kind": Self.kind(secret), "available": found == nil, "expires_at": InvitationDates.string(Date().addingTimeInterval(86_400)), "household_name": NSNull()])
         case ("POST", "/redeem"):
             if secret.contains("household") || secret.hasPrefix("HOME") {
                 throw SessionFailure.rejected(status: 409, code: "household_invitation_requires_accept")
@@ -81,7 +81,7 @@ actor InvitationsStubServer: InvitesTransport {
             if let refusal = try lookup(secret) { throw SessionFailure.rejected(status: 409, code: refusal) }
             let outcome = scenario.admitted ? "already_admitted" : "admitted"
             scenario.admitted = true
-            return try json(["admitted": true, "outcome": outcome, "kind": "beta", "replayed": false])
+            return try json(["admitted": true, "outcome": outcome, "kind": Self.kind(secret), "replayed": false])
         case ("GET", "/group-links"):
             guard scenario.founder else { throw SessionFailure.rejected(status: 403, code: "founder_required") }
             return try json(["links": links])
@@ -122,6 +122,12 @@ actor InvitationsStubServer: InvitesTransport {
         let refusals = [("EXPD", "invitation_expired"), ("USED", "invitation_consumed"), ("REVK", "invitation_revoked"), ("FULL", "group_link_full")]
         if let refusal = refusals.first(where: { names($0.0) }) { return refusal.1 }
         throw SessionFailure.rejected(status: 404, code: "invitation_not_found")
+    }
+
+    /// `FULL` and `-LINK` secrets stand for group links; the server names their kind on preview and redeem.
+    private static func kind(_ secret: String) -> String {
+        let upper = secret.uppercased()
+        return upper.hasPrefix("FULL") || upper.contains("-LINK") ? "group_link" : "beta"
     }
 
     private func quota() -> [String: Any] { ["limit": limit, "used": scenario.quotaUsed, "remaining": max(0, limit - scenario.quotaUsed)] }
