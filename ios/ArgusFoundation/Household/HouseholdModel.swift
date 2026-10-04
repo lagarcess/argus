@@ -29,7 +29,9 @@ final class HouseholdModel: ObservableObject {
     @Published private(set) var invitationPreview: HouseholdInvitationPreview?
     @Published private(set) var pending: PendingFinancialConfirmation?
     @Published var editor: HouseholdActivityEditor?
-    @Published var showManagement = false
+    @Published var showManagement = false { didSet { if !showManagement { joiningByInvitation = false } } }
+    /// The join step is open over the current Household. Selection changes only when an accept succeeds.
+    @Published private(set) var joiningByInvitation = false
     @Published private(set) var identity: SessionSnapshot?
     @Published var pendingInvitationToken = ""
     var addAccount: (() -> Void)?
@@ -161,9 +163,8 @@ final class HouseholdModel: ObservableObject {
     /// Opens the join step for an invitation that arrived by link or by the beta gate.
     func beginJoin(_ input: String) async -> Bool {
         guard isAvailable else { return false }
-        await select(nil)
-        guard isAvailable else { return false }
-        pendingInvitationToken = input; showManagement = true
+        cancelInvitationReview()
+        pendingInvitationToken = input; showManagement = true; joiningByInvitation = true
         return true
     }
     /// Answers about the invitation itself; anything else keeps the surface's own recovery.
@@ -199,6 +200,7 @@ final class HouseholdModel: ObservableObject {
                 let value: HouseholdMutation = try await send(write, identity)
                 guard current(ticket, identity) else { return }
                 if write.path == "" || write.path == "/invitations/accept" {
+                    joiningByInvitation = false
                     if value.state == "active" { selectedId = value.householdId }
                     else { errorKey = "household.accessEnded" }
                 }
@@ -238,7 +240,12 @@ final class HouseholdModel: ObservableObject {
                             plan.sheet = nil
                             await refresh()
                             if current(ticket, identity) { errorKey = HouseholdPlanModel.message(error) }
-                        } else { clear(); errorKey = invitationProblem != nil && write.path == "/invitations/accept" ? nil : "household.changed" }
+                        } else {
+                            let explained = invitationProblem != nil && write.path == "/invitations/accept"
+                            clear()
+                            if write.path == "/invitations/accept", selectedId != nil { await refresh() }
+                            if current(ticket, identity) || write.path == "/invitations/accept" { errorKey = explained ? nil : "household.changed" }
+                        }
                     }
                 } else { errorKey = "household.uncertain" }
             }

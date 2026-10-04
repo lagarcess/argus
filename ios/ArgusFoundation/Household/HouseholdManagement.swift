@@ -16,7 +16,7 @@ struct HouseholdManagement: View {
                 if model.pending != nil {
                     Section { Text("household.uncertain"); Button("accounts.retry") { Task { await model.retry() } }.accessibilityIdentifier("household.pending.retry") }
                 }
-                if let household = model.household {
+                if let household = model.household, !model.joiningByInvitation {
                     Section(household.name ?? NSLocalizedString("household.title", comment: "")) {
                         Text("household.consent").font(.footnote)
                         ForEach(household.members) { member in
@@ -72,7 +72,7 @@ struct HouseholdManagement: View {
                         }
                     }
                 }
-                if model.household == nil {
+                if model.household == nil || model.joiningByInvitation {
                     HouseholdIntroduction(model: model)
                 }
 

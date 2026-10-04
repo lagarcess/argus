@@ -359,6 +359,8 @@ private actor HouseholdServer {
     private var discoveryGate: RequestGate?
     func setEnabled(_ value: Bool) { enabled = value }
     func failNext(_ status: Int, code: String) { failure = (status, code) }
+    private var previewAvailable = true
+    func setPreviewAvailable(_ value: Bool) { previewAvailable = value }
     func holdDiscovery(_ gate: RequestGate) { discoveryGate = gate }
     private var version = 1
     private var active = true
@@ -414,7 +416,7 @@ private actor HouseholdServer {
         } else if path.hasSuffix("household-invitations/accept") {
             result = receipt(householdId)
         } else if path.hasSuffix("household-invitations/preview") {
-            result = ["name": "Synthetic household", "expires_at": "2026-10-08T12:00:00Z", "available": true]
+            result = ["name": "Synthetic household", "expires_at": "2026-10-08T12:00:00Z", "available": previewAvailable]
         }
         else if path.hasSuffix("/invitations") {
             result = receipt(householdId)
@@ -450,9 +452,7 @@ extension HouseholdModelTests {
     }
 
     func testPreviewOutcomesExplainTheInvitationWithoutEndingMembership() async throws {
-        let cases: [(Int, String, InvitationProblem)] = [(404, "invitation_not_found", .invalid), (409, "invitation_expired", .expired),
-                                                         (409, "invitation_consumed", .used), (409, "invitation_revoked", .revoked),
-                                                         (429, "invite_rate_limited", .rateLimited)]
+        let cases: [(Int, String, InvitationProblem)] = [(404, "invitation_not_found", .invalid), (429, "invite_rate_limited", .rateLimited)]
         for (status, code, problem) in cases {
             let fixture = try HouseholdFixture()
             _ = try await fixture.login()
@@ -465,6 +465,18 @@ extension HouseholdModelTests {
             XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household, code)
             XCTAssertNil(fixture.model.errorKey, code)
         }
+    }
+
+    func testAnExpiredUsedOrRevokedInvitationPreviewsAsUnavailable() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        await fixture.server.setPreviewAvailable(false)
+        await fixture.model.previewInvitation("7K2M-9QXD-4RTA")
+        XCTAssertEqual(fixture.model.invitationPreview?.available, false)
+        XCTAssertNil(fixture.model.invitationProblem)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertNil(fixture.model.errorKey)
     }
 
     func testAcceptingAUsedOrExpiredInvitationExplainsWhyAndJoinsNothing() async throws {
@@ -496,10 +508,16 @@ extension HouseholdModelTests {
         await fixture.model.select(HouseholdServer.household)
         let opened = await fixture.model.beginJoin("https://cuadrao.ai/invite#link-token-123456")
         XCTAssertTrue(opened)
-        XCTAssertNil(fixture.model.selectedId)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        let relaunched = HouseholdModel(controller: fixture.controller, configuration: fixture.configuration, journal: fixture.journal)
+        relaunched.bind(fixture.model.identity)
+        XCTAssertEqual(relaunched.selectedId, HouseholdServer.household)
+        XCTAssertTrue(fixture.model.joiningByInvitation)
         XCTAssertTrue(fixture.model.showManagement)
         XCTAssertEqual(fixture.model.pendingInvitationToken, "https://cuadrao.ai/invite#link-token-123456")
         fixture.model.showManagement = false
+        XCTAssertFalse(fixture.model.joiningByInvitation)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
         await fixture.server.setEnabled(false)
         await fixture.model.refresh()
         let refused = await fixture.model.beginJoin("7K2M-9QXD-4RTA")
