@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// Value routes keep inbox pushes inside a host's path-bound stack, so back pops one level.
+private enum ReleaseUpdatesRoute: Hashable { case item(String), preferences }
+
 struct ReleaseUpdatesInbox: View {
     let state: ReleaseUpdatesState
     let spanish: Bool
@@ -31,11 +34,8 @@ struct ReleaseUpdatesInbox: View {
                         .accessibilityIdentifier("updates-retry")
                 case .loaded(let items, let more):
                     ForEach(items) { item in
-                        NavigationLink {
-                            detail(item)
-                                .onAppear { if !item.isRead { markRead(item.id) } }
-                        } label: { row(item) }
-                        .buttonStyle(.plain).accessibilityIdentifier("updates-row-" + item.id)
+                        NavigationLink(value: ReleaseUpdatesRoute.item(item.id)) { row(item) }
+                            .buttonStyle(.plain).accessibilityIdentifier("updates-row-" + item.id)
                     }
                     switch more {
                     case .none: EmptyView()
@@ -50,10 +50,7 @@ struct ReleaseUpdatesInbox: View {
                     }
                 }
                 if permission != .unavailable {
-                    NavigationLink {
-                        ReleaseNotificationPreferences(permission: permission, spanish: spanish,
-                            requestPermission: requestPermission, openSettings: openSettings)
-                    } label: {
+                    NavigationLink(value: ReleaseUpdatesRoute.preferences) {
                         Label(spanish ? "Notificaciones" : "Notifications", systemImage: "bell")
                             .font(CuadraoTypography.supporting).frame(minHeight: 44)
                     }.accessibilityIdentifier("updates-notification-preferences")
@@ -62,6 +59,22 @@ struct ReleaseUpdatesInbox: View {
         }.background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink)
             .navigationTitle(spanish ? "Novedades" : "Updates").navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("release-updates-inbox")
+            .navigationDestination(for: ReleaseUpdatesRoute.self) { route in
+                switch route {
+                case .item(let id):
+                    if let item = items.first(where: { $0.id == id }) {
+                        detail(item).onAppear { if !item.isRead { markRead(item.id) } }
+                    }
+                case .preferences:
+                    ReleaseNotificationPreferences(permission: permission, spanish: spanish,
+                        requestPermission: requestPermission, openSettings: openSettings)
+                }
+            }
+    }
+
+    private var items: [ReleaseUpdateItem] {
+        if case .loaded(let items, _) = state { return items }
+        return []
     }
 
     private func status(_ title: String, detail: String) -> some View {
