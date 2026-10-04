@@ -97,8 +97,8 @@ struct ReleaseUpdatesGallery: View {
     private var truthSamples: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                Text(spanish ? "Mes sin registros" : "Month without records").font(CuadraoTypography.section)
-                ReleaseMonthComparison(current: .noRecords, previous: .recorded(100), currency: "DOP", spanish: spanish)
+                Text(spanish ? "Historial incompleto" : "Incomplete history").font(CuadraoTypography.section)
+                ReleaseMonthComparison(current: .missingCoverage, previous: .recorded(100), currency: "DOP", spanish: spanish)
                 Divider()
                 Text(spanish ? "Comparación con cero registrado" : "Comparison with a recorded zero").font(CuadraoTypography.section)
                 ReleaseMonthComparison(current: .recorded(250), previous: .recorded(0), currency: "DOP", spanish: spanish)

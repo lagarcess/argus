@@ -69,7 +69,7 @@ enum ReleaseSafePushCopy {
 }
 
 enum ReleaseRecordedMonth: Equatable {
-    case noRecords
+    case missingCoverage
     case recorded(Decimal)
     enum Comparison: Equatable { case unavailable, amount(Decimal), percentage(Decimal) }
     func compared(to previous: Self) -> Comparison {

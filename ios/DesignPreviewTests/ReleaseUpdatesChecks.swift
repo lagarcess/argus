@@ -7,8 +7,8 @@ import Foundation
             precondition(value, message)
             count += 1
         }
-        check(ReleaseRecordedMonth.noRecords.compared(to: .recorded(0)) == .unavailable, "Missing current records cannot compare")
-        check(ReleaseRecordedMonth.recorded(250).compared(to: .noRecords) == .unavailable, "Missing prior records cannot compare")
+        check(ReleaseRecordedMonth.missingCoverage.compared(to: .recorded(0)) == .unavailable, "Missing current coverage cannot compare")
+        check(ReleaseRecordedMonth.recorded(250).compared(to: .missingCoverage) == .unavailable, "Missing prior coverage cannot compare")
         check(ReleaseRecordedMonth.recorded(250).compared(to: .recorded(0)) == .amount(250), "Zero baseline uses money")
         check(ReleaseRecordedMonth.recorded(0).compared(to: .recorded(0)) == .amount(0), "Known zero stays known")
         check(ReleaseRecordedMonth.recorded(150).compared(to: .recorded(100)) == .percentage(50), "Nonzero baseline can compare")

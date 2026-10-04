@@ -1,4 +1,13 @@
 import SwiftUI
+
+/// One wording for a period whose coverage is missing, so no surface reads it as zero.
+enum CuadraoMissingCoverage {
+    static func amount(_ spanish: Bool) -> String { spanish ? "Sin datos" : "No data" }
+    static func detail(_ spanish: Bool) -> String {
+        spanish ? "El historial de este período está incompleto. No lo contamos como cero."
+            : "This period's history is incomplete. We don't count it as zero."
+    }
+}
 import Charts
 
 struct CuadraoSpendingChart: View {
@@ -55,7 +64,7 @@ struct CuadraoSpendingChart: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text((inspected ?? entries).isEmpty && !story.covered ? (spanish ? "Sin datos" : "No data") : money(inspected.map(CanvasSpendingHistory.total) ?? total))
+                    Text((inspected ?? entries).isEmpty && !story.covered ? CuadraoMissingCoverage.amount(spanish) : money(inspected.map(CanvasSpendingHistory.total) ?? total))
                         .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
                         .accessibilityIdentifier("home-spending-total")
                 }
@@ -109,7 +118,7 @@ struct CuadraoSpendingChart: View {
     private var emptyDetail: String {
         switch story.state {
         case .firstUse: return spanish ? "Registra tu primer gasto para empezar a ver tu ritmo." : "Record your first expense to start seeing your rhythm."
-        case .unavailable: return spanish ? "El historial de este período está incompleto. No lo contamos como cero." : "This period's history is incomplete. We don't count it as zero."
+        case .unavailable: return CuadraoMissingCoverage.detail(spanish)
         case .emptyPeriod:
             return periodOffset == 0
                 ? (spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
