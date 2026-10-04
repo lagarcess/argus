@@ -6,12 +6,14 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-10-01 (PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-10-04 (PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
+
+- October 4, 2026: [Cuadrao documentation landing](../reports/2026-10-04-cuadrao-docs-integration-landing.md), PRs #808, #813, #815 and #814, through `883d289ff8f9c4261f63078d10121de7fb371789`. Deletion edge-case decisions, the mobile execution checkpoint, October 4 direction and historical-spec archives are recorded together. No runtime, configuration, migration, deployment or phone-build change. The report owns merge lineage, retained evidence and remaining gates.
 
 - October 1, 2026: [PR #766](https://github.com/lagarcess/argus/pull/766) squash-merged as `079ec8d819f8e2513cc624bfa7a4eb9ca60c7627`, from Exact publication head `04831ccb12a46b89a3cd5f5391139d3589321815` onto tip `09ce4e0af3b6df7a41e2d21c52c67b4fe7c82c0a` (`merged_by` lagarcess at 15:10:45 UTC). Default-off Household native consent + canonical financial activity on #763 membership and #760 shell: named-account grants, view/edit separation, Home/People/invitation/Search/corrections en/es-419, private-leg redaction, owner-qualified history, and server-derived `households_unavailable` gating. Tip at promote already ancestor of the worker; prior reconcile `4fed9efb…` was docs-only. Pre-merge Exact-head CI/smoke/Preview SUCCESS; Codex follow-up clean; zero unresolved threads; modularity clean. The [execution manifest](argus-execution-board.md#pr-766-integration-landing) and [landing report](../reports/2026-10-01-pr-766-integration-landing.md) own retained evidence and remaining limits. `ARGUS_HOUSEHOLDS_ENABLED` stays default-off; additive consent/grant migrations are not production-applied. No linked issue closure. Physical iPhone/internet, external invites, shared Plan consumers, Business/Custom, hosted enablement, Accounts tab, Apple-on-connected-path, and parked design checkpoints `1dcd12a5`/`1b2005fd9` remain outside. Exact integration CI/smoke and final tip parity after landing-docs housekeeping are recorded on the merged PR. No deployment, hosted configuration change, signing, main promotion or next-slice start.
 
