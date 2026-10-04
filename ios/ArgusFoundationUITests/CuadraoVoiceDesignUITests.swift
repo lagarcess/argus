@@ -150,6 +150,7 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         for label in ["Escanear", "Foto", "Archivo"] { XCTAssertTrue(app.buttons[label].exists) }
         capture(app, "attachments-only")
         app.buttons["chat-attach"].tap()
+        XCTAssertTrue(app.buttons["Escanear"].waitForNonExistence(timeout: 3))
         for target in ["chat-composer-entry", "chat-voice-entry"] {
             lockRecording(app.buttons[target])
             XCTAssertTrue(app.buttons["voice-message-stop"].waitForExistence(timeout: 3))
@@ -166,6 +167,7 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
             XCTAssertEqual(app.staticTexts["voice-message-status"].label, "Revisar mensaje · Vista previa")
             capture(app, "review-preserved")
             app.buttons["Descartar"].tap()
+            XCTAssertTrue(app.staticTexts["voice-message-status"].waitForNonExistence(timeout: 3))
         }
         lockRecording(app.buttons["chat-voice-entry"])
         app.buttons["voice-message-cancel"].tap()
@@ -173,9 +175,22 @@ final class CuadraoVoiceDesignUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["voice-message-status"].exists)
     }
     private func lockRecording(_ target: XCUIElement) {
+        waitUntilStill(target)
         let origin = target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         origin.press(forDuration: 0.7, thenDragTo: origin.withOffset(CGVector(dx: 0, dy: -135)),
                      withVelocity: .slow, thenHoldForDuration: 0.5)
+    }
+    /// A coordinate gesture lands where its target was when resolved, so the target must have stopped moving.
+    private func waitUntilStill(_ element: XCUIElement) {
+        var previous = CGRect.null
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            let frame = element.frame
+            if element.isHittable && frame == previous { return }
+            previous = frame
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        XCTFail("\(element) did not come to rest")
     }
     func testEnglishVoiceAndLargeText() {
         continueAfterFailure = false

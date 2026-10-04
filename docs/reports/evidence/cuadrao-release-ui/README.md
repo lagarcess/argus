@@ -323,6 +323,97 @@ Sources: `9493ea575` with the overlay removed. Simulator: iPhone 18 Pro only. Fi
 - Debug, Release and build-for-testing compile ([compiles](2026-10-04-w1g/compiles.txt)).
   The [design preview checks](2026-10-04-w1g/design-preview-checks.txt) pass.
 
+## Two in-suite UI failures diagnosed, October 4, 2026
+
+Sources: `4bb1696a3` (reproduction), `a72c3033b` and `211b3d732` (test changes). Simulator:
+iPhone 18 Pro only. Every simulator run held the shared lock with
+`-collect-test-diagnostics never`. Files are in [2026-10-04-w1h](2026-10-04-w1h/). The
+evidence came from the two candidate suite result bundles (`4af8fced`, `2520da49`):
+synthesized-event records, the UI hierarchy at failure, and the screen recordings.
+
+- `CuadraoVoiceDesignUITests/testLockedRecordingAndCleanAttachments`, line 155. Test
+  defect, fixed in `a72c3033b`. The test closed the attachment tray and at once pressed
+  `chat-composer-entry`. In both suite failures the press landed at y 509.8 or 527.6, the
+  entry's tray-open position. In every passing run it landed at y 662
+  ([coordinates](2026-10-04-w1h/voice-press-coordinates.txt)). The recordings show why.
+  In the failing run the tray was still open 0.37 s after the close tap and the press
+  coordinate was read then. In the passing run the tray was already closing when the
+  coordinate was read, 0.30 s after the tap
+  ([failing](2026-10-04-w1h/voice-close-tap-failing-pair.png),
+  [passing](2026-10-04-w1h/voice-close-tap-passing-alone.png)). XCUITest's idle wait
+  returned before the app applied the close. The press hit empty space and no recording
+  started.
+- Reproduced with the suite predecessor `testHoldComposerAndWaveformWithoutStartingLiveVoice`
+  in the same run: 1 failure in 5 pairs (2 unloaded, 3 under 14 busy processes), with the
+  same y 509.8. Alone it passed 2 of 2. After an unrelated predecessor it passed. Hold and
+  Locked as two separate runs passed. The in-run state that slows the close after Hold is
+  not identified. The fix does not depend on it.
+- The fix waits for the tray's Escanear row to leave, waits for the press target to stop
+  moving before each lock gesture, and waits for the review panel to leave after
+  Descartar. No assertion changed. The predecessor pair then passed 3 of 3, with the first
+  press at y 662 each time. (The run helper also started two busy processes during those
+  three runs by mistake; it was corrected afterwards.) The Escanear wait adds about 1 s,
+  because XCUITest polls non-existence about once a second.
+- `CuadraoGroupDesignUITests/testSharedJourneySpanish`, line 48, `2520da49` suite only.
+  Not reproduced; cause narrowed. At failure, Ana's share was DOP 40,300.00, the editor
+  said "Hay DOP 40,000 de más.", all five members were included and Save was correctly
+  disabled. The recording shows the six deletes typed at 60 characters per second turned
+  "400.00" into "40", not empty, and the typed 300 made 40300
+  ([frames](2026-10-04-w1h/group-ana-share-suite-failure.png)). Two deletes had no net
+  effect. This rules out the removed overlay (no member was dropped) and a late Save
+  enablement (the split was over).
+- Two mechanisms remain: a SwiftUI update rewrote the field from a stale binding during
+  the burst (the `CanvasMoneyValueInput` re-sync class; by reading, its re-sync writes two
+  decimals, which does not explain a plain "40"), or two synthesized deletes were not
+  delivered under load. Tries that did not reproduce it: the predecessor pair
+  (`testSampleCardSaveImage`, then the journey) twice under 14 busy processes, the whole
+  Group class once, and a throwaway probe that replaced and read back Tú's and Ana's
+  shares 48 times, half under load, with 0 mismatches
+  ([probe](2026-10-04-w1h/W1hSplitDiagnosticUITests.swift.txt)).
+- `211b3d732` makes the group journeys read back every money field they replace, so a
+  recurrence fails at the field with the value it holds. To tell the two mechanisms apart
+  next time, log each keystroke and each field rewrite in `CanvasDecimalInput` during a
+  full suite. That needs an app change and was not made without a reproduction.
+- Pending checks at `211b3d732`: `ReleaseUIJourneyTests` 13 of 13 passed; the Mac pass
+  auth-on welcome check (`testDefaultLaunchOffersNoAppleSignIn`, auth-on loopback build,
+  social flags off) passed; build-for-testing (Debug) succeeded for each change. CI on
+  `4bb1696a3` was green. `git diff --check a8c37d3a...HEAD` is clean. Raw results are in
+  [runs](2026-10-04-w1h/runs-raw.txt).
+
+## Money keystroke probe under a stalled main thread, October 4, 2026
+
+Source: `c2b47c661`, with throwaway DEBUG instrumentation that was never committed. Simulator:
+iPhone 18 Pro only, every run under the shared lock with `-collect-test-diagnostics never`.
+Files are in [2026-10-04-w1i](2026-10-04-w1i/). This follows the `testSharedJourneySpanish`
+entry in the section above.
+
+- Question. Can money entry undo a keystroke? Two candidates were open: the
+  `CanvasMoneyValueInput` re-sync rewriting the field from a stale value when the main
+  thread stalls, and the silent refusal in `CanvasDecimalInput` when a keystroke's range
+  does not fit the field's text.
+- Not reproduced. The [probe](2026-10-04-w1i/W1iMoneyStallProbeUITests.swift.txt) replaced
+  and read back a split share and the expense amount, and Tú's and Ana's shares in a freshly
+  opened editor, 344 times in four runs. Three runs had a repeating main-thread stall of 60
+  to 150 ms or 250 to 600 ms. The app handled 3,180 keystrokes, 2,224 of them stalled, and
+  582 while earlier writes were still queued. Every keystroke was accepted, none was refused
+  at the range guard, none was sent without being handled, no update rewrote a non-empty
+  field and no re-sync was requested ([results](2026-10-04-w1i/probe-results.txt)).
+- The re-sync window did not open. Of 1,571 value writes that changed the value, 80 had a
+  later keystroke already handled and its write queued. In all 80 the change report ran
+  before that queued write, 2 to 8 ms after the value write, with nothing but view updates
+  between them. The re-sync needs the queued write to land first.
+- The heavy run logged one mismatch. It was the probe's own read timing out under 250 to
+  600 ms stalls. The app's log for that burst shows six deletes handled and an empty field.
+- Still open: two synthesized deletes not being delivered under whole-machine load. The
+  stall slows the app only, so it does not test that.
+- To settle a recurrence, apply the
+  [instrumentation](2026-10-04-w1i/stall-and-log-instrumentation.diff.txt) to a throwaway
+  build, add `-W1iLog` to the UI tests' launch arguments, run the suite, and run
+  [summarize](2026-10-04-w1i/summarize.sh.txt) on the app log. A burst with fewer handled
+  keystrokes than sent means an undelivered key. A `REWRITE` onto a non-empty field or a
+  `REFUSED` line means the app.
+- No app change. Both Swift files equal `c2b47c661`, so no build was rerun.
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.

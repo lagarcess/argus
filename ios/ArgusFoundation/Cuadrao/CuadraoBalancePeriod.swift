@@ -26,9 +26,15 @@ struct CanvasBalancePeriod {
 
     init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], range: CanvasHistoryRange,
          offset: Int, now: Date = .now) {
+        self.init(accounts: accounts, observations: observations, range: range, offset: offset, now: now,
+            history: CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: now))
+    }
+
+    /// `history` is the points of these accounts and observations on the day of `now`.
+    init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], range: CanvasHistoryRange,
+         offset: Int, now: Date, history: [CanvasBalancePoint]) {
         let window = range.interval(now: now, offset: offset)
         interval = window
-        let history = CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: now)
         closing = history.last { $0.date < window.end && $0.date <= now }
         if let closing, closing.date >= window.start {
             opening = history.last { $0.date <= window.start && $0.date < closing.date }

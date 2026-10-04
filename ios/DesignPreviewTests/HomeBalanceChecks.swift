@@ -182,6 +182,28 @@ import Foundation
         check(CanvasBalanceHistory.position(clearedPeriod.closingAccounts) == clearedPeriod.closing?.balance, "Historical allocation preserves aggregate participation after balance clearing")
         check(clearedPeriod.changes.compactMap(\.change).reduce(0, +) == clearedPeriod.change, "Historical changes reconcile after clearing an observed account")
         let unknowable = CanvasBalancePeriod(accounts: [unknown], observations: [], range: .month, offset: 0, now: october)
+        func sameWithBuiltHistory(_ accounts: [CanvasAccount], _ observations: [CanvasBalanceObservation], _ now: Date) -> Bool {
+            let built = CanvasBuiltBalanceHistory(accounts: accounts, observations: observations, now: now)
+            let later = calendar.date(byAdding: .hour, value: 23, to: calendar.startOfDay(for: now))!
+            guard built.points(on: later) == built.points, built.points(on: later.addingTimeInterval(3600)) == nil,
+                built.points == CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: later) else { return false }
+            return CanvasHistoryRange.allCases.allSatisfy { range in
+                (-14...0).allSatisfy { offset in
+                    let own = CanvasBalancePeriod(accounts: accounts, observations: observations, range: range, offset: offset, now: later)
+                    let given = CanvasBalancePeriod(accounts: accounts, observations: observations, range: range, offset: offset, now: later, history: built.points)
+                    return own.interval == given.interval && own.opening == given.opening && own.closing == given.closing
+                        && own.isPartial == given.isPartial && own.change == given.change
+                        && own.closingAccounts.map(\.id) == given.closingAccounts.map(\.id)
+                        && own.closingAccounts.map(\.balance) == given.closingAccounts.map(\.balance)
+                        && own.changes.map(\.id) == given.changes.map(\.id) && own.changes.map(\.opening) == given.changes.map(\.opening)
+                        && own.changes.map(\.closing) == given.changes.map(\.closing)
+                }
+            }
+        }
+        check(sameWithBuiltHistory(scoped, startingBalances, october) && sameWithBuiltHistory(scoped + [unknown, newcomer], historicalBalances, november)
+            && sameWithBuiltHistory([wallet, clearedMortgage, owned], historicalBalances, november) && sameWithBuiltHistory([unknown], [], october)
+            && sameWithBuiltHistory([wallet], [observed(wallet, 900, octoberFifth), observed(wallet, 800, octoberTenth)], november),
+            "A period given the history built earlier that day equals the period that builds its own")
         check(unknowable.closing == nil && unknowable.change == nil, "Unknown balance never becomes zero")
         check(emptyStory.state == .emptyPeriod && unknownStory.state == .populated, "Known empty and partial populated spending use distinct states")
         let firstUse = CanvasSpendingStory(expenses: [], range: .month, offset: 0, coverageStart: nil, now: october)
