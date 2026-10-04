@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TFunction } from "i18next";
+import { createInstance } from "i18next";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { I18nextProvider } from "react-i18next";
 
+import ChatMessage from "../components/chat/ChatMessage";
 import NextMoveRow from "../components/chat/NextMoveRow";
 import NextStepsSection from "../components/chat/NextStepsSection";
 import type { ChatActionOption } from "../components/chat/types";
@@ -151,6 +154,52 @@ describe("one list of next steps under an answer", () => {
     },
   ];
   for (const { language, heading, tests } of renderCases) {
+    test(`a complete follow-up preserves its answer and shows four steps once in ${language}`, async () => {
+      // Authored contract fixture, not evidence of live model compliance.
+      const factAnswer = language === "en"
+        ? "The gap was 38.1 percentage points. Modeled costs totaled $25.17."
+        : "La diferencia fue de 38.1 puntos porcentuales. Los costos modelados sumaron $25.17.";
+      const costQuestion = language === "en"
+        ? "What do modeled costs include?"
+        : "¿Qué incluyen los costos modelados?";
+      const i18n = createInstance();
+      await i18n.init({
+        lng: language,
+        fallbackLng: false,
+        resources: { [language]: { translation: locales[language] } },
+      });
+      const source = metadata(language);
+      const html = renderToStaticMarkup(
+        <I18nextProvider i18n={i18n}>
+          <ChatMessage
+            isLatest
+            message={{
+              id: "result-follow-up",
+              role: "ai",
+              content: factAnswer,
+              nextSteps: [...stepsFor(language), { type: "question", text: costQuestion }],
+              nextExperiments: nextExperimentRowsFromMetadata(source) ?? [],
+              nextExperimentsSourceRunId: "run-docn",
+            }}
+          />
+        </I18nextProvider>,
+      );
+      const visible = html.replace(/<[^>]*>/g, "").replaceAll("&#x27;", "'");
+      const suggestions = [tests[0], QUESTIONS[language], tests[1], costQuestion];
+
+      expect(visible).toContain(factAnswer);
+      expect(html.match(/<section aria-label=/g)?.length).toBe(1);
+      expect(html).not.toMatch(/<(ol|ul)\b/);
+      for (const suggestion of suggestions) {
+        expect(visible.split(suggestion)).toHaveLength(2);
+      }
+      const section = html.slice(html.indexOf(`<section aria-label="${heading}"`));
+      const labels = [...section.slice(0, section.indexOf("</section>")).matchAll(/<button[^>]*aria-label="([^"]+)"/g)]
+        .map((match) => match[1].replaceAll("&#x27;", "'"));
+      expect(labels).toEqual(suggestions);
+      expect(visible).not.toContain("—");
+    });
+
     test(`renders one section in plain words in ${language}`, () => {
       const html = renderToStaticMarkup(
         <NextStepsSection
