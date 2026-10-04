@@ -16,6 +16,49 @@ blockers. It grants no merge, deployment or hosted change.
 
 No origin branch has a commit newer than the integration tip.
 
+## Round 2 state (October 4, 2026, afternoon CT). Supersedes the section below.
+
+**Combined candidate:** `claude/cuadrao-iphone-candidate` at
+`03a33ef2be86cd86f4ad65c51d3e95a08a0e7ba8` (verification branch, not for merge).
+
+| Component | PR | Head | Independent review | CI |
+| --- | --- | --- | --- | --- |
+| Release UI, pickup items, app defect fixes | [#790](https://github.com/lagarcess/argus/pull/790) | `53a4d67d6bbac3dc9d21fe79f2af685462f0ba69` | eight rounds, PASS | green at `c2b47c66`; `53a4d67d` adds evidence only |
+| Household and beta invitations (stacked on #790) | [#810](https://github.com/lagarcess/argus/pull/810) | `2cd7662ae4` | four rounds, PASS at code head `18b49191`; later commits are merges | not run by CI |
+| Lag fixes measured on the iPhone (stacked on #810) | [#812](https://github.com/lagarcess/argus/pull/812) | `122bb23219` | three rounds, PASS at code head `b56c56d3` | not run by CI |
+| Docs batch, deletion flag-off fallback | [#808](https://github.com/lagarcess/argus/pull/808) | `a1ebf4b4f24e2778b2e9501aa3ab8d1cb8bd8c1e` | three rounds, PASS | see PR |
+| Pytest gate script | [#809](https://github.com/lagarcess/argus/pull/809) | `ecd2bb5704db21f4d1ff1be3e64ce9325aa6b9c2` | two rounds, PASS | green |
+
+Landing order: #808 and #809 independent; #790, then #810, then #812.
+
+**Candidate verification at `03a33ef2`** (`reports/CANDIDATE-03a33ef2.md`): full
+iOS UI suite, run alone: 167 tests, 119 passed, 48 skipped, 0 failed, 0
+never-idle waits, 46.2 min (integration baseline: 82 passed, 5 failed, 49
+waits). Debug and Release builds succeed; Release has no harness, review or
+preview launch strings; client flags default false. Ten host check runners
+pass, including byte-identical money formatting (12157 checks in each of nine
+locales). Docs checks pass. Backend, Postgres and web were not rerun: no file
+outside `ios/`, one doc and evidence changed since they passed at `4af8fced`.
+Signed device build 3428 saved, not installed.
+
+**Lag, measured on the iPhone 15** (`reports/LAG-phone*.md`, `lag/`): first
+frame of Home 1.09 s to about 0.17 s; hitch time ratio during the founder's
+90 s script 62.0, then 29.6, then 15.7 ms/s across builds 3425, 3426, 3427.
+All fixes are repeated computation in app code with identical output. The
+phone carries optimized build 3427.
+
+**Security:** client default-grants finding assessed and filed as
+[#811](https://github.com/lagarcess/argus/issues/811); record in
+`SEC-default-grants.md`. Hosted production re-verified not affected on
+October 4; nothing hosted was changed. No fix is written.
+
+**Issues:** #789 closed as completed by #794 with evidence.
+
+**Open after this round:** one-off wrong typed amount in a UI suite, not
+reproduced in 3,180 keystrokes under an induced stall (instrument saved in
+#790's evidence); deferred performance items with measured cost in #812; no
+connected journey has run on a physical phone.
+
 ## Final state (October 4, 2026, early morning CT)
 
 **Combined candidate:** `claude/cuadrao-iphone-candidate` at

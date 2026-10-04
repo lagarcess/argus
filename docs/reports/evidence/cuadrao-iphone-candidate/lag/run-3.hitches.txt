@@ -1,0 +1,134 @@
+hitches 65; hitch time 1366.2 ms over 87.2 s; hitch time ratio 15.7 ms/s; over 100 ms: 1
+hangs 50: 00:07.465.978 38.69 ms Potential Interaction Delay; 00:08.630.782 46.35 ms Potential Interaction Delay; 00:09.130.030 50.56 ms Potential Interaction Delay; 00:14.853.792 36.39 ms Potential Interaction Delay; 00:16.351.559 380.23 ms Microhang; 00:18.498.192 95.48 ms Potential Interaction Delay; 00:25.236.921 69.47 ms Potential Interaction Delay; 00:26.268.599 36.53 ms Potential Interaction Delay; 00:26.601.386 36.64 ms Potential Interaction Delay; 00:26.950.850 36.54 ms Potential Interaction Delay; 00:27.266.965 33.57 ms Potential Interaction Delay; 00:27.616.357 36.91 ms Potential Interaction Delay; 00:27.949.159 34.83 ms Potential Interaction Delay; 00:28.281.939 35.16 ms Potential Interaction Delay; 00:28.631.338 36.89 ms Potential Interaction Delay; 00:28.964.147 34.51 ms Potential Interaction Delay; 00:29.629.712 34.14 ms Potential Interaction Delay; 00:29.962.449 37.01 ms Potential Interaction Delay; 00:31.393.407 34.07 ms Potential Interaction Delay; 00:32.840.933 36.35 ms Potential Interaction Delay; 00:33.223.663 36.37 ms Potential Interaction Delay; 00:33.961.549 39.37 ms Potential Interaction Delay; 00:34.538.061 39.33 ms Potential Interaction Delay; 00:34.904.114 71.55 ms Potential Interaction Delay; 00:36.468.329 40.08 ms Potential Interaction Delay; 00:36.900.930 33.90 ms Potential Interaction Delay; 00:38.864.439 41.32 ms Potential Interaction Delay; 00:41.510.105 39.74 ms Potential Interaction Delay; 00:41.743.081 37.46 ms Potential Interaction Delay; 00:41.959.412 37.47 ms Potential Interaction Delay; 00:42.175.728 35.75 ms Potential Interaction Delay; 00:42.874.616 216.63 ms Brief Unresponsiveness; 00:46.169.393 40.96 ms Potential Interaction Delay; 00:54.106.885 60.40 ms Potential Interaction Delay; 00:54.439.634 64.34 ms Potential Interaction Delay; 00:55.521.244 652.24 ms Hang; 00:57.135.370 48.97 ms Potential Interaction Delay; 00:57.801.012 410.69 ms Microhang; 00:59.506.528 33.01 ms Potential Interaction Delay; 00:59.597.822 58.30 ms Potential Interaction Delay; 01:01.644.538 36.37 ms Potential Interaction Delay; 01:09.997.372 85.67 ms Potential Interaction Delay; 01:11.644.701 38.76 ms Potential Interaction Delay; 01:22.327.254 302.36 ms Microhang; 01:23.108.562 89.72 ms Potential Interaction Delay; 01:25.389.078 65.94 ms Potential Interaction Delay; 01:27.086.313 37.23 ms Potential Interaction Delay; 01:28.367.627 67.82 ms Potential Interaction Delay; 01:29.720.878 98.23 ms Potential Interaction Delay; 01:30.530.997 159.23 ms Brief Unresponsiveness
+-- hitch at 16.389 s, 116.7 ms, main thread busy 67 ms.
+     app     45 ms main
+     app      8 ms CuadraoHomeInsights.body.getter
+     app      6 ms specialized static CanvasBalanceHistory.points(accounts:observations:now:)
+     app      1 ms closure #1 in CuadraoHomeInsights.body.getter
+     app      1 ms __swift_instantiateConcreteTypeFromMangledNameV2
+     app      1 ms closure #2 in CuadraoHomeInsights.body.getter
+     all     54 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all     52 ms AG::Graph::update_attribute(AG::data::ptr<AG::Node>, unsigned int)  [AttributeGraph]
+     all     46 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all     45 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all     45 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all     45 ms __CFRunLoopDoSource1  [CoreFoundation]
+     all     45 ms __CFMachPortPerform  [CoreFoundation]
+     all     45 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__  [CoreFoundation]
+-- hitch at 18.535 s, 83.3 ms, main thread busy 91 ms. Potentially expensive app update(s)
+     app     76 ms main
+     app     11 ms CuadraoHomeInsights.body.getter
+     app     10 ms specialized static CanvasBalanceHistory.points(accounts:observations:now:)
+     app      5 ms closure #1 in closure #1 in CuadraoHomeBalanceChartContent.chartBase(_:)
+     app      2 ms closure #1 in closure #2 in closure #1 in closure #1 in CuadraoHomeInsights.body.getter
+     app      2 ms closure #1 in closure #1 in closure #1 in closure #2 in closure #1 in closure #1 in CuadraoHomeInsights.body.getter
+     all     76 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all     76 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all     76 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all     76 ms __CFRunLoopDoSource1  [CoreFoundation]
+     all     76 ms __CFMachPortPerform  [CoreFoundation]
+     all     76 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__  [CoreFoundation]
+     all     75 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all     47 ms <deduplicated_symbol>  [SwiftUI]
+-- hitch at 54.477 s, 50.0 ms, main thread busy 62 ms. Potentially expensive app update(s)
+     app     51 ms main
+     app     13 ms closure #1 in CuadraoAllocationBar.body.getter
+     app     12 ms CuadraoHomeInsights.body.getter
+     app     11 ms specialized static CanvasBalanceHistory.points(accounts:observations:now:)
+     app      2 ms closure #1 in closure #2 in closure #1 in closure #1 in CuadraoHomeInsights.body.getter
+     app      2 ms CanvasHistoryRange.interval(now:offset:)
+     all     52 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all     52 ms __CFRunLoopDoSource0  [CoreFoundation]
+     all     52 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all     52 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all     52 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__  [CoreFoundation]
+     all     51 ms __CFRunLoopDoSources0  [CoreFoundation]
+     all     45 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all     39 ms partial apply for implicit closure #1 in closure #1 in closure #1 in Attribute.init<A>(_:)  [SwiftUICore]
+-- hitch at 7.520 s, 33.3 ms, main thread busy 19 ms. Potentially expensive app update(s)
+     app     19 ms main
+     app      3 ms closure #1 in closure #1 in CuadraoHomeBalanceChartContent.chartBase(_:)
+     app      1 ms DYLD-STUB$$AreaMark.init<A, B>(x:yStart:yEnd:)
+     app      1 ms CanvasMoneyFormatters.string(_:digits:)
+     all     19 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all     19 ms __CFRunLoopDoSource1  [CoreFoundation]
+     all     19 ms __CFMachPortPerform  [CoreFoundation]
+     all     19 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__  [CoreFoundation]
+     all     18 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all     18 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all     17 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all     15 ms 0x185a2a370  [UIKitCore]
+-- hitch at 35.973 s, 33.3 ms, main thread busy 32 ms. Potentially expensive app update(s), Potentially expensive render, 1 offscreen passes)
+     app     23 ms main
+     app      5 ms CuadraoHomeInsights.body.getter
+     app      5 ms specialized static CanvasBalanceHistory.points(accounts:observations:now:)
+     app      1 ms closure #1 in closure #2 in closure #1 in closure #1 in CuadraoHomeInsights.body.getter
+     app      1 ms closure #1 in closure #1 in closure #1 in closure #2 in closure #1 in CuadraoBalanceBreakdown.body.getter
+     app      1 ms closure #1 in CuadraoBalanceBreakdown.accountValue(_:alignment:)
+     all     24 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all     24 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all     24 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all     24 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all     23 ms __CFRunLoopDoSource0  [CoreFoundation]
+     all     23 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__  [CoreFoundation]
+     all     23 ms __CFRunLoopDoSources0  [CoreFoundation]
+     all     18 ms AG::Subgraph::update(unsigned int)  [AttributeGraph]
+-- hitch at 71.682 s, 33.3 ms, main thread busy 39 ms. Potentially expensive app update(s)
+     app     39 ms main
+     app      6 ms specialized MutableCollection<>.sort(by:)
+     app      6 ms specialized UnsafeMutableBufferPointer._stableSortImpl(by:)
+     app      6 ms CuadraoSpendingHighlights.body.getter
+     app      5 ms specialized closure #1 in UnsafeMutableBufferPointer._stableSortImpl(by:)
+     app      5 ms <deduplicated_symbol>
+     all     39 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all     38 ms __CFRunLoopDoSource0  [CoreFoundation]
+     all     38 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all     38 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all     38 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE0_PERFORM_FUNCTION__  [CoreFoundation]
+     all     38 ms __CFRunLoopDoSources0  [CoreFoundation]
+     all     32 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all     30 ms 0x185a2a370  [UIKitCore]
+-- hitch at 72.930 s, 33.3 ms, main thread busy 0 ms. Potentially expensive app update(s)
+-- hitch at 75.592 s, 33.3 ms, main thread busy 0 ms. Potentially expensive app update(s)
+-- hitch at 4.325 s, 16.7 ms, main thread busy 8 ms. Potentially expensive render, 9 offscreen passes)
+     app      8 ms main
+     all      8 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all      8 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all      8 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all      8 ms __CFRunLoopDoSource1  [CoreFoundation]
+     all      8 ms __CFMachPortPerform  [CoreFoundation]
+     all      8 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__  [CoreFoundation]
+     all      6 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all      5 ms 0x185a2a370  [UIKitCore]
+-- hitch at 5.191 s, 16.7 ms, main thread busy 5 ms. Potentially expensive app update(s)
+     app      5 ms main
+     all      5 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all      5 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all      5 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all      3 ms __setupUpdateSequence_block_invoke_2  [UIKitCore]
+     all      3 ms CA::Layer::layout_and_display_if_needed(CA::Transaction*)  [QuartzCore]
+     all      3 ms _UIApplicationFlushCATransaction  [UIKitCore]
+     all      3 ms CA::Context::commit_transaction(CA::Transaction*, double, double*)  [QuartzCore]
+     all      3 ms __CFRunLoopDoSource1  [CoreFoundation]
+-- hitch at 5.989 s, 16.7 ms, main thread busy 9 ms. Potentially expensive app update(s)
+     app      9 ms main
+     all      7 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all      7 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all      7 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all      7 ms __CFRunLoopDoSource1  [CoreFoundation]
+     all      7 ms __CFMachPortPerform  [CoreFoundation]
+     all      7 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__  [CoreFoundation]
+     all      5 ms __setupUpdateSequence_block_invoke_2  [UIKitCore]
+     all      5 ms _UIApplicationFlushCATransaction  [UIKitCore]
+-- hitch at 6.804 s, 16.7 ms, main thread busy 13 ms. Potentially expensive app update(s)
+     app     13 ms main
+     app      1 ms closure #1 in closure #1 in CuadraoHomeBalanceChartContent.chartBase(_:)
+     app      1 ms CuadraoHomeBalanceChartContent.dateLabel(_:)
+     all     10 ms UC::DriverCore::continueProcessing()  [UpdateCycle]
+     all     10 ms _UIUpdateSequenceRunNext  [UIKitCore]
+     all     10 ms schedulerStepScheduledMainSectionContinue  [UIKitCore]
+     all      9 ms __CFRunLoopDoSource1  [CoreFoundation]
+     all      9 ms __CFMachPortPerform  [CoreFoundation]
+     all      9 ms __CFRUNLOOP_IS_CALLING_OUT_TO_A_SOURCE1_PERFORM_FUNCTION__  [CoreFoundation]
+     all      9 ms AG::Graph::UpdateStack::update()  [AttributeGraph]
+     all      8 ms 0x185a2a370  [UIKitCore]
