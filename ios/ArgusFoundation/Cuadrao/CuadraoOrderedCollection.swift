@@ -45,9 +45,9 @@ struct CuadraoOrderedCollection<Item: Identifiable, Row: View>: View where Item.
                                 move([id], before: item.id); return true
                             }
                         HStack {
-                            if canEdit(item) { Button(spanish ? "Editar" : "Edit", systemImage: "pencil") { edit(item) } }
+                            if canEdit(item) { Button { edit(item) } label: { Label(spanish ? "Editar" : "Edit", systemImage: "pencil").frame(minHeight: 44).contentShape(Rectangle()) } }
                             Spacer()
-                            Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { archive(item) }
+                            Button { archive(item) } label: { Label(spanish ? "Archivar" : "Archive", systemImage: "archivebox").frame(minHeight: 44).contentShape(Rectangle()) }
                         }.font(.caption).frame(minHeight: 44).buttonStyle(.plain)
                     }
                 }

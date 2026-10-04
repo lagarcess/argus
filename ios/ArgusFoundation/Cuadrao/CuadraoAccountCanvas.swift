@@ -104,7 +104,7 @@ struct CuadraoAccountCanvas: View {
             Button(spanish ? "Añadir movimiento" : "Add transaction", systemImage: "plus") { record(accountID) }
             Button(spanish ? "Archivar" : "Archive", systemImage: "archivebox") { actions(.archive(accountID)) }
         } label: {
-            Image(systemName: "ellipsis").frame(width: 44, height: 44)
+            Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle())
         }.buttonStyle(.plain)
             .accessibilityLabel(spanish ? "Opciones de cuenta" : "Account actions")
             .accessibilityIdentifier("account-detail-options")

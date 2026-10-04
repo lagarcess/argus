@@ -74,9 +74,8 @@ struct CuadraoGroupExpenseEditor: View {
                                         if selected.contains(member.id) { selected.remove(member.id) } else { selected.insert(member.id) }
                                     } label: {
                                         HStack { Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle"); PlanMemberAvatar(member: member, index: index); Text(member.name) }
-                                            .frame(minHeight: 44)
+                                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
                                     }.buttonStyle(.plain).accessibilityLabel("\(member.name), \(selected.contains(member.id) ? (spanish ? "incluido" : "included") : (spanish ? "excluido" : "excluded"))")
-                                    Spacer()
                                     if custom && selected.contains(member.id) {
                                         VStack(alignment: .trailing) {
                                             CanvasMoneyValueInput(value: Binding(get: { exactShares[member.id] ?? 0 }, set: { exactShares[member.id] = $0 }),

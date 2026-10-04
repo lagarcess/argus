@@ -103,7 +103,7 @@ struct CuadraoChatCanvas: View {
                     else { store.leaveTemporary(for: .newRegular) }
                 } label: {
                     Image("CuadraoNewChat").resizable().scaledToFit().frame(width: 20, height: 20)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
                 }.buttonStyle(.plain)
                     .accessibilityLabel(store.temporary ? (es ? "Nuevo chat normal" : "New regular chat") : (es ? "Nuevo chat" : "New chat"))
                     .accessibilityIdentifier("chat-new")
@@ -120,7 +120,7 @@ struct CuadraoChatCanvas: View {
             if active && !store.temporary {
                 Button { sheet = .share } label: {
                     Image("CuadraoShare").resizable().scaledToFit().frame(width: 20, height: 20)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
                 }.buttonStyle(.plain)
                     .accessibilityLabel(es ? "Compartir chat" : "Share chat")
                     .accessibilityIdentifier("chat-share")
@@ -257,7 +257,7 @@ struct CuadraoChatCanvas: View {
                         ForEach(CanvasChatExample.allCases) { sample in
                             Button { if sample == .document { sheet = .attachment("doc") } else { store.send(example: sample, spanish: es) } } label: {
                                 Text(sample.title(es)).font(.subheadline).padding(.horizontal, 16).frame(minHeight: 44)
-                                    .overlay { Capsule().stroke(WelcomePalette.separator, lineWidth: 1) }
+                                    .overlay { Capsule().stroke(WelcomePalette.separator, lineWidth: 1) }.contentShape(Rectangle())
                             }.buttonStyle(.plain)
                         }
                     }.padding(.horizontal, 20)
@@ -369,11 +369,11 @@ struct CuadraoChatCanvas: View {
             } else { sheet = .attachment(symbol) }
         } label: {
             VStack(spacing: 9) { Image(systemName: symbol).font(.title3); Text(title).font(.caption) }
-                .frame(maxWidth: .infinity, minHeight: 70)
+                .frame(maxWidth: .infinity, minHeight: 70).contentShape(Rectangle())
         }.buttonStyle(.plain)
     }
     private func control(_ symbol: String, _ label: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: symbol).font(.system(size: 19)).frame(width: 44, height: 44) }
+        Button(action: action) { Image(systemName: symbol).font(.system(size: 19)).frame(width: 44, height: 44).contentShape(Rectangle()) }
             .buttonStyle(.plain).accessibilityLabel(label).accessibilityIdentifier(id)
     }
 }

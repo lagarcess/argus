@@ -54,7 +54,7 @@ struct CuadraoHomeCanvas: View {
                             if data.selectedSpace.kind == .household {
                                 Button { sheet = .household } label: {
                                     PlanAvatarStack(members: data.acceptedHouseholdMembers(spanish: spanish))
-                                        .frame(minHeight: 44)
+                                        .frame(minHeight: 44).contentShape(Rectangle())
                                 }.buttonStyle(.plain)
                                     .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")
                                     .accessibilityValue(String(data.acceptedHouseholdMembers(spanish: spanish).count))
@@ -245,7 +245,7 @@ struct CuadraoHomeCanvas: View {
                         HStack(spacing: 8) {
                             sectionTitle(spanish ? "Cuentas" : "Accounts")
                             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
-                        }.frame(minHeight: 44)
+                        }.frame(minHeight: 44).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("home-accounts-open")
                     Spacer()
                     CuadraoSectionAddButton(title: spanish ? "Añadir cuenta" : "Add account") { sheet = .add }

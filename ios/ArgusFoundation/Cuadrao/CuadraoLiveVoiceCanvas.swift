@@ -105,7 +105,7 @@ struct CuadraoLiveVoiceCanvas: View {
     private var previewNotice: some View {
         Button { previewDetails = true } label: {
             Label(es ? "Vista previa · Sin conexión" : "Preview · Not connected", systemImage: "info.circle")
-                .font(.caption).foregroundStyle(.secondary).frame(minHeight: 44)
+                .font(.caption).foregroundStyle(.secondary).frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("voice-preview-info")
     }
 
@@ -114,7 +114,7 @@ struct CuadraoLiveVoiceCanvas: View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 22, weight: .regular))
                 .frame(width: 52, height: 52)
-                .background(selected ? WelcomePalette.sage : Color.clear, in: Circle())
+                .background(selected ? WelcomePalette.sage : Color.clear, in: Circle()).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier(id)
             .accessibilityLabel(title).accessibilityValue(selected ? (es ? "Activado" : "On") : "")
     }

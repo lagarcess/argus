@@ -33,10 +33,10 @@ struct CuadraoVoiceBar: View {
                 .accessibilityValue(voice.status(spanish))
                 .accessibilityIdentifier("voice-expand")
             Button { voice.muted.toggle() } label: {
-                Image(systemName: voice.muted ? "mic.slash" : "mic").frame(width: 44, height: 48)
+                Image(systemName: voice.muted ? "mic.slash" : "mic").frame(width: 44, height: 48).contentShape(Rectangle())
             }.accessibilityIdentifier("voice-mute-compact").accessibilityLabel(voice.muted ? (spanish ? "Activar micrófono" : "Unmute microphone") : (spanish ? "Silenciar micrófono" : "Mute microphone"))
             Button { voice.end() } label: {
-                Image(systemName: "xmark").frame(width: 44, height: 48)
+                Image(systemName: "xmark").frame(width: 44, height: 48).contentShape(Rectangle())
             }.accessibilityLabel(spanish ? "Terminar conversación de voz" : "End voice conversation")
                 .accessibilityIdentifier("voice-end-compact")
         }.buttonStyle(.plain).foregroundStyle(WelcomePalette.ink)

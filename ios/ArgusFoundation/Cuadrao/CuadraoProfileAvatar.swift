@@ -97,7 +97,7 @@ struct CuadraoProfileAvatarPicker: View {
                         }
                     }
                 Text(title).font(.caption).foregroundStyle(.primary)
-            }.frame(minHeight: 88)
+            }.frame(minHeight: 88).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityLabel(title)
             .accessibilityAddTraits(avatar == style ? .isSelected : [])
             .accessibilityIdentifier("cuadrao.profile.avatar.\(id)")
