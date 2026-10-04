@@ -380,6 +380,40 @@ synthesized-event records, the UI hierarchy at failure, and the screen recording
   `4bb1696a3` was green. `git diff --check a8c37d3a...HEAD` is clean. Raw results are in
   [runs](2026-10-04-w1h/runs-raw.txt).
 
+## Money keystroke probe under a stalled main thread, October 4, 2026
+
+Source: `c2b47c661`, with throwaway DEBUG instrumentation that was never committed. Simulator:
+iPhone 18 Pro only, every run under the shared lock with `-collect-test-diagnostics never`.
+Files are in [2026-10-04-w1i](2026-10-04-w1i/). This follows the `testSharedJourneySpanish`
+entry in the section above.
+
+- Question. Can money entry undo a keystroke? Two candidates were open: the
+  `CanvasMoneyValueInput` re-sync rewriting the field from a stale value when the main
+  thread stalls, and the silent refusal in `CanvasDecimalInput` when a keystroke's range
+  does not fit the field's text.
+- Not reproduced. The [probe](2026-10-04-w1i/W1iMoneyStallProbeUITests.swift.txt) replaced
+  and read back a split share and the expense amount, and Tú's and Ana's shares in a freshly
+  opened editor, 344 times in four runs. Three runs had a repeating main-thread stall of 60
+  to 150 ms or 250 to 600 ms. The app handled 3,180 keystrokes, 2,224 of them stalled, and
+  582 while earlier writes were still queued. Every keystroke was accepted, none was refused
+  at the range guard, none was sent without being handled, no update rewrote a non-empty
+  field and no re-sync was requested ([results](2026-10-04-w1i/probe-results.txt)).
+- The re-sync window did not open. Of 1,571 value writes that changed the value, 80 had a
+  later keystroke already handled and its write queued. In all 80 the change report ran
+  before that queued write, 2 to 8 ms after the value write, with nothing but view updates
+  between them. The re-sync needs the queued write to land first.
+- The heavy run logged one mismatch. It was the probe's own read timing out under 250 to
+  600 ms stalls. The app's log for that burst shows six deletes handled and an empty field.
+- Still open: two synthesized deletes not being delivered under whole-machine load. The
+  stall slows the app only, so it does not test that.
+- To settle a recurrence, apply the
+  [instrumentation](2026-10-04-w1i/stall-and-log-instrumentation.diff.txt) to a throwaway
+  build, add `-W1iLog` to the UI tests' launch arguments, run the suite, and run
+  [summarize](2026-10-04-w1i/summarize.sh.txt) on the app log. A burst with fewer handled
+  keystrokes than sent means an undelivered key. A `REWRITE` onto a non-empty field or a
+  `REFUSED` line means the app.
+- No app change. Both Swift files equal `c2b47c661`, so no build was rerun.
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
