@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** October 4, 2026.
-**Execution state:** Integration is `a8c37d3a182fbdb3228f6003272418e65286bc1a` at this checkpoint. Cuadrao Preview build 3423 is installed and launched on the founder's iPhone. It uses sample data with auth off. The combined candidate has not landed on integration; connected physical-phone acceptance and external TestFlight readiness remain open. The current mobile sequence and completion record are below. Older dated sections retain their evidence and contract history.
+**Execution state:** Integration is `a8c37d3a182fbdb3228f6003272418e65286bc1a` at this checkpoint. Candidate `03a33ef2` has a completed UI suite (119 passed, 48 skipped, zero failures) and completed screenshot classification. Claude's ledger records phone profiling build 3427; signed candidate build 3428 is saved but uninstalled. The founder has taken the phone offline. The combined candidate has not landed on integration; connected physical-phone acceptance and external TestFlight readiness remain open. The current mobile sequence and completion record are below. Older dated sections retain their evidence and contract history.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -17,7 +17,9 @@ This section owns the current high-level sequence. The six-lane contract and
 the release UI table below retain their detailed requirements. This lock does
 not authorize a merge, deployment, hosted flag, migration, paid provider run,
 new runtime implementation, or automatic restart of a parked lane. Claude's
-existing scoped assignments continue. The runtime discussion must produce a
+existing scoped assignments are preserved. The founder transferred mobile
+ownership to Codex on October 4 after Claude exhausted usage. The runtime
+discussion must produce a
 separate bounded assignment before architecture or model instructions change.
 
 ### Completed checkpoints, with limits
@@ -38,11 +40,16 @@ are separate states.
   [Grok handoff](https://github.com/lagarcess/argus/pull/790#issuecomment-5975107437)
   pins their merges and enablement limits. This does not mark live features done.
 - [x] Local verification checkpoint recorded. The
-  [candidate ledger](https://github.com/lagarcess/argus/blob/4116474faaf840a622969b254f7af07669bfef03/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
-  links Mac builds, backend/database/web results, local GoTrue probes, and the
-  connected invitation walk. Preserve each result's tested commit. The full
-  candidate UI run still recorded two failures; focused passes do not make
-  that full run green.
+  [round-two candidate ledger](https://github.com/lagarcess/argus/blob/2bde54e48/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
+  records the uncontended `03a33ef2` UI run: 119 passed, 48 skipped, zero
+  failures. Both earlier failing tests pass in that full run. Mac builds,
+  backend/database/web results and local connected walks retain their named
+  tested commits. Codex checked the original UI log during recovery.
+- [x] Interrupted visual classification completed: all 92 differing pairs and
+  six new-only captures inspected. No new layout or money-format regression
+  established. Scroll, slider-input, persisted-hint and transition differences
+  retain explicit limits in the [recovery evidence](../reports/evidence/cuadrao-mobile-recovery-2026-10-04/README.md).
+  This is not pixel equality or connected-device acceptance.
 - [x] Signed preview build 3423 from candidate
   `0408469282a4fe3c5c7857fa668544f7cff7624c` installed and launched on the iPhone
   15 on October 4. Codex observed successful `devicectl` install and launch
@@ -56,12 +63,23 @@ are separate states.
   environments and reachable writes. Filing and assessment are complete;
   its fix and acceptance checks remain open.
 
+### Later foundation alignment
+
+The founder identified docs-only [#814](https://github.com/lagarcess/argus/pull/814)
+and [#815](https://github.com/lagarcess/argus/pull/815) as the foundation for later
+builds. #814 retains this board as the delivery checkpoint. Its currency rule,
+pre-TestFlight space-model timing and provider direction inform future assigned
+mobile slices; they are not implemented by candidate `03a33ef2`. The new model
+still has its stated design/engineering decisions open. #815 archives three
+historical specs with compatibility pointers. Neither PR expands this mobile
+verification recovery into business, runtime, migration or archive work.
+
 ### Remaining work and acceptance
 
 | Work | Current state | Next deliverable and completion check |
 | --- | --- | --- |
-| Candidate review and landing | Open PRs #790, #810, #808, #809; combined verification branch is not integration | Final-head review, current checks, documented disposition of UI failures, founder-approved landings, and verification of the assembled result. #790 precedes its stacked #810. Resolve shared board edits once. |
-| Device responsiveness and connectivity | Preview installed; lag is reported, not diagnosed on the phone | Record the slow phone journeys, identify demonstrated causes, fix within the approved design, and verify before/after behavior. Walk navigation, return position, sheets, chart gestures, and persistence. Simulator never-idle counts are not frame-hitch proof. |
+| Candidate review and landing | Open PRs #790, #810, #812, #808, #809; candidate `03a33ef2` passes its full UI run and visual classification | Preserve review and verification evidence. #790 has successful CI; #810 and #812 have no executed workflow checks at their stacked heads. The stack lands #790, #810, #812; each merge still needs founder approval. #808 and #809 are independent. Reconcile shared board edits once and verify affected gates after landing. |
+| Device responsiveness and connectivity | Phone profiling and app computation fixes recorded in #812; physical connected acceptance remains open | Retain the measured traces and remaining performance limits. The phone is disconnected; resume physical interaction and persistence checks when it returns. Candidate 3428 is not installed. Simulator never-idle counts are not frame-hitch proof. |
 | Onboarding | Sign-in and invitation building blocks exist; complete first-use acceptance is open | Install, preserve invite intent, enter code, sign in, complete verification, select or join the permitted context, and perform the first useful action. Cover cancellation, invalid/expired codes, denied permissions, interruption, and relaunch. Request permissions when the feature needs them. |
 | Accounts, Plans, Household | Landed services and native paths plus candidate invitation work | Verify the connected financial and shared journeys on the phone, including relaunch, revoked access, recovery, and correct personal/household boundaries. Preserve existing contract owners. |
 | Receipts and imports | Capture/review UI and durable draft foundations exist | Connect capture, save for later, reopen, prepare, correct, split, approve, and save through the same financial services. Prove persistence and sharing boundaries. Keep source/extraction enablement gates open until satisfied. |
@@ -81,8 +99,8 @@ a hypothetical question or unapproved model output.
 
 ### Parallel execution and priority
 
-1. Finish the current candidate's review and test disposition, assess/fix the
-   relevant security gates, and profile the phone. These tracks can progress
+1. Preserve the completed candidate review, test disposition and phone traces.
+   Close the remaining security and connected-device gates. These tracks can progress
    together under separate ownership. One Mac scheduler owns native tests and
    profiling so competing runs do not invalidate measurements.
 2. Discuss end-to-end onboarding and the first agentic chat jobs next. Keep the
@@ -139,12 +157,13 @@ Apple audit references checked October 4, 2026:
 and [permission design](https://developer.apple.com/design/human-interface-guidelines/privacy/).
 These define an audit to finish, not a completed compliance assessment.
 
-**Checkpoint boundary:** PRs #790 (`c2b47c66`), #810 (`329fd00d`), #808
-(`a1ebf4b4`), and #809 (`ecd2bb57`) were open when this update was written.
-Build 3423 uses the earlier combined candidate, not every later PR change.
-The [candidate evidence](https://github.com/lagarcess/argus/blob/4116474faaf840a622969b254f7af07669bfef03/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
-is historical and must be revalidated where later changes affect it. This
-section replaces conflicting current-queue or phone-status wording below;
+**Checkpoint boundary:** PRs #790 (`53a4d67d`), #810 (`2cd7662a`), #812
+(`122bb232`), #808 (`a1ebf4b4`), and #809 (`ecd2bb57`) remain open. Combined
+candidate `03a33ef2` is for verification, not a replacement integration branch.
+The [candidate evidence](https://github.com/lagarcess/argus/blob/2bde54e48/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
+and [recovery report](../reports/evidence/cuadrao-mobile-recovery-2026-10-04/README.md)
+name the tested heads and remaining limits. Revalidate only evidence affected
+by subsequent changes. This section replaces conflicting current-queue or phone-status wording below;
 it does not erase dated evidence or change the lane contracts.
 
 **Original preservation authorization (historical):** The founder accepted this expanded plan for
