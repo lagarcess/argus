@@ -2,7 +2,7 @@
 
 **Status:** Planning roadmap, drafted October 4, 2026 (CT). It merges the product half by the Product Lead (Iris) and the engineering half by the Head of Engineering (Yelena), and the docs seat (Maya) assembled it. It is not an authority over the [MVEE](argus-minimum-viable-ecosystem-experience.md), the [execution board](argus-execution-board.md) or the [decision log](argus-decision-log.md). Nothing here authorizes a merge, deploy, migration, hosted flag, paid provider or new runtime work. The Oct 4 mobile roadmap lock in [#813](https://github.com/lagarcess/argus/pull/813) is the delivery checkpoint, and the execution board keeps delivery authority. Founder locks live in the decision log; this plan links to them instead of restating them as new decisions.
 
-**Sources:** Lucas's two October 4 documents, recorded verbatim as [go to market vision](../research/2026-10-04-cuadrao-gtm-vision-source.md) (cited as **GTM**) and [product and business architecture](../research/2026-10-04-cuadrao-product-business-architecture-source.md) (cited as **Blueprint**). Repo facts were read on integration `codex/private-alpha-next` at `a8c37d3a` (Oct 3, 6:09 AM CT). Open issues and PRs are as of October 4.
+**Sources:** Lucas's two October 4 documents, recorded verbatim as [go to market vision](../research/2026-10-04-cuadrao-gtm-vision-source.md) (cited as **GTM**) and [product and business architecture](../research/2026-10-04-cuadrao-product-business-architecture-source.md) (cited as **Blueprint**). Repo facts were read on integration `codex/private-alpha-next` at `a8c37d3a` (Oct 3, 6:09 AM CT). Open issues and PRs are as of October 4. Lucas approved keeping both source records public as recorded, with no summaries (Oct 4, 2:22 PM CT).
 
 **Related open PRs:** [#813](https://github.com/lagarcess/argus/pull/813) (draft, execution board Oct 4 roadmap lock) and [#808](https://github.com/lagarcess/argus/pull/808) (profile hidden rows backend; touches the decision log, MVEE, board, handoff, FK census, `DATA_MODEL.md` and `API_CONTRACT.md`). This plan doesn't edit the execution board.
 
@@ -40,6 +40,14 @@ Lucas set the launch shape in the room on October 4 at 12:30 PM CT. The [decisio
 
 Where integration code and docs differ from this rule is listed in [canon rows 12-17](#conflicts-with-repo-canon). No code is changed by this plan.
 
+**AI providers (Lucas, Oct 4, 2:20 PM CT, relayed by Yelena):** all three stay behind the server, and none of them writes saved balances. Details are in §B4.1.
+
+1. **OpenRouter** is kept, for the chat models (GPT and Grok) and for vision extraction.
+2. **Grok voice** is the provider for the chat voice-call feature. It's new and not wired yet. Once built it gets a server-only key; the phone never holds it.
+3. **Perplexity** is kept, for finance search. The agent work in #813 wires it in.
+
+**Space model timing (Lucas, Oct 4, 2:21 PM CT, relayed by Iris):** the space-model change lands before TestFlight, which is a few days out. This settles [conflict row 5](#where-the-two-halves-disagree). Which migration steps that covers is Yelena's sequencing (§B2.3). The model itself, including roles and the business retention rule, still needs Lucas's lock (§B9 question 1).
+
 The rest of this plan is proposals. F1 to F5 in §A7 and the questions in §B9 stay open.
 
 ## Roadmap at a glance
@@ -49,14 +57,14 @@ This summary combines both halves. Sizes are Yelena's estimates (§B6). Order in
 | Stream | What it delivers | First step | Waits on |
 | --- | --- | --- | --- |
 | **Consumer TestFlight** (personal + household, iOS) | The connected candidate from #813 in invite-only TestFlight, then public | The must-do issues in §B7 and the minimum in §A4 | Apple team and bundle id (§B3.2), cuadrao.ai DNS, email and AASA |
-| **Shared foundation** | Space and membership model (§B2), entitlement service (§B5), scoped storage (#778), audit and approvals | Space model steps 1-2 (§B2.3) for personal and household | Lucas's lock on §B2 |
+| **Shared foundation** | Space and membership model (§B2), entitlement service (§B5), scoped storage (#778), audit and approvals | Space model steps 1-2 (§B2.3) for personal and household, landing before TestFlight (Lucas's lock) | Lucas's lock on the model itself (§B9 question 1) |
 | **Business ledger** (web first, thin app space for pilots) | Web shell, roles, money and ops, Inbox and Vault, customers, non-fiscal invoices, external e-CF tracking, matching, accountant export | Space model step 4, then the web shell | Roles matrix lock; about 12-18 eng-weeks [estimate] |
 | **Fiscal: certified-provider bridge** (partner first) | Live e-invoicing through Cuadrao via a PSFE | Adapter against the provider's sandbox, behind the shared fiscal-backend interface | A PSFE agreement (Lucas's partner track); about 3-5 eng-weeks [estimate], the first fiscal work |
 | **Fiscal: own backend** (parallel, lower priority) | Offline e-CF XML builder, validator, sequencing, submission state machine, evidence store, Cuadrao DGII MCP | Offline build against DGII's published specs | Lucas's DGII paperwork; about 6-10 eng-weeks [estimate] |
 | **Brand and domain** | `ai.cuadrao.app`, cuadrao.ai web, API host, AASA, email domain, redirects | Entity and Apple team choice (§B3.2 step 0) | F3 |
 | **Founder tracks** | Entity, Apple enrollment, PSFE partner, Plaid production access, pilot recruitment, DGII answer | See §A5 | Lucas |
 
-**What runs in sequence:** the space model before any business data exists; the invoice record and its fiscal-state fields locked before the fiscal streams touch the ledger; no compliance promise to a customer before a live issuance route exists; own PSFE status after at least three pilot issuers.
+**What runs in sequence:** the space-model change before TestFlight (Lucas's lock) and before any business data exists; the invoice record and its fiscal-state fields locked before the fiscal streams touch the ledger; no compliance promise to a customer before a live issuance route exists; own PSFE status after at least three pilot issuers.
 
 **Issue placement for #686 and #694:** both are must-dos at the time of the next integration-to-`main` promotion, not TestFlight blockers. Any promotion that carries #674 applies its migration and env keys first (#686), and the forged-header check runs in that promotion window (#694). This matches Yelena's reasoning in §B7 and Iris's deferral in §A6.
 
@@ -70,7 +78,7 @@ Each row gives Iris's current position (her Oct 4 corrections included), Yelena'
 | 2 | **Fiscal order** | New pillar 7, certified-provider integration built against the provider's sandbox; own fiscal tooling (pillar 8) is a parallel track behind it. Yelena sets the exact sequence against capture. F2 is which provider and when. | §B6: external e-CF tracking is the first pilot step; the provider bridge (3-5 eng-weeks) is the first fiscal work; the own backend (6-10 eng-weeks) runs in parallel at lower priority. | **Converged** on order; the exact sequence against capture is Yelena's. F2 stays open for Lucas. |
 | 3 | **Keeping business out of the public build** | Yelena's Option C. The in-app business space stays thin; the full service is the web. | §B3.4: Option C, a compile-time `CUADRAO_BUSINESS` build plus server authorization. | **Converged** (Head of Engineering's decision under lock 2). |
 | 4 | **Business roles** | Yelena's 6 roles plus billing admin in the data model; Iris's 3 presets (owner, associate, accountant) in the pilot interface. | §B2.2: owner, admin, bookkeeper, approver, accountant, viewer, plus a billing admin flag. | **Converged.** Lucas still locks the matrix with the space model (§B9 question 1). |
-| 5 | **Space model before TestFlight** | Yes, because it's cheapest with no real data. If it threatens the TestFlight date, it's Lucas's call. | §B2.3: steps 1-3 are cheapest before external TestFlight; consumer TestFlight needs steps 1-2; the business kind (step 4) comes last, web first. | **Converged** on intent. **Open** only if it threatens the date (Lucas). |
+| 5 | **Space model before TestFlight** | Yes, because it's cheapest with no real data. | §B2.3: steps 1-3 are cheapest before external TestFlight; consumer TestFlight needs steps 1-2; the business kind (step 4) comes last, web first. | **Settled by Lucas's lock** (Oct 4, 2:21 PM CT): the space-model change lands before TestFlight. The exact steps are Yelena's sequencing. |
 | 6 | **#686, #694** | (No new position.) | §B7: listed under consumer TestFlight because the TestFlight API is `argus-api` on `main`. | **Settled by steering:** must-dos at main-promotion time, not TestFlight blockers. |
 | 7 | **#807** | Yelena's sequencing. Iris only needs the deletion sweep (item 15) before TestFlight. | §B7: item 15 for TestFlight; items 3 (alerting) and 5 (per-worker limiter) before public launch. | **Converged.** |
 | 8 | **#671, #676** | Yelena's sequencing. | §B7: before public launch (the iOS app relies on web recovery; limiters scale with workers). | **Converged.** |
@@ -90,7 +98,7 @@ Each row gives Iris's current position (her Oct 4 corrections included), Yelena'
 | 22 | **Docs archive or keep** | Archive anything only about the Argus web, guest or chat; everything else follows Yelena's list. | §B8: keep and rewrite list, plus archive candidates. | **Converged** on the rule; the web, guest and chat archive is **pending F5**. #815 isn't widened for it. |
 | 23 | **Plaid** | Kept: sandbox plus Faker for stress tests; real Plaid for Dominicans in the US or with accounts abroad, a named consumer segment; manual entry for everyone else. Production access needs Plaid's review, next to the US entity (§A2, §A5). | §B1.1: salvage, US-only. §B6: "Gated for DR users", "Keep only for foreign accounts". §B4.1 and §B9 question 4 originally had Plaid as "Lucas decides"; now Keep. | **Settled by Lucas's 12:44 PM CT call** (keep). §B4.1 and §B9 question 4 are updated in Part B (Yelena accepted). |
 | 24 | **Market-data providers** | Alpaca, Kraken, BCRD and other market data parked: keys removed, code kept. Perplexity answers general finance questions in chat. | §B4.1: Alpaca (`ALPACA_*`), Kraken (keyless), FRED and the market-data mode names are "Park (pilot)": runtime reads stop, keys leave Render, code and provider keys stay, no revoke. BCRD has no env names and is "Park (pilot)". | **Converged** for Alpaca, Kraken and the others. BCRD: see row 26. |
-| 25 | **OpenRouter** | Stays, because receipt capture depends on it. | §B4.1: `ARGUS_PROD_OPENROUTER_API_KEY`, `ARGUS_VISION_MODEL` and the document-extraction timeout are Keep, with "confirm" since it wasn't on Lucas's keep list; §B9 question 4 asks Lucas to confirm. The chat model tiers and the guest OpenRouter key are Drop (blocked). | **Converged.** Iris's correction answers the confirm request. Note from §B4.1: `ARGUS_VISION_MODEL` isn't in `render.yaml`, so extraction fails with `missing_vision_model` until it's set. |
+| 25 | **OpenRouter** | Stays, because receipt capture depends on it. | §B4.1: `ARGUS_PROD_OPENROUTER_API_KEY`, `ARGUS_VISION_MODEL` and the document-extraction timeout are Keep. The Argus chat tier names are Drop (blocked), and the guest OpenRouter key is Drop (blocked). | **Locked by Lucas** (Oct 4, 2:20 PM CT): OpenRouter is Keep for the chat models (GPT and Grok) and vision extraction. Note from §B4.1: `ARGUS_VISION_MODEL` isn't in `render.yaml`, so extraction fails with `missing_vision_model` until it's set. |
 | 26 | **Currency conversion and BCRD** | Lucas's currency rule: no conversion, one total per currency with the primary first, one currency per chart with a switcher, plans in a fixed currency, both bank amounts recorded (§A2). | §B4.1, corrected with Yelena's agreement: BCRD is a parked data source with no planned use and no rate-source role; there's no rule for future conversion. `calculation_rows.py` `dollar_rate` converts in the frozen Argus web chat only: a known violation, nothing new builds on it, it goes with the chat retirement, and it isn't a TestFlight blocker. | **Converged.** |
 | 27 | **Gmail import** | Still open for Lucas. | §B6: 1-away. §B4.1: `GOOGLE_OAUTH_*` are "Lucas decides". | **Converged**; the decision stays open for Lucas. |
 | 28 | **When to park the market-data keys** | Not covered. | §B4.1: Yelena recommends pulling them later with the chat freeze, not now. The `/ops` readiness check probes market data (`api/routers/ops.py:73`), so pulling the keys first breaks it as well as the frozen chat, and idle keys cost nothing. If Lucas wants them out now, the ops probe has to change first. | **Open** for Lucas, tied to F5. |
@@ -639,7 +647,7 @@ The server is the real boundary in both flavors. A consumer build that called bu
 
 #### B4.1 Argus-era env vars and data providers: keep, drop, park [fact for "where read"; proposed for the call]
 
-**Method.** Snapshot of integration `a8c37d3a`. I took every name declared in `render.yaml`, `.env.example`, `web/.env.local.example`, `.github/private-alpha-release-profile.json`, GitHub Actions `secrets.*`/`vars.*` and `ios/Config/*`, plus every name the code reads (`os.getenv`/`environ`, `process.env`, Info.plist keys, shell `$VAR`), then matched each against non-test code. **238 names classified: 102 Keep, 121 Drop, 12 Park (pilot), 3 Lucas decides.** 62 of the Keep names are `ARGUS_*` (or `NEXT_PUBLIC_ARGUS_*`) and become `CUADRAO_*` under §B3.2 step 7, marked **→C** below. Not counted: about 70 local QA/e2e harness names (`ARGUS_GUEST_QA_*`, `ARGUS_QA_*`, Playwright ports, evidence dirs, `ARGUS_EVAL_*`, `ARGUS_RUN_LIVE_*`). They never touch Render or GitHub. `ARGUS_GUEST_QA_*` goes with the guest flow; rename the rest as the scripts get touched. Names only; no values were read or printed.
+**Method.** Snapshot of integration `a8c37d3a`. I took every name declared in `render.yaml`, `.env.example`, `web/.env.local.example`, `.github/private-alpha-release-profile.json`, GitHub Actions `secrets.*`/`vars.*` and `ios/Config/*`, plus every name the code reads (`os.getenv`/`environ`, `process.env`, Info.plist keys, shell `$VAR`), then matched each against non-test code. **238 names classified: 102 Keep, 121 Drop, 12 Park (pilot), 3 Lucas decides.** The planned Grok voice row (below) has no env name yet and isn't counted. 62 of the Keep names are `ARGUS_*` (or `NEXT_PUBLIC_ARGUS_*`) and become `CUADRAO_*` under §B3.2 step 7, marked **→C** below. Not counted: about 70 local QA/e2e harness names (`ARGUS_GUEST_QA_*`, `ARGUS_QA_*`, Playwright ports, evidence dirs, `ARGUS_EVAL_*`, `ARGUS_RUN_LIVE_*`). They never touch Render or GitHub. `ARGUS_GUEST_QA_*` goes with the guest flow; rename the rest as the scripts get touched. Names only; no values were read or printed.
 
 **Call key.** **Keep:** Cuadrao needs it. **Drop:** stop reading it and delete it. "(blocked)" means it can only go after the Argus chat/backtest/guest freeze-then-retire (§B1.3). **Park (pilot):** code stops reading it at runtime and it leaves Render, but the code path, docs and provider keys stay so it can come back. No revoke. **Lucas decides:** product call.
 
@@ -654,6 +662,11 @@ The server is the real boundary in both flavors. A consumer build that called bu
 
 
 **Perplexity [fact]: Keep. It's wired into the backend, but not into the Cuadrao app yet.** `PERPLEXITY_API_KEY` is read via `domain/research/credentials.py` `perplexity_api_key()`. The research rail (`domain/research/perplexity_agent.py`, `ARGUS_RESEARCH_RAIL_ENABLED=true` on Render) serves the Argus web chat. Memory embeddings reuse the same key (`llm/memory_embedding.py:301`). The iOS Cuadrao chat doesn't call it yet; the Cuadrao agent lane (#813) has to wire it for one-off outside-finance questions.
+
+**AI providers (Lucas, locked Oct 4, 2:20 PM CT, relayed by Yelena).** All three stay behind the server, and none of them writes saved balances.
+- **OpenRouter: Keep**, for the chat models (GPT and Grok) and for vision extraction.
+- **Grok voice: Keep (planned)**, the provider for the chat voice-call feature. It's new and not wired yet, so it has no env name today. Once built it gets a server-only key; the phone never holds it.
+- **Perplexity: Keep**, for finance search. The agent work in #813 wires it in.
 
 | name | where read | provider | call | reason |
 |---|---|---|---|---|
@@ -701,19 +714,21 @@ The server is the real boundary in both flavors. A consumer build that called bu
 | `NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN` | `web/lib/guest-captcha.ts` | Cloudflare | Keep →C | **Not guest-only.** iOS sign-up captcha goes `web/app/auth/native-captcha` → `lib/native-captcha.ts` → `guest-captcha.ts`. Rename the file before the guest deletion PR. |
 | `ARGUS_CAPTCHA_URL` | `NativeAuthConfiguration.swift`, Info.plist | Cloudflare | Keep →C | iOS captcha page URL |
 | **Perplexity** | | | | |
-| `PERPLEXITY_API_KEY` | `domain/research/credentials.py`, `research/search/selection.py`, `llm/memory_embedding.py` | Perplexity | Keep | One-off outside-finance answers (see above) |
+| `PERPLEXITY_API_KEY` | `domain/research/credentials.py`, `research/search/selection.py`, `llm/memory_embedding.py` | Perplexity | Keep | Finance search (Lucas's Oct 4 lock); the #813 agent work wires it in (see above) |
 | `ARGUS_RESEARCH_RAIL_ENABLED`, `ARGUS_RESEARCH_BACKGROUND_DEADLINE_SECONDS` | `domain/research/config.py` | Perplexity | Keep →C | Research rail |
 | `ARGUS_REGISTERED_DAILY_RESEARCH_CEILING`, `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` | `domain/usage_limits.py` | Perplexity | Keep →C | Cost caps |
 | `ARGUS_GROUNDED_DISCOVERY_ENABLED`, `ARGUS_DISCOVERY_{SEARCH_PROVIDER,SEARCH_TIMEOUT_SECONDS,MAX_CANDIDATES,HOURLY_LIMIT,DAILY_LIMIT,GLOBAL_DAILY_CEILING,OPENROUTER_SEARCH_MODEL}` (8) | `domain/research/search/config.py`, `selection.py`, `domain/usage_limits.py` | Perplexity/OpenRouter | Drop (blocked) | Asset discovery for backtests ("5-symbol run cap") |
 | `NEXT_PUBLIC_RESEARCH_RAIL_ENABLED` | `web/lib/private-alpha-flags.ts` | none | Drop (blocked) | Web chat UI |
 | **OpenRouter** | | | | |
-| `ARGUS_PROD_OPENROUTER_API_KEY`, `OPENROUTER_API_KEY` (dev) | `llm/openrouter_key_policy.py` | OpenRouter | Keep (prod →C) | Document vision extraction runs on it (`ingestion/documents/extractor.py:222`). It wasn't on Lucas's keep list, so confirm. |
+| `ARGUS_PROD_OPENROUTER_API_KEY`, `OPENROUTER_API_KEY` (dev) | `llm/openrouter_key_policy.py` | OpenRouter | Keep (prod →C) | Locked Keep by Lucas (Oct 4, 2:20 PM CT) for the chat models (GPT and Grok) and vision extraction. Document vision extraction runs on it (`ingestion/documents/extractor.py:222`). |
 | `ARGUS_VISION_MODEL`, `ARGUS_OPENROUTER_DOCUMENT_EXTRACTION_TIMEOUT_SECONDS` | `llm/openrouter_model_env.py`, `llm/openrouter.py:244` (name built from the task) | OpenRouter | Keep →C | Business Inbox extraction. **`ARGUS_VISION_MODEL` isn't in `render.yaml`**, so extraction fails with `missing_vision_model` (`extractor.py:224`) until it's set. |
 | `ARGUS_DOCUMENT_EXTRACTION_ENABLED` | `ingestion/documents/config.py` | own | Keep →C | Stays off until #778 |
 | `ARGUS_DOCUMENT_EXTRACTION_MAX_BYTES`, `_MAX_PAGES` | `.env.example` only; no reader | none | Drop | Documented but unread |
-| `ARGUS_{CHAT,CONTEXT,READOUT,STRUCTURED,UTILITY}_MODEL` + `_FALLBACK_MODEL` (10), `ARGUS_{CAPABILITY,STRUCTURED}_REASONING_EFFORT` (2) | `llm/openrouter_model_env.py`, `llm/openrouter.py` | OpenRouter | Drop (blocked) | Argus chat tiers. If the #813 agent lane adopts the tier scheme, rename instead. |
+| `ARGUS_{CHAT,CONTEXT,READOUT,STRUCTURED,UTILITY}_MODEL` + `_FALLBACK_MODEL` (10), `ARGUS_{CAPABILITY,STRUCTURED}_REASONING_EFFORT` (2) | `llm/openrouter_model_env.py`, `llm/openrouter.py` | OpenRouter | Drop (blocked) | Argus chat tiers. If the #813 agent lane adopts the tier scheme, rename instead. The provider itself stays: Lucas's Oct 4 lock keeps OpenRouter for the Cuadrao chat models (GPT and Grok). |
 | `ARGUS_OPENROUTER_<TASK>_TIMEOUT_SECONDS` for 13 chat tasks (`INTERPRETATION_REPAIR`, `ASSET_MENTION_PREFLIGHT`, `FIELD_FIDELITY`, `CAPABILITY_CONFLICT`, `CLARIFICATION`, `RESULT_SUMMARY`, `NAME_SUGGESTION`, `DISCOVERY_{EXTRACTION,VOICING,MODEL_KNOWLEDGE}`, `KNOWLEDGE_{ROUTE,VOICING}`, `MEMORY_SENSITIVITY`), plus `INTERPRETATION` and `CHAT_COMPOSER` (no such task) | `llm/openrouter.py:244`, `llm/openrouter_tasks.py` | OpenRouter | Drop (13 blocked; 2 dead now) | Chat stages |
 | `ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY` | `llm/openrouter_key_policy.py` | OpenRouter | Drop (blocked) | Guest flow. Revoke the key at OpenRouter after the guest deletion. |
+| **Grok voice (planned)** | | | | |
+| Key name TBD (not counted) | Not wired yet; no code reads it | Grok voice | Keep (planned) | Chat voice-call feature (Lucas's Oct 4 lock). Server-only key once built; the phone never holds it. |
 | **Alpaca** | | | | |
 | `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_PAPER_TRADING` | `context/providers.py`, `domain/market_data/{provider,assets,capabilities}.py` | Alpaca | Park (pilot) | Market data. Off Render; keys kept. |
 | `ARGUS_MARKET_DATA_PROVIDER_MODE`, `MARKET_DATA_CACHE_TTL`, `ENABLE_MARKET_DATA_CACHE`, `ARGUS_ASSET_{PROVIDER_MODE,FIXTURE_PATH,UNIVERSE_LOADER_TIMEOUT_SECONDS}`, `ARGUS_READINESS_ASSET_TIMEOUT_SECONDS` | `domain/market_data/*`, `api/routers/ops.py:73`, `workflows/proof.py` | Alpaca/Kraken | Park (pilot) | **`/ops` readiness probes the asset universe**, so take it out of readiness before removing the Alpaca keys |
@@ -949,7 +964,7 @@ Iris's F1-F5 cover segment, e-CF timing, entity, business premium route and Argu
 1. **Lock the space model in §B2**, including the business identity-retention rule. The fiscal retention period needs counsel.
 2. **Staging:** TestFlight against the production project (MVEE §1.4 as locked), or reopen §B1.4 for a separate staging project after #811?
 3. **Sole-owner deletion:** must a sole business owner transfer ownership or close the business before deleting their account?
-4. **Gmail import** (§B4.1): keep, park or drop. Plaid is kept, per Lucas (Oct 4). OpenRouter stays as the vision-extraction provider, per Iris's Oct 4 correction (receipt capture depends on it).
+4. **Gmail import** (§B4.1): keep, park or drop. Plaid is kept, per Lucas (Oct 4). OpenRouter is Keep for the chat models and vision extraction, per Lucas's Oct 4 2:20 PM CT lock.
 5. **Bundle id and name:** confirm `ai.cuadrao.app` and "Cuadrao" (availability unverified). Enroll the Apple team as an organization *before* the first external build (Iris F3, Guideline 5.1.1(ix)). Changing teams later forces a Sign in with Apple migration (#803).
 
 #### Not verified in this draft
