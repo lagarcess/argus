@@ -134,7 +134,7 @@ struct FinancialDebtDetail: View {
                                     VStack(alignment: .leading, spacing: 8) {
                                         HStack { Text(payment.activity?.note ?? NSLocalizedString("debt.payment", comment: "")); Spacer(); Text(verbatim: money(payment.netPaidMinor.map(String.init), progress)); Image(systemName: "chevron.right") }
                                         Text(LocalizedStringKey("debt.payment." + payment.status)).foregroundStyle(ArgusStyle.secondary)
-                                    }.frame(minHeight: 48)
+                                    }.frame(minHeight: 48).contentShape(Rectangle())
                                 }.buttonStyle(.plain).id(payment.activityId).accessibilityIdentifier("debt.activity." + payment.activityId.uuidString)
                             }
                             if progress.debt.archived { Button("debt.restore") { Task { await model.archive(false) } }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("debt.restore") }
@@ -200,7 +200,7 @@ struct FinancialDebtLinkView: View {
                     if model.candidates.isEmpty && !model.loading { Text("debt.link.empty").accessibilityIdentifier("debt.link.empty") }
                     ForEach(model.candidates) { entry in
                         Button { Task { await model.link(entry) } } label: {
-                            HStack { Text(entry.note ?? NSLocalizedString("debt.payment", comment: "")); Spacer(); Text(verbatim: entry.currency + " " + AccountPresentation.amount(entry.amount, locale: locale)) }.frame(minHeight: 48)
+                            HStack { Text(entry.note ?? NSLocalizedString("debt.payment", comment: "")); Spacer(); Text(verbatim: entry.currency + " " + AccountPresentation.amount(entry.amount, locale: locale)) }.frame(minHeight: 48).contentShape(Rectangle())
                         }.buttonStyle(.plain).disabled(model.saving || loop.pendingConfirmation != nil).accessibilityIdentifier("debt.candidate." + entry.activityId.uuidString)
                     }
                     if let key = model.errorKey { Text(LocalizedStringKey(key)).accessibilityIdentifier("debt.error") }

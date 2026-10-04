@@ -99,6 +99,7 @@ struct ReleaseUpdatesInbox: View {
             Circle().fill(item.isRead ? Color.clear : WelcomePalette.pine).frame(width: 7, height: 7).padding(.top, 7)
                 .accessibilityHidden(true)
         }.padding(.vertical, 8).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
             .accessibilityElement(children: .combine)
             .accessibilityValue(item.isRead ? (spanish ? "Leída" : "Read") : (spanish ? "Sin leer" : "Unread"))
     }

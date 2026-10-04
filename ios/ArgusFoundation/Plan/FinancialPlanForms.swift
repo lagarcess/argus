@@ -202,7 +202,7 @@ struct FinancialOccurrenceView: View {
                                     Text(activity.note ?? NSLocalizedString("loop.kind." + activity.kind.rawValue, comment: ""))
                                     Text(verbatim: activity.currency + " " + AccountPresentation.amount(activity.amount, locale: locale))
                                     Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
-                                }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 12)
+                                }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 12).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityIdentifier("plan.candidate." + activity.activityId.uuidString)
                         }
                         if let candidate {

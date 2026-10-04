@@ -346,3 +346,11 @@ user trials, no new growth analytics), scoped to invites only.
   invitations and update email are not in this pass, so nothing is built for
   email. The domain, keys and links the founder will supply are not recorded
   here.
+
+## October 3, 2026: avatar editing in release
+
+- Founder decision. Hide the connected avatar-editing entry in release until
+  selections survive relaunch. Keep the full editor, including photos, in
+  DEBUG. Keep the existing profile display and default icon. One shared
+  availability rule across connected and preview entry points. No this-device
+  copy for session-only state.
