@@ -656,9 +656,9 @@ Financial currency filters do not filter nonfinancial content. Household exclude
 private chats, source files and memory; a preview filter is not authorization.
 The October 2 support-surface assignment reopens Profile polish within the existing
 identity and App, Account, Support groups. Settings keep literal native headings.
-Current release identity uses initials and the existing avatar themes. Hide personal
-photo selection, crop, replacement and upload controls. The previously verified
-photo editor is historical preview work, not a remaining release requirement.
+Release builds hide the avatar-editing entry and development builds keep the full
+editor, including initials, themes and photos
+([decision of October 3, 2026](../../../docs/specs/argus-decision-log.md#october-3-2026-avatar-editing-in-release)).
 Group covers are a separate feature. Home reads the same preferred name and
 avatar owner; Appearance retains its existing preference owner.
 
@@ -860,7 +860,7 @@ email authentication or recovery. Household email invitations and update email
 are not in this pass (October 2 lock), so no email invitation delivery is implied.
 Hide Personalization, Security and sessions, Shared conversations, Removed
 activity, Memory, Usage, More options, conversation bulk actions and
-personal-photo controls in the initial native release. Design commit `fc7650ea`,
+the avatar-editing entry in the initial native release. Design commit `fc7650ea`,
 from Yelena's UI checklist, hides Personalization, Security and sessions, Shared
 conversations, Removed activity and photos. Usage, More options and conversation
 bulk actions are hidden by #786 (`a20362d3`) as a Head of Engineering judgment

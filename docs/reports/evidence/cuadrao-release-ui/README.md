@@ -193,6 +193,104 @@ under the shared-Mac lock. Summaries are in [2026-10-04-w1c](2026-10-04-w1c/).
   ([run](2026-10-04-w1c/focused-final-sweep-tree.txt)) failed the group journey at the
   split Save, read in the instant after typing; `92fa37bc` waits for it.
 
+## Tap-target class closed by a check, October 4, 2026
+
+Fourth worker on this branch. No simulator and no UI test ran in this pass; another
+worker held the simulators. Files are in [2026-10-04-w1d](2026-10-04-w1d/).
+
+- The October 4 audit found 69 plain-style statements without a content shape at
+  `cc68b341` ([before](2026-10-04-w1d/plain-audit-before-cc68b341.txt)). 27 took no
+  taps on part of their frame: the split member toggle, the Manage spaces link, the
+  outlined Sign in buttons, text links, stroke-only chips and tabs, icon buttons and
+  header links. Each label now carries the rectangular content shape used in
+  `feaca9bf`. The other 42 are labels that already fill or shape their frame
+  ([after](2026-10-04-w1d/plain-audit-after.txt)).
+- `ios/DesignPreviewTests/run_tap_targets.py` now fails the design checks when a
+  plain-style statement has neither a content shape nor a reviewed reason in
+  `tap_targets_reviewed.txt` ([output](2026-10-04-w1d/tap-target-check.txt),
+  [checks run](2026-10-04-w1d/design-preview-checks.txt)). It reads one statement per
+  `buttonStyle(.plain)` line, so a style set on a container of several buttons is
+  read once. Invitations and Household are not read.
+- The repayment journey waits for the field to read `3,301` before it reads the
+  refusal. The Debug app compile passed
+  ([tail](2026-10-04-w1d/debug-compile-tail.txt)). The Release compile and the UI
+  test target compile did not run in this pass, and none of these controls has a
+  focused UI run yet.
+
+## Tap-target check corrected after review, October 4, 2026
+
+Fifth worker on this branch, applying the delta review of `cc68b341..c45e1eb7`. No
+simulator and no UI test ran. Files are in [2026-10-04-w1e](2026-10-04-w1e/).
+
+- The voice message Cancel button kept its 80x48 frame outside a plain-style button,
+  so only its text took taps. The check missed it because the style sat on the
+  enclosing stack and the check read only the last button under it. The frame and a
+  content shape are now inside Cancel's label, and the four container sites set the
+  style on each button. Nothing visible changes.
+- `run_tap_targets.py` now follows each plain style through its modifier chain to the
+  statement it styles. A style on a container of controls fails and cannot be reviewed
+  away. A reviewed reason of the form "X carries the shape" is checked against the body
+  of X. Removing the shape from the voice bar mute button, the ordered-collection Edit
+  label, Cancel, `FinancialActivityRow` or `CuadraoChoiceLabel` on a scratch copy now
+  fails the check, as does moving the style back to a container
+  ([script](2026-10-04-w1e/tap-target-mutations.sh),
+  [output](2026-10-04-w1e/tap-target-mutations.txt),
+  [check](2026-10-04-w1e/tap-target-check.txt)). The check does not judge a free-text
+  reason such as "filled capsule", and identical statements still share one digest.
+- The split member row is laid out as at `cc68b341` again: label, Spacer, trailing
+  column. The row stays tappable through a tap area in an overlay on the Spacer, which
+  takes no part in layout and stops 32 pt before the amount. A macOS SwiftUI probe
+  measured the icon, avatar, name and trailing frames of the old row, the `c45e1eb7`
+  row and this row over six widths, five names and both split modes: this row matched
+  the old one in 60 of 60 cases and `c45e1eb7` differed in 22. Trailing padding on a
+  full-width button, the smaller fix the review suggested, differed in 5 of 60, all at
+  280 pt in exact mode, where the share field came out 6 to 10 pt off. Synthesized
+  clicks landed in the tap area from the name's edge to 32 pt before the field and not
+  after ([probe](2026-10-04-w1e/member-row-layout-probe.swift),
+  [output](2026-10-04-w1e/member-row-layout-probe.txt)). The probe runs on macOS with
+  stand-in children, so an off-centre tap on the iPhone simulator is still owed.
+- Debug, Release and test-target compiles passed for the simulator
+  ([commands and results](2026-10-04-w1e/compiles.txt)), and the design checks passed
+  ([output](2026-10-04-w1e/design-preview-checks.txt)).
+
+## Feedback Save under the keyboard and the Release preview argument, October 4, 2026
+
+Sources `3ed8dae0a`. Simulator: iPhone 18 Pro Max only. Files are in
+[2026-10-04-w1f](2026-10-04-w1f/).
+
+- `CuadraoProfileFollowupUITests/testFeedbackPreservesKindsAndPartialDrafts` failed on
+  the combined candidate `4af8fced` on iPhone 18 Pro because of the test's `reveal`
+  helper, not the app. The helper reads the keyboard element's frame as the top of the
+  keyboard. That frame begins below the 44 pt Typing Predictions bar, and a drag that
+  starts on the bar does not scroll the form. On iPhone 18 Pro the helper's drag began
+  at y 551 with the bar's top at y 550
+  ([candidate frame](2026-10-04-w1f/candidate-4af8fced-pro-save-under-keyboard.png)).
+  On iPhone 18 Pro Max it began 7 pt above the bar, so it passed there.
+- The [probe](2026-10-04-w1f/feedback-keyboard-geometry.txt) measures it: drags that
+  start 10, 30 and 43 pt above the keyboard frame move nothing, and a drag that starts
+  51 pt above scrolls the form and leaves Save
+  [above the keyboard and tappable](2026-10-04-w1f/save-above-keyboard-pro-max.png).
+  A person can reach Save with the keyboard up.
+- The keyboard-aware helper arrived in `fd408c62c`. The integration baseline passed
+  with no software keyboard on screen, so it never exercised this path.
+- Fix `620d6a39a`: the helper's floor is the top of the prediction bar. The test body is
+  unchanged. [Focused runs](2026-10-04-w1f/focused-runs.txt): the feedback test passed
+  twice alone and once in its class (6 of 6). **Not rerun on iPhone 18 Pro**, the
+  device where it failed; with the fix the drag there starts at y 506, 44 pt above the bar.
+- Never-idle waits: `CuadraoContextUITests/testGroupContextPreservesDraftAttachmentsAndReturn`
+  ran alone with none (52.8 s). The feedback test logged 5 in one of four runs, starting
+  after text entry with the software keyboard up. No cause established and nothing changed.
+- `3ed8dae0a`: only DEBUG builds read `--cuadrao-design`. A Release build launched with
+  the argument now opens exactly as a default launch
+  ([screenshot](2026-10-04-w1f/release-design-argument-launch.png), byte-identical to the
+  default launch), and its binary no longer contains the string
+  ([compiles](2026-10-04-w1f/compiles.txt)). This supersedes the October 3
+  `release-design-launch-light.png` reading above. A standalone preview build still uses
+  `CUADRAO_DESIGN_PREVIEW=true`; `--design-gallery` and `--home-populated` remain in the
+  binary and are read only inside that preview.
+- Debug, Release and build-for-testing compile;
+  [design preview checks](2026-10-04-w1f/design-preview-checks.txt) pass.
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.

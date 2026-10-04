@@ -76,7 +76,7 @@ struct CuadraoCreateAccount: View {
                                : (spanish ? "Inicia sesión" : "Sign in"))
                             .foregroundColor(WelcomePalette.pine).bold())
                             .font(.subheadline)
-                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 16)

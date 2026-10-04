@@ -106,6 +106,7 @@ struct CuadraoCanvas: View {
                                     RoundedRectangle(cornerRadius: 16)
                                         .stroke(WelcomePalette.border, lineWidth: 1)
                                 }
+                                .contentShape(Rectangle())
                         }.buttonStyle(.plain)
                     }.padding(.bottom, 28)
                 }
