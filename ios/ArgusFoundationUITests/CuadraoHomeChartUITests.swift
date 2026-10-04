@@ -312,7 +312,7 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["home-balance-net-change"].exists)
         shot(app, "balance-first-observation-es")
         app.buttons["home-insight-metric"].tap(); app.buttons["Actividad"].tap()
-        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "—")
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "Sin datos", "First use has no coverage, so no zero")
         XCTAssertTrue(app.staticTexts["Tu historia empieza aquí"].exists)
         shot(app, "activity-first-use-es")
         app.buttons["chart-state-action"].tap()
