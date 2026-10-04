@@ -32,6 +32,7 @@ ff6872434883  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carri
 3b293c8c2d90  ArgusFoundation/Cuadrao/CuadraoUpdatesCanvas.swift: row(_:) carries the shape
 b868490ad918  ArgusFoundation/Cuadrao/CuadraoVoiceMessagePanel.swift: Stop only, filled capsule, opaque across its frame
 592c27234470  ArgusFoundation/Cuadrao/CuadraoVoicePicker.swift: filled capsule, opaque across its frame
+874c103f38a3  ArgusFoundation/Cuadrao/Planning/CuadraoGroupExpenseEditor.swift: split member toggle, deliberately label-only and not hittable across the row: it sits beside the amount and share fields, so a near-miss must not change who is in the split; widening it is a design decision
 d91a69540884  ArgusFoundation/Cuadrao/Planning/CuadraoPlanVisuals.swift: filled capsule, opaque across its frame
 52c6ad8a724d  ArgusFoundation/Cuadrao/Planning/PlanCurrencyChoice.swift: the label of CuadraoChoiceMenu, CuadraoChoiceLabel carries the shape
 c5c6a6dba0e1  ArgusFoundation/Cuadrao/Receipts/CuadraoReceiptSupport.swift: filled card, opaque across its frame

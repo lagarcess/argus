@@ -41,7 +41,6 @@ struct CuadraoGroupExpenseEditor: View {
         return PlanSharedExpense.equal(cents, among: participants(group).filter { selected.contains($0.id) }.map(\.id))
     }
     private func participants(_ group: PlanGroup) -> [PlanMember] { initial == nil ? group.activeMembers : group.members }
-    private func toggle(_ id: UUID) { if selected.contains(id) { selected.remove(id) } else { selected.insert(id) } }
     var body: some View {
         NavigationStack {
             if let group {
@@ -71,15 +70,13 @@ struct CuadraoGroupExpenseEditor: View {
                             }
                             ForEach(Array(participants(group).enumerated()), id: \.element.id) { index, member in
                                 HStack(spacing: 12) {
-                                    Button { toggle(member.id) } label: {
+                                    Button {
+                                        if selected.contains(member.id) { selected.remove(member.id) } else { selected.insert(member.id) }
+                                    } label: {
                                         HStack { Image(systemName: selected.contains(member.id) ? "checkmark.circle.fill" : "circle"); PlanMemberAvatar(member: member, index: index); Text(member.name) }
-                                            .frame(minHeight: 44).contentShape(Rectangle())
+                                            .frame(minHeight: 44)
                                     }.buttonStyle(.plain).accessibilityLabel("\(member.name), \(selected.contains(member.id) ? (spanish ? "incluido" : "included") : (spanish ? "excluido" : "excluded"))")
-                                    // The overlay takes no part in layout: the row toggles from the name up to 32 pt before the amount.
-                                    Spacer().overlay {
-                                        Color.clear.frame(height: 44).contentShape(Rectangle()).onTapGesture { toggle(member.id) }
-                                            .padding(.trailing, 8).offset(x: -12).accessibilityHidden(true)
-                                    }
+                                    Spacer()
                                     if custom && selected.contains(member.id) {
                                         VStack(alignment: .trailing) {
                                             CanvasMoneyValueInput(value: Binding(get: { exactShares[member.id] ?? 0 }, set: { exactShares[member.id] = $0 }),
