@@ -31,7 +31,7 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-29 | The [private iPhone delivery and execution lock](#september-29-2026-private-iphone-delivery-and-execution-lock) owns the current delivery decision and supersedes the batch instructions below. | Lucas |
 | 2026-10-01 | Lock Household permission policy: creator administers invitations/membership and may transfer administration or close before departure; members see the member list and may leave; shared accounts start view-only with editing only via explicit grant; edit grants do not confer ownership, membership administration or resharing; leave/removal revokes membership and that member's account grants while owners retain records/history; invitations are revocable, single-use, seven-day links with safe same-recipient acceptance retries; create ≠ invite ≠ share account and acceptance is membership only. MVEE consent and financial-meaning boundaries remain. Owners: [execution board Household lane](argus-execution-board.md#connected-spaces-and-household-lane), [MVEE section 12](argus-minimum-viable-ecosystem-experience.md#12-household-collaboration-approved-minimum-capacity), [lane contract](lanes/household-permission-policy.md). Narrowed on 2026-10-02: rule 5's departure behavior, and rule 1's admin handoff when the admin deletes their account, now follow the [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas (Project orchestrator recorded) |
 | 2026-10-02 | Lock the invitation (beta versus household invites, 10 beta invites per user, and a founder group link as the one exception to single-use codes), TestFlight beta-gate, Home comparison, Updates, plan-export, account-move and account-deletion-in-a-household rules for the five Cuadrao lanes, including what happens to a deleted person's part in shared plans (8:53 PM CT). Detailed record: [October 2 lane locks](#october-2-2026-cuadrao-lane-locks). | Lucas |
-| 2026-10-04 | Lock the Cuadrao launch shape: consumer iPhone app with personal and household only, a short invite-only TestFlight then a public launch; Cuadrao for Business as a full web service with a thin in-app business space for the first business testers only; cuadrao.ai promoting the whole suite with waitlists; Resend, Render and Supabase kept. Also partner first for live e-invoicing, Plaid kept, market-data providers parked for the pilot and Dominicans in the US added as a consumer segment. Detailed record: [October 4 Cuadrao launch shape](#october-4-2026-cuadrao-launch-shape). | Lucas |
+| 2026-10-04 | Lock the Cuadrao launch shape: consumer iPhone app with personal and household only, a short invite-only TestFlight then a public launch; Cuadrao for Business as a full web service with a thin in-app business space for the first business testers only; cuadrao.ai promoting the whole suite with waitlists; Resend, Render and Supabase kept. Also partner first for live e-invoicing, Plaid kept, market-data providers parked for the pilot, Dominicans in the US added as a consumer segment, and no currency conversion or blended totals. Detailed record: [October 4 Cuadrao launch shape](#october-4-2026-cuadrao-launch-shape). | Lucas |
 
 ## Superseded coordination instructions (historical only)
 
@@ -353,7 +353,8 @@ user trials, no new growth analytics), scoped to invites only.
 The founder set these in the room on October 4. Head of Engineering (Yelena)
 recorded the launch shape at 12:30 PM CT and the fiscal route correction at
 12:39 PM CT in her engineering notes. Product Lead (Iris) relayed the
-connector and segment calls at about 12:44 PM CT. The docs seat (Maya)
+connector and segment calls at about 12:44 PM CT and the currency rule at
+about 12:45 PM CT. The docs seat (Maya)
 recorded them here with the [Cuadrao master plan](cuadrao-master-plan.md),
 which is a planning roadmap, not a lock. These are decisions, not claims that
 anything is built. Everything else in the master plan, including the space
@@ -395,7 +396,26 @@ the [product and business architecture](../research/2026-10-04-cuadrao-product-b
   September 24 lock that the first user is people living in the Dominican
   Republic; that lock is not replaced.
 - Market-data providers (Alpaca, Kraken, BCRD and the others) are parked for
-  the pilot, not deleted. Their keys come out of the live setup and the code
-  stays. Perplexity covers general finance questions in chat and never
-  supplies numbers that get stored.
+  the pilot, not deleted. BCRD is fully parked. Their keys come out of the
+  live setup and the code stays. Perplexity covers general finance questions
+  in chat.
 - The Gmail import is still an open decision.
+
+### Currency
+
+Cuadrao never converts currencies, because converting would blur the numbers
+and make Cuadrao responsible for their accuracy. This decides the September 27
+note that combined conversion "remains undefined". The founder's design lane
+owns the final screens.
+
+- Every account stays in its own currency. Cuadrao never shows a blended
+  total.
+- Home shows one total per currency on separate lines, for example
+  "RD$ 85,400" and "US$ 1,250". The person's primary currency comes first;
+  they set it at onboarding and can change it later.
+- Charts and comparisons show one currency at a time, with a switcher when
+  the person holds more than one currency.
+- Plans keep a fixed currency. When an account in another currency pays
+  toward a plan, the person records both amounts exactly as their bank
+  charged them. The rate comes from their real transaction, never from
+  Cuadrao.
