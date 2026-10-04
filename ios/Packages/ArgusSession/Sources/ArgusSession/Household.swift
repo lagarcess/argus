@@ -30,7 +30,9 @@ public struct HouseholdInvitation: Decodable, Identifiable, Sendable {
     public let expiresAt: String
     public let state: String
     public let token: String?
-    enum CodingKeys: String, CodingKey { case id, state, token, expiresAt = "expires_at" }
+    public let code: String?
+    public let link: String?
+    enum CodingKeys: String, CodingKey { case id, state, token, code, link, expiresAt = "expires_at" }
 }
 public struct HouseholdShare: Decodable, Sendable {
     public let accountId: UUID
@@ -168,11 +170,17 @@ public struct HouseholdCommand: Encodable, Sendable {
     public var expectedVersion: Int?
     public var userId: UUID?
     public var token: String?
+    public var code: String?
     public var recipients: [HouseholdRecipient]?
     public init(name: String? = nil, displayName: String? = nil, expectedVersion: Int? = nil, userId: UUID? = nil, token: String? = nil, recipients: [HouseholdRecipient]? = nil) {
         self.name = name; self.displayName = displayName; self.expectedVersion = expectedVersion; self.userId = userId; self.token = token; self.recipients = recipients
     }
-    enum CodingKeys: String, CodingKey { case name, displayName = "display_name", expectedVersion = "expected_version", userId = "user_id", token, recipients }
+    /// Preview or accept by exactly one secret, as the contract requires.
+    public init(secret: InviteSecret, displayName: String? = nil) {
+        self.displayName = displayName
+        switch secret { case .token(let value): token = value; case .code(let value): code = value }
+    }
+    enum CodingKeys: String, CodingKey { case name, displayName = "display_name", expectedVersion = "expected_version", userId = "user_id", token, code, recipients }
 }
 
 extension SessionController {
