@@ -253,6 +253,44 @@ simulator and no UI test ran. Files are in [2026-10-04-w1e](2026-10-04-w1e/).
   ([commands and results](2026-10-04-w1e/compiles.txt)), and the design checks passed
   ([output](2026-10-04-w1e/design-preview-checks.txt)).
 
+## Feedback Save under the keyboard and the Release preview argument, October 4, 2026
+
+Sources `3ed8dae0a`. Simulator: iPhone 18 Pro Max only. Files are in
+[2026-10-04-w1f](2026-10-04-w1f/).
+
+- `CuadraoProfileFollowupUITests/testFeedbackPreservesKindsAndPartialDrafts` failed on
+  the combined candidate `4af8fced` on iPhone 18 Pro because of the test's `reveal`
+  helper, not the app. The helper reads the keyboard element's frame as the top of the
+  keyboard. That frame begins below the 44 pt Typing Predictions bar, and a drag that
+  starts on the bar does not scroll the form. On iPhone 18 Pro the helper's drag began
+  at y 551 with the bar's top at y 550
+  ([candidate frame](2026-10-04-w1f/candidate-4af8fced-pro-save-under-keyboard.png)).
+  On iPhone 18 Pro Max it began 7 pt above the bar, so it passed there.
+- The [probe](2026-10-04-w1f/feedback-keyboard-geometry.txt) measures it: drags that
+  start 10, 30 and 43 pt above the keyboard frame move nothing, and a drag that starts
+  51 pt above scrolls the form and leaves Save
+  [above the keyboard and tappable](2026-10-04-w1f/save-above-keyboard-pro-max.png).
+  A person can reach Save with the keyboard up.
+- The keyboard-aware helper arrived in `fd408c62c`. The integration baseline passed
+  with no software keyboard on screen, so it never exercised this path.
+- Fix `620d6a39a`: the helper's floor is the top of the prediction bar. The test body is
+  unchanged. [Focused runs](2026-10-04-w1f/focused-runs.txt): the feedback test passed
+  twice alone and once in its class (6 of 6). **Not rerun on iPhone 18 Pro**, the
+  device where it failed; with the fix the drag there starts at y 506, 44 pt above the bar.
+- Never-idle waits: `CuadraoContextUITests/testGroupContextPreservesDraftAttachmentsAndReturn`
+  ran alone with none (52.8 s). The feedback test logged 5 in one of four runs, starting
+  after text entry with the software keyboard up. No cause established and nothing changed.
+- `3ed8dae0a`: only DEBUG builds read `--cuadrao-design`. A Release build launched with
+  the argument now opens exactly as a default launch
+  ([screenshot](2026-10-04-w1f/release-design-argument-launch.png), byte-identical to the
+  default launch), and its binary no longer contains the string
+  ([compiles](2026-10-04-w1f/compiles.txt)). This supersedes the October 3
+  `release-design-launch-light.png` reading above. A standalone preview build still uses
+  `CUADRAO_DESIGN_PREVIEW=true`; `--design-gallery` and `--home-populated` remain in the
+  binary and are read only inside that preview.
+- Debug, Release and build-for-testing compile;
+  [design preview checks](2026-10-04-w1f/design-preview-checks.txt) pass.
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
