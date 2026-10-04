@@ -1,5 +1,6 @@
 "use client";
 
+import type { LogoutOptions } from "@/lib/account-deletion-api";
 import { conversationPreviewText } from "@/lib/conversation-preview-display";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -112,7 +113,7 @@ export type ChatSidebarProps = {
   /** User-facing toast presenter owned by the chat shell */
   onToast?: (message: string) => void;
   /** Logout handler */
-  onLogout: () => void;
+  onLogout: (options?: LogoutOptions) => void;
   /** Feedback handler */
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   /** Sidebar preference handler */

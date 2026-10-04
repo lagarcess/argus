@@ -11,7 +11,9 @@ import {
 import { createPortal } from "react-dom";
 import { useModalSurface } from "../layout/useModalSurface";
 import { useOverlayLayer } from "../layout/overlayStack";
-import ProfileDeleteRequestDialog from "./ProfileDeleteRequestDialog";
+import ProfileDeleteRequestDialog, {
+  type DeleteRequestState,
+} from "./ProfileDeleteRequestDialog";
 import ProfileDetailsDialog from "./ProfileDetailsDialog";
 import ProfileSettingsPanels, {
   type SettingsPanel,
@@ -48,7 +50,12 @@ import {
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import { postFeedback, type ApiUser } from "@/lib/argus-api";
+import {
+  deletionEndsSession,
+  requestAccountDeletion,
+  type LogoutOptions,
+} from "@/lib/account-deletion-api";
+import { type ApiUser } from "@/lib/argus-api";
 import {
   readProfile,
   saveProfile,
@@ -83,7 +90,7 @@ import { useQuickJump } from "@/components/keyboard/useQuickJump";
 type ProfileMenuProps = {
   isOpen: boolean;
   onClose: () => void;
-  onLogout: () => void;
+  onLogout: (options?: LogoutOptions) => void;
   onFeedback?: (type: "bug" | "feature" | "general") => void;
   onDeleteAllConversations?: () => void;
   onHistoryMutated?: () => void;
@@ -107,7 +114,6 @@ type ActiveModal = null | SettingsPanel | "profile";
 
 type SubMenu = null | "data" | "settings" | "help" | "feedback";
 
-type DeleteRequestState = "idle" | "submitting" | "success" | "error";
 
 type ProfileQuickJumpItem = {
   id: string;
@@ -369,7 +375,12 @@ export default function ProfileMenu({
       return;
     }
     if (isDeleteRequestOpen) {
-      if (deleteRequestState !== "submitting") setIsDeleteRequestOpen(false);
+      // Deleted or locked: signed out on the result; leaving only cleans up.
+      if (deletionEndsSession(deleteRequestState)) {
+        onLogout({ sessionEnded: true });
+      } else if (deleteRequestState !== "submitting") {
+        setIsDeleteRequestOpen(false);
+      }
       return;
     }
     closeProfileModal();
@@ -380,6 +391,7 @@ export default function ProfileMenu({
     isAvatarPickerOpen,
     isDeleteRequestOpen,
     isLanguagePickerOpen,
+    onLogout,
   ]);
 
 
@@ -829,25 +841,40 @@ export default function ProfileMenu({
   };
 
   const handleSubmitDeleteRequest = useCallback(async () => {
-    if (deleteRequestState === "submitting" || deleteRequestState === "success") {
+    if (
+      deleteRequestState === "submitting" ||
+      deleteRequestState === "success" ||
+      deleteRequestState === "in_progress" ||
+      deleteRequestState === "requested"
+    ) {
       return;
     }
     setDeleteRequestState("submitting");
+    let outcome: DeleteRequestState;
     try {
-      await postFeedback({
-        type: "account_deletion_request",
-        message: "Private alpha account deletion requested.",
-        context: {
-          source: "profile_modal",
-          profile_language: currentLanguage,
-        },
-      });
-      setDeleteRequestState("success");
+      // 202 and a post-lock 503 are in_progress, never shown as done or as a
+      // failure; 404 (command off here) falls back to a support ticket.
+      outcome = await requestAccountDeletion(currentLanguage);
     } catch (err) {
-      console.error("Failed to submit account deletion request", err);
+      console.error("Account deletion failed", err);
       setDeleteRequestState("error");
+      return;
     }
-  }, [currentLanguage, deleteRequestState]);
+    setDeleteRequestState(outcome);
+    // The session is dead: sign this browser out on the result itself, with
+    // the dialog kept up as the signed-out confirmation.
+    if (deletionEndsSession(outcome)) onLogout({ afterAccountDeletion: true });
+  }, [currentLanguage, deleteRequestState, onLogout]);
+
+  // Signed out on the result already, so Done never calls logout again: it
+  // only clears this browser's state and leaves (Priya #801 note 10).
+  const handleCloseDeleteRequest = useCallback(() => {
+    if (deletionEndsSession(deleteRequestState)) {
+      onLogout({ sessionEnded: true });
+      return;
+    }
+    setIsDeleteRequestOpen(false);
+  }, [deleteRequestState, onLogout]);
 
   const accountHint = profile?.email ? ` (${profile.email})` : "";
   const supportMailto = `mailto:${supportEmail}?subject=${encodeURIComponent(
@@ -867,7 +894,7 @@ export default function ProfileMenu({
     <ProfileDeleteRequestDialog
       state={deleteRequestState}
       supportMailto={supportMailto}
-      onClose={() => setIsDeleteRequestOpen(false)}
+      onClose={handleCloseDeleteRequest}
       onSubmit={handleSubmitDeleteRequest}
       returnFocusRef={anchorRef}
     />
@@ -1117,7 +1144,7 @@ export default function ProfileMenu({
               <span className="pl-6 text-[11px] leading-snug text-black/35 dark:text-white/35">
                 {t(
                   "settings.profile.delete_account_note",
-                  "Request permanent deletion of your Argus account. Support will follow up by email.",
+                  "Permanently delete your Argus account and your data.",
                 )}
               </span>
             </button>

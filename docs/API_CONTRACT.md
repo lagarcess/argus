@@ -2785,6 +2785,61 @@ well when it is closed.
 }
 ```
 
+## `POST /auth/apple/authorization-code`
+
+Default-off behind `ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED`. The native app
+calls it right after a Sign in with Apple through Supabase Auth's ID-token
+sign-in, under that new session, with Apple's one-time authorization code. The
+API exchanges the code at Apple, checks that the returned identity token's
+`sub` is the Apple identity Supabase linked to this user, and keeps only the
+refresh token, sealed with `ARGUS_INGESTION_SECRET_KEY`, so account deletion
+can revoke it (App Store Review Guideline 5.1.1(v)). The user id comes only
+from the verified session; the body accepts no other field.
+
+**Request:**
+```json
+{
+  "authorization_code": "Apple authorizationCode, 1–512 ASCII characters"
+}
+```
+
+**Response:** `204 No Content`. No response carries a token.
+
+| Status | `code` | Meaning |
+| --- | --- | --- |
+| 404 | none: body `{"detail": "Not Found"}` | Flag off. The plain answer of a route that doesn't exist, given before the body is read or the session checked, so invalid JSON, no session and a valid call all get it |
+| 503 | `apple_sign_in_unconfigured` | Flag on, but an Apple client-secret input, the credential key or durable storage is missing. Fails closed |
+| 401 / 403 | `unauthorized` / `account_conversion_required` | No session, or a guest session |
+| 409 | `apple_identity_missing` | The account has no Apple identity |
+| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple in one short attempt. The answer is 409 whatever that revoke returns |
+| 400 | `apple_authorization_invalid` | Apple says the code expired, was used, or is malformed |
+| 429 | `too_many_requests` | Five attempts per user per ten minutes |
+| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple in one short attempt, and the next Apple sign-in sends a fresh code). The answer is 503 whatever that revoke returns, never 500 |
+
+A later sign-in replaces the stored token without revoking the old one,
+because revoking any token ends the whole Apple authorization for the app.
+The compensating revoke on the 409 and 503 paths is a single attempt with no
+retry, 2 seconds in total, and the request waits at most 4 seconds for it
+however slowly Apple answers. The code exchange before it keeps its 30-second
+limit.
+
+No route revokes or discards. Account deletion (Lane 6) calls
+`AppleCredentialService.revoke`. It deletes the row after Apple answers 200
+(`revoked`) or `invalid_grant` (`already_revoked`: the token is already dead),
+and keeps it as the pending revoke otherwise. When revoke reports
+`credential_unreadable` because `ARGUS_INGESTION_SECRET_KEY` was rotated, Lane 6
+calls `AppleCredentialService.discard_unreadable`. It deletes the row only while
+the token still can't be opened, and returns `discarded`, `nothing_stored` or
+`readable`, so the user can be deleted. Apple's authorization for the app then
+stays until the person removes it in their Apple ID settings. Lane 6 calls it
+only when the token's stored key fingerprint (`secret_key_fingerprint`, set by
+capture) equals this process's key's, so the key that sealed it is the one that
+can't open it; `discard_unreadable` checks the same itself and raises
+`key_unproven` otherwise. A different or missing fingerprint (a rolling key
+rotation, a stale environment, a row stored before Lane 6), or no key, keeps the
+row as a pending revoke and alerts. Storage is in
+[DATA_MODEL.md](DATA_MODEL.md#apple-sign-in-credentials).
+
 ## `POST /auth/logout`
 
 Clear Argus's mirrored cookies after the browser client has revoked its local
@@ -3126,6 +3181,79 @@ Update profile preferences. Partial update semantics are supported.
 # 9. Language & Locale Resolution
 
 Argus supports English and Spanish (Latin America) in Alpha.
+
+## `POST /account/delete`
+
+Deletes the signed-in person's account, in the app. A guest session is deleted
+by the same command. Off unless
+`ARGUS_ACCOUNT_DELETION_ENABLED` is on; while off it answers `404` before any
+authentication. The account is always the session's. The body is only a
+confirmation, and any other field is a `422`:
+
+```json
+{ "confirm": true }
+```
+
+The command runs the Lane 6 order (`docs/specs/lanes/account-deletion-fk-census.md`
+and #787). It hands over or closes the person's households and plans, keeps their
+amounts in other people's plans under a nameless former-member placeholder (one
+per household or standalone shared group, shown as "Former member" or
+"Exmiembro" in the viewer's language), deletes everything else of theirs,
+revokes provider tokens, and deletes the auth user. A retry resumes the same run.
+
+**Who may call it.** Every other route refuses a person whose run is in flight
+(the account is locked). This route alone accepts them, so a retry resumes
+their own run: GoTrue refuses a banned account's token, so the API verifies it
+itself (signature against the project's JWKS, or `SUPABASE_JWT_SECRET` for
+HS256; expiry; audience; `exp`, `sub` and `session_id` must all be present),
+then requires a live `auth.sessions` row for its session that belongs to its
+subject (live: not past its `not_after`, GoTrue's session time-box, when one is
+set), a run in flight for that subject, and a subject that is not a
+placeholder. Anything else is `401`. Anyone not locked goes through the usual session check. The route
+is rate limited per account (6 a minute, `429 too_many_requests` with
+`Retry-After`). A guest create-then-delete loop makes a new account each time,
+so it is bounded where guests are made (captcha and the guest limits).
+
+**Response `200`:** everything is deleted, every third party has confirmed,
+and the auth user is gone.
+
+```json
+{ "status": "done", "pending": [] }
+```
+
+**Response `202`:** deletion is in progress. The data step has run (or is
+being retried), and the account is locked: its sessions are refused from the
+moment the run opens and the auth user is banned, so clients sign out. A third
+party hasn't confirmed yet, so the auth delete waits. `pending` names it
+(`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
+itself is being retried. Every third-party step (Sign in with Apple through
+#793, Google/Gmail and Plaid tokens, PostHog person deletion) runs before the
+auth delete. A repeat request resumes the run, and so does the operator-run
+sweep (`scripts/ops/resume_account_deletions.py` inside
+`scheduled_maintenance.py`; nothing runs it on a schedule, see
+PRIVATE_LAUNCH_RUNBOOK.md for the cadence). `pending` is also empty when
+another request holds the run at that moment. Clients sign out as soon as
+this response (or `200`) arrives, keep showing "deletion in progress" as the
+signed-out confirmation, and never show the finished state. The web signs out
+once, on the result; closing the confirmation only clears local state.
+
+```json
+{ "status": "in_progress", "pending": ["plaid"] }
+```
+
+A request after another one finished the run answers `200` `done`: the session
+was verified, so the person existed a moment ago.
+
+**Errors** (the same for a first request and a resume; all listed in
+`docs/api/openapi.yaml`): `401` (no valid session, or on resume a token that
+doesn't name the person's own live session), `403 account_deletion_not_allowed`,
+`404 not_found` (flag off), `429 too_many_requests`,
+`503 account_deletion_unavailable` (no `DATABASE_URL` or Admin API client;
+nothing happened), `503 account_deletion_incomplete` with `Retry-After` (an
+unexpected failure; the run may be open and the account locked, so clients
+treat it as in progress, and a retry resumes the same run), and the shared
+`503 auth_session_verification_unavailable`.
+
 
 ## Supported Values
 - **language:** `en`, `es-419`
@@ -6783,7 +6911,6 @@ retain the existing refusal shape. No production client holds a direct write gra
 - `bug`
 - `feature`
 - `general`
-- `account_deletion_request`
 
 `message` is capped at 5,000 characters.
 
@@ -6822,10 +6949,10 @@ profile language, message, and the sanitized context above, and adds no contact
 details the submission did not already carry. A missing credential or a failed
 delivery is logged and never changes the response or the saved feedback.
 
-For `account_deletion_request`, clients send a one-click support request from
-the account surface. The backend enriches `context` with authenticated account
-metadata such as account email, profile language, request user id, and request
-timestamp before persistence. The frontend must not render the internal user id.
+`account_deletion_request` is the support-ticket fallback while the in-app
+command (`POST /account/delete`) is off: the web sends it when that route
+answers `404`. The API adds `source` (default `profile_modal`), the account
+email, profile language, user id and request time to its context.
 
 ---
 
@@ -7387,9 +7514,11 @@ UTC days, can be revoked, and have one acceptor. Same-recipient acceptance
 retries return their original membership outcome even after departure/closure
 or later rejoin. A fresh invitation creates a new membership incarnation.
 
-The `code` is 8 Crockford base32 characters shown as `XXXX-XXXX`; input
-ignores case, spaces and dashes. Only its hash is stored, beside `token_hash`,
-with the same single use, expiry and revoke rules. `link` is
+The `code` is 12 Crockford base32 characters (60 bits) shown as
+`XXXX-XXXX-XXXX`; input ignores case, spaces and dashes and folds look-alike
+letters. Only a keyed digest is stored, outside every client-readable table,
+with the same single use, expiry and revoke rules (see
+[Invite code security](#invite-code-security)). `link` is
 `https://cuadrao.ai/invite#<token>` when `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED`
 is on, otherwise today's `argus-household://invite#<token>`. The QR is drawn on
 the device from `link`; no QR image is stored. Accepting a household invitation
@@ -7445,6 +7574,79 @@ the migration ran are admitted. The caller is always the verified JWT subject;
 a missing or null subject (as under `service_role`) owns nothing, is never the
 founder, and is refused with `401 verified_user_required`. Row-level security on
 the new tables likewise matches no row when `auth.uid()` is null.
+
+## Invite code security
+
+Applies to household invitation codes and to beta and group-link codes (#789).
+Without it, none of `ARGUS_HOUSEHOLDS_ENABLED`, `ARGUS_BETA_INVITES_ENABLED` or
+`ARGUS_BETA_INVITE_GATE_ENABLED` may be turned on in a hosted environment.
+
+**Keyed digests.** A code is stored only as HMAC-SHA-256 under
+`ARGUS_INVITE_CODE_SECRET` (at least 32 characters, and not an obvious
+placeholder such as one repeated character: at least 10 distinct characters and
+about 96 bits by a per-character entropy estimate; generate with
+`openssl rand -base64 48`), written `v2.<key id>.<hex>`, where the key id is
+derived from the secret and does not reveal it. The digests live in
+`argus_private.invite_code_digests`: anon and authenticated cannot reach the
+schema, the table has row-level security with no policy for any role, and no
+privilege for anon, authenticated or service_role, so no select policy can ever
+expose a digest. A database check refuses any other digest shape. Link tokens
+are 256 random bits and stay plain SHA-256 digests on the invitation rows; a
+key would add nothing to that much entropy.
+
+**Fail closed.** With any of those three flags on and the secret missing,
+shorter than 32 characters or a placeholder, the surface does not start (households answer
+`404 households_unavailable`, invites `404 invites_unavailable`), and
+`/internal/readiness` reports an `invite_codes` check as `degraded` (503), so
+the release warmup (`.github/warmup-render.sh`) fails. `/health` is unchanged. If the secret disappears while running, making or
+looking up a code answers `503 invite_codes_unavailable`. There is no unkeyed
+fallback. Link tokens keep working.
+
+**Rotation.** Set `ARGUS_INVITE_CODE_SECRET_PREVIOUS` to the old secret and
+`ARGUS_INVITE_CODE_SECRET` to the new one, then deploy. New codes use the new
+secret; a code is looked up under the new secret first and then the old one, and
+a code found under the old secret is re-hashed to the new one on that lookup
+(`rehashed_at`). Keep the old secret for at least the longest remaining code
+lifetime: seven days when no group link is live, otherwise until the last live
+group link expires (at most a year), or revoke and re-issue those links. Then
+remove `ARGUS_INVITE_CODE_SECRET_PREVIOUS`; any code still under the old key
+stops working, and its link keeps working. If a secret leaks, rotate without the
+previous secret: every outstanding code stops at once and links still work.
+Digests still under a key: `select split_part(digest,'.',2), count(*) from
+argus_private.invite_code_digests group by 1`. The 8-character `v1` digests of
+#788 were unkeyed and cannot be re-hashed (a digest cannot be turned back into
+its code), so migration `20261003150100` drops them. Those invitations keep
+their links.
+
+**Lookup limits.** Household preview and accept and beta preview and redeem,
+by code or token, are limited per client IP (`resolve_client_ip`, the trusted
+`CF-Connecting-IP` header) and per account, with no founder or admin bypass:
+
+| Budget | Per IP | Per account |
+| --- | --- | --- |
+| Lookups of any outcome | 30 per minute | 30 per minute |
+| Lookups that named no invitation | 20 per hour, 60 per day | 10 per hour, 30 per day |
+
+Each lookup reserves one failure in every budget before it runs, and the
+reservation is given back once it found an invitation (even an expired, revoked
+or used one) or never ran (an idempotent replay), so concurrent guesses cannot
+run past a budget. A spent budget answers `429 invite_rate_limited` with
+`Retry-After`, before the lookup. The counters are per process and in memory, like
+every limiter in this API, so they reset when the process restarts or a deploy
+rolls out. Production runs one Render instance with one worker;
+with N processes an attacker gets at most N times the budget, which the code
+length absorbs.
+
+**Why 12 characters.** 32^12 = 2^60, about 1.15 x 10^18 codes. Assume an
+attacker with 10,000 IP addresses (and about 20,000 accounts) holding every IP
+at its daily failure cap on 4 processes for a year: about 8.8 x 10^8 guesses.
+Against 100,000 live codes the expected number of hits is about 8 x 10^-5 a
+year. With #788's 8 characters (40 bits) the same attack would expect about 80
+hits; with 10 characters (50 bits), about 0.08. Hitting one particular
+seven-day household code that way has odds of about 1.5 x 10^-11. Even with no
+limiter at all, 1,000 guesses a second for a year expects about 0.003 hits. So
+the limiter is defense in depth, and per-process counting is enough. The shape
+stays in the `XXXX-XXXX` family as three groups of four.
 
 ## Explicit account consent
 

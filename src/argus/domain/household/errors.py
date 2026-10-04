@@ -112,3 +112,8 @@ class InviteRuleViolation(HouseholdError):
 class VerifiedUserRequired(HouseholdError):
     code = "verified_user_required"
     detail = "Sign in to use invites."
+
+
+class InviteCodesUnavailable(HouseholdError):
+    code = "invite_codes_unavailable"
+    detail = "Invite codes are not configured on this server."

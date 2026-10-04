@@ -41,6 +41,24 @@ def _profile(user_id: str, email: str | None) -> User:
     )
 
 
+TEST_CODE_SECRET = "household-tests-invite-code-secret-0123456789"
+
+
+@pytest.fixture(autouse=True)
+def invite_code_secret(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Codes fail closed without a secret (#789); every household test has one.
+
+    The invite lookup limiter is process-local, so each test starts empty.
+    """
+    from argus.api import invite_limits
+
+    monkeypatch.setenv("ARGUS_INVITE_CODE_SECRET", TEST_CODE_SECRET)
+    monkeypatch.delenv("ARGUS_INVITE_CODE_SECRET_PREVIOUS", raising=False)
+    invite_limits.reset()
+    yield
+    invite_limits.reset()
+
+
 @pytest.fixture
 def identities() -> dict[str, dict[str, Any]]:
     users = {}

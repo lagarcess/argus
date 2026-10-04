@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.apple_sign_in import AppleCaptureFlagGateMiddleware
 from argus.api.chat.refusal_evidence import record_http_rejection
 from argus.api.dependencies import (
     ChatRequestBoundaryMiddleware,
@@ -88,6 +89,9 @@ async def lifespan(app: FastAPI):
     from argus.api.households import start_households, stop_households
 
     start_households(app)
+    from argus.api.apple_sign_in import start_apple_sign_in, stop_apple_sign_in
+
+    start_apple_sign_in(app)
     from argus.api.chat.research_pricing_evidence import ResearchPricingRecorder
     from argus.domain.research.billing import set_unpriced_spend_recorder
 
@@ -100,6 +104,7 @@ async def lifespan(app: FastAPI):
         await research_pricing_recorder.close()
         stop_personalization_memory(app)
         stop_households(app)
+        stop_apple_sign_in(app)
         stop_ingestion(app)
         stop_financial_accounts(app)
         if checkpointer_cm is not None:
@@ -150,6 +155,7 @@ def add_core_middleware_and_handlers(app: FastAPI) -> None:
     # Added before request_id_middleware so it sits inside it: a gated 404 still
     # carries X-Request-Id, exactly as a genuine unmatched route does.
     app.add_middleware(EvidenceReceiptFlagGateMiddleware)
+    app.add_middleware(AppleCaptureFlagGateMiddleware)
     app.middleware("http")(request_id_middleware)
     app.add_middleware(
         CORSMiddleware,

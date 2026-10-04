@@ -7,8 +7,11 @@ approved behavior to apply to the connected app. It does not implement that
 behavior or change production Argus web styling, financial contracts or providers.
 The October 2 release-readiness pivot below supersedes conflicting preview rules.
 Read a rule as approved direction, not proof that it is shipped.
-The [main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-design-dispositions)
-continues to own unfinished work and delivery status. Existing approved account,
+The [main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-release-ui-landing-order)
+owns the release UI landing order, and its
+[design dispositions](../../../docs/specs/argus-execution-board.md#cuadrao-design-dispositions),
+C01 to C10, own follow-up work. Together they own unfinished work and delivery
+status. Existing approved account,
 chat, voice and Plan behavior is preserved unless this guide explicitly revises it.
 
 This is a reference organized by design rule, not a sequence of polish notes.
@@ -179,8 +182,9 @@ money behavior, typography, icons, selectors, gestures and return paths provide
 consistency. Plan retains its illustration, exploration and personal language. The forecast
 playground entry is a quiet “Explorar escenarios / Explore scenarios” link beneath
 the forecast, rather than an attention-seeking headline or primary action.
-Implementation status and future work live in the
-[main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-consistency-pass-and-home-chart-follow-up).
+Implementation status and future work live in the design branch's
+[consistency pass and Home chart follow-up](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/docs/specs/argus-execution-board.md#cuadrao-consistency-pass-and-home-chart-follow-up),
+at commit `fc7650ea`.
 
 The header reads **Lo que viene / What's ahead** with the primary plus beside it.
 Remove the old literal Plan heading and its subtitle. Preserve the heading's
@@ -196,7 +200,10 @@ The space creation shortcut uses the shared plain plus. In Household, the existi
 avatar stack sits left-aligned between spaces and the amount. It includes the owner
 and accepted members only; pending invitations never count as members. Tapping it
 opens People. The current preview roster supports the owner and one companion.
-The greeting's context menu retains the preview gallery/reset tools.
+The greeting's context menu holds the preview reset tools (first use, household
+with no shared accounts, with activity) and opens the gallery (Guía visual /
+Visual guide). Both are on integration in `CuadraoHomeCanvas.swift`, since #786
+(design PR 3) for the gallery entry.
 
 ### Home account and activity shortcuts
 
@@ -374,7 +381,8 @@ References: [Wealthsimple history](https://mobbin.com/screens/667bf371-6e73-42f5
 [Public allocation](https://mobbin.com/screens/07c1ff8c-f0da-4bf0-919a-d21b2ac5ff43),
 [Origin disclosure](https://mobbin.com/screens/7edb40e1-bbbe-4c1a-9916-f10f943d7685).
 Founder-supplied decomposition screenshots are retained with this decision's
-[reference evidence](../../../docs/reports/evidence/cuadrao-native-design/home-distribution-reference/README.md). They motivate the hierarchy and subtle depth; they are not
+[reference evidence](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/docs/reports/evidence/cuadrao-native-design/home-distribution-reference/README.md)
+on the design branch at commit `fc7650ea`. They motivate the hierarchy and subtle depth; they are not
 Cuadrao implementation or acceptance evidence.
 
 ### Balance change breakdown
@@ -429,9 +437,9 @@ They identify the missing content without pretending to be records.
 
 | State | Presentation and behavior |
 | --- | --- |
-| Current month with no records and no confirmed coverage | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
-| Historical period with no records and no confirmed coverage | Sin datos / No data and neutral past-period copy; keep period navigation |
-| Confirmed complete coverage with zero spending | Show the known zero; distinguish it from missing records |
+| Current month with missing coverage | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
+| Historical period with missing coverage | Sin datos / No data and neutral past-period copy; keep period navigation |
+| Confirmed complete coverage with zero spending | Show the known zero, even without an expense row; distinguish it from missing coverage. A comparison against it shows the amount difference, not a percent ([October 2 Home comparisons lock](../../../docs/specs/argus-decision-log.md#home-comparisons), clarified 10:18 PM CT) |
 | First use with no history | Welcoming artwork and one working record-entry action |
 | Incomplete or unavailable history | Distinguish unknown from zero; omit unsupported comparison claims |
 | Real records, even one | Real chart immediately; leave future buckets empty |
@@ -475,8 +483,11 @@ its basis and be explicitly applied; no such recommendation is implemented here.
 
 ### Collection gestures
 
-`CuadraoOrderedCollection` owns the shared interaction across Home account rows,
-personal plans and group cards. Tap opens detail; swipe right reveals Edit
+`CuadraoOrderedCollection` is the shared interaction for Home account rows,
+personal plans and group cards. On integration it came with #783. Since #785
+(design PR 2), personal plans and group cards use it. Since #786 (design PR 3),
+Home account rows use it and Home opens plans and groups, all inside the design
+preview only. Tap opens detail; swipe right reveals Edit
 (including rename); swipe left reveals Archive. Neither swipe executes on a full
 swipe. Hold and drag reorders directly in place, without a context menu or an
 ordering tray. Sheets are for actual editing, invitation and review flows.
@@ -504,7 +515,8 @@ remains in the Argus guide.
   with a document-scanner symbol. Photos and files remain independent entry points.
 - Apple's native document scanner owns capture, page cropping and retakes. Cuadrao
   owns entry, saved drafts and review around that native screen. Delivery and the
-  interpretation boundary belong to [roadmap C01](../../../docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split).
+  interpretation boundary belong to [roadmap C01](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/docs/specs/argus-execution-board.md#c01--native-scan-and-receipt-split),
+  on the design branch at commit `fc7650ea`.
 - Recents uses title-first rows, separate Pinned/Recent sections, unread/current
   indicators, and one conversation object shared with Chat and Search. Do not repeat a sample subtitle on every row. Dates derive from the last
   message timestamp, shared with Search; metadata changes do not update recency.
@@ -547,7 +559,8 @@ remains available; selecting a record tells Cuadrao what the person means.
 
 The founder approved completing this continuity behavior on October 2. UI delivery
 and connected context contracts remain in
-[roadmap C04](../../../docs/specs/argus-execution-board.md#c04--contextual-conversation-handoff).
+[roadmap C04](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/docs/specs/argus-execution-board.md#c04--contextual-conversation-handoff),
+on the design branch at commit `fc7650ea`.
 
 Mobbin references inspected October 2:
 [Fabric item selection and Ask AI](https://mobbin.com/flows/a9096ee9-967b-4110-a738-d77acb704671)
@@ -730,13 +743,23 @@ Use one readable consequences screen, followed by one deliberate verification
 step. Show the applicable consequences together rather than a series of retention
 screens. Use native titles, body type and the shared destructive action treatment.
 
-- Explain removal of the account and its data, with the retained anonymous invite
-  record and anonymous shared-plan amounts as the stated exceptions. This copy must match the connected deletion and
-  retention contract before release; the UI cannot certify anonymization itself.
+- Explain removal of the account and its data. The stated exceptions are the
+  anonymous invite record and, in plans other people own, the person's amounts
+  kept under "Exmiembro" / "Former member" (decision 17 in the
+  [lane handoff](../../../docs/specs/lanes/mvee-five-lane-handoff.md#lane-6-account-deletion)).
+  Add Iris's founder-locked consequences block from the lane handoff's
+  [copy](../../../docs/specs/lanes/mvee-five-lane-handoff.md#copy-founder-locked-iriss-wording).
+  This copy must match the connected deletion and retention contract before
+  release; the UI cannot certify anonymization itself.
 - If the person administers a household, explain succession to its longest-standing
-  eligible member. Show the actual successor only when resolved by the owner.
+  remaining member. Show the actual successor only when resolved by the owner.
 - If the person owns shared history, explain that deletion removes the household's
   locked copy of that history. Do not describe deleting another member's records.
+- A shared debt plan whose owner deleted their account is archived read-only, not
+  handed over (decision 19 in the lane handoff, the Head of Engineering's call).
+  Participants see Iris's founder-locked banner on it, from the lane handoff's
+  copy, item 4, and get the usual member note. Show it as a closed plan with no
+  edit actions.
 - Reuse supported identity verification, such as a code sent to an existing verified
   channel. Cover incorrect/expired code, resend, cancellation, in-progress and
   retry states without requiring a support conversation.
@@ -744,17 +767,23 @@ screens. Use native titles, body type and the shared destructive action treatmen
   after confirmed completion. A queued operation gets an honest pending state.
   A failure retains a recoverable state and does not pretend deletion succeeded.
 
-The latest six-lane handoff owns deletion retention and founder-approved copy.
-A sole-member household closes. Shared-plan amounts remain under Exmiembro /
-Former member with receipts, photos and notes removed. Open balances become
-closed, not paid; shared plans pass to their longest-standing participant.
-Do not promise that previously emailed support copies are erased.
-Deletion completion and resolved successor facts come from the connected contract. Ordinary leave, removal and archive keep their distinct
+The six-lane handoff owns deletion retention and the founder-locked copy. With no
+remaining member, the household closes (October 2 lock). Shared-plan amounts
+remain under Exmiembro / Former member with receipts, photos and notes removed.
+Open balances become closed, not paid. Plans the person created pass to their
+longest-standing participant, except shared debt plans, which close read-only.
+Do not promise that previously emailed support copies are erased. Deletion
+completion, retention and resolved successor facts belong to the connected
+contract. Ordinary leave, removal and archive keep their distinct
 history rules. Account deletion must not silently redefine them.
 
 ### Authentication and invitation purpose
 
-The founder chose **Apple and Google**, alongside the existing email path.
+Sign-in for TestFlight is **Apple, Google and email**
+([October 2 founder decision](../../../docs/specs/argus-decision-log.md#sign-in-for-testflight)).
+Email works with any address and has an in-app confirmation step. Engineering
+builds Apple and Google behind default-off flags until the founder supplies the
+keys; connected buttons stay hidden while a flag is off.
 Both social flows need loading, user cancellation, recoverable error and return
 to the intended invitation. Use Apple's native authorization treatment. Request
 a preferred name only if it is missing; reuse a supplied or saved name. A private
@@ -772,15 +801,17 @@ code entry remains the recovery path. Visiting the waitlist is not proof of join
 | Invitation purpose | What it grants | Visible rules |
 | --- | --- | --- |
 | Invite someone to Cuadrao | App admission | Share link, copy code and QR represent one invitation; show the returned quota, such as 7 de 10 disponibles / 7 of 10 left |
-| Invite to a household | Membership after acceptance | Only the administrator sends it; it does not consume the personal ten; account sharing remains a separate consent |
-| Capped group access link | App admission for several invitees | Create with a cap and expiry; show actual usage, full, expired and revoked states; do not silently create a household or financial plan |
+| Invite to a household | Membership after acceptance, and app admission for a new user | Only the administrator sends it; it does not consume the personal ten; account sharing remains a separate consent |
+| Capped group access link | App admission for several invitees, beta only | Only the founder creates it, with a cap and expiry; show actual usage, full, expired and revoked states; a full link sends people to the waitlist; it never grants household membership or creates a financial plan |
 | Invite to a plan | Participation in that specific plan | Preserve the plan's membership and permission rules; do not treat it as app admission |
 
 A cap, a remaining personal quota and a member count are different values. Read
 them from their owners. Opening or sharing a link does not count as acceptance.
-Founder group links are beta-only, created by the founder account, and do not
-consume personal quota. Household acceptance also grants beta admission. Carry
-both purposes through validation without charging personal quota.
+Founder group links are beta-only and created by the founder account. Under the
+lane contract, group-link redemptions do not use anyone's personal ten; read the
+counter from its owner rather than guessing it. A household invite also admits a
+new user: carry both purposes through validation without charging the personal
+quota.
 
 A full link explains the limit and offers the waitlist. Show **Estás en la lista /
 You're on the waitlist** only after enrollment is confirmed. Use one invite-card
@@ -789,8 +820,13 @@ outside its quiet zone and test scan reliability. Public profile QR stays deferr
 
 ### Updates, chart truth and historical access
 
-Use the existing Updates inbox for invitation acceptance, administrator handoff,
-owner deletion with history removal, and household closure. Each notice explains
+Use the Updates inbox for invitation acceptance, administrator handoff,
+owner deletion with history removal, and household closure. Use Iris's
+founder-locked wording for the deletion note and the new-owner message. The lane
+that causes an event writes its entry: Household writes the closure when the last
+member leaves, and Lane 6 writes the administrator handoff and any closure a
+deletion causes. The Updates lane owns only how entries are displayed and the push
+opt-in (Yelena's rule, October 2). Each notice explains
 what changed and opens the relevant authorized destination. A closed household
 opens an explanation, not a broken detail. Do not leave deleted financial history
 readable through an old notification.
@@ -803,10 +839,11 @@ asks to enable it again. Push text never includes amounts or sensitive detail.
 An example is **Tienes un pago próximo / You have an upcoming payment**.
 
 A zero comparison baseline produces a monetary difference, never an infinite or
-invented percentage. No records without confirmed coverage produces **Sin datos / No data**.
-Confirmed continuous coverage with no expenses is a known zero, even without an
-expense row. It counts in covered averages and amount comparisons. Unknown,
-partially covered and confirmed zero periods remain different states. Keep the
+invented percentage. Missing coverage produces **Sin datos / No data**. A month
+with confirmed complete coverage and no spending is a known zero and shows 0,
+even without an expense row. It counts in covered averages and amount
+comparisons. Unknown, partially covered and confirmed zero periods remain
+different states. Keep the
 quiet chart and established category colors, icons and typography.
 
 After an account move, the previous household's authorized pre-move history is
@@ -818,15 +855,29 @@ remains authorized. An owner deletion removes its retained copy as stated above.
 
 ### Profile visibility and feature-timed controls
 
-Remove the **Por correo / By email** notification toggle. This is not a decision
-to remove email authentication, recovery or household invitation delivery.
+Remove the **Por correo / By email** notification toggle. This does not remove
+email authentication or recovery. Household email invitations and update email
+are not in this pass (October 2 lock), so no email invitation delivery is implied.
 Hide Personalization, Security and sessions, Shared conversations, Removed
-activity in the initial native release. Keep the approved personal photo picker,
-initials, themes, supported preferences, help, legal links, deletion and sign-out.
-An unset avatar keeps the existing Profile tab icon. Any selected initials, theme
-or photo replaces that icon, with the same selection read by Profile. Removing
-the selection restores the icon. Selection remains session-local until the
-profile storage contract is connected; do not imply a hosted upload. Avoid
+activity, Memory, Usage, More options, conversation bulk actions and
+personal-photo controls in the initial native release. Design commit `fc7650ea`,
+from Yelena's UI checklist, hides Personalization, Security and sessions, Shared
+conversations, Removed activity and photos. Usage, More options and conversation
+bulk actions are hidden by #786 (`a20362d3`) as a Head of Engineering judgment
+call. Memory (`.memory`) is hidden until native memory arrives with its
+controls. These are designed rows whose backend is still owed, not cuts. The
+first-release switch is meant to hide them only in release builds; development
+builds show every row. Yelena is ordering their backends after chat. **Por correo / By email**
+stays removed because Updates go to the inbox and push only. Keep initials,
+themes, supported preferences, help, legal links, deletion and sign-out.
+
+The founder retained the personal photo picker in the design. Its shared avatar
+and photo components stay; release builds hide photo selection until hosted
+avatar storage is connected. An unset avatar keeps
+the existing Profile tab icon. Any selected initials, theme or photo replaces
+that icon, with the same selection read by Profile. Removing the selection
+restores the icon. Selection remains session-local until the profile storage
+contract is connected; do not imply a hosted upload. Avoid
 empty destinations, unavailable rows and new Coming soon settings sections.
 
 Before a live chat, voice or document-reading action shares personal data with
@@ -885,22 +936,23 @@ favors permission requests in context.
 | Shared decision | Single code owner | Usage |
 | --- | --- | --- |
 | Typography roles | [CuadraoTypography.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoTypography.swift) | Use named roles for expressive headings and amounts. Native navigation titles, text bodies and system controls retain their semantic text styles. |
-| Adaptive palette | [WelcomePalette](../../../ios/ArgusFoundation/Cuadrao/CuadraoCanvas.swift) | Pine, sage, background, surface, ink, borders and positive input text. The historical type name remains; do not create a competing Cuadrao palette. |
-| Money parsing and caret behavior | [CanvasDecimalInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasDecimalInput.swift) | Accounts and Plan use this same native text editor. |
+| Adaptive palette | [WelcomePalette](../../../ios/ArgusFoundation/Cuadrao/CuadraoCanvas.swift) | Pine, sage, background, surface, ink, borders and positive input text. The historical type name remains; do not create a competing Cuadrao palette. Adaptive light/dark values are gated behind the design-preview flag, `CuadraoDesignPreview.isActive` (`--cuadrao-design`, or a build whose Info.plist sets `CUADRAO_DESIGN_PREVIEW` to `true`); every other launch keeps the shipped tokens. |
+| Money parsing and caret behavior | [CanvasDecimalInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasDecimalInput.swift) | Accounts uses this native text editor on integration. Since #785 (design PR 2), Plan uses the same editor through `PlanAmountInput` and `CanvasMoneyValueInput`, inside the design preview only; Home reaches Plan since #786 (design PR 3). |
 | Currency precision, formatting and limits | [CanvasMoney.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoney.swift) | Derive preview limits and formatting here; currency selection/immutability retains its plan/group owner. |
 | Numeric preview bridge | [CanvasMoneyValueInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoneyValueInput.swift) | Adapts existing numeric preview models to decimal editing text; it is not a new financial store. |
-| Plan amount composition | [PlanAmountInput.swift](../../../ios/ArgusFoundation/Cuadrao/Planning/PlanAmountInput.swift) | Currency, rounded amount, focus underline and inline error. Accounts keeps its approved bordered, right-aligned composition around the same editor. |
+| Plan amount composition | [PlanAmountInput.swift](../../../ios/ArgusFoundation/Cuadrao/Planning/PlanAmountInput.swift), on integration since #785 (design PR 2), design preview only | Currency, rounded amount, focus underline and inline error. Accounts keeps its approved bordered, right-aligned composition around the same editor. |
 | Choice labels and add shortcuts | [CuadraoChoiceControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChoiceControls.swift) | Shared value/caret, native single-selection menu, fixed code and section plus. |
 | Balance period and account changes | [CuadraoBalancePeriod.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoBalancePeriod.swift) | One observed opening/closing pair, signed contributions and matching allocation; reuses `CanvasBalanceHistory`. |
 | Empty and loading treatment | [CuadraoChartState.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChartState.swift) | Shared decorative forms; `CanvasSpendingStory` classifies financial states. Loading is a gallery specimen until a real operation needs it. |
 | Expanded chart controls | [CuadraoChartControls.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoChartControls.swift) | Icon view choice and localized period choice, including selected accessibility state. |
-| Account management | [CuadraoAccountsCollection.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoAccountsCollection.swift) | Native ordering and archive recovery over the existing shared account model. |
-| Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift) | Uses real shared components. Access from a hold on Home's greeting → Guía visual / Visual guide, or launch with `--design-gallery`. Preview-only. |
+| Account management | [CuadraoAccountsCollection.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoAccountsCollection.swift), on integration since #786 (design PR 3), design preview only | Native ordering and archive recovery over the existing shared account model. |
+| Reference gallery | [CuadraoDesignGallery.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoDesignGallery.swift), on integration since #786 (design PR 3) | Uses real shared components. Preview-only. It opens from a hold on Home's greeting → Guía visual / Visual guide, or with `--design-gallery`. That routing came to integration with #786. |
 
 <a id="14-reference-gallery-and-evolution"></a>
 ## 15. Reference gallery and evolution
 
-The gallery offers Spanish/English, light/dark and large-text controls. It contains
+The gallery is on integration since #786 (design PR 3), inside the design preview
+only. The gallery offers Spanish/English, light/dark and large-text controls. It contains
 headings, amounts, a row, a disabled action, working Account/Plan input fields,
 and the real shared choice, add and chart controls.
 Use it to compare states, then verify the actual surfaces: isolated components do

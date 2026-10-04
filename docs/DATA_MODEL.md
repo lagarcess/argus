@@ -114,6 +114,7 @@ beta_invitations
 invite_referrals
 invite_sender_refs
 beta_admissions
+argus_private.invite_code_digests
 beta_invite_quota_grants
 ```
 
@@ -1969,8 +1970,19 @@ Members carry a user-supplied `display_name`; administrator authority remains
 including after departure, closure and rejoin. Historical accepted memberships
 are backfilled where the invitation acceptance timestamp identifies the row.
 Unresolvable historical outcomes fail closed. Token plaintext is returned once.
-`code_hash` stores the hash of the short typed code beside `token_hash`; it is
-unique, and plaintext is returned once.
+The short typed code is not stored on this table: its keyed digest lives in
+`argus_private.invite_code_digests` (below), and plaintext is returned once.
+
+`argus_private.invite_code_digests` (migration
+`20261003150100_invite_code_digests_private.sql`, #789) holds one row per typed
+code: `digest` (primary key, `v2.<key id>.<HMAC-SHA-256 hex>` under
+`ARGUS_INVITE_CODE_SECRET`, enforced by a check), exactly one of
+`household_invitation_id` or `beta_invitation_id` (unique, cascading), `created_at`
+and `rehashed_at` (set when a code found under the previous secret moves to the
+current one). The schema is unreachable for anon and authenticated; the table has
+RLS with no policy and no privilege for anon, authenticated or service_role.
+Only the backend database owner reads it. The earlier `code_hash` columns on
+`household_invitations` and `beta_invitations` are dropped.
 
 `beta_invitations` holds beta invites (`kind='beta'`, `max_uses=1`) and founder
 group links (`kind='group_link'`, a `source_label`, a cap in `max_uses`, an
@@ -3090,6 +3102,46 @@ metadata/link type validation is serialized with details writes. Existing
 owner-scoped native financial journals persist pending account creation and
 asset commands until an accepted response or explicit failure resolution.
 
+## Apple sign-in credentials
+
+`public.apple_sign_in_credentials`
+(`supabase/migrations/20261003150000_apple_sign_in_credentials.sql`) holds one
+row per person who signed in with Apple while
+`ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` was on: `user_id` (primary key, the
+verified session's user), `client_id` (the Apple client the token was issued
+to, the bundle id for the native app), `secret_ciphertext` (Apple's refresh
+token sealed with AES-256-GCM under `ARGUS_INGESTION_SECRET_KEY`, bound to
+`apple_sign_in:<user_id>`), `captured_at`, `updated_at` and
+`secret_key_fingerprint`. A later sign-in replaces the row.
+`secret_key_fingerprint` (Lane 6, `20261004090000_account_deletion.sql`) names
+the key that sealed the token without revealing it (`SecretBox.key_id`: 32 hex
+characters of HMAC-SHA256 of a fixed label under the key); capture sets it, and
+rows stored before Lane 6 have none. A token that doesn't open is discarded
+only when its fingerprint is the running key's.
+
+RLS is on with no policy, and every client privilege is revoked: no client
+role can read or write any column. The API's service role is the only writer.
+No SECURITY DEFINER function is involved.
+
+`user_id` references `auth.users` with `on delete restrict`. An auth user who
+still has an unrevoked Apple token cannot be deleted, so no deletion path can
+drop the token without revoking it at Apple. The account-deletion run revokes
+first, deletes this row only after Apple confirms, then deletes the user. The
+row is the pending revoke until then, which matches the contract that the
+encrypted credential is kept only while a revoke is pending. Apple's
+`invalid_grant` on revoke means the token is already dead, so it also deletes
+the row.
+
+If `ARGUS_INGESTION_SECRET_KEY` was rotated, the token can't be opened and so
+can't be revoked, and the restrict key would keep that user undeletable
+forever. The deletion run then calls `discard_unreadable`, which deletes the
+row only while it still can't be opened and never logs a token. No route
+exposes it. Apple's authorization stays until the person removes it in their
+Apple ID settings.
+
+Capture never writes a row for a code that belongs to another Apple ID: that is
+`409 apple_identity_mismatch`, and the token is revoked at Apple instead.
+
 ## Connected financial sources
 
 Default-off with `ARGUS_INGESTION_ENABLED`. Lane spec:
@@ -3107,7 +3159,12 @@ never backs two people's connections; webhooks resolve by the same pair.
 Cursor advances are compare-and-set under the lease; failures never clear
 `last_success_at` or the cursor, and recording a failure releases the lease so
 a sync already in flight cannot report success over it. A check constraint keeps disconnected rows free
-of credential, cursor and lease.
+of credential, cursor and lease. `secret_key_fingerprint` (Lane 6) names the
+key that sealed `secret_ciphertext` (`SecretBox.key_id`, 32 hex characters,
+non-secret); every sealing path sets it (Plaid link and update-mode reconnect,
+Gmail connect and reconnect), it is null with no credential, and rows sealed
+before Lane 6 have none. Account deletion gives up on a credential that does
+not open only when its fingerprint is the running key's.
 
 Registered owners may `SELECT` only the non-secret columns (column grant); no
 client role can read `secret_ciphertext`, `sync_cursor` or the lease, or write

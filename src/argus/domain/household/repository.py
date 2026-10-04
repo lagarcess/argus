@@ -26,8 +26,9 @@ from argus.domain.household.errors import (
     MustTransferOrClose,
 )
 from argus.domain.household.invite_codes import (
+    CodeHasher,
+    find_code,
     format_code,
-    hash_code,
     new_code,
     normalize_code,
 )
@@ -59,14 +60,28 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def secret_lookup(token: str | None, code: str | None) -> tuple[str, str]:
-    """Which hash column to match, and the digest, for a link token or a code."""
+def code_hasher(hasher: CodeHasher | None) -> CodeHasher:
+    """The injected hasher, or the one the environment configures (fail closed)."""
+    return hasher if hasher is not None else CodeHasher.from_env()
+
+
+def locate_secret(
+    connection,  # noqa: ANN001
+    token: str | None,
+    code: str | None,
+    hasher: CodeHasher | None,
+) -> tuple[str, str]:
+    """Which column to match and its value, for a link token or a typed code.
+
+    A token matches its SHA-256 digest. A code is resolved through the private
+    digest table to the invitation id, so no client-readable table holds it.
+    """
     if token is not None:
         return "token_hash", hash_token(token)
-    normalized = normalize_code(code or "")
-    if normalized is None:
+    found = find_code(connection, code, code_hasher(hasher))
+    if found is None:
         raise InvitationNotFound()
-    return "code_hash", hash_code(normalized)
+    return "id", found
 
 
 @dataclass
@@ -135,9 +150,11 @@ class InMemoryHouseholdRepository:
         accounts: AccountLookup,
         *,
         clock=_utcnow,  # noqa: ANN001
+        code_hasher: CodeHasher | None = None,
     ) -> None:
         self._accounts = accounts
         self._clock = clock
+        self._hasher = code_hasher
         self._households: dict[str, _Household] = {}
         self._invites_by_hash: dict[str, str] = {}
         self._codes: dict[str, str] = {}
@@ -183,9 +200,10 @@ class InMemoryHouseholdRepository:
     def create_invitation(self, *, user_id: str, household_id: str) -> InvitationCreated:
         household = self._require_admin(user_id=user_id, household_id=household_id)
         now = self._clock()
+        hasher = code_hasher(self._hasher)
         token = secrets.token_urlsafe(32)
         code = new_code()
-        while hash_code(code) in self._codes:
+        while any(d in self._codes for d in hasher.candidates(code)):
             code = new_code()
         invite = _Invitation(
             id=str(uuid4()),
@@ -194,7 +212,7 @@ class InMemoryHouseholdRepository:
             created_by=user_id,
             created_at=now,
             expires_at=now + INVITE_TTL,
-            code_hash=hash_code(code),
+            code_hash=hasher.digest(code),
         )
         household.invitations.append(invite)
         self._invites_by_hash[invite.token_hash] = household.id
@@ -208,10 +226,20 @@ class InMemoryHouseholdRepository:
         )
 
     def _token_hash(self, token: str | None, code: str | None) -> str:
-        column, digest = secret_lookup(token, code)
-        if column == "token_hash":
-            return digest
-        found = self._codes.get(digest)
+        if token is not None:
+            return hash_token(token)
+        hasher = code_hasher(self._hasher)
+        normalized = normalize_code(code or "")
+        found = None
+        if normalized is not None:
+            found = next(
+                (
+                    self._codes[d]
+                    for d in hasher.candidates(normalized)
+                    if d in self._codes
+                ),
+                None,
+            )
         if found is None:
             raise InvitationNotFound()
         return found

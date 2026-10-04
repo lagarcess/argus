@@ -109,3 +109,21 @@ def test_relinking_my_own_item_never_removes_it():
     first = connector.link.exchange(user_id=USER, public_token=PUBLIC_TOKEN)
     again = connector.link.exchange(user_id=USER, public_token=PUBLIC_TOKEN)
     assert again.connection.id == first.connection.id and removes(fake) == 0
+
+
+def test_exchange_and_reconnect_record_the_key_that_sealed_the_token():
+    """Priya B1: account deletion gives up on a token only under the key that
+    sealed it, so every Plaid seal stores that key's fingerprint. Reconnect
+    (Link update mode) re-stores a token that just opened under this key, so
+    it fills in a row from before the fingerprint."""
+    fake = FakePlaid()
+    connector, row = connected(fake)
+    box = connector.hub.box
+    assert row.secret_key == box.key_id and len(row.secret_key) == 32
+    repo = connector.hub.connections
+    repo.set_secret(
+        connection_id=row.id, secret=row.secret, status="needs_reauth",
+        now=connector.hub.clock(), secret_key=None,
+    )  # fmt: skip
+    restored = connector.link.reconnected(user_id=USER, connection_id=row.id)
+    assert restored.status == "active" and restored.secret_key == box.key_id

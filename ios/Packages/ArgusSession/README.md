@@ -15,8 +15,8 @@ except for loopback development. Public publishable/anon keys are accepted;
 secret/service-role keys are rejected. Keep development values in the app's
 ignored configuration, never in this package.
 
-Public methods are `snapshot`, `restore`, `login`, `signup`, `profile`, `signOut`
-and `retryPendingSignOut`. Signup accepts an optional trailing `displayName`.
+Public methods are `snapshot`, `restore`, `login`, `signup`, `signIn(with:)`,
+`profile`, `signOut`, `retryPendingSignOut` and `captureAppleAuthorizationCode`. Signup accepts an optional trailing `displayName`.
 `SessionSnapshot` contains only a phase, the canonical Argus `/me` profile and an
 account revision. It never exposes credentials. The phases are `signedOut`,
 `authenticated`, `signOutPending` and `unsupportedAnonymousSession`.
@@ -25,6 +25,21 @@ Auth mutations are serialized; overlapping mutations return `busy`. Profile
 reads may run concurrently. Before every retry or delivery, their original
 account epoch must still be current. A stale request cannot refresh, deliver
 another account's profile, or write/delete that account's SDK storage.
+
+## Native Apple and Google sign-in
+
+`signIn(with: IdentityTokenCredential)` takes an Apple or Google ID token from the
+app's native sheet plus the `SignInNonce` used for it. The nonce's SHA-256 hex
+digest goes to the provider and the raw value only to Supabase Auth's `id_token`
+grant, which runs on an isolated in-memory SDK client. The issued tokens then take
+the same journaled adoption as email login: pending journal, `setSession`, `/me`.
+If Argus refuses the new session (for example the private-alpha allowlist at
+`/me`), it is revoked at once; a failed revoke stays pending like any sign-out.
+Provider 4xx errors surface as `rejected` with a bounded code, 5xx as
+`unavailable`. `captureAppleAuthorizationCode` posts Apple's one-time code to
+`POST /api/v1/auth/apple/authorization-code` for revocation at account deletion;
+it is best effort. The server answers a plain 404 while capture is off and
+`409 apple_identity_mismatch` when the code belongs to another Apple ID.
 
 ## Credential and error behavior
 

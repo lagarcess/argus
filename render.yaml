@@ -63,9 +63,15 @@ services:
         value: "false"
       - key: ARGUS_HOUSEHOLDS_ENABLED
         value: "false"
+      - key: ARGUS_ACCOUNT_DELETION_ENABLED
+        value: "false"
       - key: ARGUS_INGESTION_ENABLED
         value: "false"
       - key: ARGUS_INGESTION_SECRET_KEY
+        sync: false
+      - key: ARGUS_INVITE_CODE_SECRET
+        sync: false
+      - key: ARGUS_INVITE_CODE_SECRET_PREVIOUS
         sync: false
       - key: GOOGLE_OAUTH_CLIENT_ID
         sync: false
@@ -85,6 +91,16 @@ services:
         sync: false
       - key: PLAID_COUNTRY_CODES
         value: "US"
+      - key: ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED
+        value: "false"
+      - key: ARGUS_APPLE_TEAM_ID
+        sync: false
+      - key: ARGUS_APPLE_SIGN_IN_KEY_ID
+        sync: false
+      - key: ARGUS_APPLE_SIGN_IN_PRIVATE_KEY
+        sync: false
+      - key: ARGUS_APPLE_BUNDLE_ID
+        sync: false
       - key: ARGUS_IN_PLACE_CARD_EDITS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED

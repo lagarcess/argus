@@ -6,8 +6,10 @@ from fastapi.openapi.utils import get_openapi
 from argus.api import app_setup, openapi_compat, pagination, search_utils
 from argus.api import state as api_state
 from argus.api.routers import (
+    account,
     agent,
     auth,
+    auth_apple,
     backtest,
     computations,
     conversation_activity,
@@ -49,6 +51,7 @@ def health() -> dict[str, str]:
 
 for api_router in (
     auth.router,
+    auth_apple.router,
     profile.router,
     conversations.router,
     computations.router,
@@ -71,6 +74,7 @@ for api_router in (
     household_financial.router,
     household_planning.router,
     feedback.router,
+    account.router,
     ops.router,
     dev.router,
 ):

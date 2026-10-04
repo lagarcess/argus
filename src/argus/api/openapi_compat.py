@@ -259,6 +259,19 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             responses["503"] = copy.deepcopy(_AUTH_SESSION_UNAVAILABLE_RESPONSE_REF)
             responses["500"] = _error_response("An unexpected server error occurred.")
 
+    deletion_op = (
+        spec.get("paths", {}).get(f"{API_PREFIX}/account/delete", {}).get("post")
+    )
+    if deletion_op is not None:
+        # Starting and resuming a deletion are the same POST (Lane 6).
+        deletion_op.setdefault("responses", {})["503"] = _error_response(
+            "`account_deletion_incomplete`: the run did not finish and may have "
+            "locked the account; retrying this route resumes it (Retry-After: "
+            "5). `account_deletion_unavailable`: deletion isn't configured on "
+            "this server. `auth_session_verification_unavailable`: the session "
+            "could not be verified; retry."
+        )
+
     search_op = spec.get("paths", {}).get(f"{API_PREFIX}/search", {}).get("get")
     if search_op is not None:
         search_op.setdefault("responses", {})["503"] = _error_response(

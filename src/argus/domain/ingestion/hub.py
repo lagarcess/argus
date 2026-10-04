@@ -21,17 +21,25 @@ from argus.domain.ingestion.connections import (
     SourceConnection,
 )
 from argus.domain.ingestion.contract import SourceKind
-from argus.domain.ingestion.secrets import SecretBox
+from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 from argus.domain.ingestion.sink import CandidateSink
 
 Revocation = Literal["revoked", "failed", "not_applicable"]
+# Account deletion also learns when the provider no longer held the grant
+# (``already_revoked``) and when a credential does not open under this key
+# (``unreadable``: a wrong key and a truly dead credential look the same here;
+# the deletion run's key check tells them apart by the stored key fingerprint).
+DeletionRevocation = Literal[
+    "revoked", "already_revoked", "failed", "not_applicable", "unreadable"
+]
 
 
 class SourceAdapter(Protocol):
     source: SourceKind
 
-    def revoke(self, connection: SourceConnection, credential: str | None) -> None:
-        """Revoke provider-side access. Raise on failure; never log the credential."""
+    def revoke(self, connection: SourceConnection, credential: str | None) -> str | None:
+        """Revoke provider-side access. Raise on failure; never log the credential.
+        May return ``"already_revoked"`` when the provider no longer held it."""
         ...
 
 
@@ -121,3 +129,64 @@ class IngestionHub:
         if self.sink is None:
             return 0
         return self.sink.forget_connection(user_id=ended.user_id, connection_id=ended.id)
+
+    def revoke_for_deletion(
+        self,
+        *,
+        source: str,
+        connection_id: str,
+        external_ref: str,
+        envelope: bytes | None,
+    ) -> DeletionRevocation:
+        """Account deletion's revocation path (Lane 6, step 2).
+
+        Unlike ``disconnect`` it touches no connection row: the caller holds the
+        encrypted credential in the deletion run and drops it only after this
+        returns ``revoked``. ``failed`` keeps the revocation pending for a retry;
+        ``already_revoked`` means the provider no longer held the grant;
+        ``unreadable`` means the credential does not open under this process's
+        key, which the caller must not take as proof it never will.
+        """
+        adapter = self._adapters.get(source)
+        if envelope is None:
+            return "not_applicable"
+        if adapter is None or self.box is None:
+            return "failed"
+        now = self.clock()
+        connection = SourceConnection(
+            id=connection_id,
+            user_id="",
+            source=source,  # type: ignore[arg-type]
+            status="disconnected",
+            label=None,
+            external_ref=external_ref,
+            cursor=None,
+            secret=envelope,
+            last_success_at=None,
+            last_attempt_at=None,
+            last_error_code=None,
+            attention_code=None,
+            attention_at=None,
+            lease_holder=None,
+            lease_until=None,
+            created_at=now,
+            updated_at=now,
+            disconnected_at=now,
+            version=0,
+        )
+        try:
+            credential = self.credential(connection)
+        except SecretUnreadable:
+            # Not openable under this process's key: a wrong or missing key
+            # looks the same as a dead credential, so the caller decides.
+            return "unreadable"
+        try:
+            result = adapter.revoke(connection, credential)
+        except Exception as exc:
+            logger.warning(
+                "Deletion revocation failed; the credential stays pending",
+                source=source,
+                failure_mode=type(exc).__name__,
+            )
+            return "failed"
+        return "already_revoked" if result == "already_revoked" else "revoked"

@@ -8,7 +8,15 @@ import { useTranslation } from "react-i18next";
 import { useModalSurface } from "../layout/useModalSurface";
 
 /**
- * Account deletion request, lifted out of the profile menu.
+ * In-app account deletion (Lane 6), lifted out of the profile menu.
+ *
+ * Confirming runs the deletion command. Once it succeeds, or the account is
+ * locked while it finishes (in_progress), the session is dead, so the browser
+ * signs out on that result (the one logout call) and this dialog stays as
+ * the signed-out confirmation; Done only cleans up and leaves. When the
+ * command is switched off on this server (404), support gets a ticket instead
+ * (requested), or by email if that fails too, so the confirmation never says
+ * the account is deleted "now".
  *
  * It portals to the body, outside the menu it opens from, so the menu's focus
  * trap never contained it and system back dismissed the menu or the drawer
@@ -16,7 +24,14 @@ import { useModalSurface } from "../layout/useModalSurface";
  * way a portaled `aria-modal` surface gets that right.
  */
 
-export type DeleteRequestState = "idle" | "submitting" | "success" | "error";
+export type DeleteRequestState =
+  | "idle"
+  | "submitting"
+  | "success"
+  | "in_progress"
+  | "requested"
+  | "error"
+  | "unavailable";
 
 function ProfileDeleteRequestDialogSurface({
   state,
@@ -69,7 +84,7 @@ function ProfileDeleteRequestDialogSurface({
         }}
         aria-label={t(
           "settings.profile.request_deletion.close",
-          "Close deletion request",
+          "Close account deletion",
         )}
       />
       <div
@@ -86,7 +101,7 @@ function ProfileDeleteRequestDialogSurface({
           >
             {t(
               "settings.profile.request_deletion.title",
-              "Request account deletion",
+              "Delete your account?",
             )}
           </h3>
           <button
@@ -96,20 +111,33 @@ function ProfileDeleteRequestDialogSurface({
             className="rounded-full p-1.5 hover:bg-black/5 disabled:cursor-wait disabled:opacity-50 dark:hover:bg-white/10"
             aria-label={t(
               "settings.profile.request_deletion.close",
-              "Close deletion request",
+              "Close account deletion",
             )}
           >
             <X className="h-4 w-4 text-black/50 dark:text-white/50" />
           </button>
         </div>
 
-        {state === "success" ? (
+        {state === "success" || state === "in_progress" || state === "requested" ? (
           <>
-            <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
-              {t(
-                "settings.profile.request_deletion.success",
-                "Request sent. We'll follow up by email.",
-              )}
+            <p
+              className="text-[13px] leading-relaxed text-black/55 dark:text-white/55"
+              data-testid={`argus-delete-account-${state}`}
+            >
+              {state === "success"
+                ? t(
+                    "settings.profile.request_deletion.success",
+                    "Your account is deleted. You're signed out.",
+                  )
+                : state === "in_progress"
+                  ? t(
+                      "settings.profile.request_deletion.in_progress",
+                      "Your account is being deleted. You're signed out now, and we'll finish removing it within a few days. You don't need to do anything.",
+                    )
+                  : t(
+                      "settings.profile.request_deletion.requested",
+                      "Request sent. Support will delete your account and follow up by email.",
+                    )}
             </p>
             <div className="mt-5 flex justify-end">
               <button
@@ -123,17 +151,44 @@ function ProfileDeleteRequestDialogSurface({
           </>
         ) : (
           <>
+            {/* General and household lines first, then Iris's locked block
+                (handoff "Copy", item 1) word for word in its own key. Nothing
+                here says "now": with the command off this becomes a support
+                request, and the result says so. */}
             <p className="text-[13px] leading-relaxed text-black/55 dark:text-white/55">
               {t(
                 "settings.profile.request_deletion.body",
-                "Support handles account deletion. We'll verify ownership, process your account data, and follow up by email. Completed deletions cannot be undone.",
+                "Your account and your data will be deleted, and this can't be undone. Households you run pass to the longest-standing member, or close if you're the only one.",
+              )}
+            </p>
+            <p
+              className="mt-2 text-[13px] leading-relaxed text-black/55 dark:text-white/55"
+              data-testid="argus-delete-account-shared-plans"
+            >
+              {t(
+                "settings.profile.request_deletion.shared_plans",
+                "In plans you share, your amounts stay so everyone else's numbers still add up, but without your name: you'll show as \"Former member.\" Your receipts and notes are deleted. Anything you owe or are owed is closed in the app, not marked as paid. Plans you created pass to whoever has been in each one longest, except shared debt plans, which are closed and stay view-only.",
               )}
             </p>
             {state === "error" && (
               <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
                 {t(
                   "settings.profile.request_deletion.error",
-                  "We could not submit that request yet.",
+                  "We couldn't delete your account just now. Try again.",
+                )}{" "}
+                <a className="underline" href={supportMailto}>
+                  {t(
+                    "settings.profile.request_deletion.email_fallback",
+                    "Email support",
+                  )}
+                </a>
+              </p>
+            )}
+            {state === "unavailable" && (
+              <p className="mt-3 text-[12px] leading-relaxed text-[#d66d75]">
+                {t(
+                  "settings.profile.request_deletion.unavailable",
+                  "Deleting in the app isn't available here yet. Support can delete your account for you.",
                 )}{" "}
                 <a className="underline" href={supportMailto}>
                   {t(
@@ -155,17 +210,17 @@ function ProfileDeleteRequestDialogSurface({
               <button
                 type="button"
                 onClick={() => void onSubmit()}
-                disabled={state === "submitting"}
+                disabled={state === "submitting" || state === "unavailable"}
                 className="rounded-md bg-[#d66d75]/12 px-3 py-2 text-[13px] font-medium text-[#b94c55] hover:bg-[#d66d75]/18 disabled:cursor-wait disabled:opacity-60 dark:text-[#e7a2a8]"
               >
                 {state === "submitting"
                   ? t(
                       "settings.profile.request_deletion.submitting",
-                      "Sending...",
+                      "Deleting...",
                     )
                   : t(
-                      "settings.profile.request_deletion.contact_support",
-                      "Contact support",
+                      "settings.profile.request_deletion.confirm",
+                      "Delete account",
                     )}
               </button>
             </div>

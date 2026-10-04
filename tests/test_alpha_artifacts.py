@@ -511,6 +511,16 @@ def test_authenticated_openapi_declares_session_verification_unavailable() -> No
                     "$ref": "#/components/schemas/Error"
                 }
                 continue
+            if path == "/api/v1/account/delete":
+                # Lane 6: the deletion POST adds its own 503s (note 7).
+                response = operation["responses"]["503"]
+                assert "auth_session_verification_unavailable" in response["description"]
+                assert "account_deletion_incomplete" in response["description"]
+                assert "account_deletion_unavailable" in response["description"]
+                assert response["content"]["application/json"]["schema"] == {
+                    "$ref": "#/components/schemas/Error"
+                }
+                continue
             if path == "/api/v1/search":
                 response = operation["responses"]["503"]
                 assert "exact bounded recall" in response["description"]

@@ -27,10 +27,12 @@
         "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": "false",
         "ARGUS_FINANCIAL_ACCOUNTS_ENABLED": "false",
         "ARGUS_HOUSEHOLDS_ENABLED": "false",
+        "ARGUS_ACCOUNT_DELETION_ENABLED": "false",
         "ARGUS_INGESTION_ENABLED": "false",
         "PLAID_ENV": "sandbox",
         "PLAID_CREDENTIALS_INJECTED": "false",
         "PLAID_COUNTRY_CODES": "US",
+        "ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED": "false",
         "ARGUS_IN_PLACE_CARD_EDITS_ENABLED": "true",
         "ARGUS_MEMORY_EMBEDDING_MODEL": "pplx-embed-v1-0.6b",
         "ARGUS_MEMORY_EMBEDDING_DIMENSIONS": "1024",
@@ -88,12 +90,18 @@
       ],
       "optional": [
         "ARGUS_INGESTION_SECRET_KEY",
+        "ARGUS_INVITE_CODE_SECRET",
+        "ARGUS_INVITE_CODE_SECRET_PREVIOUS",
         "GOOGLE_OAUTH_CLIENT_ID",
         "GOOGLE_OAUTH_CLIENT_SECRET",
         "GOOGLE_OAUTH_REDIRECT_URI",
         "PLAID_CLIENT_ID",
         "PLAID_SECRET",
-        "PLAID_WEBHOOK_URL"
+        "PLAID_WEBHOOK_URL",
+        "ARGUS_APPLE_TEAM_ID",
+        "ARGUS_APPLE_SIGN_IN_KEY_ID",
+        "ARGUS_APPLE_SIGN_IN_PRIVATE_KEY",
+        "ARGUS_APPLE_BUNDLE_ID"
       ]
     },
     "web": {

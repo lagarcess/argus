@@ -56,6 +56,9 @@ def test_connect_sync_increment_reconnect_and_disconnect(pool, users):  # noqa: 
     connector = postgres_connector(pool, fake, sink)
     repo, senders = connector.hub.connections, connector.senders
     row = connect(connector, fake, owner).connection
+    # The sealing key's fingerprint round-trips through the table (Priya B1).
+    key_id = connector.hub.box.key_id
+    assert repo.get(user_id=owner, connection_id=row.id).secret_key == key_id
     assert [r.sender for r in senders.list(connection_id=row.id)] == [
         "alerts@card-example.test",
         "banco-ejemplo.test",
@@ -75,11 +78,13 @@ def test_connect_sync_increment_reconnect_and_disconnect(pool, users):  # noqa: 
     again = connect(connector, fake, owner, senders=None)
     assert not again.created and again.connection.id == row.id
     assert again.connection.status == "active" and again.connection.cursor == "1001"
+    assert repo.get(user_id=owner, connection_id=row.id).secret_key == key_id
     assert len(repo.list(user_id=owner)) == 1
 
     outcome = connector.hub.disconnect(user_id=owner, connection_id=row.id)
     assert outcome.provider_revocation == "revoked"
-    assert repo.get(user_id=owner, connection_id=row.id).secret is None
+    ended = repo.get(user_id=owner, connection_id=row.id)
+    assert ended.secret is None and ended.secret_key is None
     assert senders.list(connection_id=row.id) == []
     with pytest.raises(ConnectionNotFound):
         senders.replace(
