@@ -23,7 +23,7 @@ struct ConnectedCuadraoProfile: View {
                 VStack(spacing: 0) {
                     NavigationLink(value: CuadraoProfileDestination.appearance) {
                         row(spanish ? "Apariencia" : "Appearance", symbol: "paintpalette")
-                    }
+                    }.accessibilityIdentifier("profile.preferences")
                     Divider()
                     NavigationLink(value: CuadraoProfileDestination.legal) {
                         row(spanish ? "Privacidad y términos" : "Privacy and terms", symbol: "hand.raised")

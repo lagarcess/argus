@@ -50,6 +50,16 @@ final class ReleaseUIJourneyTests: XCTestCase {
         capture(release, "profile-release-gates-en")
     }
 
+    func testDeletionSharedConsequencesEnglish() {
+        let app = launch(spanish: false)
+        app.buttons["release.review.identity"].tap()
+        app.buttons["identity.gallery.delete"].tap()
+        XCTAssertTrue(app.staticTexts["identity.delete.sharedConsequences"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["identity.delete.sharedConsequences"].label,
+            "In plans you share, your amounts stay so everyone else's numbers still add up, but without your name: you'll show as \"Former member.\" Your receipts and notes are deleted. Anything you owe or are owed is closed in the app, not marked as paid. Plans you created pass to whoever has been in each one longest, except shared debt plans, which are closed and stay view-only.",
+            "Iris's founder-locked copy, verbatim")
+    }
+
     func testDeletionConfirmationPendingAndFinish() {
         let app = launch(spanish: true)
         app.buttons["release.review.identity"].tap()

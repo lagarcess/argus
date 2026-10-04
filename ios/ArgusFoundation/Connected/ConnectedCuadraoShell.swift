@@ -66,7 +66,7 @@ struct ConnectedCuadraoShell: View {
                     ReleaseUpdatesInbox(state: .unavailable, spanish: spanish)
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
-                                Button(spanish ? "Listo" : "Done") { sheet = nil }
+                                Button(spanish ? "Listo" : "Done") { sheet = nil }.accessibilityIdentifier("sheet.close")
                             }
                         }
                 }.preferredColorScheme(appearance.colorScheme)

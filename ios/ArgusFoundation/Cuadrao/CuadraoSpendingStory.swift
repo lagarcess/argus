@@ -84,14 +84,12 @@ extension CanvasSpendingStory {
         let end = calendar.dateInterval(of: .month, for: cutoff)!.start
         let start = calendar.date(byAdding: .month, value: -count, to: end)!
         guard let coverageStart, coverageStart <= start else { return nil }
-        let months = (0..<count).compactMap { index -> CanvasSpendingMonth? in
+        return (0..<count).map { index in
             let first = calendar.date(byAdding: .month, value: index, to: start)!
             let span = calendar.dateInterval(of: .month, for: first)!
-            let allRecords = CanvasSpendingHistory.entries(expenses, in: span)
-            let records = allRecords.filter { category == nil || $0.category == category }
+            let records = CanvasSpendingHistory.entries(expenses, in: span).filter { category == nil || $0.category == category }
             return CanvasSpendingMonth(interval: span, amount: CanvasSpendingHistory.total(records))
         }
-        return months.count == count ? months : nil
     }
     var longitudinalInsights: [CanvasSpendingInsight] {
         var result: [CanvasSpendingInsight] = []
