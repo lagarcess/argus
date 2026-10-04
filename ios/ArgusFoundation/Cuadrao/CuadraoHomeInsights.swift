@@ -33,9 +33,16 @@ struct CuadraoHomeInsights: View {
         CanvasSpendingHistory.expenses(data.visibleActivity, accounts: data.scopedAccounts, currency: currency)
     }
     private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: data.balanceObservations, now: .now) }
-    private var oldest: Int { activity ? CanvasSpendingHistory.oldestOffset(expenses, range: range) : range.oldestOffset(history) }
-    private func balancePeriod(_ offset: Int) -> CanvasBalancePeriod {
-        CanvasBalancePeriod(accounts: accounts, observations: data.balanceObservations, range: range, offset: offset)
+    private var oldest: Int { oldestOffset(history) }
+    private func oldestOffset(_ history: @autoclosure () -> [CanvasBalancePoint]) -> Int {
+        activity ? CanvasSpendingHistory.oldestOffset(expenses, range: range) : range.oldestOffset(history())
+    }
+    private func balancePeriod(_ offset: Int, built: CanvasBuiltBalanceHistory?) -> CanvasBalancePeriod {
+        let now = Date.now
+        guard let history = built?.points(on: now) else {
+            return CanvasBalancePeriod(accounts: accounts, observations: data.balanceObservations, range: range, offset: offset, now: now)
+        }
+        return CanvasBalancePeriod(accounts: accounts, observations: data.balanceObservations, range: range, offset: offset, now: now, history: history)
     }
     private func recordFirstExpense() {
         if accounts.count == 1, let account = accounts.first { accountSheet = .record(account.id) }
@@ -47,21 +54,25 @@ struct CuadraoHomeInsights: View {
             interval: range.interval(offset: offset), periodTitle: range.periodLabel(spanish: spanish, offset: offset),
             metric: activity ? .activity : .balance, presentation: distribution ? .distribution : .evolution)
     }
-    @ViewBuilder private func periodContent(_ offset: Int) -> some View {
+    @ViewBuilder private func periodContent(_ offset: Int, built: CanvasBuiltBalanceHistory?) -> some View {
         if activity {
             CuadraoSpendingChart(expenses: expenses, coverageStart: data.spendingCoverageStart(currency: currency), currency: currency,
                 spanish: spanish, distribution: distribution, range: range, periodOffset: .constant(offset), record: accounts.isEmpty ? nil : recordFirstExpense, context: chartContext(offset))
         } else if distribution {
-            CuadraoHomeDistribution(accounts: balancePeriod(offset).closingAccounts, currency: currency, spanish: spanish, historical: offset < 0,
-                asOf: balancePeriod(offset).closing?.date, context: chartContext(offset))
+            let period = balancePeriod(offset, built: built)
+            CuadraoHomeDistribution(accounts: period.closingAccounts, currency: currency, spanish: spanish, historical: offset < 0,
+                asOf: period.closing?.date, context: chartContext(offset))
         } else {
             CuadraoHomeBalanceChart(accounts: accounts, observations: data.balanceObservations, currency: currency,
                 currencies: [currency], spanish: spanish, shared: shared, chooseCurrency: { _ in }, expanded: true,
-                range: $range, periodOffset: .constant(offset))
+                history: built, range: $range, periodOffset: .constant(offset))
             CanvasChartAsk(context: chartContext(offset), spanish: spanish)
         }
     }
     var body: some View {
+        // One history per pass feeds the page range, every live page and its period.
+        let built = activity ? nil : CanvasBuiltBalanceHistory(accounts: accounts, observations: data.balanceObservations, now: .now)
+        let oldest = oldestOffset(built?.points ?? history)
         NavigationStack(path: $accountPath) {
             VStack(spacing: 8) {
                 VStack(spacing: 4) {
@@ -74,7 +85,7 @@ struct CuadraoHomeInsights: View {
                             if abs(offset - periodOffset) <= 1 {
                                 VStack(alignment: .leading, spacing: 16) {
                                     periodLabel(offset)
-                                    periodContent(offset)
+                                    periodContent(offset, built: built)
                                 }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 32)
                             }
                         }

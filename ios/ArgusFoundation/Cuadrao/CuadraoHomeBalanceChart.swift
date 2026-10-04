@@ -13,24 +13,25 @@ struct CuadraoHomeBalanceChart: View {
     var expanded = false
     var expand: () -> Void = {}
     var controls: CuadraoInsightControls?
+    /// Built by the owner from the same accounts and observations, when it already has one.
+    var history: CanvasBuiltBalanceHistory?
     @Binding var range: CanvasHistoryRange
     @Binding var periodOffset: Int
     init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], currency: String,
          currencies: [String], spanish: Bool, shared: Bool, chooseCurrency: @escaping (String) -> Void,
          expanded: Bool = false, expand: @escaping () -> Void = {}, controls: CuadraoInsightControls? = nil,
-         range: Binding<CanvasHistoryRange> = .constant(.month), periodOffset: Binding<Int> = .constant(0)) {
+         history: CanvasBuiltBalanceHistory? = nil, range: Binding<CanvasHistoryRange> = .constant(.month), periodOffset: Binding<Int> = .constant(0)) {
         self.accounts = accounts; self.observations = observations; self.currency = currency
         self.currencies = currencies; self.spanish = spanish; self.shared = shared; self.chooseCurrency = chooseCurrency
-        self.expanded = expanded; self.expand = expand; self.controls = controls
+        self.expanded = expanded; self.expand = expand; self.controls = controls; self.history = history
         _range = range; _periodOffset = periodOffset
     }
     var body: some View {
-        let now = Date.now
         CuadraoHomeBalanceChartContent(accounts: accounts, observations: observations, currency: currency,
             currencies: currencies, spanish: spanish, shared: shared, chooseCurrency: chooseCurrency,
             expanded: expanded, expand: expand, controls: controls,
-            builtHistory: CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: now),
-            builtDay: Calendar.current.startOfDay(for: now), range: $range, periodOffset: $periodOffset)
+            built: history ?? CanvasBuiltBalanceHistory(accounts: accounts, observations: observations, now: .now),
+            range: $range, periodOffset: $periodOffset)
     }
 }
 
@@ -45,20 +46,15 @@ private struct CuadraoHomeBalanceChartContent: View {
     let expanded: Bool
     let expand: () -> Void
     let controls: CuadraoInsightControls?
-    let builtHistory: [CanvasBalancePoint]
-    let builtDay: Date
+    let built: CanvasBuiltBalanceHistory
     @Environment(\.dynamicTypeSize) var typeSize
     @State var compactRange: CanvasHomeRange = .month
     @Binding var range: CanvasHistoryRange
     @Binding var periodOffset: Int
     @State var selectedDate: Date?
     /// The history depends on the clock only through its day, so the built one holds until the day changes.
-    private var history: [CanvasBalancePoint] {
-        Calendar.current.startOfDay(for: .now) == builtDay ? builtHistory
-            : CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now)
-    }
-    private var period: CanvasBalancePeriod {
-        CanvasBalancePeriod(accounts: accounts, observations: observations, range: range, offset: periodOffset)
+    private func history(_ now: Date) -> [CanvasBalancePoint] {
+        built.points(on: now) ?? CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: now)
     }
     /// Everything drawn from the history, derived once per body pass: the marks read it per point.
     private struct Reading {
@@ -72,7 +68,8 @@ private struct CuadraoHomeBalanceChartContent: View {
         let period: CanvasBalancePeriod?
     }
     private var reading: Reading {
-        let history = history
+        let now = Date.now
+        let history = history(now)
         let availableRanges = CanvasHomeRange.available(history)
         let effectiveRange = availableRanges.contains(compactRange) ? compactRange : .all
         let points = expanded ? range.points(history, offset: periodOffset) : effectiveRange.points(history)
@@ -87,7 +84,8 @@ private struct CuadraoHomeBalanceChartContent: View {
         let selected = selectedDate.flatMap { selectedDate in
             points.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
         }
-        let period = expanded ? period : nil
+        let period = expanded ? CanvasBalancePeriod(accounts: accounts, observations: observations, range: range,
+            offset: periodOffset, now: now, history: history) : nil
         let values = points.map(\.value)
         let low = values.min() ?? 0, high = values.max() ?? 1
         let step = pow(10, floor(log10(max(high - low, max(abs(high) * 0.01, 1)))))
@@ -149,7 +147,7 @@ private struct CuadraoHomeBalanceChartContent: View {
             }
         }.onChange(of: range) { _, _ in selectedDate = nil }
             .onChange(of: periodOffset) { _, _ in selectedDate = nil }
-            .onAppear { periodOffset = max(range.oldestOffset(history), min(0, periodOffset)) }
+            .onAppear { periodOffset = max(range.oldestOffset(history(.now)), min(0, periodOffset)) }
             .sensoryFeedback(.selection, trigger: selected?.date)
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
