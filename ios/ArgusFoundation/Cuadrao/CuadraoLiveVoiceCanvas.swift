@@ -72,7 +72,7 @@ struct CuadraoLiveVoiceCanvas: View {
                 Image(systemName: "chevron.down").font(.system(size: 18, weight: .medium))
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
-            }.accessibilityLabel(es ? "Minimizar conversación de voz" : "Minimize voice conversation")
+            }.buttonStyle(.plain).accessibilityLabel(es ? "Minimizar conversación de voz" : "Minimize voice conversation")
                 .accessibilityIdentifier("voice-minimize")
             Spacer()
             Text("Cuadrao").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
@@ -82,13 +82,13 @@ struct CuadraoLiveVoiceCanvas: View {
                     Image(systemName: "slider.horizontal.3").font(.system(size: 20))
                         .frame(width: 48, height: 48)
                         .background(.ultraThinMaterial, in: Circle())
-                }.accessibilityLabel(es ? "Elegir voz" : "Choose voice")
+                }.buttonStyle(.plain).accessibilityLabel(es ? "Elegir voz" : "Choose voice")
                     .accessibilityIdentifier("voice-choose")
             } else {
                 // Keeps the title centered while voice selection is off.
                 Color.clear.frame(width: 48, height: 48).accessibilityHidden(true)
             }
-        }.buttonStyle(.plain).padding(.horizontal, 24).padding(.top, 12)
+        }.padding(.horizontal, 24).padding(.top, 12)
     }
 
     private var controls: some View {

@@ -1,4 +1,5 @@
 # digest  reason the label is already hittable across its frame (file shown for the reader; the digest is the key)
+# A reason ending in "<helper> carries the shape" is checked: that struct, func or var must contain contentShape.
 9ac2023b862c  ArgusFoundation/Accounts/AccountActivityView.swift: FinancialActivityRow carries the shape
 6f087ece4b6f  ArgusFoundation/Accounts/AccountsView.swift: AccountRow carries the shape
 493a429d01cf  ArgusFoundation/Accounts/FinancialHomeView.swift: FinancialActivityRow carries the shape
@@ -16,7 +17,8 @@ f40248e0c29a  ArgusFoundation/Cuadrao/CuadraoChatAnswer.swift: filled card, opaq
 a9024b606f1c  ArgusFoundation/Cuadrao/CuadraoFirstAccountSheet.swift: filled label, opaque across its frame
 5f56d7f6826c  ArgusFoundation/Cuadrao/CuadraoFirstAccountSheet.swift: filled tile, opaque across its frame
 e79cf69f8796  ArgusFoundation/Cuadrao/CuadraoHomeCanvas.swift: feedRow carries the shape
-a16ae8e4b581  ArgusFoundation/Cuadrao/CuadraoLiveVoiceCanvas.swift: material-filled circle; the style sits on the enclosing HStack
+4da694898bab  ArgusFoundation/Cuadrao/CuadraoLiveVoiceCanvas.swift: material-filled circle across its 48 pt frame
+df0fee271773  ArgusFoundation/Cuadrao/CuadraoLiveVoiceCanvas.swift: material-filled circle across its 48 pt frame
 85fdfd09be7e  ArgusFoundation/Cuadrao/CuadraoProfileCanvas.swift: CanvasProfileRow carries the shape
 0fd6b99e1d66  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carries the shape
 ae491bb6b7d8  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carries the shape
@@ -28,13 +30,13 @@ ff6872434883  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carri
 2fcf20220b6f  ArgusFoundation/Cuadrao/CuadraoSpacesSheet.swift: spaceChoice carries the shape
 9392d175d509  ArgusFoundation/Cuadrao/CuadraoSpendingTrends.swift: filled card, opaque across its frame
 3b293c8c2d90  ArgusFoundation/Cuadrao/CuadraoUpdatesCanvas.swift: row(_:) carries the shape
-6e1228b1526b  ArgusFoundation/Cuadrao/CuadraoVoiceMessagePanel.swift: filled capsule, opaque across its frame
+b868490ad918  ArgusFoundation/Cuadrao/CuadraoVoiceMessagePanel.swift: Stop only, filled capsule, opaque across its frame
 592c27234470  ArgusFoundation/Cuadrao/CuadraoVoicePicker.swift: filled capsule, opaque across its frame
 d91a69540884  ArgusFoundation/Cuadrao/Planning/CuadraoPlanVisuals.swift: filled capsule, opaque across its frame
-a0e03c556626  ArgusFoundation/Cuadrao/Planning/PlanCurrencyChoice.swift: CuadraoChoiceMenu carries the shape
+52c6ad8a724d  ArgusFoundation/Cuadrao/Planning/PlanCurrencyChoice.swift: the label of CuadraoChoiceMenu, CuadraoChoiceLabel carries the shape
 c5c6a6dba0e1  ArgusFoundation/Cuadrao/Receipts/CuadraoReceiptSupport.swift: filled card, opaque across its frame
-73fe15564e24  ArgusFoundation/DesignSystem.swift: SampleRow content carries the shape
-749c2924f68e  ArgusFoundation/FoundationSheets.swift: SampleRow content carries the shape
+73fe15564e24  ArgusFoundation/DesignSystem.swift: the content of SampleRow carries the shape
+749c2924f68e  ArgusFoundation/FoundationSheets.swift: the content of SampleRow carries the shape
 a535259d2cd2  ArgusFoundation/Plan/FinancialBudgetView.swift: contributor(_:) carries the shape
 81054c0416c7  ArgusFoundation/Plan/FinancialPlanView.swift: FinancialOccurrenceRow carries the shape
 cf242bbfe912  ArgusFoundation/Plan/FinancialPlanView.swift: FinancialOccurrenceRow carries the shape
