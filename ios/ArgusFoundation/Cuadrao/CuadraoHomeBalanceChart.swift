@@ -30,46 +30,60 @@ struct CuadraoHomeBalanceChart: View {
     private var period: CanvasBalancePeriod {
         CanvasBalancePeriod(accounts: accounts, observations: observations, range: range, offset: periodOffset)
     }
-    private var availableRanges: [CanvasHomeRange] { CanvasHomeRange.available(history) }
-    private var effectiveRange: CanvasHomeRange { availableRanges.contains(compactRange) ? compactRange : .all }
-    private var points: [CanvasBalancePoint] {
-        expanded ? range.points(history, offset: periodOffset) : effectiveRange.points(history)
+    /// Everything drawn from the history, derived once per body pass: the marks read it per point.
+    private struct Reading {
+        let availableRanges: [CanvasHomeRange]
+        let effectiveRange: CanvasHomeRange
+        let points: [CanvasBalancePoint]
+        let xDomain: ClosedRange<Date>
+        let selected: CanvasBalancePoint?
+        let shown: CanvasBalancePoint?
+        let bounds: ClosedRange<Double>
+        let period: CanvasBalancePeriod?
     }
-    private var xDomain: ClosedRange<Date> {
+    private var reading: Reading {
+        let history = history
+        let availableRanges = CanvasHomeRange.available(history)
+        let effectiveRange = availableRanges.contains(compactRange) ? compactRange : .all
+        let points = expanded ? range.points(history, offset: periodOffset) : effectiveRange.points(history)
+        let xDomain: ClosedRange<Date>
         if expanded {
             let interval = range.interval(offset: periodOffset)
-            return interval.start...interval.end
+            xDomain = interval.start...interval.end
+        } else {
+            let first = points.first?.date ?? Date.now
+            xDomain = first...max(points.last?.date ?? first, first.addingTimeInterval(86400))
         }
-        let first = points.first?.date ?? Date.now
-        return first...max(points.last?.date ?? first, first.addingTimeInterval(86400))
-    }
-    private var selected: CanvasBalancePoint? {
-        guard let selectedDate else { return nil }
-        return points.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
-    }
-    private var shown: CanvasBalancePoint? { selected ?? (expanded ? period.closing : points.last) }
-    private var partial: Bool { accounts.contains { $0.balance == nil } }
-    private var bounds: ClosedRange<Double> {
+        let selected = selectedDate.flatMap { selectedDate in
+            points.min { abs($0.date.timeIntervalSince(selectedDate)) < abs($1.date.timeIntervalSince(selectedDate)) }
+        }
+        let period = expanded ? period : nil
         let values = points.map(\.value)
         let low = values.min() ?? 0, high = values.max() ?? 1
         let step = pow(10, floor(log10(max(high - low, max(abs(high) * 0.01, 1)))))
-        return (floor((low - step * 0.2) / step) * step)...(ceil((high + step * 0.2) / step) * step)
+        return Reading(availableRanges: availableRanges, effectiveRange: effectiveRange, points: points, xDomain: xDomain,
+            selected: selected, shown: selected ?? (expanded ? period?.closing : points.last),
+            bounds: (floor((low - step * 0.2) / step) * step)...(ceil((high + step * 0.2) / step) * step), period: period)
     }
+    private var partial: Bool { accounts.contains { $0.balance == nil } }
     var body: some View {
+        let reading = reading
+        let points = reading.points, xDomain = reading.xDomain, selected = reading.selected, shown = reading.shown
+        let availableRanges = reading.availableRanges, effectiveRange = reading.effectiveRange
         VStack(alignment: .leading, spacing: 12) {
-            amountRow
+            amountRow(shown)
             Text((expanded ? shown.map { (partial ? (spanish ? "Balance parcial · " : "Partial balance · ") : (spanish ? "Balance neto · " : "Net balance · ")) + dateLabel($0.date) } : selected.map { dateLabel($0.date) }) ?? (partial
                 ? (spanish ? "Balance parcial" : "Partial balance")
                 : (spanish ? "Balance neto" : "Net balance")))
                 .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("home-chart-date")
             if expanded, let point = shown {
-                Text(takeaway(point)).font(CuadraoTypography.supporting)
+                Text(takeaway(point, period: reading.period)).font(CuadraoTypography.supporting)
                     .fixedSize(horizontal: false, vertical: true).accessibilityIdentifier("home-chart-takeaway")
             }
             if let controls { controls.padding(.vertical, 8) }
             if !points.isEmpty {
-                periodCanvas
+                periodCanvas(reading)
                 HStack {
                     Text(dateLabel(expanded ? xDomain.lowerBound : points.first!.date))
                     Spacer()
@@ -85,7 +99,7 @@ struct CuadraoHomeBalanceChart: View {
                         : (spanish ? "No hay nuevos balances registrados en este período." : "No new balances were recorded in this period."))
                     .accessibilityIdentifier("home-chart-empty")
             }
-            if expanded, period.closing != nil {
+            if expanded, let period = reading.period, period.closing != nil {
                 CuadraoBalanceBreakdown(period: period, currency: currency, spanish: spanish)
             }
             if !expanded && availableRanges.count > 1 {
@@ -109,7 +123,7 @@ struct CuadraoHomeBalanceChart: View {
             .sensoryFeedback(.selection, trigger: selected?.date)
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
-    private var amountRow: some View {
+    private func amountRow(_ shown: CanvasBalancePoint?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
                 if currencies.count > 1 {
                     CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency",
@@ -130,8 +144,8 @@ struct CuadraoHomeBalanceChart: View {
                 }
             }.font(CuadraoTypography.supporting)
     }
-    private var periodCanvas: some View {
-        chart.padding(expanded ? 14 : 0)
+    private func periodCanvas(_ reading: Reading) -> some View {
+        chart(reading).padding(expanded ? 14 : 0)
             .background {
                 if expanded { RoundedRectangle(cornerRadius: 22).fill(WelcomePalette.surface.opacity(0.5)) }
             }
@@ -147,8 +161,8 @@ struct CuadraoHomeBalanceChart: View {
             return dateLabel(interval.start) + " – " + dateLabel(end)
         }
     }
-    private func takeaway(_ point: CanvasBalancePoint) -> String {
-        guard let baseline = period.opening, baseline.date < point.date else {
+    private func takeaway(_ point: CanvasBalancePoint, period: CanvasBalancePeriod?) -> String {
+        guard let baseline = period?.opening, baseline.date < point.date else {
             return spanish ? "Tu último balance registrado, sin estimaciones." : "Your latest recorded balance, without estimates."
         }
         let change = point.balance - baseline.balance
@@ -157,8 +171,10 @@ struct CuadraoHomeBalanceChart: View {
         if spanish { return "\(amount) \(change > 0 ? "más" : "menos") desde el \(dateLabel(baseline.date))." }
         return "\(amount) \(change > 0 ? "more" : "less") since \(dateLabel(baseline.date))."
     }
-    private var chartBase: some View {
-        Chart {
+    private func chartBase(_ reading: Reading) -> some View {
+        let points = reading.points, bounds = reading.bounds, xDomain = reading.xDomain
+        let selected = reading.selected, shown = reading.shown
+        return Chart {
             ForEach(points) { point in
                 AreaMark(x: .value("Date", point.date), yStart: .value("Base", bounds.lowerBound), yEnd: .value("Balance", point.value))
                     .foregroundStyle(LinearGradient(colors: [WelcomePalette.pine.opacity(0.16), WelcomePalette.pine.opacity(0)], startPoint: .top, endPoint: .bottom))
@@ -191,9 +207,9 @@ struct CuadraoHomeBalanceChart: View {
             .frame(height: expanded ? 270 : 125).accessibilityIdentifier("home-balance-chart")
             .accessibilityValue(periodTitle)
     }
-    @ViewBuilder private var chart: some View {
+    @ViewBuilder private func chart(_ reading: Reading) -> some View {
         if expanded {
-            chartBase
+            chartBase(reading)
             .chartOverlay { proxy in
                 GeometryReader { geometry in
                     CuadraoChartTouchSurface { location in
@@ -204,7 +220,7 @@ struct CuadraoHomeBalanceChart: View {
                 }
             }
         } else {
-            chartBase.chartXSelection(value: $selectedDate)
+            chartBase(reading).chartXSelection(value: $selectedDate)
                 .chartGesture { proxy in
                     LongPressGesture(minimumDuration: 0.2)
                         .sequenced(before: DragGesture(minimumDistance: 0))
