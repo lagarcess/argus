@@ -53,6 +53,7 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         let repayment = app.textFields["group-repayment-amount"], record = app.buttons["group-repayment-save"]
         XCTAssertEqual(repayment.value as? String, "3,300.00", "Ana owes her 3,000 house share plus 300 of the dinner")
         replace(repayment, with: "3301")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "3,301"), object: repayment)], timeout: 3), .completed, "The over-cap amount is in the field before the refusal is read")
         XCTAssertTrue(record.wait(for: \.isEnabled, toEqual: false, timeout: 2), "A repayment cannot exceed what the sender owes")
         replace(repayment, with: "500")
         XCTAssertTrue(record.wait(for: \.isEnabled, toEqual: true, timeout: 2), "A partial repayment under the cap can be recorded")

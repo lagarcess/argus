@@ -29,16 +29,16 @@ struct CuadraoVoiceBar: View {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .font(.system(size: 12)).foregroundStyle(.secondary).padding(.trailing, 10)
                 }.padding(.leading, embedded ? 4 : 16).frame(minHeight: 54).contentShape(Rectangle())
-            }.accessibilityLabel(spanish ? "Ampliar voz" : "Expand voice")
+            }.buttonStyle(.plain).accessibilityLabel(spanish ? "Ampliar voz" : "Expand voice")
                 .accessibilityValue(voice.status(spanish))
                 .accessibilityIdentifier("voice-expand")
             Button { voice.muted.toggle() } label: {
-                Image(systemName: voice.muted ? "mic.slash" : "mic").frame(width: 44, height: 48)
-            }.accessibilityIdentifier("voice-mute-compact").accessibilityLabel(voice.muted ? (spanish ? "Activar micrófono" : "Unmute microphone") : (spanish ? "Silenciar micrófono" : "Mute microphone"))
+                Image(systemName: voice.muted ? "mic.slash" : "mic").frame(width: 44, height: 48).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityIdentifier("voice-mute-compact").accessibilityLabel(voice.muted ? (spanish ? "Activar micrófono" : "Unmute microphone") : (spanish ? "Silenciar micrófono" : "Mute microphone"))
             Button { voice.end() } label: {
-                Image(systemName: "xmark").frame(width: 44, height: 48)
-            }.accessibilityLabel(spanish ? "Terminar conversación de voz" : "End voice conversation")
+                Image(systemName: "xmark").frame(width: 44, height: 48).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel(spanish ? "Terminar conversación de voz" : "End voice conversation")
                 .accessibilityIdentifier("voice-end-compact")
-        }.buttonStyle(.plain).foregroundStyle(WelcomePalette.ink)
+        }.foregroundStyle(WelcomePalette.ink)
     }
 }

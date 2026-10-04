@@ -121,7 +121,7 @@ struct CanvasChatFocusChip: View {
             Text(focus.title(spanish)).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
             if let remove {
                 Spacer(minLength: 0)
-                Button(action: remove) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                Button(action: remove) { Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle()) }
                     .buttonStyle(.plain)
                     .accessibilityLabel(spanish ? "Quitar contexto" : "Remove context")
                     .accessibilityIdentifier("chat-focus-remove")

@@ -125,7 +125,7 @@ struct CuadraoPlanCanvas: View {
                 HStack {
                     Text(spanish ? "Explorar escenarios" : "Explore scenarios")
                     Image(systemName: "chevron.right").font(.caption2).accessibilityHidden(true)
-                }.font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44)
+                }.font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("plan-explore")
         }
     }

@@ -97,7 +97,7 @@ struct FinancialSearchView: View {
                 .foregroundStyle(model.origin.kind == kind ? WelcomePalette.pine : ArgusStyle.secondary)
                 .overlay(alignment: .bottom) {
                     Rectangle().fill(model.origin.kind == kind ? WelcomePalette.pine : .clear).frame(height: 2)
-                }
+                }.contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("search.filter." + (kind?.rawValue ?? "all"))
             .accessibilityAddTraits(model.origin.kind == kind ? .isSelected : [])
     }

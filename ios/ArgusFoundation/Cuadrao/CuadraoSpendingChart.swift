@@ -201,8 +201,8 @@ struct CuadraoSpendingChart: View {
             }, selection: Binding(get: { selectedCategory?.rawValue }, set: { selectedCategory = $0.flatMap(CanvasExpenseCategory.init(rawValue:)) }),
                 identifier: "home-spending-segment-")
             HStack(spacing: 8) {
-                Button(spanish ? "Todo" : "All") { selectedCategory = nil }
-                    .frame(minHeight: 44).buttonStyle(.plain)
+                Button { selectedCategory = nil } label: { Text(spanish ? "Todo" : "All").frame(minHeight: 44).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
                     .foregroundStyle(selectedCategory == nil ? WelcomePalette.ink : .secondary)
                     .accessibilityIdentifier("home-spending-all")
                 if let selectedCategory {

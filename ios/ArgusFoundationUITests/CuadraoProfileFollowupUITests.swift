@@ -213,9 +213,10 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
 
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
         for _ in 0..<10 {
-            // A drag that starts on the keyboard never scrolls the form, so stay above it.
+            // A drag that starts on the keyboard never scrolls the form. The keyboard element's
+            // frame begins below its 44 pt prediction bar, which swallows the drag as well.
             let keyboard = app.keyboards.firstMatch
-            let floor = keyboard.exists ? keyboard.frame.minY : app.frame.maxY - 100
+            let floor = keyboard.exists ? keyboard.frame.minY - 44 : app.frame.maxY - 100
             if element.isHittable && element.frame.maxY < floor { return }
             let downward = !element.exists || element.frame.minY > app.frame.midY
             let top = min(0.7, floor / app.frame.height - 0.05)

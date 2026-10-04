@@ -101,8 +101,9 @@ struct CuadraoVoiceRecordingOverlay: View {
     private var recordingActions: some View {
         let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 16)) : AnyLayout(HStackLayout(spacing: 24))
         return layout {
-            Button(es ? "Cancelar" : "Cancel", role: .destructive) { message.cancel() }
-                .frame(minWidth: 80, minHeight: 48).fixedSize(horizontal: false, vertical: true)
+            Button(role: .destructive) { message.cancel() } label: {
+                Text(es ? "Cancelar" : "Cancel").frame(minWidth: 80, minHeight: 48).contentShape(Rectangle())
+            }.buttonStyle(.plain).fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("voice-message-cancel")
             Button { message.stop() } label: {
                 Label(es ? "Detener" : "Stop", systemImage: "stop.fill")
@@ -110,8 +111,8 @@ struct CuadraoVoiceRecordingOverlay: View {
                     .padding(.horizontal, 22).padding(.vertical, 10).frame(minHeight: 48)
                     .foregroundStyle(WelcomePalette.onAccent)
                     .background(WelcomePalette.pine, in: Capsule())
-            }.accessibilityIdentifier("voice-message-stop")
-        }.buttonStyle(.plain)
+            }.buttonStyle(.plain).accessibilityIdentifier("voice-message-stop")
+        }
     }
 
     private var lockHint: some View {

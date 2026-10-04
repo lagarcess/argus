@@ -39,7 +39,7 @@ struct FinancialPlanView: View {
                                 Text(item.title).font(ArgusStyle.body(14, relativeTo: .subheadline))
                                     .frame(minWidth: 44, minHeight: 48)
                                     .foregroundStyle(model.section == item ? ArgusStyle.ink : ArgusStyle.secondary)
-                                    .overlay(alignment: .bottom) { Rectangle().fill(model.section == item ? ArgusStyle.ink : .clear).frame(height: 1) }
+                                    .overlay(alignment: .bottom) { Rectangle().fill(model.section == item ? ArgusStyle.ink : .clear).frame(height: 1) }.contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityIdentifier("plan." + item.rawValue)
                                 .accessibilityAddTraits(model.section == item ? .isSelected : [])
                         }
