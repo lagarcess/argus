@@ -68,7 +68,7 @@ pass: 16 tests, 0 failures.
 | --- | --- | --- |
 | Initial Frame Rendering, 5 cold launches | 209, 192, 192, 191, 191 ms | 286, 319, 317, 171, 179 ms |
 | UIKit Initialization in the same launches | 85, about 70 ms | 204, 178, 190, 70, 73 ms |
-| Initial Frame Rendering in the two 40 s recordings | not read | 167 ms (hitches recording) |
+| Initial Frame Rendering in the 40 s hitches recording | not read | 167 ms |
 | Launch hitch in the 40 s recording | 250 ms | none |
 | Hitch time ratio over the 40 s recording | 6.1 ms/s | 0.0 ms/s |
 | Interaction delay at launch | 35 ms | 34 ms |
@@ -79,7 +79,7 @@ pass: 16 tests, 0 failures.
 
 The first three launches on 3426 were slower. In those three the system's own UIKit Initialization
 phase, which runs before any app view code, took 178 to 204 ms instead of about 70 ms, and they were the
-first launches after the install. The next two launches and the two 40 s recordings came in at 167 to
+first launches after the install. The next two launches and the 40 s hitches recording came in at 167 to
 179 ms. No app frame grew in the slow launches. In the fourth launch the app left the foreground about
 1.1 s after its first frame; nobody was meant to touch the phone, and the cause is not known.
 
