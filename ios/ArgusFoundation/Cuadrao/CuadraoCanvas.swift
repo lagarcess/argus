@@ -3,7 +3,12 @@ import SwiftUI
 enum WelcomePalette {
     /// Design-preview only (default off): dark-appearance tokens apply under `CuadraoDesignPreview`.
     /// Every other launch, including Connected Cuadrao, keeps the shipped light tokens exactly.
+    #if DEBUG
     static let adaptsToAppearance = CuadraoDesignPreview.isActive
+        || ProcessInfo.processInfo.arguments.contains("--cuadrao-release-ui")
+    #else
+    static let adaptsToAppearance = CuadraoDesignPreview.isActive
+    #endif
 
     static let pine = adaptive(Color(red: 0.16, green: 0.29, blue: 0.25),
                                UIColor(red: 0.16, green: 0.29, blue: 0.25, alpha: 1),

@@ -5,7 +5,7 @@ struct CanvasProfileDraft {
     var name = "Alex Rivera"
     var preferredName = "Alex"
     var currency = "DOP"
-    var avatar: CanvasProfileAvatarStyle = .initial
+    var avatar: CuadraoAvatarSelection = .none
     var quietStart = Calendar.current.date(from: DateComponents(hour: 22)) ?? .now
     var quietEnd = Calendar.current.date(from: DateComponents(hour: 8)) ?? .now
     var responseLength = 0
@@ -66,17 +66,23 @@ enum CanvasProfileRoute: Hashable {
     }
 }
 
-/// First native release presentation (fc7650ea; lock wording in #787). These Profile rows and the
-/// personal-photo option stay in code but are hidden; flip a value once its feature, owner and
-/// controls are ready. Voice follows its own default-off preview switch.
+/// Release builds hide designed controls whose backend is still owed. DEBUG builds show all of
+/// them unless launched with `--cuadrao-release-gates`, which previews the release set.
 enum CuadraoFirstRelease {
-    static let hiddenProfileRoutes: Set<CanvasProfileRoute> = [
+    static let unfinishedProfileRoutes: Set<CanvasProfileRoute> = [
         .personalization, .security, .shared, .removed, .memory, .usage, .advanced
     ]
-    static let showsPersonalPhoto = false
-    static let showsConversationBulkActions = false
+    #if DEBUG
+    static let hidesUnfinished = ProcessInfo.processInfo.arguments.contains("--cuadrao-release-gates")
+    #else
+    static let hidesUnfinished = true
+    #endif
+    /// Avatar choices, photos included, live only in this session until profile storage exists.
+    static var editsAvatar: Bool { !hidesUnfinished }
+    static var showsConversationBulkActions: Bool { !hidesUnfinished }
     static func shows(_ route: CanvasProfileRoute) -> Bool {
-        route == .voice ? CuadraoDesignPreview.voiceSelection : !hiddenProfileRoutes.contains(route)
+        if route == .voice { return CuadraoDesignPreview.voiceSelection }
+        return !(hidesUnfinished && unfinishedProfileRoutes.contains(route))
     }
 }
 
@@ -205,7 +211,7 @@ struct CuadraoProfileEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var preferred: String
-    @State private var avatar: CanvasProfileAvatarStyle
+    @State private var avatar: CuadraoAvatarSelection
     @State private var photoLoading = false
     @State private var cropRequest: CanvasAvatarCropRequest?
 
@@ -228,7 +234,9 @@ struct CuadraoProfileEditor: View {
                 HStack { Spacer(); CanvasProfileAvatar(name: name, style: avatar); Spacer() }
                     .padding(.vertical, 12).listRowBackground(Color.clear)
             }
-            CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar, loading: $photoLoading, cropRequest: $cropRequest)
+            if CuadraoFirstRelease.editsAvatar {
+                CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar, loading: $photoLoading, cropRequest: $cropRequest)
+            }
             Section {
                 field(spanish ? "Nombre" : "Name", text: $name, id: "cuadrao.profile.name")
                     .textContentType(.name)

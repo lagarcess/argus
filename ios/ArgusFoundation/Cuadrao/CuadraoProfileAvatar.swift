@@ -1,41 +1,20 @@
 import SwiftUI
 import PhotosUI
 
-enum CanvasProfileAvatarStyle: Equatable {
-    case initial
-    case theme(CanvasPlanLook)
-    case photo(CanvasAvatarPhoto)
-}
-
 struct CanvasProfileAvatar: View {
     let name: String
-    let style: CanvasProfileAvatarStyle
+    let style: CuadraoAvatarSelection
     var size: CGFloat = 64
 
     var body: some View {
-        Group {
-            switch style {
-            case .initial:
-                Text(String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(1)).uppercased())
-                    .frame(width: size, height: size)
-                    .foregroundStyle(WelcomePalette.pine).background(WelcomePalette.sage)
-            case .theme(let theme):
-                Image(systemName: theme.symbol).frame(width: size, height: size)
-                    .foregroundStyle(theme.color).background(theme.color.opacity(0.12))
-            case .photo(let photo):
-                if let image = UIImage(data: photo.thumbnail) {
-                    Image(uiImage: image).resizable().scaledToFill().frame(width: size, height: size)
-                }
-            }
-        }.font(.system(.title, design: .rounded, weight: .medium))
-            .frame(width: size, height: size).clipShape(Circle()).accessibilityHidden(true)
+        CuadraoIdentityAvatar(selection: style, name: name, size: size)
     }
 }
 
 struct CuadraoProfileAvatarPicker: View {
     let name: String
     let spanish: Bool
-    @Binding var avatar: CanvasProfileAvatarStyle
+    @Binding var avatar: CuadraoAvatarSelection
     @Binding var loading: Bool
     @Binding var cropRequest: CanvasAvatarCropRequest?
     @State private var selectedPhoto: PhotosPickerItem?
@@ -49,8 +28,6 @@ struct CuadraoProfileAvatarPicker: View {
 
     var body: some View {
         Section {
-            // First release: initials and themes only; the photo option stays in code, hidden.
-            if CuadraoFirstRelease.showsPersonalPhoto {
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 Label(spanish ? (hasPhoto ? "Cambiar foto" : "Elegir foto") : (hasPhoto ? "Change photo" : "Choose photo"),
                       systemImage: "photo")
@@ -63,7 +40,7 @@ struct CuadraoProfileAvatarPicker: View {
                 Button(spanish ? "Ajustar foto" : "Reposition photo") {
                     cropRequest = CanvasAvatarCropRequest(source: photo.source, crop: photo.crop)
                 }.accessibilityIdentifier("cuadrao.profile.photo.edit")
-                Button(spanish ? "Quitar foto" : "Remove photo", role: .destructive) { select(.initial) }
+                Button(spanish ? "Quitar foto" : "Remove photo", role: .destructive) { select(.none) }
                     .accessibilityIdentifier("cuadrao.profile.photo.remove")
             }
             if loadFailed {
@@ -71,19 +48,18 @@ struct CuadraoProfileAvatarPicker: View {
                     .font(.footnote).foregroundStyle(.secondary)
                     .accessibilityIdentifier("cuadrao.profile.photo.error")
             }
-            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 76))], spacing: 12) {
-                choice(nil)
-                ForEach(CanvasPlanLook.allCases) { choice($0) }
+                choice(.none, title: spanish ? "Perfil" : "Profile", id: "none")
+                choice(.initials, title: spanish ? "Iniciales" : "Initials", id: "initial")
+                ForEach(CuadraoAvatarTheme.allCases) { theme in
+                    choice(.theme(theme), title: theme.title(spanish), id: theme.rawValue)
+                }
             }.padding(.vertical, 8)
         } header: {
-            Text(CuadraoFirstRelease.showsPersonalPhoto ? (spanish ? "Tu foto o avatar" : "Your photo or avatar")
-                 : (spanish ? "Tu avatar" : "Your avatar"))
+            Text(spanish ? "Tu foto o avatar" : "Your photo or avatar")
         } footer: {
-            if CuadraoFirstRelease.showsPersonalPhoto {
-                Text(spanish ? "Tu foto se queda en esta vista previa. No se sube a tu cuenta."
-                     : "Your photo stays in this preview. It isn’t uploaded to your account.")
-            }
+            Text(spanish ? "Tu foto se queda en esta vista previa. No se sube a tu cuenta."
+                 : "Your photo stays in this preview. It isn’t uploaded to your account.")
         }
             .listRowBackground(CanvasSettingsStyle.surface)
             .task(id: selectedPhoto) {
@@ -105,14 +81,12 @@ struct CuadraoProfileAvatarPicker: View {
             .onDisappear { generation = UUID(); selectedPhoto = nil; loading = false }
     }
 
-    private func select(_ style: CanvasProfileAvatarStyle) {
+    private func select(_ style: CuadraoAvatarSelection) {
         generation = UUID(); selectedPhoto = nil; loading = false; loadFailed = false
         avatar = style
     }
 
-    private func choice(_ theme: CanvasPlanLook?) -> some View {
-        let style = theme.map(CanvasProfileAvatarStyle.theme) ?? .initial
-        let title = theme?.title(spanish) ?? (spanish ? "Inicial" : "Initial")
+    private func choice(_ style: CuadraoAvatarSelection, title: String, id: String) -> some View {
         return Button { select(style) } label: {
             VStack(spacing: 6) {
                 CanvasProfileAvatar(name: name, style: style)
@@ -126,6 +100,6 @@ struct CuadraoProfileAvatarPicker: View {
             }.frame(minHeight: 88)
         }.buttonStyle(.plain).accessibilityLabel(title)
             .accessibilityAddTraits(avatar == style ? .isSelected : [])
-            .accessibilityIdentifier("cuadrao.profile.avatar.\(theme?.rawValue ?? "initial")")
+            .accessibilityIdentifier("cuadrao.profile.avatar.\(id)")
     }
 }

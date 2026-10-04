@@ -5,17 +5,17 @@ final class CuadraoSupportUITests: XCTestCase {
         let app = launch()
         app.buttons["header.profile"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
-        app.buttons["cuadrao.profile.avatar.coast"].tap()
+        app.buttons["cuadrao.profile.avatar.leaf"].tap()
         let preferred = app.textFields["cuadrao.profile.preferred"]
         reveal(app, preferred); replace(preferred, with: "Luna")
         app.buttons["cuadrao.profile.cancel"].tap()
         app.buttons["cuadrao.profile.identity"].tap()
-        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.initial"].isSelected)
+        XCTAssertTrue(app.buttons["cuadrao.profile.avatar.none"].isSelected)
         reveal(app, preferred)
         XCTAssertEqual(preferred.value as? String, "Alex")
         replace(preferred, with: "Luna")
         app.swipeDown()
-        let theme = app.buttons["cuadrao.profile.avatar.bloom"]
+        let theme = app.buttons["cuadrao.profile.avatar.moon"]
         reveal(app, theme); theme.tap()
         XCTAssertTrue(app.buttons["cuadrao.profile.save"].isEnabled)
         app.buttons["cuadrao.profile.save"].tap()

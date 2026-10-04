@@ -7,6 +7,8 @@ struct HouseholdManagement: View {
     @Environment(\.dismiss) private var dismiss
     @State private var sharing: FinancialAccount?
     @State private var confirmation: HouseholdAction?
+    @Environment(\.locale) private var locale
+    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     var body: some View {
         NavigationStack {
             Form {
@@ -35,11 +37,7 @@ struct HouseholdManagement: View {
                         Section("household.invitations") {
                             Button("household.prepareInvite") { Task { await model.versionCommand("/invitations") } }.accessibilityIdentifier("household.invite")
                             if let invitation = model.invitation {
-                                if let token = invitation.token, let url = URL(string: "argus-household://invite#" + token) {
-                                    ShareLink(item: url) { Label("household.shareInvite", systemImage: "square.and.arrow.up") }.accessibilityIdentifier("household.invite.share")
-                                    Text(url.absoluteString).textSelection(.enabled).font(.caption).accessibilityIdentifier("household.invite.link")
-                                    Text("household.invitationPrepared").font(.footnote)
-                                } else { Text("household.linkUnavailable").font(.footnote).accessibilityIdentifier("household.invite.lost") }
+                                HouseholdInvitationShareView(invitation: invitation, spanish: spanish)
                             }
                             ForEach(household.invitations) { invitation in
                                 HStack {
@@ -79,6 +77,9 @@ struct HouseholdManagement: View {
                 }
 
             }
+            .scrollContentBackground(.hidden)
+            .background(WelcomePalette.background)
+            .tint(WelcomePalette.pine)
             .disabled(model.busy)
             .navigationTitle(model.household == nil ? "household.title" : "household.people")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("action.close") { dismiss() }.accessibilityIdentifier("household.management.done") } }

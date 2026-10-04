@@ -66,8 +66,10 @@ final class CuadraoHistoryDesignUITests: XCTestCase {
             XCTAssertTrue(scan.waitForExistence(timeout: 2))
             capture(app, english ? "scan-english" : "scan-spanish")
             scan.tap()
-            XCTAssertTrue(app.buttons[english ? "Attach example" : "Adjuntar ejemplo"].waitForExistence(timeout: 2))
-            app.buttons[english ? "Attach example" : "Adjuntar ejemplo"].tap()
+            XCTAssertTrue(app.buttons["receipt-sample"].waitForExistence(timeout: 3), "Scan opens receipt capture")
+            XCTAssertEqual(app.buttons["receipt-sample"].label, english ? "Try a sample receipt" : "Probar un recibo de ejemplo")
+            capture(app, english ? "scan-capture-english" : "scan-capture-spanish")
+            app.buttons[english ? "Cancel" : "Cancelar"].tap()
             app.buttons["chat-history"].tap()
             XCTAssertTrue(app.segmentedControls.buttons[english ? "Archived" : "Archivados"].exists)
             if english {

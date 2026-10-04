@@ -7,12 +7,11 @@ approved behavior to apply to the connected app. It does not implement that
 behavior or change production Argus web styling, financial contracts or providers.
 The October 2 release-readiness pivot below supersedes conflicting preview rules.
 Read a rule as approved direction, not proof that it is shipped.
-On integration, the [main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-release-ui-landing-order)
-owns the release UI landing order. The detailed design dispositions, C01 to C10,
-still live only in the design branch's roadmap, linked here at
-[commit `fc7650ea`](https://github.com/lagarcess/argus/blob/fc7650eab4eac9298a09eea37eddc3964a709fba/docs/specs/argus-execution-board.md#cuadrao-design-dispositions),
-until design PRs bring them onto integration. Together they own unfinished work
-and delivery status. Existing approved account,
+The [main roadmap](../../../docs/specs/argus-execution-board.md#cuadrao-release-ui-landing-order)
+owns the release UI landing order, and its
+[design dispositions](../../../docs/specs/argus-execution-board.md#cuadrao-design-dispositions),
+C01 to C10, own follow-up work. Together they own unfinished work and delivery
+status. Existing approved account,
 chat, voice and Plan behavior is preserved unless this guide explicitly revises it.
 
 This is a reference organized by design rule, not a sequence of polish notes.
@@ -440,7 +439,7 @@ They identify the missing content without pretending to be records.
 | --- | --- |
 | Current month with missing coverage | Sin datos / No data, compact artwork and a record-entry action; no invented zero or comparison |
 | Historical period with missing coverage | Sin datos / No data and neutral past-period copy; keep period navigation |
-| Confirmed complete coverage with zero spending | Show the known zero; distinguish it from missing coverage. A comparison against it shows the amount difference, not a percent ([October 2 Home comparisons lock](../../../docs/specs/argus-decision-log.md#home-comparisons), clarified 10:18 PM CT) |
+| Confirmed complete coverage with zero spending | Show the known zero, even without an expense row; distinguish it from missing coverage. A comparison against it shows the amount difference, not a percent ([October 2 Home comparisons lock](../../../docs/specs/argus-decision-log.md#home-comparisons), clarified 10:18 PM CT) |
 | First use with no history | Welcoming artwork and one working record-entry action |
 | Incomplete or unavailable history | Distinguish unknown from zero; omit unsupported comparison claims |
 | Real records, even one | Real chart immediately; leave future buckets empty |
@@ -768,8 +767,14 @@ screens. Use native titles, body type and the shared destructive action treatmen
   after confirmed completion. A queued operation gets an honest pending state.
   A failure retains a recoverable state and does not pretend deletion succeeded.
 
-With no remaining member, the household closes (October 2 lock). Deletion
-completion and retention facts belong to the connected contract. Ordinary leave, removal and archive keep their distinct
+The six-lane handoff owns deletion retention and the founder-locked copy. With no
+remaining member, the household closes (October 2 lock). Shared-plan amounts
+remain under Exmiembro / Former member with receipts, photos and notes removed.
+Open balances become closed, not paid. Plans the person created pass to their
+longest-standing participant, except shared debt plans, which close read-only.
+Do not promise that previously emailed support copies are erased. Deletion
+completion, retention and resolved successor facts belong to the connected
+contract. Ordinary leave, removal and archive keep their distinct
 history rules. Account deletion must not silently redefine them.
 
 ### Authentication and invitation purpose
@@ -802,10 +807,11 @@ code entry remains the recovery path. Visiting the waitlist is not proof of join
 
 A cap, a remaining personal quota and a member count are different values. Read
 them from their owners. Opening or sharing a link does not count as acceptance.
-Under the lane contract, group-link redemptions do not use anyone's personal ten;
-read the counter from its owner rather than guessing it. A household invite also
-admits a new user: carry both purposes through validation without charging the
-personal quota.
+Founder group links are beta-only and created by the founder account. Under the
+lane contract, group-link redemptions do not use anyone's personal ten; read the
+counter from its owner rather than guessing it. A household invite also admits a
+new user: carry both purposes through validation without charging the personal
+quota.
 
 A full link explains the limit and offers the waitlist. Show **Estás en la lista /
 You're on the waitlist** only after enrollment is confirmed. Use one invite-card
@@ -834,9 +840,10 @@ An example is **Tienes un pago próximo / You have an upcoming payment**.
 
 A zero comparison baseline produces a monetary difference, never an infinite or
 invented percentage. Missing coverage produces **Sin datos / No data**. A month
-with confirmed complete coverage and no spending is a known zero and shows 0.
-Unknown, partially covered and confirmed zero periods remain different states.
-Keep the
+with confirmed complete coverage and no spending is a known zero and shows 0,
+even without an expense row. It counts in covered averages and amount
+comparisons. Unknown, partially covered and confirmed zero periods remain
+different states. Keep the
 quiet chart and established category colors, icons and typography.
 
 After an account move, the previous household's authorized pre-move history is
@@ -858,11 +865,19 @@ from Yelena's UI checklist, hides Personalization, Security and sessions, Shared
 conversations, Removed activity and photos. Usage, More options and conversation
 bulk actions are hidden by #786 (`a20362d3`) as a Head of Engineering judgment
 call. Memory (`.memory`) is hidden until native memory arrives with its
-controls. These are designed rows whose backend is still owed, not cuts. The first-release switch is
-meant to hide them only in release builds; development builds show every row.
-Yelena is ordering their backends after chat. **Por correo / By email** stays
-removed because Updates go to the inbox and push only. Keep initials,
-themes, supported preferences, help, legal links, deletion and sign-out. Avoid
+controls. These are designed rows whose backend is still owed, not cuts.
+`CuadraoFirstRelease` hides them only in release builds; development builds show
+every row, and `--cuadrao-release-gates` previews the release set in a DEBUG build. Yelena is ordering their backends after chat. **Por correo / By email**
+stays removed because Updates go to the inbox and push only. Keep initials,
+themes, supported preferences, help, legal links, deletion and sign-out.
+
+The founder retained the personal photo picker in the design. Its shared avatar
+and photo components stay and show in development builds; release builds hide
+photo selection until hosted avatar storage is connected. An unset avatar keeps
+the existing Profile tab icon. Any selected initials, theme or photo replaces
+that icon, with the same selection read by Profile. Removing the selection
+restores the icon. Selection remains session-local until the profile storage
+contract is connected; do not imply a hosted upload. Avoid
 empty destinations, unavailable rows and new Coming soon settings sections.
 
 Before a live chat, voice or document-reading action shares personal data with
@@ -876,6 +891,21 @@ Connected sources and Disconnect arrive with Gmail/Plaid activation, under the
 existing source owner. Explain stopping future access separately from deleting
 previous imports. Memory controls arrive with native memory, including off and
 reset as distinct actions; switching off must not falsely claim deletion.
+
+### Trackle reconciliation
+
+Borrow clear labels for amounts and budget progress paired with elapsed time in
+Plan. Keep Home quiet; do not add Trackle's dense shortcut and category rows.
+Keep Cuadrao serif headings, rounded money, illustration and category icon family.
+The shared avatar belongs in the Profile tab, without an extra Home action.
+An unset avatar keeps the existing Profile tab icon. Selecting initials, a theme
+or a photo replaces that icon without an additional circular frame or background;
+the tab's shared selected highlight remains. Profile settings and the editor use
+a circular frame. Their empty state is a muted circle with an add-camera symbol,
+not an enlarged navigation glyph. A photo retains its circular crop in both places.
+[Instagram's edit-profile screen](https://mobbin.com/screens/968761ca-7201-48ba-a822-06e3f5c6620a)
+was visually inspected for the circular picture and separate editing action;
+the empty camera treatment follows the founder's supplied reference.
 
 ### Research and interpretation
 

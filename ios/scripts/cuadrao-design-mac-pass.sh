@@ -13,7 +13,7 @@
 # uploads or calls a backend; the default launch stays signed out.
 #
 # A failing step doesn't stop the later ones: `all` always runs checks, tests and screens,
-# then exits non-zero if any of them failed. Merge #790 into the tree first if it has landed.
+# then exits non-zero if any of them failed.
 set -euo pipefail
 
 ios_dir="$(cd "$(dirname "$0")/.." && pwd)"
@@ -39,7 +39,7 @@ design_tests=(
   CuadraoGroupDesignUITests CuadraoHistoryDesignUITests CuadraoPlanCurrencyUITests
   CuadraoPlanDesignUITests CuadraoPolishUITests CuadraoProfileFollowupUITests
   CuadraoReceiptPermissionUITests CuadraoReceiptUITests CuadraoSignInPresentationUITests
-  CuadraoSupportUITests CuadraoVoiceDesignUITests
+  CuadraoSupportUITests CuadraoVoiceDesignUITests ReleaseUIJourneyTests
 )
 
 # Each runner is non-fatal so one broken check can't hide the others, the tests or the screens.
@@ -47,12 +47,8 @@ run_checks() {
   local runner failed=0
   {
     for runner in run_home_balance run_plan_preview run_group_preview run_receipt_preview \
-                  run_temporary_chat run_avatar_crop; do
+                  run_temporary_chat run_avatar_crop run_release_updates run_release_identity; do
       echo "== $runner"
-      if [[ "$runner" == run_home_balance ]]; then
-        echo "   (expected to fail until #790 lands: integration's runner omits CuadraoBalancePeriod.swift," \
-             "so HomeBalanceChecks.swift reports cannot find 'CanvasBalancePeriod')"
-      fi
       python3 "$ios_dir/DesignPreviewTests/$runner.py" || { echo "FAILED $runner"; failed=1; }
     done
   } 2>&1 | tee "$out/design-preview-checks.log"
@@ -70,6 +66,14 @@ run_tests() {
     xcrun xcresulttool export attachments --path "$bundle" --output-path "$out/ui-attachments" \
       || echo "Could not export attachments; open $bundle in Xcode instead."
   fi
+  # Connected sign-in exists only with auth on; loopback placeholders keep it offline and signed out,
+  # and the command line forces both social flags off over any local override.
+  TEST_RUNNER_ARGUS_TEST_AUTH_UI_ENABLED=true RESULT_DIR="$out/results-auth" "$ios_dir/scripts/verify.sh" test \
+    -only-testing:ArgusFoundationUITests/CuadraoSignInPresentationUITests/testDefaultLaunchOffersNoAppleSignIn \
+    ARGUS_AUTH_ENABLED=true ARGUS_API_URL=http://127.0.0.1:9 ARGUS_SUPABASE_URL=http://127.0.0.1:9 \
+    ARGUS_SUPABASE_ANON_KEY=sb_publishable_mac_pass_placeholder ARGUS_WEB_URL=http://127.0.0.1:9 \
+    ARGUS_CAPTCHA_URL=http://127.0.0.1:9/captcha \
+    ARGUS_APPLE_SIGN_IN_ENABLED=false ARGUS_GOOGLE_SIGN_IN_ENABLED=false || status=$?
   return "$status"
 }
 
@@ -87,7 +91,7 @@ build_app() {
   xcodebuild build -project "$1/ArgusFoundation.xcodeproj" -scheme ArgusFoundation \
     -configuration Debug -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
     -derivedDataPath "$2" CODE_SIGNING_REQUIRED=NO \
-    ARGUS_AUTH_ENABLED=false CUADRAO_DESIGN_PREVIEW=false >"$2.log" 2>&1
+    ARGUS_AUTH_ENABLED=false CUADRAO_DESIGN_PREVIEW=false >"$2.log" 2>&1 || return 1
   find "$2/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' ! -name '*-Runner.app' | head -1
 }
 

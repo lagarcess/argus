@@ -57,8 +57,10 @@ struct CanvasDecimalInput: UIViewRepresentable {
         (field.inputAccessoryView as? UIToolbar)?.items?.last?.title = spanish ? "Listo" : "Done"
         field.font = CuadraoTypography.moneyFont(size, category: contentSizeCategory)
         field.textAlignment = alignment
-        let current = (field.text ?? "").replacingOccurrences(of: ",", with: "")
-        if current != raw { field.text = Coordinator.group(raw) }
+        if context.coordinator.pending == 0 && raw != context.coordinator.raw {
+            context.coordinator.raw = raw
+            if (field.text ?? "").replacingOccurrences(of: ",", with: "") != raw { field.text = Coordinator.group(raw) }
+        }
         field.placeholder = CanvasMoney.format(0, currency: currency)
         field.accessibilityLabel = title ?? (spanish ? "Monto" : "Amount")
         field.textColor = (Decimal(string: raw) ?? 0) > 0
@@ -67,6 +69,10 @@ struct CanvasDecimalInput: UIViewRepresentable {
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: CanvasDecimalInput
         weak var field: UITextField?
+        /// The field's text without grouping; the binding catches up through `commit`.
+        var raw = ""
+        /// While writes are in flight the binding can lag the field, so updates must not rewrite it.
+        var pending = 0
         init(_ parent: CanvasDecimalInput) { self.parent = parent }
         @objc func done() { field?.resignFirstResponder() }
         func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
@@ -82,22 +88,23 @@ struct CanvasDecimalInput: UIViewRepresentable {
             }
             if string.count > 1 && string.contains(",") &&
                 string.range(of: #"^-?(?:[0-9]{1,3}(?:,[0-9]{3})+)(?:\.[0-9]*)?$"#, options: .regularExpression) == nil {
-                parent.error = parent.spanish ? "Revisa las comas del monto." : "Check the amount’s grouping."; return false
+                commit(error: parent.spanish ? "Revisa las comas del monto." : "Check the amount’s grouping."); return false
             }
             var normalized = proposed.replacingOccurrences(of: ",", with: "")
             let pattern = parent.allowNegative ? #"^-?[0-9]*(?:\.[0-9]*)?$"# : #"^[0-9]*(?:\.[0-9]*)?$"#
             guard normalized.range(of: pattern, options: .regularExpression) != nil else {
-                parent.error = parent.spanish ? "Usa números y un punto decimal." : "Use digits and a decimal point."; return false
+                commit(error: parent.spanish ? "Usa números y un punto decimal." : "Use digits and a decimal point."); return false
             }
             if normalized.hasPrefix(".") { normalized = "0" + normalized; logical += 1 }
             let fraction = normalized.split(separator: ".", omittingEmptySubsequences: false).dropFirst().first?.count ?? 0
             guard fraction <= CanvasMoney.digits(parent.currency) else {
-                parent.error = parent.spanish ? "Revisa los decimales para \(parent.currency)." : "Check decimal places for \(parent.currency)."; return false
+                commit(error: parent.spanish ? "Revisa los decimales para \(parent.currency)." : "Check decimal places for \(parent.currency)."); return false
             }
             guard abs(Decimal(string: normalized) ?? 0) <= CanvasMoney.maximum, normalized.count <= 24 else {
-                parent.error = parent.spanish ? "Máximo: 9,999,999.99" : "Maximum: 9,999,999.99"; return false
+                commit(error: parent.spanish ? "Máximo: 9,999,999.99" : "Maximum: 9,999,999.99"); return false
             }
-            parent.error = ""; parent.raw = normalized
+            raw = normalized
+            commit(raw: normalized, error: "")
             let grouped = Self.group(normalized)
             textField.text = grouped
             var location = 0, count = 0
@@ -117,12 +124,23 @@ struct CanvasDecimalInput: UIViewRepresentable {
         func textFieldDidBeginEditing(_ textField: UITextField) { parent.onFocus(true) }
         func textFieldDidEndEditing(_ textField: UITextField) {
             parent.onFocus(false)
-            guard let value = Decimal(string: parent.raw), !parent.raw.isEmpty else { return }
-            let fraction = parent.raw.split(separator: ".", omittingEmptySubsequences: false).dropFirst().first?.count ?? 0
+            guard let value = Decimal(string: raw), !raw.isEmpty else { return }
+            let fraction = raw.split(separator: ".", omittingEmptySubsequences: false).dropFirst().first?.count ?? 0
             guard fraction <= CanvasMoney.digits(parent.currency) else { return }
             let formatted = CanvasMoney.format(value, currency: parent.currency)
-            parent.raw = formatted.replacingOccurrences(of: ",", with: "")
+            raw = formatted.replacingOccurrences(of: ",", with: "")
+            commit(raw: raw)
             textField.text = formatted
+        }
+        /// Keyboard input can arrive while SwiftUI is updating; deferring keeps each write from being dropped.
+        private func commit(raw: String? = nil, error: String? = nil) {
+            let parent = parent
+            pending += 1
+            DispatchQueue.main.async { [self] in
+                if let raw { parent.raw = raw }
+                if let error { parent.error = error }
+                pending -= 1
+            }
         }
         static func group(_ raw: String) -> String {
             let parts = raw.split(separator: ".", omittingEmptySubsequences: false)

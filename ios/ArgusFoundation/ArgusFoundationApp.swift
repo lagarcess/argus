@@ -26,7 +26,25 @@ struct ArgusFoundationApp: App {
 
     var body: some Scene {
         WindowGroup {
+            appContent
+        }
+    }
+
+    @ViewBuilder private var appContent: some View {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--cuadrao-release-ui") {
+            ReleaseUIReview()
+        } else {
+            connectedContent
+        }
+        #else
+        connectedContent
+        #endif
+    }
+
+    @ViewBuilder private var connectedContent: some View {
             if CuadraoDesignPreview.isActive {
+
                 CuadraoCanvas()
                     .preferredColorScheme(previewAppearance.colorScheme)
             } else {
@@ -41,6 +59,5 @@ struct ArgusFoundationApp: App {
                     .foregroundStyle(ArgusStyle.ink)
                     .font(ArgusStyle.body())
             }
-        }
     }
 }
