@@ -21,9 +21,11 @@ struct InvitationGateHost<Content: View>: View {
             case .checking:
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                     .accessibilityIdentifier("invites.access.checking")
-            case .required:
-                gate
-            case .admitted, .surfaceOff, .unknown:
+            case .unanswered:
+                unanswered
+            case .required(let destinations):
+                gate(destinations)
+            case .admitted, .off:
                 content()
             }
         }
@@ -32,17 +34,34 @@ struct InvitationGateHost<Content: View>: View {
         .invitationNotices(model)
     }
 
-    private var gate: some View {
-        ReleaseInviteGate(state: model.gate, code: $model.gateCode, spanish: locale.spanish,
+    private var unanswered: some View {
+        VStack(spacing: 16) {
+            Text(locale.spanish ? "No pudimos comprobar tu acceso a la beta. Revisa tu conexión e intenta de nuevo."
+                 : "We couldn't check your beta access. Check your connection and try again.")
+                .font(CuadraoTypography.supporting).multilineTextAlignment(.center)
+            Button(locale.spanish ? "Reintentar" : "Try again") { Task { await model.retryAccess() } }
+                .buttonStyle(.borderedProminent).frame(minHeight: 44).accessibilityIdentifier("invites.access.retry")
+            signOutButton
+        }
+        .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+        .accessibilityElement(children: .contain).accessibilityIdentifier("invites.access.unanswered")
+    }
+
+    @ViewBuilder private var signOutButton: some View {
+        if let signOut {
+            Button(locale.spanish ? "Cerrar sesión" : "Sign out", action: signOut)
+                .frame(minHeight: 44).accessibilityIdentifier("invites.gate.signOut")
+        }
+    }
+
+    private func gate(_ destinations: InviteDestinations) -> some View {
+        ReleaseInviteGate(state: InvitationCopy.gateState(model.gate), code: $model.gateCode, spanish: locale.spanish,
                           onSubmit: { code in Task { await model.submitCode(code) } },
-                          onWaitlist: { if let url = model.access?.waitlistURL { openURL(url) } },
-                          showsWaitlist: model.access?.waitlistURL != nil)
-            .safeAreaInset(edge: .bottom) {
-                if let signOut {
-                    Button(locale.spanish ? "Cerrar sesión" : "Sign out", action: signOut)
-                        .frame(minHeight: 44).accessibilityIdentifier("invites.gate.signOut")
-                }
-            }
+                          onWaitlist: { if let url = destinations.waitlist { openURL(url) } },
+                          showsWaitlist: destinations.waitlist != nil)
+            .safeAreaInset(edge: .bottom) { signOutButton }
             .background {
                 if let household {
                     HouseholdPresenter(model: household)
@@ -121,13 +140,22 @@ struct InvitationsHub: View {
                      : "Household invitations are sent from your Household. They don't use these invitations.")
             }
             Section(spanish ? "Enviadas" : "Sent") {
-                if model.sent.isEmpty {
-                    Text(spanish ? "Todavía no has enviado invitaciones." : "You haven't sent any invitations yet.")
-                        .foregroundStyle(.secondary).accessibilityIdentifier("invites.sent.empty")
+                switch model.personal {
+                case .loading:
+                    ProgressView().accessibilityIdentifier("invites.sent.loading")
+                case .failed:
+                    Text(spanish ? "No pudimos cargar tus invitaciones. Desliza hacia abajo para intentar de nuevo."
+                         : "We couldn't load your invitations. Pull down to try again.")
+                        .foregroundStyle(.secondary).accessibilityIdentifier("invites.sent.failed")
+                case .ready(let sent):
+                    if sent.invitations.isEmpty {
+                        Text(spanish ? "Todavía no has enviado invitaciones." : "You haven't sent any invitations yet.")
+                            .foregroundStyle(.secondary).accessibilityIdentifier("invites.sent.empty")
+                    }
+                    ForEach(sent.invitations) { SentInvitationRow(invite: $0) }
                 }
-                ForEach(model.sent) { SentInvitationRow(invite: $0) }
             }
-            if let links = model.groupLinks {
+            if case .ready(.links(let links)) = model.groupLinks {
                 Section(spanish ? "Enlaces de grupo" : "Group links") {
                     ForEach(links) { link in
                         GroupLinkRow(link: link) { Task { await model.revokeGroupLink(link.id) } }
@@ -219,11 +247,22 @@ private struct PersonalInvitationsScreen: View {
     @Environment(\.locale) private var locale
 
     var body: some View {
-        ReleasePersonalInvitationsView(state: model.personal, spanish: locale.spanish) {
+        ReleasePersonalInvitationsView(state: state, spanish: locale.spanish) {
             Task { await model.createPersonal() }
         }
         .toolbar(.visible, for: .navigationBar)
         .task { await model.loadPersonal() }
+    }
+
+    private var state: ReleasePersonalInvitationState {
+        if model.creatingPersonal { return .loading }
+        switch model.personal {
+        case .loading: return .loading
+        case .failed: return .unavailable
+        case .ready(let sent):
+            let share = model.createdPersonal.map { InvitationCopy.share($0, testFlight: model.admission.destinations?.testFlight) }
+            return .ready(remaining: sent.quota.remaining, total: sent.quota.limit, invitation: share)
+        }
     }
 }
 
@@ -232,11 +271,47 @@ private struct GroupLinkScreen: View {
     @Environment(\.locale) private var locale
 
     var body: some View {
-        ReleaseFounderGroupInvitationView(isFounder: model.groupLinks != nil, state: model.group, spanish: locale.spanish) { label, cap, expiry in
+        ReleaseFounderGroupInvitationView(isFounder: model.groupLinks != .ready(.notFounder), state: state, spanish: locale.spanish) { label, cap, expiry in
             Task { await model.createGroupLink(label: label, cap: cap, expiresAt: expiry) }
         }
         .toolbar(.visible, for: .navigationBar)
         .onAppear { model.startGroupLink() }
+    }
+
+    private var state: ReleaseGroupInvitationState {
+        switch model.group {
+        case .draft: .draft
+        case .creating: .creating
+        case .created(let invite, let used):
+            .ready(cap: invite.cap ?? 0, used: used, invitation: InvitationCopy.share(invite, testFlight: model.admission.destinations?.testFlight))
+        }
+    }
+}
+
+/// Maps the model's answers onto the release screens' states and copy.
+enum InvitationCopy {
+    static func gateState(_ gate: InvitationGate) -> ReleaseInviteGateState {
+        switch gate {
+        case .ready: .ready
+        case .checking: .checking
+        case .problem(let problem): gateState(problem)
+        }
+    }
+
+    static func gateState(_ problem: InvitationProblem) -> ReleaseInviteGateState {
+        switch problem {
+        case .invalid: .invalid
+        case .expired: .expired
+        case .revoked: .revoked
+        case .used: .consumed
+        case .full: .full
+        case .rateLimited: .rateLimited
+        default: .unavailable
+        }
+    }
+
+    static func share(_ invite: CreatedInvite, testFlight: URL?) -> ReleaseInvitationShare {
+        ReleaseInvitationShare(url: invite.link, code: invite.code, expiresAt: invite.expiresAt, testFlightURL: testFlight)
     }
 }
 
@@ -245,9 +320,9 @@ extension View {
 
     /// Universal links arrive as browsing activity; the legacy scheme arrives as an opened URL.
     func invitationLinks(_ model: InvitationsModel?) -> some View {
-        onOpenURL { url in model?.open(url) }
+        onOpenURL { url in Task { await model?.open(url) } }
             .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
-                if let url = activity.webpageURL { model?.open(url) }
+                if let url = activity.webpageURL { Task { await model?.open(url) } }
             }
     }
 }
@@ -281,14 +356,21 @@ private struct InvitationNoticeAlert: ViewModifier {
                 : "The link and code are shown only once. Create another invitation to share it."
         case .householdUnavailable:
             return spanish ? "Las invitaciones al Hogar no están disponibles ahora." : "Household invitations aren't available right now."
+        case .groupLink(let invalid):
+            switch invalid {
+            case .label: return spanish ? "El nombre del enlace debe tener entre 1 y 80 caracteres." : "The link name must be between 1 and 80 characters."
+            case .cap: return spanish ? "El límite debe estar entre 1 y 10,000 personas." : "The limit must be between 1 and 10,000 people."
+            case .expiry: return spanish ? "El enlace debe vencer en el futuro y dentro de un año." : "The link must expire in the future and within one year."
+            }
         case .problem(let problem):
             switch problem {
+            case .refused: return spanish ? "No pudimos completar esa solicitud. Revisa los datos e intenta de nuevo." : "We couldn't complete that request. Check the details and try again."
             case .quotaExhausted: return spanish ? "Ya usaste tus invitaciones disponibles." : "You've used your available invitations."
             case .founderOnly: return spanish ? "Solo Lucas puede crear enlaces de grupo." : "Only Lucas can create group links."
             case .invitationRequired: return spanish ? "Necesitas entrar a la beta antes de invitar a otras personas." : "You need beta access before you can invite others."
             case .rateLimited: return ReleaseInviteGateState.rateLimited.message(spanish: spanish) ?? ""
             case .invalid, .expired, .revoked, .used, .full:
-                return InvitationsModel.gateState(problem).message(spanish: spanish) ?? ""
+                return InvitationCopy.gateState(problem).message(spanish: spanish) ?? ""
             default: return ReleaseInviteGateState.unavailable.message(spanish: spanish) ?? ""
             }
         case nil: return ""

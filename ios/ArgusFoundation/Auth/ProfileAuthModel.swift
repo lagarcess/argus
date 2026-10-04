@@ -46,7 +46,7 @@ final class ProfileAuthModel: ObservableObject {
             accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             if let accounts, let loadedConfiguration {
                 household = HouseholdModel(controller: loadedController, configuration: loadedConfiguration.session)
-                invitations = InvitationsModel(universalLinksEnabled: InvitationsModel.universalLinksEnabled()) {
+                invitations = InvitationsModel(flags: .load()) {
                     InvitesClient(transport: SessionInvitesTransport(controller: loadedController, identity: $0))
                 }
                 household?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }

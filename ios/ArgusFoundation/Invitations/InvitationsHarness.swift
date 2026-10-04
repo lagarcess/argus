@@ -2,19 +2,26 @@
 import SwiftUI
 import ArgusSession
 
-/// Answers `/api/v1/invites` with the shapes in docs/api/openapi.yaml so UI tests drive the connected
-/// screens and `InvitationsModel` without a server. It never grants real access.
+/// Answers `/api/v1/invites` only in shapes the real routes produce (docs/api/openapi.yaml,
+/// src/argus/domain/household/invites.py), so UI tests drive the connected screens and
+/// `InvitationsModel` without a server. It never grants real access.
 actor InvitationsStubServer: InvitesTransport {
     struct Scenario {
         var surfaceOn = true, gateEnabled = true, admitted = false, founder = false, waitlist = true
-        var quotaUsed = 3
+        var serverLinks = false
+        var quotaUsed = 3, accessDown = 0
         init(arguments: [String]) {
+            func number(_ flag: String) -> Int? {
+                arguments.firstIndex(of: flag).flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil }
+            }
+            serverLinks = arguments.contains("--harness-server-links")
+            quotaUsed = number("--harness-quota-used") ?? 3
+            accessDown = number("--harness-access-down") ?? 0
             surfaceOn = !arguments.contains("--harness-surface-off")
             gateEnabled = !arguments.contains("--harness-gate-off")
             admitted = arguments.contains("--harness-admitted")
             founder = arguments.contains("--harness-founder")
             waitlist = !arguments.contains("--harness-no-waitlist")
-            if let index = arguments.firstIndex(of: "--harness-quota-used"), index + 1 < arguments.count { quotaUsed = Int(arguments[index + 1]) ?? 3 }
         }
     }
     private var scenario: Scenario
@@ -44,6 +51,7 @@ actor InvitationsStubServer: InvitesTransport {
         let secret = (fields["code"] ?? fields["token"]) as? String ?? ""
         switch (method, path) {
         case ("GET", "/access"):
+            if scenario.accessDown > 0 { scenario.accessDown -= 1; throw SessionFailure.unavailable }
             return try json(["gate_enabled": scenario.gateEnabled, "admitted": scenario.admitted || !scenario.gateEnabled,
                              "waitlist_url": scenario.waitlist ? "https://cuadrao.ai" : NSNull(),
                              "testflight_url": "https://testflight.apple.com/join/EXAMPLE0"])
@@ -57,20 +65,20 @@ actor InvitationsStubServer: InvitesTransport {
                          "sent_at": InvitationDates.string(Date()), "expires_at": expires, "accepted_at": NSNull()], at: 0)
             return try json(["invitation": ["id": UUID().uuidString, "kind": "beta", "expires_at": expires,
                                             "token": "harness-only-not-a-real-token-000000000000", "code": "DEMO-ONLY-0007",
-                                            "link": "https://cuadrao.ai/invite#harness-only-not-a-real-token-000000000000",
+                                            "link": scenario.serverLinks ? "https://cuadrao.ai/invite#harness-only-not-a-real-token-000000000000" : NSNull(),
                                             "source_label": NSNull(), "cap": NSNull(), "replayed": false] as [String: Any],
                              "quota": quota()])
         case ("POST", "/preview"):
             if secret.contains("household") || secret.hasPrefix("HOME") {
                 return try json(["kind": "household", "available": true, "expires_at": InvitationDates.string(Date().addingTimeInterval(86_400)), "household_name": "Casa"])
             }
-            try outcome(secret)
-            return try json(["kind": "beta", "available": true, "expires_at": InvitationDates.string(Date().addingTimeInterval(86_400)), "household_name": NSNull()])
+            let found = try lookup(secret)
+            return try json(["kind": "beta", "available": found == nil, "expires_at": InvitationDates.string(Date().addingTimeInterval(86_400)), "household_name": NSNull()])
         case ("POST", "/redeem"):
             if secret.contains("household") || secret.hasPrefix("HOME") {
                 throw SessionFailure.rejected(status: 409, code: "household_invitation_requires_accept")
             }
-            try outcome(secret)
+            if let refusal = try lookup(secret) { throw SessionFailure.rejected(status: 409, code: refusal) }
             let outcome = scenario.admitted ? "already_admitted" : "admitted"
             scenario.admitted = true
             return try json(["admitted": true, "outcome": outcome, "kind": "beta", "replayed": false])
@@ -86,25 +94,33 @@ actor InvitationsStubServer: InvitesTransport {
             links.insert(Self.link(id: id, label: label, cap: cap, redeemed: 0, overflow: 0, expires: expires, state: "open"), at: 0)
             return try json(["invitation": ["id": id, "kind": "group_link", "expires_at": expires,
                                             "token": "harness-only-group-token-0000000000000000", "code": "DEMO-ONLY-GRP1",
-                                            "link": "https://cuadrao.ai/invite#harness-only-group-token-0000000000000000",
+                                            "link": scenario.serverLinks ? "https://cuadrao.ai/invite#harness-only-group-token-0000000000000000" : NSNull(),
                                             "source_label": label, "cap": cap, "replayed": false] as [String: Any],
                              "quota": NSNull()])
+        case ("POST", _) where path.hasPrefix("/group-links/") && path.hasSuffix("/revoke"):
+            guard scenario.founder else { throw SessionFailure.rejected(status: 403, code: "founder_required") }
+            let id = path.dropFirst("/group-links/".count).dropLast("/revoke".count)
+            guard let index = links.firstIndex(where: { ($0["id"] as? String)?.lowercased() == id.lowercased() }) else {
+                throw SessionFailure.rejected(status: 404, code: "invitation_not_found")
+            }
+            links[index]["state"] = "revoked"; links[index]["revoked_at"] = InvitationDates.string(Date())
+            return Data()
         default:
             throw SessionFailure.rejected(status: 404, code: "not_found")
         }
     }
 
-    /// Codes the UI tests type for each server outcome; anything else names no invitation.
-    private func outcome(_ secret: String) throws {
+    /// Finds the invitation a test's code or link names. Returns nil when it can still admit, or the
+    /// redeem refusal when it cannot; preview reports that as `available: false`. Unknown secrets,
+    /// the lookup limit and a 5xx fail the same way on both routes.
+    private func lookup(_ secret: String) throws -> String? {
         let upper = secret.uppercased()
-        if upper.hasPrefix("BETA") || secret.contains("beta-link") { return }
-        let failures: [(String, Int, String)] = [
-            ("EXPD", 409, "invitation_expired"), ("USED", 409, "invitation_consumed"), ("REVK", 409, "invitation_revoked"),
-            ("FULL", 409, "group_link_full"), ("WAIT", 429, "invite_rate_limited"), ("DOWN", 503, "invite_codes_unavailable"),
-        ]
-        for (prefix, status, code) in failures where upper.hasPrefix(prefix) || secret.lowercased().contains(prefix.lowercased() + "-link") {
-            throw SessionFailure.rejected(status: status, code: code)
-        }
+        func names(_ prefix: String) -> Bool { upper.hasPrefix(prefix) || upper.contains(prefix + "-LINK") }
+        if names("BETA") { return nil }
+        if names("WAIT") { throw SessionFailure.rejected(status: 429, code: "invite_rate_limited") }
+        if names("DOWN") { throw SessionFailure.unavailable }
+        let refusals = [("EXPD", "invitation_expired"), ("USED", "invitation_consumed"), ("REVK", "invitation_revoked"), ("FULL", "group_link_full")]
+        if let refusal = refusals.first(where: { names($0.0) }) { return refusal.1 }
         throw SessionFailure.rejected(status: 404, code: "invitation_not_found")
     }
 
@@ -125,7 +141,7 @@ struct InvitationsHarness: View {
     init() {
         let arguments = ProcessInfo.processInfo.arguments
         let server = InvitationsStubServer(scenario: .init(arguments: arguments))
-        _model = StateObject(wrappedValue: InvitationsModel(universalLinksEnabled: arguments.contains("--harness-universal"),
+        _model = StateObject(wrappedValue: InvitationsModel(flags: InvitationFlags(surface: !arguments.contains("--harness-client-off"), links: arguments.contains("--harness-links")),
                                                             clientFor: { _ in InvitesClient(transport: server) }))
         _signedIn = State(initialValue: !arguments.contains("--harness-signed-out"))
     }
@@ -153,7 +169,7 @@ struct InvitationsHarness: View {
         .onAppear {
             model.openHousehold = { input in householdInput = input; return true }
             if let index = arguments.firstIndex(of: "--harness-open-url"), index + 1 < arguments.count, let url = URL(string: arguments[index + 1]) {
-                model.open(url)
+                Task { await model.open(url) }
             }
         }
     }
