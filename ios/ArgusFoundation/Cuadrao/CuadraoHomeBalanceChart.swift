@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 
+/// Builds the balance history when its inputs change; scrubbing only re-evaluates the chart below it.
 struct CuadraoHomeBalanceChart: View {
     let accounts: [CanvasAccount]
     let observations: [CanvasBalanceObservation]
@@ -12,11 +13,8 @@ struct CuadraoHomeBalanceChart: View {
     var expanded = false
     var expand: () -> Void = {}
     var controls: CuadraoInsightControls?
-    @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var compactRange: CanvasHomeRange = .month
     @Binding var range: CanvasHistoryRange
     @Binding var periodOffset: Int
-    @State private var selectedDate: Date?
     init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], currency: String,
          currencies: [String], spanish: Bool, shared: Bool, chooseCurrency: @escaping (String) -> Void,
          expanded: Bool = false, expand: @escaping () -> Void = {}, controls: CuadraoInsightControls? = nil,
@@ -26,7 +24,39 @@ struct CuadraoHomeBalanceChart: View {
         self.expanded = expanded; self.expand = expand; self.controls = controls
         _range = range; _periodOffset = periodOffset
     }
-    private var history: [CanvasBalancePoint] { CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now) }
+    var body: some View {
+        let now = Date.now
+        CuadraoHomeBalanceChartContent(accounts: accounts, observations: observations, currency: currency,
+            currencies: currencies, spanish: spanish, shared: shared, chooseCurrency: chooseCurrency,
+            expanded: expanded, expand: expand, controls: controls,
+            builtHistory: CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: now),
+            builtDay: Calendar.current.startOfDay(for: now), range: $range, periodOffset: $periodOffset)
+    }
+}
+
+private struct CuadraoHomeBalanceChartContent: View {
+    let accounts: [CanvasAccount]
+    let observations: [CanvasBalanceObservation]
+    let currency: String
+    let currencies: [String]
+    let spanish: Bool
+    let shared: Bool
+    let chooseCurrency: (String) -> Void
+    let expanded: Bool
+    let expand: () -> Void
+    let controls: CuadraoInsightControls?
+    let builtHistory: [CanvasBalancePoint]
+    let builtDay: Date
+    @Environment(\.dynamicTypeSize) var typeSize
+    @State var compactRange: CanvasHomeRange = .month
+    @Binding var range: CanvasHistoryRange
+    @Binding var periodOffset: Int
+    @State var selectedDate: Date?
+    /// The history depends on the clock only through its day, so the built one holds until the day changes.
+    private var history: [CanvasBalancePoint] {
+        Calendar.current.startOfDay(for: .now) == builtDay ? builtHistory
+            : CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: .now)
+    }
     private var period: CanvasBalancePeriod {
         CanvasBalancePeriod(accounts: accounts, observations: observations, range: range, offset: periodOffset)
     }
