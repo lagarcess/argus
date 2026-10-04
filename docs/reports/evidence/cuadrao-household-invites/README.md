@@ -42,6 +42,29 @@ and plainly merges `origin/codex/cuadrao-release-ui` at `3370ba509`.
   package 104 tests with 4 skipped and 0 failures, Debug and Release builds succeeded, and the focused
   `InvitationsUITests` run passed 18 of 18 under the Mac lock.
 
+## Last fix pass at `a02e7d3ec`
+
+Code head `a02e7d3ec294d9dbac7e49c8a38c3f5efaa24985` closes scope A of `R-candidate-4af8fced` and
+plainly merges `origin/codex/cuadrao-release-ui` at `cc68b341e` (no conflict).
+
+- **Unshare message (A-1).** An unshare bumps the Household version, so the reload inside
+  `open(_:)` started a new access generation and dropped "household.changed". The message now
+  depends on the same session, the same selection, an available surface and no message already set.
+  `testAnUnsharedAccountLeavesTheListAndSaysPermissionsChanged` failed before the fix with
+  `errorKey == nil`. A reload that turns Households off now keeps no message, and the existing
+  reload test covers that case.
+- **Join step review (A-3, A-6).** Closing management cancels the invitation review. A preview
+  answer that lands after a cancel or a newer preview is dropped. `beginJoin` returns false when its
+  own preview turned Households off. Both new tests failed before the fix.
+- **Link over the introduction (A-4).** The introduction adopts a handed-over code on change as
+  well as on appear. This is view code with no host test; the UI tests below cover the join step.
+- **Harness kind (A-5).** The DEBUG harness answers `group_link` only for `FULL` secrets, so
+  `beta-link-…` previews and redeems as `beta`. No client branch reads it.
+- **`accessEnded()` (A-2)** is private.
+- **Runs at `a02e7d3ec`.** `run_household.py` 49 of 49, `run_invitations.py` 21 of 21, ArgusSession
+  package 104 tests with 4 skipped and 0 failures, Debug and Release simulator builds succeeded. UI tests
+  were not run in this pass, because the simulators were reserved for another agent.
+
 ## What these screenshots are, and what they are not
 
 They come from `ios/ArgusFoundationUITests/InvitationsUITests.swift`. The tests launch the Debug app

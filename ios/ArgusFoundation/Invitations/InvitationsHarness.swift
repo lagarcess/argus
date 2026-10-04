@@ -124,10 +124,9 @@ actor InvitationsStubServer: InvitesTransport {
         throw SessionFailure.rejected(status: 404, code: "invitation_not_found")
     }
 
-    /// `FULL` and `-LINK` secrets stand for group links; the server names their kind on preview and redeem.
+    /// `FULL` secrets stand for group links, the only kind with a group-only refusal; every other secret is personal.
     private static func kind(_ secret: String) -> String {
-        let upper = secret.uppercased()
-        return upper.hasPrefix("FULL") || upper.contains("-LINK") ? "group_link" : "beta"
+        secret.uppercased().hasPrefix("FULL") ? "group_link" : "beta"
     }
 
     private func quota() -> [String: Any] { ["limit": limit, "used": scenario.quotaUsed, "remaining": max(0, limit - scenario.quotaUsed)] }
