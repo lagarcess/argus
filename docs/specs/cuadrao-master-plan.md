@@ -62,35 +62,40 @@ This summary combines both halves. Sizes are Yelena's estimates (§B6). Order in
 
 ## Where the two halves disagree
 
-Each row names the sections, what each half says, and a suggested resolution. None of these resolutions is a lock unless the row says so.
+Each row gives Iris's current position (her Oct 4 corrections included), Yelena's position in Part B, and the status. Iris's positions are positions, not locks: Lucas or Yelena still decide. A row is **converged** when the two positions agree or Iris adopts Yelena's text; otherwise it stays **open** and names who decides. Rows 23 to 28 also compare Yelena's §B4.1 with Lucas's later Oct 4 calls.
 
-| # | Topic | Product (Part A) | Engineering (Part B) | Suggested resolution |
+| # | Topic | Iris's position | Yelena's position (Part B) | Status |
 | --- | --- | --- | --- | --- |
-| 1 | **e-CF route** | §A7 contradiction 1 withdraws "partner first" and adopts the Blueprint: own fiscal backend and DGII MCP as the goal, a certified provider only as an optional fallback. §A5 (b) calls the bridge optional. | §B6 and the fiscal route line: partner first, per Lucas's 12:39 PM CT correction. The bridge is the route to live invoicing and the first fiscal work; own backend runs in parallel at lower priority. | **Resolved by Lucas's correction:** partner first. Iris to update contradiction 1 and §A5 (b). F2's remaining question is timing (see row 2). |
-| 2 | **F2 and pillar order for fiscal work** | §A3 lists pillar 7 (own offline fiscal tooling) above pillar 9 (live issuance, "optionally" via a PSFE). F2 recommends tracking over bridging for pilots before Nov 15. | Tracking externally issued e-CF is the first pilot step; issuance moves to the provider bridge once live. Own backend replaces the provider later. | Compatible on tracking first. Keep F2 open on whether live e-CF is in the first business release. Iris to re-check pillars 7 and 9 against the partner-first order. |
-| 3 | **Keeping business out of the public build** | §A4: Yelena is comparing a server switch and a separate TestFlight build; product defers. | §B3.4: Option C, compile-time `CUADRAO_BUSINESS` build plus server authorization. Server-only gating is ruled out for App Store builds. | Follow §B3.4. It's the Head of Engineering's decision under lock 2. |
-| 4 | **Business role presets** | §A2 and pillar 1: three presets (owner, associate, accountant). | §B2.2: owner, admin, bookkeeper, approver, accountant, viewer, plus a separate billing admin flag. | Lucas locks the roles matrix (§B6 "needs Lucas's matrix lock"). Suggest Iris's three presets as the starting UI, mapped onto Yelena's permission roles. |
-| 5 | **Space model and consumer TestFlight** | §A4's TestFlight minimum doesn't include the space-model migration; §A3 runs pillar 1 alongside pillar 2. Pillar 1's first slice includes a business space. | §B2.3: steps 1-3 are cheapest before external TestFlight; consumer TestFlight needs steps 1-2. The business kind comes last (step 4) and is web first. | Not a TestFlight blocker unless Lucas says so. Schedule steps 1-2 before production holds tester data where possible; the business space follows step 4. |
-| 6 | **#686, #694** | §A6: keep deferred; un-defer #686 if Argus web stays live (F5). | §B7: listed under consumer TestFlight because the TestFlight API is `argus-api` on `main`. | **Settled by steering:** must-dos at main-promotion time, not TestFlight blockers. |
-| 7 | **#807 scope** | §A6: item 15 and alerting, "before an external beta" per the issue. | §B7: item 15 for TestFlight; items 3 (alerting) and 5 (per-worker limiter) before public launch. | Item 15 before TestFlight. Ask Yelena whether alerting moves up to match the issue's "before an external beta". |
-| 8 | **#671, #676** | §A6: keep deferred; moot if arguschat.ai redirects. Un-defer #676 if Argus web stays live. | §B7: before public launch. The iOS app relies on web password recovery (#676) and the limiters scale with workers (#671). | Follow §B7. Both apply to the Cuadrao surfaces whatever F5 decides. |
-| 9 | **#684, #685** | §A6: keep deferred; un-defer if Argus web stays live. | §B7: archive when guest flow and backtests retire; until then they matter on arguschat.ai. | Compatible. Tie both to the F5 answer. |
-| 10 | **#803, #804** | §A6: keep deferred; fold #804's worker-count check into #807. | §B7: before public launch. §B3.2 cites #803 for the cost of an Apple team change. | Before public launch, with #804's worker-count check folded into #807. |
-| 11 | **#700, #656** | §A6: keep deferred; re-check against the chat runtime assignment. | §B7: before public launch (#700 if the Cuadrao agent reuses the chat turn path; #656 because calculations stay). | Re-check when the agentic runtime assignment is scoped; if the chat path is reused, before public launch. |
-| 12 | **#690** | §A6: keep deferred (live Argus web security). | §B7: re-scope to the business, agent and file surfaces before real business data. | Follow §B7 for business pilots. |
-| 13 | **Archive vs keep deferred** (#640, #606, #644, #653, #623, #620, #696) | §A6: keep deferred; re-check against chat runtime. | §B7: archive or close as obsolete after the pivot. | Lucas or Iris confirm before any closure. |
-| 14 | **Android** | §A2: partial, "iPhone first, Android after". | §B1.1: park; no Android release is committed (GTM p.5). | Park. It also conflicts with canon (canon row 7). |
-| 15 | **Guest flow** | §A6 lists guest issues as live-web security. | §B1.1: drop from Cuadrao; delete with the chat retirement. | Engineering call for Cuadrao surfaces; deleting it needs F5 and conflicts with canon (canon row 6). |
-| 16 | **WhatsApp intake access** | §A3 pillar 3: "no access" (Meta business account is platform onboarding). | §B6: "1-away" (Meta WhatsApp Business Platform). | Wording only; both say no regulator. Use "1-away". |
-| 17 | **Revenue: one RevenueCat entitlement** | §A5 recommends IAP plus web on one RevenueCat entitlement; lists Lemon Squeezy for a DR-only entity. | §B5: the server entitlement table is the source of truth; RevenueCat has no Lemon Squeezy integration, so on a DR entity the API is the only reconciler. | Server table as source of truth; RevenueCat feeds it. F4 stays open. |
-| 18 | **`GUEST_PUBLIC_LAUNCH_SAFETY.md`** | §A6: update during the domain move. | §B8: archive with the guest flow and web chat retirement, not before. | Update domain references during the move; archive when the guest flow retires. |
-| 19 | **Execution board size** | §A6: shrink it; move pre-October sections to `docs/archive/`. | §B8: keep it (#813 section). | Out of scope here: this plan doesn't edit the board, and #813, #808 and #790 all touch it. Revisit after they land. |
-| 20 | **Staging and sole-owner deletion** | Not covered. | §B4 and §B9 questions 2-3. | Add to Lucas's open questions (done in §B9). |
-| 21 | **Plaid** | §A2: Plaid sandbox listed under imports and connectors as partial; no DR bank feeds. | §B1.1: salvage; Plaid is US-only with no Dominican coverage. §B6: "Gated for DR users", "Keep only for foreign accounts". | **Settled by Lucas's 12:44 PM CT call:** keep Plaid. Sandbox plus Faker data for stress tests; real Plaid for Dominicans in the US and accounts abroad; manual entry for the rest. Production access is a founder-track partner step. |
-| 22 | **Market-data providers** | Not covered. | §B1.1: salvage the chat and calculations selectively; `market_data` is part of the Argus-era code. No call on provider keys. | **Settled by Lucas's call:** parked for the pilot. Keys come out of the live setup; code stays; BCRD fully parked. Perplexity covers general finance questions. Currency follows the Oct 4 currency rule (no conversion). |
-| 23 | **Gmail import** | §A2: partial (foundation, not enabled). | §B6: "1-away" (Google OAuth verification and annual security assessment). | **Lucas's call:** stays an open decision. |
+| 1 | **e-CF route** | Partner first. A DGII-certified provider is the path to a full business service; our own DGII backend and certified-provider status run in parallel while Lucas does the DGII paperwork. Pilots record invoices issued elsewhere, then issue through Cuadrao (§A7 contradiction 1). | Same, per Lucas's 12:39 PM CT correction (fiscal route line, §B6). | **Converged** (Lucas's correction). |
+| 2 | **Fiscal order** | New pillar 7, certified-provider integration built against the provider's sandbox; own fiscal tooling (pillar 8) is a parallel track behind it. Yelena sets the exact sequence against capture. F2 is which provider and when. | §B6: external e-CF tracking is the first pilot step; the provider bridge (3-5 eng-weeks) is the first fiscal work; the own backend (6-10 eng-weeks) runs in parallel at lower priority. | **Converged** on order; the exact sequence against capture is Yelena's. F2 stays open for Lucas. |
+| 3 | **Keeping business out of the public build** | Yelena's Option C. The in-app business space stays thin; the full service is the web. | §B3.4: Option C, a compile-time `CUADRAO_BUSINESS` build plus server authorization. | **Converged** (Head of Engineering's decision under lock 2). |
+| 4 | **Business roles** | Yelena's 6 roles plus billing admin in the data model; Iris's 3 presets (owner, associate, accountant) in the pilot interface. | §B2.2: owner, admin, bookkeeper, approver, accountant, viewer, plus a billing admin flag. | **Converged.** Lucas still locks the matrix with the space model (§B9 question 1). |
+| 5 | **Space model before TestFlight** | Yes, because it's cheapest with no real data. If it threatens the TestFlight date, it's Lucas's call. | §B2.3: steps 1-3 are cheapest before external TestFlight; consumer TestFlight needs steps 1-2; the business kind (step 4) comes last, web first. | **Converged** on intent. **Open** only if it threatens the date (Lucas). |
+| 6 | **#686, #694** | (No new position.) | §B7: listed under consumer TestFlight because the TestFlight API is `argus-api` on `main`. | **Settled by steering:** must-dos at main-promotion time, not TestFlight blockers. |
+| 7 | **#807** | Yelena's sequencing. Iris only needs the deletion sweep (item 15) before TestFlight. | §B7: item 15 for TestFlight; items 3 (alerting) and 5 (per-worker limiter) before public launch. | **Converged.** |
+| 8 | **#671, #676** | Yelena's sequencing. | §B7: before public launch (the iOS app relies on web recovery; limiters scale with workers). | **Converged.** |
+| 9 | **#803, #804** | Yelena's sequencing. | §B7: before public launch. | **Converged.** |
+| 10 | **#700, #656** | Yelena's sequencing. | §B7: before public launch (#700 if the Cuadrao agent reuses the chat turn path; #656 because calculations stay). | **Converged.** |
+| 11 | **#690** | Yelena's sequencing. | §B7: re-scope to the business, agent and file surfaces before real business data. | **Converged.** |
+| 12 | **#684, #685** | Tie both to F5 (§A6). | §B7: close when the guest flow and backtests retire; until then they matter on arguschat.ai. | Compatible. **Open** on F5 (Lucas). |
+| 13 | **Archive or close Argus-era issues** (#640, #606, #644, #653, #623, #620, #696) | Keep deferred; re-check against the chat runtime (§A6). | §B7: archive or close as obsolete after the pivot. | **Open.** Lucas or Iris confirm before any closure. |
+| 14 | **Android** | Partially built (shell #730); parked until after the public iOS launch. | §B1.1: park; no Android release is committed. | **Converged.** Canon row 7 still applies. |
+| 15 | **Guest flow** | Drop it: an invite-only TestFlight with sign-in makes it unnecessary. Still tied to F5 and the MVEE guest lock. | §B1.1, §B1.3: drop from Cuadrao; delete it with the chat retirement. | **Open** for Lucas (F5 and canon row 6). |
+| 16 | **WhatsApp intake** | Yelena's 1-away, because it needs a Meta business account (§A3 pillar 3). | §B6: 1-away (Meta WhatsApp Business Platform). | **Converged.** |
+| 17 | **Purchase record and entitlements** | RevenueCat is the record of purchases; our table mirrors it so the server can check entitlements. Final call is Yelena's. | §B5: the server entitlement table is the source of truth; RevenueCat feeds it. RevenueCat has no Lemon Squeezy integration, so with a DR entity on Lemon Squeezy the API is the only reconciler. | **Open** for Yelena. The two agree on server-side checks; they differ on which is the record when a purchase doesn't go through RevenueCat. F4 stays open. |
+| 18 | **`GUEST_PUBLIC_LAUNCH_SAFETY.md`** | Archive it with the guest flow. | §B8: archive with the guest flow and web chat retirement, not before. | **Converged.** |
+| 19 | **Execution board** | Shrink it. | §B8: keep it (#813 section). | **Open.** Out of scope here: no board edits until #813, #808 and #790 land. |
+| 20 | **Staging** | Yelena's call. | §B4 and §B9 question 2: TestFlight against production (MVEE §1.4) or a staging project after #811. | **Converged** on owner. §B9 question 2 still goes to Lucas because a new project reopens MVEE §1.4. |
+| 21 | **Sole-owner deletion** | Block account deletion until the owner transfers ownership or closes the business, keeping records for DR tax retention. A Lucas call. | §B2.4 gap and §B9 question 3: the same proposed rule. Retention period is counsel's input. | **Converged** on the rule. **Open** for Lucas. |
+| 22 | **Docs archive or keep** | Archive anything only about the Argus web, guest or chat; everything else follows Yelena's list. | §B8: keep and rewrite list, plus archive candidates. | **Converged** on the rule; the web, guest and chat archive is **pending F5**. #815 isn't widened for it. |
+| 23 | **Plaid** | Kept: sandbox plus Faker for stress tests; real Plaid for Dominicans in the US or with accounts abroad, a named consumer segment; manual entry for everyone else. Production access needs Plaid's review, next to the US entity (§A2, §A5). | §B1.1: salvage, US-only. §B6: "Gated for DR users", "Keep only for foreign accounts". §B4.1: the 6 `PLAID_*` names are "Lucas decides". §B9 question 4: "keep, park or drop". | **Settled by Lucas's 12:44 PM CT call** (keep). §B4.1 and §B9 question 4 need updating; Maya's notes mark both. |
+| 24 | **Market-data providers** | Alpaca, Kraken, BCRD and other market data parked: keys removed, code kept. Perplexity answers general finance questions in chat. | §B4.1: Alpaca (`ALPACA_*`), Kraken (keyless), FRED and the market-data mode names are "Park (pilot)": runtime reads stop, keys leave Render, code and provider keys stay, no revoke. BCRD has no env names and is "Park (pilot)". | **Converged** for Alpaca, Kraken and the others. BCRD differs: see row 26. |
+| 25 | **OpenRouter** | Stays, because receipt capture depends on it. | §B4.1: `ARGUS_PROD_OPENROUTER_API_KEY`, `ARGUS_VISION_MODEL` and the document-extraction timeout are Keep, with "confirm" since it wasn't on Lucas's keep list; §B9 question 4 asks Lucas to confirm. The chat model tiers and the guest OpenRouter key are Drop (blocked). | **Converged.** Iris's correction answers the confirm request. Note from §B4.1: `ARGUS_VISION_MODEL` isn't in `render.yaml`, so extraction fails with `missing_vision_model` until it's set. |
+| 26 | **Currency conversion and BCRD** | Lucas's currency rule: no conversion, one total per currency with the primary first, one currency per chart with a switcher, plans in a fixed currency, both bank amounts recorded (§A2). | §B4.1: BCRD "becomes the single rate source when conversion is built", and a "rule for when conversion arrives" stores one rate on the record. It also says "nothing converts between currencies today". | **Open** for Yelena to correct §B4.1: under the rule BCRD is fully parked with no rate-source role. The "nothing converts" finding misses the Argus chat market counterfactual (`agent_runtime/calculation_rows.py` `dollar_rate`; canon row 14). |
+| 27 | **Gmail import** | Still open for Lucas. | §B6: 1-away. §B4.1: `GOOGLE_OAUTH_*` are "Lucas decides". | **Converged**; the decision stays open for Lucas. |
+| 28 | **When to park the market-data keys** | Not covered. | §B4.1: the Park group can move now only if Lucas accepts that the frozen arguschat.ai chat loses backtests and market answers; otherwise it moves with the chat freeze. | **Open** timing question for Lucas, tied to F5. |
 
-**Maya's note on the product half:** I was told that Iris sent corrections to the product half. I didn't receive them, and the product half used here is the version dated October 4 (last changed 12:34 PM CT). Part A is that version, with three edits for the public repo: the prospect-list file path is removed, the box file paths for the sources now point to the committed source records, and notes mark where Lucas's fiscal correction and Yelena's §B3.4 decision supersede the text.
+**Maya's note on the product half:** Part A is Iris's Oct 4 draft with her later Oct 4 corrections rewritten in place: partner first, Plaid and the US segment, providers, the currency rule, the thin in-app business space with Option C, and the new certified-provider pillar. For the public repo, the prospect-list file path is removed and the source paths point to the committed records.
 
 ## Conflicts with repo canon
 
@@ -111,7 +116,7 @@ These canon passages conflict with the October 4 sources, the locks above or the
 | 11 | [Decision log](argus-decision-log.md#locked), 2026-09-24 | "The first user is people living in the Dominican Republic, not the diaspora." | Lucas's Oct 4 addition of Dominicans in the US as a named consumer segment, served by real Plaid. | Lucas confirms a decision-log entry that adds the segment next to the DR-first lock without replacing it. |
 | 12 | [Decision log](argus-decision-log.md#locked), 2026-09-27 | "Preserve currency-separated net worth; combined conversion remains undefined." | The Oct 4 currency rule decides it: never convert, never blend. | Compatible in direction. Lucas confirms the decision-log entry (recorded in the October 4 section) that replaces "undefined" with "never". |
 | 13 | [Blueprint source](../research/2026-10-04-cuadrao-product-business-architecture-source.md), data model page | "Save exchange-rate value, source, effective time and rounding policy when conversion occurs. Preserve original-currency amounts alongside translated views." Allocations also mention "FX differences". | The currency rule: no conversion and no translated views. A rate only exists as the one implied by a person's real two-amount transaction. | The Blueprint is Lucas's own source and stays verbatim. The later Oct 4 rule wins; allocation FX differences are recorded as real settled amounts, not computed. |
-| 14 | `docs/API_CONTRACT.md` (calculation market counterfactual, about L5745-5750) and `src/argus/agent_runtime/calculation_rows.py`, `research_grounded.py`, `domain/market_data/assets.py` | An amount in another currency "is converted at Argus's own latest close for its pair with the dollar". | Currency rule (no conversion) and the market-data park. | Argus-era chat calculation. Retire or disable it with the market-data park before the Cuadrao agent reuses calculations (§B1.1). Not changed here. |
+| 14 | `docs/API_CONTRACT.md` (calculation market counterfactual, about L5745-5750) and `src/argus/agent_runtime/calculation_rows.py` (`dollar_rate`, L15, L168), `research_grounded.py`, `domain/market_data/assets.py` | An amount in another currency "is converted at Argus's own latest close for its pair with the dollar". | Currency rule (no conversion) and the market-data park. | Argus-era chat calculation. Retire or disable it with the market-data park before the Cuadrao agent reuses calculations (§B1.1). Not changed here. |
 | 15 | Backend plans: `domain/planning/budgets.py` L78, `planning/model.py` L52, `planning/debt_model.py` L56, `recording/money_plan.py` L155 and L215 | Plans and transfers reject accounts in another currency ("Choose accounts with the same currency"). | Plans keep a fixed currency (matches), but the rule also lets an account in another currency pay toward a plan by recording both bank amounts. There's no two-amount path today. | Gap for engineering: a cross-currency contribution or transfer that stores both real amounts. Same for transfers between a DOP and a USD account. |
 | 16 | iOS Home (`ios/ArgusFoundation/Cuadrao/CuadraoHomeOverview.swift` L8-9) | Home shows one currency at a time with a switcher; currencies are ordered alphabetically; the default is the first alphabetically. No primary-currency setting exists for Home. | Rule: one total per currency on separate lines, primary currency first, set at onboarding. Charts with a switcher already match. | For Lucas's design lane and the iOS owner. The profile's `currency_override` (`docs/DATA_MODEL.md` L191, L231) comes from the Argus home-country feature; whether it becomes the primary currency is an engineering call. |
 | 17 | iOS design sample (`ios/ArgusFoundation/Cuadrao/CuadraoSampleData.swift` L14, `CuadraoDesignSample.swift` L70-71) | Sample accounts have no currency field; the sample screen sums every account and labels the total "DOP". | Every account keeps its own currency; no blended total. | Low risk if the sample stays in the design preview only. Give sample accounts a currency before any of it reaches a tester build. |
@@ -125,6 +130,7 @@ These run beside the main streams. Each item names an owner where one is known. 
 **Docs pass** (Maya; combines §A6 and §B8 where they agree)
 - [ ] Archive the Argus-era specs both halves list: `docs/specs/private-alpha-next-*` (roadmap, decision memo, p2.1 audit, refine-to-version, chat header title, conversational-edit contract), `docs/specs/wave-1/`, `graded-interpretation-routing.md`, `evidence-aware-idea-loop.md`, `conversation-sharing.md`, and the pointer stubs `argus-active-roadmap.md`, `argus-grounded-finance-roadmap.md`, `argus-pivot-strategy.md`, `argus-answers-that-stay-true-roadmap.md`. Check inbound links first. Proposed as a separate docs-cleanup PR.
 - [ ] Archive `docs/superpowers/` (agent working notes, 146 files) in the same cleanup PR, after checking inbound links.
+- [ ] Pending F5: archive anything only about the Argus web, guest or chat (Iris's rule, conflict row 22). Not part of #815.
 - [ ] Hold until the guest flow and web chat retire: `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md`, `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md`, `docs/BREAKPOINTS.md`, `.agent/designs/argus/DESIGN.md`. Update domain references in `GUEST_PUBLIC_LAUNCH_SAFETY.md` during the domain move (conflict row 18).
 - [ ] Rewrite for Cuadrao after the canon locks: `DOCUMENTATION_AUTHORITY.md`, `PRODUCT.md`, MVEE "Financial spaces" and §1.6 (canon rows 1-5, 9).
 - [ ] New docs once locked: the space and ownership spec (§B2), a business spec or business MVEE section (§A7 contradiction 2), and `docs/CUADRAO_CODE_MAP.md` (§B1.3).
@@ -140,11 +146,13 @@ These run beside the main streams. Each item names an owner where one is known. 
 - [ ] Web freeze scope and the landing page (canon row 5).
 - [ ] Dominicans in the US as a named consumer segment, next to the DR-first lock (canon row 11).
 - [ ] Gmail import: ship or not (Lucas's Oct 4 call keeps it open).
-- [ ] F1 to F5 (§A7) and §B9 questions 1-4.
+- [ ] Sole-owner deletion: block deletion until ownership is transferred or the business is closed, keeping records for DR tax retention (conflict row 21, §B9 question 3).
+- [ ] F1 to F5 (§A7) and §B9 questions 1-5.
 
 **Open engineering checks** (Yelena)
 - [ ] Currency rule gaps (canon rows 14-17): retire the chat market counterfactual conversion, add a two-amount cross-currency contribution and transfer, Home lines per currency with the primary first, and a primary-currency setting at onboarding. Lucas's design lane owns the screens.
-- [ ] Take the market-data provider keys (Alpaca, Kraken, BCRD and the others; BCRD fully parked) out of the live setup; keep the code.
+- [ ] Take the market-data provider keys (Alpaca, Kraken, BCRD and the others; BCRD fully parked) out of the live setup; keep the code. Follow the safe removal order in §B4.1, and take the asset check out of `/ops` readiness before the Alpaca keys go.
+- [ ] Correct §B4.1 against Lucas's calls: Plaid names to Keep, BCRD with no rate-source role, and the chat counterfactual conversion (conflict rows 23, 26).
 
 **Issues** (Yelena files the business issues after the space-model lock)
 - [ ] File issues for space model steps 1-4, roles and permissions, audit log, entitlement service, business Inbox/Vault, thin app space and its release-check CI, the certified-provider bridge adapter, and the offline fiscal backend.
@@ -162,7 +170,7 @@ These run beside the main streams. Each item names an owner where one is known. 
 
 ## Part A: Product
 
-**Author:** Iris (Product Lead). **Date:** October 4, 2026. **Status:** Draft for Lucas to lock. This is direction, not a list of shipped features. "Exists" means code is on integration `a8c37d3a` or in an open PR, usually behind a default-off switch. It does not mean the feature is live.
+**Author:** Iris (Product Lead). **Date:** October 4, 2026. **Status:** Draft for Lucas to lock, with Iris's later Oct 4 corrections applied in place. This is direction, not a list of shipped features. "Exists" means code is on integration `a8c37d3a` or in an open PR, usually behind a default-off switch. It does not mean the feature is live.
 
 **Sources:** Lucas's Oct 4 GTM and Blueprint (now recorded in `docs/research/`, see §A7); PR #813 (Oct 4 roadmap lock); PRs #790, #808, #809, #810, #812, #781; the MVEE, the decision log and DOCUMENTATION_AUTHORITY on integration; open issues as of Oct 4. Outside facts are cited at the end of this part.
 
@@ -187,18 +195,23 @@ Tags: **[exists]** code on integration (mostly default-off) · **[partial]** fou
 | Plans: budgets, goals, debt, shared plans | exists/partial | Shared household planning #773 |
 | Household: membership, grants, leaving, deletion with "Exmiembro" | exists/partial | #763, #766, #788, #799, #801; frozen balance is still open (#805) |
 | Capture and receipts: camera, upload, drafts, review | partial | UI #785, durable drafts #776; extraction blocked by #778 |
-| Imports and connectors: statement/CSV, Plaid sandbox, Gmail, Shortcuts, review queue | partial | #768–#772 as foundations, not enabled; no DR bank feeds |
+| Imports and connectors: statement/CSV, Plaid, Gmail, Shortcuts, review queue | partial | #768–#772 as foundations, not enabled; no DR bank feeds. **Plaid is kept** (Lucas, Oct 4): the Plaid sandbox plus Faker-generated data is how we stress-test financial data, and real Plaid serves Dominicans in the US or with accounts abroad. Manual entry covers everyone else. Gmail import is still open for Lucas |
 | Home, Search, Updates inbox, private push | partial | Designs #786; connected paths and push setup open (#813) |
 | Ask Cuadrao (chat, then agentic actions) | partial/new | Argus runtime exists (explanations, calculations, research); Cuadrao chat design #785; agentic runtime not implemented (#813). Lucas starts chat work Oct 5 |
 | Voice | new | Researched, parked |
 | Profile, controls, AI consent, deletion, legal | partial | Release UI #790 (open), deletion #799/#801, Terms/Privacy draft #781 |
 | Android | partial | Shell #730; accounts branch stopped |
 
-> **Maya's note:** Lucas's Oct 4 calls keep Plaid (sandbox plus Faker data for stress tests; real Plaid for Dominicans in the US and accounts abroad), add Dominicans in the US as a named consumer segment, and leave Gmail import open. See [Locked on October 4](#locked-on-october-4).
+
+**Consumer segments.** The locked first users are people living in the Dominican Republic (Sep 24). Lucas's Oct 4 addition names a second segment next to it: **Dominicans in the US or with accounts abroad**, served by real Plaid. Manual entry covers everyone else.
+
+**Providers (Lucas, Oct 4).** Alpaca, Kraken, BCRD and the other market-data providers are **parked** for the pilot: their keys come out of the live setup and the code stays. Perplexity answers general finance questions in chat. **OpenRouter stays**, because receipt capture (document extraction) depends on it. Gmail import is still open for Lucas.
+
+**Currency rule (Lucas, Oct 4).** Cuadrao never converts currencies, because converting would blur the numbers and make us responsible for their accuracy. Every account stays in its own currency, and there's never a blended total. Home shows one total per currency on separate lines, with the person's primary currency first (set at onboarding, changeable later). Charts and comparisons show one currency at a time, with a switcher when the person holds more than one. Plans keep a fixed currency; when an account in another currency pays toward a plan, the person records both amounts exactly as their bank charged them. Lucas's design lane owns the final screens.
 
 #### Business (premium): thin in the app, full service on the web
 
-Lucas agreed the **business space in the iPhone app stays thin**: capturing receipts and invoices, quick approvals, and checking where money stands. **The full service is the business web workspace**, so we don't build business twice. Everything below is **[new]** unless noted. Much of it reuses consumer foundations.
+Lucas agreed the **business space in the iPhone app stays thin**: capturing receipts and invoices, quick approvals, and checking where money stands. **The full service is the business web workspace**, so we don't build business twice. Keeping it out of the public App Store build uses Yelena's Option C (§B3.4). Everything below is **[new]** unless noted. Much of it reuses consumer foundations.
 
 | Subproduct | Surface | Notes |
 | --- | --- | --- |
@@ -221,19 +234,21 @@ There's no fixed order. Higher pillars unlock more of the ones below them. **No 
 | --- | --- | --- | --- | --- |
 | 1 | **Spaces and permissions foundation** | No access | Every other pillar depends on who owns a record. It's cheap to fix now while there's no real data | Yelena's ownership model locked; personal and household running on it; a business space with three role presets |
 | 2 | **Consumer core loop to TestFlight** | No access | It's the product closest to done, and first-tester learning starts here | The connected candidate from #813: onboarding, accounts and activity, plans, household, sign-in, deletion |
-| 3 | **Capture and document inbox** | No access (WhatsApp needs a Meta business account, which is platform onboarding, not a regulator) | Shared by consumer and business, and the main time-saver for owners | Photo or upload → draft → review → record into the chosen space |
+| 3 | **Capture and document inbox** | No access for camera and upload; WhatsApp is 1-away (it needs a Meta business account, which is platform onboarding, not a regulator) | Shared by consumer and business, and the main time-saver for owners | Photo or upload → draft → review → record into the chosen space |
 | 4 | **Personal ↔ business separation** | No access | It's the owner's real pain and the hardest test of the space model | Two money-move actions that create linked records in each space, plus the owner's combined view |
 | 5 | **Business admin without fiscal issuance** | No access | The blueprint (p.13) says business can launch before e-CF. It works for owners who already invoice through DGII's free invoicing tool or another provider | Customer → invoice draft → PDF → mark paid / match → accountant export |
 | 6 | **Ask Cuadrao (agentic)** | No access (needs AI consent and a model provider) | One interface across all contexts, using the same actions and permissions as the screens | Read-only answers over the user's own space, then a proposed draft record that needs confirmation |
-| 7 | **Own fiscal tooling, prepared offline** | No access to build; live use is gated | Lets us detach from partners later | e-CF XML builder and validator against DGII's published technical specs, with no live submission |
-| 8 | **Revenue capture** | Gated by company entity and store agreements, not regulators | Both products can earn revenue | Paywall and entitlements in sandbox; no prices (§A5) |
-| 9 | **Live e-CF issuance** | Gated by each customer's DGII issuer certification, a compliant signing route (INDOTEL-authorized trust service), and optionally a certified provider (PSFE) [3][4] | It's the regulatory way in | One pilot issuer certified through the route Lucas picks (§A7, F2) |
-| 10 | **Own PSFE status** | Gated by DGII: our own RNC with software activity, e-CF issuer status, three certified customer issuers, and a full dossier [3] | Independence from providers | After at least three pilot issuers |
-| 11 | Bank feeds, money movement, cards, tax filing | Gated by banks, aggregators, licenses and DGII channels | Long-term vision only | Not in this plan's first push |
+| 7 | **Certified-provider integration** | 1-away: an agreement with a DGII-certified provider (PSFE), picked in Lucas's partner track | It's the path to a full business service and to issuing e-CF through Cuadrao (partner first, Lucas, Oct 4) | Integration built against the provider's sandbox; pilots then issue through Cuadrao once the connection is live |
+| 8 | **Own fiscal tooling, prepared offline** (parallel track behind 7) | No access to build; live use is gated | Lets us detach from the provider later | e-CF XML builder and validator against DGII's published technical specs, with no live submission |
+| 9 | **Revenue capture** | Gated by company entity and store agreements, not regulators | Both products can earn revenue | Paywall and entitlements in sandbox; no prices (§A5) |
+| 10 | **Live e-CF issuance** | Gated by each customer's DGII issuer certification, a compliant signing route (INDOTEL-authorized trust service), and the certified-provider connection (pillar 7) [3][4] | It's the regulatory way in | One pilot issuer issuing through the provider connection once it's live (§A7, F2) |
+| 11 | **Own PSFE status** | Gated by DGII: our own RNC with software activity, e-CF issuer status, three certified customer issuers, and a full dossier [3] | Independence from providers | After at least three pilot issuers |
+| 12 | Bank feeds, money movement, cards, tax filing | Gated by banks, aggregators, licenses and DGII channels | Long-term vision only | Not in this plan's first push |
 
-**What can run in parallel:** 1 alongside 2 (separate owners); 3 and 4 once 1 is locked; 5 and 7 alongside each other on the web track; 6 starts with Lucas's chat work but its runtime design waits for its own scoped assignment (#813). **What must run in sequence:** 1 before any business data exists; 9 before any compliance promise to a customer; 10 after 9.
+**What can run in parallel:** 1 alongside 2 (separate owners); 3 and 4 once 1 is locked; 5 and 7 alongside each other on the web track, with 8 as a parallel track behind 7 while Lucas does the DGII paperwork; 6 starts with Lucas's chat work but its runtime design waits for its own scoped assignment (#813). Yelena sets the exact fiscal sequence against capture. **What must run in sequence:** 1 before any business data exists; 7 before 10; 10 before any compliance promise to a customer; 11 after 10.
 
-> **Maya's note:** the pillar table is kept as Iris wrote it. For the order of fiscal work after Lucas's partner-first correction, see [conflict rows 1-2](#where-the-two-halves-disagree) and §B6.
+> **Maya's note:** pillar numbers moved on Oct 4. Part B's "Iris pillar 7" (§B6, own fiscal backend row) refers to own fiscal tooling, now pillar 8.
+
 
 ### A4. Path to first real testers
 
@@ -245,11 +260,10 @@ There's no fixed order. Higher pillars unlock more of the ones below them. **No 
 
 #### Business TestFlight + concierge
 
-**Shape:** about 10 owners from one segment, served hands-on. The earlier research lane produced a first batch of DR small-business prospects; the list stays off the public repo. Owners use the **thin business space in the iPhone app** (capture, quick approvals, where money stands) and the **business web workspace** for everything else. The first loop runs **without live e-CF**: owners keep issuing through their current route (for example DGII's free invoicing tool [6]), and Cuadrao tracks those invoices.
+**Shape:** about 10 owners from one segment, served hands-on. The earlier research lane produced a first batch of DR small-business prospects; the list stays off the public repo. Owners use the **thin business space in the iPhone app** (capture, quick approvals, where money stands) and the **business web workspace** for everything else. The first loop runs **without live e-CF**: owners keep issuing through their current route (for example DGII's free invoicing tool [6]), and Cuadrao records those invoices. Pilots issue through Cuadrao once the certified-provider connection is live.
 
-**Keeping business out of the public App Store build** while it's in testing is required, because guideline 2.3.1(a) bars hidden or dormant features [5]. **Yelena is comparing two approaches and will make the recommendation:** a server switch per account, or a separate TestFlight build from the same code that includes business. The product half defers to her.
+**Keeping business out of the public App Store build** while it's in testing is required, because guideline 2.3.1(a) bars hidden or dormant features [5]. **Yelena chose Option C** (§B3.4): a compile-time business build that only the business TestFlight group gets, plus server-side authorization for what any client may do.
 
-> **Maya's note:** Yelena's decision is Option C in §B3.4: a compile-time business build for TestFlight pilots plus server-side authorization.
 
 **Minimum:** pillar 1 locked; a business space with role presets; capture into the business space; the two money-move actions; customer → invoice draft → payment matched → accountant export on the web; a written support and responsibility boundary for the concierge service.
 
@@ -257,11 +271,10 @@ There's no fixed order. Higher pillars unlock more of the ones below them. **No 
 
 ### A5. Founder tracks running in parallel
 
-**Institutional access.** (a) Each pilot customer's issuer certification and signing route [3][4]. (b) An optional certified-provider bridge, only if it makes a safe pilot faster. The blueprint names no partner and treats it as a fallback. (c) The DGII answer on a foreign, non-certified software provider, which was still pending on Oct 4 per the blueprint. (d) Later, our own PSFE application. (e) Banks and aggregators for the long-term vision.
+**Institutional access.** (a) Each pilot customer's issuer certification and signing route [3][4]. (b) **Partner first:** an agreement with a DGII-certified provider (PSFE), which is the path to a full business service. Picking the provider and timing is F2. (c) The DGII answer on a foreign, non-certified software provider, which was still pending on Oct 4 per the blueprint. (d) Our own DGII backend and certified-provider (PSFE) status, in parallel while Lucas does the DGII paperwork. (e) Banks and aggregators for the long-term vision. (f) **Plaid production access:** Plaid's application and security review, next to the US entity. A light partner step, not a blocker.
 
-> **Maya's note:** Lucas's Oct 4 12:39 PM CT correction makes the certified-provider bridge the route to live invoicing (partner first), so (b) is no longer optional. See [Locked on October 4](#locked-on-october-4).
 
-**Company entity: US vs DR.** For consumer, I agree with Yelena: the choice mostly changes which payment accounts we can open, not what we build. For business it can change more, and Lucas should know:
+**Company entity: US vs DR.** For consumer, I agree with Yelena: the choice mostly changes which payment accounts we can open, not what we build. Plaid production access (founder track (f)) sits next to the US entity. For business it can change more, and Lucas should know:
 - **Stripe:** stripe.com/global doesn't list the Dominican Republic (checked Oct 4) [7]. A Stripe account for Cuadrao's own billing likely needs a US entity. Stripe also can't be the payment rail for DR business customers collecting from their own clients. The blueprint already says to choose that provider by DR merchant eligibility.
 - **Lemon Squeezy:** acts as merchant of record and lists the Dominican Republic for bank payouts [8]. It's the most entity-flexible web option.
 - **Apple and Google:** apps in "banking and financial services" "should be submitted by a legal entity" rather than an individual (5.1.1(ix)) [5]. Whether a money manager counts is App Review's call. Enrolling as an organization is the safe path either way.
@@ -329,9 +342,12 @@ There's no fixed order. Higher pillars unlock more of the ones below them. **No 
 - **Shrink:** `argus-execution-board.md` is 3,107 lines. Keep the Oct 4 section current and move the dated pre-Oct sections to `docs/archive/`.
 - **Archive candidates in `docs/specs/`:** `private-alpha-next-*` (roadmap, decision memo, p2.1 audit, refine-to-version, chat header title, conversational-edit contract), `wave-1/`, `graded-interpretation-routing.md`, `evidence-aware-idea-loop.md`, `conversation-sharing.md`, and the pointer stubs (`argus-active-roadmap`, `argus-grounded-finance-roadmap`, `argus-pivot-strategy`, `argus-answers-that-stay-true-roadmap`).
 - **Agent working notes:** `docs/superpowers/` and `.superpowers/sdd/`.
-- **Update during the domain move:** `PRIVATE_LAUNCH_RUNBOOK.md`, `GUEST_PUBLIC_LAUNCH_SAFETY.md`, `docs/release-manifests/` (Argus web history).
+- **Update during the domain move:** `PRIVATE_LAUNCH_RUNBOOK.md`, `docs/release-manifests/` (Argus web history).
+- **Archive with the guest flow (pending F5):** `GUEST_PUBLIC_LAUNCH_SAFETY.md` and anything else only about the Argus web, guest or chat. Everything else follows Yelena's list (§B8).
 
 #### Open issues
+
+> **Maya's note:** Iris's later Oct 4 positions on issue timing are in the "Iris's position" column of [the conflict table](#where-the-two-halves-disagree). Where they differ from this list, the column is current.
 
 **Un-defer for the first-tester push:**
 
@@ -360,12 +376,11 @@ PR #809 (pytest gate) isn't an issue but should land too.
 **Where the blueprint is:** two Oct 4 documents, *Cuadrao consumer and business go to market vision* and *Cuadrao Product and Business Architecture*. Neither was in the repo on Oct 4: no e-CF, DGII or Ley 32-23 text appeared on any recent branch, including #813. They are now recorded as the [GTM source](../research/2026-10-04-cuadrao-gtm-vision-source.md) and the [Blueprint source](../research/2026-10-04-cuadrao-product-business-architecture-source.md).
 
 **Contradictions, each with a proposed resolution:**
-1. **e-CF route.** My earlier advice was to connect to a certified provider first. The blueprint makes our **own fiscal backend and DGII MCP** the goal, with a certified provider only as an optional fallback. Lucas's Oct 4 ask mentions both. *Resolution:* I'm withdrawing "partner first" as the default and adopting the blueprint. The first business loop runs without live issuance, so a bridge is only needed if a pilot must issue through us before our route is ready (F2).
-   **Maya's note:** superseded by Lucas's 12:39 PM CT correction: partner first, with our own backend as the parallel track (see [Locked on October 4](#locked-on-october-4) and §B6). The docs seat hasn't received Iris's updated wording.
+1. **e-CF route.** My earlier advice was to connect to a certified provider first; the blueprint makes our **own fiscal backend and DGII MCP** the goal. *Resolution:* **partner first** (Lucas, Oct 4). A DGII-certified provider is the path to a full business service. Our own DGII backend and certified-provider status run in parallel while Lucas does the DGII paperwork. Pilots record invoices issued elsewhere, then issue through Cuadrao once the provider connection is live (F2).
 2. **The MVEE limits Business to a private manual space** ("no employees, payroll, invoicing or tax") while the blueprint calls for a premium business product. *Resolution:* the MVEE limit becomes the consumer release's scope. Business gets its own spec. Record it in the decision log.
 3. **"Web remake frozen"** (MVEE §1.6, DOCUMENTATION_AUTHORITY) vs the business web workspace. *Resolution:* the freeze covers the Argus consumer web. The business web workspace is a new, scoped surface, per Lucas's Oct 4 decision.
 4. **"Revenue deferred; don't assign free and paid features"** vs "both products can earn revenue". *Resolution:* the direction has changed. Still no prices. Billing can be built in sandbox, and TestFlight can't charge.
-5. **Business in TestFlight while consumer is public, in one codebase.** Guideline 2.3.1(a) bars hidden features. *Resolution:* Yelena recommends how to keep it out (a server switch per account, or a separate TestFlight build).
+5. **Business in TestFlight while consumer is public, in one codebase.** Guideline 2.3.1(a) bars hidden features. *Resolution:* Yelena's Option C (§B3.4): a compile-time business build for the business TestFlight group plus server-side authorization.
 6. **"Entity mostly changes payment accounts."** That's true for consumer. For business it may also decide the PSFE route and whether we can issue valid fiscal receipts to DR customers (§A5). *Resolution:* treat it as an input to F3, not as settled.
 7. **"Stripe for business invoicing."** Stripe can bill for Cuadrao's own subscription with a supported entity. It isn't the rail for DR owners collecting from their own clients. *Resolution:* pick customer payment links by DR merchant eligibility, later.
 8. **Domain.** "argustchat.ai" is `arguschat.ai`, and `get-argus.com` (email) also has to move. Lucas didn't mention it. *Resolution:* include it in the rewire.
@@ -373,8 +388,7 @@ PR #809 (pytest gate) isn't an issue but should land too.
 
 **True founder calls (kept short):**
 - **F1. First business segment.** The blueprint lists independent service providers, small professional-service firms, or owners already collecting documents on WhatsApp. Who recruits the ~10 owners?
-- **F2. Is live e-CF in the first business release or after it?** If a pilot must issue before Nov 15, do we bridge through a certified provider or track their DGII free-tool or current-provider invoices? I recommend tracking.
-  **Maya's note:** Lucas's correction already sets the route (partner first) and the pilot's start (tracking). What stays open is whether live e-CF is in the first business release.
+- **F2. Which certified provider, and when?** The route is set (partner first). Lucas picks the provider in his partner track and the timing of the connection; pilots record invoices issued elsewhere until it's live.
 - **F3. Company entity:** US, DR, or both, and in what order. Is the Apple developer account enrolled as an organization? That's needed for 5.1.1(ix) safety.
 - **F4. Business premium route:** in-app purchase plus web on one entitlement (my recommendation) vs web-only under an exception. Prices stay open.
 - **F5. Argus web during the transition:** a redirect or holding page now (the security backlog becomes moot), or keep serving Argus (un-defer the four security issues).
@@ -624,6 +638,130 @@ The server is the real boundary in both flavors. A consumer build that called bu
 | **Resend** | SMTP `smtp.resend.com`, sender `noreply@get-argus.com` (`resend_email.py`). Used for approval and feedback mail. | cuadrao.ai domain (§B3.2 step 4). Waitlist opt-in, invites and business notifications. |
 | **Costs to watch** | OpenRouter models on six routes (`render.yaml` `ARGUS_*_MODEL`), Perplexity research, PostHog, and Render `standard` + `starter` + workflows | Vision extraction per document, storage growth, Supabase branch hours, WhatsApp per-conversation fees (if adopted), and Gmail's annual security assessment (if Gmail ships). Track cost per space (Blueprint §11). |
 
+#### B4.1 Argus-era env vars and data providers: keep, drop, park [fact for "where read"; proposed for the call]
+
+**Method.** Snapshot of integration `a8c37d3a`. I took every name declared in `render.yaml`, `.env.example`, `web/.env.local.example`, `.github/private-alpha-release-profile.json`, GitHub Actions `secrets.*`/`vars.*` and `ios/Config/*`, plus every name the code reads (`os.getenv`/`environ`, `process.env`, Info.plist keys, shell `$VAR`), then matched each against non-test code. **238 names classified: 96 Keep, 121 Drop, 12 Park (pilot), 9 Lucas decides.** 62 of the Keep names are `ARGUS_*` (or `NEXT_PUBLIC_ARGUS_*`) and become `CUADRAO_*` under §B3.2 step 7, marked **→C** below. Not counted: about 70 local QA/e2e harness names (`ARGUS_GUEST_QA_*`, `ARGUS_QA_*`, Playwright ports, evidence dirs, `ARGUS_EVAL_*`, `ARGUS_RUN_LIVE_*`). They never touch Render or GitHub. `ARGUS_GUEST_QA_*` goes with the guest flow; rename the rest as the scripts get touched. Names only; no values were read or printed.
+
+**Call key.** **Keep:** Cuadrao needs it. **Drop:** stop reading it and delete it. "(blocked)" means it can only go after the Argus chat/backtest/guest freeze-then-retire (§B1.3). **Park (pilot):** code stops reading it at runtime and it leaves Render, but the code path, docs and provider keys stay so it can come back. No revoke. **Lucas decides:** product call.
+
+**DOP/USD conversion check (BCRD) [fact]: nothing converts between currencies today, so BCRD is Park.** No code, env var or migration mentions BCRD or a rate feed (`git grep -i 'bcrd|banco central|exchange_rate|fx_rate'` over `src`, `web`, `ios`, `supabase/migrations` finds nothing outside `docs/archive`). Every money aggregate is grouped or filtered by currency, never translated:
+- Net worth, assets, debts, cash and recorded spending on Home: one subtotal per currency, `src/argus/domain/recording/loop_reads.py` `home_response` (groups keyed on `facts.currency`, L160-170). Spending is filtered by currency (`recording/spending.py` `spending`, L22-34).
+- Household positions: per-currency groups, `src/argus/domain/household/projection.py` `positions` (L105-125). Shared plan actuals match on currency, `household/planning_projection.py` `public` (L209).
+- Mixed-currency inputs are refused, not converted: budgets `domain/planning/budgets.py` `validate` (L78, `currency_mismatch`), expectations `domain/planning/model.py` `cash_account` (L52), transfers/plans `domain/recording/money_plan.py` `plan` (L155).
+- iOS says so to the user: "Choosing a currency does not convert or combine your balances" (`ios/ArgusFoundation/Cuadrao/CuadraoProfilePage.swift:88`).
+- Chat: `src/argus/agent_runtime` and `src/argus/api/chat` import nothing from `recording`, `planning` or `household`, so chat can't write balances. The legacy web chat routes an exchange-rate question to Perplexity research as a one-off answer (`agent_runtime/interpreter/unsupported_admission.py:105`), and nothing persists it. The Cuadrao iOS chat is a local preview: the 8 `Cuadrao/CuadraoChat*.swift` files make no network calls, and `CanvasChatCalculation` is a hard-coded 3,000 × 6 demo.
+- The only planned conversion is backtest #623 (open, "converted once to dollars at the latest rate", waiting on BCRD). It goes with the backtest retirement. The archived pivot doc also notes BCRD's site terms forbid commercial redistribution without authorization (`docs/archive/2026-09-26-argus-pivot-strategy.md:160`). **Rule for when conversion arrives:** one rate source, stored with the rate and date on the record. Perplexity never supplies a number that's saved into a balance.
+
+> **Maya's note:** Lucas's Oct 4 currency rule (about 12:45 PM CT) supersedes the "rule for when conversion arrives" above: Cuadrao never converts currencies, so no conversion is planned and BCRD is fully parked, not a future rate source. Exchange rates only exist as the ones implied by a person's real two-amount bank transaction. Also, "nothing converts between currencies today" misses one Argus-era path: the chat market counterfactual converts amounts at Argus's latest close against the dollar (`src/argus/agent_runtime/calculation_rows.py` `dollar_rate`, L15 and L168; `docs/API_CONTRACT.md` about L5748). It is display-only in the web chat and nothing stores it, but it still conflicts with the rule. See [conflict row 26](#where-the-two-halves-disagree) and [canon row 14](#conflicts-with-repo-canon).
+
+**Perplexity [fact]: Keep. It's wired into the backend, but not into the Cuadrao app yet.** `PERPLEXITY_API_KEY` is read via `domain/research/credentials.py` `perplexity_api_key()`. The research rail (`domain/research/perplexity_agent.py`, `ARGUS_RESEARCH_RAIL_ENABLED=true` on Render) serves the Argus web chat. Memory embeddings reuse the same key (`llm/memory_embedding.py:301`). The iOS Cuadrao chat doesn't call it yet; the Cuadrao agent lane (#813) has to wire it for one-off outside-finance questions.
+
+| name | where read | provider | call | reason |
+|---|---|---|---|---|
+| **Supabase** | | | | |
+| `SUPABASE_URL`, `SUPABASE_PROJECT_URL` (alias) | `domain/supabase_gateway.py`, `scripts/ops/*` | Supabase | Keep | Core DB/Auth. Collapse the alias in the config module. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `supabase_gateway.py`, `scripts/ops/*` | Supabase | Keep | Server writes, deletion sweep |
+| `SUPABASE_ANON_KEY`, `SUPABASE_ANON_PUBLIC_KEY` (alias) | `supabase_gateway.py`, `mobile/android/app/build.gradle.kts` | Supabase | Keep | Public client key |
+| `SUPABASE_JWT_SECRET` | `api/account_deletion_auth.py` | Supabase | Keep | Deletion re-auth |
+| `DATABASE_URL` | `scripts/ops/resume_account_deletions.py`, `force_account_deletion_step.py` | Supabase | Keep | Deletion sweep (manual, §B4) |
+| `ARGUS_PRODUCTION_DATABASE_URL`, `ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT` | `scripts/ops/production_migration_gate.py` | Supabase | Keep →C | Migration gate |
+| `SUPABASE_POSTGRES_DIRECT_URL`, `_SESSION_POOLER_URL`, `_TRANSACTION_POOLER_URL` | `.github/qa.sh`, `scripts/qa/*`, `scripts/benchmarks/run_turn_latency.py` | Supabase | Keep | QA and ops |
+| `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` | `.env.example` only; the Supabase CLI reads them itself | Supabase | Keep | CLI |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `web/lib/supabase-client.ts`, `supabase-server.ts` | Supabase | Keep | Web auth, recovery, business web |
+| `ARGUS_SUPABASE_URL`, `ARGUS_SUPABASE_ANON_KEY` | `ios/Config/Info.plist`, `ios/ArgusFoundation/Auth/NativeAuthConfiguration.swift` | Supabase | Keep →C | iOS auth |
+| **Render: platform and runtime** | | | | |
+| `RENDER_API_KEY` | `.github/canary-*.sh`, `scripts/benchmarks/*`; on `argus-api` only `api/chat/backtest_jobs.py` | Render | Keep | Keep the GitHub secret for the canary's deploy lookup. Remove it from the `argus-api` service when backtest dispatch goes (blocked). |
+| `POETRY_VERSION` | Render build (`render.yaml`) | Render | Keep | Build |
+| `ARGUS_APP_ORIGIN`, `ARGUS_CORS_ALLOW_ORIGINS` | `api/routers/ops.py`, `web/app/api/auth/recovery/route.ts`, `web/app/r/[receiptId]/page.tsx`; `api/app_setup.py` | Render | Keep →C | Values move to cuadrao.ai (§B3.2) |
+| `ARGUS_TRUSTED_CLIENT_IP_HEADER` | `api/client_ip.py` | Render | Keep →C | Rate limits |
+| `ARGUS_OPS_TOKEN` | `api/routers/ops.py`, canary scripts, GitHub secret | Render | Keep →C | Ops endpoints |
+| `ARGUS_PERSISTENCE_MODE`, `ARGUS_DEV_MEMORY_FALLBACK` | `api/state.py`, `api/dependencies.py`, `api/client_ip.py` | Render | Keep →C | Storage mode; dev fallback must stay off in prod |
+| `ARGUS_DEV_ENDPOINTS_ENABLED`, `ARGUS_MOCK_AUTH`, `NEXT_PUBLIC_MOCK_AUTH`, `NEXT_PUBLIC_E2E_ALLOW_MOCK_SIGNUP`, `MOCK_USER_EMAIL`, `MOCK_USER_PASSWORD` | `api/routers/dev.py`, `api/dependencies.py`, `web/app/page.tsx`, `domain/supabase_gateway.py` | none (dev) | Keep (the 2 `ARGUS_*` →C) | Local and test only. #800-style release gate keeps them off. |
+| `APP_ENV` | `observability/envelope.py`, `llm/openrouter_key_policy.py`, `scripts/documents/benchmark.py` | Render | Keep | Environment name |
+| `ARGUS_APP_ENV`, `ARGUS_ENV`, `ENVIRONMENT` | `observability/envelope.py`, `api/dependencies.py`, `observability/analytics_deletion.py` | Render | Drop | Three aliases of `APP_ENV`; not set on Render. Not blocked. |
+| `NEXT_PUBLIC_APP_ENV` | Set on `argus-app`; no reader | Render | Drop | Set but unused |
+| `NODE_ENV`, `NEXT_DEV_ALLOWED_ORIGINS`, `NEXT_DIST_DIR` | `web/next.config.ts`, `web/proxy.ts` | Next.js | Keep | Framework |
+| **Render Workflows: backtest jobs** | | | | |
+| `ARGUS_BACKTEST_JOBS_{DISPATCH,SHADOW}_ENABLED`, `ARGUS_BACKTEST_JOBS_{GLOBAL,USER}_{QUEUED,RUNNING}_LIMIT` (4), `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED`, `ARGUS_BACKTEST_WORKFLOW_TASK`, `ARGUS_BACKTEST_REAL_WORKFLOW_TASK`, `ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS` (10) | `api/chat/backtest_jobs.py`, `domain/backtest_admission.py`, `workflows/main.py` | Render Workflows | Drop (blocked) | Backtests |
+| `ARGUS_RENDER_WORKFLOW_PROOF_{TASK,POLL_SECONDS,TIMEOUT_SECONDS}`, `ARGUS_RENDER_WORKFLOW_RELEASE_{COMMIT,VERSION_ID}`, `ARGUS_WORKFLOW_PROOF_{PLAN,USER_ID}`, `ARGUS_WORKFLOW_DATABASE_URL`, `RENDER_TASK_RUN_ID`, `RENDER_USE_LOCAL_DEV`, `RENDER_LOCAL_DEV_URL` (11) | `workflows/trigger_proof.py`, `workflows/proof.py`, `workflows/main.py`, `api/chat/backtest_jobs.py`, release profile, GitHub secret `ARGUS_WORKFLOW_DATABASE_URL` | Render Workflows | Drop (blocked) | Backtest proof harness. Re-create the pattern as `CUADRAO_*` with the extraction/import task family (§B4). |
+| `ARGUS_STALE_JOBS_SUPABASE_URL`, `_SERVICE_ROLE_KEY` | `scripts/ops/stale_backtest_jobs.py`, `.github/stale-backtest-jobs.sh` | Supabase | Drop (blocked) | Backtest job reaper |
+| `ARGUS_BENCHMARK_LIVE_PROVIDER`, `ARGUS_ENABLE_EXECUTION_REALISM` | `scripts/benchmarks/backtest_infra_benchmark.py`, `domain/backtesting/config.py` | none | Drop (blocked) | Backtests |
+| **Resend** | | | | |
+| `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD` | `domain/resend_email.py` | Resend | Keep →C | The Resend SMTP key. Rename it to a general email key, since invites, waitlist and business mail use it too. |
+| `NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL` | `web/lib/support-email.ts` | Resend/Cloudflare | Keep →C | Value moves to `support@cuadrao.ai` (§B3.2 step 4) |
+| **PostHog** | | | | |
+| `POSTHOG_PROJECT_TOKEN`, `POSTHOG_HOST`, `POSTHOG_REGION`, `ARGUS_POSTHOG_TIMEOUT_SECONDS` | `observability/envelope.py` | PostHog | Keep (timeout →C) | Backend analytics |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Secret on `argus-app`; **no reader** (web has no PostHog SDK) | PostHog | Drop | Set but unused. Delete from Render; don't revoke (same project as the backend). Re-add when the landing page wires analytics. |
+| **Apple** | | | | |
+| `ARGUS_APPLE_TEAM_ID`, `_SIGN_IN_KEY_ID`, `_SIGN_IN_PRIVATE_KEY`, `_BUNDLE_ID` | `domain/apple_sign_in/config.py` | Apple | Keep →C | Sign in with Apple; `_BUNDLE_ID` value changes at §B3.2 step 1 |
+| `ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` | `api/apple_sign_in.py` | Apple | Keep →C | Token revocation on delete (5.1.1(v)) |
+| `ARGUS_APPLE_SIGN_IN_ENABLED` | `ios/.../Auth/NativeProviderSignIn.swift`, Info.plist | Apple | Keep →C | iOS flag |
+| **Google Sign-In** | | | | |
+| `ARGUS_GOOGLE_SIGN_IN_ENABLED`, `GOOGLE_SIGN_IN_IOS_CLIENT_ID`, `GOOGLE_SIGN_IN_IOS_URL_SCHEME`, `GOOGLE_SIGN_IN_WEB_CLIENT_ID` | `NativeProviderSignIn.swift`, Info.plist, xcconfig | Google | Keep (flag →C) | iOS Google sign-in |
+| **Cloudflare Turnstile** | | | | |
+| `NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN` | `web/lib/guest-captcha.ts` | Cloudflare | Keep →C | **Not guest-only.** iOS sign-up captcha goes `web/app/auth/native-captcha` → `lib/native-captcha.ts` → `guest-captcha.ts`. Rename the file before the guest deletion PR. |
+| `ARGUS_CAPTCHA_URL` | `NativeAuthConfiguration.swift`, Info.plist | Cloudflare | Keep →C | iOS captcha page URL |
+| **Perplexity** | | | | |
+| `PERPLEXITY_API_KEY` | `domain/research/credentials.py`, `research/search/selection.py`, `llm/memory_embedding.py` | Perplexity | Keep | One-off outside-finance answers (see above) |
+| `ARGUS_RESEARCH_RAIL_ENABLED`, `ARGUS_RESEARCH_BACKGROUND_DEADLINE_SECONDS` | `domain/research/config.py` | Perplexity | Keep →C | Research rail |
+| `ARGUS_REGISTERED_DAILY_RESEARCH_CEILING`, `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` | `domain/usage_limits.py` | Perplexity | Keep →C | Cost caps |
+| `ARGUS_GROUNDED_DISCOVERY_ENABLED`, `ARGUS_DISCOVERY_{SEARCH_PROVIDER,SEARCH_TIMEOUT_SECONDS,MAX_CANDIDATES,HOURLY_LIMIT,DAILY_LIMIT,GLOBAL_DAILY_CEILING,OPENROUTER_SEARCH_MODEL}` (8) | `domain/research/search/config.py`, `selection.py`, `domain/usage_limits.py` | Perplexity/OpenRouter | Drop (blocked) | Asset discovery for backtests ("5-symbol run cap") |
+| `NEXT_PUBLIC_RESEARCH_RAIL_ENABLED` | `web/lib/private-alpha-flags.ts` | none | Drop (blocked) | Web chat UI |
+| **OpenRouter** | | | | |
+| `ARGUS_PROD_OPENROUTER_API_KEY`, `OPENROUTER_API_KEY` (dev) | `llm/openrouter_key_policy.py` | OpenRouter | Keep (prod →C) | Document vision extraction runs on it (`ingestion/documents/extractor.py:222`). It wasn't on Lucas's keep list, so confirm. |
+| `ARGUS_VISION_MODEL`, `ARGUS_OPENROUTER_DOCUMENT_EXTRACTION_TIMEOUT_SECONDS` | `llm/openrouter_model_env.py`, `llm/openrouter.py:244` (name built from the task) | OpenRouter | Keep →C | Business Inbox extraction. **`ARGUS_VISION_MODEL` isn't in `render.yaml`**, so extraction fails with `missing_vision_model` (`extractor.py:224`) until it's set. |
+| `ARGUS_DOCUMENT_EXTRACTION_ENABLED` | `ingestion/documents/config.py` | own | Keep →C | Stays off until #778 |
+| `ARGUS_DOCUMENT_EXTRACTION_MAX_BYTES`, `_MAX_PAGES` | `.env.example` only; no reader | none | Drop | Documented but unread |
+| `ARGUS_{CHAT,CONTEXT,READOUT,STRUCTURED,UTILITY}_MODEL` + `_FALLBACK_MODEL` (10), `ARGUS_{CAPABILITY,STRUCTURED}_REASONING_EFFORT` (2) | `llm/openrouter_model_env.py`, `llm/openrouter.py` | OpenRouter | Drop (blocked) | Argus chat tiers. If the #813 agent lane adopts the tier scheme, rename instead. |
+| `ARGUS_OPENROUTER_<TASK>_TIMEOUT_SECONDS` for 13 chat tasks (`INTERPRETATION_REPAIR`, `ASSET_MENTION_PREFLIGHT`, `FIELD_FIDELITY`, `CAPABILITY_CONFLICT`, `CLARIFICATION`, `RESULT_SUMMARY`, `NAME_SUGGESTION`, `DISCOVERY_{EXTRACTION,VOICING,MODEL_KNOWLEDGE}`, `KNOWLEDGE_{ROUTE,VOICING}`, `MEMORY_SENSITIVITY`), plus `INTERPRETATION` and `CHAT_COMPOSER` (no such task) | `llm/openrouter.py:244`, `llm/openrouter_tasks.py` | OpenRouter | Drop (13 blocked; 2 dead now) | Chat stages |
+| `ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY` | `llm/openrouter_key_policy.py` | OpenRouter | Drop (blocked) | Guest flow. Revoke the key at OpenRouter after the guest deletion. |
+| **Alpaca** | | | | |
+| `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_PAPER_TRADING` | `context/providers.py`, `domain/market_data/{provider,assets,capabilities}.py` | Alpaca | Park (pilot) | Market data. Off Render; keys kept. |
+| `ARGUS_MARKET_DATA_PROVIDER_MODE`, `MARKET_DATA_CACHE_TTL`, `ENABLE_MARKET_DATA_CACHE`, `ARGUS_ASSET_{PROVIDER_MODE,FIXTURE_PATH,UNIVERSE_LOADER_TIMEOUT_SECONDS}`, `ARGUS_READINESS_ASSET_TIMEOUT_SECONDS` | `domain/market_data/*`, `api/routers/ops.py:73`, `workflows/proof.py` | Alpaca/Kraken | Park (pilot) | **`/ops` readiness probes the asset universe**, so take it out of readiness before removing the Alpaca keys |
+| **Kraken** (no env names) | `domain/market_data/provider.py`, `engine_launch/adapter.py` (`alpaca_crypto_with_kraken_fallback`) | Kraken (keyless public OHLC) | Park (pilot) | Nothing on Render, nothing to revoke |
+| **FRED** | | | | |
+| `FRED_API_KEY`, `ARGUS_FRED_CONTEXT_SERIES` | `context/providers.py` | FRED | Park (pilot) | Rate/macro context. **Read, but not in `render.yaml`.** |
+| **BCRD** (no env names) | Nowhere in code; `docs/archive` only | BCRD | Park (pilot) | Nothing converts today (above). Becomes the single rate source when conversion is built. |
+| **Plaid** | | | | |
+| `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV`, `PLAID_COUNTRY_CODES`, `PLAID_WEBHOOK_URL`, `PLAID_CREDENTIALS_INJECTED` | `domain/ingestion/plaid/config.py`, `scripts/ingestion/plaid_*` | Plaid | Lucas decides | US only, no DR coverage (§B1.1) |
+| **Gmail import** | | | | |
+| `GOOGLE_OAUTH_CLIENT_ID`, `_CLIENT_SECRET`, `_REDIRECT_URI` | `domain/ingestion/gmail/config.py`, `api/gmail.py` | Google | Lucas decides | Restricted scope plus an annual security assessment (§B1.1) |
+| **Cuadrao app flags and secrets (own)** | | | | |
+| `ARGUS_FINANCIAL_ACCOUNTS_ENABLED`, `ARGUS_HOUSEHOLDS_ENABLED`, `ARGUS_BETA_INVITES_ENABLED`, `ARGUS_BETA_INVITE_GATE_ENABLED`, `ARGUS_INVITE_CODE_SECRET`, `ARGUS_INVITE_CODE_SECRET_PREVIOUS`, `ARGUS_INVITE_FOUNDER_USER_ID`, `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED`, `ARGUS_TESTFLIGHT_PUBLIC_URL`, `ARGUS_WAITLIST_URL`, `ARGUS_ACCOUNT_DELETION_ENABLED`, `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED`, `ARGUS_INGESTION_ENABLED` | `api/financial_accounts.py`, `api/households.py`, `api/routers/households.py`, `domain/household/invite_codes.py`, `api/routers/account.py`, `api/guest_access.py`, `api/ingestion.py` | own | Keep →C | The consumer product |
+| `ARGUS_INGESTION_SECRET_KEY` | `domain/ingestion/secrets.py:24` (sealing for Plaid, Gmail **and Apple refresh tokens**, `domain/apple_sign_in/credentials.py:29`) | own | Keep →C | **Not ingestion-only.** Keep it even if Plaid and Gmail are dropped. Rotating it leaves stored Apple tokens unrevocable. |
+| `ARGUS_API_URL`, `ARGUS_WEB_URL`, `ARGUS_AUTH_ENABLED`, `ARGUS_LOCAL_BUNDLE_IDENTIFIER`, `CUADRAO_DESIGN_PREVIEW` | `ios/Config/*.xcconfig`, Info.plist, `NativeAuthConfiguration.swift`, `Cuadrao/CuadraoDesignPreview.swift` | own (iOS) | Keep (4 →C) | iOS build settings |
+| `NEXT_PUBLIC_ARGUS_API_URL`, `NEXT_PUBLIC_ENABLE_SPANISH` | `web/lib/argus-api-transport.ts`, `web/lib/guest-captcha.ts`, `web/lib/language-features.ts` | own (web) | Keep (API URL →C) | Web shell |
+| **Argus chat, share pages and guest (own)** | | | | |
+| `ARGUS_CHECKPOINTER_MODE`, `ARGUS_CONTEXT_PACKETS_ENABLED`, `ARGUS_CONTEXT_PACKET_BUDGET_SECONDS`, `ARGUS_RUNTIME_EVENT_{TIMEOUT,KEEPALIVE}_SECONDS`, `ARGUS_RUNTIME_STREAM_WORKER(S)` (2), `ARGUS_TURN_DEADLINE_SECONDS`, `ARGUS_TURN_CALL_ALLOWANCE`, `ARGUS_REGISTERED_DAILY_TURN_CEILING`, `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`, `ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS` (12) | `api/chat/*`, `api/state.py`, `agent_runtime/turn_execution.py`, `api/routers/agent.py`, `domain/edit_contract_config.py`, `domain/usage_limits.py` | own | Drop (blocked) | Web chat runtime (`web/lib/chat-runtime-timeout.ts` too) |
+| `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED`, `NEXT_PUBLIC_OMNISEARCH_ENABLED` | `api/public_excerpts.py`, `web/lib/private-alpha-flags.ts` | own | Drop (blocked) | `/r/` share pages, chat omnisearch |
+| `ARGUS_GUEST_ACCESS_ENABLED`, `NEXT_PUBLIC_GUEST_ACCESS_ENABLED`, `ARGUS_GUEST_SESSION_DAILY_TURN_CEILING`, `ARGUS_VISITOR_KEY_SECRET` | `api/guest_access.py`, `domain/usage_limits.py`, `domain/visitor_usage.py` | own | Drop (blocked) | Guest flow |
+| `ARGUS_TITLE_AUTOGEN_ENABLED`, `ARGUS_TITLE_AUTOGEN_TIMEOUT_MS` | Set on `argus-api`; **no reader** | own | Drop | Set but unused. Not blocked. |
+| `ARGUS_ENABLE_PERSONALIZATION_MEMORY`, `ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL`, `ARGUS_MEMORY_EMBEDDING_{MODEL,DIMENSIONS,TIMEOUT_SECONDS}`, `ARGUS_MEMORY_VECTOR_COLLECTION`, `MEM0_TELEMETRY` (7) | `memory/service.py`, `api/personalization_memory*.py`, `llm/memory_embedding.py` | Mem0 + Perplexity embeddings | Drop (blocked) | Chat memory. Dropping it doesn't touch the Perplexity key. |
+| **GitHub Actions, canary, benchmarks** | | | | |
+| `ARGUS_CANARY_{API_URL,APP_URL,EMAIL,PASSWORD,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}` | `.github/canary-render.sh`, `.github/workflows/private-alpha-canary.yml` (3 are GitHub secrets), `scripts/benchmarks/render_internet_benchmark.py` | GitHub | Keep →C | Deploy canary. Re-point to cuadrao.ai; the canary inbox moves (§B3.2 step 4). |
+| `ARGUS_DISPOSABLE_DATABASE_URL`, `ARGUS_LOCAL_SUPABASE_{URL,ANON_KEY,SERVICE_ROLE_KEY}` | `.github/workflows/ci.yml`, real-PG tests | GitHub | Keep →C | CI real-Postgres matrix |
+| `ARGUS_CANARY_BROWSER_{CHAT_PROMPT,BACKTEST_PROMPT,RESEARCH_PROMPT,ARTIFACT_PROBE,REDACTION_PROBE_VALUE,CHECKS,CHECKS_HANDOFF,STORAGE_STATE,USER_ID}`, `ARGUS_CANARY_STATIC_LABELS_JSON` (10) | `.github/canary-browser.sh`, `web/e2e/private-alpha-release-canary.spec.ts` | GitHub | Drop (blocked) | The browser canary drives `/chat` |
+| `ARGUS_PUBLIC_ALPHA_{API_URL,APP_URL,CANDIDATE_SHA,LOAD_IDENTITIES_JSON,LOAD_PROMPT,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}` (7) | `scripts/benchmarks/public_alpha_render_load.py` | none | Drop (blocked) | Chat load test |
+| `ARGUS_ALPHA_METRICS_SUPABASE_URL`, `_SERVICE_ROLE_KEY` | `scripts/ops/alpha_readiness_metrics.py` (reads `backtest_jobs`) | Supabase | Drop (blocked) | Chat-era alpha metrics |
+| **Dead (no reader anywhere)** | | | | |
+| `TAVILY_API_KEY`, `GROQ_API_KEY`, `RATE_LIMIT_DELAY`, `CRYPTO_SYMBOLS`, `EQUITY_SYMBOLS` | `.env.example` only | Tavily, Groq, none | Drop | Delete now. Revoke the Tavily and Groq keys if any were issued. |
+
+> **Maya's note:** Lucas's Oct 4 calls change three rows in this table. The 6 Plaid names are **Keep**, not "Lucas decides" (the Plaid sandbox with Faker data for stress tests; real Plaid for Dominicans in the US and accounts abroad; production access through Plaid's review on Lucas's founder track). That moves the counts to about 102 Keep and 3 Lucas decides. The BCRD row is fully parked, with no future role as a rate source (currency rule). The Gmail row stays "Lucas decides". The Alpaca, Kraken, FRED and market-data mode rows match Lucas's call (parked for the pilot, keys out of the live setup, code kept).
+
+Android (`mobile/android/app/build.gradle.kts` reads `API_URL` and `SUPABASE_ANON_KEY`) stays parked with Android (§B1.1).
+
+**Safe removal order [proposed].** For every Drop or Park, in this order:
+1. **Stop reading it in code**, in one PR per provider family. Keep the Park code paths behind a default-off mode. Don't make them fail at import. Update `.env.example`, the release profile (`.github/private-alpha-release-profile.json`), `.github/argus-env.sh` and `.github/render-env-sync.sh` and the pinned tests in the same PR, because the release-profile tests fail on drift. Remove the asset check from `/ops` readiness before parking Alpaca.
+2. **Promote it** through the normal integration → `main` path, and let one deploy run clean.
+3. **Remove it from Render and GitHub** (`render.yaml` plus the dashboard env and secrets; GitHub `secrets.*`). Park ends here.
+4. **Delete the secret values** you no longer hold anywhere (Render, GitHub, local `.env` files).
+5. **Revoke at the provider**, for truly dead keys only: Tavily and Groq (if issued), `ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY` after the guest deletion, and the backtest-only GitHub secret `ARGUS_WORKFLOW_DATABASE_URL` (rotate that DB role's password). **Don't revoke** the Alpaca, FRED or `NEXT_PUBLIC_POSTHOG_KEY` keys (shared project), or `RENDER_API_KEY` (still used by the canary).
+
+**What can go now, and what waits for the Argus freeze-then-retire:**
+- **Not blocked (16 names):** the 3 env-name aliases, `NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_POSTHOG_KEY`, `ARGUS_TITLE_AUTOGEN_*` ×2, `ARGUS_DOCUMENT_EXTRACTION_MAX_{BYTES,PAGES}`, the `INTERPRETATION`/`CHAT_COMPOSER` timeouts and the 5 dead `.env.example` names. The Park group (12) can move now, but only if Lucas accepts that the frozen arguschat.ai chat loses backtests and market answers. Otherwise park it together with the chat freeze.
+- **Blocked until arguschat.ai `/chat` is retired:** chat runtime, memory, research-rail web flag, chat model tiers and task timeouts, share pages, browser canary, load and alpha metrics. Blocked by the backtest retirement: Render Workflows backtest jobs, stale-job reaper, discovery and execution realism. Blocked by the guest deletion PR: the guest flags, `ARGUS_VISITOR_KEY_SECRET`, the guest OpenRouter key and `ARGUS_GUEST_QA_*`.
+- **The `→C` renames ride on §B3.2 step 7** (read `CUADRAO_*` with an `ARGUS_*` fallback, flip Render, drop the fallback). Do the renames after the drops, so dead names never get a `CUADRAO_*` twin.
+
 ---
 
 ### B5. Revenue capture: engineering view
@@ -798,7 +936,7 @@ Stream (c) touches (b) only at the invoice record and its fiscal-state fields, s
 
 **Archive candidates:** §A6 list, which I agree with. Add `docs/GUEST_PUBLIC_LAUNCH_SAFETY.md` and `docs/QA_CONVERSATIONAL_TRANSCRIPTS.md` (archive with the guest flow and web chat retirement, not before), `docs/BREAKPOINTS.md` and `.agent/designs/argus/DESIGN.md` (web Argus), and the 146 files in `docs/superpowers/`.
 
-**New, from this half:** the space and ownership spec (§B2, once locked) and `docs/CUADRAO_CODE_MAP.md` (§B1.3). Also commit both source docs (§A7).
+**New, from this half:** the space and ownership spec (§B2, once locked) and `docs/CUADRAO_CODE_MAP.md` (§B1.3). The env and provider inventory in §B4.1 drives the `.env.example` and release-profile cleanup; keep `docs/archive` BCRD and market-data notes, since those providers are parked, not dropped. Also commit both source docs (§A7).
 
 **Size:** `docs/reports/evidence/` is ~4,950 files, 2,195 of them PNGs. Consider moving dated evidence out of the main tree (an archive branch or release assets) while keeping the links. `docs/maintenance/docs-classification-inventory.md` already exists as a starting point.
 
@@ -813,7 +951,9 @@ Iris's F1-F5 cover segment, e-CF timing, entity, business premium route and Argu
 1. **Lock the space model in §B2**, including the business identity-retention rule. The fiscal retention period needs counsel.
 2. **Staging:** TestFlight against the production project (MVEE §1.4 as locked), or reopen §B1.4 for a separate staging project after #811?
 3. **Sole-owner deletion:** must a sole business owner transfer ownership or close the business before deleting their account?
-4. **Bundle id and name:** confirm `ai.cuadrao.app` and "Cuadrao" (availability unverified). Enroll the Apple team as an organization *before* the first external build (Iris F3, Guideline 5.1.1(ix)). Changing teams later forces a Sign in with Apple migration (#803).
+4. **Plaid and Gmail import** (§B4.1): keep, park or drop. Also confirm OpenRouter stays as the vision-extraction provider; it wasn't on the keep list.
+   **Maya's note:** Lucas already decided Plaid on Oct 4 (keep), and Iris's Oct 4 correction says OpenRouter stays because receipt capture depends on it. Only Gmail import is still open here.
+5. **Bundle id and name:** confirm `ai.cuadrao.app` and "Cuadrao" (availability unverified). Enroll the Apple team as an organization *before* the first external build (Iris F3, Guideline 5.1.1(ix)). Changing teams later forces a Sign in with Apple migration (#803).
 
 #### Not verified in this draft
 - Whether any 20260928+ migration exists in hosted production (no DB access). Hosted Supabase Auth settings, Render dashboard state and `WEB_CONCURRENCY`.
