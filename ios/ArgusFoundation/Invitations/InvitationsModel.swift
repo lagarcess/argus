@@ -38,6 +38,7 @@ final class InvitationsModel: ObservableObject {
     var openHousehold: ((String) async -> Bool)?
     private let clientFor: (SessionSnapshot) -> InvitesClient
     private var generation = UUID()
+    private var continuing = false
     private var createKey: UUID?
     private var groupKey: UUID?
     private var personalShare: ReleaseInvitationShare?
@@ -137,7 +138,9 @@ final class InvitationsModel: ObservableObject {
     func discardPendingLink() { pendingLink = nil }
 
     func continuePendingLink() async {
-        guard let secret = pendingLink, let identity else { return }
+        guard let secret = pendingLink, let identity, !continuing else { return }
+        continuing = true
+        defer { continuing = false }
         switch admission {
         case .checking:
             return

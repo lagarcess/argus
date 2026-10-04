@@ -148,7 +148,8 @@ final class HouseholdModel: ObservableObject {
             guard current(ticket, identity) else { return }; invitationPreview = value; reviewedInvitation = secret
         } catch {
             guard current(ticket, identity) else { return }
-            if case SessionFailure.rejected = error, !Self.endsAccess(error) { invitationProblem = InvitationProblem(error); return }
+            let problem = InvitationProblem(error)
+            if Self.invitationOutcomes.contains(problem) { invitationProblem = problem; return }
             await failed(error, ticket, identity, householdId: nil)
         }
     }
@@ -165,10 +166,8 @@ final class HouseholdModel: ObservableObject {
         pendingInvitationToken = input; showManagement = true
         return true
     }
-    private static func endsAccess(_ error: Error) -> Bool {
-        guard case SessionFailure.rejected(_, let code) = error else { return false }
-        return ["households_unavailable", "household_not_found", "not_a_member", "household_closed", "household_access_unavailable"].contains(code)
-    }
+    /// Answers about the invitation itself; anything else keeps the surface's own recovery.
+    private static let invitationOutcomes: [InvitationProblem] = [.invalid, .expired, .revoked, .used, .rateLimited]
     func command(_ command: HouseholdCommand, path: String, method: String = "POST") async {
         guard isAvailable, let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), !busy, pending == nil else { return }
         if path == "/invitations/accept", (command.token.map(InviteSecret.token) ?? command.code.map(InviteSecret.code)) != reviewedInvitation { errorKey = "household.changed"; return }
@@ -231,7 +230,7 @@ final class HouseholdModel: ObservableObject {
             else { accessFailure = handleAccessFailure(error, householdId: requestHouseholdId(write.path)) }
             guard current(ticket, identity) else { return }
             if availability != .disabled {
-                if write.path == "/invitations/accept", case SessionFailure.rejected = error { invitationProblem = InvitationProblem(error) }
+                if write.path == "/invitations/accept", Self.invitationOutcomes.contains(InvitationProblem(error)) { invitationProblem = InvitationProblem(error) }
                 if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 && status != 429 {
                     try? journal.clear(write, for: identity); pending = nil
                     if !accessFailure {
@@ -239,7 +238,7 @@ final class HouseholdModel: ObservableObject {
                             plan.sheet = nil
                             await refresh()
                             if current(ticket, identity) { errorKey = HouseholdPlanModel.message(error) }
-                        } else { clear(); errorKey = write.path == "/invitations/accept" ? nil : "household.changed" }
+                        } else { clear(); errorKey = invitationProblem != nil && write.path == "/invitations/accept" ? nil : "household.changed" }
                     }
                 } else { errorKey = "household.uncertain" }
             }
