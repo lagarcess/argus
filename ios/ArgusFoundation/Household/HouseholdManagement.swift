@@ -186,10 +186,13 @@ struct HouseholdIntroduction: View {
             if mode != "intro" { Button("accounts.back") { mode = "intro" }.frame(minHeight: 44) }
         }.onAppear {
             displayName = model.identity?.profile?.displayName ?? ""
-            if !model.pendingInvitationToken.isEmpty {
-                let input = model.pendingInvitationToken
-                handedOver = input; token = input; mode = "join"; model.pendingInvitationToken = ""
-            }
-        }
+            adoptHandedOver()
+        }.onChange(of: model.pendingInvitationToken) { adoptHandedOver() }
+    }
+    /// A code handed over by link or by the beta gate fills the field whether it arrives before or after the introduction appears.
+    private func adoptHandedOver() {
+        guard !model.pendingInvitationToken.isEmpty else { return }
+        let input = model.pendingInvitationToken
+        handedOver = input; token = input; mode = "join"; model.pendingInvitationToken = ""
     }
 }
