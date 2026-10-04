@@ -14,6 +14,7 @@ struct InvitationGateHost<Content: View>: View {
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var phase
+    @State private var keyboardUp = false
 
     var body: some View {
         Group {
@@ -39,8 +40,10 @@ struct InvitationGateHost<Content: View>: View {
             Text(locale.spanish ? "No pudimos comprobar tu acceso a la beta. Revisa tu conexión e intenta de nuevo."
                  : "We couldn't check your beta access. Check your connection and try again.")
                 .font(CuadraoTypography.supporting).multilineTextAlignment(.center)
-            Button(locale.spanish ? "Reintentar" : "Try again") { Task { await model.retryAccess() } }
-                .buttonStyle(.borderedProminent).frame(minHeight: 44).accessibilityIdentifier("invites.access.retry")
+            Button { Task { await model.retryAccess() } } label: {
+                Text(locale.spanish ? "Reintentar" : "Try again").foregroundStyle(WelcomePalette.onAccent).frame(minHeight: 28)
+            }
+            .buttonStyle(.borderedProminent).accessibilityIdentifier("invites.access.retry")
             signOutButton
         }
         .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -61,7 +64,9 @@ struct InvitationGateHost<Content: View>: View {
                           onSubmit: { code in Task { await model.submitCode(code) } },
                           onWaitlist: { if let url = destinations.waitlist { openURL(url) } },
                           showsWaitlist: destinations.waitlist != nil)
-            .safeAreaInset(edge: .bottom) { signOutButton }
+            .safeAreaInset(edge: .bottom) { if !keyboardUp { signOutButton } }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
             .background {
                 if let household {
                     HouseholdPresenter(model: household)
