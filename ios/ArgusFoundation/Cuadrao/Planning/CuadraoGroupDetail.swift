@@ -160,7 +160,7 @@ struct CuadraoGroupDetail: View {
                         }
                         Spacer()
                         Text(entry.draft && entry.cents == 0 ? (spanish ? "Total pendiente" : "Total pending") : PlanFormat.amount(Double(entry.cents) / 100, currency: group.currency)).font(CuadraoTypography.rowAmount).foregroundStyle(WelcomePalette.ink)
-                    }.frame(minHeight: 64)
+                    }.frame(minHeight: 64).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityIdentifier("group-entry-\(entry.draft ? "draft" : "recorded")")
             }
             if !group.repayments.isEmpty {
