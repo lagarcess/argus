@@ -35,19 +35,20 @@ public struct ReleaseDeleteAccountView: View {
                     if state == .submitting {
                         ProgressView(text("Eliminando tu cuenta…", "Deleting your account…"))
                     } else {
-                        Label(text("La eliminación sigue pendiente", "Deletion is still pending"), systemImage: "clock")
-                        Text(text("Aún quedan pasos por completar. Puedes volver a comprobar el estado.",
-                                  "There are still steps to finish. You can check the status again."))
+                        Label(text("Eliminación en curso", "Deletion in progress"), systemImage: "clock")
+                        Text(text("Estamos eliminando tu cuenta. Ya cerraste sesión y terminaremos de eliminarla en unos días. No tienes que hacer nada.",
+                                  "Your account is being deleted. You're signed out now, and we'll finish removing it within a few days. You don't need to do anything."))
                             .foregroundStyle(.secondary)
-                        Button(text("Comprobar estado", "Check status"), action: onRetry)
-                            .accessibilityIdentifier("identity.delete.check")
+                            .accessibilityIdentifier("identity.delete.inProgress")
+                        Button(text("Listo", "Done"), action: onComplete)
+                            .accessibilityIdentifier("identity.delete.pendingDone")
                     }
                 }
             case .failed:
                 Section {
-                    Label(text("No se pudo completar", "Deletion couldn't finish"), systemImage: "exclamationmark.circle")
-                    Text(text("Tu cuenta no se ha eliminado por completo. Vuelve a intentarlo para continuar.",
-                              "Your account has not been fully deleted. Try again to continue."))
+                    Label(text("No se pudo eliminar", "Couldn't delete your account"), systemImage: "exclamationmark.circle")
+                    Text(text("No pudimos eliminar tu cuenta en este momento. Inténtalo de nuevo.",
+                              "We couldn't delete your account just now. Try again."))
                         .foregroundStyle(.secondary)
                     Button(text("Volver a intentar", "Try again"), action: onRetry)
                         .accessibilityIdentifier("identity.delete.retry")
@@ -55,10 +56,10 @@ public struct ReleaseDeleteAccountView: View {
             case .completed:
                 Section {
                     Label(text("Cuenta eliminada", "Account deleted"), systemImage: "checkmark.circle")
-                    Text(text("Tu cuenta se eliminó. Finaliza para cerrar sesión y borrar sus datos de este dispositivo.",
-                              "Your account is deleted. Finish to sign out and clear its data from this device."))
+                    Text(text("Tu cuenta está eliminada. Ya cerraste sesión.",
+                              "Your account is deleted. You're signed out."))
                         .foregroundStyle(.secondary)
-                    Button(text("Finalizar", "Finish"), action: onComplete)
+                    Button(text("Listo", "Done"), action: onComplete)
                         .accessibilityIdentifier("identity.delete.complete")
                 }
             }
@@ -97,8 +98,8 @@ public struct ReleaseDeleteAccountView: View {
             if consequences.hasSharedPlans {
                 Section(text("Planes compartidos", "Shared plans")) {
                     Text(text(
-                        "En los planes que compartes, tus montos se quedan para que las cuentas de los demás sigan cuadrando, pero sin tu nombre: aparecerás como «Exmiembro». Tus recibos y notas se borran. Lo que debes o te deben queda cerrado en la app, no marcado como pagado. Los planes que creaste pasan a la persona que lleva más tiempo en cada uno.",
-                        "In plans you share, your amounts stay so everyone else's numbers still add up, but without your name: you'll show as \"Former member.\" Your receipts and notes are deleted. Anything you owe or are owed is closed in the app, not marked as paid. Plans you created pass to whoever has been in each one longest."))
+                        "En los planes que compartes, tus montos se quedan para que las cuentas de los demás sigan cuadrando, pero sin tu nombre: aparecerás como «Exmiembro». Tus recibos y notas se borran. Lo que debes o te deben queda cerrado en la app, no marcado como pagado. Los planes que creaste pasan a la persona que lleva más tiempo en cada uno, salvo los planes de deuda compartidos, que se cierran y quedan solo para consulta.",
+                        "In plans you share, your amounts stay so everyone else's numbers still add up, but without your name: you'll show as \"Former member.\" Your receipts and notes are deleted. Anything you owe or are owed is closed in the app, not marked as paid. Plans you created pass to whoever has been in each one longest, except shared debt plans, which are closed and stay view-only."))
                         .accessibilityIdentifier("identity.delete.sharedConsequences")
                     Text(text("Si no queda nadie más en un plan que creaste, ese plan se elimina.",
                               "If no one else is in a plan you created, that plan is deleted."))

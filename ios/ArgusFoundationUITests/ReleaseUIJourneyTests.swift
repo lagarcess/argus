@@ -38,6 +38,9 @@ final class ReleaseUIJourneyTests: XCTestCase {
         app.buttons["release.review.identity"].tap()
         app.buttons["identity.gallery.delete"].tap()
         XCTAssertTrue(app.staticTexts["identity.delete.sharedConsequences"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts["identity.delete.sharedConsequences"].label,
+            "En los planes que compartes, tus montos se quedan para que las cuentas de los demás sigan cuadrando, pero sin tu nombre: aparecerás como «Exmiembro». Tus recibos y notas se borran. Lo que debes o te deben queda cerrado en la app, no marcado como pagado. Los planes que creaste pasan a la persona que lleva más tiempo en cada uno, salvo los planes de deuda compartidos, que se cierran y quedan solo para consulta.",
+            "Iris's founder-locked copy, verbatim")
         let next = app.buttons["identity.delete.continue"]
         reveal(next, in: app)
         next.tap()
@@ -49,7 +52,9 @@ final class ReleaseUIJourneyTests: XCTestCase {
         XCTAssertFalse(app.buttons["identity.delete.complete"].exists)
         app.buttons["identity.delete.fixtureStates"].tap()
         app.buttons["Pendiente"].tap()
-        XCTAssertTrue(app.buttons["identity.delete.check"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["identity.delete.inProgress"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["identity.delete.complete"].exists, "In progress never shows the finished state")
+        XCTAssertTrue(app.buttons["identity.delete.pendingDone"].exists)
         capture(app, "deletion-pending-es")
         app.buttons["identity.delete.fixtureStates"].tap()
         app.buttons["Completada"].tap()

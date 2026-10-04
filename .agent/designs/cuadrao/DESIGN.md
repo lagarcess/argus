@@ -865,15 +865,15 @@ from Yelena's UI checklist, hides Personalization, Security and sessions, Shared
 conversations, Removed activity and photos. Usage, More options and conversation
 bulk actions are hidden by #786 (`a20362d3`) as a Head of Engineering judgment
 call. Memory (`.memory`) is hidden until native memory arrives with its
-controls. These are designed rows whose backend is still owed, not cuts. The
-first-release switch is meant to hide them only in release builds; development
-builds show every row. Yelena is ordering their backends after chat. **Por correo / By email**
+controls. These are designed rows whose backend is still owed, not cuts.
+`CuadraoFirstRelease` hides them only in release builds; development builds show
+every row, and `--cuadrao-release-gates` previews the release set in a DEBUG build. Yelena is ordering their backends after chat. **Por correo / By email**
 stays removed because Updates go to the inbox and push only. Keep initials,
 themes, supported preferences, help, legal links, deletion and sign-out.
 
 The founder retained the personal photo picker in the design. Its shared avatar
-and photo components stay; release builds hide photo selection until hosted
-avatar storage is connected. An unset avatar keeps
+and photo components stay and show in development builds; release builds hide
+photo selection until hosted avatar storage is connected. An unset avatar keeps
 the existing Profile tab icon. Any selected initials, theme or photo replaces
 that icon, with the same selection read by Profile. Removing the selection
 restores the icon. Selection remains session-local until the profile storage
