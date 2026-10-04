@@ -4,6 +4,54 @@ UI handoff, October 2, 2026. This checkpoint implements the founder's 17-item
 presentation scope and the subsequent avatar correction. It does not establish
 external TestFlight readiness or connected service acceptance.
 
+## Integration reconciliation, October 3, 2026
+
+Merge commit `ad0532f1` brings integration `a8c37d3a` into this branch with a plain
+merge. The guide's conflict and the board and MVEE duplicates that the auto-merge
+created were resolved toward the October 2 locks and the six-lane handoff. Later
+commits finish the handoff's ten pickup items. Code head for this run: `c82f093d`.
+Simulator: iPhone 18 Pro Max, Xcode 27. This run does not certify connected or
+physical-device journeys, TestFlight readiness or any service behaviour.
+
+- `CuadraoFirstRelease` hides the unfinished Profile rows, photo selection and
+  conversation bulk actions only in release builds. DEBUG builds show all of them,
+  and `--cuadrao-release-gates` previews the release set in DEBUG.
+- Temporary-chat memory copy follows `CuadraoFirstRelease.shows(.memory)`.
+- The deletion fixture uses Iris's locked shared-plans copy verbatim. In progress
+  (`202`, or `503 account_deletion_incomplete`) is a signed-out confirmation that
+  never becomes the finished state. It stays a DEBUG fixture; nothing calls
+  `POST /account/delete` from iOS yet.
+- A Release build for the simulator compiles. Its binary contains no
+  `--cuadrao-release-gates` string, and the default and `--cuadrao-design` launches
+  show no Apple or Google button:
+  [default](2026-10-03-w1/release-default-launch-light.png),
+  [design welcome](2026-10-03-w1/release-design-launch-light.png).
+
+Results, all on the simulator above:
+
+| Run | Head | Result |
+| --- | --- | --- |
+| `verify.sh build` (Debug) | `860a6044` | Build succeeded |
+| Release build for the simulator | `860a6044` working tree | Build succeeded |
+| Preview state checks (`cuadrao-design-mac-pass.sh checks`) | `860a6044` | All six runners passed: 80 Home balance, 58 Plan, 50 group, 44 receipt, 213 avatar crop, 10 temporary chat. [Log](2026-10-03-w1/design-preview-checks.txt) |
+| Full `verify.sh test` | `860a6044` | 146 tests: 88 passed, 47 skipped, 11 failed. [Per test](2026-10-03-w1/full-suite-860a6044.txt) |
+| Focused pickup runs | pre-commit tree, then `860a6044` | [Items 1 to 4 and 7](2026-10-03-w1/focused-pickup-items.txt), [feedback reveal](2026-10-03-w1/focused-feedback.txt), [auth-on sign-in](2026-10-03-w1/focused-auth-signin.txt) |
+| Focused rerun of full-suite failures | `c82f093d` | [Results](2026-10-03-w1/focused-c82f093d.txt) |
+
+Of the 11 full-suite failures, `CuadraoHomeChartUITests.testFirstObservationAndFirstExpense`
+still expected a dash for first use; `c82f093d` asserts Sin datos and the focused rerun
+passes. `CuadraoReceiptPermissionUITests.testAllowedLocationCanBeRemoved` needed the
+checklist's simulator location and passes once it is set. Two are in #790's area and
+still fail in the focused rerun: `ReleaseUIJourneyTests.testUpdatesNoDataAndReadOnlyHistory`
+(the back step after opening the first notice lands on the review root, so the Data link
+is gone) and `CuadraoSupportUITests.testHomeActivityReturnsToSameRow` (the returned row
+sits under the floating tab bar and is not hittable). The other seven touch code #790 does
+not change (#785 planning, groups, receipts and scan, and a connected fixture test that
+needs its environment) and were not investigated here.
+
+The Mac pass `screens` step and its auth-on sign-in rerun were not run as a whole: the
+shared-Mac lock order arrived first. The auth-on sign-in check passed on its own.
+
 ## Combined preview update for build 3420
 
 PR #786 is included through integration `0ea81a208668e0391aaf008412716f6cae38826c`.
