@@ -253,7 +253,7 @@
    }.buttonStyle(.plain)
 == a0e03c556626  ArgusFoundation/Cuadrao/Planning/PlanCurrencyChoice.swift:1-18  ArgusFoundation/Cuadrao/Planning/PlanCurrencyChoice.swift: CuadraoChoiceMenu carries the shape
    import SwiftUI
-   
+
    struct PlanCurrencyChoice: View {
    @Binding var currency: String
    let locked: Bool

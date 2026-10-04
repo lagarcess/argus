@@ -430,7 +430,7 @@
    }.buttonStyle(.plain)
 == ios/ArgusFoundation/Cuadrao/Planning/PlanCurrencyChoice.swift:1-18
    import SwiftUI
-   
+
    struct PlanCurrencyChoice: View {
    @Binding var currency: String
    let locked: Bool
@@ -460,7 +460,7 @@
    .font(.subheadline).fixedSize(horizontal: !vertical, vertical: true)
    .padding(.horizontal, 8).frame(minHeight: 44)
    .background(line.members.contains(member.id) ? WelcomePalette.sage : .clear, in: Capsule())
-   }.buttonStyle(.plain).accessibilityIdentifier("receipt-assign-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)-\(group.activeMembers.firstIndex(where: { $0.id 
+   }.buttonStyle(.plain).accessibilityIdentifier("receipt-assign-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)-\(group.activeMembers.firstIndex(where: { $0.id
 == ios/ArgusFoundation/Cuadrao/Receipts/CuadraoReceiptSupport.swift:130-142
    Button(action: open) {
    HStack(spacing: 14) {

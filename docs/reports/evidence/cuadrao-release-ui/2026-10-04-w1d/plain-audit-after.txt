@@ -253,7 +253,7 @@
    }.buttonStyle(.plain)
 == ios/ArgusFoundation/Cuadrao/Planning/PlanCurrencyChoice.swift:1-18
    import SwiftUI
-   
+
    struct PlanCurrencyChoice: View {
    @Binding var currency: String
    let locked: Bool
