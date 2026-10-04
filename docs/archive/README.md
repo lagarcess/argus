@@ -60,6 +60,15 @@ Added in the 2026-07-23 interim-slate reconciliation:
 - `private-alpha-interim-issue-roadmap-2026-07-21.md` — retired issue/wave
   dependency plan; founder outcomes now own sequencing.
 
+Added in the 2026-10-04 Cuadrao docs cleanup (Argus-era specs both halves of
+the Cuadrao master plan list for archiving):
+
+- `private-alpha-next-conversational-edit-contract.md` — Argus web chat
+  conversational edit contract, built and landed in `0fb32c1`; web chat frozen.
+- `graded-interpretation-routing.md` — Argus chat interpreter routing lane.
+- `evidence-aware-idea-loop.md` — Argus research-lab source thesis behind the
+  archived decision memo.
+
 Compatibility pointers remain at the former spec/plan paths where existing
 issues, PRs, or historical plans link to them.
 
