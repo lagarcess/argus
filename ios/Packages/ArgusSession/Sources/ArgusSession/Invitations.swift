@@ -86,6 +86,7 @@ public struct SentInvite: Decodable, Identifiable, Equatable, Sendable {
 public struct SentInvites: Decodable, Equatable, Sendable {
     public let quota: InviteQuota
     public let invitations: [SentInvite]
+    public init(quota: InviteQuota, invitations: [SentInvite]) { self.quota = quota; self.invitations = invitations }
 }
 
 /// Secrets arrive once. A replayed create carries none of them.
@@ -156,11 +157,32 @@ public struct GroupLink: Decodable, Identifiable, Equatable, Sendable {
 
 struct GroupLinkList: Decodable { let links: [GroupLink] }
 
+/// The founder's group-link form, held to the server's limits before any request.
+public struct GroupLinkDraft: Equatable, Sendable {
+    public enum Invalid: Error, Equatable, Sendable { case label, cap, expiry }
+    public static let labelLimit = 80
+    public static let capLimit = 10_000
+    public static let longestLifetime: TimeInterval = 365 * 86_400
+
+    public let label: String
+    public let cap: Int
+    public let expires: String
+
+    public init(label: String, cap: Int, expiresAt: Date, now: Date = Date()) throws {
+        let name = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= Self.labelLimit else { throw Invalid.label }
+        guard (1...Self.capLimit).contains(cap) else { throw Invalid.cap }
+        guard expiresAt > now, expiresAt <= now.addingTimeInterval(Self.longestLifetime) else { throw Invalid.expiry }
+        self.label = name; self.cap = cap; expires = InvitationDates.string(expiresAt)
+    }
+}
+
 /// Every invite lookup and command failure the screens can explain, from the server's problem code.
+/// `unavailable` means no answer arrived; every other case is the server's answer.
 public enum InvitationProblem: Error, Equatable, Sendable {
     case invalid, expired, revoked, used, full, rateLimited
     case householdInvitation, quotaExhausted, founderOnly, invitationRequired
-    case surfaceUnavailable, signedOut, unavailable
+    case surfaceUnavailable, signedOut, refused, unavailable
 
     public init(_ error: any Error) {
         if let problem = error as? InvitationProblem { self = problem; return }
@@ -186,7 +208,7 @@ public enum InvitationProblem: Error, Equatable, Sendable {
         case "beta_invite_required": .invitationRequired
         case "invites_unavailable", "households_unavailable": .surfaceUnavailable
         case "account_conversion_required", "verified_user_required": .signedOut
-        default: status == 429 ? .rateLimited : .unavailable
+        default: status == 429 ? .rateLimited : status >= 500 ? .unavailable : .refused
         }
     }
 }
@@ -224,8 +246,8 @@ public struct InvitesClient: Sendable {
     public func redeem(_ secret: InviteSecret) async throws -> RedeemResult {
         try await call("/redeem", method: "POST", body: try JSONEncoder().encode(secret))
     }
-    public func createGroupLink(label: String, cap: Int, expiresAt: Date, key: UUID) async throws -> CreatedInviteResponse {
-        let body: [String: Any] = ["source_label": label, "cap": cap, "expires_at": InvitationDates.string(expiresAt)]
+    public func createGroupLink(_ draft: GroupLinkDraft, key: UUID) async throws -> CreatedInviteResponse {
+        let body: [String: Any] = ["source_label": draft.label, "cap": draft.cap, "expires_at": draft.expires]
         return try await call("/group-links", method: "POST", body: try JSONSerialization.data(withJSONObject: body), key: key)
     }
     public func revokeGroupLink(_ id: UUID) async throws {

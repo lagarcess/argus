@@ -124,7 +124,8 @@ final class InvitationsTests: XCTestCase {
         _ = try? await client.preview(.token("abcdefgh"))
         await wire.reply("/group-links", InviteWireFixture.created(secrets: true, kind: "group_link"))
         let expiry = try XCTUnwrap(InvitationDates.date("2026-11-01T00:00:00Z"))
-        _ = try await client.createGroupLink(label: "Launch dinner", cap: 25, expiresAt: expiry, key: key)
+        let draft = try GroupLinkDraft(label: " Launch dinner ", cap: 25, expiresAt: expiry, now: expiry.addingTimeInterval(-86_400))
+        _ = try await client.createGroupLink(draft, key: key)
         let id = UUID()
         try await client.revokeGroupLink(id)
         let sent = await wire.requests()
@@ -146,7 +147,8 @@ final class InvitationsTests: XCTestCase {
             (409, "household_invitation_requires_accept", .householdInvitation),
             (409, "beta_invite_quota_exhausted", .quotaExhausted), (403, "founder_required", .founderOnly),
             (403, "beta_invite_required", .invitationRequired), (404, "invites_unavailable", .surfaceUnavailable),
-            (503, "invite_codes_unavailable", .unavailable), (500, nil, .unavailable),
+            (422, "invite_request_invalid", .refused), (409, "idempotency_conflict", .refused),
+            (400, "idempotency_key_required", .refused), (500, nil, .unavailable),
             (403, "account_conversion_required", .signedOut),
         ]
         for (status, code, expected) in cases {
@@ -160,7 +162,26 @@ final class InvitationsTests: XCTestCase {
             }
         }
         XCTAssertEqual(InvitationProblem(SessionFailure.unauthorized), .signedOut)
+        XCTAssertEqual(InvitationProblem(SessionFailure.unavailable), .unavailable)
         XCTAssertEqual(InvitationProblem(URLError(.notConnectedToInternet)), .unavailable)
+    }
+
+    func testAGroupLinkDraftHoldsTheServersLimits() throws {
+        let now = try XCTUnwrap(InvitationDates.date("2026-10-01T00:00:00Z"))
+        let week = now.addingTimeInterval(7 * 86_400)
+        let draft = try GroupLinkDraft(label: "  Cena  ", cap: 10_000, expiresAt: now.addingTimeInterval(365 * 86_400), now: now)
+        XCTAssertEqual(draft.label, "Cena")
+        XCTAssertEqual(draft.expires, "2027-10-01T00:00:00Z")
+        let refused: [(String, Int, Date, GroupLinkDraft.Invalid)] = [
+            ("   ", 5, week, .label), (String(repeating: "a", count: 81), 5, week, .label),
+            ("Cena", 0, week, .cap), ("Cena", 10_001, week, .cap),
+            ("Cena", 5, now, .expiry), ("Cena", 5, now.addingTimeInterval(365 * 86_400 + 1), .expiry),
+        ]
+        for (label, cap, expiry, expected) in refused {
+            XCTAssertThrowsError(try GroupLinkDraft(label: label, cap: cap, expiresAt: expiry, now: now)) {
+                XCTAssertEqual($0 as? GroupLinkDraft.Invalid, expected)
+            }
+        }
     }
 
     func testAMalformedReplyIsUnavailableNotAnAdmission() async throws {
@@ -176,7 +197,7 @@ final class InvitationsTests: XCTestCase {
         let identity = try await fixture.login(controller)
         let client = InvitesClient(transport: SessionInvitesTransport(controller: controller, identity: identity))
         do { _ = try await client.redeem(.code("7K2M-9QXD-4RTA")); XCTFail("the fixture server knows no invites") }
-        catch { XCTAssertEqual(error as? InvitationProblem, .unavailable) }
+        catch { XCTAssertEqual(error as? InvitationProblem, .refused) }
         let captured = await fixture.server.captured()
         let request = try XCTUnwrap(captured.last)
         XCTAssertEqual(request.url?.absoluteString, "https://api.example.test/api/v1/invites/redeem")
