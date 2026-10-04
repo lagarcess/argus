@@ -726,10 +726,21 @@ log](argus-decision-log.md#deleting-an-account-in-a-household)). These follow th
 October 2 locks; the wording is Iris's founder-locked copy in the
 [lane handoff](lanes/mvee-five-lane-handoff.md#copy-founder-locked-iriss-wording).
 Present only applicable consequences, then verification, confirmed completion and
-sign-out. This is requested behavior, not a claim that the existing support-request
-endpoint implements deletion or anonymization. Retention and completion facts need
-the connected contract. Ordinary household leave/removal and financial archive
-retain their own semantics.
+sign-out. The deletion command and its web flow are on integration behind the
+default-off `ARGUS_ACCOUNT_DELETION_ENABLED` (#799, #801); while it is off, the web
+files the earlier support request instead, and no native flow is on integration.
+Deletion locks the account (signed out, every route but deletion refuses it)
+until every outside service confirms its revocation, and only then deletes the
+login. A deletion still waiting finishes when the person retries or an operator
+runs the sweep. Nothing runs that sweep on a schedule: that is the founder's
+decision of October 3, 2026, to revisit before an external beta, and no cron or
+scheduled job is to be created for it until he decides otherwise. The
+[API contract](../API_CONTRACT.md#post-accountdelete) owns the route and its
+responses, the [launch runbook](../PRIVATE_LAUNCH_RUNBOOK.md#account-deletion-runs-lane-6)
+owns the sweep and its cadence, and the
+[lane handoff](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion) owns the
+steps. #805 and #806 block turning the flag on. Ordinary household leave/removal
+and financial archive retain their own semantics.
 
 Updates includes invitation acceptance, administrator handoff, owner-history
 removal and household closure. The lane that causes an event writes its Updates
