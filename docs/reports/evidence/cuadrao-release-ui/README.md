@@ -157,6 +157,42 @@ Summaries of the runs are in [2026-10-03-w1b](2026-10-03-w1b/).
   dark: [create light](2026-10-03-w1b/invitation-create-light-es.png),
   [create dark](2026-10-03-w1b/invitation-create-dark-es.png).
 
+## Swallowed taps, October 4, 2026
+
+Third worker on this branch. Simulator: iPhone 18 Pro Max, every UI run focused and
+under the shared-Mac lock. Summaries are in [2026-10-04-w1c](2026-10-04-w1c/).
+
+- Cause of the three taps that did nothing: the tappable area was only the drawn
+  content. A plain-style link or button ignores taps on the empty part of its label,
+  and a Menu in a form row is only as wide as its text. A tap at the row's centre
+  missed; a tap on the text opened it ([positions](2026-10-04-w1c/diag1-tap-position.txt)).
+  This is an app defect a thumb hits too, not a test defect.
+- `80a01d1b` (Updates notice rows), `74ec455c` (Home activity rows) and `fc327b03`
+  (receipt Choose currency menu) give each label a rectangular content shape.
+  `testUpdatesNoDataAndReadOnlyHistory`, `testHomeActivityReturnsToSameRow` and
+  `testPhotoImportKeepsOriginalWithoutInventedItems` pass unchanged
+  ([run](2026-10-04-w1c/focused-taps-after-fc327b03.txt)). The Home and receipt defects
+  exist on integration `a8c37d3a`.
+- `feaca9bf` applies the same shape to eight more rows found by
+  [plain_audit.py](2026-10-04-w1c/plain_audit.py) and read by hand. They compile in Debug
+  and Release; only the group entry row has a UI run.
+- Group repayment: the app's cap is right. Ana owes 3,300 (3,000 house share plus 300
+  of the dinner) and the sheet opens with 3,300.00
+  ([values](2026-10-04-w1c/group-repayment-cap.txt)). The journey asserted in the same
+  instant as its input. `3842099a` and `92fa37bc` assert the cap, that 3,301 cannot be
+  recorded, and wait for Save and for the sheet to close
+  ([run](2026-10-04-w1c/focused-group-final.txt)).
+- `2351ea3b` picks Ana from the payer menu rather than the participant row
+  ([matches](2026-10-04-w1c/receipt-payer-ana-matches.txt)); `0083a7c8` skips the shared
+  planning four-kinds journey without its seeded backend
+  ([run](2026-10-04-w1c/focused-tests456-0083a7c8.txt)).
+- Recents rename never-idle: three fresh launches reached the alert in 1.15 s each
+  ([times](2026-10-04-w1c/recents-rename-three-launches.txt)). It did not reproduce, so
+  no change shipped.
+- One run of the six fixed tests on the sweep tree
+  ([run](2026-10-04-w1c/focused-final-sweep-tree.txt)) failed the group journey at the
+  split Save, read in the instant after typing; `92fa37bc` waits for it.
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
