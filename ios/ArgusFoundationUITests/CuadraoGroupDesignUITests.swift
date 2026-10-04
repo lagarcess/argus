@@ -45,7 +45,7 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         replace(app.textFields["Parte de Ana"], with: "300")
         if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }
         reveal(app, app.buttons["group-expense-save"])
-        XCTAssertTrue(app.buttons["group-expense-save"].isEnabled)
+        XCTAssertTrue(app.buttons["group-expense-save"].wait(for: \.isEnabled, toEqual: true, timeout: 2), "A split that adds up can be saved")
         shot(app, "plan-unequal-split-es")
         app.buttons["group-expense-save"].tap()
         app.segmentedControls["group-sections"].buttons["El plan"].tap()
