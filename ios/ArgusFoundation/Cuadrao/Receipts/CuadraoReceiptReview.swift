@@ -86,6 +86,7 @@ private struct ReceiptEditor: View {
                         }
                     } label: {
                         Label(es ? "Elegir moneda" : "Choose currency", systemImage: "chevron.up.chevron.down")
+                            .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                     }.accessibilityIdentifier("receipt-currency")
                     Text(es ? "El recibo ya está guardado. Elige su moneda para revisar los montos; después quedará fija." : "Your receipt is saved. Choose its currency to review amounts; it stays fixed afterward.")
                         .font(CuadraoTypography.caption).foregroundStyle(.secondary)
