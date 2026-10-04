@@ -1,0 +1,49 @@
+$ next build
+▲ Next.js 16.2.4 (Turbopack)
+
+  Creating an optimized production build ...
+(node:22742) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:22743) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✓ Compiled successfully in 7.5s
+  Running TypeScript ...
+
+  We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+  The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+    - include was updated to add '.next-ecosystem-production/types/**/*.ts'
+    - include was updated to add '.next-ecosystem-production/dev/types/**/*.ts'
+
+  Finished TypeScript in 16.5s ...
+  Collecting page data using 17 workers ...
+  Generating static pages using 17 workers (0/12) ...
+  Generating static pages using 17 workers (3/12)
+  Generating static pages using 17 workers (6/12)
+  Generating static pages using 17 workers (9/12)
+✓ Generating static pages using 17 workers (12/12) in 286ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /account/security
+├ ƒ /api/auth/recovery
+├ ○ /auth/forgot-password
+├ ○ /auth/recovery
+├ ƒ /chat
+├ ƒ /dev/bottom-sheet
+├ ƒ /dev/ecosystem
+├ ƒ /dev/result-card
+├ ○ /login
+├ ○ /privacy
+├ ƒ /r/[receiptId]
+├ ƒ /r/-/opengraph-image
+├ ○ /signup
+└ ○ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

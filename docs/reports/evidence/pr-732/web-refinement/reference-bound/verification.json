@@ -1,0 +1,59 @@
+{
+  "codeHead": "8e5d74e25bb3e26952019823ab386cdb7153b075",
+  "webTree": "56941cbf59ef3a2e7fbecbed1c30b0c7100c333a",
+  "recordedAt": "2026-09-29T00:13:07.864432+00:00",
+  "referenceCellsPassed": 9,
+  "screenshots": 31,
+  "networkViolations": 0,
+  "pageErrors": 0,
+  "consoleErrors": 0,
+  "serverBinding": "One manifest supplies each source root, command, origin and readiness URL; Playwright owns process lifecycle and refuses existing servers.",
+  "negativeTest": {
+    "result": "passed",
+    "fixture": "Unrelated HTTP 200 server on port3200",
+    "expectedRunExit": 1,
+    "screenshotsAccepted": 0
+  },
+  "afterAcceptanceRetention": {
+    "codeHead": "53029f5d7c18827adba9daf79197936086ea0188",
+    "browserCases": 46,
+    "screenshots": 48,
+    "unchangedAppTree": "ecedb7edac3f5973703573781d19781718141ed9",
+    "changedWebFilesSinceAfter": [
+      "web/e2e/ecosystem-preview-reference-manifest.ts",
+      "web/e2e/ecosystem-preview-reference.gate.ts",
+      "web/e2e/ecosystem-preview-reference.playwright.config.ts"
+    ],
+    "disposition": "Only the separate reference harness changed. All product and 46-case acceptance inputs are unchanged; retain that evidence. The affected reference gate was fully recaptured."
+  },
+  "focusedLint": "passed",
+  "focusedHarnessTypecheck": "passed",
+  "modularity": "passed",
+  "additionalCheckLimitation": "Plain repository-wide tsc --noEmit reports existing Bun-test declaration and unrelated e2e typing errors in unchanged files. No claim of a green repository-wide raw tsc check.",
+  "cleanup": "Framework teardown stopped ports3199/3200/3201; unrelated loopback preview3197 remains available.",
+  "limitations": [
+    "Local source reference, not hosted-deployment verification or founder visual approval.",
+    "Registered identity and financial/chat readouts are local fixtures; no real authorization, model turn, write or provider call is exercised.",
+    "Named shared rendered owners are byte-verified; current preview also verifies its complete route source file set. Other web files are not byte-verified; the full web Git tree is recorded for context.",
+    "Screenshots freeze animations/caret and hide Next development chrome and the fixture DevModeBadge via shared FREEZE_CSS."
+  ],
+  "environment": {
+    "browser": "147.0.7727.15",
+    "node": "v26.10.0",
+    "platform": "darwin",
+    "release": "27.0.0",
+    "viewport": {
+      "width": 834,
+      "height": 1000
+    },
+    "deviceScaleFactor": 1,
+    "timezone": "America/Santo_Domingo",
+    "locale": "en-US",
+    "appearance": "light",
+    "reducedMotion": "reduce",
+    "serviceWorkers": "blocked",
+    "websockets": "only same-origin Next development HMR",
+    "retries": 0
+  },
+  "publicationRule": "Later docs/evidence-only heads must retain web tree56941cbf59ef3a2e7fbecbed1c30b0c7100c333a and explicitly revalidate this evidence."
+}
