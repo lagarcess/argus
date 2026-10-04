@@ -20,6 +20,28 @@ The older branch history: `031ad3cd018a77e1672366e9cde044d4087dadf9` was the pla
 
 **Simulator:** iPhone 17e, iOS 27 simulator, UDID `8B7975F1-1338-4966-90E2-770416CAF174`, Xcode 27.0.
 
+## Final pass at `a10f6b5c4`
+
+Code head `a10f6b5c46b21d7c6dd21a8c63fb71e1ba5a38d5` closes the five P3s in `R-household-3c7d7f27`
+and plainly merges `origin/codex/cuadrao-release-ui` at `3370ba509`.
+
+- **Household-scoped not-found.** The synchronous handler that ended membership is private. Every
+  Household-scoped failure goes through `resolveAccessFailure`, and a `household_not_found` ends
+  membership only when the membership read (`GET /households/{id}`) agrees. The plan path shares the
+  same read. Detail, history, Search, the Search reload after a plan write, the activity editor's load
+  and review, and activity writes are each covered by `run_household.py`, plus a membership read with
+  no answer. Before the fix, the editor load, editor review and Search reload cases ended membership.
+- **Handed-over invitation.** The hand-off from the gate or a link now previews the invitation in
+  `HouseholdModel.beginJoin`, and a model test covers it. The view only shows the handed-over text.
+  The earlier "covered by model tests" claim was not true when it was made, because the preview was
+  triggered from view code.
+- **Screens.** No screenshot was re-exported. The #790 merge gives prominent invitation labels the
+  on-accent ink, so the Share and Create buttons in `personal-invitation-created-*` and the gate's
+  Continue button in `gate-*` now render lighter than these files show.
+- **Runs at `a10f6b5c4`.** `run_household.py` 46 of 46, `run_invitations.py` 21 of 21, ArgusSession
+  package 104 tests with 4 skipped and 0 failures, Debug and Release builds succeeded, and the focused
+  `InvitationsUITests` run passed 18 of 18 under the Mac lock.
+
 ## What these screenshots are, and what they are not
 
 They come from `ios/ArgusFoundationUITests/InvitationsUITests.swift`. The tests launch the Debug app
