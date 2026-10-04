@@ -1,0 +1,4 @@
+CFBundleDisplayName=Cuadrao Preview
+CFBundleIdentifier=local.cuadrao.design.47R3855RTJ
+CFBundleVersion=3423
+CFBundleShortVersionString=0.1.0

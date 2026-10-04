@@ -1,0 +1,18 @@
+# Standing orders (Cuadrao iPhone candidate, lead: Claude, founder: Lucas)
+1. Repo lagarcess/argus. Integration is origin/codex/private-alpha-next at a8c37d3a182fbdb3228f6003272418e65286bc1a. Never write to it or to main. Never merge a PR. Lucas approves merges.
+2. One writer per branch and worktree. Write only inside your assigned worktree and your SCOPE paths. Never touch another worktree, never `git stash`, never reset, never rebase, never force-push, never amend pushed commits. Bring integration in with a plain `git merge` only.
+3. Read AGENTS.md (first 350 lines plus Never-Violate Standards), docs/DOCUMENTATION_AUTHORITY.md, and the handoff at ~/.claude/orchestrate/cuadrao-iphone-candidate/handoff-5975107437.md before working. The locked decisions in handoff section 5 are final. Do not reopen them.
+4. No deploys, no hosted flags, no hosted migrations, no secret rotation, no publishing legal pages, no external messages (email, Slack, App Store), no paid provider calls. Local simulator, local Supabase and local tests are fine.
+5. Never print, read aloud or commit secret values. Never rewrite a linked .env with redirection (see AGENTS.md Worktree Environment Contract).
+6. Preserve Cuadrao artwork, typography, gestures, chart swipes, sheets and transitions. Do not remove interactions to hide slowness. Measure before proposing any performance change.
+7. Unfinished capabilities stay gated in release builds and show fully in DEBUG builds. "Por correo" stays removed. Beta admission, household membership and financial account access are three distinct facts. Never merge them.
+8. Do not create a deletion-retry schedule or cron. Do not delete old evidence. Do not close issues or PRs. Do not expand scope into historical issues; record them as follow-ups in your report.
+9. Evidence must be durable: commit under docs/reports/evidence/<lane>/ in your branch, captured at the head it vouches for. Installation does not prove a phone journey. Never claim TestFlight readiness.
+10. No em dash in user-facing copy. Static UI copy is bilingual (en, es-419). Use the founder-locked deletion copy verbatim (handoff doc docs/specs/lanes/mvee-five-lane-handoff.md "Iris" section).
+11. Commit in small verified units with conventional messages and no attribution lines. Push your branch after each verified unit so work is never only local. Do not open a PR unless your brief says so.
+12. iOS builds use your own worktree's derived data (ios/scripts/verify.sh does this) and only your assigned simulator UDID. Do not boot, erase or shut down other simulators.
+13. Comments in code state a one or two line invariant only. No narration.
+14. End with the REPORT your brief asks for, written to your report path, with exact SHAs and the commands you actually ran and their real results. Say plainly what failed or was not run.
+15. The Mac is a shared resource and the lead is its only scheduler. Every simulator test run, UI test run, xctrace recording and device build or install must run under the lock: `lockf -k ~/.claude/orchestrate/cuadrao-iphone-candidate/mac-sim.lock <command>`. Plain compiles (`verify.sh build`) do not need it. A run already in flight when this rule arrived may finish; do not start another outside the lock.
+16. Do not repeat a full iOS UI suite, full backend suite or full real-Postgres matrix that already has a recorded result for the same head. Run focused checks for what you changed (`-only-testing:` targets, named test files) and record the reason whenever a full suite is rerun. Never delete or overwrite existing logs; write new runs to a new directory.
+17. The local Supabase stack has one owner at a time, named on the first line of reports/W4.md. Only the owner starts, resets or stops it.
