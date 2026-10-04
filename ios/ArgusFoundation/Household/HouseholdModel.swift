@@ -105,7 +105,9 @@ final class HouseholdModel: ObservableObject {
         } catch {
             await failed(error, ticket, identity, householdId: selectedId)
             // Still a member: reload so an account that is no longer shared leaves the list.
-            if current(ticket, identity), self.selectedId == selectedId, errorKey == "household.changed" { await refresh(); errorKey = "household.changed" }
+            guard current(ticket, identity), self.selectedId == selectedId, errorKey == "household.changed" else { return }
+            await refresh()
+            if current(ticket, identity), self.selectedId == selectedId, errorKey == nil { errorKey = "household.changed" }
         }
     }
     func back() { detail = nil; history = []; highlightActivityId = nil }
@@ -169,6 +171,8 @@ final class HouseholdModel: ObservableObject {
         guard isAvailable else { return false }
         cancelInvitationReview()
         pendingInvitationToken = input; showManagement = true; joiningByInvitation = true
+        // A handed-over code is previewed at once; joining still needs a name and a tap.
+        await previewInvitation(input)
         return true
     }
     /// Answers about the invitation itself; anything else keeps the surface's own recovery.
@@ -276,7 +280,8 @@ final class HouseholdModel: ObservableObject {
             search = refreshed; nextCursor = cursor; searchState = refreshed.isEmpty ? .empty : .results
         } catch {
             guard current(ticket, identity), searchGeneration == searchTicket else { return }
-            searchState = .unavailable; handleAccessFailure(error, householdId: selectedId)
+            searchState = .unavailable
+            _ = await resolveAccessFailure(error, householdId: selectedId)
         }
     }
     private func send<Value: Decodable & Sendable>(_ write: PendingFinancialConfirmation, _ identity: SessionSnapshot) async throws -> Value {
@@ -325,25 +330,36 @@ final class HouseholdModel: ObservableObject {
     // A plan's uniform not-found response also covers a removed definition or
     // claim. Verify the Household boundary before discarding its Search context.
     func handlePlanAccessFailure(_ error: Error, householdId: UUID) async -> Bool {
-        guard case SessionFailure.rejected(404, "household_not_found") = error else { return handleAccessFailure(error, householdId: householdId) }
+        guard case SessionFailure.rejected(_, "household_not_found") = error else { return applyMembershipAnswer(error, householdId: householdId) }
         guard let identity, let household, household.id == householdId else { return true }
+        guard case .member(let value) = await rereadMembership(householdId, identity) else { return true }
+        guard value.id == householdId, value.membershipId == household.membershipId, value.version == household.version else {
+            suspend(.unavailable); errorKey = "sharedPlan.changed"; return true
+        }
+        return false
+    }
+    /// Every Household-scoped failure lands here. `household_not_found` also answers for an
+    /// account, grant or plan that is gone, so only the membership read ends membership.
+    func resolveAccessFailure(_ error: Error, householdId: UUID?) async -> Bool {
+        guard case SessionFailure.rejected(_, "household_not_found") = error, let householdId, householdId == selectedId, let identity else {
+            return applyMembershipAnswer(error, householdId: householdId)
+        }
+        if case .member = await rereadMembership(householdId, identity) { errorKey = "household.changed" }
+        return true
+    }
+    private enum MembershipRead { case member(Household), settled }
+    private func rereadMembership(_ householdId: UUID, _ identity: SessionSnapshot) async -> MembershipRead {
         let ticket = generation
         do {
             let value = try await controller.householdResponse(Household.self, path: path(householdId), expectedIdentity: identity)
-            guard current(ticket, identity), selectedId == householdId else { return true }
-            guard value.id == householdId, value.membershipId == household.membershipId, value.version == household.version else {
-                suspend(.unavailable); errorKey = "sharedPlan.changed"; return true
-            }
-            return false
+            return current(ticket, identity) && selectedId == householdId ? .member(value) : .settled
         } catch {
-            guard current(ticket, identity) else { return true }
-            if !handleAccessFailure(error, householdId: householdId) { errorKey = "household.loadError" }
-            return true
+            if current(ticket, identity), !applyMembershipAnswer(error, householdId: householdId) { errorKey = "household.loadError" }
+            return .settled
         }
     }
     // Surface availability is server-owned; a disabled route says nothing about membership.
-    @discardableResult
-    func handleAccessFailure(_ error: Error, householdId: UUID?) -> Bool {
+    private func applyMembershipAnswer(_ error: Error, householdId: UUID?) -> Bool {
         guard case SessionFailure.rejected(_, let code) = error else { return false }
         switch code {
         case "households_unavailable": suspend(.disabled)
@@ -351,23 +367,6 @@ final class HouseholdModel: ObservableObject {
             if let householdId, householdId == selectedId { accessEnded() }
             else { errorKey = "household.changed" }
         default: return false
-        }
-        return true
-    }
-    /// `household_not_found` also answers for an account or grant that is gone, so only the
-    /// membership read ends membership.
-    private func resolveAccessFailure(_ error: Error, householdId: UUID?) async -> Bool {
-        guard case SessionFailure.rejected(404, "household_not_found") = error, let householdId, householdId == selectedId, let identity else {
-            return handleAccessFailure(error, householdId: householdId)
-        }
-        let ticket = generation
-        do {
-            _ = try await controller.householdResponse(Household.self, path: path(householdId), expectedIdentity: identity)
-            guard current(ticket, identity) else { return true }
-            errorKey = "household.changed"
-        } catch let membership {
-            guard current(ticket, identity) else { return true }
-            if !handleAccessFailure(membership, householdId: householdId) { errorKey = "household.loadError" }
         }
         return true
     }

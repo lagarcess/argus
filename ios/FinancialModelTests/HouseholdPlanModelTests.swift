@@ -247,6 +247,20 @@ final class HouseholdPlanModelTests: XCTestCase {
         XCTAssertNil(f.model.selectedId); XCTAssertNil(f.model.plan.openedRef); XCTAssertTrue(f.model.search.isEmpty)
         XCTAssertEqual(f.model.errorKey, "household.accessEnded")
     }
+    /// The Search reload after a plan write refuses like any account-scoped read; membership decides.
+    func testSearchReloadNotFoundAfterAPlanWriteKeepsMembershipWhenTheMembershipReadAnswers() async throws {
+        let f = try SharedPlanFixture(); _ = try await f.login(); await f.model.select(SharedPlanTestData.householdId); await f.model.find("Synthetic")
+        let plan = try XCTUnwrap(f.model.plan.plans.first)
+        await f.server.rejectSearch("household_not_found")
+        await f.model.plan.submit(HouseholdPlanEditCommand(scope: f.model.plan.scope(plan), definition: .init(name: "Confirmed title")), action: .edit(plan.ref))
+        let rejected = await f.server.searchRejected
+        XCTAssertTrue(rejected)
+        XCTAssertNil(f.model.pending)
+        XCTAssertEqual(f.model.selectedId, SharedPlanTestData.householdId)
+        XCTAssertEqual(f.model.household?.id, SharedPlanTestData.householdId)
+        XCTAssertEqual(f.model.searchState, .unavailable)
+        XCTAssertEqual(f.model.errorKey, "household.changed")
+    }
     func testContributionConfirmsNormalizedReviewRatherThanEditableDraft() async throws {
         let f = try SharedPlanFixture(); _ = try await f.login(); await f.model.select(SharedPlanTestData.householdId)
         let plan = try XCTUnwrap(f.model.plan.plans.first)
@@ -313,6 +327,9 @@ private actor SharedPlanServer {
     func hold(_ entry: String, _ gate: RequestGate) { self.gate = (entry, gate) }
     func reject(_ code: String, count: Int = 1) { failure = code; failuresRemaining = count }
     func loseNext() { lose = true }
+    private var searchFailure: String?
+    private(set) var searchRejected = false
+    func rejectSearch(_ code: String) { searchFailure = code }
     func commitAndLoseNext() { loseCommitted = true }
     func advanceAuthorization() { authorizationVersion += 1 }
     func commitCount() -> Int { commits }
@@ -360,6 +377,7 @@ private actor SharedPlanServer {
             let account: [String: Any] = ["id": Self.accountId.uuidString, "type": "cash", "nature": "asset", "currency": "DOP", "currency_fraction_digits": 2, "archived": false, "ownership_share_bps": 10000, "version": 4, "created_at": "2026-10-01T12:00:00Z", "updated_at": "2026-10-01T12:00:00Z", "balance": ["state": "unknown", "activity_since_tracking_minor": 0]]
             return response(request, 200, ["membership_id": membership.uuidString, "authorization_version": authorizationVersion, "people": [SharedPlanTestData.person()], "owned_account_ids": [Self.accountId.uuidString], "money": ["accounts": [account], "eligibility": ["expense": ["cash"]], "destination_eligibility": [:], "categories": [], "sources": []], "existing_definitions": [], "purposes": ["budget": ["spending"]]])
         }
+        if path.hasSuffix("/search"), let code = searchFailure { searchFailure = nil; searchRejected = true; return response(request, 404, ["code": code]) }
         if path.hasSuffix("/search") { return response(request, 200, ["items": [["id": SharedPlanTestData.planId.uuidString, "kind": "plan", "title": "Synthetic " + resultKind.rawValue, "account_id": NSNull(), "activity_id": NSNull(), "plan_ref": ["kind": resultKind.rawValue, "id": SharedPlanTestData.planId.uuidString]]], "next_cursor": NSNull()]) }
         for kind in HouseholdPlanKind.allCases {
             if path.hasSuffix("/plan" + HouseholdPlanRef(kind: kind, id: SharedPlanTestData.planId).path) { return response(request, 200, plan(kind)) }

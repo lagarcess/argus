@@ -107,6 +107,75 @@ final class HouseholdModelTests: XCTestCase {
             XCTAssertEqual(fixture.model.errorKey, "household.accessEnded", code)
         }
     }
+    /// Every account-scoped route answers `404 household_not_found` for a grant or account that is
+    /// gone; each one re-reads the membership right after the refusal and keeps it when that read answers.
+    func testAnAccountScopedNotFoundFromAnyEntryKeepsMembershipWhenTheMembershipReadAnswers() async throws {
+        let household = "/api/v1/households/" + HouseholdServer.household.uuidString
+        let entries: [(name: String, request: String)] = [
+            ("detail", "GET " + household + "/accounts/" + HouseholdServer.account.uuidString),
+            ("history", "GET " + household + "/activities/" + HouseholdServer.account.uuidString + "/history"),
+            ("search", "GET " + household + "/search"),
+            ("editorLoad", "GET " + household + "/activity-options"),
+            ("editorReview", "POST " + household + "/activities/preview"),
+            ("activityWrite", "POST " + household + "/activities"),
+        ]
+        for entry in entries {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            fixture.model.beginActivity(try XCTUnwrap(fixture.model.snapshot?.accounts.first))
+            let editor = try XCTUnwrap(fixture.model.editor)
+            editor.amount = "25"
+            await fixture.server.fail(entry.request, 404, code: "household_not_found")
+            switch entry.name {
+            case "detail": await fixture.model.open(HouseholdServer.account)
+            case "history": await fixture.model.loadHistory(HouseholdServer.account)
+            case "search": await fixture.model.find("private query")
+            case "editorLoad": await editor.load()
+            case "editorReview": await editor.review(Locale(identifier: "en_US"))
+            default:
+                let household = try XCTUnwrap(fixture.model.household)
+                fixture.model.editor = nil
+                await fixture.model.confirmActivity(FinancialActivityCommand(kind: .expense, accountId: HouseholdServer.account, amount: "25", occurredAt: "2026-10-01T12:00:00Z", timeZone: "America/Santo_Domingo"), activityId: nil, membership: household.membershipId, version: household.version)
+            }
+            XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household, entry.name)
+            XCTAssertEqual(fixture.model.household?.id, HouseholdServer.household, entry.name)
+            XCTAssertEqual(fixture.model.errorKey, "household.changed", entry.name)
+            XCTAssertNil(fixture.model.pending, entry.name)
+            let paths = await fixture.server.paths
+            let refused = try XCTUnwrap(paths.lastIndex(of: entry.request), entry.name)
+            XCTAssertEqual(paths.dropFirst(refused + 1).first, "GET " + household, entry.name)
+        }
+    }
+    func testAnAccountNotFoundWithoutAMembershipAnswerKeepsTheHousehold() async throws {
+        let fixture = try HouseholdFixture()
+        let identity = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        let household = "/api/v1/households/" + HouseholdServer.household.uuidString
+        await fixture.server.fail("GET " + household + "/accounts/" + HouseholdServer.account.uuidString, 404, code: "household_not_found")
+        await fixture.server.offline("GET " + household)
+        await fixture.model.open(HouseholdServer.account)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertEqual(fixture.model.household?.id, HouseholdServer.household)
+        XCTAssertNotNil(fixture.model.snapshot)
+        XCTAssertEqual(fixture.model.errorKey, "household.loadError")
+        let reopened = HouseholdModel(controller: fixture.controller, configuration: fixture.configuration, journal: fixture.journal)
+        reopened.bind(identity)
+        XCTAssertEqual(reopened.selectedId, HouseholdServer.household)
+    }
+    /// The reload after an account refusal can end membership or lose its answer; its message stands.
+    func testTheReloadAfterAnAccountRefusalKeepsItsOwnMessage() async throws {
+        for (reload, expected) in [("departed", "household.accessEnded"), ("offline", "household.loadError")] {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            await fixture.server.fail("GET /api/v1/households/" + HouseholdServer.household.uuidString + "/accounts/" + HouseholdServer.account.uuidString, 404, code: "household_not_found")
+            if reload == "departed" { await fixture.server.depart() } else { await fixture.server.offline("GET /api/v1/households") }
+            await fixture.model.open(HouseholdServer.account)
+            XCTAssertEqual(fixture.model.errorKey, expected, reload)
+            XCTAssertEqual(fixture.model.selectedId == nil, reload == "departed", reload)
+        }
+    }
     func testANonAdminInvitationRefusalKeepsMembershipAndSaysPermissionsChanged() async throws {
         let fixture = try HouseholdFixture()
         _ = try await fixture.login()
@@ -400,6 +469,12 @@ private actor HouseholdServer {
     static let account = UUID()
     private var enabled = true
     private var failures: [(status: Int, code: String)] = []
+    private var targeted: [String: (status: Int, code: String)] = [:]
+    private var unreachable: Set<String> = []
+    /// Refuses the next request to exactly this method and path.
+    func fail(_ request: String, _ status: Int, code: String) { targeted[request] = (status, code) }
+    /// The next request to exactly this method and path gets no answer.
+    func offline(_ request: String) { unreachable.insert(request) }
     private var discoveryGate: RequestGate?
     func setEnabled(_ value: Bool) { enabled = value }
     func failNext(_ status: Int, code: String) { failures.append((status, code)) }
@@ -445,7 +520,12 @@ private actor HouseholdServer {
             invitationBodies.append((path, body))
         }
         if !enabled { return response(request, 404, ["code": "households_unavailable"]) }
-        paths.append(request.httpMethod! + " " + path)
+        let requested = request.httpMethod! + " " + path
+        paths.append(requested)
+        if unreachable.remove(requested) != nil { throw URLError(.notConnectedToInternet) }
+        if let failure = targeted.removeValue(forKey: requested) {
+            return response(request, failure.status, ["type": "https://api.argus.app/problems/" + failure.code, "status": failure.status, "code": failure.code])
+        }
         if !failures.isEmpty {
             let failure = failures.removeFirst()
             return response(request, failure.status, ["type": "https://api.argus.app/problems/" + failure.code, "status": failure.status, "code": failure.code])
@@ -561,6 +641,10 @@ extension HouseholdModelTests {
         XCTAssertTrue(fixture.model.joiningByInvitation)
         XCTAssertTrue(fixture.model.showManagement)
         XCTAssertEqual(fixture.model.pendingInvitationToken, "https://cuadrao.ai/invite#link-token-123456")
+        XCTAssertEqual(fixture.model.invitationPreview?.name, "Synthetic household")
+        let previewed = await fixture.server.invitationBodies
+        XCTAssertEqual(previewed.map(\.path), ["/api/v1/household-invitations/preview"])
+        XCTAssertEqual(previewed.map(\.body), [["token": "link-token-123456"]])
         fixture.model.showManagement = false
         XCTAssertFalse(fixture.model.joiningByInvitation)
         XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)

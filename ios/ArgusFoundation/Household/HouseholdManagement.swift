@@ -187,10 +187,8 @@ struct HouseholdIntroduction: View {
         }.onAppear {
             displayName = model.identity?.profile?.displayName ?? ""
             if !model.pendingInvitationToken.isEmpty {
-                // A handed-over code is previewed at once; joining still needs a name and a tap.
                 let input = model.pendingInvitationToken
                 handedOver = input; token = input; mode = "join"; model.pendingInvitationToken = ""
-                Task { await model.previewInvitation(input) }
             }
         }
     }
