@@ -60,8 +60,13 @@ replace them with `CuadraoHouseholdSheet`, fictional invite acceptance,
 `CanvasProfileDraft` or preview sign-out. Do not wholesale merge the divergent
 preview branch to obtain the style.
 
-Existing `ConnectedCuadraoAuthFlow` handles email auth; Apple is hidden and Google
-is not a connected native choice. Sign-in for TestFlight is **Apple, Google and
+Existing `ConnectedCuadraoAuthFlow` handles email auth. Native Apple and Google
+sign-in exist on iOS behind the default-off `ARGUS_APPLE_SIGN_IN_ENABLED` and
+`ARGUS_GOOGLE_SIGN_IN_ENABLED` switches (#795, not compiled on a Mac), and the
+backend's Apple token capture and revocation sits behind
+`ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` (#793, #802). None is enabled: the keys
+are still owed by the founder and the [#800](https://github.com/lagarcess/argus/issues/800)
+gates stand. Sign-in for TestFlight is **Apple, Google and
 email** ([October 2 founder
 decision](argus-decision-log.md#sign-in-for-testflight)). Apple and Google are
 built behind default-off flags until the founder supplies the keys, and connected
