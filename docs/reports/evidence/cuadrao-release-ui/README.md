@@ -193,6 +193,30 @@ under the shared-Mac lock. Summaries are in [2026-10-04-w1c](2026-10-04-w1c/).
   ([run](2026-10-04-w1c/focused-final-sweep-tree.txt)) failed the group journey at the
   split Save, read in the instant after typing; `92fa37bc` waits for it.
 
+## Tap-target class closed by a check, October 4, 2026
+
+Fourth worker on this branch. No simulator and no UI test ran in this pass; another
+worker held the simulators. Files are in [2026-10-04-w1d](2026-10-04-w1d/).
+
+- The October 4 audit found 69 plain-style statements without a content shape at
+  `cc68b341` ([before](2026-10-04-w1d/plain-audit-before-cc68b341.txt)). 27 took no
+  taps on part of their frame: the split member toggle, the Manage spaces link, the
+  outlined Sign in buttons, text links, stroke-only chips and tabs, icon buttons and
+  header links. Each label now carries the rectangular content shape used in
+  `feaca9bf`. The other 42 are labels that already fill or shape their frame
+  ([after](2026-10-04-w1d/plain-audit-after.txt)).
+- `ios/DesignPreviewTests/run_tap_targets.py` now fails the design checks when a
+  plain-style statement has neither a content shape nor a reviewed reason in
+  `tap_targets_reviewed.txt` ([output](2026-10-04-w1d/tap-target-check.txt),
+  [checks run](2026-10-04-w1d/design-preview-checks.txt)). It reads one statement per
+  `buttonStyle(.plain)` line, so a style set on a container of several buttons is
+  read once. Invitations and Household are not read.
+- The repayment journey waits for the field to read `3,301` before it reads the
+  refusal. The Debug app compile passed
+  ([tail](2026-10-04-w1d/debug-compile-tail.txt)). The Release compile and the UI
+  test target compile did not run in this pass, and none of these controls has a
+  focused UI run yet.
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
