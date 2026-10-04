@@ -556,7 +556,7 @@ The whole run is idempotent and can resume after a partial failure. A retry cont
 
 **Ship gates (Lucas, Oct 3).** Two issues block turning on `ARGUS_ACCOUNT_DELETION_ENABLED`: #805, decision 17's frozen closed-line balance and its settle event, which #799 does not build; and #806, a real PostHog deletion adapter.
 
-Web is on the deletion command since #801: the deletion dialog in `web/components/sidebar/ProfileMenu.tsx` calls `POST /api/v1/account/delete` through `web/lib/account-deletion-api.ts`. While `ARGUS_ACCOUNT_DELETION_ENABLED` is off the route answers `404`, and the web then files the earlier `type: "account_deletion_request"` support ticket through `POST /api/v1/feedback`, so that type is still accepted (Marcus's #801 review, S4). The acceptance item below that says it is no longer accepted holds only once the flag is on. Guest accounts go through the same command; `delete_auth_user` in `src/argus/api/routers/auth.py` still removes the auth user when a guest session fails to start.
+Web is on the deletion command since #801: the deletion dialog in `web/components/sidebar/ProfileMenu.tsx` calls `POST /api/v1/account/delete` through `web/lib/account-deletion-api.ts`. While `ARGUS_ACCOUNT_DELETION_ENABLED` is off the route answers `404`, and the web then files the earlier `type: "account_deletion_request"` support ticket through `POST /api/v1/feedback`, so that type is still accepted (Marcus's #801 review, S4), and the dialog says a support request was sent, not that the account was deleted. This fallback is the agreed behaviour (Lucas, October 4): `account_deletion_request` stays accepted while the flag is off, and is retired only once the flag is on everywhere and a later change removes the fallback. Guest accounts go through the same command; `delete_auth_user` in `src/argus/api/routers/auth.py` still removes the auth user when a guest session fails to start.
 
 ### Foreign keys and user-id columns
 
@@ -576,7 +576,7 @@ The Lane 6 PR opens with a real-Postgres test that deletes a user who has a row 
 - The admin handoff on deletion, inside the Household owner.
 - A PostHog deletion adapter with a recording fake, behind `ARGUS_ANALYTICS_DELETION_ENABLED`. See [Outside services](#outside-services-fakes-behind-default-off-flags).
 - The note the other members see, and the admin handoff and closure entries, written through the inbox model.
-- Moving web onto the deletion command, and in that same PR retiring `account_deletion_request` and the web dialog.
+- Moving web onto the deletion command, with `account_deletion_request` kept as its flag-off fallback. The paragraph after [the steps](#steps-in-order) says when that fallback is retired.
 
 ### iOS parts: landed unverified, Mac pass by Lucas's local agent
 
@@ -585,7 +585,7 @@ The Lane 6 PR opens with a real-Postgres test that deletes a user who has a row 
 
 ### Allowed files
 
-A new deletion module under `src/argus/domain/` and one router, `src/argus/domain/household/` for the admin handoff, the leave call, the former-member placeholder, frozen balances, and plan ownership transfer, `src/argus/domain/ingestion/hub.py` for the deletion revocation path only, the Apple token store from the sign-in work for reading and deleting the token only, `src/argus/domain/household/invites.py` for the step 4 invite changes only, `src/argus/observability/` for the PostHog deletion adapter, the feedback router, schema, and store for clearing the email, and, in the PR that moves web onto the deletion command, retiring `account_deletion_request` together with `web/components/sidebar/ProfileMenu.tsx`, `web/lib/argus-api.ts`, and their web tests, one new migration, the account and Household deletion sections of the API contract and data model when this lane is landing, the iOS profile row and confirmation screen, and the tests for all of these.
+A new deletion module under `src/argus/domain/` and one router, `src/argus/domain/household/` for the admin handoff, the leave call, the former-member placeholder, frozen balances, and plan ownership transfer, `src/argus/domain/ingestion/hub.py` for the deletion revocation path only, the Apple token store from the sign-in work for reading and deleting the token only, `src/argus/domain/household/invites.py` for the step 4 invite changes only, `src/argus/observability/` for the PostHog deletion adapter, the feedback router, schema, and store for clearing the email, and, in the PR that moves web onto the deletion command, `web/components/sidebar/ProfileMenu.tsx`, `web/lib/argus-api.ts`, and their web tests, one new migration, the account and Household deletion sections of the API contract and data model when this lane is landing, the iOS profile row and confirmation screen, and the tests for all of these.
 
 No-touch: what `disconnect` does for an ordinary disconnect, `resend_email.py`, invitation token storage, Plan math, and the design branch files.
 
@@ -619,7 +619,7 @@ After deletion:
 - Their feedback rows hold no email or user id.
 - The PostHog fake recorded a deletion for their distinct id with events included.
 - The new owner of a handed-over plan can edit it right after the run. It has no `departed_at` and no #773 archive from this deletion.
-- In the PR that moves web onto the deletion command, web deletion uses that command and `account_deletion_request` is no longer accepted. Before that PR, the web dialog still works.
+- With `ARGUS_ACCOUNT_DELETION_ENABLED` on, web deletion uses the deletion command. With it off, the web files the `account_deletion_request` support request, the API accepts it, and the dialog says a support request was sent, not that the account was deleted. Retiring that fallback is a later change, described after [the steps](#steps-in-order).
 - A guest account is deleted by the same command.
 - Replaying the deletion changes nothing. Stopping the run after any step and retrying reaches the same end state.
 - With `ARGUS_ACCOUNT_DELETION_ENABLED` off, the route answers `404` before auth.
