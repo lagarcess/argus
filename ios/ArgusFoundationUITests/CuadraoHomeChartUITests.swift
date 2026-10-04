@@ -240,10 +240,12 @@ final class CuadraoHomeChartUITests: XCTestCase {
         continueAfterFailure = false
         let app = launch(extra: ["--insights-empty-month"])
         openActivity(app)
-        // Release rule (fc7650ea): a period with no records shows Sin datos, not a recorded zero.
-        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "—")
-        XCTAssertTrue(app.staticTexts["Sin datos"].exists)
+        // Known zero (Home comparisons lock): confirmed coverage with no spending shows 0, not Sin datos.
+        XCTAssertEqual(app.staticTexts["home-spending-total"].label, "0.00")
+        XCTAssertFalse(app.staticTexts["Sin datos"].exists)
+        XCTAssertTrue(app.staticTexts["Sin gastos"].exists)
         XCTAssertTrue(app.staticTexts["Aún no hay gastos registrados en este período."].exists)
+        XCTAssertFalse(app.staticTexts["home-spending-insight"].label.contains("%"))
         XCTAssertTrue(app.otherElements.matching(identifier: "home-spending-chart").firstMatch.exists)
         app.buttons["home-view-distribution"].tap()
         XCTAssertTrue(app.staticTexts["Aún no hay gastos registrados en este período."].exists)
@@ -253,11 +255,11 @@ final class CuadraoHomeChartUITests: XCTestCase {
         XCTAssertFalse(app.buttons["home-highlight-largest"].exists)
         shot(app, "story-empty-month-es")
         app.otherElements.matching(identifier: "home-spending-chart").firstMatch.swipeRight(velocity: .fast)
-        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "—")
+        XCTAssertNotEqual(app.staticTexts["home-spending-total"].label, "0.00")
         app.terminate()
         let unavailable = launch(extra: ["--insights-empty-month", "--insights-no-coverage"])
         openActivity(unavailable)
-        XCTAssertEqual(unavailable.staticTexts["home-spending-total"].label, "—")
+        XCTAssertEqual(unavailable.staticTexts["home-spending-total"].label, "Sin datos")
         XCTAssertTrue(unavailable.staticTexts["El historial de este período está incompleto. No lo contamos como cero."].exists)
         shot(unavailable, "story-unknown-month-es")
     }

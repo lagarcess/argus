@@ -1,25 +1,28 @@
 import XCTest
 
-/// First release (#787): no Apple or Google sign-in is offered, in Connected or in the design preview.
+/// Apple and Google flags default off (#795): no social sign-in is offered, in Connected or in the design preview.
 final class CuadraoSignInPresentationUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
     }
 
-    /// Default launch, no flags: Connected's sign-up and sign-in entries offer email only.
-    func testDefaultLaunchOffersNoAppleSignIn() {
+    /// Auth on, social flags at their defaults: Connected's sign-up and sign-in entries offer email only.
+    /// The default build has auth off and never shows these entries, so the run must opt in.
+    func testDefaultLaunchOffersNoAppleSignIn() throws {
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_AUTH_UI_ENABLED"] == "true" else {
+            throw XCTSkip("Requires a build with ARGUS_AUTH_ENABLED=true (cuadrao-design-mac-pass.sh tests builds one).")
+        }
         for createAccount in [true, false] {
             let app = XCUIApplication()
             app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
             app.launch()
             assertNoSocialSignIn(app)
             let welcome = app.buttons[createAccount ? "cuadrao.welcome.signup" : "cuadrao.welcome.signin"]
-            if welcome.waitForExistence(timeout: 10) {
-                welcome.tap()
-                let email = app.buttons[createAccount ? "cuadrao.signup.email" : "cuadrao.signin.emailChoice"]
-                XCTAssertTrue(email.waitForExistence(timeout: 10))
-                assertNoSocialSignIn(app)
-            }
+            XCTAssertTrue(welcome.waitForExistence(timeout: 10))
+            welcome.tap()
+            let email = app.buttons[createAccount ? "cuadrao.signup.email" : "cuadrao.signin.emailChoice"]
+            XCTAssertTrue(email.waitForExistence(timeout: 10))
+            assertNoSocialSignIn(app)
             app.terminate()
         }
     }
