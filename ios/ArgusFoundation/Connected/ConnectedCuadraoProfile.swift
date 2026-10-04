@@ -13,22 +13,17 @@ struct ConnectedCuadraoProfile: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
-                Button { editingAvatar = true } label: {
-                    HStack(spacing: 18) {
-                        CuadraoIdentityAvatar(selection: avatar, name: auth.profile?.displayName ?? "", size: 64)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(auth.profile?.displayName ?? (spanish ? "Tu perfil" : "Your profile"))
-                                .font(.title2.weight(.semibold)).foregroundStyle(.primary)
-                            Text(spanish ? "Editar avatar" : "Edit avatar").font(CuadraoTypography.supporting)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-                    }.contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityIdentifier("release.profile.avatar")
+                if CuadraoFirstRelease.editsAvatar {
+                    Button { editingAvatar = true } label: { identity(editable: true) }
+                        .buttonStyle(.plain).accessibilityIdentifier("release.profile.avatar")
+                } else {
+                    identity(editable: false).accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("release.profile.display")
+                }
                 VStack(spacing: 0) {
                     NavigationLink(value: CuadraoProfileDestination.appearance) {
                         row(spanish ? "Apariencia" : "Appearance", symbol: "paintpalette")
-                    }
+                    }.accessibilityIdentifier("profile.preferences")
                     Divider()
                     NavigationLink(value: CuadraoProfileDestination.legal) {
                         row(spanish ? "Privacidad y términos" : "Privacy and terms", symbol: "hand.raised")
@@ -49,6 +44,19 @@ struct ConnectedCuadraoProfile: View {
             case .legal: CuadraoLegalLinks(webURL: auth.configuration?.webURL)
             }
         }
+    }
+
+    private func identity(editable: Bool) -> some View {
+        HStack(spacing: 18) {
+            CuadraoIdentityAvatar(selection: avatar, name: auth.profile?.displayName ?? "", size: 64)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(auth.profile?.displayName ?? (spanish ? "Tu perfil" : "Your profile"))
+                    .font(.title2.weight(.semibold)).foregroundStyle(.primary)
+                if editable { Text(spanish ? "Editar avatar" : "Edit avatar").font(CuadraoTypography.supporting) }
+            }
+            Spacer()
+            if editable { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
+        }.contentShape(Rectangle())
     }
 
     private func row(_ title: String, symbol: String) -> some View {

@@ -43,7 +43,7 @@ struct ReleaseInvitationShareCard: View {
             if let item = invitation.url?.absoluteString ?? invitation.code {
                 ShareLink(item: item) {
                     Label(spanish ? "Compartir invitación" : "Share invitation", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .frame(maxWidth: .infinity, minHeight: 48).modifier(ReleaseProminentLabel())
                 }
                 .buttonStyle(.borderedProminent).tint(WelcomePalette.pine)
                 .accessibilityIdentifier(identifier + ".share")
@@ -121,6 +121,14 @@ struct HouseholdInvitationShareView: View {
         } else {
             Text("household.linkUnavailable").font(.footnote).accessibilityIdentifier("household.invite.lost")
         }
+    }
+}
+
+/// Prominent labels sit on the pine fill, so they take the on-accent ink instead of the page ink.
+struct ReleaseProminentLabel: ViewModifier {
+    @Environment(\.isEnabled) private var enabled
+    func body(content: Content) -> some View {
+        content.foregroundStyle(enabled ? WelcomePalette.onAccent : WelcomePalette.disabledInk)
     }
 }
 

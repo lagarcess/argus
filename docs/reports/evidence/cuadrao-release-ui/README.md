@@ -124,6 +124,38 @@ circular frame; the empty circle contains a camera with an add badge. Save commi
 the editor draft; Cancel leaves the selection unchanged. One typed selection owns
 both surfaces, applying Model the Domain rather than competing optional fields.
 
+## Review fixes, October 3, 2026
+
+Second worker on this branch, after the independent review of `e9195b58`. Simulator:
+iPhone 18 Pro Max, every UI run focused (`-only-testing`) and under the shared-Mac lock.
+Summaries of the runs are in [2026-10-03-w1b](2026-10-03-w1b/).
+
+- `26055a28`: one release rule, `CuadraoFirstRelease.editsAvatar`, hides the avatar
+  editor and with it photo selection and Reposition in release builds (review F1, and
+  the founder's F2 decision). The connected Profile, the review host and the preview
+  picker read it. Release keeps the profile display and the default icon. DEBUG keeps
+  the full editor. `testReleaseGatesHideUnfinishedRowsAndPhotos` and the new
+  `testReleaseGatesHideAvatarEditingAndPhotos` pass. A signed-in connected Profile run
+  was not possible here (it needs a session), so the connected entry is covered by
+  code reading only: it reads the same rule.
+- `8bd88ae6` (F3), `36cafb10` (F6), `69f5ebef` (F7), `26b3e1ab` (F8 code items) and
+  `5130c02d` (F5): month comparison shows Sin datos only for missing coverage; the
+  covered-zero average check is back (81 Home checks pass); `--cuadrao-release-ui` is
+  read only in DEBUG and the Release binary contains neither preview argument; the
+  English deletion copy is pinned verbatim; the Mac pass runs `ReleaseUIJourneyTests`,
+  the Updates checks (25 pass) and the new identity runner (passes).
+- `6bd93b85` and `00b5be65` fix defects present on integration `a8c37d3a`: the design
+  gallery's empty month read Sin datos, and money fields dropped keystrokes that
+  arrived during a SwiftUI update (typing 1250.5 in one burst left 125, 150.5 or 1).
+  The money journey and a one-burst typing check pass after the fix.
+- Updates back navigation (`testUpdatesNoDataAndReadOnlyHistory`) still lands on the
+  review root. `a488a1c6` tried value routing; it did not fix it and `81076e6e` reverts it.
+  Tapping a notice row does not open the notice (the bar still reads Novedades), with or
+  without marking it read; root cause open.
+- `300abf54` (E8): invitation prominent labels use `WelcomePalette.onAccent`, light and
+  dark: [create light](2026-10-03-w1b/invitation-create-light-es.png),
+  [create dark](2026-10-03-w1b/invitation-create-dark-es.png).
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
@@ -134,6 +166,11 @@ both surfaces, applying Model the Domain rather than competing optional fields.
 - Native coverage includes Spanish, English, large Dynamic Type, dark photos,
   deletion resend/cancel/pending/finish, social cancellation/name recovery,
   invitation full/quota presentation, Updates/no-data/read-only and AI decline.
+  Correction, October 3, 2026: `testUpdatesNoDataAndReadOnlyHistory` does not pass.
+  It failed in the full suite at `860a6044`, in the focused reruns at `c82f093d` and
+  `e9195b58`, and on the review-fix tree; see "Review fixes, October 3, 2026" below.
+  The avatar journeys above predate the release rule in `26055a28`, which hides avatar
+  editing and photos in release builds.
 - 25 Updates checks, 79 Home projection checks and identity-state checks passed.
   Swift macro compilation required running outside the nested process sandbox.
 - Modularity budget passed on the reconciled tree. Diff whitespace checks passed.

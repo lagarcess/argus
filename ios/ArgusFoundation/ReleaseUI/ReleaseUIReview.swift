@@ -15,16 +15,13 @@ struct ReleaseUIReview: View {
         NavigationStack(path: $path) {
             List {
                 Section {
-                    Button { editing = true } label: {
-                        HStack(spacing: 18) {
-                            CuadraoIdentityAvatar(selection: avatar, name: "Alex", size: 64)
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("Alex").font(.title2.weight(.semibold)).foregroundStyle(.primary)
-                                Text(spanish ? "Editar avatar" : "Edit avatar").font(.subheadline)
-                            }
-                            Spacer()
-                        }.padding(.vertical, 8)
-                    }.accessibilityIdentifier("release.profile.avatar")
+                    if CuadraoFirstRelease.editsAvatar {
+                        Button { editing = true } label: { identity(editable: true) }
+                            .accessibilityIdentifier("release.profile.avatar")
+                    } else {
+                        identity(editable: false).accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("release.profile.display")
+                    }
                 }
                 Section(spanish ? "Cuenta" : "Account") {
                     NavigationLink(value: ReleaseReviewRoute.identity) {
@@ -60,6 +57,17 @@ struct ReleaseUIReview: View {
             .sheet(isPresented: $editing) { CuadraoIdentityEditor(name: "Alex", selection: $avatar) }
         }.tint(WelcomePalette.pine)
             .preferredColorScheme(ProcessInfo.processInfo.arguments.contains("--release-dark") ? .dark : nil)
+    }
+
+    private func identity(editable: Bool) -> some View {
+        HStack(spacing: 18) {
+            CuadraoIdentityAvatar(selection: avatar, name: "Alex", size: 64)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Alex").font(.title2.weight(.semibold)).foregroundStyle(.primary)
+                if editable { Text(spanish ? "Editar avatar" : "Edit avatar").font(.subheadline) }
+            }
+            Spacer()
+        }.padding(.vertical, 8)
     }
 }
 #endif

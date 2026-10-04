@@ -36,7 +36,7 @@ struct ReleasePersonalInvitationsView: View {
                     }
                     Button(action: onCreate) {
                         Text(spanish ? "Crear invitación" : "Create invitation")
-                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .frame(maxWidth: .infinity, minHeight: 48).modifier(ReleaseProminentLabel())
                     }
                     .buttonStyle(.borderedProminent).disabled(remaining <= 0)
                     .accessibilityIdentifier("release.personalInvites.create")
@@ -125,7 +125,7 @@ struct ReleaseFounderGroupInvitationView: View {
                 HStack {
                     if creating { ProgressView() }
                     Text(creating ? (spanish ? "Creando…" : "Creating…") : (spanish ? "Crear enlace de grupo" : "Create group link"))
-                }.frame(maxWidth: .infinity, minHeight: 48)
+                }.frame(maxWidth: .infinity, minHeight: 48).modifier(ReleaseProminentLabel())
             }
             .buttonStyle(.borderedProminent)
             .disabled(label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (Int(cap) ?? 0) <= 0 || expiry <= Date() || creating)

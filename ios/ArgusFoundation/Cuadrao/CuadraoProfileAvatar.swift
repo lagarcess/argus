@@ -28,7 +28,6 @@ struct CuadraoProfileAvatarPicker: View {
 
     var body: some View {
         Section {
-            if CuadraoFirstRelease.showsPersonalPhoto {
             PhotosPicker(selection: $selectedPhoto, matching: .images) {
                 Label(spanish ? (hasPhoto ? "Cambiar foto" : "Elegir foto") : (hasPhoto ? "Change photo" : "Choose photo"),
                       systemImage: "photo")
@@ -49,7 +48,6 @@ struct CuadraoProfileAvatarPicker: View {
                     .font(.footnote).foregroundStyle(.secondary)
                     .accessibilityIdentifier("cuadrao.profile.photo.error")
             }
-            }
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 76))], spacing: 12) {
                 choice(.none, title: spanish ? "Perfil" : "Profile", id: "none")
                 choice(.initials, title: spanish ? "Iniciales" : "Initials", id: "initial")
@@ -58,13 +56,10 @@ struct CuadraoProfileAvatarPicker: View {
                 }
             }.padding(.vertical, 8)
         } header: {
-            Text(CuadraoFirstRelease.showsPersonalPhoto ? (spanish ? "Tu foto o avatar" : "Your photo or avatar")
-                 : (spanish ? "Tu avatar" : "Your avatar"))
+            Text(spanish ? "Tu foto o avatar" : "Your photo or avatar")
         } footer: {
-            if CuadraoFirstRelease.showsPersonalPhoto {
-                Text(spanish ? "Tu foto se queda en esta vista previa. No se sube a tu cuenta."
-                     : "Your photo stays in this preview. It isn’t uploaded to your account.")
-            }
+            Text(spanish ? "Tu foto se queda en esta vista previa. No se sube a tu cuenta."
+                 : "Your photo stays in this preview. It isn’t uploaded to your account.")
         }
             .listRowBackground(CanvasSettingsStyle.surface)
             .task(id: selectedPhoto) {

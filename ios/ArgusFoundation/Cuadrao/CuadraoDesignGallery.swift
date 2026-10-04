@@ -76,7 +76,7 @@ struct CuadraoDesignGallery: View {
                             .accessibilityIdentifier("gallery-empty-state")
                     }
                     sample(spanish ? "Mes sin registros" : "Month without records") {
-                        CuadraoChartState(title: spanish ? "Sin datos" : "No data",
+                        CuadraoChartState(title: spanish ? "Sin gastos" : "No spending",
                             detail: spanish ? "Aún no hay gastos registrados en este período." : "No expenses recorded in this period yet.")
                             .accessibilityIdentifier("gallery-empty-month")
                     }

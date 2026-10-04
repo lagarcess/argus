@@ -127,6 +127,7 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         }
         debug.buttons["cuadrao.profile.identity"].tap()
         XCTAssertTrue(debug.buttons["cuadrao.profile.photo.choose"].waitForExistence(timeout: 3))
+        XCTAssertTrue(debug.buttons["cuadrao.profile.avatar.moon"].exists, "DEBUG keeps the avatar editor")
         debug.terminate()
         let release = launch(extra: ["--cuadrao-release-gates"])
         release.buttons["header.profile"].tap()
@@ -136,8 +137,11 @@ final class CuadraoProfileFollowupUITests: XCTestCase {
         }
         shot(release, "profile-release-gates")
         release.buttons["cuadrao.profile.identity"].tap()
-        XCTAssertTrue(release.buttons["cuadrao.profile.avatar.none"].waitForExistence(timeout: 3))
+        XCTAssertTrue(release.textFields["cuadrao.profile.name"].waitForExistence(timeout: 3))
+        XCTAssertFalse(release.buttons["cuadrao.profile.avatar.none"].exists, "Release gates hide avatar editing")
+        XCTAssertFalse(release.buttons["cuadrao.profile.avatar.moon"].exists)
         XCTAssertFalse(release.buttons["cuadrao.profile.photo.choose"].exists)
+        XCTAssertFalse(release.buttons["cuadrao.profile.photo.edit"].exists)
     }
 
     private func verifyNavigation(extra: [String]) {

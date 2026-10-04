@@ -104,7 +104,7 @@ private struct ReleaseInviteGateFixture: View {
                                       : "This result is a local fixture. Your Cuadrao access has not changed.") {
                     NavigationLink(spanish ? "Explorar invitaciones personales" : "Explore personal invitations") {
                         ReleasePersonalInvitationFixture(spanish: spanish)
-                    }.buttonStyle(.borderedProminent)
+                    }.buttonStyle(.borderedProminent).modifier(ReleaseProminentLabel())
                         .accessibilityIdentifier("release.invites.fixture.accepted.continue")
                     Button(spanish ? "Probar otro resultado" : "Try another result") {
                         accepted = false; state = .ready

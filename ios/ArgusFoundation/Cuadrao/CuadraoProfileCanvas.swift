@@ -77,7 +77,8 @@ enum CuadraoFirstRelease {
     #else
     static let hidesUnfinished = true
     #endif
-    static var showsPersonalPhoto: Bool { !hidesUnfinished }
+    /// Avatar choices, photos included, live only in this session until profile storage exists.
+    static var editsAvatar: Bool { !hidesUnfinished }
     static var showsConversationBulkActions: Bool { !hidesUnfinished }
     static func shows(_ route: CanvasProfileRoute) -> Bool {
         if route == .voice { return CuadraoDesignPreview.voiceSelection }
@@ -233,7 +234,9 @@ struct CuadraoProfileEditor: View {
                 HStack { Spacer(); CanvasProfileAvatar(name: name, style: avatar); Spacer() }
                     .padding(.vertical, 12).listRowBackground(Color.clear)
             }
-            CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar, loading: $photoLoading, cropRequest: $cropRequest)
+            if CuadraoFirstRelease.editsAvatar {
+                CuadraoProfileAvatarPicker(name: name, spanish: spanish, avatar: $avatar, loading: $photoLoading, cropRequest: $cropRequest)
+            }
             Section {
                 field(spanish ? "Nombre" : "Name", text: $name, id: "cuadrao.profile.name")
                     .textContentType(.name)

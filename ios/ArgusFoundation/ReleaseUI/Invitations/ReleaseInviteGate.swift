@@ -63,7 +63,7 @@ struct ReleaseInviteGate: View {
                     HStack {
                         if state == .checking { ProgressView().tint(WelcomePalette.onAccent) }
                         Text(state == .checking ? (spanish ? "Comprobando…" : "Checking…") : (spanish ? "Continuar" : "Continue"))
-                    }.frame(maxWidth: .infinity, minHeight: 48)
+                    }.frame(maxWidth: .infinity, minHeight: 48).modifier(ReleaseProminentLabel())
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state == .checking)

@@ -9,9 +9,9 @@ struct ReleaseMonthComparison: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             switch current {
-            case .noRecords:
-                Text(spanish ? "Sin datos" : "No data").font(CuadraoTypography.secondaryAmount)
-                Text(spanish ? "No hay registros en este mes." : "There are no records this month.")
+            case .missingCoverage:
+                Text(CuadraoMissingCoverage.amount(spanish)).font(CuadraoTypography.secondaryAmount)
+                Text(CuadraoMissingCoverage.detail(spanish))
                     .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
             case .recorded(let amount):
                 Text(currency + " " + CanvasMoney.format(amount, currency: currency)).font(CuadraoTypography.secondaryAmount)
