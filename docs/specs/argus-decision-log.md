@@ -320,12 +320,15 @@ user trials, no new growth analytics), scoped to invites only.
 - Implementation note, not a new decision: "no user id" above is implemented
   as "no id tied to the person". The foreign keys require a real `auth.users`
   row, so account deletion creates one nameless, banned placeholder user per
-  household or standalone shared group and departed person (Yelena's call,
+  household or [standalone shared group](lanes/account-deletion-fk-census.md#sharing-scopes-and-the-standalone-shared-group) and departed person (Yelena's call,
   October 2). A household is one scope: every plan and membership-keyed row in
   it re-keys to that household's single placeholder, because its members
   already knew it was one person. Every shared plan sits in a household,
-  because `household_plan_bindings.household_id` is `not null`. No placeholder
-  spans more than one household or group. The "Exmiembro" numbering stays per
+  because `household_plan_bindings.household_id` is `not null`. A placeholder owns
+  rows in one household or group only; under decision (c) (Lucas, Oct 3, in
+  the [lane handoff](lanes/mvee-five-lane-handoff.md#steps-in-order)), another
+  household's claims on an activity can name it as a reference without it
+  owning anything there. The "Exmiembro" numbering stays per
   plan, because it is only a label. The steps are in the
   [lane handoff](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion).
 - A shared debt plan whose owner deletes their account is not handed over,

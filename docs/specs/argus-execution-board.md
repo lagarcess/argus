@@ -60,26 +60,33 @@ replace them with `CuadraoHouseholdSheet`, fictional invite acceptance,
 `CanvasProfileDraft` or preview sign-out. Do not wholesale merge the divergent
 preview branch to obtain the style.
 
-Existing `ConnectedCuadraoAuthFlow` handles email auth; Apple is hidden and Google
-is not a connected native choice. Sign-in for TestFlight is **Apple, Google and
+Existing `ConnectedCuadraoAuthFlow` handles email auth. Native Apple and Google
+sign-in exist on iOS behind the default-off `ARGUS_APPLE_SIGN_IN_ENABLED` and
+`ARGUS_GOOGLE_SIGN_IN_ENABLED` switches (#795, not compiled on a Mac), and the
+backend's Apple token capture and revocation sits behind
+`ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` (#793, #802). None is enabled: the keys
+are still owed by the founder and the [#800](https://github.com/lagarcess/argus/issues/800)
+gates stand. Sign-in for TestFlight is **Apple, Google and
 email** ([October 2 founder
 decision](argus-decision-log.md#sign-in-for-testflight)). Apple and Google are
 built behind default-off flags until the founder supplies the keys, and connected
 buttons stay hidden while a flag is off. Email has an in-app confirmation step,
 which does not exist yet: today's sign-up ends on an emailed confirmation link. `HouseholdManagement`
 owns member/invitation management and explicit account consent;
-`HouseholdPlanPeople` owns shared-plan permissions. Current login deletion is a
-support request, and account archive is not an account move. In-app deletion is
-[Lane 6](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion). The team
+`HouseholdPlanPeople` owns shared-plan permissions. In-app deletion,
+[Lane 6](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion), is built
+behind the default-off `ARGUS_ACCOUNT_DELETION_ENABLED` (#799, #801); while it is
+off, login deletion stays a support request. Account archive is not an account
+move. The team
 connecting each checkpoint owns the remaining contract gaps; simulated UI acceptance
 must stay distinguished from connected acceptance.
 
 | Landing checkpoint | User items | UI deliverable | Closure evidence and existing responsibility |
 | --- | --- | --- | --- |
-| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English, with Iris's founder-locked copy | Ordinary member, admin and financial-owner variants; "Exmiembro" / "Former member" in other people's plans and plan handover per decision 17; a shared debt plan archived read-only with Iris's banner instead (decision 19, Head of Engineering); no false success or deletion of another owner's data. C07/C10, identity and Household owners, Lane 6 |
+| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English, with Iris's founder-locked copy | Ordinary member, admin and financial-owner variants; "Exmiembro" / "Former member" in other people's plans and plan handover per decision 17; a shared debt plan archived read-only with Iris's banner instead (decision 19, Head of Engineering); no false success or deletion of another owner's data. C07/C10, identity and Household owners, Lane 6. Backend and web landed default-off: census #791, command #799, route and web flow #801, behind `ARGUS_ACCOUNT_DELETION_ENABLED`, which #805 and #806 block. No native flow is on integration. The [API contract](../API_CONTRACT.md#post-accountdelete) and the [launch runbook](../PRIVATE_LAUNCH_RUNBOOK.md#account-deletion-runs-lane-6) own the deletion model. The resume sweep is operator-run with no cron, by founder decision (October 3), and none is to be created |
 | 1. Trust and profile | 2 | Signed-in Privacy and Terms destinations | Actual approved links, return to Settings, both languages. C07, native identity/support |
 | 1. Trust and profile | 3 | Apple and Google auth alongside email | Founder decision, October 2: Apple, Google and email, Apple and Google behind default-off flags until the keys arrive; email with an in-app confirmation step. Loading, cancellation, error, missing-name recovery and return to invitation; connected credentials/session owned by auth; Apple token revocation, and revoking every Google token Argus holds, at deletion is Lane 6. C07/C10 |
-| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows (including Memory, Usage, More options and conversation bulk actions) and photo avatars, retain initials/themes | `fc7650ea`, from Yelena's UI checklist, hides Personalization, Security and sessions, Shared conversations, Removed activity and photos; #786 (`a20362d3`) hides Usage, More options and conversation bulk actions as a Head of Engineering judgment call; Memory (`.memory`) waits for native memory. They are designed rows whose backend is owed, hidden only in release builds. Today `CuadraoFirstRelease` hides them in every build. Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
+| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows (including Memory, Usage, More options and conversation bulk actions) and photo avatars, retain initials/themes | `fc7650ea`, from Yelena's UI checklist, hides Personalization, Security and sessions, Shared conversations, Removed activity and photos; #786 (`a20362d3`) hides Usage, More options and conversation bulk actions as a Head of Engineering judgment call; Memory (`.memory`) waits for native memory. They are designed rows whose backend is owed, hidden only in release builds; the [hidden-rows backend list](lanes/cuadrao-profile-hidden-rows-backend.md) names what each needs, ordered after chat. Today `CuadraoFirstRelease` hides them in every build. Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
 | 2. Access and Household | 4 | Invitation gate after install and cuadrao.ai waitlist | Valid, invalid, expired, already-used, cancelled auth and admitted-user return. Preserve link intent/manual code recovery. C02/C08 plus auth, Lane 1 |
 | 2. Access and Household | 5–6 | Personal invitation link/code/QR, remaining quota out of ten and accepted notice | Sharing is not acceptance; counter and notice derive from canonical status; QR scans; the QR card names its purpose. C02/C08, Lane 1 |
 | 2. Access and Household | 7 | Administrator-only household invitation without personal quota charge, which also admits a new person to the beta | Existing integration invitation preview/accept and account-sharing boundaries preserved. C02/C05, Household, Lane 1 |
