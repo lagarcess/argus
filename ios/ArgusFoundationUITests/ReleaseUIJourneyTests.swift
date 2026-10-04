@@ -33,6 +33,23 @@ final class ReleaseUIJourneyTests: XCTestCase {
         capture(app, "avatar-initials-large-en")
     }
 
+    func testReleaseGatesHideAvatarEditingAndPhotos() {
+        let debug = launch(spanish: false)
+        debug.buttons["release.profile.avatar"].tap()
+        XCTAssertTrue(debug.buttons["release.avatar.photo"].waitForExistence(timeout: 4), "DEBUG keeps photos")
+        debug.terminate()
+        let release = launch(spanish: false, extra: ["--cuadrao-release-gates"])
+        let display = release.descendants(matching: .any)["release.profile.display"]
+        XCTAssertTrue(display.waitForExistence(timeout: 4))
+        XCTAssertEqual(display.label, "Alex")
+        XCTAssertTrue(release.buttons["header.profile"].exists)
+        XCTAssertFalse(release.buttons["release.profile.avatar"].exists, "Release gates hide the avatar editor entry")
+        display.tap()
+        XCTAssertFalse(release.buttons["release.avatar.photo"].waitForExistence(timeout: 1))
+        XCTAssertFalse(release.buttons["release.avatar.save"].exists)
+        capture(release, "profile-release-gates-en")
+    }
+
     func testDeletionConfirmationPendingAndFinish() {
         let app = launch(spanish: true)
         app.buttons["release.review.identity"].tap()
@@ -193,14 +210,14 @@ final class ReleaseUIJourneyTests: XCTestCase {
         XCTAssertTrue(element.exists)
     }
 
-    private func launch(spanish: Bool, large: Bool = false, dark: Bool = false) -> XCUIApplication {
+    private func launch(spanish: Bool, large: Bool = false, dark: Bool = false, extra: [String] = []) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--cuadrao-release-ui", "-AppleLanguages", spanish ? "(es)" : "(en)", "-AppleLocale", spanish ? "es_DO" : "en_US"]
+        app.launchArguments = ["--cuadrao-release-ui", "-AppleLanguages", spanish ? "(es)" : "(en)", "-AppleLocale", spanish ? "es_DO" : "en_US"] + extra
         if dark { app.launchArguments += ["--release-dark"] }
         if large { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         app.launch()
-        XCTAssertTrue(app.buttons["release.profile.avatar"].waitForExistence(timeout: 6))
+        XCTAssertTrue(app.buttons["release.review.identity"].waitForExistence(timeout: 6))
         return app
     }
 
