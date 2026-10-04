@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 
 /// One wording for a period whose coverage is missing, so no surface reads it as zero.
@@ -8,7 +9,6 @@ enum CuadraoMissingCoverage {
             : "This period's history is incomplete. We don't count it as zero."
     }
 }
-import Charts
 
 struct CuadraoSpendingChart: View {
     let expenses: [CanvasActivity]

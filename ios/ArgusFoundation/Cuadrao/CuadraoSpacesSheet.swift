@@ -136,7 +136,7 @@ private struct CuadraoManageSpaces: View {
                     Text(space.title(spanish)).foregroundStyle(.primary)
                     Text(space.deleted || space.archived ? (spanish ? "Restaurar y abrir" : "Restore and open")
                          : space.kind.title(spanish)).font(.caption).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
             }.buttonStyle(.plain)
             if space.isPrivate && !space.deleted {
                 Menu {

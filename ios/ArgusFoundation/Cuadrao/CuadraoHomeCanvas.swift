@@ -311,7 +311,7 @@ struct CuadraoHomeCanvas: View {
             }
             Spacer()
             Text(amount).font(CuadraoTypography.rowAmount)
-        }.padding(.vertical, 6)
+        }.padding(.vertical, 6).contentShape(Rectangle())
     }
 
     private func sectionTitle(_ title: String) -> some View {

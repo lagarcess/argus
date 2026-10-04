@@ -130,7 +130,7 @@ struct FinancialPlanView: View {
                 DisclosureGroup("plan.manageExpectations") {
                     ForEach(projection.expectations) { expectation in
                         Button { model.edit(expectation) } label: {
-                            HStack { Text(expectation.title); Spacer(); Image(systemName: "chevron.right") }.frame(minHeight: 48)
+                            HStack { Text(expectation.title); Spacer(); Image(systemName: "chevron.right") }.frame(minHeight: 48).contentShape(Rectangle())
                         }.buttonStyle(.plain).disabled(loop.pendingConfirmation != nil)
                             .accessibilityIdentifier("plan.expectation." + expectation.id.uuidString)
                     }

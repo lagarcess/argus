@@ -285,7 +285,9 @@ extension FinancialLoopUITests {
     }
 
     func testSharedPlanningFourKindsPrivateContributionsCorrectionsAndReopen() throws {
-        _ = try sharedEnvironment("HOUSEHOLD")
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_SHARED_PLAN_HOUSEHOLD"] != nil else {
+            throw XCTSkip("Requires the seeded shared-plan backend (ARGUS_TEST_SHARED_PLAN_* environment).")
+        }
         try signIn(fresh: true, user: "A")
         try selectSharedPlanSpace()
         let stamp = String(UUID().uuidString.prefix(6))
