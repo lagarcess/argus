@@ -150,6 +150,11 @@ Summaries of the runs are in [2026-10-03-w1b](2026-10-03-w1b/).
   The money journey and a one-burst typing check pass after the fix.
 - Updates back navigation (`testUpdatesNoDataAndReadOnlyHistory`) still lands on the
   review root. `a488a1c6` tried value routing; it did not fix it and `81076e6e` reverts it.
+  Tapping a notice row does not open the notice (the bar still reads Novedades), with or
+  without marking it read; root cause open.
+- `030f2c5e` (E8): invitation prominent labels use `WelcomePalette.onAccent`, light and
+  dark: [create light](2026-10-03-w1b/invitation-create-light-es.png),
+  [create dark](2026-10-03-w1b/invitation-create-dark-es.png).
 
 ## Verification and evidence
 
