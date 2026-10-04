@@ -24,7 +24,8 @@ final class HouseholdModel: ObservableObject {
     @Published private(set) var errorKey: String?
     @Published private var preparedInvitation: (householdId: UUID, value: HouseholdInvitation)?
     var invitation: HouseholdInvitation? { preparedInvitation?.householdId == selectedId ? preparedInvitation?.value : nil }
-    private var reviewedInvitationToken: String?
+    private var reviewedInvitation: InviteSecret?
+    @Published private(set) var invitationProblem: InvitationProblem?
     @Published private(set) var invitationPreview: HouseholdInvitationPreview?
     @Published private(set) var pending: PendingFinancialConfirmation?
     @Published var editor: HouseholdActivityEditor?
@@ -57,7 +58,7 @@ final class HouseholdModel: ObservableObject {
         clear(); households = []; household = nil; preparedInvitation = nil; invitationPreview = nil; pending = nil; busy = false; writeAttempt = nil
         selectedId = storageKey.flatMap { UserDefaults.standard.string(forKey: $0) }.flatMap(UUID.init(uuidString:))
         lastSearchQuery = nil; searchQuery = ""; availability = .discovering; showManagement = false; errorKey = nil
-        reviewedInvitationToken = nil; pendingInvitationToken = ""
+        reviewedInvitation = nil; invitationProblem = nil; pendingInvitationToken = ""
         if let identity { pending = try? journal.pending(for: identity) }
     }
     func clear() {
@@ -137,22 +138,40 @@ final class HouseholdModel: ObservableObject {
             handleAccessFailure(error, householdId: selectedId)
         }
     }
-    func previewInvitation(_ token: String) async {
-        guard isAvailable, let identity else { return }; let ticket = generation; invitationPreview = nil
+    /// A pasted link, a scanned QR's link or a typed code previews the same invitation.
+    func previewInvitation(_ input: String) async {
+        guard isAvailable, let identity else { return }; let ticket = generation; invitationPreview = nil; invitationProblem = nil
+        guard let secret = InviteSecret(input: input) else { invitationProblem = .invalid; return }
         do {
-            let body = try JSONEncoder().encode(HouseholdCommand(token: Self.token(token)))
+            let body = try JSONEncoder().encode(HouseholdCommand(secret: secret))
             let value = try await controller.householdResponse(HouseholdInvitationPreview.self, path: "/invitations/preview", method: "POST", body: body, expectedIdentity: identity)
-            guard current(ticket, identity) else { return }; invitationPreview = value; reviewedInvitationToken = Self.token(token)
-        } catch { await failed(error, ticket, identity, householdId: nil) }
+            guard current(ticket, identity) else { return }; invitationPreview = value; reviewedInvitation = secret
+        } catch {
+            guard current(ticket, identity) else { return }
+            if case SessionFailure.rejected = error, !Self.endsAccess(error) { invitationProblem = InvitationProblem(error); return }
+            await failed(error, ticket, identity, householdId: nil)
+        }
     }
-    func cancelInvitationReview() { invitationPreview = nil; reviewedInvitationToken = nil }
-    static func token(_ input: String) -> String {
-        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        return URLComponents(string: trimmed)?.fragment ?? trimmed
+    func cancelInvitationReview() { invitationPreview = nil; reviewedInvitation = nil; invitationProblem = nil }
+    func acceptInvitation(displayName: String) async {
+        guard let reviewedInvitation else { errorKey = "household.changed"; return }
+        await command(HouseholdCommand(secret: reviewedInvitation, displayName: displayName), path: "/invitations/accept")
+    }
+    /// Opens the join step for an invitation that arrived by link or by the beta gate.
+    func beginJoin(_ input: String) async -> Bool {
+        guard isAvailable else { return false }
+        await select(nil)
+        guard isAvailable else { return false }
+        pendingInvitationToken = input; showManagement = true
+        return true
+    }
+    private static func endsAccess(_ error: Error) -> Bool {
+        guard case SessionFailure.rejected(_, let code) = error else { return false }
+        return ["households_unavailable", "household_not_found", "not_a_member", "household_closed", "household_access_unavailable"].contains(code)
     }
     func command(_ command: HouseholdCommand, path: String, method: String = "POST") async {
         guard isAvailable, let identity, let owner = identity.profile.flatMap({ UUID(uuidString: $0.id) }), !busy, pending == nil else { return }
-        if path == "/invitations/accept", command.token != reviewedInvitationToken { errorKey = "household.changed"; return }
+        if path == "/invitations/accept", (command.token.map(InviteSecret.token) ?? command.code.map(InviteSecret.code)) != reviewedInvitation { errorKey = "household.changed"; return }
         do {
             let write = PendingFinancialConfirmation(ownerId: owner, originAccountId: nil, route: "households", path: path, method: method, body: try JSONEncoder().encode(command), key: UUID(), householdMembershipId: household?.membershipId, householdAuthorizationVersion: household?.version, householdOperation: .management)
             try journal.begin(write, for: identity); pending = write
@@ -212,6 +231,7 @@ final class HouseholdModel: ObservableObject {
             else { accessFailure = handleAccessFailure(error, householdId: requestHouseholdId(write.path)) }
             guard current(ticket, identity) else { return }
             if availability != .disabled {
+                if write.path == "/invitations/accept", case SessionFailure.rejected = error { invitationProblem = InvitationProblem(error) }
                 if case SessionFailure.rejected(let status, _) = error, status >= 400 && status < 500 && status != 429 {
                     try? journal.clear(write, for: identity); pending = nil
                     if !accessFailure {
@@ -219,7 +239,7 @@ final class HouseholdModel: ObservableObject {
                             plan.sheet = nil
                             await refresh()
                             if current(ticket, identity) { errorKey = HouseholdPlanModel.message(error) }
-                        } else { clear(); errorKey = "household.changed" }
+                        } else { clear(); errorKey = write.path == "/invitations/accept" ? nil : "household.changed" }
                     }
                 } else { errorKey = "household.uncertain" }
             }

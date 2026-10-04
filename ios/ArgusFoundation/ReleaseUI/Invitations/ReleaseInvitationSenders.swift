@@ -61,7 +61,8 @@ struct ReleaseFounderGroupInvitationView: View {
     let isFounder: Bool
     let state: ReleaseGroupInvitationState
     let spanish: Bool
-    let onCreate: (Int, Date) -> Void
+    let onCreate: (String, Int, Date) -> Void
+    @State private var label = ""
     @State private var cap = ""
     @State private var expiry = Date()
 
@@ -103,6 +104,11 @@ struct ReleaseFounderGroupInvitationView: View {
 
     private var groupForm: some View {
         VStack(alignment: .leading, spacing: 16) {
+            Text(spanish ? "Nombre del enlace" : "Link name").font(CuadraoTypography.supporting)
+            TextField(spanish ? "Por ejemplo, cena de lanzamiento" : "For example, launch dinner", text: $label)
+                .padding(16)
+                .background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityIdentifier("release.groupInvite.label")
             Text(spanish ? "Límite de personas" : "Number of places").font(CuadraoTypography.supporting)
             TextField(spanish ? "Elige un límite" : "Choose a limit", text: $cap)
                 .keyboardType(.numberPad).padding(16)
@@ -112,8 +118,9 @@ struct ReleaseFounderGroupInvitationView: View {
                        displayedComponents: [.date, .hourAndMinute])
                 .accessibilityIdentifier("release.groupInvite.expiry")
             Button {
-                guard let value = Int(cap), value > 0, expiry > Date(), !creating else { return }
-                onCreate(value, expiry)
+                let name = label.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty, let value = Int(cap), value > 0, expiry > Date(), !creating else { return }
+                onCreate(name, value, expiry)
             } label: {
                 HStack {
                     if creating { ProgressView() }
@@ -121,7 +128,7 @@ struct ReleaseFounderGroupInvitationView: View {
                 }.frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
-            .disabled((Int(cap) ?? 0) <= 0 || expiry <= Date() || creating)
+            .disabled(label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (Int(cap) ?? 0) <= 0 || expiry <= Date() || creating)
             .accessibilityIdentifier("release.groupInvite.create")
         }.disabled(creating)
     }

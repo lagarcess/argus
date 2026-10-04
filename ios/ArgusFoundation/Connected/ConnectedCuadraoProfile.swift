@@ -33,6 +33,7 @@ struct ConnectedCuadraoProfile: View {
                     NavigationLink(value: CuadraoProfileDestination.legal) {
                         row(spanish ? "Privacidad y términos" : "Privacy and terms", symbol: "hand.raised")
                     }.accessibilityIdentifier("release.profile.legal")
+                    if let invitations = auth.invitations { InvitationsProfileRow(model: invitations) }
                 }.padding(.horizontal, 16).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
                 if auth.enabled { ProfileAccountSection(model: auth) }
             }.padding(24)

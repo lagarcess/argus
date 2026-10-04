@@ -34,6 +34,8 @@ struct ArgusFoundationApp: App {
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--cuadrao-release-ui") {
             ReleaseUIReview()
+        } else if ProcessInfo.processInfo.arguments.contains("--invitations-harness") {
+            InvitationsHarness()
         } else {
             connectedContent
         }

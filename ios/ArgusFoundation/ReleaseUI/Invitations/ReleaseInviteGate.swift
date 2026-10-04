@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ReleaseInviteGateState: String, CaseIterable {
-    case ready, checking, invalid, expired, full, waitlist, consumed, revoked, unavailable
+    case ready, checking, invalid, expired, full, waitlist, consumed, revoked, rateLimited, unavailable
 
     func title(spanish: Bool) -> String {
         switch self {
@@ -13,6 +13,7 @@ enum ReleaseInviteGateState: String, CaseIterable {
         case .waitlist: spanish ? "Lista de espera" : "Waitlist"
         case .consumed: spanish ? "Invitación utilizada" : "Used invitation"
         case .revoked: spanish ? "Invitación revocada" : "Revoked invitation"
+        case .rateLimited: spanish ? "Demasiados intentos" : "Too many attempts"
         case .unavailable: spanish ? "No disponible" : "Unavailable"
         }
     }
@@ -26,6 +27,7 @@ enum ReleaseInviteGateState: String, CaseIterable {
         case .waitlist: spanish ? "Necesitas una invitación para entrar. Puedes unirte a la lista de espera en cuadrao.ai." : "You need an invitation to enter. You can join the waitlist at cuadrao.ai."
         case .consumed: spanish ? "Esta invitación ya fue utilizada. Pide una nueva." : "This invitation has already been used. Ask for a new one."
         case .revoked: spanish ? "Esta invitación ya no está disponible. Pide una nueva." : "This invitation is no longer available. Ask for a new one."
+        case .rateLimited: spanish ? "Hiciste muchos intentos. Espera unos minutos y vuelve a intentarlo." : "You've made too many attempts. Wait a few minutes and try again."
         case .unavailable: spanish ? "No pudimos comprobar tu invitación. Intenta de nuevo más tarde." : "We couldn't check your invitation. Try again later."
         }
     }
@@ -37,6 +39,7 @@ struct ReleaseInviteGate: View {
     let spanish: Bool
     let onSubmit: (String) -> Void
     let onWaitlist: () -> Void
+    var showsWaitlist = true
 
     var body: some View {
         ReleaseInvitationPage(title: spanish ? "Tu invitación\na Cuadrao." : "Your invitation\nto Cuadrao.",
@@ -68,11 +71,13 @@ struct ReleaseInviteGate: View {
                 Text(spanish ? "TestFlight instala la app. Tu invitación te da acceso a la beta."
                      : "TestFlight installs the app. Your invitation gives you beta access.")
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                Button(action: onWaitlist) {
-                    Text(spanish ? "No tengo código · Lista de espera" : "No code? Visit the waitlist")
-                        .frame(minHeight: 44)
-                }.accessibilityIdentifier("release.inviteGate.waitlist")
-                Text("cuadrao.ai").font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                if showsWaitlist {
+                    Button(action: onWaitlist) {
+                        Text(spanish ? "No tengo código · Lista de espera" : "No code? Visit the waitlist")
+                            .frame(minHeight: 44)
+                    }.accessibilityIdentifier("release.inviteGate.waitlist")
+                    Text("cuadrao.ai").font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                }
             }
         }
     }

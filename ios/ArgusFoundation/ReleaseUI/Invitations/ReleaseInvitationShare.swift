@@ -3,7 +3,7 @@ import CoreImage.CIFilterBuiltins
 import ArgusSession
 
 struct ReleaseInvitationShare {
-    let url: URL
+    let url: URL?
     var code: String? = nil
     var expiresAt: Date? = nil
     var testFlightURL: URL? = nil
@@ -16,9 +16,11 @@ struct ReleaseInvitationShareCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ReleaseInvitationQRCode(url: invitation.url, spanish: spanish)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier(identifier + ".qr")
+            if let url = invitation.url {
+                ReleaseInvitationQRCode(url: url, spanish: spanish)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier(identifier + ".qr")
+            }
             if let code = invitation.code {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(spanish ? "Código de invitación" : "Invitation code")
@@ -28,20 +30,24 @@ struct ReleaseInvitationShareCard: View {
                         .accessibilityIdentifier(identifier + ".code")
                 }
             }
-            Text(invitation.url.absoluteString).font(CuadraoTypography.caption)
-                .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier(identifier + ".link")
+            if let url = invitation.url {
+                Text(url.absoluteString).font(CuadraoTypography.caption)
+                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier(identifier + ".link")
+            }
             if let expiresAt = invitation.expiresAt {
                 Text(spanish ? "Vence: \(expiresAt.formatted(date: .abbreviated, time: .shortened))"
                      : "Expires: \(expiresAt.formatted(date: .abbreviated, time: .shortened))")
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
-            ShareLink(item: invitation.url) {
-                Label(spanish ? "Compartir invitación" : "Share invitation", systemImage: "square.and.arrow.up")
-                    .frame(maxWidth: .infinity, minHeight: 48)
+            if let item = invitation.url?.absoluteString ?? invitation.code {
+                ShareLink(item: item) {
+                    Label(spanish ? "Compartir invitación" : "Share invitation", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.borderedProminent).tint(WelcomePalette.pine)
+                .accessibilityIdentifier(identifier + ".share")
             }
-            .buttonStyle(.borderedProminent).tint(WelcomePalette.pine)
-            .accessibilityIdentifier(identifier + ".share")
             if let testFlightURL = invitation.testFlightURL {
                 Link(destination: testFlightURL) {
                     Text(spanish ? "Instalar con TestFlight" : "Install with TestFlight").frame(minHeight: 44)
@@ -99,7 +105,7 @@ struct HouseholdInvitationShareView: View {
     let spanish: Bool
 
     var body: some View {
-        if let token = invitation.token, let url = URL(string: "argus-household://invite#" + token) {
+        if let url = invitation.link.flatMap(URL.init(string:)) ?? invitation.token.flatMap({ URL(string: "argus-household://invite#" + $0) }) {
             VStack(alignment: .leading, spacing: 16) {
                 Text(spanish ? "Un lugar para lo compartido." : "A place for what you share.")
                     .font(CuadraoTypography.section)
@@ -107,8 +113,9 @@ struct HouseholdInvitationShareView: View {
                 Text(spanish ? "Esta invitación es para tu Hogar. No usa tus invitaciones personales."
                      : "This invitation is for your Household. It does not use your personal invitations.")
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                ReleaseInvitationShareCard(invitation: ReleaseInvitationShare(url: url), spanish: spanish,
-                                           identifier: "household.invite")
+                ReleaseInvitationShareCard(invitation: ReleaseInvitationShare(url: url, code: invitation.code,
+                                                                              expiresAt: InvitationDates.date(invitation.expiresAt)),
+                                           spanish: spanish, identifier: "household.invite")
                 Text("household.invitationPrepared").font(CuadraoTypography.caption)
             }.padding(.vertical, 8)
         } else {

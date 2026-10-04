@@ -11,10 +11,19 @@ struct ConnectedCuadraoRoot: View {
             case .disabled:
                 FoundationShell(appearance: $appearance)
             case .authenticated:
-                ConnectedCuadraoShell(appearance: $appearance)
+                if let invitations = auth.invitations {
+                    InvitationGateHost(model: invitations, household: auth.household, signOut: { Task { await auth.signOut() } }) {
+                        ConnectedCuadraoShell(appearance: $appearance)
+                    }
+                } else {
+                    ConnectedCuadraoShell(appearance: $appearance)
+                }
             case .signedOut, .configurationInvalid, .pendingSignOut, .unsupportedAnonymous:
                 ConnectedCuadraoAuthFlow()
+                    .safeAreaInset(edge: .top) { if let invitations = auth.invitations { InvitationPendingNotice(model: invitations) } }
             }
         }
+        .invitationLinks(auth.invitations)
+        .onAppear { auth.invitations?.openHousehold = { [weak auth] input in await auth?.household?.beginJoin(input) == true } }
     }
 }

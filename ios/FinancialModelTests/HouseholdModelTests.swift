@@ -368,6 +368,7 @@ private actor HouseholdServer {
     private var changedAsset = false
     private var invitationGate: RequestGate?
     private(set) var creates: [URLRequest] = []
+    private(set) var invitationBodies: [(path: String, body: [String: String])] = []
     func holdDetail(_ gate: RequestGate) { detailGate = gate }
     func holdCreate(_ gate: RequestGate) { createGate = gate }
     func holdInvitation(_ gate: RequestGate) { invitationGate = gate }
@@ -392,6 +393,10 @@ private actor HouseholdServer {
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         let path = request.url!.path
         guard path.contains("households") || path.contains("household-invitations") else { return try await auth.send(request) }
+        if path.contains("household-invitations") {
+            let body = (try? JSONSerialization.jsonObject(with: request.httpBody ?? Data())) as? [String: String] ?? [:]
+            invitationBodies.append((path, body))
+        }
         if !enabled { return response(request, 404, ["code": "households_unavailable"]) }
         if let failure {
             self.failure = nil
@@ -406,6 +411,8 @@ private actor HouseholdServer {
         } else if path.hasSuffix("households") {
             result = ["households": active ? [household(), household(Self.secondHousehold)] : []]
             if let gate = discoveryGate { discoveryGate = nil; await gate.enter() }
+        } else if path.hasSuffix("household-invitations/accept") {
+            result = receipt(householdId)
         } else if path.hasSuffix("household-invitations/preview") {
             result = ["name": "Synthetic household", "expires_at": "2026-10-08T12:00:00Z", "available": true]
         }
@@ -425,5 +432,78 @@ private actor HouseholdServer {
     }
     private func response(_ request: URLRequest, _ status: Int, _ value: [String: Any]) -> (Data, URLResponse) {
         (try! JSONSerialization.data(withJSONObject: value), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+extension HouseholdModelTests {
+    func testACodeOrALinkPreviewsAndAcceptsTheSameReviewedSecret() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.previewInvitation(" 7k2m-9qxd-4rta ")
+        XCTAssertEqual(fixture.model.invitationPreview?.name, "Synthetic household")
+        await fixture.model.acceptInvitation(displayName: "Bea")
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        await fixture.model.previewInvitation("https://cuadrao.ai/invite#link-token-123456")
+        let sent = await fixture.server.invitationBodies
+        XCTAssertEqual(sent.map(\.path), ["/api/v1/household-invitations/preview", "/api/v1/household-invitations/accept", "/api/v1/household-invitations/preview"])
+        XCTAssertEqual(sent.map(\.body), [["code": "7k2m-9qxd-4rta"], ["code": "7k2m-9qxd-4rta", "display_name": "Bea"], ["token": "link-token-123456"]])
+    }
+
+    func testPreviewOutcomesExplainTheInvitationWithoutEndingMembership() async throws {
+        let cases: [(Int, String, InvitationProblem)] = [(404, "invitation_not_found", .invalid), (409, "invitation_expired", .expired),
+                                                         (409, "invitation_consumed", .used), (409, "invitation_revoked", .revoked),
+                                                         (429, "invite_rate_limited", .rateLimited)]
+        for (status, code, problem) in cases {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            await fixture.server.failNext(status, code: code)
+            await fixture.model.previewInvitation("7K2M-9QXD-4RTA")
+            XCTAssertEqual(fixture.model.invitationProblem, problem, code)
+            XCTAssertNil(fixture.model.invitationPreview, code)
+            XCTAssertTrue(fixture.model.isAvailable, code)
+            XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household, code)
+            XCTAssertNil(fixture.model.errorKey, code)
+        }
+    }
+
+    func testAcceptingAUsedOrExpiredInvitationExplainsWhyAndJoinsNothing() async throws {
+        for (code, problem) in [("invitation_consumed", InvitationProblem.used), ("invitation_expired", .expired)] {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.previewInvitation("7K2M-9QXD-4RTA")
+            await fixture.server.failNext(409, code: code)
+            await fixture.model.acceptInvitation(displayName: "Bea")
+            XCTAssertEqual(fixture.model.invitationProblem, problem, code)
+            XCTAssertNil(fixture.model.selectedId, code)
+            XCTAssertNil(fixture.model.pending, code)
+            XCTAssertNil(fixture.model.errorKey, code)
+        }
+    }
+
+    func testUnrecognizedInputIsInvalidWithoutAnyRequest() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.previewInvitation("https://example.com/invite#abc")
+        XCTAssertEqual(fixture.model.invitationProblem, .invalid)
+        let sent = await fixture.server.invitationBodies
+        XCTAssertTrue(sent.isEmpty)
+    }
+
+    func testAnOpenedLinkReachesTheJoinStepOnlyWhileHouseholdsAreAvailable() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        let opened = await fixture.model.beginJoin("https://cuadrao.ai/invite#link-token-123456")
+        XCTAssertTrue(opened)
+        XCTAssertNil(fixture.model.selectedId)
+        XCTAssertTrue(fixture.model.showManagement)
+        XCTAssertEqual(fixture.model.pendingInvitationToken, "https://cuadrao.ai/invite#link-token-123456")
+        fixture.model.showManagement = false
+        await fixture.server.setEnabled(false)
+        await fixture.model.refresh()
+        let refused = await fixture.model.beginJoin("7K2M-9QXD-4RTA")
+        XCTAssertFalse(refused)
+        XCTAssertFalse(fixture.model.showManagement)
     }
 }
