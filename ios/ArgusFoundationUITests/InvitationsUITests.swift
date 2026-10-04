@@ -1,9 +1,10 @@
 import XCTest
 
 /// Drives the connected invitation screens and `InvitationsModel` over the DEBUG stub server,
-/// which answers with the `/api/v1/invites` shapes. Codes name the server outcome they trigger.
+/// which answers only in shapes the real `/api/v1/invites` routes produce. Codes name the outcome.
 final class InvitationsUITests: XCTestCase {
     private let betaLink = "https://cuadrao.ai/invite#beta-link-token-000000000000000000000000001"
+    private let householdLink = "argus-household://invite#household-link-token-00000000000000000000000"
 
     func testGateExplainsEachCodeOutcomeAndAdmitsWithAValidCode() {
         let app = launch()
@@ -31,19 +32,32 @@ final class InvitationsUITests: XCTestCase {
     }
 
     func testLinkIntentSurvivesCancelledSignInAndAdmitsAfterSignIn() {
-        let app = launch(["--harness-signed-out", "--harness-universal", "--harness-open-url", betaLink])
+        let app = launch(["--harness-signed-out", "--harness-links", "--harness-open-url", betaLink])
         let pending = element(app, "invites.pending")
         XCTAssertTrue(pending.waitForExistence(timeout: 10))
         app.buttons["harness.cancelSignIn"].tap()
         XCTAssertTrue(pending.exists)
         XCTAssertTrue(app.staticTexts["harness.signedOut"].exists)
         app.buttons["harness.signIn"].tap()
+        let field = app.textFields["release.inviteGate.code"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "beta-link-token-000000000000000000000000001")
+        XCTAssertFalse(app.staticTexts["harness.app"].exists)
+        app.buttons["release.inviteGate.submit"].tap()
         XCTAssertTrue(app.staticTexts["harness.app"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.textFields["release.inviteGate.code"].exists)
+        XCTAssertFalse(field.exists)
+    }
+
+    func testALinkIsForgottenWhenThePersonSignsOut() {
+        let app = launch(["--harness-links", "--harness-access-down", "1000", "--harness-open-url", betaLink])
+        XCTAssertTrue(element(app, "invites.access.unanswered").waitForExistence(timeout: 10))
+        app.buttons["invites.gate.signOut"].tap()
+        XCTAssertTrue(app.staticTexts["harness.signedOut"].waitForExistence(timeout: 5))
+        XCTAssertFalse(element(app, "invites.pending").exists)
     }
 
     func testDiscardingASavedLinkLeavesTheGateForManualEntry() {
-        let app = launch(["--harness-signed-out", "--harness-universal", "--harness-open-url", betaLink])
+        let app = launch(["--harness-signed-out", "--harness-links", "--harness-open-url", betaLink])
         XCTAssertTrue(element(app, "invites.pending").waitForExistence(timeout: 10))
         app.buttons["invites.pending.discard"].tap()
         XCTAssertFalse(element(app, "invites.pending").exists)
@@ -51,21 +65,54 @@ final class InvitationsUITests: XCTestCase {
         XCTAssertTrue(app.textFields["release.inviteGate.code"].waitForExistence(timeout: 10))
     }
 
-    func testUniversalLinkIsIgnoredWhileItsFlagIsOff() {
-        let app = launch(["--harness-signed-out", "--harness-open-url", betaLink])
-        XCTAssertTrue(app.staticTexts["harness.signedOut"].waitForExistence(timeout: 10))
-        XCTAssertFalse(element(app, "invites.pending").exists)
+    func testNoLinkOfEitherShapeIsHandledWhileTheLinkFlagIsOff() {
+        for link in [betaLink, householdLink] {
+            let signedOut = launch(["--harness-signed-out", "--harness-open-url", link])
+            XCTAssertTrue(signedOut.staticTexts["harness.signedOut"].waitForExistence(timeout: 10))
+            XCTAssertFalse(element(signedOut, "invites.pending").exists)
+            signedOut.terminate()
+            let gated = launch(["--harness-open-url", link])
+            let field = gated.textFields["release.inviteGate.code"]
+            XCTAssertTrue(field.waitForExistence(timeout: 10))
+            XCTAssertNotEqual(field.value as? String, String(link.split(separator: "#")[1]))
+            XCTAssertFalse(gated.staticTexts["harness.household.opened"].exists)
+            XCTAssertFalse(gated.staticTexts["harness.app"].exists)
+            gated.terminate()
+        }
+    }
+
+    func testAnAccessCheckWithoutAnAnswerKeepsTheAppClosed() {
+        let app = launch(["--harness-access-down", "1000"])
+        XCTAssertTrue(element(app, "invites.access.unanswered").waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["harness.app"].exists)
+        capture(app, "access-unanswered-es-light")
+        app.buttons["invites.access.retry"].tap()
+        XCTAssertTrue(element(app, "invites.access.unanswered").waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["harness.app"].exists)
+        XCTAssertFalse(app.textFields["release.inviteGate.code"].exists)
+    }
+
+    func testWithTheClientFlagOffTheAppOpensAtOnceWithoutInvitations() {
+        let app = launch(["--harness-client-off", "--harness-access-down", "1000"])
+        XCTAssertTrue(app.staticTexts["harness.app"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["invites.profile"].exists)
+        XCTAssertFalse(element(app, "invites.access.unanswered").exists)
     }
 
     func testAFailedLinkShowsWhyAndKeepsManualCodeRecovery() {
-        let app = launch(["--harness-universal", "--harness-open-url", "https://cuadrao.ai/invite#expd-link-token-00000000000000000000000000"])
+        let app = launch(["--harness-links", "--harness-open-url", "https://cuadrao.ai/invite#expd-link-token-00000000000000000000000000"])
+        let field = app.textFields["release.inviteGate.code"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        XCTAssertEqual(field.value as? String, "expd-link-token-00000000000000000000000000")
+        XCTAssertFalse(element(app, "release.inviteGate.status.expired").exists)
+        app.buttons["release.inviteGate.submit"].tap()
         XCTAssertTrue(element(app, "release.inviteGate.status.expired").waitForExistence(timeout: 10))
         enter("BETA-0000-0001", in: app)
         XCTAssertTrue(app.staticTexts["harness.app"].waitForExistence(timeout: 5))
     }
 
     func testAnAdmittedPersonReturnsToTheAppFromABetaLink() {
-        let app = launch(["--harness-admitted", "--harness-universal", "--harness-open-url", betaLink])
+        let app = launch(["--harness-admitted", "--harness-links", "--harness-open-url", betaLink])
         let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 10))
         XCTAssertEqual(alert.label, "Ya tienes acceso")
@@ -81,12 +128,27 @@ final class InvitationsUITests: XCTestCase {
         enter("HOME-0000-0001", in: gated)
         XCTAssertTrue(gated.staticTexts["harness.household.opened"].waitForExistence(timeout: 5))
         gated.terminate()
-        let legacy = launch(["--harness-admitted", "--harness-open-url", "argus-household://invite#household-link-token-00000000000000000000000"])
+        let legacy = launch(["--harness-admitted", "--harness-links", "--harness-open-url", householdLink])
         XCTAssertTrue(legacy.staticTexts["harness.household.opened"].waitForExistence(timeout: 10))
     }
 
-    func testPersonalInvitationsShowTheServersQuotaAndOneTimeSecrets() {
+    func testABetaInvitationWithoutAServerLinkSharesTheCodeAlone() {
         let app = launch(["--harness-admitted"])
+        openHub(app)
+        app.buttons["invites.personal"].tap()
+        XCTAssertTrue(app.buttons["release.personalInvites.create"].waitForExistence(timeout: 5))
+        app.buttons["release.personalInvites.create"].tap()
+        let code = app.staticTexts["release.personalInvites.code"]
+        XCTAssertTrue(code.waitForExistence(timeout: 5))
+        XCTAssertEqual(code.label, "DEMO-ONLY-0007")
+        XCTAssertEqual(app.staticTexts["release.personalInvites.remaining"].label, "Te quedan 6 de 10 invitaciones")
+        XCTAssertFalse(app.staticTexts["release.personalInvites.link"].exists)
+        XCTAssertFalse(element(app, "release.personalInvites.qr").exists)
+        capture(app, "personal-invitation-code-only-es-light")
+    }
+
+    func testPersonalInvitationsShowTheServersQuotaAndOneTimeSecrets() {
+        let app = launch(["--harness-admitted", "--harness-server-links"])
         openHub(app)
         XCTAssertTrue(element(app, "invites.sent.accepted").waitForExistence(timeout: 5))
         XCTAssertTrue(element(app, "invites.sent.pending").exists)
@@ -133,8 +195,14 @@ final class InvitationsUITests: XCTestCase {
         XCTAssertTrue(usage.waitForExistence(timeout: 5))
         XCTAssertEqual(usage.label, "0 de 25 lugares usados")
         XCTAssertEqual(app.staticTexts["release.groupInvite.code"].label, "DEMO-ONLY-GRP1")
+        XCTAssertFalse(app.staticTexts["release.groupInvite.link"].exists)
         app.navigationBars.buttons.element(boundBy: 0).tap()
-        XCTAssertTrue(element(app, "invites.group.open").waitForExistence(timeout: 5))
+        let open = element(app, "invites.group.open")
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        open.swipeLeft()
+        app.buttons["Revocar"].tap()
+        XCTAssertTrue(element(app, "invites.group.revoked").waitForExistence(timeout: 5))
+        XCTAssertFalse(open.exists)
     }
 
     func testOffSurfaceKeepsTodaysAppWithoutInvitations() {
@@ -167,12 +235,12 @@ final class InvitationsUITests: XCTestCase {
                 capture(gated, "gate-rate-limited-" + suffix)
                 gated.terminate()
 
-                let pending = launch(["--harness-signed-out", "--harness-universal", "--harness-open-url", betaLink], spanish: spanish, dark: dark)
+                let pending = launch(["--harness-signed-out", "--harness-links", "--harness-open-url", betaLink], spanish: spanish, dark: dark)
                 XCTAssertTrue(element(pending, "invites.pending").waitForExistence(timeout: 10))
                 capture(pending, "link-saved-signed-out-" + suffix)
                 pending.terminate()
 
-                let founder = launch(["--harness-admitted", "--harness-founder"], spanish: spanish, dark: dark)
+                let founder = launch(["--harness-admitted", "--harness-founder", "--harness-server-links"], spanish: spanish, dark: dark)
                 openHub(founder)
                 XCTAssertTrue(element(founder, "invites.group.full").waitForExistence(timeout: 5))
                 capture(founder, "invitations-hub-" + suffix)
