@@ -291,6 +291,38 @@ Sources `3ed8dae0a`. Simulator: iPhone 18 Pro Max only. Files are in
 - Debug, Release and build-for-testing compile;
   [design preview checks](2026-10-04-w1f/design-preview-checks.txt) pass.
 
+## Correction: split member row tap area, October 4, 2026
+
+Sources: `9493ea575` with the overlay removed. Simulator: iPhone 18 Pro only. Files are in
+[2026-10-04-w1g](2026-10-04-w1g/).
+
+- Correction to the October 4 tap-target entry above. The claim that the split member
+  row's overlay "stops 32 pt before the amount" was wrong on iOS. It came from a macOS
+  mouse probe with stand-in children. On the iPhone 18 Pro simulator the candidate
+  `2520da49` probe toggled the member with taps up to 16 pt before the amount or share
+  field, and stopped toggling at 12 pt. A tap just short of a share field could take that
+  person out of a money split.
+- The overlay from `567f59819` is removed. The row is again identical to `cc68b341` and
+  integration `a8c37d3a`, and only the drawn member label toggles. Next to money fields, a
+  near-miss must not change who is in the split. The row is listed in
+  `tap_targets_reviewed.txt` as deliberately label-only. A wider row would be a design
+  decision. The tap-target check passes with 44 of 44 reviewed.
+- The [probe](2026-10-04-w1g/split-row-boundary-probe.swift.txt) ran on the simulator
+  in both split modes ([output](2026-10-04-w1g/split-row-boundary-probe.txt)). Taps on
+  the icon, avatar and name toggle. Taps up to 20 pt past the label's edge also toggle
+  (system touch tolerance). Taps at 22 pt and beyond do not. No tap from 44 pt before
+  the field up to the field toggled. The closest toggling tap is now about 85 pt before
+  the share field (exact) and 153 pt before the amount (equal). With the overlay these
+  distances were 16 pt.
+- `CuadraoGroupDesignUITests/testSharedJourneySpanish` passed three runs in a row, and
+  `CuadraoReceiptUITests/testExpenseEditsSurviveReceiptCapture` passed once
+  ([runs](2026-10-04-w1g/focused-runs.txt)). One link to the earlier in-suite failure at
+  line 48 is possible but not proven. That test's `reveal` swipes up from the screen
+  centre. On an exact-split row that point lies between the label and the share field,
+  where the removed overlay took taps.
+- Debug, Release and build-for-testing compile ([compiles](2026-10-04-w1g/compiles.txt)).
+  The [design preview checks](2026-10-04-w1g/design-preview-checks.txt) pass.
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
