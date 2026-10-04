@@ -25,11 +25,13 @@ final class HouseholdModel: ObservableObject {
     @Published private var preparedInvitation: (householdId: UUID, value: HouseholdInvitation)?
     var invitation: HouseholdInvitation? { preparedInvitation?.householdId == selectedId ? preparedInvitation?.value : nil }
     private var reviewedInvitation: InviteSecret?
+    private var invitationReview = UUID()
     @Published private(set) var invitationProblem: InvitationProblem?
     @Published private(set) var invitationPreview: HouseholdInvitationPreview?
     @Published private(set) var pending: PendingFinancialConfirmation?
     @Published var editor: HouseholdActivityEditor?
-    @Published var showManagement = false { didSet { if !showManagement { joiningByInvitation = false } } }
+    /// Closing management ends the join step and its review.
+    @Published var showManagement = false { didSet { if !showManagement { joiningByInvitation = false; cancelInvitationReview() } } }
     /// The join step is open over the current Household. Selection changes only when an accept succeeds.
     @Published private(set) var joiningByInvitation = false
     @Published private(set) var identity: SessionSnapshot?
@@ -150,19 +152,20 @@ final class HouseholdModel: ObservableObject {
     /// A pasted link, a scanned QR's link or a typed code previews the same invitation.
     func previewInvitation(_ input: String) async {
         guard isAvailable, let identity else { return }; let ticket = generation; invitationPreview = nil; invitationProblem = nil
+        let review = UUID(); invitationReview = review
         guard let secret = InviteSecret(input: input) else { invitationProblem = .invalid; return }
         do {
             let body = try JSONEncoder().encode(HouseholdCommand(secret: secret))
             let value = try await controller.householdResponse(HouseholdInvitationPreview.self, path: "/invitations/preview", method: "POST", body: body, expectedIdentity: identity)
-            guard current(ticket, identity) else { return }; invitationPreview = value; reviewedInvitation = secret
+            guard current(ticket, identity), invitationReview == review else { return }; invitationPreview = value; reviewedInvitation = secret
         } catch {
             guard current(ticket, identity) else { return }
             let problem = InvitationProblem(error)
-            if Self.invitationOutcomes.contains(problem) { invitationProblem = problem; return }
+            if Self.invitationOutcomes.contains(problem) { if invitationReview == review { invitationProblem = problem }; return }
             await failed(error, ticket, identity, householdId: nil)
         }
     }
-    func cancelInvitationReview() { invitationPreview = nil; reviewedInvitation = nil; invitationProblem = nil }
+    func cancelInvitationReview() { invitationReview = UUID(); invitationPreview = nil; reviewedInvitation = nil; invitationProblem = nil }
     func acceptInvitation(displayName: String) async {
         guard let reviewedInvitation else { errorKey = "household.changed"; return }
         await command(HouseholdCommand(secret: reviewedInvitation, displayName: displayName), path: "/invitations/accept")
@@ -174,7 +177,7 @@ final class HouseholdModel: ObservableObject {
         pendingInvitationToken = input; showManagement = true; joiningByInvitation = true
         // A handed-over code is previewed at once; joining still needs a name and a tap.
         await previewInvitation(input)
-        return true
+        return isAvailable
     }
     /// Answers about the invitation itself; anything else keeps the surface's own recovery.
     private static let invitationOutcomes: [InvitationProblem] = [.invalid, .expired, .revoked, .used, .rateLimited]
@@ -325,7 +328,7 @@ final class HouseholdModel: ObservableObject {
     private func accessEnded() {
         availability = .available
         clear(); household = nil; selectedId = nil; preparedInvitation = nil
-        showManagement = false; cancelInvitationReview(); pendingInvitationToken = ""
+        showManagement = false; pendingInvitationToken = ""
         if let storageKey { UserDefaults.standard.removeObject(forKey: storageKey) }
         errorKey = "household.accessEnded"
     }
@@ -374,7 +377,7 @@ final class HouseholdModel: ObservableObject {
     }
     private func suspend(_ state: Availability) {
         clear(); lastSearchQuery = nil; availability = state; households = []; household = nil; preparedInvitation = nil
-        showManagement = false; cancelInvitationReview(); pendingInvitationToken = ""
+        showManagement = false; pendingInvitationToken = ""
         errorKey = state == .unavailable ? "household.loadError" : nil
         // Keep actor-partitioned selection and exact pending bytes for explicit recovery.
     }
