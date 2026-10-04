@@ -14,8 +14,8 @@ This file lists, for each row, the backend it needs, what integration already ha
 2. **More options.** Feedback exists; one preference needs a product definition first.
 3. **Security.** Supabase Auth owns the operations; Argus has no session list.
 4. **Memory.** The API exists behind a role gate; the native client and the rollout decision are missing.
-5. **Personalization.** No storage exists, and the change reaches model-facing text.
-6. **Shared conversations.** The API exists behind a default-off flag that needs a founder decision.
+5. **Shared conversations.** The API exists behind a default-off flag that needs a founder decision.
+6. **Personalization.** No storage exists, and the change reaches model-facing text.
 7. **Removed activity.** No removal or restore operation exists, and its recovery rules are open.
 
 The order puts the smallest backend gap first. Rows 4 to 6 also depend on chat for their content. Row 7 does not depend on chat, but it waits on open product decisions.
@@ -35,26 +35,26 @@ The order puts the smallest backend gap first. Rows 4 to 6 also depend on chat f
 ## Security (`.security`)
 
 - **Needs.** Change password, show this device, sign out other sessions, and sign out all sessions.
-- **Exists.** Supabase Auth (GoTrue) owns passwords and sessions. `POST /api/v1/auth/logout` clears Argus's mirrored cookies only, and the [contract](../../API_CONTRACT.md#post-authlogout) says it does not choose a revocation scope. Argus reads `auth.sessions` in one place, the account deletion resume check (`src/argus/api/account_deletion_auth.py`).
+- **Exists.** Supabase Auth (GoTrue) owns passwords and sessions. `POST /api/v1/auth/logout` clears Argus's mirrored cookies only, and the [contract](../../API_CONTRACT.md#post-authlogout) says it does not choose a revocation scope. Argus reads `auth.sessions` only to check that the caller's own session is live (`src/argus/api/auth_sessions.py`); it never lists sessions.
 - **Missing.** A session list that names devices: Argus has no route for it. The native client must call Supabase Auth for a password change and for sign-out with the `others` or `global` scope. A person who signed in only with Apple or Google has no password, so the row needs that state.
 
 ## Memory (`.memory`)
 
 - **Needs.** A list of remembered context, with edit, pause and reset. The Personalization screen also links here.
-- **Exists.** The memory API ([API contract 17.2](../../API_CONTRACT.md#172-memory-registered-role-gated)) in `src/argus/api/routers/personalization_memory.py`: `GET /memory/availability`, `/memory/settings`, `/memory/records` and `/memory/export`; `PATCH` and `DELETE /memory/records/{record_id}`; and `POST /memory/enable`, `/memory/disable`, `/memory/reset`, `/memory/candidates` and `/memory/retrieval`. Tables: `memory_settings`, `memory_consent_actions` and `memory_records` (`20260729225600_add_personalization_memory_persistence.sql`). `ARGUS_ENABLE_PERSONALIZATION_MEMORY` is `"true"` in `render.yaml`, but every endpoint also needs an `admin` or `developer` role in `private_alpha_allowlist`, so ordinary accounts get `404 personalization_memory_unavailable`.
+- **Exists.** The memory API ([API contract 17.2](../../API_CONTRACT.md#172-memory-registered-role-gated)) in `src/argus/api/routers/personalization_memory.py`: `GET /memory/availability`, `/memory/settings`, `/memory/records` and `/memory/export`; `PATCH` and `DELETE /memory/records/{record_id}`; and `POST /memory/enable`, `/memory/disable`, `/memory/reset`, `/memory/candidates` and `/memory/retrieval`. Tables: `memory_settings`, `memory_consent_actions` and `memory_records` (`20260729225600_add_personalization_memory_persistence.sql`). `ARGUS_ENABLE_PERSONALIZATION_MEMORY` is `"true"` in `render.yaml`, but every endpoint except `GET /memory/availability` also needs an `admin` or `developer` role in `private_alpha_allowlist`, so ordinary accounts get `404 personalization_memory_unavailable`. `GET /memory/availability` answers them `available: false`.
 - **Missing.** A native client. Memory candidates come from conversations, so chat comes first. Opening memory to ordinary accounts is a rollout decision that [PRODUCT.md](../../PRODUCT.md#current-production-availability-and-planned-changes) owns. The temporary-chat copy that mentions memory (`ios/ArgusFoundation/Cuadrao/CuadraoTemporaryChatSettings.swift`) has to follow the same gate.
-
-## Personalization (`.personalization`)
-
-- **Needs.** Response length (automatic, brief, detailed), tone (natural, direct, educational) and free-text instructions the person writes. The screen says these are preferences the person chooses, not memories.
-- **Exists.** Nothing stores them. `PATCH /me` accepts names, language, locale, avatar theme, country and currency only. `src/argus/agent_runtime/response_style.py` holds one fixed style for every account.
-- **Missing.** Storage on the profile and a `PATCH /me` contract for the three fields, then a way for chat to use them. Using them changes model-facing text, so it needs the committed scorecard that AGENTS.md Never-Violate Standard 12 requires. The free-text field also needs a sensitivity rule, as memory has.
 
 ## Shared conversations (`.shared`)
 
 - **Needs.** The person's share links, each with a revoke action. The screen says: "Links you share will appear here."
 - **Exists.** The owner routes in the [API contract](../../API_CONTRACT.md#public-evidence-receipts), in `src/argus/api/routers/evidence_receipts.py`: `GET /public-excerpts` (the owner's list) and `DELETE /public-excerpts/{snapshot_id}` (revoke), plus candidate, preview and create under `/conversations/{conversation_id}/public-excerpt*`. Table: `public_excerpt_snapshots`. All of it sits behind `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, which is `"false"` on integration and `"true"` on `main`.
 - **Missing.** A native client, and a native way to create a share from chat. The founder decides whether sharing is on before the next promotion to `main`. The [sharing spec](../conversation-sharing.md) owns the behavior.
+
+## Personalization (`.personalization`)
+
+- **Needs.** Response length (automatic, brief, detailed), tone (natural, direct, educational) and free-text instructions the person writes. The screen says these are preferences the person chooses, not memories.
+- **Exists.** Nothing stores them. `PATCH /me` accepts names, language, locale, avatar theme, country and currency only. `src/argus/agent_runtime/response_style.py` holds one fixed style for every account.
+- **Missing.** Storage on the profile and a `PATCH /me` contract for the three fields, then a way for chat to use them. Using them changes model-facing text, so it needs the committed scorecard that AGENTS.md Never-Violate Standard 12 requires. The free-text field also needs a sensitivity rule, as memory has.
 
 ## Removed activity (`.removed`)
 

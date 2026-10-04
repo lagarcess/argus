@@ -730,7 +730,7 @@ sign-out. The deletion command and its web flow are on integration behind the
 default-off `ARGUS_ACCOUNT_DELETION_ENABLED` (#799, #801); while it is off, the web
 files the earlier support request instead, and no native flow is on integration.
 Deletion locks the account (signed out, every route but deletion refuses it)
-until every outside service confirms its revocation, and only then deletes the
+until every outside service has confirmed, and only then deletes the
 login. A deletion still waiting finishes when the person retries or an operator
 runs the sweep. Nothing runs that sweep on a schedule: that is the founder's
 decision of October 3, 2026, to revisit before an external beta, and no cron or
