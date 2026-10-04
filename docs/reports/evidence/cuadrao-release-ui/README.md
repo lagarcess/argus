@@ -217,6 +217,42 @@ worker held the simulators. Files are in [2026-10-04-w1d](2026-10-04-w1d/).
   test target compile did not run in this pass, and none of these controls has a
   focused UI run yet.
 
+## Tap-target check corrected after review, October 4, 2026
+
+Fifth worker on this branch, applying the delta review of `cc68b341..c45e1eb7`. No
+simulator and no UI test ran. Files are in [2026-10-04-w1e](2026-10-04-w1e/).
+
+- The voice message Cancel button kept its 80x48 frame outside a plain-style button,
+  so only its text took taps. The check missed it because the style sat on the
+  enclosing stack and the check read only the last button under it. The frame and a
+  content shape are now inside Cancel's label, and the four container sites set the
+  style on each button. Nothing visible changes.
+- `run_tap_targets.py` now follows each plain style through its modifier chain to the
+  statement it styles. A style on a container of controls fails and cannot be reviewed
+  away. A reviewed reason of the form "X carries the shape" is checked against the body
+  of X. Removing the shape from the voice bar mute button, the ordered-collection Edit
+  label, Cancel, `FinancialActivityRow` or `CuadraoChoiceLabel` on a scratch copy now
+  fails the check, as does moving the style back to a container
+  ([script](2026-10-04-w1e/tap-target-mutations.sh),
+  [output](2026-10-04-w1e/tap-target-mutations.txt),
+  [check](2026-10-04-w1e/tap-target-check.txt)). The check does not judge a free-text
+  reason such as "filled capsule", and identical statements still share one digest.
+- The split member row is laid out as at `cc68b341` again: label, Spacer, trailing
+  column. The row stays tappable through a tap area in an overlay on the Spacer, which
+  takes no part in layout and stops 32 pt before the amount. A macOS SwiftUI probe
+  measured the icon, avatar, name and trailing frames of the old row, the `c45e1eb7`
+  row and this row over six widths, five names and both split modes: this row matched
+  the old one in 60 of 60 cases and `c45e1eb7` differed in 22. Trailing padding on a
+  full-width button, the smaller fix the review suggested, differed in 5 of 60, all at
+  280 pt in exact mode, where the share field came out 6 to 10 pt off. Synthesized
+  clicks landed in the tap area from the name's edge to 32 pt before the field and not
+  after ([probe](2026-10-04-w1e/member-row-layout-probe.swift),
+  [output](2026-10-04-w1e/member-row-layout-probe.txt)). The probe runs on macOS with
+  stand-in children, so an off-centre tap on the iPhone simulator is still owed.
+- Debug, Release and test-target compiles passed for the simulator
+  ([commands and results](2026-10-04-w1e/compiles.txt)), and the design checks passed
+  ([output](2026-10-04-w1e/design-preview-checks.txt)).
+
 ## Verification and evidence
 
 - Initial acceptance used iPhone 18 Pro simulator, iOS 27. The combined update above records the later physical installation.
