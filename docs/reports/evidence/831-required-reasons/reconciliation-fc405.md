@@ -7,7 +7,7 @@ This October 5, 2026 record extends [the currency reconciliation](reconciliation
 - The normal reconciliation merge is `5cdb8ae6bbf354c23c380a42e65b49172d229595`.
 - This evidence commit changes no implementation. The handoff records the final published head.
 
-PR 868 changes only a Postgres lock-observer test and its evidence. The entire `ios` tree and manifest evidence tree are byte-identical to the previous published head. The preceding required-reason API inventory, dependency, configuration, and packaged-byte comparisons therefore remain valid. This landing changes no production code or manifest input.
+PR 868 changes only a Postgres lock-observer test and its evidence. The entire `ios` tree is byte-identical to the previous published head. Existing manifest audit inputs and evidence files are also byte-identical, excluding this new reconciliation record. The preceding required-reason API inventory, dependency, configuration, and packaged-byte comparisons therefore remain valid. This landing changes no production code or manifest input.
 
 Seven manifest validators passed again, with zero failures and zero skips. The combined tree's modularity budget has zero violations. `git diff --check` passes. The manifest implementation's stable patch ID remains `54fcbcff41ecafce9b9ad0fed4a9733f8a8a8d29`.
 
