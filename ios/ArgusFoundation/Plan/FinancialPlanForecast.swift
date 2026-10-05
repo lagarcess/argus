@@ -58,11 +58,13 @@ private struct FinancialPlanForecastCurrency: View {
                 amount: displayedMinor.map(amount) ?? currency.currency + " · " + NSLocalizedString("accounts.unknown", comment: ""),
                 identifier: (displayedMinor == nil ? "plan.unknown." : "plan.projected.") + currency.currency)
             if !currency.unknownAccountIds.isEmpty {
-                Text("plan.unknown").font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(locale.language.languageCode?.identifier == "es" ? "Saldo inicial conocido" : "Known starting balance")
-                    Text(amount(currency.knownStartingMinor)).monospacedDigit()
-                }.font(CuadraoTypography.supporting)
+                if currency.accountIds.contains(where: { !currency.unknownAccountIds.contains($0) }) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(locale.language.languageCode?.identifier == "es" ? "Saldo inicial conocido" : "Known starting balance")
+                        Text(amount(currency.knownStartingMinor)).monospacedDigit()
+                            .accessibilityIdentifier("plan.knownStarting." + currency.currency)
+                    }.font(CuadraoTypography.supporting)
+                }
                 Text("\(currency.unknownAccountIds.count) · " + NSLocalizedString("accounts.unknown", comment: ""))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }

@@ -117,6 +117,8 @@ extension FinancialLoopUITests {
         XCTAssertFalse(app.staticTexts["home.projected.USD"].exists)
         XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
         assertText("Balance unknown")
+        XCTAssertFalse(app.staticTexts["plan.knownStarting.USD"].exists,
+                       "No selected account has a known balance; an empty subtotal is not a known zero")
         capture("plan-unknown-dollar-balance")
         openMoneyAccount(unknown); assertText("Balance unknown")
         app.terminate()
