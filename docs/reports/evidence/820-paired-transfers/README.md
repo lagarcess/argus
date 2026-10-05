@@ -4,6 +4,49 @@ October 5, 2026. Original integration base is
 `875de09ac2115acec42e09060b92878aa5f18eff`. This is a default-off backend slice
 of #820. It does not complete the native two-amount flow or enable transfers.
 
+## CI release contract correction
+
+The [failed backend job](https://github.com/lagarcess/argus/actions/runs/37350137202/job/111899312070)
+on `04e4cfa4512462b5ca714dc322d7fdabf5c8ae07` exposed eight environment-contract
+failures and three empty-DSN fixture errors. The [local reproduction](ci-contract-red.txt)
+matches those counts. The [same eight checks](ci-contract-baseline.txt) pass on
+an isolated archive of integration `26c0692d634953bd542a6cca6504138e6e420e6c`.
+These are regressions in this PR. The defect and owner are recorded on
+[#820](https://github.com/lagarcess/argus/issues/820#issuecomment-6000323931).
+
+The release profile now owns the flag's default `false` value. The existing
+profile CLI supplies API key membership to `argus-env.sh`, replacing its
+duplicate list. CLI failure returns an error from the sourced contract.
+The Blueprint uses the string `"false"`, matching the surrounding environment
+values. The new [membership regressions](ci-membership-red.txt) first failed
+because profile additions were ignored and malformed profiles were accepted.
+They now prove both behaviors through the sourced shell contract from another
+working directory.
+
+The PostgreSQL module inherits `shared.pytestmark`, just as it inherits its
+fixtures. The [configuration run](ci-contract-green.txt) passes 74 tests and
+skips the three database cases when no disposable DSN is configured. Those
+skips establish the tier guard only. With the coordinator's exclusive local
+PostgreSQL slot, the [explicit three-case run](ci-postgres-three.txt) executes
+all three tests with zero skips. The [affected paired suite](ci-paired-suite.txt)
+passes all 232 tests with zero failures or skips and 57 existing pool warnings.
+The [mocked eval suite](ci-mocked-evals.txt) passes all 272 tests without providers.
+
+Current integration `26c0692d634953bd542a6cca6504138e6e420e6c` was merged normally
+as `1a8635a7be120e489c87c30ed674e437b563044e`. Its intervening #846 changes add
+deletion recovery tests, evidence and runbook guidance. There is no overlap in
+runtime owners, API/data contracts, UI state, migrations, environment variables
+or directly affected tests. The [combined-tree modularity check](ci-combined-modularity.txt)
+passes. This correction changes no money implementation, OpenAPI schema or
+migration. Existing denomination and privacy evidence remains valid; the paired
+suite revalidates it after integration reconciliation.
+
+Focused Ruff, changed-line formatting, shell syntax and whitespace checks pass.
+The independent no-comments pass found no added comments or suppressions and
+was stopped. Final independent correctness review and terminal CI judgment
+remain with the root coordinator. The PR handoff records the committed head
+and its final exact-head revalidation.
+
 ## Shared Plan denomination review fix
 
 The [P1 review](https://github.com/lagarcess/argus/pull/854#issuecomment-5999583701)

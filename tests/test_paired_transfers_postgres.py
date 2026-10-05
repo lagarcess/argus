@@ -9,6 +9,7 @@ from tests.financial_accounts.test_personal_money import account, command, save
 scene = shared.scene
 repository = shared.repository
 users = shared.users
+pytestmark = shared.pytestmark
 
 
 @pytest.fixture
