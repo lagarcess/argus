@@ -513,6 +513,36 @@ extension FinancialModelTests {
         XCTAssertEqual(moved["effective_date"] as? String, expectation.earliestEffectiveDate)
     }
 
+    func testSeededMonthlyDraftKeepsTheMovementDayAnchorAfterClamping() throws {
+        let checking = UUID()
+        let legs: [[String: Any]] = [["record_id": UUID().uuidString, "record_revision": 1, "account_id": checking.uuidString,
+                                      "role": "single", "balance_movement_minor": -35000, "coverage": []]]
+        let raw: [String: Any] = ["activity_id": UUID().uuidString, "revision": 1, "kind": "expense", "amount_minor": 35000, "amount": "350.00",
+            "currency": "DOP", "currency_fraction_digits": 2, "occurred_at": "2026-01-31T15:00:00Z", "time_zone": "UTC",
+            "note": "Rent", "recorded_at": "2026-01-31T15:00:00Z", "legs": legs]
+        let activity = try JSONDecoder().decode(FinancialActivityDetail.self, from: JSONSerialization.data(withJSONObject: raw))
+        let account: [String: Any] = ["id": checking.uuidString, "type": "checking", "nature": "asset", "currency": "DOP", "currency_fraction_digits": 2,
+            "archived": false, "ownership_share_bps": 10000, "version": 1, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z",
+            "balance": ["state": "unknown", "activity_since_tracking_minor": 0]]
+        let accounts = [try JSONDecoder().decode(FinancialAccount.self, from: JSONSerialization.data(withJSONObject: account))]
+        let seed = try XCTUnwrap(FinancialExpectationSeed(activity: activity, accounts: accounts, today: "2026-02-15", fallbackTitle: "Housing"))
+        let draft = FinancialExpectationDraft(seed: seed)
+        XCTAssertTrue(draft.seededFromActivity)
+        XCTAssertTrue(draft.ready)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(draft.command(locale: Locale(identifier: "en_US")))) as? [String: Any])
+        XCTAssertEqual(payload["kind"] as? String, "bill")
+        XCTAssertEqual(payload["title"] as? String, "Rent")
+        XCTAssertEqual(payload["currency"] as? String, "DOP")
+        XCTAssertEqual(payload["amount"] as? String, "350.00")
+        XCTAssertEqual(payload["account_id"] as? String, checking.uuidString)
+        let schedule = try XCTUnwrap(payload["schedule"] as? [String: Any])
+        XCTAssertEqual(schedule["cadence"] as? String, "monthly")
+        XCTAssertEqual(schedule["start_date"] as? String, "2026-02-28", "first date clamps to February")
+        XCTAssertEqual(schedule["month_days"] as? [Int], [31], "the anchor stays on the 31st so March is not stuck on the 28th")
+        XCTAssertNil(schedule["end_date"], "no end date is prepared")
+        XCTAssertNil(payload["expected_version"])
+    }
+
     func testPlanConfirmationSurvivesRelaunchAndDifferentOwnerCannotReplay() async throws {
         let fixture = try PresentationFixture()
         let alice = try await fixture.login()

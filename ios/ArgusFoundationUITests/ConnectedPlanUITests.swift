@@ -210,7 +210,7 @@ extension FinancialLoopUITests {
         app.revealConnectedTabBar()
         app.buttons["tab.plan"].tap()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.occurrence.' AND label CONTAINS %@", title)).firstMatch
-        if !row.exists, app.buttons["Show more"].exists { tapVisible(app.buttons["Show more"]) }
+        if !row.exists, app.buttons["plan.showMore"].exists { tapVisible(app.buttons["plan.showMore"]) }
         tapVisible(row)
     }
 
