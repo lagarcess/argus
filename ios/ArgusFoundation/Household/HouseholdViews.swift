@@ -39,6 +39,7 @@ struct HouseholdConnectedDestination: View {
         if active {
             NavigationStack {
                 content
+                    .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("screen." + tab.rawValue)
                     .toolbar(.hidden, for: .navigationBar)
                     .navigationDestination(isPresented: Binding(
