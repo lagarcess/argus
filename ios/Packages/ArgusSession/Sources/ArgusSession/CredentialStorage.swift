@@ -44,23 +44,40 @@ enum SessionSignInMethod: String, Codable, Sendable {
 }
 
 struct StoredSession: Codable {
-    let version: Int
     var session: Session
     let signInMethod: SessionSignInMethod?
 
-    init(session: Session, signInMethod: SessionSignInMethod?) {
-        self.version = 1; self.session = session; self.signInMethod = signInMethod
+    private enum CodingKeys: String, CodingKey { case provenance = "cuadrao_session_provenance" }
+    private struct Provenance: Codable {
+        let version: Int
+        let method: SessionSignInMethod
     }
 
-    static func decode(_ data: Data) throws -> Self {
-        let decoder = JSONDecoder()
-        if let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], object["version"] != nil || object["session"] != nil {
-            let stored = try decoder.decode(Self.self, from: data)
-            guard stored.version == 1 else { throw SessionFailure.storageUnavailable }
-            return stored
-        }
-        return .init(session: try decoder.decode(Session.self, from: data), signInMethod: nil)
+    init(session: Session, signInMethod: SessionSignInMethod?) {
+        self.session = session; self.signInMethod = signInMethod
     }
+
+    init(from decoder: Decoder) throws {
+        session = try Session(from: decoder)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if container.contains(.provenance) {
+            let provenance = try container.decode(Provenance.self, forKey: .provenance)
+            guard provenance.version == 1 else { throw SessionFailure.storageUnavailable }
+            signInMethod = provenance.method
+        } else {
+            signInMethod = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try session.encode(to: encoder)
+        if let signInMethod {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Provenance(version: 1, method: signInMethod), forKey: .provenance)
+        }
+    }
+
+    static func decode(_ data: Data) throws -> Self { try JSONDecoder().decode(Self.self, from: data) }
 }
 
 /// One lock binds generation validation to the actual storage operation. Checking only
@@ -143,7 +160,7 @@ final class CredentialVault: @unchecked Sendable {
                 if let previous, previous.session.user.id != session.user.id {
                     throw SessionFailure.staleOperation
                 }
-                let stored = StoredSession(session: session, signInMethod: previous?.signInMethod ?? adoptingMethod)
+                let stored = StoredSession(session: session, signInMethod: previous == nil ? adoptingMethod : previous?.signInMethod)
                 try backing.store(key: prefix + ".session", value: JSONEncoder().encode(stored))
             }
             catch {
@@ -168,14 +185,6 @@ final class CredentialVault: @unchecked Sendable {
             guard epoch == generation else { throw SessionFailure.staleOperation }
             do { return try operation() }
             catch { failed = true; throw SessionFailure.storageUnavailable }
-        }
-    }
-    private func read<T: Decodable>(_ suffix: String) throws -> T? {
-        try locked {
-            do {
-                guard let data = try backing.retrieve(key: prefix + "." + suffix) else { return nil }
-                return try JSONDecoder().decode(T.self, from: data)
-            } catch { throw SessionFailure.storageUnavailable }
         }
     }
     private func remove(_ suffix: String) throws {

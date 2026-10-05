@@ -63,17 +63,35 @@ final class TransportAndStorageTests: XCTestCase, @unchecked Sendable {
         }
     }
 
-    func testUnsupportedOrMalformedEnvelopeNeverFallsBackToLegacy() async throws {
-        let server = AuthServer()
-        let raw = try await server.sessionData()
-        for value in [2, "unknown"] as [Any] {
+    func testUnsupportedOrMalformedProvenanceNeverFallsBackToUnknown() async throws {
+        let raw = try await AuthServer().sessionData()
+        let invalid: [Any] = [NSNull(), "unknown", ["version": 2, "method": "apple"],
+                              ["version": 1, "method": "unknown"], ["version": 1]]
+        for value in invalid {
             var object = try XCTUnwrap(JSONSerialization.jsonObject(with: raw) as? [String: Any])
-            object["version"] = value
+            object["cuadrao_session_provenance"] = value
             let backing = MemoryStore()
             try backing.store(key: "method.session", value: JSONSerialization.data(withJSONObject: object))
             let vault = CredentialVault(backing: backing, prefix: "method")
             XCTAssertThrowsError(try vault.session()) { XCTAssertEqual($0 as? SessionFailure, .storageUnavailable) }
         }
+    }
+
+    func testPinnedSDKCanReadNewSessionAndOldRefreshRemovesProvenance() async throws {
+        let raw = try await AuthServer().sessionData()
+        let backing = MemoryStore(), prefix = "compatible"
+        let vault = CredentialVault(backing: backing, prefix: prefix)
+        let storage = EpochStorage(vault: vault, epoch: vault.epoch(), adoptingMethod: .apple)
+        try storage.store(key: "argus.session", value: raw)
+        let saved = try XCTUnwrap(backing.retrieve(key: prefix + ".session"))
+        let olderSession = try JSONDecoder().decode(Session.self, from: saved)
+        XCTAssertEqual(olderSession, try JSONDecoder().decode(Session.self, from: raw))
+        XCTAssertEqual(try vault.signInMethod(), .apple)
+        try backing.store(key: prefix + ".session", value: JSONEncoder().encode(olderSession))
+        XCTAssertNil(try vault.signInMethod())
+        // The same adapter retains its initial grant method across refreshes.
+        try storage.store(key: "argus.session", value: raw)
+        XCTAssertNil(try vault.signInMethod())
     }
 
     func testSDKCannotSwitchAccountsWithinOneEpoch() async throws {
