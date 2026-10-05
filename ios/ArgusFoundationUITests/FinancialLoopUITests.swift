@@ -352,6 +352,7 @@ final class FinancialLoopUITests: XCTestCase {
             app.buttons["debt.close"].tap()
             XCTAssertTrue(app.otherElements["debt.detail"].waitForNonExistence(timeout: 10))
         }
+        app.revealConnectedTabBar()
         let connected = app.usesConnectedChrome
             || app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 2)
         if connected {

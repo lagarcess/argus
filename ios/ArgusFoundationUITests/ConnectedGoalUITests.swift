@@ -14,9 +14,17 @@ extension FinancialLoopUITests {
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.card.goal.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(card)
         assertGoal("DOP 0.00")
+        XCTAssertTrue(app.navigationBars.buttons["BackButton"].waitForExistence(timeout: 5))
+        app.swipeBack(cancel: true)
+        assertGoal("DOP 0.00")
+        XCTAssertFalse(app.buttons["tab.home"].exists)
+        app.swipeBack()
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        tapVisible(card)
+        assertGoal("DOP 0.00")
         app.terminate(); app.launch()
         assertGoal("DOP 0.00")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
         revealPlanManagement()
         XCTAssertTrue(app.buttons["plan.overview"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["plan.overview"].isSelected)
@@ -25,7 +33,7 @@ extension FinancialLoopUITests {
         _ = openGoal(title)
         app.terminate(); app.launch()
         assertGoal("DOP 0.00")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
         XCTAssertTrue(app.buttons["plan.goals"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["plan.goals"].isSelected)
     }
@@ -62,7 +70,7 @@ extension FinancialLoopUITests {
         fillMoneyField("loop.reason", with: "Correct contribution amount")
         dismissMoneyKeyboard(); reviewMoney(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
-        app.buttons["goal.activity.back"].tap()
+        app.returnFromPlan("goal.activity.back")
         assertGoal("DOP 750.00")
         capture("goal-original-correction-propagated")
         let release = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.release.' AND identifier != 'goal.release.confirm'")).firstMatch
@@ -88,7 +96,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["goal.restore"].waitForExistence(timeout: 15))
         tapVisible(app.buttons["goal.restore"])
         assertGoal("DOP 750.00")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
         verifyGoalSearch(title, supported: "DOP 750.00")
     }
 
@@ -111,7 +119,7 @@ extension FinancialLoopUITests {
         assertGoal("DOP 0.00")
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("goal-exact-command-recovered-once")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.row.plan.' AND label CONTAINS %@", title)).count, 1)
     }
 
@@ -141,7 +149,7 @@ extension FinancialLoopUITests {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.activity.' AND identifier != 'goal.activity.back'")).count, 1)
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("goal-transfer-recovered-once-after-relaunch")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
         openMoneyAccount(source); assertText("DOP 800.00")
         openMoneyAccount(destination); assertText("DOP 1,200.00")
     }
@@ -157,7 +165,7 @@ extension FinancialLoopUITests {
         tapVisible(row); assertGoal(amount)
         verifyGoalSheetCancellation()
         capture("goal-home-recorded-progress")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
         verifyGoalSearch(title, supported: amount)
     }
 
@@ -211,7 +219,7 @@ extension FinancialLoopUITests {
         tapVisible(hit); assertGoal(supported)
         app.terminate(); app.launch(); assertGoal(supported)
         capture("goal-detail-restored-after-relaunch")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
         XCTAssertEqual(app.textFields["search.query"].value as? String, title)
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
         XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains("Goals"))
@@ -222,6 +230,6 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.staticTexts["goal.supported"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'goal.'")).firstMatch.exists)
         capture("goal-spanish-detail")
-        app.buttons["goal.close"].tap()
+        app.returnFromPlan("goal.close")
     }
 }

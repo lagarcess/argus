@@ -35,8 +35,31 @@ extension XCUIApplication {
                 buttons["sheet.close"].tap()
                 continue
             }
+            let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+            if nativeBack.waitForExistence(timeout: 1) {
+                nativeBack.tap()
+                continue
+            }
             break
         }
+    }
+
+    func returnFromPlan(_ legacyIdentifier: String) {
+        let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+        if nativeBack.waitForExistence(timeout: 2) { nativeBack.tap() }
+        else {
+            XCTAssertTrue(buttons[legacyIdentifier].waitForExistence(timeout: 5))
+            buttons[legacyIdentifier].tap()
+        }
+    }
+
+    func swipeBack(cancel: Bool = false) {
+        coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.5)).press(
+            forDuration: 0.05,
+            thenDragTo: coordinate(withNormalizedOffset: CGVector(dx: cancel ? 0.15 : 0.9, dy: 0.5)),
+            withVelocity: .slow,
+            thenHoldForDuration: 0.4
+        )
     }
 
     /// Accounts live on Home in Connected; tip keeps a dedicated Accounts tab.
