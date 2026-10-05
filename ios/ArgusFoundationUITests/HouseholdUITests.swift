@@ -209,7 +209,8 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard(); tapVisible(app.buttons["household.accept"])
         XCTAssertTrue(app.staticTexts["Household Bob"].waitForExistence(timeout: 15))
         let leave = app.buttons["household.leave"]
-        for _ in 0..<40 where !leave.exists { app.collectionViews.lastMatch.swipeUp() }
+        let members = app.collectionViews.element(boundBy: app.collectionViews.count - 1)
+        for _ in 0..<40 where !leave.exists { members.swipeUp() }
         XCTAssertTrue(leave.waitForExistence(timeout: 5))
         tapVisible(app.buttons["household.management.done"])
         XCTAssertFalse(home.buttons["household.account." + shared.id].exists)
