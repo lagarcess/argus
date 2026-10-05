@@ -21,6 +21,10 @@ struct FinancialExpectationForm: View {
                             Text(LocalizedStringKey("plan.kind." + kind.rawValue)).tag(kind)
                         }
                     }.disabled(draft.existing != nil).accessibilityIdentifier("plan.expectation.kind")
+                    if draft.seededFromActivity {
+                        Text("plan.fromActivity.hint").font(ArgusStyle.body(13, relativeTo: .subheadline)).foregroundStyle(ArgusStyle.secondary)
+                            .accessibilityIdentifier("plan.expectation.fromActivity")
+                    }
                     field("plan.name", identifier: "plan.expectation.name", text: $draft.title)
                     if draft.existing == nil {
                         Picker("accounts.currency", selection: $draft.currency) {

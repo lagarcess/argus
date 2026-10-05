@@ -73,9 +73,6 @@ struct FinancialPlanView: View {
         .sheet(isPresented: $selectingAccounts) {
             if let projection = model.projection { FinancialPlanSelectionView(model: model, loop: loop, projection: projection) }
         }
-        .sheet(item: $model.selectedOccurrence, onDismiss: model.occurrenceDismissed) { occurrence in
-            FinancialOccurrenceView(model: model, loop: loop, occurrence: occurrence)
-        }
     }
 
     private func overview(_ projection: FinancialPlanProjection) -> some View {
@@ -122,6 +119,7 @@ struct FinancialPlanView: View {
                 }
                 if projection.occurrences.count > 6 {
                     Button(expanded ? "plan.showLess" : "plan.showMore") { expanded.toggle() }.frame(minHeight: 44)
+                        .accessibilityIdentifier("plan.showMore")
                 }
             }
             Button("plan.add.title") { model.create() }.buttonStyle(PillButtonStyle())
@@ -151,6 +149,8 @@ struct FinancialPlanView: View {
 
 struct FinancialForecastSummary: View {
     let currency: FinancialForecastCurrency
+    /// Home and Plan both render a summary; distinct prefixes keep each total addressable.
+    var identifier = "plan.projected."
     @Environment(\.locale) private var locale
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -158,7 +158,7 @@ struct FinancialForecastSummary: View {
             if let ending = currency.endingMinor {
                 Text(verbatim: PlanPresentation.money(ending, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale))
                     .font(ArgusStyle.display(32)).monospacedDigit().fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("plan.projected." + currency.currency)
+                    .accessibilityIdentifier(identifier + currency.currency)
             } else {
                 Text("accounts.unknown").font(ArgusStyle.display(28))
                 Text(verbatim: currency.currency).font(ArgusStyle.body(14))
@@ -266,40 +266,5 @@ struct PlanPendingView: View {
                 .buttonStyle(PillButtonStyle()).disabled(loop.recovering).accessibilityIdentifier("loop.pending.retry")
             if let error = loop.recoveryErrorKey { Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary) }
         }.padding(16).overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
-    }
-}
-
-struct FinancialComingUpView: View {
-    @ObservedObject var model: FinancialPlanModel
-    let viewPlan: () -> Void
-    @Environment(\.locale) private var locale
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("home.coming").font(ArgusStyle.display(23)).accessibilityIdentifier("home.comingUp")
-                Spacer()
-                Button("home.viewplan", action: viewPlan).font(ArgusStyle.body(12, relativeTo: .caption))
-                    .frame(minHeight: 44).accessibilityIdentifier("home.viewPlan")
-            }
-            if let projection = model.projection {
-                Text(verbatim: PlanPresentation.dateLabel(projection.endDate, locale: locale)).font(ArgusStyle.body(13, relativeTo: .subheadline))
-                ForEach(projection.currencies) { currency in
-                    FinancialForecastSummary(currency: currency)
-                    Text(projection.accounts.filter { currency.accountIds.contains($0.id) }.map {
-                        $0.nickname ?? NSLocalizedString("accounts.type." + $0.type, comment: "")
-                    }.joined(separator: " · ")).font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
-                    if currency.firstShortfallDate != nil { Text("plan.shortfall").font(ArgusStyle.body(13, relativeTo: .subheadline)) }
-                }
-                ForEach(Array(projection.occurrences.filter { $0.status != .fulfilled }.prefix(2))) { occurrence in
-                    Button(action: viewPlan) { FinancialOccurrenceRow(occurrence: occurrence) }.buttonStyle(.plain)
-                }
-                if !projection.hasExpectations || projection.selection.accountIds.isEmpty { Text("plan.empty").foregroundStyle(ArgusStyle.secondary) }
-                Text("plan.home.disclosure").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
-            } else if model.loading { ProgressView("accounts.loading") }
-            else if let error = model.errorKey {
-                Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
-                Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
-            }
-        }
     }
 }

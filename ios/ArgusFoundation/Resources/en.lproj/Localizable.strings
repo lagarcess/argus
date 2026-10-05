@@ -215,6 +215,9 @@
 "loop.check.missing" = "If you know the missing expense, cancel and record it first.";
 "loop.correction.title" = "Correct entry";
 "loop.activity.title" = "Activity details";
+"loop.activity.repeat" = "Set up as recurring";
+"loop.activity.repeat.hint" = "Prepares an expected payment or income to review. The movement stays as it is.";
+"plan.fromActivity.hint" = "Prepared from a recorded movement. Review the amount, how often it repeats and the next date. The original movement stays as it is, and saving does not record a payment.";
 "loop.amount" = "Amount";
 "loop.date" = "Date";
 "loop.note" = "Note (optional)";

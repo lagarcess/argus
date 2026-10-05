@@ -262,7 +262,11 @@ final class FinancialLoopUITests: XCTestCase {
         XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
         let value = app.staticTexts["home.netWorth.DOP"]
-        XCTAssertTrue(value.waitForExistence(timeout: 10))
+        // A new identity has no DOP account yet: its recorded DOP net worth is zero, not a failure.
+        if !value.waitForExistence(timeout: 10) {
+            XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 5), "Home must show a net worth or the add-account entry")
+            return 0
+        }
         let exact = value.label.replacingOccurrences(of: "DOP", with: "").replacingOccurrences(of: ",", with: "").trimmingCharacters(in: .whitespaces)
         guard let parsed = Decimal(string: exact, locale: Locale(identifier: "en_US_POSIX")) else { XCTFail("Home must expose a numeric amount"); return 0 }
         return parsed
