@@ -262,17 +262,17 @@ extension FinancialLoopUITests {
     }
 
     func revealPlanForecastControls() {
-        if !app.descendants(matching: .any)["plan.forecast.details"].exists {
+        if !app.buttons["plan.forecast.details"].exists {
             selectPlanSection("overview")
         }
         if !app.buttons["plan.accounts"].exists {
-            tapVisible(app.descendants(matching: .any)["plan.forecast.details"])
+            tapVisible(app.buttons["plan.forecast.details"])
         }
     }
 
     func revealPlanManagement() {
         if !app.buttons["plan.overview"].exists {
-            tapVisible(app.descendants(matching: .any)["plan.manage"])
+            tapVisible(app.buttons["plan.manage"])
         }
     }
 

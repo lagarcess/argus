@@ -97,6 +97,7 @@ struct ConnectedHouseholdAccountDetail: View {
                     }
                 }.padding(24).padding(.bottom, 32).frame(maxWidth: .infinity, alignment: .leading)
             }.background(WelcomePalette.background).toolbar(.hidden, for: .navigationBar)
+                .accessibilityIdentifier("household.detail")
                 .onAppear { if let id = model.highlightActivityId { proxy.scrollTo(id, anchor: .top) } }
                 .onChange(of: model.highlightActivityId) { _, id in if let id { proxy.scrollTo(id, anchor: .top) } }
         }
@@ -112,7 +113,10 @@ struct ConnectedHouseholdAccountDetail: View {
                 amount: account.balance.amount.map { AccountPresentation.amount($0, locale: locale) }
                     ?? NSLocalizedString("household.unknown", comment: ""),
                 freshness: item.ownerName + " · " + NSLocalizedString("household.permission." + item.permission, comment: ""),
-                amountIdentifier: "household.detail.balance"))
+                amountIdentifier: "household.detail.balance",
+                amountAccessibilityLabel: account.currency + " " + (account.balance.amount.map {
+                    AccountPresentation.amount($0, locale: locale)
+                } ?? NSLocalizedString("household.unknown", comment: ""))))
             if account.ownershipShareBps != 10000 {
                 Text("household.wholeValue").font(.footnote).foregroundStyle(.secondary)
                 (Text(Decimal(account.ownershipShareBps) / 100, format: .number) + Text("%"))

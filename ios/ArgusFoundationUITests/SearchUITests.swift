@@ -210,6 +210,7 @@ extension FinancialLoopUITests {
     }
 
     private func searchFor(_ query: String, kind: String) {
+        app.revealConnectedTabBar()
         app.buttons["tab.search"].tap()
         let field = app.textFields["search.query"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))

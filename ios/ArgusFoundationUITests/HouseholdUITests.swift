@@ -128,7 +128,7 @@ extension FinancialLoopUITests {
         let link = app.staticTexts["household.invite.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
         let invitation = link.label
-        XCTAssertTrue(invitation.hasPrefix("argus-household://invite#"))
+        XCTAssertTrue(invitation.hasPrefix("https://cuadrao.ai/invite#"))
         tapVisible(app.buttons["household.management.done"])
 
         try signIn(fresh: true, user: "B")
@@ -171,6 +171,7 @@ extension FinancialLoopUITests {
     func testHouseholdTwoUsersConsentEditingRevocationAndSpanishRelaunch() throws {
         let home = app.scrollViews["screen.home"]
         let accounts = app.scrollViews["screen.home"]
+        let detail = app.scrollViews["household.detail"]
         try signIn(fresh: true, user: "A")
         completePriorHouseholdCommand()
         tapVisible(app.buttons["household.personal"])
@@ -188,7 +189,7 @@ extension FinancialLoopUITests {
         let link = app.staticTexts["household.invite.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
         let invitation = link.label
-        XCTAssertTrue(invitation.hasPrefix("argus-household://invite#"))
+        XCTAssertTrue(invitation.hasPrefix("https://cuadrao.ai/invite#"))
         tapVisible(app.buttons["household.management.done"])
         XCTAssertFalse(home.buttons["household.account." + shared.id].exists)
 
@@ -232,8 +233,8 @@ extension FinancialLoopUITests {
         XCTAssertTrue(sharedRow.waitForExistence(timeout: 15))
         XCTAssertFalse(accounts.buttons["household.account." + privateAccount.id].exists)
         tapVisible(sharedRow)
-        XCTAssertTrue(accounts.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
-        XCTAssertFalse(accounts.buttons["household.record"].exists)
+        XCTAssertTrue(detail.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
+        XCTAssertFalse(detail.buttons["household.record"].exists)
         capture("household-recipient-view-only-detail")
         app.terminate(); app.launch()
         openAccountsTab()
@@ -279,12 +280,13 @@ extension FinancialLoopUITests {
 
     private func completeHouseholdEditingJourney(shared: MoneyAccount, privateAccount: MoneyAccount, stamp: String) throws {
         let accounts = app.scrollViews["screen.home"]
+        let detail = app.scrollViews["household.detail"]
         let search = app.scrollViews["screen.search"]
         let sharedRow = accounts.buttons["household.account." + shared.id]
         openAccountsTab(); tapVisible(sharedRow)
-        XCTAssertTrue(accounts.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
-        XCTAssertEqual(accounts.staticTexts["household.detail.balance"].label, "DOP 1000.00")
-        tapVisible(accounts.buttons["household.record"])
+        XCTAssertTrue(detail.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
+        XCTAssertEqual(detail.staticTexts["household.detail.balance"].label, "DOP 1,000.00")
+        tapVisible(detail.buttons["household.record"])
         fillMoneyField("household.activity.amount", with: "25")
         fillMoneyField("household.activity.note", with: "HH reviewed expense " + stamp)
         dismissMoneyKeyboard(); reviewHouseholdActivity()
@@ -292,9 +294,9 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["household.activity.confirm"])
         XCTAssertTrue(app.buttons["household.activity.confirm"].waitForNonExistence(timeout: 15))
         tapVisible(sharedRow)
-        XCTAssertTrue(accounts.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
-        XCTAssertEqual(accounts.staticTexts["household.detail.balance"].label, "DOP 975.00")
-        let corrections = accounts.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'household.correct.'"))
+        XCTAssertTrue(detail.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
+        XCTAssertEqual(detail.staticTexts["household.detail.balance"].label, "DOP 975.00")
+        let corrections = detail.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'household.correct.'"))
         XCTAssertEqual(corrections.count, 1, "This new fixture has one correctable expense")
         let correct = corrections.element(boundBy: 0)
         let activityID = String(correct.identifier.dropFirst("household.correct.".count))
@@ -305,10 +307,10 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["household.activity.confirm"])
         XCTAssertTrue(app.buttons["household.activity.confirm"].waitForNonExistence(timeout: 15))
         tapVisible(sharedRow)
-        XCTAssertTrue(accounts.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
-        XCTAssertEqual(accounts.staticTexts["household.detail.balance"].label, "DOP 980.00")
+        XCTAssertTrue(detail.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
+        XCTAssertEqual(detail.staticTexts["household.detail.balance"].label, "DOP 980.00")
         capture("household-editor-correction-preserves-canonical-account")
-        tapVisible(accounts.buttons["household.back"])
+        tapVisible(detail.buttons["household.back"])
         app.revealConnectedTabBar()
         app.buttons["tab.search"].tap()
         let searchField = search.textFields["household.search.query"]
@@ -316,17 +318,17 @@ extension FinancialLoopUITests {
         let hit = search.buttons["household.search." + activityID]
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         tapVisible(hit)
-        XCTAssertTrue(search.staticTexts["Selected search result"].waitForExistence(timeout: 15))
-        XCTAssertTrue(search.descendants(matching: .any)["household.activity." + activityID].exists)
+        XCTAssertTrue(detail.staticTexts["Selected search result"].waitForExistence(timeout: 15))
+        XCTAssertTrue(detail.descendants(matching: .any)["household.activity." + activityID].exists)
         capture("household-search-shared-activity")
-        tapVisible(search.buttons["household.back"])
+        tapVisible(detail.buttons["household.back"])
         XCTAssertTrue(hit.waitForExistence(timeout: 10))
         XCTAssertEqual(searchField.value as? String, "HH reviewed expense " + stamp)
         app.terminate(); app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO"]
         app.launch(); openAccountsTab()
         XCTAssertTrue(sharedRow.waitForExistence(timeout: 15))
         tapVisible(sharedRow)
-        XCTAssertEqual(accounts.buttons["household.record"].label, "Registrar movimiento")
+        XCTAssertEqual(detail.buttons["household.record"].label, "Registrar movimiento")
         capture("household-spanish-shared-detail")
 
         try signIn(fresh: true, user: "A")

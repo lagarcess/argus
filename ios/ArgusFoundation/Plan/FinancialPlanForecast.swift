@@ -64,7 +64,8 @@ struct FinancialPlanForecast<Details: View>: View {
                 }.padding(.top, 16)
             } label: {
                 Text(spanish ? "¿De dónde sale?" : "What's behind this?").font(.subheadline.weight(.medium))
-            }.padding(.top, 8).accessibilityIdentifier("plan.forecast.details")
+                    .accessibilityIdentifier("plan.forecast.details")
+            }.padding(.top, 8)
         }
     }
     private func amount(_ minor: String, in currency: FinancialForecastCurrency) -> String {

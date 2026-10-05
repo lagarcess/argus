@@ -104,7 +104,8 @@ struct FinancialPlanView: View {
                 sections.padding(.top, 8)
             } label: {
                 Text(spanish ? "Administrar mis planes" : "Manage my plans").font(.subheadline.weight(.medium))
-            }.accessibilityIdentifier("plan.manage")
+                    .accessibilityIdentifier("plan.manage")
+            }
         }
     }
 

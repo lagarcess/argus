@@ -23,6 +23,10 @@ extension XCUIApplication {
                 buttons["activity.back"].tap()
                 continue
             }
+            if buttons["household.back"].waitForExistence(timeout: 1) {
+                buttons["household.back"].tap()
+                continue
+            }
             if buttons["accounts.manage.back"].waitForExistence(timeout: 1) {
                 buttons["accounts.manage.back"].tap()
                 continue
