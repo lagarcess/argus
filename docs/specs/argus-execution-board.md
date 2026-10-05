@@ -147,6 +147,13 @@ off the launch critical path.
 
 ### Release gates still open
 
+- [x] October 5 overnight landing: #835, #837, #838, #836 and #839 merged with
+  independent reviews; integration `19f0dc3af`. Bounded slices of #822 and #824
+  (recurring movement to Home Upcoming to confirmed payment; Home movement detail
+  and row gestures) are implemented and simulator-verified, not enabled or
+  device-accepted. The [overnight landing record](../reports/2026-10-05-cuadrao-overnight-integration-landing.md)
+  holds exact SHAs, evidence and limitations.
+
 - [ ] Complete the sign-in gates in
   [#800](https://github.com/lagarcess/argus/issues/800), required credentials,
   provider configuration, and device checks. Apple, Google, and email remain
@@ -158,7 +165,10 @@ off the launch critical path.
   retry process remains manual; no schedule is authorized here.
 - [ ] Close [#811](https://github.com/lagarcess/argus/issues/811) against its
   acceptance and environment gates. A safer existing hosted configuration does
-  not certify a newly built database.
+  not certify a newly built database. The implementation landed on October 5
+  through #837 (`f655d131b`) and passed on both local CLI images and in CI;
+  hosted application, readback and the migration gate's maintenance review
+  remain.
 - [ ] Finish [#784](https://github.com/lagarcess/argus/issues/784) for the actual
   combined candidate and the relevant physical journeys. Keep
   [#778](https://github.com/lagarcess/argus/issues/778) before document extraction
