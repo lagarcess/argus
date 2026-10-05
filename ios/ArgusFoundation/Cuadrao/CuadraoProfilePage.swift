@@ -2,7 +2,7 @@ import SwiftUI
 
 enum CuadraoProfilePageConnection {
     case preview
-    case connected(appearance: Binding<AppearancePreference>, webURL: URL?)
+    case connected(appearance: Binding<AppearancePreference>, profile: ProfileAuthModel)
 }
 
 struct CuadraoProfilePage: View {
@@ -61,8 +61,8 @@ struct CuadraoProfilePage: View {
     private var developmentDetail: String {
         switch route {
         case .preferences:
-            spanish ? "La apariencia funciona en este dispositivo. Las demás opciones son ejemplos y no cambian tu cuenta."
-                : "Appearance works on this device. The other options are examples and do not change your account."
+            spanish ? "La apariencia funciona en este dispositivo y la moneda preferida se guarda en tu cuenta. Las demás opciones son ejemplos."
+                : "Appearance works on this device and preferred currency is saved to your account. The other options are examples."
         case .help:
             spanish ? "Ayuda y comentarios son ejemplos de desarrollo. Los enlaces legales abren el sitio de Cuadrao."
                 : "Help and feedback are development examples. Legal links open Cuadrao's website."
@@ -127,10 +127,15 @@ struct CuadraoProfilePage: View {
             } header: { Text(spanish ? "Pantalla" : "Display") }
             Section {
                 LabeledContent(spanish ? "Región" : "Region", value: spanish ? "República Dominicana" : "Dominican Republic")
-                LabeledContent(spanish ? "Moneda preferida" : "Preferred currency") {
-                    CuadraoChoiceMenu(title: spanish ? "Moneda preferida" : "Preferred currency",
-                        selection: $settings.currency, values: PlanCurrency.supported, valueTitle: { $0 })
-                        .accessibilityIdentifier("cuadrao.profile.currency")
+                switch connection {
+                case .preview:
+                    LabeledContent(spanish ? "Moneda preferida" : "Preferred currency") {
+                        CuadraoChoiceMenu(title: spanish ? "Moneda preferida" : "Preferred currency",
+                            selection: $settings.currency, values: PlanCurrency.supported, valueTitle: { $0 })
+                            .accessibilityIdentifier("cuadrao.profile.currency")
+                    }
+                case .connected(_, let profile):
+                    ConnectedProfileCurrencyRow(model: profile, spanish: spanish)
                 }
             } header: { Text(spanish ? "Región y moneda" : "Region and currency") }
               footer: { Text(spanish ? "Elegir una moneda no convierte ni combina tus balances." : "Choosing a currency does not convert or combine your balances.") }
@@ -269,8 +274,8 @@ struct CuadraoProfilePage: View {
                 case .preview:
                     previewAction(spanish ? "Términos de uso" : "Terms of use")
                     previewAction(spanish ? "Política de privacidad" : "Privacy policy")
-                case .connected(_, let webURL):
-                    if let webURL {
+                case .connected(_, let profile):
+                    if let webURL = profile.configuration?.webURL {
                         Link(spanish ? "Términos de uso" : "Terms of use", destination: webURL.appendingPathComponent("terms"))
                             .accessibilityIdentifier("release.legal.terms")
                         Link(spanish ? "Política de privacidad" : "Privacy policy", destination: webURL.appendingPathComponent("privacy"))

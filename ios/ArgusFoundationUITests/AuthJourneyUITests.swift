@@ -13,6 +13,46 @@ final class AuthJourneyUITests: XCTestCase {
         super.tearDown()
     }
 
+    func testPrimaryCurrencySurvivesRelaunch() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let email = environment["ARGUS_TEST_EMAIL"], let password = environment["ARGUS_TEST_PASSWORD"] else {
+            throw XCTSkip("Requires lane-owned synthetic credentials.")
+        }
+        continueAfterFailure = false
+        let spanish = environment["ARGUS_TEST_LANGUAGE"] == "es-419"
+        app = XCUIApplication()
+        app.launchArguments = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-AppleLocale", spanish ? "es_DO" : "en_US"]
+        app.launch()
+        app.openSignedOutAuthEntry()
+        app.textFields["auth.email"].tap(); app.textFields["auth.email"].typeText(email)
+        pastePassword(password)
+        let submit = app.buttons["auth.submit"]
+        if !submit.isHittable { app.swipeUp() }
+        submit.tap()
+        XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 30))
+        app.openProfileSurface()
+        let preferences = app.buttons["cuadrao.profile.preferences"]
+        XCTAssertTrue(preferences.waitForExistence(timeout: 10))
+        preferences.tap()
+        let choice = app.buttons["profile.primaryCurrency"]
+        XCTAssertTrue(choice.waitForExistence(timeout: 10))
+        choice.tap(); app.buttons["USD"].tap()
+        let saved = NSPredicate(format: "label CONTAINS %@", "USD")
+        expectation(for: saved, evaluatedWith: choice)
+        waitForExpectations(timeout: 15)
+        capture(spanish ? "primary-currency-es-saved" : "primary-currency-en-saved")
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 30))
+        app.openProfileSurface()
+        XCTAssertTrue(preferences.waitForExistence(timeout: 10))
+        preferences.tap()
+        XCTAssertTrue(choice.waitForExistence(timeout: 10))
+        XCTAssertTrue(choice.label.contains("USD"))
+        capture(spanish ? "primary-currency-es-restored" : "primary-currency-en-restored")
+        app.navigationBars.buttons.matching(identifier: "BackButton").firstMatch.tap()
+        app.buttons["auth.signOut"].tap()
+    }
+
     func testRegisteredSessionSurvivesRelaunchAndSignsOut() throws {
         let environment = ProcessInfo.processInfo.environment
         guard let email = environment["ARGUS_TEST_EMAIL"], let password = environment["ARGUS_TEST_PASSWORD"] else {
@@ -147,10 +187,10 @@ final class AuthJourneyUITests: XCTestCase {
         let field = app.secureTextFields["auth.password"]
         field.tap()
         field.press(forDuration: 1.1)
-        let paste = app.menuItems["Paste"].firstMatch
+        let paste = app.menuItems.matching(NSPredicate(format: "label IN %@", ["Paste", "Pegar"])).firstMatch
         if paste.waitForExistence(timeout: 3) { paste.tap() }
-        else { app.buttons["Paste"].firstMatch.tap() }
-        let permission = app.alerts.buttons["Allow Paste"]
+        else { app.buttons.matching(NSPredicate(format: "label IN %@", ["Paste", "Pegar"])).firstMatch.tap() }
+        let permission = app.alerts.buttons.matching(NSPredicate(format: "label IN %@", ["Allow Paste", "Permitir pegar"])).firstMatch
         if permission.waitForExistence(timeout: 1) { permission.tap() }
         UIPasteboard.general.items = []
     }

@@ -27,7 +27,7 @@ struct ConnectedCuadraoProfile: View {
                     InvitationsHub(model: invitations).toolbar(.visible, for: .navigationBar)
                 } else {
                     CuadraoProfilePage(route: route, settings: $settingsExamples, spanish: spanish,
-                        includeExamples: true, connection: .connected(appearance: $appearance, webURL: auth.configuration?.webURL))
+                        includeExamples: true, connection: .connected(appearance: $appearance, profile: auth))
                 }
             }
             .sheet(isPresented: $editingAvatar) {

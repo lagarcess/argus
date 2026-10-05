@@ -208,7 +208,7 @@ def test_the_profile_row_stores_the_override_and_never_the_resolved_currency(
 
         def update_user(self, user_id: str, updates: dict[str, Any]) -> User:
             written.append(dict(updates))
-            return User.model_validate(updates)
+            return User.model_validate(stored.model_dump() | updates)
 
     monkeypatch.setattr(api_state, "supabase_gateway", _ProfileGateway())
 
@@ -218,7 +218,8 @@ def test_the_profile_row_stores_the_override_and_never_the_resolved_currency(
     assert response.json()["user"]["currency"] == "USD"
     assert len(written) == 1
     assert "currency" not in written[0]
-    assert (written[0]["country"], written[0]["currency_override"]) == ("MX", "USD")
+    assert "country" not in written[0]
+    assert written[0]["currency_override"] == "USD"
 
 
 def test_guests_carry_no_country_or_currency() -> None:
