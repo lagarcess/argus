@@ -28,6 +28,9 @@ def test_currency_roundtrip_preserves_concurrent_preference(monkeypatch):
     try:
         with (
             patch.object(api_state, "supabase_gateway", gateway),
+            patch.object(
+                api_state, "DATABASE_URL", os.environ["ARGUS_DISPOSABLE_DATABASE_URL"]
+            ),
             TestClient(app, base_url="http://localhost:3000") as client,
         ):
             headers = _login(client, gateway, "currency", created)

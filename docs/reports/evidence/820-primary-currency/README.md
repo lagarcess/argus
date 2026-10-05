@@ -27,3 +27,11 @@ A real local Auth/API/PostgREST/Postgres regression inserts a display-name edit 
 ## Remaining gates
 
 Physical iPhone acceptance and hosted API/profile availability remain open. No hosted data, credentials, migrations, flags or provider calls were changed. This slice does not claim all #820 scope is implemented or verified.
+
+## CI fixture repair, October 5
+
+The first profile PATCH failed in CI because this test bound the Supabase gateway
+but omitted the database URL used by real session verification. The focused
+repair and its separate passing and failing checks are recorded in
+[ci-profile-fixture.md](ci-profile-fixture.md). Final Linux CI and independent
+review remain with the release coordinator.
