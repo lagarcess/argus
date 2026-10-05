@@ -2,6 +2,22 @@
 
 This audit gives the Trust lane and the legal-draft owner a source-backed inventory for #828, #831 and #832. It does not claim launch readiness or select unresolved product contracts. The inspected integration base is `875de09ac2115acec42e09060b92878aa5f18eff`, fetched by the release captain on October 5, 2026. Existing Argus paths and identifiers remain valid for Cuadrao.
 
+## Integration reconciliation on October 5
+
+The original inventory remains anchored to `875de09ac2115acec42e09060b92878aa5f18eff`. This branch normally merged fetched integration `7018e0edebbc370b999005a857230bf3c3a1ad8b`. The following landed changes update its claims. No hosted state was changed or read back for this reconciliation.
+
+| Landed slice | Effect on this inventory | Open acceptance |
+| --- | --- | --- |
+| [#844](https://github.com/lagarcess/argus/pull/844) | Native Release builds force Apple and Google off. Debug Google availability requires Apple availability. | Hosted provider setup, approved linking policy and real phone authorization. |
+| [#858](https://github.com/lagarcess/argus/pull/858) | One Auth identity reader owns Apple subject resolution. Captured credentials bind to the current subject. Ambiguous identities fail closed. The protected nullable column has local migration and privilege proof. | Hosted migration/readback, old-writer upgrade before binding consumers, provider proof and activation. |
+| [#857](https://github.com/lagarcess/argus/pull/857) | Official Apple and Google buttons follow light and dark appearance. Connected sign-in form colors follow the same appearance. | Physical phone and Google accessibility XXXL clipping tracked in [#856](https://github.com/lagarcess/argus/issues/856). |
+| [#846](https://github.com/lagarcess/argus/pull/846) | Existing deletion recovery has isolated PostgreSQL proof for resealing and retry safety. The operator runbook preserves pending state. | Operator assignment and live alerts remain unapproved. No cron was added. |
+| [#851](https://github.com/lagarcess/argus/pull/851) | CI passes the existing GitHub token through the supported Supabase setup-action input. | This fixes release resolution, not hosted application or provider acceptance. |
+
+The founder approved Apple revocation checks for Apple sign-ins. Older mixed-provider sessions with unknown sign-in provenance require explicit sign-in again. The session implementation remains under review; this decision does not claim that the pending native session slice has landed.
+
+The personless deletion adapter, required-reason manifest, Apple deletion admission and primary-currency work remain separate unmerged PRs at this snapshot. Their local evidence does not enable a feature. The app-manifest absence noted below is a fact about the original inventory base. Final archive evidence must reflect the final candidate after the manifest PR lands.
+
 ## Authority and ownership
 
 [Documentation authority](../DOCUMENTATION_AUTHORITY.md), [PRODUCT](../PRODUCT.md), [MVEE](../specs/argus-minimum-viable-ecosystem-experience.md), [ARCHITECTURE](../ARCHITECTURE.md), [API_CONTRACT](../API_CONTRACT.md), [DATA_MODEL](../DATA_MODEL.md), the [Cuadrao guide](../../.agent/designs/cuadrao/DESIGN.md), [execution board](../specs/argus-execution-board.md) and [locked decisions](../specs/argus-decision-log.md) own their respective contracts. The [overnight report](2026-10-05-cuadrao-overnight-integration-landing.md) records #843's preceding delivery and its remaining gates.
