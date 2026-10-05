@@ -108,17 +108,28 @@ bounded runtime contract and its migration plan.
 | --- | --- | --- |
 | Render Workflows | Extend the existing backtest execution foundation to assigned receipt, import and export jobs. | Separate task families, persisted product state, duplicate-safe effects, bounded retries and recovery after interruption. Document preparation currently uses FastAPI background tasks; this extension is not already delivered. |
 | LangGraph | Start from the existing orchestration and checkpointing foundation. | Define Cuadrao's state and action contract. Preserve the active Argus runtime until its authorized transition; do not start a second chat brain per client. |
-| Memory, including existing Mem0 work | Preserve reusable code and controls for the runtime assessment. | Decide scoped recall, consent, revocation, deletion and launch inclusion. Existing code does not establish active or approved Cuadrao memory. |
+| Mem0 and pgvector | Reuse the existing semantic-recall integration; retain Supabase/Postgres as the storage foundation rather than adding a second memory database. | Define Cuadrao recall scope, consent, correction, revocation, deletion and first-release availability in #826. The current adapter configures pgvector and returns canonical record IDs; this is code evidence, not hosted enablement evidence. |
+| On-demand context injection | Retrieve the permitted records and memories needed for the current request. | Resolve retrieved IDs through current authorization and canonical records before model dispatch. Define bounded context selection and stale/deleted/revoked-result handling; similarity is not authority or financial truth. |
 | Supabase and financial services | Keep identity, storage and canonical financial operations under existing owners. | Complete the approved space contract and share the same actions across manual and conversational entry points. |
 | OpenRouter, Perplexity and Grok voice | Retain the [selected provider direction](specs/argus-decision-log.md#ai-providers). | Connect only assigned capabilities with shared consent and server-side credentials. Voice selection does not settle first-release inclusion. |
 | Resend and Apple push | Keep Resend for approved email uses; use direct APNs for iOS push. | Deliver the assigned inbox/push journey with private payloads. Email templates do not expand consumer Updates or household invitation channels. |
 
 React Email and react-pdf are candidates for their assigned template and business
 PDF work, not new consumer launch dependencies. Specialist OCR needs evidence of
-lower total correction effort and cost against the existing vision path. Trigger.dev,
-Novu, pgvector and framework replacement remain outside the launch plan unless a
-measured gap justifies a separately scoped decision. No library license or copied
-application-code rights are established by this reuse map.
+lower total correction effort and cost against the existing vision path.
+
+Founder-locked clarification, October 4: LangGraph, Mem0/pgvector, scoped
+on-demand context injection and Render Workflows are the starting stack for
+Cuadrao's continuous agentic chat. Temporal, Inngest, Trigger.dev and Novu are
+not additional launch dependencies. Evaluate a replacement or addition only
+against a demonstrated unmet requirement in the assigned slice, including
+recovery, approval waits or scheduling. Braintrust is optional evaluation and
+tracing tooling; quality evaluation remains required without selecting it.
+Reconcile any external trace content and retention before transmitting user data.
+This lock supersedes the earlier blanket pgvector deferral for Cuadrao memory;
+it does not authorize a general vector-search rewrite, provider activation or a
+new runtime. No library license or copied application-code rights are established
+by this reuse map.
 
 Retirement inventories describe old tasks and configuration, not blanket deletion
 of these foundations. Before removal, name current callers, the replacement
@@ -899,12 +910,11 @@ Alpha search is implemented using **Postgres Full-Text Search (FTS)** + recency 
 
 ## Deferred Direction
 
-Semantic retrieval (Vector embeddings) is deferred from Alpha.
-- Use SQL/Text search first.
-- Re-evaluate semantic search for Beta.
-- Do not add pgvector or embedding tables for the launch chat/backtest branch.
-  Structured Supabase product records and run metadata are sufficient until
-  Argus needs semantic recall across large histories.
+The global Search surface retains SQL/text search. A vector-search replacement
+is not part of this launch assignment. This boundary does not prohibit reuse of
+the existing Mem0/pgvector adapter for scoped Cuadrao memory under the
+[reuse decision](#cuadrao-reuse-decisions). Memory recall and global Search have
+different owners and acceptance criteria.
 
 ## Structured Recall Versus Memory
 

@@ -486,3 +486,22 @@ and [journey acceptance questions](../PRIVATE_LAUNCH_RUNBOOK.md#customer-work-re
 own the details. #826 still owns the bounded runtime contract before #827
 implementation. Reuse does not claim memory or voice is connected, choose a new
 schema, authorize paid evaluations or permit deletion of active Argus services.
+
+
+## October 4, 2026: continuous-chat stack and launch pillars
+
+The founder approved LangGraph, the existing Mem0/pgvector integration, scoped
+on-demand context injection and Render Workflows as the starting stack for
+Cuadrao's continuous agentic chat. The [architecture owner](../ARCHITECTURE.md#cuadrao-reuse-decisions)
+records the choice and corrects the earlier blanket pgvector deferral. Temporal
+and Inngest require a demonstrated workflow gap; Braintrust is optional quality
+tooling. Neither workflow selection nor memory retrieval changes the canonical
+owner of financial records or grants access across spaces.
+
+The founder also requested a complete launch breakdown and updates to missing
+issue acceptance. The [execution pillars](argus-execution-board.md#parallel-execution-and-priority)
+map the existing #817 checklist to parallel tracks and the final serial release
+sequence. #826 retains the bounded runtime contract; the foundation choice is
+settled, while exact first-release jobs and memory/voice inclusion remain in the
+scope record. This planning lock does not claim implementation or approve
+merges, hosted changes, paid evaluations or distribution.
