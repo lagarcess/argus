@@ -1,25 +1,20 @@
-"""PostHog person deletion for account deletion (Lane 6, step 8).
-
-Until a real deletion adapter ships (the issue that blocks the Lane 6 flag),
-``ARGUS_ANALYTICS_DELETION_ENABLED`` stays off and the recording fake is used.
-The fake contacts nobody and returns ``recorded_by_fake``, which the deletion
-run counts as done only where the fake is explicitly the adapter (tests, local
-dev): anywhere else the PostHog step stays pending.
-
-Note for the real adapter: our events are personless
-(``$process_person_profile`` is false in ``envelope.py``), so PostHog's
-``persons/bulk_delete`` finds no person (``persons_found: 0``) and its 200
-does not mean anything was deleted. Events must be deleted by distinct id.
-"""
-
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from typing import Literal, Protocol, runtime_checkable
+
+from argus.observability.posthog_deletion import EventDeletionResult, PostHogEventDeletion
 
 AnalyticsDeletionOutcome = Literal["deleted", "recorded_by_fake", "failed"]
 FLAG = "ARGUS_ANALYTICS_DELETION_ENABLED"
+
+
+@runtime_checkable
+class EventAnalyticsDeletion(Protocol):
+    def advance(
+        self, distinct_id: str, submission_id: str, request_id: str | None
+    ) -> EventDeletionResult: ...
 
 
 class AnalyticsDeletion(Protocol):
@@ -51,9 +46,17 @@ def fake_analytics_allowed() -> bool:
     return False
 
 
-def analytics_deletion_from_env() -> AnalyticsDeletion:
+def analytics_deletion_from_env() -> AnalyticsDeletion | EventAnalyticsDeletion:
     if os.getenv(FLAG, "").strip().lower() in {"1", "true", "yes", "on"}:
-        # No real adapter ships until a person-deleting key exists. Failing
-        # here keeps the flag from silently pointing at the fake.
-        raise RuntimeError(f"{FLAG} is on but no PostHog deletion adapter is configured")
+        names = (
+            "ARGUS_POSTHOG_DELETION_HOST",
+            "ARGUS_POSTHOG_DELETION_PROJECT_ID",
+            "ARGUS_POSTHOG_DELETION_API_KEY",
+        )
+        values = [os.getenv(name, "").strip() for name in names]
+        if not all(values):
+            raise RuntimeError(
+                f"{FLAG} requires dedicated PostHog deletion configuration"
+            )
+        return PostHogEventDeletion(*values)
     return RecordingAnalyticsDeletion()

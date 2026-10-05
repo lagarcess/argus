@@ -512,8 +512,9 @@ class SupabaseGateway(
             raise RuntimeError(f"Login failed: {e}") from e
 
     def update_user(self, user_id: str, updates: dict[str, Any]) -> User:
-        updates["updated_at"] = _now_iso()
-        self.client.table("profiles").upsert(updates, on_conflict="id").execute()
+        payload = {key: value for key, value in updates.items() if key != "id"}
+        payload["updated_at"] = _now_iso()
+        self.client.table("profiles").update(payload).eq("id", user_id).execute()
         loaded = (
             self.client.table("profiles").select("*").eq("id", user_id).single().execute()
         )
