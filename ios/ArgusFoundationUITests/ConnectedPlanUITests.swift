@@ -88,6 +88,7 @@ extension FinancialLoopUITests {
         app.terminate(); app.launch()
         try signIn(fresh: true, user: "B")
         openMoneyAccount(isolated); assertText("DOP 111.00")
+        app.revealConnectedTabBar()
         app.buttons["tab.plan"].tap()
         XCTAssertFalse(app.buttons["loop.pending.retry"].exists)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.occurrence.' AND label CONTAINS %@", title)).firstMatch.exists)
