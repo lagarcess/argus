@@ -15,7 +15,7 @@ except for loopback development. Public publishable/anon keys are accepted;
 secret/service-role keys are rejected. Keep development values in the app's
 ignored configuration, never in this package.
 
-Public methods are `snapshot`, `restore`, `login`, `signup`, `signIn(with:)`,
+Public methods are `snapshot`, `requestCredentialRevalidation`, `restore`, `login`, `signup`, `signIn(with:)`,
 `profile`, `signOut`, `retryPendingSignOut` and `captureAppleAuthorizationCode`. Signup accepts an optional trailing `displayName`.
 `SessionSnapshot` contains a phase, the canonical Argus `/me` profile, an optional
 linked `AppleIdentity` and an account revision. It never exposes credentials.
@@ -159,6 +159,14 @@ not-found credentials retire through the existing pending-sign-out journal.
 Platform errors and transferred credentials block product requests while keeping
 the stored session available for validation retry. The shared authenticated
 transport checks that validation still holds before sending and after responses.
+
+The app admits foreground and revocation signals through
+`requestCredentialRevalidation()` before queuing a restore. This actor operation
+can hold Apple access while another operation is busy. Each signal invalidates
+older checker answers, so an earlier authorized or revoked answer cannot reopen
+or retire the session before the queued fresh check. Pending revocation retains
+priority; unreadable Keychain state blocks access and also invalidates old checks.
+The app's restore queue schedules work, while this session actor owns admission.
 
 Legacy raw SDK sessions have an unknown method. A legacy session with a linked
 Apple identity, or a known Apple session without a linked subject, requires the

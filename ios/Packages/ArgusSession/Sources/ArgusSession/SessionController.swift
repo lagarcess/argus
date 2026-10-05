@@ -10,6 +10,7 @@ public actor SessionController {
     private let appleChecker: any AppleCredentialChecking
     private var auth: AuthClient?
     private var mutating = false
+    private var credentialValidationGeneration: UInt64 = 0
     private var state = SessionSnapshot(phase: .signedOut, profile: nil, revision: 0)
 
     public init(configuration: SessionConfiguration, appleChecker: any AppleCredentialChecking) throws {
@@ -25,6 +26,24 @@ public actor SessionController {
         self.transport = SessionTransport(fetch: fetch)
     }
     public func snapshot() -> SessionSnapshot { state }
+
+    public func requestCredentialRevalidation() throws -> SessionSnapshot {
+        credentialValidationGeneration &+= 1
+        do {
+            if try vault.pending() != nil {
+                setState(.signOutPending)
+                return state
+            }
+            let method = try vault.signInMethod()
+            if method == .apple || (method == nil && state.appleIdentity != nil) {
+                setState(.credentialValidationRequired, profile: state.profile, appleIdentity: state.appleIdentity)
+            }
+            return state
+        } catch {
+            if state.phase != .signOutPending { setState(.credentialValidationRequired) }
+            throw SessionFailure.storageUnavailable
+        }
+    }
 
     public func restore(onValidationRequired: @Sendable (SessionSnapshot) async -> Void = { _ in }) async throws -> SessionSnapshot {
         guard !mutating else { throw SessionFailure.busy }
@@ -275,6 +294,7 @@ public actor SessionController {
             return state
         }
         if method == .apple, let identity = state.appleIdentity {
+            let generation = credentialValidationGeneration
             let answer: AppleCredentialState
             do { answer = try await appleChecker.state(for: identity.subject) }
             catch {
@@ -282,6 +302,7 @@ public actor SessionController {
                 return state
             }
             try vault.check(epoch)
+            guard generation == credentialValidationGeneration else { return state }
             switch answer {
             case .authorized: break
             case .transferred: return state

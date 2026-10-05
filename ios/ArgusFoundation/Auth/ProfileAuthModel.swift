@@ -83,6 +83,12 @@ final class ProfileAuthModel: ObservableObject {
 
     func restore() async {
         guard let controller else { return }
+        do {
+            accept(try await controller.requestCredentialRevalidation())
+        } catch {
+            accept(await controller.snapshot())
+            errorKey = Self.messageKey(error)
+        }
         revalidationRequested = true
         guard !busy else { return }
         busy = true

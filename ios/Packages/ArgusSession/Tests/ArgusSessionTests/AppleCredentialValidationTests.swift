@@ -222,9 +222,134 @@ final class AppleCredentialValidationTests: XCTestCase, @unchecked Sendable {
             try fixture.storage.store(key: fixture.configuration.storagePrefix + ".session", value: Data("malformed".utf8))
             if unreadable { fixture.storage.failedReadSuffix = ".session" }
             await fixture.server.configure()
-            let restored = try await fixture.controller().restore()
+            let relaunched = try fixture.controller()
+            let admitted = try await relaunched.requestCredentialRevalidation()
+            XCTAssertEqual(admitted.phase, .signOutPending)
+            let restored = try await relaunched.restore()
             XCTAssertEqual(restored.phase, .signedOut)
             XCTAssertNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending"))
+        }
+    }
+
+    func testNotificationInvalidatesInFlightAppleAnswersBeforeQueuedRestore() async throws {
+        for answer in [AppleCredentialState.authorized, .revoked] {
+            let fixture = try SessionFixture(), checker = AppleChecker()
+            let client = try fixture.controller(appleChecker: checker)
+            let before = try await signIn(client)
+            let gate = RequestGate()
+            await checker.configure(answer, gate: gate)
+            let checking = Task { try await client.restore() }
+            await gate.waitUntilStarted()
+            let admitted = try await client.requestCredentialRevalidation()
+            XCTAssertEqual(admitted.phase, .credentialValidationRequired)
+            await gate.release()
+            let stale = try await checking.value
+            XCTAssertEqual(stale.phase, .credentialValidationRequired)
+            XCTAssertEqual(stale.revision, before.revision)
+            do {
+                _ = try await client.financialAccounts(expectedIdentity: before)
+                XCTFail("A superseded checker answer reopened protected dispatch")
+            } catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
+            let reads = await fixture.server.count("/financial-accounts")
+            let logouts = await fixture.server.count("/logout")
+            XCTAssertEqual(reads, 0)
+            XCTAssertEqual(logouts, 0)
+            XCTAssertNotNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".session"))
+            await checker.configure(answer)
+            let fresh = try await client.restore()
+            XCTAssertEqual(fresh.phase, answer == .authorized ? .authenticated : .signedOut)
+        }
+    }
+
+    func testNotificationHoldsAppleAccessButLeavesKnownEmailAndGoogleUsable() async throws {
+        for method in [SessionSignInMethod.apple, .email, .google] {
+            let fixture = try SessionFixture(), checker = AppleChecker()
+            await fixture.server.configureApple(subject: "linked-subject")
+            let client = try fixture.controller(appleChecker: checker)
+            let before: SessionSnapshot
+            switch method {
+            case .apple: before = try await signIn(client)
+            case .email: before = try await fixture.login(client)
+            case .google:
+                before = try await client.signIn(with: .init(provider: .google, idToken: AuthServer.aliceIdToken, nonce: SignInNonce())).session
+            }
+            let admitted = try await client.requestCredentialRevalidation()
+            XCTAssertEqual(admitted.phase, method == .apple ? .credentialValidationRequired : .authenticated)
+            do {
+                _ = try await client.financialAccounts(expectedIdentity: before)
+                XCTFail("Synthetic endpoint returns 404")
+            } catch {
+                XCTAssertEqual(error as? SessionFailure, method == .apple ? .staleOperation : .rejected(status: 404, code: nil))
+            }
+            let reads = await fixture.server.count("/financial-accounts")
+            XCTAssertEqual(reads, method == .apple ? 0 : 1)
+        }
+    }
+
+    func testNotificationDuringCaptureHoldsSessionWithoutReplayingCode() async throws {
+        let fixture = try SessionFixture(), checker = AppleChecker()
+        let gate = RequestGate()
+        await fixture.server.holdCapture(gate)
+        let client = try fixture.controller(appleChecker: checker)
+        let signingIn = Task {
+            try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce()), appleAuthorizationCode: "one-time-code")
+        }
+        await gate.waitUntilStarted()
+        let admitted = try await client.requestCredentialRevalidation()
+        XCTAssertEqual(admitted.phase, .credentialValidationRequired)
+        await gate.release()
+        let outcome = try await signingIn.value
+        XCTAssertEqual(outcome.session.phase, .credentialValidationRequired)
+        XCTAssertEqual(outcome.appleCapture, .failed(.credentialValidationRequired))
+        let restored = try await client.restore()
+        XCTAssertEqual(restored.phase, .authenticated)
+        let captures = await fixture.server.count("/authorization-code")
+        XCTAssertEqual(captures, 1)
+    }
+
+    func testNotificationDuringAdoptionKeepsJournalAndRequiresFreshCheck() async throws {
+        let fixture = try SessionFixture(), checker = AppleChecker()
+        let gate = RequestGate()
+        await fixture.server.holdMe(gate)
+        let client = try fixture.controller(appleChecker: checker)
+        let signingIn = Task { try await self.signIn(client) }
+        await gate.waitUntilStarted()
+        let admitted = try await client.requestCredentialRevalidation()
+        XCTAssertEqual(admitted.phase, .signOutPending)
+        XCTAssertNotNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending"))
+        await checker.configure(.revoked)
+        await gate.release()
+        let outcome = try await signingIn.value
+        XCTAssertEqual(outcome.phase, .signedOut)
+        let captures = await fixture.server.count("/authorization-code")
+        XCTAssertEqual(captures, 0)
+    }
+
+    func testUnreadableNotificationAdmissionInvalidatesInFlightCheckerAnswer() async throws {
+        for suffix in [".session", ".pending"] {
+            let fixture = try SessionFixture(), checker = AppleChecker()
+            let client = try fixture.controller(appleChecker: checker)
+            let before = try await signIn(client)
+            let gate = RequestGate()
+            await checker.configure(gate: gate)
+            let checking = Task { try await client.restore() }
+            await gate.waitUntilStarted()
+            fixture.storage.failedReadSuffix = suffix
+            do {
+                _ = try await client.requestCredentialRevalidation()
+                XCTFail("Unreadable admission must fail closed")
+            } catch { XCTAssertEqual(error as? SessionFailure, .storageUnavailable) }
+            await gate.release()
+            let stale = try await checking.value
+            XCTAssertEqual(stale.phase, .credentialValidationRequired)
+            do {
+                _ = try await client.financialAccounts(expectedIdentity: before)
+                XCTFail("Unreadable journal permitted protected access")
+            } catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
+            fixture.storage.failedReadSuffix = nil
+            await checker.configure()
+            let restored = try await client.restore()
+            XCTAssertEqual(restored.phase, .authenticated)
         }
     }
 
