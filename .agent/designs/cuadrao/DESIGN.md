@@ -18,6 +18,20 @@ This is a reference organized by design rule, not a sequence of polish notes.
 The [Argus guide](../argus/DESIGN.md) supplies the document structure; Cuadrao keeps
 its native type, palette and artwork. Delivery evidence belongs in the roadmap.
 
+## Connected presentation ownership
+
+The October 5 connection uses the existing approved Preview views. Connecting a
+backend does not authorize a second Home, different typography, new artwork, or a
+replacement navigation bar. Preview and connected hosts render shared components.
+Preview owns sample records. Existing account, financial-loop, and Plan models own
+live reads, review, confirmation, and recovery.
+
+Missing live data uses the approved empty treatment. A current balance does not
+establish historical coverage. Future Plan points do not become balance history.
+Home's Upcoming reads its own rolling 30-day projection. A row opens review;
+a due date never records a payment. Simulator evidence and physical-phone
+acceptance remain distinct.
+
 ## 1. Character and surface purpose
 
 Cuadrao is warm, clear and personal. Home offers a calm first glance; Plan makes

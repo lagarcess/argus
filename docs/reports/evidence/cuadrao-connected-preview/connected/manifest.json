@@ -1,0 +1,30 @@
+[
+  {
+    "image": "connected/home-upcoming-preserved-after-reopen.png",
+    "test": "FinancialLoopUITests/testRecurringFromMovementShowsInHomeUpcomingAndFulfilsOnce()",
+    "source_revision": "a1f2aab31",
+    "result_bundle": "ui-20261005T175437Z.xcresult",
+    "captured_at_unix": 1791223103.879
+  },
+  {
+    "image": "connected/home-upcoming-recurring.png",
+    "test": "FinancialLoopUITests/testRecurringFromMovementShowsInHomeUpcomingAndFulfilsOnce()",
+    "source_revision": "a1f2aab31",
+    "result_bundle": "ui-20261005T175437Z.xcresult",
+    "captured_at_unix": 1791223011.344
+  },
+  {
+    "image": "connected/recurring-review-form-prefilled.png",
+    "test": "FinancialLoopUITests/testRecurringFromMovementShowsInHomeUpcomingAndFulfilsOnce()",
+    "source_revision": "a1f2aab31",
+    "result_bundle": "ui-20261005T175437Z.xcresult",
+    "captured_at_unix": 1791222971.649
+  },
+  {
+    "image": "connected/recurring-movement-detail-action.png",
+    "test": "FinancialLoopUITests/testRecurringFromMovementShowsInHomeUpcomingAndFulfilsOnce()",
+    "source_revision": "a1f2aab31",
+    "result_bundle": "ui-20261005T175437Z.xcresult",
+    "captured_at_unix": 1791222968.138
+  }
+]
