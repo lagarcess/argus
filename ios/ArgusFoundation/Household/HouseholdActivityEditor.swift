@@ -54,7 +54,10 @@ final class HouseholdActivityEditor: ObservableObject, Identifiable {
             let value = try await model.controller.householdResponse(HouseholdActivityOptions.self, path: model.path(household.id, "/activity-options"), expectedIdentity: identity)
             guard current else { return }; options = value
             if correcting == nil, !kinds.contains(kind), let first = kinds.first { kind = first }
-        } catch { if current, !model.handleAccessFailure(error, householdId: household.id) { errorKey = "household.loadError" } }
+        } catch {
+            guard current else { return }
+            if !(await model.resolveAccessFailure(error, householdId: household.id)), current { errorKey = "household.loadError" }
+        }
     }
     func answer(_ accountId: UUID, _ observationId: UUID, _ included: Bool) {
         coverage.removeAll { $0.accountId == accountId && $0.observationId == observationId }
@@ -69,7 +72,7 @@ final class HouseholdActivityEditor: ObservableObject, Identifiable {
             guard current else { return }; preview = value
         } catch {
             guard current else { return }
-            if !model.handleAccessFailure(error, householdId: household.id) { errorKey = "household.reviewError" }
+            if !(await model.resolveAccessFailure(error, householdId: household.id)), current { errorKey = "household.reviewError" }
         }
     }
     func confirm() async {

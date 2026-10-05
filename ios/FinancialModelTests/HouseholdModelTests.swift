@@ -74,8 +74,139 @@ final class HouseholdModelTests: XCTestCase {
             XCTAssertNotNil(reopened.snapshot, entry)
         }
     }
+    /// Live: a removed grant or an unknown account answers `404 household_not_found` on the account
+    /// route while `GET /households/{id}` still answers 200 for the same member.
+    func testAnAccountRouteNotFoundNeverEndsMembershipOnItsOwn() async throws {
+        let fixture = try HouseholdFixture()
+        let identity = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        await fixture.server.failNext(404, code: "household_not_found")
+        await fixture.model.open(HouseholdServer.account)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertEqual(fixture.model.household?.id, HouseholdServer.household)
+        XCTAssertNil(fixture.model.detail)
+        XCTAssertEqual(fixture.model.errorKey, "household.changed")
+        XCTAssertNotNil(fixture.model.snapshot)
+        let paths = await fixture.server.paths
+        let household = "/api/v1/households/" + HouseholdServer.household.uuidString
+        let refused = try XCTUnwrap(paths.lastIndex(of: "GET " + household + "/accounts/" + HouseholdServer.account.uuidString))
+        XCTAssertEqual(paths[refused + 1], "GET " + household)
+        let reopened = HouseholdModel(controller: fixture.controller, configuration: fixture.configuration, journal: fixture.journal)
+        reopened.bind(identity)
+        XCTAssertEqual(reopened.selectedId, HouseholdServer.household)
+    }
+    func testAnAccountRouteNotFoundEndsMembershipOnlyWhenTheMembershipReadAgrees() async throws {
+        for code in ["household_not_found", "not_a_member"] {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            await fixture.server.failNext(404, code: "household_not_found")
+            await fixture.server.failNext(code == "not_a_member" ? 403 : 404, code: code)
+            await fixture.model.open(HouseholdServer.account)
+            XCTAssertNil(fixture.model.selectedId, code)
+            XCTAssertEqual(fixture.model.errorKey, "household.accessEnded", code)
+        }
+    }
+    /// Every account-scoped route answers `404 household_not_found` for a grant or account that is
+    /// gone; each one re-reads the membership right after the refusal and keeps it when that read answers.
+    func testAnAccountScopedNotFoundFromAnyEntryKeepsMembershipWhenTheMembershipReadAnswers() async throws {
+        let household = "/api/v1/households/" + HouseholdServer.household.uuidString
+        let entries: [(name: String, request: String)] = [
+            ("detail", "GET " + household + "/accounts/" + HouseholdServer.account.uuidString),
+            ("history", "GET " + household + "/activities/" + HouseholdServer.account.uuidString + "/history"),
+            ("search", "GET " + household + "/search"),
+            ("editorLoad", "GET " + household + "/activity-options"),
+            ("editorReview", "POST " + household + "/activities/preview"),
+            ("activityWrite", "POST " + household + "/activities"),
+        ]
+        for entry in entries {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            fixture.model.beginActivity(try XCTUnwrap(fixture.model.snapshot?.accounts.first))
+            let editor = try XCTUnwrap(fixture.model.editor)
+            editor.amount = "25"
+            await fixture.server.fail(entry.request, 404, code: "household_not_found")
+            switch entry.name {
+            case "detail": await fixture.model.open(HouseholdServer.account)
+            case "history": await fixture.model.loadHistory(HouseholdServer.account)
+            case "search": await fixture.model.find("private query")
+            case "editorLoad": await editor.load()
+            case "editorReview": await editor.review(Locale(identifier: "en_US"))
+            default:
+                let household = try XCTUnwrap(fixture.model.household)
+                fixture.model.editor = nil
+                await fixture.model.confirmActivity(FinancialActivityCommand(kind: .expense, accountId: HouseholdServer.account, amount: "25", occurredAt: "2026-10-01T12:00:00Z", timeZone: "America/Santo_Domingo"), activityId: nil, membership: household.membershipId, version: household.version)
+            }
+            XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household, entry.name)
+            XCTAssertEqual(fixture.model.household?.id, HouseholdServer.household, entry.name)
+            XCTAssertEqual(fixture.model.errorKey, "household.changed", entry.name)
+            XCTAssertNil(fixture.model.pending, entry.name)
+            let paths = await fixture.server.paths
+            let refused = try XCTUnwrap(paths.lastIndex(of: entry.request), entry.name)
+            XCTAssertEqual(paths.dropFirst(refused + 1).first, "GET " + household, entry.name)
+        }
+    }
+    func testAnAccountNotFoundWithoutAMembershipAnswerKeepsTheHousehold() async throws {
+        let fixture = try HouseholdFixture()
+        let identity = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        let household = "/api/v1/households/" + HouseholdServer.household.uuidString
+        await fixture.server.fail("GET " + household + "/accounts/" + HouseholdServer.account.uuidString, 404, code: "household_not_found")
+        await fixture.server.offline("GET " + household)
+        await fixture.model.open(HouseholdServer.account)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertEqual(fixture.model.household?.id, HouseholdServer.household)
+        XCTAssertNotNil(fixture.model.snapshot)
+        XCTAssertEqual(fixture.model.errorKey, "household.loadError")
+        let reopened = HouseholdModel(controller: fixture.controller, configuration: fixture.configuration, journal: fixture.journal)
+        reopened.bind(identity)
+        XCTAssertEqual(reopened.selectedId, HouseholdServer.household)
+    }
+    /// The reload after an account refusal can end membership, lose its answer or find the surface off; its message stands.
+    func testTheReloadAfterAnAccountRefusalKeepsItsOwnMessage() async throws {
+        let cases: [(reload: String, expected: String?)] = [("departed", "household.accessEnded"), ("offline", "household.loadError"), ("disabled", nil)]
+        for (reload, expected) in cases {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            await fixture.server.fail("GET /api/v1/households/" + HouseholdServer.household.uuidString + "/accounts/" + HouseholdServer.account.uuidString, 404, code: "household_not_found")
+            switch reload {
+            case "departed": await fixture.server.depart()
+            case "offline": await fixture.server.offline("GET /api/v1/households")
+            default: await fixture.server.fail("GET /api/v1/households", 404, code: "households_unavailable")
+            }
+            await fixture.model.open(HouseholdServer.account)
+            XCTAssertEqual(fixture.model.errorKey, expected, reload)
+            XCTAssertEqual(fixture.model.selectedId == nil, reload == "departed", reload)
+        }
+    }
+    /// Unsharing bumps the Household version, so the reload starts a new access generation; the person still learns why the account left.
+    func testAnUnsharedAccountLeavesTheListAndSaysPermissionsChanged() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        await fixture.server.revokeAccount()
+        await fixture.server.fail("GET /api/v1/households/" + HouseholdServer.household.uuidString + "/accounts/" + HouseholdServer.account.uuidString, 404, code: "household_not_found")
+        await fixture.model.open(HouseholdServer.account)
+        XCTAssertEqual(fixture.model.errorKey, "household.changed")
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertEqual(fixture.model.snapshot?.authorizationVersion, 2)
+        XCTAssertEqual(fixture.model.snapshot?.accounts.isEmpty, true)
+    }
+    func testANonAdminInvitationRefusalKeepsMembershipAndSaysPermissionsChanged() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        await fixture.server.failNext(403, code: "household_admin_required")
+        await fixture.model.versionCommand("/invitations")
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertEqual(fixture.model.errorKey, "household.changed")
+        XCTAssertNil(fixture.model.pending)
+        XCTAssertNil(fixture.model.invitation)
+    }
     func testScopedAccessLossClearsSelectionButOther404And403DoNot() async throws {
-        for (status, code, ended) in [(404, "household_not_found", true), (403, "not_a_member", true), (404, "invitation_not_found", false), (403, "household_admin_required", false)] {
+        for (status, code, ended) in [(403, "not_a_member", true), (404, "invitation_not_found", false), (403, "household_admin_required", false)] {
             let fixture = try HouseholdFixture()
             let identity = try await fixture.login()
             await fixture.model.select(HouseholdServer.household)
@@ -355,10 +486,19 @@ private actor HouseholdServer {
     static let member = UUID()
     static let account = UUID()
     private var enabled = true
-    private var failure: (status: Int, code: String)?
+    private var failures: [(status: Int, code: String)] = []
+    private var targeted: [String: (status: Int, code: String)] = [:]
+    private var unreachable: Set<String> = []
+    /// Refuses the next request to exactly this method and path.
+    func fail(_ request: String, _ status: Int, code: String) { targeted[request] = (status, code) }
+    /// The next request to exactly this method and path gets no answer.
+    func offline(_ request: String) { unreachable.insert(request) }
     private var discoveryGate: RequestGate?
     func setEnabled(_ value: Bool) { enabled = value }
-    func failNext(_ status: Int, code: String) { failure = (status, code) }
+    func failNext(_ status: Int, code: String) { failures.append((status, code)) }
+    private(set) var paths: [String] = []
+    private var previewAvailable = true
+    func setPreviewAvailable(_ value: Bool) { previewAvailable = value }
     func holdDiscovery(_ gate: RequestGate) { discoveryGate = gate }
     private var version = 1
     private var active = true
@@ -368,9 +508,12 @@ private actor HouseholdServer {
     private var changedAsset = false
     private var invitationGate: RequestGate?
     private(set) var creates: [URLRequest] = []
+    private(set) var invitationBodies: [(path: String, body: [String: String])] = []
     func holdDetail(_ gate: RequestGate) { detailGate = gate }
     func holdCreate(_ gate: RequestGate) { createGate = gate }
     func holdInvitation(_ gate: RequestGate) { invitationGate = gate }
+    private var previewGate: RequestGate?
+    func holdPreview(_ gate: RequestGate) { previewGate = gate }
     func useChangedAsset() { changedAsset = true }
     func revokeAccount() { version += 1 }
     func depart() { active = false }
@@ -392,10 +535,20 @@ private actor HouseholdServer {
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
         let path = request.url!.path
         guard path.contains("households") || path.contains("household-invitations") else { return try await auth.send(request) }
+        if path.contains("household-invitations") {
+            let body = (try? JSONSerialization.jsonObject(with: request.httpBody ?? Data())) as? [String: String] ?? [:]
+            invitationBodies.append((path, body))
+        }
         if !enabled { return response(request, 404, ["code": "households_unavailable"]) }
-        if let failure {
-            self.failure = nil
-            return response(request, failure.status, ["code": failure.code])
+        let requested = request.httpMethod! + " " + path
+        paths.append(requested)
+        if unreachable.remove(requested) != nil { throw URLError(.notConnectedToInternet) }
+        if let failure = targeted.removeValue(forKey: requested) {
+            return response(request, failure.status, ["type": "https://api.argus.app/problems/" + failure.code, "status": failure.status, "code": failure.code])
+        }
+        if !failures.isEmpty {
+            let failure = failures.removeFirst()
+            return response(request, failure.status, ["type": "https://api.argus.app/problems/" + failure.code, "status": failure.status, "code": failure.code])
         }
         var status = 200; var result: [String: Any]
         let householdId = path.contains(Self.secondHousehold.uuidString) ? Self.secondHousehold : Self.household
@@ -406,8 +559,11 @@ private actor HouseholdServer {
         } else if path.hasSuffix("households") {
             result = ["households": active ? [household(), household(Self.secondHousehold)] : []]
             if let gate = discoveryGate { discoveryGate = nil; await gate.enter() }
+        } else if path.hasSuffix("household-invitations/accept") {
+            result = receipt(householdId)
         } else if path.hasSuffix("household-invitations/preview") {
-            result = ["name": "Synthetic household", "expires_at": "2026-10-08T12:00:00Z", "available": true]
+            result = ["name": "Synthetic household", "expires_at": "2026-10-08T12:00:00Z", "available": previewAvailable]
+            if let gate = previewGate { previewGate = nil; await gate.enter() }
         }
         else if path.hasSuffix("/invitations") {
             result = receipt(householdId)
@@ -425,5 +581,133 @@ private actor HouseholdServer {
     }
     private func response(_ request: URLRequest, _ status: Int, _ value: [String: Any]) -> (Data, URLResponse) {
         (try! JSONSerialization.data(withJSONObject: value), HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+extension HouseholdModelTests {
+    func testACodeOrALinkPreviewsAndAcceptsTheSameReviewedSecret() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.previewInvitation(" 7k2m-9qxd-4rta ")
+        XCTAssertEqual(fixture.model.invitationPreview?.name, "Synthetic household")
+        await fixture.model.acceptInvitation(displayName: "Bea")
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        await fixture.model.previewInvitation("https://cuadrao.ai/invite#link-token-123456")
+        let sent = await fixture.server.invitationBodies
+        XCTAssertEqual(sent.map(\.path), ["/api/v1/household-invitations/preview", "/api/v1/household-invitations/accept", "/api/v1/household-invitations/preview"])
+        XCTAssertEqual(sent.map(\.body), [["code": "7k2m-9qxd-4rta"], ["code": "7k2m-9qxd-4rta", "display_name": "Bea"], ["token": "link-token-123456"]])
+    }
+
+    func testPreviewOutcomesExplainTheInvitationWithoutEndingMembership() async throws {
+        let cases: [(Int, String, InvitationProblem)] = [(404, "invitation_not_found", .invalid), (429, "invite_rate_limited", .rateLimited)]
+        for (status, code, problem) in cases {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            await fixture.server.failNext(status, code: code)
+            await fixture.model.previewInvitation("7K2M-9QXD-4RTA")
+            XCTAssertEqual(fixture.model.invitationProblem, problem, code)
+            XCTAssertNil(fixture.model.invitationPreview, code)
+            XCTAssertTrue(fixture.model.isAvailable, code)
+            XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household, code)
+            XCTAssertNil(fixture.model.errorKey, code)
+        }
+    }
+
+    func testAnExpiredUsedOrRevokedInvitationPreviewsAsUnavailable() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        await fixture.server.setPreviewAvailable(false)
+        await fixture.model.previewInvitation("7K2M-9QXD-4RTA")
+        XCTAssertEqual(fixture.model.invitationPreview?.available, false)
+        XCTAssertNil(fixture.model.invitationProblem)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        XCTAssertNil(fixture.model.errorKey)
+    }
+
+    func testAcceptingAUsedOrExpiredInvitationExplainsWhyAndJoinsNothing() async throws {
+        for (code, problem) in [("invitation_consumed", InvitationProblem.used), ("invitation_expired", .expired)] {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.previewInvitation("7K2M-9QXD-4RTA")
+            await fixture.server.failNext(409, code: code)
+            await fixture.model.acceptInvitation(displayName: "Bea")
+            XCTAssertEqual(fixture.model.invitationProblem, problem, code)
+            XCTAssertNil(fixture.model.selectedId, code)
+            XCTAssertNil(fixture.model.pending, code)
+            XCTAssertNil(fixture.model.errorKey, code)
+        }
+    }
+
+    func testUnrecognizedInputIsInvalidWithoutAnyRequest() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.previewInvitation("https://example.com/invite#abc")
+        XCTAssertEqual(fixture.model.invitationProblem, .invalid)
+        let sent = await fixture.server.invitationBodies
+        XCTAssertTrue(sent.isEmpty)
+    }
+
+    func testAnOpenedLinkReachesTheJoinStepOnlyWhileHouseholdsAreAvailable() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        let opened = await fixture.model.beginJoin("https://cuadrao.ai/invite#link-token-123456")
+        XCTAssertTrue(opened)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        let relaunched = HouseholdModel(controller: fixture.controller, configuration: fixture.configuration, journal: fixture.journal)
+        relaunched.bind(fixture.model.identity)
+        XCTAssertEqual(relaunched.selectedId, HouseholdServer.household)
+        XCTAssertTrue(fixture.model.joiningByInvitation)
+        XCTAssertTrue(fixture.model.showManagement)
+        XCTAssertEqual(fixture.model.pendingInvitationToken, "https://cuadrao.ai/invite#link-token-123456")
+        XCTAssertEqual(fixture.model.invitationPreview?.name, "Synthetic household")
+        let previewed = await fixture.server.invitationBodies
+        XCTAssertEqual(previewed.map(\.path), ["/api/v1/household-invitations/preview"])
+        XCTAssertEqual(previewed.map(\.body), [["token": "link-token-123456"]])
+        fixture.model.showManagement = false
+        XCTAssertFalse(fixture.model.joiningByInvitation)
+        XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household)
+        await fixture.server.setEnabled(false)
+        await fixture.model.refresh()
+        let refused = await fixture.model.beginJoin("7K2M-9QXD-4RTA")
+        XCTAssertFalse(refused)
+        XCTAssertFalse(fixture.model.showManagement)
+    }
+
+    func testAHandOffWhosePreviewTurnsHouseholdsOffIsNotOpened() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        await fixture.model.select(HouseholdServer.household)
+        await fixture.server.failNext(404, code: "households_unavailable")
+        let opened = await fixture.model.beginJoin("7K2M-9QXD-4RTA")
+        XCTAssertFalse(opened)
+        XCTAssertFalse(fixture.model.isAvailable)
+        XCTAssertFalse(fixture.model.showManagement)
+        XCTAssertFalse(fixture.model.joiningByInvitation)
+    }
+
+    /// Closing the join step ends its review: a landed preview goes away and one still in flight never lands.
+    func testClosingTheJoinStepEndsItsReview() async throws {
+        for inFlight in [true, false] {
+            let fixture = try HouseholdFixture()
+            _ = try await fixture.login()
+            await fixture.model.select(HouseholdServer.household)
+            let gate = RequestGate()
+            if inFlight { await fixture.server.holdPreview(gate) }
+            let join = Task { await fixture.model.beginJoin("7K2M-9QXD-4RTA") }
+            if inFlight { await gate.waitUntilStarted() } else { _ = await join.value }
+            fixture.model.showManagement = false
+            if inFlight { await gate.release() }
+            _ = await join.value
+            XCTAssertNil(fixture.model.invitationPreview, "inFlight \(inFlight)")
+            XCTAssertNil(fixture.model.invitationProblem, "inFlight \(inFlight)")
+            fixture.model.showManagement = true
+            await fixture.model.acceptInvitation(displayName: "Bea")
+            let sent = await fixture.server.invitationBodies
+            XCTAssertEqual(sent.map(\.path), ["/api/v1/household-invitations/preview"], "inFlight \(inFlight)")
+            XCTAssertEqual(fixture.model.selectedId, HouseholdServer.household, "inFlight \(inFlight)")
+        }
     }
 }

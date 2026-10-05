@@ -16,7 +16,7 @@ struct HouseholdManagement: View {
                 if model.pending != nil {
                     Section { Text("household.uncertain"); Button("accounts.retry") { Task { await model.retry() } }.accessibilityIdentifier("household.pending.retry") }
                 }
-                if let household = model.household {
+                if let household = model.household, !model.joiningByInvitation {
                     Section(household.name ?? NSLocalizedString("household.title", comment: "")) {
                         Text("household.consent").font(.footnote)
                         ForEach(household.members) { member in
@@ -72,7 +72,7 @@ struct HouseholdManagement: View {
                         }
                     }
                 }
-                if model.household == nil {
+                if model.household == nil || model.joiningByInvitation {
                     HouseholdIntroduction(model: model)
                 }
 
@@ -142,6 +142,7 @@ struct HouseholdIntroduction: View {
     @State private var name = ""
     @State private var displayName = ""
     @State private var token = ""
+    @State private var handedOver = ""
     var body: some View {
         Group {
             Section {
@@ -165,20 +166,33 @@ struct HouseholdIntroduction: View {
             }
             if mode == "join" {
                 Section("household.join") {
-                    TextField("household.pasteInvite", text: $token).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("household.invite.input").onChange(of: token) { _, _ in model.cancelInvitationReview() }
+                    TextField("household.pasteInvite", text: $token).textInputAutocapitalization(.never).autocorrectionDisabled().accessibilityIdentifier("household.invite.input").onChange(of: token) { _, value in
+                        if value != handedOver { handedOver = ""; model.cancelInvitationReview() }
+                    }
+                    HouseholdInvitationEntryHint()
                     Button("household.reviewInvite") { Task { await model.previewInvitation(token) } }.disabled(token.isEmpty).accessibilityIdentifier("household.invite.preview")
                     if let preview = model.invitationPreview {
                         Text(preview.name ?? NSLocalizedString("household.title", comment: "")).font(.headline)
                         Text("household.consent").font(.footnote)
                         if preview.available {
                             TextField("household.yourName", text: $displayName).accessibilityIdentifier("household.join.displayName")
-                            Button("household.accept") { Task { await model.command(HouseholdCommand(displayName: displayName, token: HouseholdModel.token(token)), path: "/invitations/accept") } }.disabled(displayName.isEmpty).accessibilityIdentifier("household.accept")
+                            Button("household.accept") { Task { await model.acceptInvitation(displayName: displayName) } }.disabled(displayName.isEmpty).accessibilityIdentifier("household.accept")
                         } else { Text("household.inviteUnavailable") }
                         Button("household.notNow") { dismiss() }.accessibilityIdentifier("household.notNow")
                     }
+                    if let problem = model.invitationProblem { HouseholdInvitationProblemText(problem: problem) }
                 }
             }
             if mode != "intro" { Button("accounts.back") { mode = "intro" }.frame(minHeight: 44) }
-        }.onAppear { displayName = model.identity?.profile?.displayName ?? ""; if !model.pendingInvitationToken.isEmpty { token = model.pendingInvitationToken; mode = "join" } }
+        }.onAppear {
+            displayName = model.identity?.profile?.displayName ?? ""
+            adoptHandedOver()
+        }.onChange(of: model.pendingInvitationToken) { adoptHandedOver() }
+    }
+    /// A code handed over by link or by the beta gate fills the field whether it arrives before or after the introduction appears.
+    private func adoptHandedOver() {
+        guard !model.pendingInvitationToken.isEmpty else { return }
+        let input = model.pendingInvitationToken
+        handedOver = input; token = input; mode = "join"; model.pendingInvitationToken = ""
     }
 }

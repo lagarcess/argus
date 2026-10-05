@@ -12,6 +12,7 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var accounts: AccountsModel?
     @Published private(set) var financialLoop: FinancialLoopModel?
     @Published private(set) var household: HouseholdModel?
+    @Published private(set) var invitations: InvitationsModel?
     @Published private(set) var financialSearch: FinancialSearchModel?
     let configuration: NativeAuthConfiguration?
     /// Native Apple and Google buttons; `.off` unless email auth is configured too.
@@ -45,6 +46,9 @@ final class ProfileAuthModel: ObservableObject {
             accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             if let accounts, let loadedConfiguration {
                 household = HouseholdModel(controller: loadedController, configuration: loadedConfiguration.session)
+                invitations = InvitationsModel(flags: .load()) {
+                    InvitesClient(transport: SessionInvitesTransport(controller: loadedController, identity: $0))
+                }
                 household?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
                 financialLoop = FinancialLoopModel(controller: loadedController, accounts: accounts,
                     journal: FinancialWriteJournal(configuration: loadedConfiguration.session))
@@ -160,6 +164,7 @@ final class ProfileAuthModel: ObservableObject {
 
     private func accept(_ snapshot: SessionSnapshot) {
         household?.bind(snapshot)
+        invitations?.bind(snapshot)
         financialSearch?.bind(snapshot)
         accounts?.bind(snapshot)
         financialLoop?.bind(snapshot)

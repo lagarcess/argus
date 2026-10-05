@@ -22,6 +22,10 @@ public struct SessionSnapshot: Equatable, Sendable {
     public let phase: Phase
     public let profile: SessionProfile?
     public let revision: UInt64
+    /// A snapshot names an identity; only `SessionController` can make one usable for requests.
+    public init(phase: Phase, profile: SessionProfile?, revision: UInt64) {
+        self.phase = phase; self.profile = profile; self.revision = revision
+    }
 }
 
 public enum SignupOutcome: Equatable, Sendable {

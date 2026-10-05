@@ -194,7 +194,7 @@ private struct ReleaseGroupInvitationFixture: View {
     }
 
     var body: some View {
-        ReleaseFounderGroupInvitationView(isFounder: isFounder, state: state, spanish: spanish) { cap, expiry in
+        ReleaseFounderGroupInvitationView(isFounder: isFounder, state: state, spanish: spanish) { _, cap, expiry in
             pending = (cap, expiry)
             state = .creating
         }
