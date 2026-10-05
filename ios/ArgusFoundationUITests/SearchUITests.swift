@@ -156,7 +156,7 @@ extension FinancialLoopUITests {
         assertText(second.name)
         XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
         XCTAssertFalse(activity(firstNote).exists)
-        scrollMoneyTop(); app.buttons["accounts.back"].tap()
+        scrollMoneyTop(); app.accountBack.tap()
         app.buttons["tab.search"].tap()
         tapVisible(searchRow(first.name))
         assertText(first.name)

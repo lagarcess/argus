@@ -348,7 +348,7 @@ extension FinancialLoopUITests {
 
     func createMoneyAccount(_ name: String, type: String, amount: String? = nil, negative: Bool = false, currency: String = "DOP") -> MoneyAccount {
         openPersonalAccounts()
-        if app.buttons["accounts.back"].exists { scrollMoneyTop(); app.buttons["accounts.back"].tap() }
+        if app.accountBack.exists { scrollMoneyTop(); app.accountBack.tap() }
         tapVisible(app.buttons["accounts.add"])
         tapVisible(app.buttons["accounts.type." + type])
         fillMoneyField("accounts.nickname", with: name)
@@ -366,7 +366,7 @@ extension FinancialLoopUITests {
             print("MONEY_UI_STATE " + app.debugDescription)
             XCTFail("Saved activity or account should return to account details")
         }
-        scrollMoneyTop(); app.buttons["accounts.back"].tap()
+        scrollMoneyTop(); app.accountBack.tap()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         let result = MoneyAccount(name: name, id: String(row.identifier.dropFirst("accounts.row.".count)))
@@ -376,7 +376,7 @@ extension FinancialLoopUITests {
 
     func openMoneyAccount(_ account: MoneyAccount) {
         app.openAccountsList()
-        if app.buttons["accounts.back"].exists { scrollMoneyTop(); app.buttons["accounts.back"].tap() }
+        if app.accountBack.exists { scrollMoneyTop(); app.accountBack.tap() }
         tapVisible(app.buttons["accounts.row." + account.id])
         if !app.buttons["accounts.record"].waitForExistence(timeout: 10) {
             capture("navigation-failed")
@@ -481,7 +481,7 @@ extension FinancialLoopUITests {
 
     func scrollMoneyTop() {
         for _ in 0..<8 {
-            if app.buttons["accounts.back"].isHittable { break }
+            if app.accountBack.isHittable { break }
             app.swipeDown()
         }
     }

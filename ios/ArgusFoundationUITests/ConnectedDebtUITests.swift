@@ -52,7 +52,7 @@ extension FinancialLoopUITests {
         debtSplit(total: "100", principal: "80", interest: "15", fees: "5")
         reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
-        app.returnFromPlan("debt.activity.back"); assertDebt("DOP -830.00")
+        app.returnFromDetail("debt.activity.back"); assertDebt("DOP -830.00")
         capture("debt-return-preserves-original-payment")
         app.terminate(); app.launch()
         assertDebt("DOP -830.00")
@@ -72,7 +72,7 @@ extension FinancialLoopUITests {
         app.buttons.matching(identifier: "debt.archive.confirm").firstMatch.tap()
         XCTAssertTrue(app.buttons["debt.restore"].waitForExistence(timeout: 15))
         tapVisible(app.buttons["debt.restore"]); assertDebt("DOP -550.00")
-        app.returnFromPlan("debt.close")
+        app.returnFromDetail("debt.close")
         verifyDebtSearch("Updated loan " + stamp, balance: "DOP -550.00")
     }
 
@@ -111,7 +111,7 @@ extension FinancialLoopUITests {
         assertDebt("DOP -300.00")
         XCTAssertEqual(payments.count, 1)
         capture("card-existing-payment-linked-once")
-        app.returnFromPlan("debt.close")
+        app.returnFromDetail("debt.close")
         openMoneyAccount(bank); assertText("DOP 900.00")
         openMoneyAccount(card); assertText("DOP -300.00")
         openDebt("Card plan " + stamp)
@@ -126,10 +126,10 @@ extension FinancialLoopUITests {
         fillMoneyField("loop.amount", with: "100"); dismissMoneyKeyboard()
         reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
-        app.returnFromPlan("debt.activity.back"); assertDebt("DOP -400.00")
+        app.returnFromDetail("debt.activity.back"); assertDebt("DOP -400.00")
         XCTAssertEqual(payments.count, 1)
         capture("card-linked-original-return-updates-plan")
-        app.returnFromPlan("debt.close")
+        app.returnFromDetail("debt.close")
         openMoneyAccount(bank); assertText("DOP 1,000.00")
     }
 
@@ -141,7 +141,7 @@ extension FinancialLoopUITests {
         tapVisible(row)
         XCTAssertTrue(app.staticTexts["debt.recorded"].waitForExistence(timeout: 15))
         capture("debt-home-current-truth")
-        app.returnFromPlan("debt.close")
+        app.returnFromDetail("debt.close")
         verifyDebtSearch(query, balance: nil)
     }
 
@@ -199,7 +199,7 @@ extension FinancialLoopUITests {
         tapVisible(hit)
         if let balance { assertDebt(balance) }
         capture("debt-search-current-detail")
-        app.returnFromPlan("debt.close")
+        app.returnFromDetail("debt.close")
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         XCTAssertEqual(query.value as? String, title)
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
@@ -208,7 +208,7 @@ extension FinancialLoopUITests {
         tapVisible(hit)
         app.terminate(); app.launch()
         XCTAssertTrue(app.staticTexts["debt.recorded"].waitForExistence(timeout: 15))
-        app.returnFromPlan("debt.close")
+        app.returnFromDetail("debt.close")
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         XCTAssertEqual(query.value as? String, title)
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)

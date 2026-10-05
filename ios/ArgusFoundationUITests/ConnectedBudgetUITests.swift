@@ -13,7 +13,7 @@ extension FinancialLoopUITests {
         openBudget(title)
         assertBudget(spent: "120.00", status: "30.00")
         capture("budget-initial-limit-and-scope")
-        app.returnFromPlan("budget.close")
+        app.returnFromDetail("budget.close")
         openMoneyAccount(card)
         budgetExpense(amount: "80", note: "Card groceries " + stamp)
         openBudget(title)
@@ -31,7 +31,7 @@ extension FinancialLoopUITests {
         app.swipeBack()
         assertBudget(spent: "180.00", status: "30.00", over: true)
         capture("budget-contributor-correction-propagated")
-        app.returnFromPlan("budget.close")
+        app.returnFromDetail("budget.close")
         openMoneyAccount(cash)
         recordMoney(kind: "refund", amount: "25", note: "Budget refund " + stamp, purchase: "Card groceries " + stamp)
         assertText("Balance unknown")
@@ -41,7 +41,7 @@ extension FinancialLoopUITests {
         capture("budget-cross-account-refund")
         let oldest = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.activity.' AND label CONTAINS %@", "Budget groceries " + stamp)).firstMatch
         tapVisible(oldest)
-        app.returnFromPlan("budget.activity.back")
+        app.returnFromDetail("budget.activity.back")
         XCTAssertTrue(oldest.waitForExistence(timeout: 15))
         let savedY = oldest.frame.minY
         app.terminate(); app.launch()
@@ -62,7 +62,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["budget.save"].waitForExistence(timeout: 15))
         tapVisible(app.buttons["Cancel"])
         XCTAssertTrue(app.buttons["budget.save"].waitForNonExistence(timeout: 10))
-        app.returnFromPlan("budget.close")
+        app.returnFromDetail("budget.close")
         verifyBudgetSearchAndReopen(title)
     }
 
@@ -75,7 +75,7 @@ extension FinancialLoopUITests {
         let home = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.home.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(home)
         assertBudget(spent: "155.00", status: "5.00")
-        app.returnFromPlan("budget.close")
+        app.returnFromDetail("budget.close")
         XCTAssertTrue(home.waitForExistence(timeout: 15))
         XCTAssertTrue(home.isHittable)
         capture("budget-home-progress-and-return")
@@ -95,7 +95,7 @@ extension FinancialLoopUITests {
         app.terminate(); app.launch()
         assertBudget(spent: "155.00", status: "5.00")
         capture("budget-detail-restored-after-relaunch")
-        app.returnFromPlan("budget.close")
+        app.returnFromDetail("budget.close")
         XCTAssertEqual(app.textFields["search.query"].value as? String, title)
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         capture("budget-search-origin-restored")
@@ -106,7 +106,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.staticTexts["budget.spent"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'budget.'")).firstMatch.exists)
         capture("budget-spanish-detail")
-        app.returnFromPlan("budget.close")
+        app.returnFromDetail("budget.close")
     }
 
     func testBudgetResponseLossRecoversExactCommandAfterRelaunch() throws {
@@ -128,7 +128,7 @@ extension FinancialLoopUITests {
         assertBudget(spent: "0.00", status: "150.00")
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("budget-exact-command-recovered-once")
-        app.returnFromPlan("budget.close")
+        app.returnFromDetail("budget.close")
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.plan.' AND label CONTAINS %@", title)).count, 1)
     }
 

@@ -16,15 +16,15 @@ final class FinancialLoopUITests: XCTestCase {
         app.textFields["accounts.amount"].tap(); app.textFields["accounts.amount"].typeText("125")
         app.buttons["Done"].tap(); app.buttons["accounts.save"].tap()
         assertText("DOP 125.00")
-        tapVisible(app.buttons["accounts.back"])
+        tapVisible(app.accountBack)
         let original = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch
         XCTAssertTrue(original.waitForExistence(timeout: 10))
         let originalID = original.identifier
         tapVisible(original)
         tapVisible(app.buttons["accounts.archive"])
         XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
-        for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
-        app.buttons["accounts.back"].tap()
+        for _ in 0..<5 { if app.accountBack.isHittable { break }; app.swipeDown() }
+        app.accountBack.tap()
         XCTAssertFalse(app.buttons[originalID].exists)
         capture("archive-active-list")
         assertHome(baseline + 125)
@@ -40,9 +40,9 @@ final class FinancialLoopUITests: XCTestCase {
         tapVisible(app.buttons["accounts.archive"])
         XCTAssertTrue(app.buttons["Archive account"].waitForExistence(timeout: 10)
             || app.buttons["accounts.archive"].waitForExistence(timeout: 2))
-        for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
-        if app.buttons["accounts.back"].waitForExistence(timeout: 3) {
-            app.buttons["accounts.back"].tap()
+        for _ in 0..<5 { if app.accountBack.isHittable { break }; app.swipeDown() }
+        if app.accountBack.waitForExistence(timeout: 3) {
+            app.accountBack.tap()
         }
         // Connected may already show the restored row on Home after detail pop; tip still needs manage.back.
         if !app.buttons[originalID].waitForExistence(timeout: 3) {
@@ -102,7 +102,7 @@ final class FinancialLoopUITests: XCTestCase {
         try signIn()
         let baseline = homeValue()
         app.openAccountsList()
-        if app.buttons["accounts.back"].exists { app.buttons["accounts.back"].tap() }
+        if app.accountBack.exists { app.accountBack.tap() }
         tapVisible(app.buttons["accounts.add"])
         app.buttons["accounts.type.checking"].tap()
         let nickname = "Daily loop " + UUID().uuidString.prefix(6)

@@ -44,7 +44,12 @@ extension XCUIApplication {
         }
     }
 
-    func returnFromPlan(_ legacyIdentifier: String) {
+    var accountBack: XCUIElement {
+        let native = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+        return native.exists ? native : buttons["accounts.back"]
+    }
+
+    func returnFromDetail(_ legacyIdentifier: String) {
         let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
         if nativeBack.waitForExistence(timeout: 2) { nativeBack.tap() }
         else {
