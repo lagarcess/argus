@@ -79,28 +79,39 @@ struct FinancialDebtPresenter: View {
             if model.navigation != nil {
                 NavigationStack {
                     FinancialDebtDetail(model: model, loop: loop) {
-                        switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search; case .account: destination = .accounts; case nil: break }
+                        switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search, .searchAccount: destination = .search; case .account: destination = .accounts; case nil: break }
                         model.close(); Task { await search?.refresh() }
                     }
                 }.tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
                     .accessibilityElement(children: .contain).accessibilityIdentifier("debt.detail")
             } else { Color.clear.allowsHitTesting(false) }
         }
-        .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in FinancialDebtForm(model: model, loop: loop, draft: draft) }
-        .sheet(isPresented: $model.choosingAccount, onDismiss: model.accountChooserDismissed) {
-            NavigationStack {
-                List((loop.plan.projection?.accounts ?? []).filter { account in !account.archived && ["credit_card", "other_debt"].contains(account.type) && !(loop.plan.projection?.debts ?? []).contains(where: { !$0.debt.archived && $0.debt.debtAccountId == account.id }) }) { account in
-                    Button(loop.accountName(account.id)) { model.chooseAccount(account) }.accessibilityIdentifier("debt.account." + account.id.uuidString)
-                }.navigationTitle("debt.chooseAccount").toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { model.choosingAccount = false } } }
+        .background { FinancialDebtSheets(model: model, loop: loop, search: search) }
+    }
+}
+
+struct FinancialDebtSheets: View {
+    @ObservedObject var model: FinancialDebtModel
+    @ObservedObject var loop: FinancialLoopModel
+    let search: FinancialSearchModel?
+    var body: some View {
+        Color.clear.frame(width: 0, height: 0)
+            .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in FinancialDebtForm(model: model, loop: loop, draft: draft) }
+            .sheet(isPresented: $model.choosingAccount, onDismiss: model.accountChooserDismissed) {
+                NavigationStack {
+                    List((loop.plan.projection?.accounts ?? []).filter { account in !account.archived && ["credit_card", "other_debt"].contains(account.type) && !(loop.plan.projection?.debts ?? []).contains(where: { !$0.debt.archived && $0.debt.debtAccountId == account.id }) }) { account in
+                        Button(loop.accountName(account.id)) { model.chooseAccount(account) }.accessibilityIdentifier("debt.account." + account.id.uuidString)
+                    }.navigationTitle("debt.chooseAccount").toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { model.choosingAccount = false } } }
+                }
             }
-        }
-        .sheet(isPresented: $model.linking) { FinancialDebtLinkView(model: model, loop: loop) }
+            .sheet(isPresented: $model.linking) { FinancialDebtLinkView(model: model, loop: loop) }
     }
 }
 
 struct FinancialDebtDetail: View {
     @ObservedObject var model: FinancialDebtModel
     @ObservedObject var loop: FinancialLoopModel
+    var nativeNavigation = false
     let close: () -> Void
     @State private var archiving = false
     @Environment(\.locale) private var locale
@@ -108,7 +119,7 @@ struct FinancialDebtDetail: View {
     var body: some View {
         ScrollViewReader { reader in
             CuadraoPlanDetailPage {
-                if let id = model.navigation?.activityID { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) } }
+                if !nativeNavigation, let id = model.navigation?.activityID { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) } }
                 else if let progress = model.detail {
                     heading(progress)
                     if progress.state == "recorded_clear" {
@@ -151,15 +162,27 @@ struct FinancialDebtDetail: View {
                 if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
             }.disabled(model.saving).task(id: model.detail?.payments.map(\.activityId)) { if let anchor = model.navigation?.anchor { await Task.yield(); reader.scrollTo(anchor, anchor: .top) } }
         }
+        .navigationDestination(isPresented: activityPresented) {
+            if let id = model.navigation?.activityID {
+                ScrollView {
+                    FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24)
+                }
+                .background(WelcomePalette.background)
+                .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
+                .toolbar(.visible, for: .navigationBar)
+            }
+        }
         .navigationTitle("").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                if model.navigation?.activityID != nil {
-                    Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("debt.back", systemImage: "chevron.left") }
-                        .accessibilityIdentifier("debt.activity.back")
-                } else {
-                    Button(action: close) { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
-                        .accessibilityLabel("action.close").accessibilityIdentifier("debt.close")
+            if !nativeNavigation {
+                ToolbarItem(placement: .topBarLeading) {
+                    if model.navigation?.activityID != nil {
+                        Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("debt.back", systemImage: "chevron.left") }
+                            .accessibilityIdentifier("debt.activity.back")
+                    } else {
+                        Button(action: close) { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
+                            .accessibilityLabel("action.close").accessibilityIdentifier("debt.close")
+                    }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -168,7 +191,7 @@ struct FinancialDebtDetail: View {
                         Button { model.edit() } label: { Label("debt.edit", systemImage: "pencil") }.accessibilityIdentifier("debt.edit")
                         Button { archiving = true } label: { Label("debt.archive", systemImage: "archivebox") }.accessibilityIdentifier("debt.archive")
                     }.disabled(model.saving)
-                } else if model.navigation?.activityID != nil {
+                } else if !nativeNavigation, model.navigation?.activityID != nil {
                     Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
                         .accessibilityLabel("action.close").accessibilityIdentifier("debt.close")
                 }
@@ -178,6 +201,16 @@ struct FinancialDebtDetail: View {
             Button("debt.archive") { Task { await model.archive(true) } }.accessibilityIdentifier("debt.archive.confirm")
             Button("accounts.cancel", role: .cancel) { }
         } message: { Text("debt.archive.disclosure") }
+    }
+    private var activityPresented: Binding<Bool> {
+        let captured = model.navigation
+        return Binding(get: { nativeNavigation && model.navigation?.activityID != nil }, set: { presented in
+            guard nativeNavigation, !presented, let captured, let activityID = captured.activityID,
+                  let current = model.navigation, current.debtID == captured.debtID,
+                  current.origin == captured.origin, current.activityID == activityID else { return }
+            model.activity(nil)
+            Task { await model.refreshIfOpen() }
+        })
     }
     private func heading(_ progress: FinancialDebtProgress) -> some View {
         let credit = progress.balance.creditMinor != nil && progress.balance.creditMinor != 0

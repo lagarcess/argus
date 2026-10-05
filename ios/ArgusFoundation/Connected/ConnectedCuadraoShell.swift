@@ -19,13 +19,23 @@ struct ConnectedCuadraoShell: View {
 
     @ViewBuilder
     var body: some View {
+        if let loop = auth.financialLoop {
+            FinancialPlanNavigationState(loop: loop, tab: $tab) { allowed in
+                householdShell(allowsFinancialNavigation: allowed)
+            }
+        } else {
+            householdShell(allowsFinancialNavigation: true)
+        }
+    }
+
+    @ViewBuilder private func householdShell(allowsFinancialNavigation: Bool) -> some View {
         if let household = auth.household {
             HouseholdNavigationVisibility(model: household, tab: householdTab(tab),
                 active: tab != .profile && tab != .assistant) { allowed in
-                shell(allowsHouseholdNavigation: allowed)
+                shell(allowsHouseholdNavigation: allowed && allowsFinancialNavigation)
             }
         } else {
-            shell(allowsHouseholdNavigation: true)
+            shell(allowsHouseholdNavigation: allowsFinancialNavigation)
         }
     }
 
@@ -41,22 +51,11 @@ struct ConnectedCuadraoShell: View {
         }
         .background { if let household = auth.household { HouseholdPresenter(model: household) } }
         .background { if let household = auth.household { HouseholdPlanPresenter(model: household.plan) } }
-        .financialBudgetBackground(auth.financialLoop?.budgets)
-        .financialGoalBackground(auth.financialLoop?.goals)
-        .financialDebtBackground(auth.financialLoop?.debts)
-        .overlay {
+        .background {
             if let loop = auth.financialLoop {
-                FinancialBudgetPresenter(model: loop.budgets, loop: loop, destination: $destination, search: auth.financialSearch)
-            }
-        }
-        .overlay {
-            if let loop = auth.financialLoop {
-                FinancialGoalPresenter(model: loop.goals, loop: loop, destination: $destination, search: auth.financialSearch)
-            }
-        }
-        .overlay {
-            if let loop = auth.financialLoop {
-                FinancialDebtPresenter(model: loop.debts, loop: loop, destination: $destination, search: auth.financialSearch)
+                FinancialBudgetSheets(model: loop.budgets, loop: loop, search: auth.financialSearch)
+                FinancialGoalSheets(model: loop.goals, loop: loop, search: auth.financialSearch)
+                FinancialDebtSheets(model: loop.debts, loop: loop, search: auth.financialSearch)
             }
         }
         .background {
@@ -125,7 +124,7 @@ struct ConnectedCuadraoShell: View {
             }
         case .plan:
             NavigationStack {
-                FinancialPlanDestination(showProfile: { tab = .profile }, audience: planAudience)
+                FinancialPlanDestination(showProfile: { tab = .profile }, nativeNavigation: true, audience: planAudience)
                     .toolbar(.hidden, for: .navigationBar)
             }
         case .assistant:
@@ -134,7 +133,7 @@ struct ConnectedCuadraoShell: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         case .search:
-            FinancialSearchDestination(active: tab == .search, showProfile: { tab = .profile }, detailChanged: { searchDetail = $0 })
+            FinancialSearchDestination(active: tab == .search, showProfile: { tab = .profile }, nativePlanNavigation: true, detailChanged: { searchDetail = $0 })
         case .profile:
             ConnectedCuadraoProfile(appearance: $appearance, avatar: $avatar, path: $profilePath)
         }

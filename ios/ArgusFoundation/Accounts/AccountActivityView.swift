@@ -4,6 +4,7 @@ import ArgusSession
 struct AccountActivityView: View {
     @ObservedObject var loop: FinancialLoopModel
     let account: FinancialAccount
+    var debtOrigin: FinancialDebtNavigation.Origin = .account
     @State private var pendingCorrection: FinancialActivityDetail?
     @State private var pendingReturn: FinancialActivityDetail?
     @State private var pendingRecurring: FinancialActivityDetail?
@@ -17,7 +18,7 @@ struct AccountActivityView: View {
         LazyVStack(alignment: .leading, spacing: 16) {
             if ["credit_card", "other_debt"].contains(account.type) {
                 if let progress = loop.plan.projection?.debts?.first(where: { !$0.debt.archived && $0.debt.debtAccountId == account.id }) {
-                    Button("debt.view") { Task { await loop.debts.open(progress.id, origin: .account) } }.frame(minHeight: 44).accessibilityIdentifier("accounts.debt")
+                    Button("debt.view") { Task { await loop.debts.open(progress.id, origin: debtOrigin) } }.frame(minHeight: 44).accessibilityIdentifier("accounts.debt")
                 } else { Button("debt.add") { loop.debts.create(account) }.frame(minHeight: 44).accessibilityIdentifier("accounts.debt") }
             }
             Text(spanish ? "Movimientos" : "Activity").font(CuadraoTypography.section).accessibilityAddTraits(.isHeader)

@@ -81,6 +81,8 @@ struct ConnectedCuadraoHome: View {
                 case .account(let id): accountDetail(id)
                 }
             }
+            .financialPlanDestinations(loop: loop, search: auth.financialSearch, host: .home,
+                accountDetailPresented: homePath.last?.accountID != nil)
         }
         .task(id: accounts.identity?.revision) { await accounts.load(); await loop.refresh() }
         .onChange(of: accounts.accounts) { _, _ in Task { await loop.refresh() } }
@@ -91,13 +93,19 @@ struct ConnectedCuadraoHome: View {
                 homePath = []
             }
         }
-        .onChange(of: homePath) { _, path in
-            // Sheet dismiss can empty the stack under a still-selected account.
-            // Re-push instead of clearing selection (back button clears selection).
-            if path.isEmpty, let id = accounts.selectedID,
-               loop.activityEditor == nil, loop.editor == nil {
-                homePath = [.account(id)]
-            }
+        .onChange(of: homePath) { previous, path in
+            guard path.count < previous.count, let id = accounts.selectedID,
+                  previous.contains(.account(id)), !path.contains(.account(id)), loop.activityEditor == nil,
+                  loop.editor == nil, accounts.draft == nil else { return }
+            accounts.back()
+        }
+        .onChange(of: accounts.busy) { _, busy in
+            guard !busy, let id = accounts.selectedID, !homePath.contains(.account(id)),
+                  loop.activityEditor == nil, loop.editor == nil, accounts.draft == nil else { return }
+            accounts.back()
+        }
+        .onChange(of: accounts.draft == nil) { _, closed in
+            if closed { restoreDetailPath() }
         }
         .onChange(of: loop.activityEditor == nil) { _, closed in
             if closed { restoreDetailPath() }
@@ -146,38 +154,19 @@ struct ConnectedCuadraoHome: View {
         .background(WelcomePalette.background)
         .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { homePath.removeAll { $0.accountID == nil } } label: { Label("accounts.back", systemImage: "chevron.left") }
-                    .accessibilityIdentifier("activity.back")
-            }
-        }
-        .navigationBarBackButtonHidden(true)
     }
 
     @ViewBuilder private func accountDetail(_ id: UUID) -> some View {
         if let account = accounts.accounts.first(where: { $0.id == id }) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    AccountDetailView(account: account, model: accounts, loop: loop)
+                    AccountDetailView(account: account, model: accounts, loop: loop, nativePlanNavigation: true, search: auth.financialSearch)
                 }.padding(24)
             }
             .accessibilityIdentifier("screen.accounts")
             .background(WelcomePalette.background)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        accounts.back()
-                        if accounts.selectedID == nil, homePath.last?.accountID != nil { homePath.removeLast() }
-                    } label: {
-                        Label("accounts.back", systemImage: "chevron.left")
-                    }
-                    .accessibilityIdentifier("accounts.back").disabled(accounts.busy)
-                }
-            }
-            .navigationBarBackButtonHidden(true)
         }
     }
 

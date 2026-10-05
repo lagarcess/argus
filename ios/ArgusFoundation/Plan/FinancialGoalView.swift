@@ -83,23 +83,34 @@ struct FinancialGoalPresenter: View {
                     .accessibilityElement(children: .contain).accessibilityIdentifier("goal.detail")
             } else { Color.clear.allowsHitTesting(false) }
         }
-        .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
-            FinancialGoalForm(model: model, loop: loop, draft: draft)
-        }
-        .sheet(item: $model.action) { action in
-            if let detail = model.detail {
-                switch action {
-                case .allocation: FinancialGoalAllocationView(model: model, loop: loop, detail: detail)
-                case .link: FinancialGoalLinkView(model: model, loop: loop)
+        .background { FinancialGoalSheets(model: model, loop: loop, search: search) }
+    }
+}
+
+struct FinancialGoalSheets: View {
+    @ObservedObject var model: FinancialGoalModel
+    @ObservedObject var loop: FinancialLoopModel
+    let search: FinancialSearchModel?
+    var body: some View {
+        Color.clear.frame(width: 0, height: 0)
+            .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
+                FinancialGoalForm(model: model, loop: loop, draft: draft)
+            }
+            .sheet(item: $model.action) { action in
+                if let detail = model.detail {
+                    switch action {
+                    case .allocation: FinancialGoalAllocationView(model: model, loop: loop, detail: detail)
+                    case .link: FinancialGoalLinkView(model: model, loop: loop)
+                    }
                 }
             }
-        }
     }
 }
 
 struct FinancialGoalDetail: View {
     @ObservedObject var model: FinancialGoalModel
     @ObservedObject var loop: FinancialLoopModel
+    var nativeNavigation = false
     let close: () -> Void
     @State private var archiving = false
     @State private var releasing: FinancialGoalContribution?
@@ -107,7 +118,7 @@ struct FinancialGoalDetail: View {
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     var body: some View {
         Group {
-            if let id = model.navigation?.activityID {
+            if !nativeNavigation, let id = model.navigation?.activityID {
                 ScrollView { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24) }
             } else {
                 ScrollViewReader { reader in
@@ -164,15 +175,27 @@ struct FinancialGoalDetail: View {
             }
         }
         .background(WelcomePalette.background)
+        .navigationDestination(isPresented: activityPresented) {
+            if let id = model.navigation?.activityID {
+                ScrollView {
+                    FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24)
+                }
+                .background(WelcomePalette.background)
+                .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
+                .toolbar(.visible, for: .navigationBar)
+            }
+        }
         .navigationTitle("").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                if model.navigation?.activityID != nil {
-                    Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("goal.back", systemImage: "chevron.left") }
-                        .accessibilityIdentifier("goal.activity.back")
-                } else {
-                    Button(action: close) { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
-                        .accessibilityLabel("action.close").accessibilityIdentifier("goal.close")
+            if !nativeNavigation {
+                ToolbarItem(placement: .topBarLeading) {
+                    if model.navigation?.activityID != nil {
+                        Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("goal.back", systemImage: "chevron.left") }
+                            .accessibilityIdentifier("goal.activity.back")
+                    } else {
+                        Button(action: close) { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
+                            .accessibilityLabel("action.close").accessibilityIdentifier("goal.close")
+                    }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -181,7 +204,7 @@ struct FinancialGoalDetail: View {
                         Button { model.edit() } label: { Label("goal.edit", systemImage: "pencil") }.accessibilityIdentifier("goal.edit")
                         Button { archiving = true } label: { Label("goal.archive", systemImage: "archivebox") }.accessibilityIdentifier("goal.archive")
                     }.disabled(model.saving)
-                } else if model.navigation?.activityID != nil {
+                } else if !nativeNavigation, model.navigation?.activityID != nil {
                     Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
                         .accessibilityLabel("action.close").accessibilityIdentifier("goal.close")
                 }
@@ -195,6 +218,16 @@ struct FinancialGoalDetail: View {
             if let claim = releasing { Button("goal.stopCounting") { Task { await model.release(claim) } }.accessibilityIdentifier("goal.release.confirm") }
             Button("accounts.cancel", role: .cancel) { releasing = nil }
         } message: { Text("goal.release.disclosure") }
+    }
+    private var activityPresented: Binding<Bool> {
+        let captured = model.navigation
+        return Binding(get: { nativeNavigation && model.navigation?.activityID != nil }, set: { presented in
+            guard nativeNavigation, !presented, let captured, let activityID = captured.activityID,
+                  let current = model.navigation, current.goalID == captured.goalID,
+                  current.origin == captured.origin, current.activityID == activityID else { return }
+            model.activity(nil)
+            Task { await model.refreshIfOpen() }
+        })
     }
     private func heading(_ progress: FinancialGoalProgress) -> some View {
         CuadraoPlanDetailHeading(display: .init(

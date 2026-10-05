@@ -2,7 +2,7 @@ import SwiftUI
 import ArgusSession
 
 struct FinancialDebtNavigation: Codable, Equatable {
-    enum Origin: String, Codable { case home, plan, planOverview, search, account }
+    enum Origin: String, Codable { case home, plan, planOverview, search, account, searchAccount }
     var debtID: UUID
     var origin: Origin
     var activityID: UUID?

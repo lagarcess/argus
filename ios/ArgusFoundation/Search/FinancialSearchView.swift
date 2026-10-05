@@ -6,10 +6,11 @@ struct FinancialSearchDestination: View {
     @EnvironmentObject private var auth: ProfileAuthModel
     let active: Bool
     let showProfile: () -> Void
+    var nativePlanNavigation = false
     var detailChanged: (Bool) -> Void = { _ in }
     var body: some View {
         if auth.state == .authenticated, let model = auth.financialSearch, let accounts = auth.accounts, let loop = auth.financialLoop {
-            FinancialSearchView(model: model, accounts: accounts, loop: loop, active: active, detailChanged: detailChanged)
+            FinancialSearchView(model: model, accounts: accounts, loop: loop, active: active, nativePlanNavigation: nativePlanNavigation, detailChanged: detailChanged)
         } else {
             VStack(alignment: .leading, spacing: 24) {
                 Text("search.title").font(CuadraoTypography.screen)
@@ -25,12 +26,29 @@ struct FinancialSearchView: View {
     @ObservedObject var model: FinancialSearchModel
     @ObservedObject var accounts: AccountsModel
     @ObservedObject var loop: FinancialLoopModel
+    @ObservedObject private var goals: FinancialGoalModel
+    @ObservedObject private var budgets: FinancialBudgetModel
+    @ObservedObject private var debts: FinancialDebtModel
     let active: Bool
+    var nativePlanNavigation = false
     var detailChanged: (Bool) -> Void = { _ in }
     @Environment(\.locale) private var locale
     @StateObject private var scroll = SearchScrollOffset()
     @State private var unavailableKind: CanvasSearchKind?
     @FocusState private var focused: Bool
+
+    init(model: FinancialSearchModel, accounts: AccountsModel, loop: FinancialLoopModel,
+         active: Bool, nativePlanNavigation: Bool = false, detailChanged: @escaping (Bool) -> Void = { _ in }) {
+        self.model = model; self.accounts = accounts; self.loop = loop
+        goals = loop.goals; budgets = loop.budgets; debts = loop.debts
+        self.active = active; self.nativePlanNavigation = nativePlanNavigation; self.detailChanged = detailChanged
+    }
+
+    private var hasPlanDetail: Bool {
+        goals.navigation.map { FinancialPlanHost($0.origin) == .search } == true ||
+            budgets.navigation.map { FinancialPlanHost($0.origin) == .search } == true ||
+            debts.navigation.map { FinancialPlanHost($0.origin) == .search } == true
+    }
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var inputKey: String {
@@ -76,7 +94,7 @@ struct FinancialSearchView: View {
             .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.userScrolled() })
             .onPreferenceChange(SearchRowFrames.self) { rememberFrames($0) }
             .onChange(of: model.restoration) { _, restoration in
-                guard let restoration else { return }
+                guard !hasPlanDetail, let restoration else { return }
                 Task { @MainActor in
                     await Task.yield()
                     guard model.restoration?.id == restoration.id else { return }
@@ -92,6 +110,8 @@ struct FinancialSearchView: View {
                 set: { if !$0 { Task { await model.back() } } })) {
                     destination
                 }
+            .financialPlanDestinations(loop: loop, search: model, host: .search,
+                accountDetailPresented: model.destination != nil, enabled: nativePlanNavigation)
         }
         .task(id: inputKey) {
             guard active, unavailableKind == nil else { return }
@@ -103,7 +123,7 @@ struct FinancialSearchView: View {
             if active, unavailableKind == nil { Task { await model.activate() } }
             else { focused = false }
         }
-        .onChange(of: model.destination != nil) { _, showing in detailChanged(showing) }
+        .onChange(of: model.destination != nil || hasPlanDetail, initial: true) { _, showing in detailChanged(showing) }
         .onChange(of: model.ownerID) { _, _ in unavailableKind = nil }
         .toolbar(.hidden, for: .tabBar)
     }
@@ -185,7 +205,7 @@ struct FinancialSearchView: View {
                 switch model.destination {
                 case .account(let id):
                     if let account = accounts.accounts.first(where: { $0.id == id }) {
-                        AccountDetailView(account: account, model: accounts, loop: loop)
+                        AccountDetailView(account: account, model: accounts, loop: loop, debtOrigin: .searchAccount, nativePlanNavigation: nativePlanNavigation, search: model)
                     } else { Text("search.destination.unavailable") }
                 case .activity(let id):
                     FinancialActivityDetailView(loop: loop, activityID: id, accounts: accounts.accounts,
@@ -228,6 +248,7 @@ struct FinancialSearchView: View {
     }
     private func rememberFrames(_ frames: [String: CGRect]) {
         scroll.frames = frames
+        guard !hasPlanDetail else { return }
         if let restoration = model.restoration {
             if let frame = frames[restoration.anchor], scroll.restore(restoration, currentRowOffset: frame.minY) {
                 model.restored(restoration.id)

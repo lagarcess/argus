@@ -4,11 +4,12 @@ import ArgusSession
 struct FinancialPlanDestination: View {
     @EnvironmentObject private var auth: ProfileAuthModel
     let showProfile: () -> Void
+    var nativeNavigation = false
     var audience: Binding<Bool>? = nil
     var bottomSpace: CGFloat = 90
     var body: some View {
         if auth.state == .authenticated, let loop = auth.financialLoop {
-            FinancialPlanView(model: loop.plan, loop: loop, audience: audience, bottomSpace: bottomSpace)
+            FinancialPlanView(model: loop.plan, loop: loop, nativeNavigation: nativeNavigation, search: auth.financialSearch, audience: audience, bottomSpace: bottomSpace)
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -25,6 +26,8 @@ struct FinancialPlanDestination: View {
 struct FinancialPlanView: View {
     @ObservedObject var model: FinancialPlanModel
     @ObservedObject var loop: FinancialLoopModel
+    var nativeNavigation = false
+    var search: FinancialSearchModel? = nil
     var audience: Binding<Bool>? = nil
     var bottomSpace: CGFloat = 90
     @State private var selectingAccounts = false
@@ -61,6 +64,7 @@ struct FinancialPlanView: View {
         } footer: {
             EmptyView()
         }
+        .financialPlanDestinations(loop: loop, search: search, host: .plan, enabled: nativeNavigation)
         .task { if model.projection == nil { await model.refresh() } }
         .refreshable { await loop.refresh() }
         .confirmationDialog(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?", isPresented: $creating, titleVisibility: .visible) {

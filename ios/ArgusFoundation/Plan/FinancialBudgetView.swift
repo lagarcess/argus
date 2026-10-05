@@ -84,22 +84,33 @@ struct FinancialBudgetPresenter: View {
                     .accessibilityElement(children: .contain).accessibilityIdentifier("budget.detail")
             } else { Color.clear.allowsHitTesting(false) }
         }
-        .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
-            FinancialBudgetForm(model: model, loop: loop, draft: draft)
-        }
+        .background { FinancialBudgetSheets(model: model, loop: loop, search: search) }
+    }
+}
+
+struct FinancialBudgetSheets: View {
+    @ObservedObject var model: FinancialBudgetModel
+    @ObservedObject var loop: FinancialLoopModel
+    let search: FinancialSearchModel?
+    var body: some View {
+        Color.clear.frame(width: 0, height: 0)
+            .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
+                FinancialBudgetForm(model: model, loop: loop, draft: draft)
+            }
     }
 }
 
 struct FinancialBudgetDetailView: View {
     @ObservedObject var model: FinancialBudgetModel
     @ObservedObject var loop: FinancialLoopModel
+    var nativeNavigation = false
     let close: () -> Void
     @State private var removing = false
     @Environment(\.locale) private var locale
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     var body: some View {
         Group {
-            if let id = model.navigation?.activityID {
+            if !nativeNavigation, let id = model.navigation?.activityID {
                 ScrollView { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24) }
             } else {
                 ScrollViewReader { reader in
@@ -144,8 +155,19 @@ struct FinancialBudgetDetailView: View {
                 }
             }
         }.background(WelcomePalette.background)
-            .navigationTitle("").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
-            .toolbar {
+        .navigationDestination(isPresented: activityPresented) {
+            if let id = model.navigation?.activityID {
+                ScrollView {
+                    FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24)
+                }
+                .background(WelcomePalette.background)
+                .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
+                .toolbar(.visible, for: .navigationBar)
+            }
+        }
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            if !nativeNavigation {
                 ToolbarItem(placement: .topBarLeading) {
                     if model.navigation?.activityID != nil {
                         Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("budget.back", systemImage: "chevron.left") }
@@ -155,22 +177,33 @@ struct FinancialBudgetDetailView: View {
                             .accessibilityLabel("action.close").accessibilityIdentifier("budget.close")
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    if model.navigation?.activityID == nil, let progress = model.detail, !progress.budget.archived {
-                        CuadraoPlanDetailOptions(spanish: spanish) {
-                            Button { Task { await model.edit() } } label: { Label("budget.edit", systemImage: "pencil") }.accessibilityIdentifier("budget.edit")
-                            Button(role: .destructive) { removing = true } label: { Label("budget.remove", systemImage: "archivebox") }.accessibilityIdentifier("budget.remove")
-                        }.disabled(model.saving)
-                    } else if model.navigation?.activityID != nil {
-                        Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
-                            .accessibilityLabel("action.close").accessibilityIdentifier("budget.close")
-                    }
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                if model.navigation?.activityID == nil, let progress = model.detail, !progress.budget.archived {
+                    CuadraoPlanDetailOptions(spanish: spanish) {
+                        Button { Task { await model.edit() } } label: { Label("budget.edit", systemImage: "pencil") }.accessibilityIdentifier("budget.edit")
+                        Button(role: .destructive) { removing = true } label: { Label("budget.remove", systemImage: "archivebox") }.accessibilityIdentifier("budget.remove")
+                    }.disabled(model.saving)
+                } else if !nativeNavigation, model.navigation?.activityID != nil {
+                    Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                        .accessibilityLabel("action.close").accessibilityIdentifier("budget.close")
                 }
             }
-            .confirmationDialog("budget.remove.confirm", isPresented: $removing, titleVisibility: .visible) {
-                Button("budget.remove", role: .destructive) { Task { await model.archive(true) } }.accessibilityIdentifier("budget.remove.confirm")
-                Button("accounts.cancel", role: .cancel) { }
-            } message: { Text("budget.remove.body") }
+        }
+        .confirmationDialog("budget.remove.confirm", isPresented: $removing, titleVisibility: .visible) {
+            Button("budget.remove", role: .destructive) { Task { await model.archive(true) } }.accessibilityIdentifier("budget.remove.confirm")
+            Button("accounts.cancel", role: .cancel) { }
+        } message: { Text("budget.remove.body") }
+    }
+    private var activityPresented: Binding<Bool> {
+        let captured = model.navigation
+        return Binding(get: { nativeNavigation && model.navigation?.activityID != nil }, set: { presented in
+            guard nativeNavigation, !presented, let captured, let activityID = captured.activityID,
+                  let current = model.navigation, current.budgetID == captured.budgetID,
+                  current.origin == captured.origin, current.activityID == activityID else { return }
+            model.activity(nil)
+            Task { await model.refreshIfOpen() }
+        })
     }
     private func heading(_ progress: FinancialBudgetProgress) -> some View {
         CuadraoPlanDetailHeading(display: .init(

@@ -5,6 +5,9 @@ struct AccountDetailView: View {
     let account: FinancialAccount
     @ObservedObject var model: AccountsModel
     @ObservedObject var loop: FinancialLoopModel
+    var debtOrigin: FinancialDebtNavigation.Origin = .account
+    var nativePlanNavigation = false
+    var search: FinancialSearchModel? = nil
     @Environment(\.locale) private var locale
 
     private var current: FinancialAccount {
@@ -24,7 +27,7 @@ struct AccountDetailView: View {
                     checkEnabled: loop.pendingConfirmation == nil,
                     recordIdentifier: "accounts.record", checkIdentifier: "accounts.check",
                     record: { loop.record(current) }, check: { loop.check(current) }) {
-                        AccountActivityView(loop: loop, account: account)
+                        AccountActivityView(loop: loop, account: account, debtOrigin: debtOrigin)
                     }
             }
             accountActions
@@ -45,6 +48,7 @@ struct AccountDetailView: View {
             }
             AccountRequestStatus(model: model) { await model.refresh(account.id) }
         }
+        .financialAccountDebtDestination(loop: loop, search: search, accountID: account.id, origin: debtOrigin, enabled: nativePlanNavigation)
         .foregroundStyle(WelcomePalette.ink)
         .toolbar {
             if #available(iOS 26.0, *) {
