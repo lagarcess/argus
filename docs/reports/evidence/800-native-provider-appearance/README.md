@@ -38,7 +38,7 @@ The configuration check is `python3 ios/DesignPreviewTests/run_native_provider_c
 
 The pinned official GoogleSignInSwift 9.2.0 dark variant is blue with white text. This uses the provider's SDK style without recoloring its mark.
 
-Google's visible label clips at Accessibility XXXL before and after this change, especially in Spanish. Its accessible name remains complete. This evidence does not close full Dynamic Type acceptance; the follow-up issue owns that pre-existing defect.
+Google's visible label clips at Accessibility XXXL before and after this change, especially in Spanish. Its accessible name remains complete. This evidence does not close full Dynamic Type acceptance; [#856](https://github.com/lagarcess/argus/issues/856) owns that pre-existing defect.
 
 Busy and cancelled provider flows are unchanged but were not exercised by provider interaction. VoiceOver audio and real-provider physical-phone acceptance were not performed. These checks do not authorize social flag enablement, release distribution, hosted changes or deployment.
 
@@ -66,3 +66,7 @@ Visual inspection confirms the selected provider variants and readable adaptive 
 | signup-es-419-dark-standard | [Image](after/signup-es-419-dark-standard.png) | [Image](after/signup-es-419-dark-standard-footer.png) |
 | signup-es-419-light-accessibility | [Image](after/signup-es-419-light-accessibility.png) | [Image](after/signup-es-419-light-accessibility-footer.png) |
 | signup-es-419-light-standard | [Image](after/signup-es-419-light-standard.png) | [Image](after/signup-es-419-light-standard-footer.png) |
+
+## Evidence retention and cleanup
+
+Publication commits after the tested merge change evidence files only. `git diff 99b903090881e741a093b30fde5d00a9df2d7863 HEAD -- ios` is empty, explicitly revalidating the captured native inputs. The owned simulator `8988E923-2C87-40F7-B878-E834554C1947` was shut down and deleted after capture. Build products and xcresult bundles remain local for review; no fixture server was started.
