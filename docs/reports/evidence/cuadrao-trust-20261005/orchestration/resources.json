@@ -6,11 +6,11 @@
       "container": "supabase_db_cuadrao-trust-20261005",
       "created_by": "root",
       "physical_owner": "root",
-      "lease_owner": "apple_name_backend",
+      "lease_owner": "apple_name_backend_independent_review",
       "worker_stop_allowed": false,
       "release_action": "mark lease_owner null; preserve running container",
       "health": "healthy after exact-container restart",
-      "lease_scope": "synthetic profile name initialization, privilege, retry and race tests only"
+      "lease_scope": "independent synthetic name initializer authorization, privilege, retry and race proof"
     },
     {
       "resource": "mac_simulator_build",
