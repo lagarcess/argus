@@ -213,13 +213,20 @@ extension FinancialLoopUITests {
     }
 
     /// Scrolls Home until the element sits inside the viewport without tapping it.
+    /// Frame bounds, not `isHittable`: hidden tabs stay in the shell ZStack and their
+    /// UIKit-backed views shadow XCUITest hit tests although real touches pass through.
     func revealOnHome(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
-        for _ in 0..<12 {
-            if element.isHittable && element.frame.minY > 120 && element.frame.maxY < app.frame.height - 140 { return }
-            if element.frame.midY < 120 { app.swipeDown() } else { app.swipeUp() }
+        let home = app.scrollViews["screen.home"]
+        for _ in 0..<14 {
+            let y = element.frame.midY
+            if y > 120 && y < app.frame.height - 130 { return }
+            // Drag the Home scroll view itself a fixed distance; app-level swipes can land on hidden tabs.
+            let (from, to): (CGFloat, CGFloat) = y < 120 ? (0.3, 0.7) : (0.7, 0.3)
+            home.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
+                .press(forDuration: 0.05, thenDragTo: home.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)))
         }
-        XCTAssertTrue(element.isHittable)
+        XCTFail("\(element.identifier) stays off screen at \(element.frame)")
     }
 
     func chooseDate(_ identifier: String, daysAhead: Int, zone: TimeZone = TimeZone(identifier: "America/Santo_Domingo")!) {
