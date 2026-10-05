@@ -127,8 +127,13 @@ def test_concurrent_explicit_edit_always_wins(
             DSN, application_name=pool.kwargs["application_name"]
         ) as connection:
             connection.execute("set local lock_timeout='4s'")
+            reopen = (
+                ",name_initialization_closed=false"
+                if column in {"display_name", "preferred_name"}
+                else ""
+            )
             connection.execute(
-                f"update public.profiles set {column}=%s where id=%s",
+                f"update public.profiles set {column}=%s{reopen} where id=%s",
                 (value, apple_profile),
             )
             if held:
@@ -196,6 +201,29 @@ def test_marker_is_monotonic_even_for_privileged_writer(apple_profile):
             "select name_initialization_closed from public.profiles where id=%s",
             (apple_profile,),
         ).fetchone() == (True,)
+
+
+@pytest.mark.parametrize("column", ["display_name", "preferred_name"])
+@pytest.mark.parametrize("value", [None, "Chosen name"])
+def test_same_statement_cannot_leave_name_eligibility_open(
+    apple_profile, pool, column, value
+):
+    from argus.domain.apple_sign_in.name import initialize_apple_display_name
+
+    with psycopg.connect(DSN) as connection:
+        connection.execute(
+            f"update public.profiles set {column}=%s,name_initialization_closed=false where id=%s",
+            (value, apple_profile),
+        )
+        assert connection.execute(
+            "select name_initialization_closed from public.profiles where id=%s",
+            (apple_profile,),
+        ).fetchone() == (True,)
+    row = initialize_apple_display_name(
+        pool, user_id=apple_profile, display_name=fake.name()
+    )
+    assert row[column] == value
+    assert row["display_name"] == (value if column == "display_name" else None)
 
 
 @pytest.mark.parametrize("role", ["anon", "authenticated"])
@@ -344,9 +372,10 @@ def test_migration_preserves_historical_rows_and_named_new_rows():
             f"select name_initialization_closed from {schema}.profiles order by id"
         ).fetchall() == [(True,), (True,)]
         connection.execute(
-            f"insert into {schema}.profiles (id,display_name,name_initialization_closed) "
-            "values (3,null,false),(4,'Apple',false)"
+            f"insert into {schema}.profiles (id,display_name,preferred_name,name_initialization_closed) "
+            "values (3,null,null,false),(4,'Apple',null,false),"
+            "(5,null,'Chosen',false),(6,'Apple','Chosen',false)"
         )
         assert connection.execute(
             f"select name_initialization_closed from {schema}.profiles where id>=3 order by id"
-        ).fetchall() == [(False,), (True,)]
+        ).fetchall() == [(False,), (True,), (True,), (True,)]

@@ -43,11 +43,7 @@ def initialize_apple_display_name(
             row = cursor.fetchone()
             if row is None:
                 raise AppleNameAccountUnavailable
-            if (
-                not row["name_initialization_closed"]
-                and row["display_name"] is None
-                and row["preferred_name"] is None
-            ):
+            if not row["name_initialization_closed"]:
                 cursor.execute(
                     "update public.profiles set display_name=%s, "
                     "name_initialization_closed=true, updated_at=now() "
