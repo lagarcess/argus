@@ -25,7 +25,7 @@ extension FinancialLoopUITests {
         searchBack()
         XCTAssertTrue(app.staticTexts["search.empty"].waitForExistence(timeout: 10))
         XCTAssertEqual(app.textFields["search.query"].value as? String, bank.name)
-        XCTAssertTrue(app.buttons["search.currency"].label.contains("DOP"))
+        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains("DOP"))
         capture("search-account-edit-removes-old-match")
 
         searchFor(note, kind: "activity")
@@ -81,11 +81,11 @@ extension FinancialLoopUITests {
         let row = try XCTUnwrap(visible.last)
         let identifier = row.identifier
         let before = row.frame
-        row.tap(); XCTAssertTrue(app.buttons["search.back"].waitForExistence(timeout: 10))
+        row.tap(); XCTAssertTrue(app.scrollViews["search.detail"].waitForExistence(timeout: 10))
         searchBack()
         assertSearchFrame(identifier, y: before.minY)
         XCTAssertEqual(app.textFields["search.query"].value as? String, query)
-        XCTAssertTrue(app.buttons["search.currency"].label.contains("DOP"))
+        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains("DOP"))
         capture("search-second-page-exact-return")
         for attempt in 1...2 {
             app.terminate(); app.launch(); app.buttons["tab.search"].tap()
@@ -131,7 +131,7 @@ extension FinancialLoopUITests {
         try armSearchRead(path: "/api/v1/financial-accounts/", status: 404)
         tapVisible(searchRow(bank.name))
         XCTAssertTrue(app.staticTexts["search.destination.error"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["search.back"].exists)
+        XCTAssertFalse(app.scrollViews["search.detail"].exists)
         XCTAssertEqual(app.textFields["search.query"].value as? String, bank.name)
         capture("search-unavailable-destination")
     }
@@ -151,31 +151,62 @@ extension FinancialLoopUITests {
         searchFor(first.name, kind: "account")
         tapVisible(searchRow(first.name))
         XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
+        searchBack()
         app.openAccountsList()
         assertText(second.name)
         XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
         XCTAssertFalse(activity(firstNote).exists)
         scrollMoneyTop(); app.buttons["accounts.back"].tap()
         app.buttons["tab.search"].tap()
+        tapVisible(searchRow(first.name))
         assertText(first.name)
         XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["search.destination.unavailable"].exists)
+        searchBack()
         openMoneyAccount(second)
         XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
         app.buttons["tab.search"].tap()
+        tapVisible(searchRow(first.name))
         XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
         XCTAssertFalse(activity(secondNote).exists)
         tapVisible(app.buttons["accounts.edit"])
         replaceMoneyField("accounts.nickname", with: first.name + " revised")
         dismissMoneyKeyboard(); tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 15))
+        searchBack()
         app.openAccountsList()
         assertText(second.name)
         XCTAssertTrue(activity(secondNote).waitForExistence(timeout: 10))
         app.buttons["tab.search"].tap()
+        tapVisible(searchRow(first.name + " revised"))
         assertText(first.name + " revised")
         XCTAssertTrue(activity(firstNote).waitForExistence(timeout: 10))
         capture("search-accounts-independent-detail-identities")
+    }
+
+    func testSearchKeepsApprovedPerspectivesWithoutSampleResults() throws {
+        try signIn(fresh: true)
+        let account = createMoneyAccount("Search perspective " + String(UUID().uuidString.prefix(6)), type: "checking")
+        searchFor(account.name, kind: "account")
+        chooseSearchCurrency("DOP")
+        XCTAssertTrue(searchRow(account.name).waitForExistence(timeout: 10))
+        for kind in ["chats", "files"] {
+            let button = app.buttons["search.filter." + kind]
+            for _ in 0..<3 {
+                if button.isHittable { break }
+                app.scrollViews["search.kinds"].swipeLeft()
+            }
+            tapVisible(button)
+            XCTAssertTrue(app.staticTexts["search.empty"].waitForExistence(timeout: 10))
+            XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.'")).firstMatch.exists)
+            XCTAssertEqual(app.textFields["search.query"].value as? String, account.name)
+            XCTAssertFalse(app.descendants(matching: .any)["search.loading"].exists)
+        }
+        app.scrollViews["search.kinds"].swipeRight()
+        tapVisible(app.buttons["search.filter.account"])
+        XCTAssertTrue(searchRow(account.name).waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains("DOP"))
+        capture("search-approved-perspectives-real-records-only")
     }
 
     private func searchFor(_ query: String, kind: String) {
@@ -185,19 +216,34 @@ extension FinancialLoopUITests {
         field.tap()
         if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); field.tap() }
         field.typeText(query + "\n")
-        app.buttons["search.filter." + kind].tap()
+        if let title = ["expectation": "Income and bills", "budget": "Budgets", "goal": "Goals", "debt": "Debts"][kind] {
+            chooseSearchPlanType(title)
+        } else {
+            app.buttons["search.filter." + kind].tap()
+        }
     }
     private func searchRow(_ label: String) -> XCUIElement {
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.' AND label CONTAINS %@", label)).firstMatch
     }
     private func chooseSearchCurrency(_ currency: String) {
+        app.buttons["search.filters"].tap()
         app.buttons["search.currency"].tap(); app.buttons[currency].tap()
+        app.buttons["search.filters.done"].tap()
     }
-    private func searchBack() {
-        let back = app.buttons["search.back"]
-        for _ in 0..<10 { if back.isHittable { break }; app.scrollViews["search.detail"].swipeDown() }
-        back.tap()
-        XCTAssertTrue(back.waitForNonExistence(timeout: 10))
+    func chooseSearchPlanType(_ title: String) {
+        tapVisible(app.buttons["search.filter.plans"])
+        tapVisible(app.buttons["search.filters"])
+        tapVisible(app.buttons["search.plan-kind"])
+        tapVisible(app.buttons[title])
+        tapVisible(app.buttons["search.filters.done"])
+        XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
+        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains(title))
+    }
+    func searchBack() {
+        let detail = app.scrollViews["search.detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 10))
+        tapVisible(app.navigationBars.buttons.element(boundBy: 0))
+        XCTAssertTrue(detail.waitForNonExistence(timeout: 10))
     }
     private func assertSearchFrame(_ identifier: String, y: CGFloat) {
         let row = app.buttons[identifier]

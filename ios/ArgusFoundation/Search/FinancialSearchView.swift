@@ -6,13 +6,14 @@ struct FinancialSearchDestination: View {
     @EnvironmentObject private var auth: ProfileAuthModel
     let active: Bool
     let showProfile: () -> Void
+    var detailChanged: (Bool) -> Void = { _ in }
     var body: some View {
         if auth.state == .authenticated, let model = auth.financialSearch, let accounts = auth.accounts, let loop = auth.financialLoop {
-            FinancialSearchView(model: model, accounts: accounts, loop: loop, active: active)
+            FinancialSearchView(model: model, accounts: accounts, loop: loop, active: active, detailChanged: detailChanged)
         } else {
             VStack(alignment: .leading, spacing: 24) {
-                Text("search.title").font(ArgusStyle.display())
-                Text("search.gate").foregroundStyle(ArgusStyle.secondary)
+                Text("search.title").font(CuadraoTypography.screen)
+                Text("search.gate").foregroundStyle(.secondary)
                 Button("auth.signIn", action: showProfile).buttonStyle(PillButtonStyle())
                 Spacer()
             }.padding(24)
@@ -25,197 +26,281 @@ struct FinancialSearchView: View {
     @ObservedObject var accounts: AccountsModel
     @ObservedObject var loop: FinancialLoopModel
     let active: Bool
+    var detailChanged: (Bool) -> Void = { _ in }
+    @Environment(\.locale) private var locale
     @StateObject private var scroll = SearchScrollOffset()
+    @State private var unavailableKind: CanvasSearchKind?
     @FocusState private var focused: Bool
-    private var inputKey: String { (model.ownerID ?? "") + "|" + model.origin.query + "|" + (model.origin.kind?.rawValue ?? "") + "|" + (model.origin.currency ?? "") }
-    private var currencies: [String] { Array(Set(accounts.accounts.map(\.currency) + model.items.map(\.currency) + [model.origin.currency].compactMap { $0 })).sorted() }
+
+    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
+    private var inputKey: String {
+        (model.ownerID ?? "") + "|" + model.origin.query + "|" + (model.origin.kind?.rawValue ?? "")
+            + "|" + (model.origin.currency ?? "") + "|" + String(describing: unavailableKind)
+    }
+    private var currencies: [String] {
+        Array(Set(accounts.accounts.map(\.currency) + model.items.map(\.currency) + [model.origin.currency].compactMap { $0 })).sorted()
+    }
+    private var query: Binding<String> { Binding(get: { model.origin.query }, set: { model.update(query: $0) }) }
+    private var kind: Binding<CanvasSearchKind> {
+        Binding(get: { unavailableKind ?? Self.perspective(model.origin.kind) }, set: select)
+    }
+    private static func perspective(_ kind: FinancialSearchKind?) -> CanvasSearchKind {
+        switch kind {
+        case nil: .all
+        case .account: .accounts
+        case .activity: .activity
+        case .expectation, .budget, .goal, .debt: .plans
+        }
+    }
+    private var filterCount: Int {
+        guard unavailableKind == nil else { return 0 }
+        return (model.origin.currency == nil ? 0 : 1) + (kind.wrappedValue == .plans ? 1 : 0)
+    }
+    private var filterSummary: String {
+        [kind.wrappedValue == .plans ? model.origin.kind.map(planTitle) : nil, model.origin.currency]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
 
     var body: some View {
-        ZStack {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(ArgusStyle.secondary)
-                    TextField("search.placeholder.connected", text: Binding(get: { model.origin.query }, set: { model.update(query: $0) }))
-                        .font(ArgusStyle.body(17)).focused($focused).submitLabel(.search)
-                        .autocorrectionDisabled().onSubmit { focused = false }.accessibilityIdentifier("search.query")
-                    if !model.origin.query.isEmpty {
-                        Button { model.update(query: "") } label: { Image(systemName: "xmark.circle.fill") }
-                            .frame(width: 44, height: 44).accessibilityLabel("search.clear").accessibilityIdentifier("search.clear")
-                    }
-                }.frame(minHeight: 48).overlay(alignment: .bottom) {
-                    Rectangle().fill(WelcomePalette.separator).frame(height: 1)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 24) {
-                        filter(nil)
-                        ForEach(FinancialSearchKind.allCases, id: \.self) { filter($0) }
-                    }
-                }
-                HStack {
-                    Text("accounts.currency").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
-                    Spacer()
-                    Picker("accounts.currency", selection: Binding(get: { model.origin.currency }, set: { model.update(currency: .some($0)) })) {
-                        Text("search.currency.all").tag(nil as String?)
-                        ForEach(currencies, id: \.self) { Text(verbatim: $0).tag(Optional($0)) }
-                    }.accessibilityIdentifier("search.currency").frame(minHeight: 44)
-                }
+        NavigationStack {
+            CuadraoSearchContent(query: query, kind: kind,
+                kinds: CanvasSearchKind.allCases.filter { $0 != .memory }, spanish: spanish,
+                filterCount: filterCount, filterSummary: filterSummary, clearFilters: clearFilters,
+                focused: $focused, accessibility: .connected, loading: unavailableKind == nil && (model.loading || model.opening)) {
+                SearchScrollProbe(controller: scroll).frame(height: 0)
                 results
-            }.padding(.horizontal, 24)
-                .opacity(model.destination == nil ? 1 : 0)
-                .allowsHitTesting(model.destination == nil)
-                .accessibilityHidden(model.destination != nil)
-            if let destination = model.destination {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        Button { Task { await model.back() } } label: { Label("search.back", systemImage: "chevron.left") }
-                            .frame(minHeight: 48).accessibilityIdentifier("search.back")
-                        switch destination {
-                        case .account(let id):
-                            if let account = accounts.accounts.first(where: { $0.id == id }) {
-                                AccountDetailView(account: account, model: accounts, loop: loop)
-                            } else { Text("search.destination.unavailable") }
-                        case .activity(let id):
-                            FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }
-                        }
-                    }.padding(24)
-                }.background(ArgusStyle.background).accessibilityIdentifier("search.detail")
+            } filters: {
+                filterControls
             }
+            .refreshable { if unavailableKind == nil { await model.refresh() } }
+            .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.userScrolled() })
+            .onPreferenceChange(SearchRowFrames.self) { rememberFrames($0) }
+            .onChange(of: model.restoration) { _, restoration in
+                guard let restoration else { return }
+                Task { @MainActor in
+                    await Task.yield()
+                    guard model.restoration?.id == restoration.id else { return }
+                    scroll.view?.layoutIfNeeded()
+                    if let frame = scroll.frames[restoration.anchor],
+                       scroll.restore(restoration, currentRowOffset: frame.minY) {
+                        model.restored(restoration.id)
+                    }
+                }
+            }
+            .navigationDestination(isPresented: Binding(
+                get: { model.destination != nil },
+                set: { if !$0 { Task { await model.back() } } })) {
+                    destination
+                }
         }
         .task(id: inputKey) {
-            guard active else { return }
+            guard active, unavailableKind == nil else { return }
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
             await model.activate()
         }
-        .onChange(of: active) { _, active in if active { Task { await model.activate() } } else { focused = false } }
-    }
-
-    private func filter(_ kind: FinancialSearchKind?) -> some View {
-        Button { focused = false; model.update(kind: .some(kind)) } label: {
-            Text(LocalizedStringKey("search.filter." + (kind?.rawValue ?? "all")))
-                .font(ArgusStyle.body(14)).frame(minWidth: 44, minHeight: 48)
-                .foregroundStyle(model.origin.kind == kind ? WelcomePalette.pine : ArgusStyle.secondary)
-                .overlay(alignment: .bottom) {
-                    Rectangle().fill(model.origin.kind == kind ? WelcomePalette.pine : .clear).frame(height: 2)
-                }.contentShape(Rectangle())
-        }.buttonStyle(.plain).accessibilityIdentifier("search.filter." + (kind?.rawValue ?? "all"))
-            .accessibilityAddTraits(model.origin.kind == kind ? .isSelected : [])
-    }
-
-    private var results: some View {
-        Group {
-            ScrollView {
-                // Loaded pages need measured row heights before restoring a partial row.
-                VStack(alignment: .leading, spacing: 0) {
-                    SearchScrollProbe(controller: scroll).frame(height: 0)
-                    if let error = model.destinationError {
-                        Text(LocalizedStringKey(error)).padding(.vertical, 12).accessibilityIdentifier("search.destination.error")
-                        Button("action.close") { model.dismissError() }.frame(minHeight: 44)
-                    }
-                    if let error = model.errorKey {
-                        Text(LocalizedStringKey(error)).padding(.vertical, 12).accessibilityIdentifier("search.error")
-                        Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44).accessibilityIdentifier("search.retry")
-                    } else if model.items.isEmpty && !model.loading {
-                        Text(model.origin.query.isEmpty ? "search.empty.records" : "search.empty.matches")
-                            .font(ArgusStyle.body()).padding(.vertical, 24).accessibilityIdentifier("search.empty")
-                    }
-                    ForEach(FinancialSearchKind.allCases, id: \.self) { kind in
-                        let rows = model.items.filter { $0.kind == kind }
-                        if !rows.isEmpty {
-                            Text(LocalizedStringKey("search.filter." + kind.rawValue)).font(ArgusStyle.display(23))
-                                .padding(.top, 18).padding(.bottom, 6).accessibilityAddTraits(.isHeader)
-                            ForEach(rows) { hit in
-                                Button { focused = false; Task { await model.open(hit, accounts: accounts, loop: loop) } } label: {
-                                    FinancialSearchRow(hit: hit)
-                                }.buttonStyle(.plain).disabled(model.opening)
-                                    .id(hit.id).accessibilityIdentifier("search.row." + hit.id)
-                                    .background(GeometryReader { geometry in
-                                        Color.clear.preference(key: SearchRowFrames.self, value: [hit.id: geometry.frame(in: .named("search.viewport"))])
-                                    })
-                            }
-                        }
-                    }
-                    if model.cursor != nil {
-                        Button("loop.more") { Task { await model.more() } }.frame(minHeight: 48)
-                            .disabled(model.loading).accessibilityIdentifier("search.more")
-                    }
-                }.padding(.bottom, 24)
-            }.coordinateSpace(name: "search.viewport").scrollDismissesKeyboard(.interactively)
-                .accessibilityIdentifier("search.results")
-                .overlay(alignment: .top) {
-                    if model.loading || model.opening {
-                        ProgressView("accounts.loading").padding(.vertical, 12)
-                            .frame(maxWidth: .infinity).background(ArgusStyle.background)
-                            .accessibilityIdentifier("search.loading").allowsHitTesting(false)
-                    }
-                }
-                .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.userScrolled() })
-                .refreshable { await model.refresh() }
-                .onPreferenceChange(SearchRowFrames.self) { frames in
-                    scroll.frames = frames
-                    if let restoration = model.restoration {
-                        if let frame = frames[restoration.anchor],
-                           scroll.restore(restoration, currentRowOffset: frame.minY) {
-                            model.restored(restoration.id)
-                        }
-                        return
-                    }
-                    guard active,
-                          let row = frames.filter({ $0.value.maxY > 0 }).min(by: { $0.value.minY < $1.value.minY }) else { return }
-                    model.remember(anchor: row.key, offset: row.value.minY)
-                }
-                .onChange(of: model.restoration) { _, restoration in
-                    guard let restoration else { return }
-                    Task { @MainActor in
-                        await Task.yield()
-                        guard model.restoration?.id == restoration.id else { return }
-                        scroll.view?.layoutIfNeeded()
-                        if let frame = scroll.frames[restoration.anchor],
-                           scroll.restore(restoration, currentRowOffset: frame.minY) {
-                            model.restored(restoration.id)
-                        }
-                    }
-                }
+        .onChange(of: active) { _, active in
+            if active, unavailableKind == nil { Task { await model.activate() } }
+            else { focused = false }
         }
+        .onChange(of: model.destination != nil) { _, showing in detailChanged(showing) }
+        .onChange(of: model.ownerID) { _, _ in unavailableKind = nil }
+        .toolbar(.hidden, for: .tabBar)
+    }
+
+    @ViewBuilder private var results: some View {
+        if let unavailableKind {
+            CuadraoSearchEmptyState(query: query, kind: kind, spanish: spanish,
+                filterCount: 0, clearFilters: clearFilters,
+                title: unavailableKind.title(spanish), detail: unavailableDetail(unavailableKind), accessibility: .connected)
+                .padding(.top, 36)
+        } else {
+            if let error = model.destinationError {
+                Text(LocalizedStringKey(error)).padding(.vertical, 12).accessibilityIdentifier("search.destination.error")
+                Button("action.close") { model.dismissError() }.frame(minHeight: 44)
+            }
+            if let error = model.errorKey {
+                Text(LocalizedStringKey(error)).padding(.vertical, 12).accessibilityIdentifier("search.error")
+                Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44).accessibilityIdentifier("search.retry")
+            } else if model.items.isEmpty && !model.loading {
+                CuadraoSearchEmptyState(query: query, kind: kind, spanish: spanish,
+                    filterCount: filterCount, clearFilters: clearFilters,
+                    detail: kind.wrappedValue == .all && model.origin.query.isEmpty && filterCount == 0
+                        ? (spanish ? "Busca cuentas, movimientos y planes." : "Search accounts, activity and plans.") : nil,
+                    accessibility: .connected)
+                    .padding(.top, 36)
+            }
+            ForEach([CanvasSearchKind.accounts, .activity, .plans], id: \.self) { section in
+                let rows = model.items.filter { Self.perspective($0.kind) == section }
+                if !rows.isEmpty {
+                    CuadraoSearchHeading(title: section.title(spanish), count: rows.count)
+                    ForEach(rows) { hit in
+                        Button { focused = false; Task { await model.open(hit, accounts: accounts, loop: loop) } } label: {
+                            FinancialSearchRow(hit: hit)
+                        }.buttonStyle(.plain).disabled(model.opening)
+                            .id(hit.id).accessibilityIdentifier("search.row." + hit.id)
+                            .background(GeometryReader { geometry in
+                                Color.clear.preference(key: SearchRowFrames.self, value: [hit.id: geometry.frame(in: .named("search.viewport"))])
+                            })
+                        Divider().foregroundStyle(WelcomePalette.separator)
+                    }
+                }
+            }
+            if model.cursor != nil {
+                Button("loop.more") { Task { await model.more() } }.frame(minHeight: 48)
+                    .disabled(model.loading).accessibilityIdentifier("search.more")
+            }
+        }
+    }
+
+    @ViewBuilder private var filterControls: some View {
+        if unavailableKind == nil {
+            if kind.wrappedValue == .plans {
+                Picker(spanish ? "Tipo de plan" : "Plan type", selection: Binding(
+                    get: { model.origin.kind ?? .expectation }, set: { model.update(kind: .some($0)) })) {
+                    ForEach([FinancialSearchKind.expectation, .budget, .goal, .debt], id: \.self) { value in
+                        Text(planTitle(value)).tag(value).accessibilityIdentifier("search.filter." + value.rawValue)
+                    }
+                }.accessibilityIdentifier("search.plan-kind")
+            }
+            Picker(spanish ? "Moneda" : "Currency", selection: Binding(
+                get: { model.origin.currency }, set: { model.update(currency: .some($0)) })) {
+                    Text(spanish ? "Todas" : "All").tag(nil as String?)
+                    ForEach(currencies, id: \.self) { Text($0).tag(Optional($0)) }
+                }.accessibilityIdentifier("search.currency")
+            Section {
+                Button(spanish ? "Restablecer filtros" : "Reset filters", action: clearFilters)
+            } footer: {
+                Text(spanish ? "Busca en tus registros personales. La moneda filtra cuentas, movimientos y planes."
+                    : "Search your personal records. Currency filters accounts, activity and plans.")
+            }
+        } else if let unavailableKind {
+            Text(unavailableDetail(unavailableKind)).foregroundStyle(.secondary)
+        }
+    }
+
+    private var destination: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                switch model.destination {
+                case .account(let id):
+                    if let account = accounts.accounts.first(where: { $0.id == id }) {
+                        AccountDetailView(account: account, model: accounts, loop: loop)
+                    } else { Text("search.destination.unavailable") }
+                case .activity(let id):
+                    FinancialActivityDetailView(loop: loop, activityID: id, accounts: accounts.accounts,
+                        openAccount: { id in
+                            guard let account = accounts.accounts.first(where: { $0.id == id }) else { return }
+                            Task { await model.open(.account(account), accounts: accounts, loop: loop) }
+                        }) { loop.correct($0) }
+                case nil: EmptyView()
+                }
+            }.padding(24).padding(.bottom, 32)
+        }.background(WelcomePalette.background).accessibilityIdentifier("search.detail")
+            .navigationTitle("").navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
+    }
+
+    private func select(_ selected: CanvasSearchKind) {
+        switch selected {
+        case .all: unavailableKind = nil; model.update(kind: .some(nil))
+        case .accounts: unavailableKind = nil; model.update(kind: .some(.account))
+        case .activity: unavailableKind = nil; model.update(kind: .some(.activity))
+        case .plans:
+            unavailableKind = nil
+            if Self.perspective(model.origin.kind) != .plans { model.update(kind: .some(.expectation)) }
+        case .chats, .files, .memory: unavailableKind = selected; model.invalidate()
+        }
+    }
+    private func clearFilters() { model.update(kind: .some(nil), currency: .some(nil)) }
+    private func planTitle(_ kind: FinancialSearchKind) -> String {
+        switch kind {
+        case .expectation: spanish ? "Ingresos y pagos" : "Income and bills"
+        default: NSLocalizedString("search.filter." + kind.rawValue, comment: "")
+        }
+    }
+    private func unavailableDetail(_ kind: CanvasSearchKind) -> String {
+        switch kind {
+        case .chats: spanish ? "Tus chats aún no están disponibles en esta búsqueda." : "Your chats are not available in this search yet."
+        case .files: spanish ? "Tus archivos aún no están disponibles en esta búsqueda." : "Your files are not available in this search yet."
+        default: spanish ? "La memoria aún no está disponible en esta búsqueda." : "Memory is not available in this search yet."
+        }
+    }
+    private func rememberFrames(_ frames: [String: CGRect]) {
+        scroll.frames = frames
+        if let restoration = model.restoration {
+            if let frame = frames[restoration.anchor], scroll.restore(restoration, currentRowOffset: frame.minY) {
+                model.restored(restoration.id)
+            }
+            return
+        }
+        guard active, unavailableKind == nil,
+              let row = frames.filter({ $0.value.maxY > 0 }).min(by: { $0.value.minY < $1.value.minY }) else { return }
+        model.remember(anchor: row.key, offset: row.value.minY)
     }
 }
 
 struct FinancialSearchRow: View {
     let hit: FinancialSearchHit
     @Environment(\.locale) private var locale
+    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
+
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: symbol).font(.system(size: 19)).frame(width: 26)
-            VStack(alignment: .leading, spacing: 6) {
-                title.font(ArgusStyle.body(15)).lineLimit(2)
-                if hit.archived { Text("accounts.archived").font(ArgusStyle.body(11, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary) }
-                if case .activity(let activity, _) = hit {
-                    Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
-                        .font(ArgusStyle.body(11, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
-                }
-                HStack(spacing: 4) {
-                    if case .goal = hit { Text("goal.target") }
-                    Text(verbatim: hit.currency + " " + (hit.amount.map { AccountPresentation.amount($0, locale: locale) } ?? NSLocalizedString("accounts.unknown", comment: "")))
-                }.font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary).monospacedDigit()
-            }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(ArgusStyle.secondary)
-        }.padding(.vertical, 18).frame(maxWidth: .infinity, minHeight: 60, alignment: .leading).contentShape(Rectangle())
-            .overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
+        CuadraoSearchResultRow(title: title, detail: detail, spanish: spanish,
+            symbol: symbol, accountKind: artwork, category: category)
             .accessibilityElement(children: .combine)
     }
-    private var title: Text {
+    private var title: String {
         switch hit {
-        case .account(let account): account.nickname.map { Text(verbatim: $0) } ?? Text(LocalizedStringKey("accounts.type." + account.type))
-        case .activity(let activity, _): activity.note.map { Text(verbatim: $0) } ?? Text(LocalizedStringKey("loop.kind." + activity.kind.rawValue))
-        case .expectation(let expectation): Text(verbatim: expectation.title)
-        case .budget(let budget): Text(verbatim: budget.name)
-        case .goal(let goal): Text(verbatim: goal.goal.name)
-        case .debt(let debt): Text(verbatim: debt.debt.name)
+        case .account(let account): ConnectedAccountPresentation.title(account, spanish: spanish)
+        case .activity(let activity, _): activity.note ?? NSLocalizedString("loop.kind." + activity.kind.rawValue, comment: "")
+        case .expectation(let expectation): expectation.title
+        case .budget(let budget): budget.name
+        case .goal(let goal): goal.goal.name
+        case .debt(let debt): debt.debt.name
         }
     }
+    private var detail: String {
+        var parts: [String] = []
+        if case .account(let account) = hit {
+            parts.append(ConnectedAccountPresentation.artwork(account.type)?.title(spanish) ?? account.type)
+        }
+        if case .activity(let activity, _) = hit {
+            parts.append(NSLocalizedString("loop.kind." + activity.kind.rawValue, comment: ""))
+            parts.append(AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
+        }
+        switch hit {
+        case .expectation(let expectation): parts.append(NSLocalizedString("plan.kind." + expectation.kind.rawValue, comment: ""))
+        case .budget, .goal, .debt: parts.append(NSLocalizedString("search.filter." + hit.kind.rawValue, comment: ""))
+        default: break
+        }
+        let amount = hit.amount.map { AccountPresentation.amount($0, locale: locale) }
+            ?? NSLocalizedString("accounts.unknown", comment: "")
+        let amountLabel = hit.currency + " " + amount
+        if case .goal = hit { parts.append(NSLocalizedString("goal.target", comment: "") + " · " + amountLabel) }
+        else { parts.append(amountLabel) }
+        if hit.archived { parts.append(NSLocalizedString("accounts.archived", comment: "")) }
+        return parts.joined(separator: " · ")
+    }
+    private var artwork: CanvasAccountKind? {
+        if case .account(let account) = hit { return ConnectedAccountPresentation.artwork(account.type) }
+        return nil
+    }
+    private var category: CanvasExpenseCategory? {
+        if case .activity(let activity, _) = hit, activity.kind == .expense, let category = activity.categoryId {
+            return .fromRecordedCategory(category)
+        }
+        return nil
+    }
     private var symbol: String {
-        switch hit { case .account(let account): AccountPresentation.symbol(account.type); case .activity: "arrow.left.arrow.right"; case .expectation: "calendar"; case .budget: "chart.bar"; case .goal: "target"; case .debt: "creditcard" }
+        switch hit {
+        case .account(let account): AccountPresentation.symbol(account.type)
+        case .activity(let activity, _): FinancialActivityPresentation.symbol(for: activity.kind.rawValue)
+        case .expectation: "calendar"
+        case .budget: "chart.bar"
+        case .goal: "target"
+        case .debt: "creditcard"
+        }
     }
 }
 

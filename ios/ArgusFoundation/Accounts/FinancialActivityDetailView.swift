@@ -56,7 +56,7 @@ struct FinancialActivityDetailView: View {
 
     private func display(_ detail: FinancialActivityDetail) -> CanvasActivityDetailValue {
         let category = detail.categoryId.map {
-            CanvasActivityCategoryValue(title: NSLocalizedString("loop.category." + $0, comment: ""), artwork: categoryArtwork($0))
+            CanvasActivityCategoryValue(title: NSLocalizedString("loop.category." + $0, comment: ""), artwork: CanvasExpenseCategory.fromRecordedCategory($0))
         }
         let amount = detail.originalAmountAvailable
             ? detail.currency + " " + AccountPresentation.amount(detail.amount, locale: locale)
@@ -112,17 +112,6 @@ struct FinancialActivityDetailView: View {
                     if let reason = revision.reason { Text(verbatim: reason) }
                 }
             }
-        }
-    }
-
-    private func categoryArtwork(_ category: String) -> CanvasExpenseCategory? {
-        switch category {
-        case "dining": .food
-        case "groceries": .groceries
-        case "transport": .transport
-        case "housing": .home
-        case "other": .other
-        default: nil
         }
     }
 
