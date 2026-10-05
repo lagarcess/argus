@@ -29,8 +29,6 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     # The formatter remains one production source; copy its exact declaration.
     presentation = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
     (source / "AccountPresentation.swift").write_text("import Foundation\nimport ArgusSession\n" + presentation[presentation.index("enum AccountPresentation {"):])
-    # Exercise the connected projections using the same immutable display values.
-    # Extract artwork vocabulary only; no Preview records or fixture store enter this target.
     canvas = root / "ios/ArgusFoundation/Cuadrao"
     kinds = (canvas / "CuadraoAccountsPreview.swift").read_text()
     (source / "CanvasAccountKind.swift").write_text("import Foundation\n" + kinds[kinds.index("enum CanvasAccountKind:"):kinds.index("struct CanvasAccount:")])

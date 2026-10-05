@@ -7,7 +7,6 @@ struct AccountDetailView: View {
     @ObservedObject var loop: FinancialLoopModel
     @Environment(\.locale) private var locale
 
-    /// Pushed destinations capture a value; the model retains current versions.
     private var current: FinancialAccount {
         model.accounts.first(where: { $0.id == account.id }) ?? account
     }

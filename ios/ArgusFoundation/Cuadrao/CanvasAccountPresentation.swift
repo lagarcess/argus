@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Read-only display values shared by Preview and the connected financial hosts.
 struct CanvasAccountRowValue {
     let title: String
     let subtitle: String
@@ -44,7 +43,6 @@ struct CanvasAccountRowContent: View {
     }
 }
 
-/// Artwork is vocabulary only. A missing kind must not become a checking account.
 struct CanvasAccountArtwork: View {
     let kind: CanvasAccountKind?
     var size: CGFloat = 23
@@ -106,7 +104,6 @@ struct CanvasAccountDetailHeader: View {
     }
 }
 
-/// The account canvas's original composition; the host owns loading and history.
 struct CanvasAccountDetailContent<History: View>: View {
     let value: CanvasAccountDetailValue
     let spanish: Bool

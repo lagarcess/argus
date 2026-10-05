@@ -58,8 +58,6 @@ struct FinancialActivityDetailView: View {
         let category = detail.categoryId.map {
             CanvasActivityCategoryValue(title: NSLocalizedString("loop.category." + $0, comment: ""), artwork: categoryArtwork($0))
         }
-        // A grouped operation has one original amount; direction belongs to its
-        // canonical legs. A hidden source amount never becomes a visible leg amount.
         let amount = detail.originalAmountAvailable
             ? detail.currency + " " + AccountPresentation.amount(detail.amount, locale: locale)
             : (spanish ? "Monto no disponible" : "Amount unavailable")

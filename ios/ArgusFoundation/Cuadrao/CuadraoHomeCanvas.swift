@@ -46,37 +46,22 @@ struct CuadraoHomeCanvas: View {
     var body: some View {
         TabView(selection: tabSelection) {
             NavigationStack(path: $accountPath) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 36) {
-                        VStack(alignment: .leading, spacing: 18) {
-                            header
-                            CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
-                            if data.selectedSpace.kind == .household {
-                                Button { sheet = .household } label: {
-                                    PlanAvatarStack(members: data.acceptedHouseholdMembers(spanish: spanish))
-                                        .frame(minHeight: 44).contentShape(Rectangle())
-                                }.buttonStyle(.plain)
-                                    .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")
-                                    .accessibilityValue(String(data.acceptedHouseholdMembers(spanish: spanish).count))
-                                    .accessibilityIdentifier("home-household-members")
-                            }
-                        }
-                        ForEach(CuadraoHomeSection.decode(homeOrder)) { section in
-                            homeSection(section)
-                        }
-                        if !data.active.isEmpty {
-                            Button { sheet = .customize } label: {
-                                Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
-                                    .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
-                            }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
-                        }
+                CuadraoHomeLayout(order: CuadraoHomeSection.decode(homeOrder),
+                    canCustomize: !data.active.isEmpty, spanish: spanish, customize: { sheet = .customize }) {
+                    header
+                    CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
+                    if data.selectedSpace.kind == .household {
+                        Button { sheet = .household } label: {
+                            PlanAvatarStack(members: data.acceptedHouseholdMembers(spanish: spanish))
+                                .frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                            .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")
+                            .accessibilityValue(String(data.acceptedHouseholdMembers(spanish: spanish).count))
+                            .accessibilityIdentifier("home-household-members")
                     }
-                    .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
-                }
+                } notice: { EmptyView() } section: { homeSection($0) }
                 .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
                     enabled: selectedTab == .home && sheet == nil && accountPath.isEmpty))
-                .safeAreaPadding(.bottom, 80)
-                .background(WelcomePalette.background)
                 .navigationTitle("").navigationBarTitleDisplayMode(.inline)
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: HomeRoute.self) { route in
@@ -198,11 +183,7 @@ struct CuadraoHomeCanvas: View {
 
     private var header: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 5) {
-                Text((spanish ? "Hola" : "Hello") + (profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    ? "" : ", " + profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines)))
-                    .font(.title2.weight(.semibold)).accessibilityIdentifier("home-greeting")
-            }
+            CuadraoHomeGreeting(name: profile.preferredName, spanish: spanish)
                 .contextMenu {
                     #if DEBUG
                     Button(spanish ? "Revisión de lanzamiento" : "Release UI review") { sheet = .releaseReview }
@@ -221,19 +202,7 @@ struct CuadraoHomeCanvas: View {
                     }
                 }
             Spacer()
-            Button { sheet = .updates } label: {
-                Image("CuadraoNotifications").frame(width: 44, height: 44)
-                    .overlay(alignment: .topTrailing) {
-                        if unreadUpdates > 0 {
-                            Text(String(unreadUpdates)).font(.caption2.weight(.medium))
-                                .foregroundStyle(WelcomePalette.onAccent).padding(4)
-                                .background(WelcomePalette.pine, in: Circle()).accessibilityHidden(true)
-                        }
-                    }
-            }
-            .accessibilityLabel(spanish ? "Novedades" : "Updates")
-            .accessibilityValue(spanish ? "\(unreadUpdates) sin leer" : "\(unreadUpdates) unread")
-            .accessibilityIdentifier("cuadrao.updates.open")
+            CuadraoUpdatesButton(spanish: spanish, unread: unreadUpdates) { sheet = .updates }
         }
     }
 
@@ -291,27 +260,13 @@ struct CuadraoHomeCanvas: View {
     }
 
     private var upcoming: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                sectionTitle(spanish ? "Próximamente" : "Coming up")
-                Spacer()
-                Button(spanish ? "Ver plan" : "View plan") { selectedTab = .plan }
-                    .font(.subheadline).frame(minHeight: 44)
-            }
-            feedRow("Internet", detail: spanish ? "Mañana · Previsto" : "Tomorrow · Planned", amount: "1,500.00", icon: "wifi")
+        CuadraoUpcomingSection(spanish: spanish, viewPlan: { selectedTab = .plan }) {
+            CuadraoFeedRow(title: "Internet", detail: spanish ? "Mañana · Previsto" : "Tomorrow · Planned", amount: "1,500.00", icon: "wifi")
         }
     }
 
     private func feedRow(_ title: String, detail: String, amount: String, icon: String) -> some View {
-        HStack(alignment: .center, spacing: 14) {
-            Image(systemName: icon).font(.body).frame(width: 28).foregroundStyle(.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.body)
-                Text(detail).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(amount).font(CuadraoTypography.rowAmount)
-        }.padding(.vertical, 6).contentShape(Rectangle())
+        CuadraoFeedRow(title: title, detail: detail, amount: amount, icon: icon)
     }
 
     private func sectionTitle(_ title: String) -> some View {

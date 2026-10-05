@@ -11,7 +11,6 @@ struct ConnectedAccountRow: View {
     }
 }
 
-/// Formats canonical values without converting money or ownership to fixture records.
 @MainActor
 enum ConnectedAccountPresentation {
     static func artwork(_ type: String) -> CanvasAccountKind? {

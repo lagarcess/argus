@@ -16,15 +16,14 @@ struct ConnectedCuadraoShell: View {
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
     var body: some View {
-        ZStack {
+        TabView(selection: $tab) {
             ForEach(CuadraoTab.allCases) { item in
                 tabContent(item)
-                    .opacity(tab == item ? 1 : 0)
-                    .allowsHitTesting(tab == item)
-                    .accessibilityHidden(tab != item)
+                    .toolbar(.hidden, for: .tabBar)
+                    .tag(item)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .cuadraoScrollBar(edge: .bottom) {
             if (homePath.isEmpty || tab != .home) && (profilePath.isEmpty || tab != .profile) {
                 CuadraoNavigationBar(selection: $tab, compact: tab == .home && navigationScroll.compact, spanish: spanish, avatar: avatar, profileName: auth.profile?.displayName ?? "")
                     .padding(.horizontal, 20)
@@ -32,6 +31,7 @@ struct ConnectedCuadraoShell: View {
                     .padding(.bottom, 8)
             }
         }
+        .cuadraoSoftScrollEdges()
         .background { if let household = auth.household { HouseholdPresenter(model: household) } }
         .background { if let household = auth.household { HouseholdPlanPresenter(model: household.plan) } }
         .financialBudgetBackground(auth.financialLoop?.budgets)
@@ -78,8 +78,8 @@ struct ConnectedCuadraoShell: View {
             }
         }
         .tint(WelcomePalette.pine)
-        .foregroundStyle(Color(white: 0.08))
-        .background(Color.white.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
+        .background(WelcomePalette.background.ignoresSafeArea())
         .onChange(of: destination) { _, value in mapDestination(value) }
         .onChange(of: tab) { _, value in mapTab(value) }
         .onChange(of: auth.profile?.id) { _, _ in avatar = .none; profilePath = [] }

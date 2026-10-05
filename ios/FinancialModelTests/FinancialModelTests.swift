@@ -5,6 +5,24 @@ import XCTest
 
 @MainActor
 final class FinancialModelTests: XCTestCase {
+    func testHomeDoesNotTreatAnUnreadOrRetiredAccountListAsFirstUse() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        accounts.bind(identity)
+        XCTAssertFalse(accounts.hasLoaded)
+        await accounts.load()
+        XCTAssertTrue(accounts.hasLoaded)
+        XCTAssertFalse(accounts.accounts.isEmpty)
+        accounts.bind(nil)
+        XCTAssertFalse(accounts.hasLoaded, "another session must not inherit a successful empty/read state")
+        accounts.bind(identity)
+        await fixture.server.readReply("/api/v1/financial-accounts", body: "{}", status: 503)
+        await accounts.load()
+        XCTAssertNotNil(accounts.errorKey)
+        XCTAssertFalse(accounts.hasLoaded, "a failed initial read must show recovery, not the first-account invitation")
+    }
+
     func testRedactedOriginalHasUnknownDisplayAndCannotOpenCorrectionOrReturn() async throws {
         let fixture = try PresentationFixture(); let identity = try await fixture.login()
         let accounts = AccountsModel(controller: fixture.client)

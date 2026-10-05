@@ -152,25 +152,9 @@ private struct CuadraoHomeBalanceChartContent: View {
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
     private func amountRow(_ shown: CanvasBalancePoint?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                if currencies.count > 1 {
-                    CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency",
-                        selection: Binding(get: { currency }, set: { selectedDate = nil; chooseCurrency($0) }),
-                        values: currencies, valueTitle: { $0 })
-                        .accessibilityIdentifier("home-chart-currency")
-                } else { Text(currency).foregroundStyle(.secondary) }
-                Text(shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—")
-                    .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
-                    .accessibilityIdentifier("home-chart-amount")
-                if !expanded {
-                    Spacer(minLength: 0)
-                    Button(action: expand) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.body)
-                            .frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityLabel(spanish ? "Explorar balance" : "Explore balance")
-                        .accessibilityIdentifier("home-history-expand")
-                }
-            }.font(CuadraoTypography.supporting)
+        CuadraoBalanceAmount(amount: shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—",
+            currency: currency, currencies: currencies, spanish: spanish, expanded: expanded,
+            chooseCurrency: { selectedDate = nil; chooseCurrency($0) }, expand: expand)
     }
     private func periodCanvas(_ reading: Reading) -> some View {
         chart(reading).padding(expanded ? 14 : 0)

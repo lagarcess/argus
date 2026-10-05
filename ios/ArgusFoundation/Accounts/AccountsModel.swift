@@ -8,6 +8,7 @@ final class AccountsModel: ObservableObject {
     @Published private(set) var selectedID: UUID?
     var selected: FinancialAccount? { accounts.first { $0.id == selectedID } }
     @Published var draft: AccountDraft?
+    @Published private(set) var hasLoaded = false
     @Published private(set) var busy = false
     @Published private(set) var errorKey: String?
     @Published private(set) var latest: FinancialAccount?
@@ -31,7 +32,7 @@ final class AccountsModel: ObservableObject {
         guard snapshot?.revision != identity?.revision || snapshot?.profile?.id != identity?.profile?.id || snapshot?.phase != identity?.phase else { return }
         generation = UUID()
         identity = snapshot?.phase == .authenticated ? snapshot : nil
-        accounts = []; selectedID = nil; draft = nil; latest = nil
+        accounts = []; hasLoaded = false; selectedID = nil; draft = nil; latest = nil
         clearOpening(); pendingCreate = nil; busy = false; errorKey = nil; needsReview = false
     }
 
@@ -39,6 +40,7 @@ final class AccountsModel: ObservableObject {
         await run { identity in let values = try await self.controller.financialAccounts(expectedIdentity: identity)
             if self.current(identity) {
                 self.accounts = values
+                self.hasLoaded = true
                 if !values.contains(where: { $0.id == self.selectedID }) { self.selectedID = nil }
             } }
     }

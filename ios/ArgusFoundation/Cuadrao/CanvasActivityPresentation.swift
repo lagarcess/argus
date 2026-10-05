@@ -13,8 +13,6 @@ struct CanvasActivityDetailValue {
     let category: CanvasActivityCategoryValue?
 }
 
-/// Extracted from the approved movement canvas. The host supplies real detail
-/// and commands after these common fields; this view owns no financial state.
 struct CanvasActivityDetailContent<Details: View>: View {
     let value: CanvasActivityDetailValue
     let spanish: Bool

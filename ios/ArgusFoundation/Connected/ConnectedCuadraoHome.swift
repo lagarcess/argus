@@ -47,42 +47,32 @@ struct ConnectedCuadraoHome: View {
 
     var body: some View {
         NavigationStack(path: $homePath) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 36) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        header
-                        if tab == .home, let household = auth.household {
-                            HouseholdControls(model: household, destination: $householdDestination)
-                        }
-                    }
-                    if loop.pendingConfirmation != nil {
-                        pendingBanner
-                    }
-                    if let recoveryError = loop.recoveryErrorKey {
-                        Text(LocalizedStringKey(recoveryError)).foregroundStyle(.secondary)
-                    }
-                    ForEach(CuadraoHomeSection.decode(homeOrder)) { section in
-                        homeSection(section)
-                    }
-                    if !activeAccounts.isEmpty {
-                        Button { sheet = .customize } label: {
-                            Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
-                                .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
-                        }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
-                    }
-                    if plan.loading { ProgressView("accounts.loading") }
-                    if let error = plan.homeErrorKey {
-                        Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
-                        Button("accounts.retry") { Task { await loop.refresh() } }.frame(minHeight: 44)
-                    }
+            CuadraoHomeLayout(order: CuadraoHomeSection.decode(homeOrder),
+                canCustomize: !activeAccounts.isEmpty, spanish: spanish, customize: { sheet = .customize }) {
+                header
+                if let household = auth.household {
+                    ConnectedCuadraoSpaces(model: household, destination: $householdDestination)
+                } else {
+                    Text("household.personal").font(.subheadline.weight(.semibold)).frame(minHeight: 44)
                 }
-                .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
-            }
+            } notice: {
+                if loop.pendingConfirmation != nil { pendingBanner }
+                if let recoveryError = loop.recoveryErrorKey {
+                    Text(LocalizedStringKey(recoveryError)).foregroundStyle(.secondary)
+                }
+                if let error = accounts.errorKey {
+                    Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
+                    Button("accounts.retry") { Task { await accounts.load() } }.frame(minHeight: 44)
+                }
+                if let error = plan.homeErrorKey {
+                    Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
+                    Button("accounts.retry") { Task { await loop.refresh() } }.frame(minHeight: 44)
+                }
+            } section: { homeSection($0) }
             .accessibilityIdentifier("screen.home")
             .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
                 enabled: tab == .home && sheet == nil && homePath.isEmpty))
-            .safeAreaPadding(.bottom, 80)
-            .background(Color.white)
+            .background(WelcomePalette.background)
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ConnectedHomeRoute.self) { route in
@@ -96,7 +86,7 @@ struct ConnectedCuadraoHome: View {
         .onChange(of: accounts.accounts) { _, _ in Task { await loop.refresh() } }
         .onChange(of: accounts.selectedID) { _, id in
             if let id {
-                if homePath != [.account(id)] { homePath = [.account(id)] }
+                if homePath.last?.accountID != id { homePath.append(.account(id)) }
             } else if !homePath.isEmpty, !showsActivity {
                 homePath = []
             }
@@ -144,11 +134,16 @@ struct ConnectedCuadraoHome: View {
     @ViewBuilder private func activityDetail(_ id: UUID) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }
+                FinancialActivityDetailView(loop: loop, activityID: id, accounts: accounts.accounts,
+                    openAccount: { accountID in
+                        guard let account = accounts.accounts.first(where: { $0.id == accountID }) else { return }
+                        homePath.append(.account(accountID))
+                        Task { await accounts.open(account); await loop.open(account) }
+                    }) { loop.correct($0) }
             }.padding(24)
         }
         .accessibilityIdentifier("screen.activity")
-        .background(Color.white)
+        .background(WelcomePalette.background)
         .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
@@ -161,14 +156,14 @@ struct ConnectedCuadraoHome: View {
     }
 
     @ViewBuilder private func accountDetail(_ id: UUID) -> some View {
-        if let account = accounts.accounts.first(where: { $0.id == id }) ?? accounts.selected {
+        if let account = accounts.accounts.first(where: { $0.id == id }) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     AccountDetailView(account: account, model: accounts, loop: loop)
                 }.padding(24)
             }
             .accessibilityIdentifier("screen.accounts")
-            .background(Color.white)
+            .background(WelcomePalette.background)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
@@ -176,6 +171,7 @@ struct ConnectedCuadraoHome: View {
                     Button {
                         // Clear selection first; selectedID onChange drops the path.
                         accounts.back()
+                        if homePath.last?.accountID != nil { homePath.removeLast() }
                     } label: {
                         Label("accounts.back", systemImage: "chevron.left")
                     }
@@ -188,18 +184,15 @@ struct ConnectedCuadraoHome: View {
 
     private func restoreDetailPath() {
         guard loop.activityEditor == nil, loop.editor == nil, !showsActivity,
-              let id = accounts.selectedID, homePath != [.account(id)] else { return }
-        homePath = [.account(id)]
+              let id = accounts.selectedID, homePath.last?.accountID != id else { return }
+        homePath.append(.account(id))
     }
 
     private var header: some View {
         HStack {
-            CuadraoBrand()
+            CuadraoHomeGreeting(name: auth.profile?.displayName ?? "", spanish: spanish)
             Spacer()
-            Button(action: showUpdates) {
-                Image("CuadraoNotifications").frame(width: 44, height: 44)
-            }
-            .accessibilityLabel(spanish ? "Novedades" : "Updates")
+            CuadraoUpdatesButton(spanish: spanish, action: showUpdates)
         }
     }
 
@@ -210,13 +203,13 @@ struct ConnectedCuadraoHome: View {
             Button("loop.pending.retry") { Task { await loop.retryPending() } }
                 .buttonStyle(PillButtonStyle()).disabled(loop.recovering)
                 .accessibilityIdentifier("loop.pending.retry")
-        }.padding(16).overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(white: 0.85)))
+        }.padding(16).overlay(RoundedRectangle(cornerRadius: 14).stroke(WelcomePalette.border))
     }
 
     @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
         switch section {
         case .overview:
-            if let home = loop.home, !home.currencies.isEmpty, !activeAccounts.isEmpty {
+            if let home = loop.home, !home.currencies.isEmpty {
                 overview(home)
             }
         case .upcoming:
@@ -233,56 +226,23 @@ struct ConnectedCuadraoHome: View {
     }
 
     private func overview(_ home: FinancialHome) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(spanish ? "Tu panorama." : "Your overview.")
-                .font(.system(.largeTitle, design: .serif))
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(home.currencies, id: \.currency) { summary in
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 6) {
-                        Text("loop.home.netWorth")
-                        Text(verbatim: "· " + summary.currency)
-                    }.font(.subheadline).foregroundStyle(.secondary)
-                    if summary.knownAccounts > 0 {
-                        Text(verbatim: money(summary.netWorthMinor, summary))
-                            .font(.system(size: 38, weight: .medium, design: .rounded))
-                            .monospacedDigit()
-                            .lineLimit(1).minimumScaleFactor(0.6)
-                            .accessibilityIdentifier("home.netWorth." + summary.currency)
-                    } else {
-                        Text("accounts.unknown").font(.title2)
-                    }
-                    if summary.knownAccounts > 0 {
-                        Text("loop.home.source").font(.footnote).foregroundStyle(.secondary)
-                        summaryRow("loop.home.cash", value: money(summary.cashMinor, summary))
-                        if summary.otherAssetsMinor != "0" {
-                            summaryRow("loop.home.other", value: money(summary.otherAssetsMinor, summary))
-                        }
-                        summaryRow("loop.home.debt", value: money(summary.debtsMinor, summary))
-                    }
-                    if summary.unknownAccounts > 0 {
-                        Text(verbatim: String(format: NSLocalizedString("loop.home.unknownCount", comment: ""), summary.unknownAccounts))
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
+        ConnectedCuadraoBalanceOverview(home: home, spanish: spanish)
     }
 
     private var accountsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             if !activeAccounts.isEmpty || !archivedAccounts.isEmpty {
                 HStack(spacing: 0) {
-                    Text(spanish ? "Cuentas" : "Accounts")
-                        .font(.system(.title2, design: .serif))
-                        .accessibilityAddTraits(.isHeader)
+                    Button { sheet = .options } label: {
+                        HStack(spacing: 8) {
+                            Text(spanish ? "Cuentas" : "Accounts").font(CuadraoTypography.section)
+                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+                        }.frame(minHeight: 44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityIdentifier("accounts.manage")
                     Spacer()
-                    Button { accounts.create() } label: { Image(systemName: "plus").frame(width: 44, height: 44) }
+                    CuadraoSectionAddButton(title: spanish ? "Añadir cuenta" : "Add account") { accounts.create() }
                         .accessibilityLabel(spanish ? "Añadir cuenta" : "Add account")
                         .accessibilityIdentifier("accounts.add")
-                    Button { sheet = .archived } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                        .accessibilityLabel(spanish ? "Cuentas archivadas" : "Archived accounts")
-                        .accessibilityIdentifier("accounts.manage")
                 }
             }
             VStack(spacing: 0) {
@@ -311,7 +271,8 @@ struct ConnectedCuadraoHome: View {
                 }
             }.connectedSwipeContainer()
             if activeAccounts.isEmpty {
-                personalEmpty
+                if !accounts.hasLoaded && accounts.errorKey == nil { ProgressView("accounts.loading") }
+                else if accounts.errorKey == nil { personalEmpty }
             }
         }
     }
@@ -352,28 +313,14 @@ struct ConnectedCuadraoHome: View {
     }
 
     private var personalEmpty: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            Image(systemName: "wallet.bifold")
-                .font(.system(size: 28, weight: .light)).foregroundStyle(WelcomePalette.pine)
-                .frame(width: 60, height: 60)
-                .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 18))
-                .accessibilityHidden(true)
-            RegistrationHeading(
-                title: spanish ? "Empieza con una cuenta." : "Start with one account.",
-                detail: spanish ? "Tu banco, tu efectivo o tus ahorros. Tú eliges por dónde empezar."
-                    : "Your bank, cash or savings. Choose where to begin.")
-            RegistrationButton(title: spanish ? "Añadir cuenta" : "Add account") {
-                accounts.create()
-            }
-            .accessibilityIdentifier("accounts.add")
-        }.padding(.top, 16).frame(maxWidth: .infinity, alignment: .leading)
+        CuadraoPersonalAccountsEmpty(spanish: spanish) { accounts.create() }
     }
 
     private func activity(_ home: FinancialHome) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text(spanish ? "Movimientos" : "Activity")
-                    .font(.system(.title2, design: .serif))
+                    .font(CuadraoTypography.section)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button {
@@ -393,7 +340,7 @@ struct ConnectedCuadraoHome: View {
                 ForEach(home.recentActivity, id: \.recordId) { entry in
                     if let account = accounts.accounts.first(where: { $0.id == entry.accountId }) {
                         ConnectedSwipeRow(leading: movementActions(entry, edge: .leading), trailing: movementActions(entry, edge: .trailing)) {
-                            FinancialActivityRow(activity: entry, currency: account.currency)
+                            ConnectedCuadraoMovementRow(activity: entry, account: account)
                                 .onTapGesture { homePath.append(.activity(entry.activityId ?? entry.recordId)) }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityAddTraits(.isButton)
@@ -410,99 +357,35 @@ struct ConnectedCuadraoHome: View {
         case .customize:
             CuadraoHomeLayoutSheet(savedOrder: $homeOrder, spanish: spanish)
         case .options:
-            VStack(alignment: .leading, spacing: 8) {
-                Text(spanish ? "Cuentas" : "Accounts").font(.title3.weight(.medium)).padding(.bottom, 12)
-                CanvasActionRow(title: spanish ? "Cuentas archivadas" : "Archived accounts", symbol: "archivebox") {
-                    sheet = .archived
-                }
-                .accessibilityIdentifier("accounts.manage")
-            }.padding(28).presentationDetents([.height(200)]).presentationDragIndicator(.visible)
+            ConnectedArchivedAccounts(accounts: accounts, spanish: spanish, showAll: true)
         case .archived:
             ConnectedArchivedAccounts(accounts: accounts, spanish: spanish)
         }
     }
 
-    private func summaryRow(_ title: LocalizedStringKey, value: String) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(verbatim: value).monospacedDigit()
-        }.font(.caption)
-    }
-
-    private func money(_ minor: String, _ summary: FinancialCurrencySummary) -> String {
-        summary.currency + " " + AccountPresentation.amount(AccountPresentation.decimal(minor, digits: summary.currencyFractionDigits), locale: locale)
-    }
-}
-
-private enum ConnectedAccountKind {
-    static func map(_ type: String) -> CanvasAccountKind {
-        switch type {
-        case "cash": .cash
-        case "checking": .checking
-        case "savings": .savings
-        case "investment": .investment
-        case "credit_card": .card
-        case "other_debt": .loan
-        case "property": .property
-        case "vehicle": .vehicle
-        case "other_asset": .asset
-        default: .checking
-        }
-    }
-}
-
-private struct ConnectedAccountRow: View {
-    let account: FinancialAccount
-    let spanish: Bool
-    @Environment(\.locale) private var locale
-
-    var body: some View {
-        HStack(spacing: 12) {
-            CanvasAccountIcon(kind: ConnectedAccountKind.map(account.type))
-                .frame(width: 42, height: 42)
-                .background(WelcomePalette.sage.opacity(0.65), in: RoundedRectangle(cornerRadius: 13))
-            VStack(alignment: .leading, spacing: 5) {
-                Text(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: ""))
-                    .font(.body.weight(.medium))
-                Text(LocalizedStringKey("accounts.type." + account.type))
-                    .font(.caption).foregroundStyle(.secondary)
-                if account.isOptionalAsset {
-                    Text("assets.whole").font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 5) {
-                if let amount = account.balance.amount {
-                    Text(verbatim: AccountPresentation.amount(amount, locale: locale))
-                        .font(.subheadline.weight(.medium)).monospacedDigit()
-                } else {
-                    Text("accounts.unknown").font(.subheadline.weight(.medium))
-                }
-                Text(verbatim: account.currency).font(.caption).foregroundStyle(.secondary)
-            }
-        }.padding(.vertical, 12).contentShape(Rectangle())
-    }
 }
 
 private struct ConnectedArchivedAccounts: View {
     @ObservedObject var accounts: AccountsModel
     let spanish: Bool
+    var showAll = false
     @Environment(\.dismiss) private var dismiss
 
-    private var archived: [FinancialAccount] { accounts.accounts.filter(\.archived) }
+    private var displayed: [FinancialAccount] { showAll ? accounts.accounts : accounts.accounts.filter(\.archived) }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(spanish ? "Sus balances e historial se conservan." : "Balances and history are kept.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    if archived.isEmpty {
+                    if !showAll {
+                        Text(spanish ? "Sus balances e historial se conservan." : "Balances and history are kept.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    if displayed.isEmpty {
                         ContentUnavailableView(spanish ? "No hay cuentas archivadas" : "No archived accounts",
                                                systemImage: "archivebox")
                     }
-                    ForEach(archived) { account in
+                    ForEach(displayed) { account in
                         VStack(alignment: .leading, spacing: 0) {
                             Button {
                                 Task {
@@ -514,15 +397,17 @@ private struct ConnectedArchivedAccounts: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("accounts.row.\(account.id)")
-                            CanvasActionRow(title: spanish ? "Restaurar" : "Restore", symbol: "arrow.uturn.backward") {
-                                Task { await accounts.archive(account) }
-                            }.foregroundStyle(WelcomePalette.pine)
+                            if account.archived {
+                                CanvasActionRow(title: spanish ? "Restaurar" : "Restore", symbol: "arrow.uturn.backward") {
+                                    Task { await accounts.archive(account) }
+                                }.foregroundStyle(WelcomePalette.pine)
+                            }
                             Divider()
                         }
                     }
                 }.padding(24)
-            }.background(Color.white)
-                .navigationTitle(spanish ? "Cuentas archivadas" : "Archived accounts")
+            }.background(WelcomePalette.background)
+                .navigationTitle(showAll ? (spanish ? "Cuentas" : "Accounts") : (spanish ? "Cuentas archivadas" : "Archived accounts"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
