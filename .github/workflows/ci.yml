@@ -238,6 +238,7 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: ${{ matrix.supabase-cli == 'latest' && 'latest' || env.ARGUS_CI_SUPABASE_CLI_VERSION }}
+          github-token: ${{ github.token }}
 
       - name: Start disposable local Supabase and reset migrations
         run: |
