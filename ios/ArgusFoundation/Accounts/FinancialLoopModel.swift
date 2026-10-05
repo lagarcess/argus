@@ -159,10 +159,16 @@ final class FinancialLoopModel: ObservableObject {
         return account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")
     }
 
+    func canCorrect(_ activity: FinancialActivityDetail) -> Bool { correctionAccount(activity) != nil }
+
     func correct(_ activity: FinancialActivityDetail, focusCategory: Bool = false) {
-        guard activity.originalAmountAvailable, let id = activity.legs.first?.accountId,
-              let account = accounts.accounts.first(where: { $0.id == id }) else { return }
+        guard let account = correctionAccount(activity) else { return }
         record(account, correcting: activity, focusCategory: focusCategory)
+    }
+
+    private func correctionAccount(_ activity: FinancialActivityDetail) -> FinancialAccount? {
+        guard activity.originalAmountAvailable, let id = activity.legs.first?.accountId else { return nil }
+        return accounts.accounts.first { $0.id == id }
     }
 
     func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil, focusCategory: Bool = false) {

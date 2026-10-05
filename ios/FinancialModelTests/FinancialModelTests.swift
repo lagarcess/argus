@@ -22,6 +22,21 @@ final class FinancialModelTests: XCTestCase {
         XCTAssertEqual(editor.amount, AccountPresentation.amount(MoneyActivityWireFixture.amount, locale: .current))
         XCTAssertEqual(editor.sourceAccountId, account.id)
     }
+    func testCanCorrectMatchesTheCorrectionGate() async throws {
+        let fixture = try PresentationFixture(); let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity); await accounts.load()
+        let account = try XCTUnwrap(accounts.accounts.first)
+        let full = try MoneyActivityWireFixture.detail(source: account.id, destination: UUID(), redacted: false)
+        let redacted = try MoneyActivityWireFixture.detail(source: account.id, destination: UUID(), redacted: true)
+        let unknownAccount = try MoneyActivityWireFixture.detail(source: UUID(), destination: UUID(), redacted: false)
+        XCTAssertTrue(loop.canCorrect(full))
+        XCTAssertFalse(loop.canCorrect(redacted), "a redacted original cannot be corrected")
+        XCTAssertFalse(loop.canCorrect(unknownAccount), "an account outside this list cannot host the correction")
+        loop.correct(unknownAccount); XCTAssertNil(loop.activityEditor)
+        loop.correct(full); XCTAssertNotNil(loop.activityEditor)
+    }
     func testDetail401RetiresSessionAndClosesAccountIdentity() async throws {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()

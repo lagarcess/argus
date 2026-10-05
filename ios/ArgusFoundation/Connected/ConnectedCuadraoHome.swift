@@ -126,7 +126,7 @@ struct ConnectedCuadraoHome: View {
         .confirmationDialog(Text(verbatim: moreAccount.map(accountName) ?? ""), isPresented: Binding(get: { moreAccount != nil }, set: { if !$0 { moreAccount = nil } }),
                             titleVisibility: .visible, presenting: moreAccount) { account in
             if !account.isOptionalAsset {
-                Button(spanish ? "Revisar saldo" : "Check balance") { loop.check(account) }.accessibilityIdentifier("accounts.more.check")
+                Button(NSLocalizedString("loop.check.title", comment: "")) { loop.check(account) }.accessibilityIdentifier("accounts.more.check")
             }
             Button(spanish ? "Archivar" : "Archive", role: .destructive) { Task { await accounts.archive(account) } }
                 .accessibilityIdentifier("accounts.more.archive")
@@ -343,7 +343,10 @@ struct ConnectedCuadraoHome: View {
 
     private func correct(_ activityID: UUID, focusCategory: Bool) {
         Task {
-            guard let detail = try? await loop.detail(id: activityID) else { return }
+            // The detail explains a failed read or why this movement cannot be corrected, so a swipe never does nothing.
+            guard let detail = try? await loop.detail(id: activityID), loop.canCorrect(detail) else {
+                homePath.append(.activity(activityID)); return
+            }
             loop.correct(detail, focusCategory: focusCategory)
         }
     }
