@@ -184,7 +184,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.staticTexts["debt.recorded"].waitForExistence(timeout: 15))
     }
     private func assertDebt(_ amount: String) {
-        let value = app.otherElements["debt.detail"].staticTexts["debt.recorded"]
+        let value = app.descendants(matching: .any)["debt.detail"].staticTexts["debt.recorded"]
         XCTAssertTrue(value.waitForExistence(timeout: 15))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", amount), object: value)], timeout: 15), .completed)
     }

@@ -342,15 +342,15 @@ final class FinancialLoopUITests: XCTestCase {
         app.launch()
         if app.buttons["budget.close"].waitForExistence(timeout: 2) {
             app.buttons["budget.close"].tap()
-            XCTAssertTrue(app.otherElements["budget.detail"].waitForNonExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["budget.detail"].waitForNonExistence(timeout: 10))
         }
         if app.buttons["goal.close"].waitForExistence(timeout: 2) {
             app.buttons["goal.close"].tap()
-            XCTAssertTrue(app.otherElements["goal.detail"].waitForNonExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["goal.detail"].waitForNonExistence(timeout: 10))
         }
         if app.buttons["debt.close"].waitForExistence(timeout: 2) {
             app.buttons["debt.close"].tap()
-            XCTAssertTrue(app.otherElements["debt.detail"].waitForNonExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["debt.detail"].waitForNonExistence(timeout: 10))
         }
         app.revealConnectedTabBar()
         let connected = app.usesConnectedChrome

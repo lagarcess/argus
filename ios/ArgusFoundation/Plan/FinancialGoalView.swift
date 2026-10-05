@@ -175,6 +175,9 @@ struct FinancialGoalDetail: View {
             }
         }
         .background(WelcomePalette.background)
+        .task(id: model.navigation?.goalID) {
+            if nativeNavigation, model.detail == nil, !model.loading { await model.refreshIfOpen() }
+        }
         .navigationDestination(isPresented: activityPresented) {
             if let id = model.navigation?.activityID {
                 ScrollView {

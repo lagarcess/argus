@@ -198,12 +198,12 @@ extension FinancialLoopUITests {
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         let id = String(row.identifier.dropFirst("goal.row.plan.".count))
         tapVisible(row)
-        XCTAssertTrue(app.otherElements["goal.detail"].staticTexts["goal.supported"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["goal.detail"].staticTexts["goal.supported"].waitForExistence(timeout: 15))
         return id
     }
 
     func assertGoal(_ amount: String) {
-        let value = app.otherElements["goal.detail"].staticTexts["goal.supported"]
+        let value = app.descendants(matching: .any)["goal.detail"].staticTexts["goal.supported"]
         XCTAssertTrue(value.waitForExistence(timeout: 15))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", amount), object: value)], timeout: 15), .completed)
     }

@@ -171,7 +171,7 @@ extension FinancialLoopUITests {
     }
 
     func assertBudget(spent: String, status: String, over: Bool = false) {
-        let detail = app.otherElements["budget.detail"]
+        let detail = app.descendants(matching: .any)["budget.detail"]
         let amount = detail.staticTexts["budget.spent"]
         let expected = NSPredicate(format: "label == %@", "DOP " + spent)
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: expected, object: amount)], timeout: 15), .completed)
