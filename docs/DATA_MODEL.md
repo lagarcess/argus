@@ -245,6 +245,15 @@ product behavior reads it, and no API path writes it.
   authentication this row is authoritative and no frontend repair update is
   required.
 - `display_name` is an identity field. It is what the account is called.
+- `name_initialization_closed` is an internal monotonic boolean for the Apple
+  first-authorization display-name command. Existing rows start closed; a new
+  unnamed row starts open. Inserted names, successful initialization and any
+  explicit update of either name column close it, including NULL clears and
+  same-value writes. Database triggers prevent reopening, including privileged
+  updates, and prevent a named insert from claiming open eligibility. Unrelated
+  partial profile updates do not close it. It stores no second name value,
+  appears in no API response and grants no new client column access. It never
+  permits the initializer to write `preferred_name`.
 - `preferred_name` is what Argus calls the user when it addresses them, and
   it is deliberately separate from `display_name`: people fill an identity
   field with a legal name. It is optional, and null means surfaces use no
