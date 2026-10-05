@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import { test } from "bun:test";
+import assert from "node:assert/strict";
 import { handleRecoveryRequest, RecoveryAttemptLimiter } from "../lib/recovery-request";
 
 const attemptLimit = 5;
@@ -35,10 +36,10 @@ for (const setting of [undefined, "", "   ", " X-Verified-Client-IP "]) {
         "X-Real-IP": `198.51.100.${i + 1}`,
         [setting?.trim() || "CF-Connecting-IP"]: "203.0.113.55",
       });
-      expect(response.status).toBe(i < attemptLimit ? 202 : 429);
-      if (i === attemptLimit) expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
+      assert.equal(response.status, i < attemptLimit ? 202 : 429);
+      if (i === attemptLimit) assert.ok(Number(response.headers.get("Retry-After")) > 0);
     }
-    expect(f.sends).toBe(attemptLimit);
+    assert.equal(f.sends, attemptLimit);
   });
 }
 
@@ -50,9 +51,9 @@ for (const setting of [undefined, "X-Verified-Client-IP"]) {
         "X-Forwarded-For": `198.51.100.${i + 1}`, "X-Real-IP": `192.0.2.${i + 1}`,
         ...(setting ? { "CF-Connecting-IP": `203.0.113.${i + 1}` } : {}),
       });
-      expect(response.status).toBe(i < attemptLimit ? 202 : 429);
+      assert.equal(response.status, i < attemptLimit ? 202 : 429);
     }
-    expect(f.sends).toBe(attemptLimit);
+    assert.equal(f.sends, attemptLimit);
   });
 }
 
@@ -60,8 +61,8 @@ for (const address of ["not-an-ip", "1".repeat(46), "203.0.113.55, 198.51.100.1"
   test(`invalid trusted address rejects before sending: ${address}`, async () => {
     const f = fixture();
     const response = await f.request(0, { "CF-Connecting-IP": address, "X-Forwarded-For": "192.0.2.1" });
-    expect(response.status).toBe(400);
-    expect(f.sends).toBe(0);
+    assert.equal(response.status, 400);
+    assert.equal(f.sends, 0);
   });
 }
 
@@ -69,16 +70,29 @@ test("same email remains bounded across trusted addresses", async () => {
   const f = fixture();
   for (let i = 0; i <= attemptLimit; i += 1) {
     const response = await f.request(i, { "CF-Connecting-IP": `203.0.113.${i + 1}` }, "same@example.test");
-    expect(response.status).toBe(i < attemptLimit ? 202 : 429);
+    assert.equal(response.status, i < attemptLimit ? 202 : 429);
   }
-  expect(f.sends).toBe(attemptLimit);
+  assert.equal(f.sends, attemptLimit);
 });
 
 test("global budget bounds distinct trusted addresses and emails", async () => {
   const f = fixture();
   for (let i = 0; i <= globalLimit; i += 1) {
     const response = await f.request(i, { "CF-Connecting-IP": `203.0.113.${i + 1}` });
-    expect(response.status).toBe(i < globalLimit ? 202 : 429);
+    assert.equal(response.status, i < globalLimit ? 202 : 429);
   }
-  expect(f.sends).toBe(globalLimit);
+  assert.equal(f.sends, globalLimit);
 });
+
+for (const trusted of [undefined, "   ", "203.0.113.55"]) {
+  test(`malformed untrusted headers cannot reject recovery: ${trusted}`, async () => {
+    const f = fixture();
+    const response = await f.request(0, {
+      "X-Forwarded-For": "not-an-ip",
+      "X-Real-IP": "also-not-an-ip",
+      ...(trusted === undefined ? {} : { "CF-Connecting-IP": trusted }),
+    });
+    assert.equal(response.status, 202);
+    assert.equal(f.sends, 1);
+  });
+}
