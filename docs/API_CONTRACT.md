@@ -3212,12 +3212,37 @@ Argus supports English and Spanish (Latin America) in Alpha.
 Deletes the signed-in person's account, in the app. A guest session is deleted
 by the same command. Off unless
 `ARGUS_ACCOUNT_DELETION_ENABLED` is on; while off it answers `404` before any
-authentication. The account is always the session's. The body is only a
-confirmation, and any other field is a `422`:
+authentication. The account is always the session's. The body requires a
+confirmation and accepts an optional `apple_authorization_code` of 1–512 ASCII
+characters. Any other field is a `422`:
 
 ```json
 { "confirm": true }
 ```
+
+For a new Apple-linked deletion, the command requires a readable stored
+credential bound to the current subject in `auth.identities`. Missing, unbound,
+mismatched or unreadable credentials return `409 apple_reauthorization_required`
+before any deletion run, ban, placeholder, product mutation, third-party
+revocation or Auth deletion. An unavailable identity reader or required service
+returns `503 account_deletion_unavailable` when durable state establishes that
+no run has started. Non-Apple accounts follow ordinary admission only after
+positively verifying that no Apple identity is linked.
+
+A person can supply a fresh Apple authorization code in the same request:
+
+```json
+{ "confirm": true, "apple_authorization_code": "fresh-one-time-code" }
+```
+
+The current Argus JWT still identifies the account. The command awaits one
+capture attempt, without another Supabase sign-in, identity/email overrides or
+automatic replay of the code. A mismatched code can cause an Apple exchange and
+compensating revoke; its refusal guarantees no Argus deletion effects, not no
+provider effects. Capture and admission lock the Auth user, current identities,
+credential and deletion run in that order, then admission rechecks the bound
+readable credential before inserting the run. No database lock spans Apple HTTP.
+Ordinary capture cannot commit once a deletion run exists.
 
 The command runs the Lane 6 order (`docs/specs/lanes/account-deletion-fk-census.md`
 and #787). It hands over or closes the person's households and plans, keeps their
@@ -3235,8 +3260,8 @@ then requires a live `auth.sessions` row for its session that belongs to its
 subject (live: not past its `not_after`, GoTrue's session time-box, when one is
 set), a run in flight for that subject, and a subject that is not a
 placeholder. Anything else is `401`. Anyone not locked goes through the usual session check. The route
-is rate limited per account (6 a minute, `429 too_many_requests` with
-`Retry-After`). A guest create-then-delete loop makes a new account each time,
+is rate limited per account per API worker (6 a minute, `429 too_many_requests`
+with `Retry-After`; N workers permit up to 6N). A guest create-then-delete loop makes a new account each time,
 so it is bounded where guests are made (captcha and the guest limits).
 
 **Response `200`:** everything is deleted, every third party has confirmed,
@@ -3266,18 +3291,44 @@ once, on the result; closing the confirmation only clears local state.
 { "status": "in_progress", "pending": ["plaid"] }
 ```
 
+Existing runs bypass new-run admission. A linked Apple identity without a
+stored credential remains pending unless the existing run has a terminal Apple
+receipt. A fresh recovery code can be stored only under that run's exact live
+claim, verified after acquiring its locks. Failed recovery capture keeps the
+`202 in_progress` classification, including invalid or mismatched codes. The
+same unexpired JWT and live session are required; a device that already retired
+its session cannot be promised interactive recovery. Missing or expired proof
+remains `401`, with the existing operator path as the fallback.
+
+After Apple confirms revocation, one local transaction verifies the live claim
+and unchanged credential, removes that exact row and writes the existing run's
+`apple_revoke` receipt. An interruption before commit keeps the credential for
+retry; an interruption after commit leaves the receipt that explains its absence.
+A replacement credential is preserved. Existing legacy-pending, key-fingerprint
+and operator-force rules remain in effect.
+
 A request after another one finished the run answers `200` `done`: the session
 was verified, so the person existed a moment ago.
 
-**Errors** (the same for a first request and a resume; all listed in
-`docs/api/openapi.yaml`): `401` (no valid session, or on resume a token that
-doesn't name the person's own live session), `403 account_deletion_not_allowed`,
-`404 not_found` (flag off), `429 too_many_requests`,
-`503 account_deletion_unavailable` (no `DATABASE_URL` or Admin API client;
-nothing happened), `503 account_deletion_incomplete` with `Retry-After` (an
-unexpected failure; the run may be open and the account locked, so clients
-treat it as in progress, and a retry resumes the same run), and the shared
-`503 auth_session_verification_unavailable`.
+**Errors** (listed in `docs/api/openapi.yaml`):
+
+- Before admission, `409 apple_reauthorization_required` requests fresh Apple
+  authorization. A submitted invalid/expired/consumed code returns
+  `400 apple_authorization_invalid`; a different linked subject returns
+  `409 apple_identity_mismatch`. None admits deletion.
+- `503 account_deletion_unavailable` means required deletion, identity or
+  credential services could not be used and durable state establishes that no run
+  has started.
+- `503 account_deletion_incomplete` with `Retry-After` means a run may already
+  be open, or its admission state could not be established. It is neither
+  confirmed acceptance nor a promise that the account is intact. Retry the same
+  command to resolve its durable state. A known pending caller also receives this
+  code if the deletion service cannot be built.
+- `401` means no valid session, including on resume; `403
+  account_deletion_not_allowed` refuses an undeletable account; `404 not_found`
+  means the flag is off; `422` refuses invalid body fields or code bounds;
+  `429 too_many_requests` carries `Retry-After`. The shared
+  `503 auth_session_verification_unavailable` remains unchanged.
 
 
 ## Supported Values

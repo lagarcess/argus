@@ -152,14 +152,30 @@ def test_failures_map_to_problems(enabled, error, status, code) -> None:  # noqa
     assert USER_ID not in response.text
 
 
-def test_unavailable_without_postgres_surfaces(enabled) -> None:  # noqa: ANN001
+@pytest.mark.parametrize("construction_error", [None, RuntimeError("unavailable")])
+@pytest.mark.parametrize("started", [False, True])
+def test_service_unavailability_preserves_deletion_state(
+    enabled, construction_error, started
+) -> None:  # noqa: ANN001
+    def requester(request):
+        request.state.account_deletion_started = started
+        return _registered(request)
+
     with (
-        patch.object(account_route, "deletion_requester", _registered),
-        patch.object(account_route, "account_deletion_service", return_value=None),
+        patch.object(account_route, "deletion_requester", requester),
+        patch.object(
+            account_route,
+            "account_deletion_service",
+            return_value=None,
+            side_effect=construction_error,
+        ),
     ):
         response = client.post(URL, json={"confirm": True})
     assert response.status_code == 503
-    assert response.json()["code"] == "account_deletion_unavailable"
+    assert response.json()["code"] == (
+        "account_deletion_incomplete" if started else "account_deletion_unavailable"
+    )
+    assert response.headers.get("Retry-After") == ("5" if started else None)
 
 
 def test_feedback_still_takes_deletion_requests_while_the_command_is_off() -> None:
@@ -271,3 +287,81 @@ def test_the_deletion_repository_is_built_without_any_feature_service() -> None:
 
     repository = household_repository(MagicMock())
     assert isinstance(repository, PostgresHouseholdRepository)
+
+
+def test_fresh_apple_code_uses_current_session(enabled):
+    service = MagicMock()
+    service.delete_account.return_value = DeletionOutcome(status="done")
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(
+            URL, json={"confirm": True, "apple_authorization_code": "fresh"}
+        )
+    assert response.status_code == 200
+    service.delete_account.assert_called_once_with(
+        user_id=USER_ID, apple_authorization_code="fresh"
+    )
+
+
+@pytest.mark.parametrize("code", ["", "x" * 513, "é"])
+def test_fresh_code_bounds(enabled, code):
+    service = MagicMock()
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(
+            URL, json={"confirm": True, "apple_authorization_code": code}
+        )
+    assert response.status_code == 422
+    service.delete_account.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "code,status",
+    [
+        ("apple_reauthorization_required", 409),
+        ("apple_identity_mismatch", 409),
+        ("apple_authorization_invalid", 400),
+        ("account_deletion_unavailable", 503),
+    ],
+)
+def test_admission_refusal_is_distinct_from_started_failure(enabled, code, status):
+    from argus.domain.account_deletion.apple import AccountDeletionAdmissionError
+
+    service = MagicMock()
+    service.delete_account.side_effect = AccountDeletionAdmissionError(code, status)
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(URL, json={"confirm": True})
+    assert response.status_code == status
+    assert response.json()["code"] == code
+
+
+@pytest.mark.parametrize("code", [None, "fresh-apple-code"])
+def test_unreadable_admission_state_is_unavailable_not_accepted(enabled, code):
+    from argus.domain.account_deletion.service import AccountDeletionService
+
+    households = MagicMock()
+    households.connection.side_effect = RuntimeError("database unavailable")
+    admin = MagicMock()
+    service = AccountDeletionService(
+        households=households, auth_admin=admin, revoker=None, analytics=MagicMock()
+    )
+    body = {"confirm": True}
+    if code is not None:
+        body["apple_authorization_code"] = code
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(URL, json=body)
+    assert response.status_code == 503
+    assert response.json()["code"] == "account_deletion_incomplete"
+    assert response.headers["Retry-After"] == "5"
+    admin.lock_user.assert_not_called()
+    admin.delete_user.assert_not_called()
