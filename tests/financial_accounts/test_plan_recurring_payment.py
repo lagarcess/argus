@@ -60,7 +60,7 @@ def totals(read):
     return group["starting_minor"], group["expected_bills_minor"], group["ending_minor"]
 
 
-def test_home_default_window_is_thirty_days_and_independent_of_a_longer_plan_horizon(
+def test_default_window_is_thirty_days_and_unaffected_by_a_longer_request(
     scene,
 ):
     planner, _, expectation, _ = setup_plan(

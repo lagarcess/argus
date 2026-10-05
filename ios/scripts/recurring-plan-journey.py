@@ -374,7 +374,7 @@ def journey(c, k, now):
         "creating an expectation never changes a balance",
     )
 
-    k.begin("Home default window is independent of Plan horizon")
+    k.begin("Default window is unaffected by a longer request")
     default = plan(c, 0)
     k.eq(
         (default["start_date"], default["end_date"]),

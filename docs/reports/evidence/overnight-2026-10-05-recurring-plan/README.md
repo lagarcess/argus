@@ -24,7 +24,7 @@ allocation whose identities already have accounts or expectations.
 | Check | Assertions |
 | --- | --- |
 | movement becomes a prefilled expectation without touching the original | 12 |
-| Home default window is independent of Plan horizon | 11 |
+| Default window is unaffected by a longer request | 11 |
 | currency separation | 6 |
 | link an actual payment fulfils the occurrence once | 9 |
 | record a new payment through fulfillment | 8 |
@@ -56,6 +56,8 @@ Key literals asserted (DOP checking opened at 50,000.00; actual expense 1,500.00
 - `tests/financial_accounts/test_plan.py`, `test_plan_api.py`, `test_plan_recurrence.py`, `test_plan_recurring_payment.py`
   and `tests/test_connected_plan_postgres.py`: 35 passed, 32 skipped without a database; 67 passed against the real
   local Postgres (`ARGUS_DISPOSABLE_DATABASE_URL` on port 59802, memory and Postgres variants of every scene).
+  The Postgres variants are local evidence: CI sets that variable only for `tests/test_*_postgres.py`, so CI runs
+  the memory variants of `test_plan_recurring_payment.py`.
 
 ## Known limitations
 
@@ -68,3 +70,5 @@ Key literals asserted (DOP checking opened at 50,000.00; actual expense 1,500.00
   that seeded the expectation is also offered for linking.
 - Personal Plan only. No household, hosted or device acceptance. Dates are relative to the run day, so the literal date lists
   apply to 2026-10-05.
+
+`journey-proof.json` records the run-time label "Home default window is independent of Plan horizon" for check 2. The label was renamed afterwards to say what the check proves (the API default window is unaffected by a longer request); the assertions did not change. What Home renders is proven by the native PR.
