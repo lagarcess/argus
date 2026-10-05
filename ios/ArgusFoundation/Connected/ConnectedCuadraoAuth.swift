@@ -200,8 +200,8 @@ struct ConnectedCreateAccount: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .foregroundStyle(Color.primary)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
