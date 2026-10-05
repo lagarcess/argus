@@ -16,6 +16,8 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     let returning: FinancialActivityDetail?
     let goal: FinancialGoal?
     let goalOccurrenceId: String?
+    /// A category shortcut opens the editor scrolled to the category control.
+    let focusCategory: Bool
     @Published private(set) var kind: FinancialActivityKind
     @Published var accountId: UUID? { didSet { changed(accountId != oldValue) } }
     @Published var sourceAccountId: UUID? { didSet { changed(sourceAccountId != oldValue) } }
@@ -51,14 +53,14 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     private let retired: (SessionSnapshot) -> Void
     private let completed: (FinancialActivityReceipt) async -> Void
 
-    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil, planOccurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil,
+    init(origin: FinancialAccount, correcting: FinancialActivityDetail? = nil, planOccurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil, focusCategory: Bool = false,
          controller: SessionController, journal: FinancialWriteJournal, identity: SessionSnapshot,
          started: @escaping (PendingFinancialConfirmation) -> Void = { _ in },
          resolved: @escaping () -> Void = {},
          retired: @escaping (SessionSnapshot) -> Void = { _ in },
          completed: @escaping (FinancialActivityReceipt) async -> Void) {
         self.debt = debt; self.debtOccurrenceId = debtOccurrenceId; self.returning = returning
-        self.goal = goal; self.goalOccurrenceId = goalOccurrenceId
+        self.goal = goal; self.goalOccurrenceId = goalOccurrenceId; self.focusCategory = focusCategory
         self.origin = origin; self.correcting = correcting; self.planOccurrence = planOccurrence
         self.controller = controller; self.journal = journal; self.identity = identity
         self.started = started; self.resolved = resolved; self.retired = retired; self.completed = completed
