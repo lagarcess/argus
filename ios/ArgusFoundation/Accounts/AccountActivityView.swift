@@ -6,6 +6,7 @@ struct AccountActivityView: View {
     let account: FinancialAccount
     @State private var pendingCorrection: FinancialActivityDetail?
     @State private var pendingReturn: FinancialActivityDetail?
+    @State private var pendingRecurring: FinancialActivityDetail?
     @State private var inspected: FinancialActivity?
     @Environment(\.locale) private var locale
 
@@ -63,10 +64,13 @@ struct AccountActivityView: View {
         .sheet(item: $inspected, onDismiss: {
             if let activity = pendingCorrection { pendingCorrection = nil; loop.record(account, correcting: activity) }
             else if let activity = pendingReturn { pendingReturn = nil; loop.returnPayment(activity) }
+            else if let activity = pendingRecurring { pendingRecurring = nil; loop.plan.prepareRecurring(from: activity) }
         }) { activity in
             NavigationStack {
                 ScrollView {
-                    FinancialActivityDetailView(loop: loop, activityID: activity.activityId ?? activity.recordId, returnPayment: { current in pendingReturn = current; inspected = nil }) { current in
+                    FinancialActivityDetailView(loop: loop, activityID: activity.activityId ?? activity.recordId,
+                                                returnPayment: { current in pendingReturn = current; inspected = nil },
+                                                setUpRecurring: { current in pendingRecurring = current; inspected = nil }) { current in
                         pendingCorrection = current; inspected = nil
                     }.padding(24)
                 }.background(ArgusStyle.background)
@@ -81,6 +85,8 @@ struct FinancialActivityDetailView: View {
     @ObservedObject var loop: FinancialLoopModel
     let activityID: UUID
     var returnPayment: ((FinancialActivityDetail) -> Void)? = nil
+    /// Sheet hosts defer the plan form until this sheet closes; pushed hosts open it directly.
+    var setUpRecurring: ((FinancialActivityDetail) -> Void)? = nil
     let correct: (FinancialActivityDetail) -> Void
     @State private var detail: FinancialActivityDetail?
     @State private var revisions: [FinancialActivityDetail] = []
@@ -126,6 +132,12 @@ struct FinancialActivityDetailView: View {
                     Button("loop.correction.title") { correct(detail) }
                         .buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil)
                         .accessibilityIdentifier("activity.correct")
+                    if FinancialExpectationSeed.eligible(detail) {
+                        Button("loop.activity.repeat") { if let setUpRecurring { setUpRecurring(detail) } else { loop.plan.prepareRecurring(from: detail) } }
+                            .buttonStyle(PillButtonStyle(primary: false)).disabled(loop.pendingConfirmation != nil)
+                            .accessibilityIdentifier("activity.repeat")
+                        Text("loop.activity.repeat.hint").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+                    }
                 }
             } else if errorKey == nil { ProgressView("accounts.loading") }
             if let errorKey {

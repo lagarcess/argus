@@ -113,6 +113,8 @@ extension FinancialLoopUITests {
         selectPlanAccounts([unknown])
         XCTAssertFalse(app.staticTexts["plan.projected.USD"].exists)
         XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
+        XCTAssertFalse(app.staticTexts["home.projected.USD"].exists)
+        XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
         assertText("Balance unknown")
         capture("plan-unknown-dollar-balance")
         openMoneyAccount(unknown); assertText("Balance unknown")
@@ -136,6 +138,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
         selectPlanAccounts([])
         XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
+        XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
         let changed = createMoneyAccount("Changed plan " + stamp, type: "checking")
         selectPlanAccounts([changed])
         openMoneyAccount(changed)
@@ -153,6 +156,7 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["plan.selection.save"])
         XCTAssertTrue(app.buttons["plan.selection.save"].waitForNonExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
+        XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
     }
 
     func confirmPlanMoney() {
@@ -210,7 +214,7 @@ extension FinancialLoopUITests {
         app.revealConnectedTabBar()
         app.buttons["tab.plan"].tap()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.occurrence.' AND label CONTAINS %@", title)).firstMatch
-        if !row.exists, app.buttons["Show more"].exists { tapVisible(app.buttons["Show more"]) }
+        if !row.exists, app.buttons["plan.showMore"].exists { tapVisible(app.buttons["plan.showMore"]) }
         tapVisible(row)
     }
 

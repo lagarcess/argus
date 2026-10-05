@@ -513,6 +513,110 @@ extension FinancialModelTests {
         XCTAssertEqual(moved["effective_date"] as? String, expectation.earliestEffectiveDate)
     }
 
+    func testSeededMonthlyDraftKeepsTheMovementDayAnchorAfterClamping() throws {
+        let checking = UUID()
+        let legs: [[String: Any]] = [["record_id": UUID().uuidString, "record_revision": 1, "account_id": checking.uuidString,
+                                      "role": "single", "balance_movement_minor": -35000, "coverage": []]]
+        let raw: [String: Any] = ["activity_id": UUID().uuidString, "revision": 1, "kind": "expense", "amount_minor": 35000, "amount": "350.00",
+            "currency": "DOP", "currency_fraction_digits": 2, "occurred_at": "2026-01-31T15:00:00Z", "time_zone": "UTC",
+            "note": "Rent", "recorded_at": "2026-01-31T15:00:00Z", "legs": legs]
+        let activity = try JSONDecoder().decode(FinancialActivityDetail.self, from: JSONSerialization.data(withJSONObject: raw))
+        let account: [String: Any] = ["id": checking.uuidString, "type": "checking", "nature": "asset", "currency": "DOP", "currency_fraction_digits": 2,
+            "archived": false, "ownership_share_bps": 10000, "version": 1, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z",
+            "balance": ["state": "unknown", "activity_since_tracking_minor": 0]]
+        let accounts = [try JSONDecoder().decode(FinancialAccount.self, from: JSONSerialization.data(withJSONObject: account))]
+        let seed = try XCTUnwrap(FinancialExpectationSeed(activity: activity, accounts: accounts, today: "2026-02-15", fallbackTitle: "Housing"))
+        let draft = FinancialExpectationDraft(seed: seed)
+        XCTAssertTrue(draft.seededFromActivity)
+        XCTAssertTrue(draft.ready)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(draft.command(locale: Locale(identifier: "en_US")))) as? [String: Any])
+        XCTAssertEqual(payload["kind"] as? String, "bill")
+        XCTAssertEqual(payload["title"] as? String, "Rent")
+        XCTAssertEqual(payload["currency"] as? String, "DOP")
+        XCTAssertEqual(payload["amount"] as? String, "350.00")
+        XCTAssertEqual(payload["account_id"] as? String, checking.uuidString)
+        let schedule = try XCTUnwrap(payload["schedule"] as? [String: Any])
+        XCTAssertEqual(schedule["cadence"] as? String, "monthly")
+        XCTAssertEqual(schedule["start_date"] as? String, "2026-02-28", "first date clamps to February")
+        XCTAssertEqual(schedule["month_days"] as? [Int], [31], "the anchor stays on the 31st so March is not stuck on the 28th")
+        XCTAssertNil(schedule["end_date"], "no end date is prepared")
+        XCTAssertNil(payload["expected_version"])
+    }
+
+    private static func planWindow(endDate: String, occurrences: [String]) -> String {
+        let home = #"{"currencies":[{"currency":"DOP","currency_fraction_digits":2,"assets_minor":"10000","cash_minor":"10000","other_assets_minor":"0","debts_minor":"0","net_worth_minor":"10000","recorded_spending_minor":"0","known_accounts":1,"unknown_accounts":0,"as_of":null}],"recent_activity":[],"recorded_at":"2026-10-05T12:00:00Z"}"#
+        return #"{"home":\#(home),"selection":{"version":0,"account_ids":["\#(PresentationServer.id)"],"time_zone":"America/Santo_Domingo"},"accounts":[\#(PresentationServer.account(updated:false))],"expectations":[\#(PresentationServer.expectation)],"occurrences":[\#(occurrences.joined(separator: ","))],"currencies":[],"budgets":[],"start_date":"2026-10-05","end_date":"\#(endDate)","coverage":"recorded_and_expected","has_expectations":true}"#
+    }
+    private static func occurrence(id: String, dueDate: String) -> String {
+        #"{"id":"\#(id)","expectation_id":"\#(PresentationServer.expectationId)","expectation_version":1,"kind":"bill","title":"Synthetic rent","currency":"DOP","currency_fraction_digits":2,"amount_minor":2000,"amount":"20.00","account_id":"\#(PresentationServer.id)","due_date":"\#(dueDate)","projection_date":"\#(dueDate)","status":"planned","overdue":false}"#
+    }
+
+    func testOccurrenceOpenedFromHomeSurvivesARefreshOutsidePlansWindow() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity)
+        let rent = Self.occurrence(id: "rent-2026-10-25", dueDate: "2026-10-25")
+        await fixture.server.readReply("/api/v1/financial-plan", body: Self.planWindow(endDate: "2026-11-04", occurrences: [rent]))
+        await fixture.server.readReply("/api/v1/financial-plan?end_date=2026-10-12", body: Self.planWindow(endDate: "2026-10-12", occurrences: []))
+        await loop.plan.refresh()
+        let opened = try XCTUnwrap(loop.plan.homeProjection?.occurrences.first)
+        await loop.plan.open(opened)
+        XCTAssertEqual(loop.plan.selectedOccurrence?.id, "rent-2026-10-25")
+        await loop.plan.refresh(until: "2026-10-12")
+        XCTAssertEqual(loop.plan.projection?.endDate, "2026-10-12")
+        XCTAssertEqual(loop.plan.projection?.occurrences.count, 0)
+        XCTAssertEqual(loop.plan.homeProjection?.endDate, "2026-11-04")
+        XCTAssertEqual(loop.plan.selectedOccurrence?.id, "rent-2026-10-25", "the Home occurrence sheet stays open")
+        await fixture.server.readReply("/api/v1/financial-plan", body: Self.planWindow(endDate: "2026-11-04", occurrences: []))
+        await loop.plan.refresh(until: "2026-10-12")
+        XCTAssertNil(loop.plan.selectedOccurrence, "gone from both windows closes the sheet")
+    }
+
+    func testPlanAndHomeReadsFailIndependently() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity)
+        await fixture.server.readReply("/api/v1/financial-plan", body: Self.planWindow(endDate: "2026-11-04", occurrences: []))
+        await fixture.server.readReply("/api/v1/financial-plan?end_date=2026-10-12", body: Self.planWindow(endDate: "2026-10-12", occurrences: []))
+        await loop.plan.refresh()
+        XCTAssertEqual(loop.plan.homeProjection?.endDate, "2026-11-04")
+        await fixture.server.readReply("/api/v1/financial-plan", body: #"{"code":"unavailable"}"#, status: 503)
+        await loop.plan.refresh(until: "2026-10-12")
+        XCTAssertEqual(loop.plan.projection?.endDate, "2026-10-12", "Plan keeps its own successful read")
+        XCTAssertNil(loop.plan.errorKey)
+        XCTAssertEqual(loop.plan.homeProjection?.endDate, "2026-11-04", "Home keeps its last good window")
+        XCTAssertEqual(loop.plan.homeErrorKey, "loop.error.connection")
+        await fixture.server.readReply("/api/v1/financial-plan", body: Self.planWindow(endDate: "2026-11-05", occurrences: []))
+        await fixture.server.readReply("/api/v1/financial-plan?end_date=2026-10-12", body: #"{"code":"unavailable"}"#, status: 503)
+        await loop.plan.refresh(until: "2026-10-12")
+        XCTAssertEqual(loop.plan.projection?.endDate, "2026-10-12", "Plan keeps its last good projection")
+        XCTAssertEqual(loop.plan.errorKey, "loop.error.connection")
+        XCTAssertEqual(loop.plan.homeProjection?.endDate, "2026-11-05", "Home reads on even when Plan's read fails")
+        XCTAssertNil(loop.plan.homeErrorKey)
+    }
+
+    func testSharedDefaultWindowFailureShowsOnHomeAndPlan() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity)
+        await fixture.server.readReply("/api/v1/financial-plan", body: #"{"code":"unavailable"}"#, status: 503)
+        await loop.plan.refresh()
+        XCTAssertNil(loop.plan.homeProjection)
+        XCTAssertEqual(loop.plan.homeErrorKey, "loop.error.connection", "Home offers its own retry when the shared read fails")
+        XCTAssertEqual(loop.plan.errorKey, "loop.error.connection")
+        await fixture.server.readReply("/api/v1/financial-plan", body: Self.planWindow(endDate: "2026-11-04", occurrences: []))
+        await loop.plan.refresh()
+        XCTAssertEqual(loop.plan.homeProjection?.endDate, "2026-11-04")
+        XCTAssertNil(loop.plan.homeErrorKey)
+        XCTAssertNil(loop.plan.errorKey)
+    }
+
     func testPlanConfirmationSurvivesRelaunchAndDifferentOwnerCannotReplay() async throws {
         let fixture = try PresentationFixture()
         let alice = try await fixture.login()

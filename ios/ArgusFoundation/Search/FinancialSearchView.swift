@@ -267,6 +267,10 @@ struct FinancialDomainPresenter: View {
             .sheet(item: $loop.assetEditor, onDismiss: refreshSearch) { editor in FinancialAssetForm(model: editor, accounts: accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
             .sheet(item: $accounts.draft, onDismiss: refreshSearch) { _ in AccountForm(model: accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
             .sheet(item: $plan.draft, onDismiss: refreshSearch) { draft in FinancialExpectationForm(model: plan, draft: draft, loop: loop).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
+            // One presenter so Home Upcoming and Plan open the same occurrence sheet.
+            .sheet(item: $plan.selectedOccurrence, onDismiss: { plan.occurrenceDismissed(); refreshSearch() }) { occurrence in
+                FinancialOccurrenceView(model: plan, loop: loop, occurrence: occurrence)
+            }
     }
     private func refreshSearch() { Task { await search?.refresh() } }
 }
