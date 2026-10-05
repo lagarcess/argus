@@ -347,7 +347,7 @@ extension FinancialLoopUITests {
     }
 
     func createMoneyAccount(_ name: String, type: String, amount: String? = nil, negative: Bool = false, currency: String = "DOP") -> MoneyAccount {
-        app.openAccountsList()
+        openPersonalAccounts()
         if app.buttons["accounts.back"].exists { scrollMoneyTop(); app.buttons["accounts.back"].tap() }
         tapVisible(app.buttons["accounts.add"])
         tapVisible(app.buttons["accounts.type." + type])

@@ -128,7 +128,7 @@ extension FinancialLoopUITests {
         let link = app.staticTexts["household.invite.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
         let invitation = link.label
-        XCTAssertTrue(invitation.hasPrefix("https://cuadrao.ai/invite#"))
+        XCTAssertTrue(invitation.hasPrefix("https://cuadrao.ai/invite#") || invitation.hasPrefix("argus-household://invite#"))
         tapVisible(app.buttons["household.management.done"])
 
         try signIn(fresh: true, user: "B")
@@ -189,7 +189,7 @@ extension FinancialLoopUITests {
         let link = app.staticTexts["household.invite.link"]
         XCTAssertTrue(link.waitForExistence(timeout: 15))
         let invitation = link.label
-        XCTAssertTrue(invitation.hasPrefix("https://cuadrao.ai/invite#"))
+        XCTAssertTrue(invitation.hasPrefix("https://cuadrao.ai/invite#") || invitation.hasPrefix("argus-household://invite#"))
         tapVisible(app.buttons["household.management.done"])
         XCTAssertFalse(home.buttons["household.account." + shared.id].exists)
 

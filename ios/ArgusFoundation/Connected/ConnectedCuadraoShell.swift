@@ -81,6 +81,11 @@ struct ConnectedCuadraoShell: View {
                     .foregroundStyle(ArgusStyle.ink)
             }
         }
+        .connectedReceiptDrafts(
+            userID: auth.profile.flatMap { UUID(uuidString: $0.id) },
+            chat: chat,
+            spanish: spanish
+        )
         .tint(WelcomePalette.pine)
         .foregroundStyle(WelcomePalette.ink)
         .background(WelcomePalette.background.ignoresSafeArea())

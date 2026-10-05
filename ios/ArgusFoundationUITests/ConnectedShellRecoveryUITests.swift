@@ -1,6 +1,65 @@
 import XCTest
 
 extension FinancialLoopUITests {
+    func testConnectedReceiptDraftSurvivesRelaunchWithoutPosting() throws {
+        #if !DEBUG
+        throw XCTSkip("Receipt capture remains a development-only local draft.")
+        #else
+        try signIn(fresh: true)
+        let balance = homeValue()
+        openConnectedSavedReceipts()
+        tapVisible(app.buttons["saved-add-receipt"])
+        tapVisible(app.buttons["receipt-sample"])
+        XCTAssertTrue(app.staticTexts["receipt-local-draft-notice"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["receipt-confirm"].exists)
+        XCTAssertFalse(app.buttons["receipt-account"].exists)
+        XCTAssertFalse(app.segmentedControls["receipt-split"].exists)
+        tapVisible(app.buttons["Correct details"])
+        let name = "Local receipt " + UUID().uuidString.prefix(6)
+        replaceMoneyField("receipt-merchant", with: name)
+        dismissMoneyKeyboard()
+        capture("connected-receipt-local-draft")
+        tapVisible(app.buttons["receipt-later"])
+        openConnectedSavedReceipts()
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'receipt-card-' AND label CONTAINS %@", name)).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 5))
+        let id = card.identifier
+        app.terminate(); app.launch()
+        openConnectedSavedReceipts()
+        tapVisible(app.buttons[id])
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["receipt-local-draft-notice"].exists)
+        XCTAssertFalse(app.buttons["receipt-confirm"].exists)
+        tapVisible(app.buttons["receipt-source"])
+        XCTAssertTrue(app.navigationBars["Original receipt"].waitForExistence(timeout: 5))
+        capture("connected-receipt-original-after-relaunch")
+        app.buttons["Done"].tap()
+        tapVisible(app.buttons["receipt-later"])
+        assertHome(balance)
+        try signIn(fresh: true, user: "B")
+        openConnectedSavedReceipts()
+        XCTAssertTrue(app.buttons["saved-add-receipt"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons[id].exists)
+        capture("connected-receipt-isolated-from-other-person")
+        app.buttons["Done"].tap()
+        try signIn(fresh: true)
+        openConnectedSavedReceipts()
+        tapVisible(app.buttons[id])
+        tapVisible(app.buttons["Receipt options"])
+        app.buttons["Discard receipt"].tap()
+        app.sheets.buttons["Discard receipt"].tap()
+        XCTAssertTrue(app.buttons["receipt-later"].waitForNonExistence(timeout: 5))
+        assertHome(balance)
+        #endif
+    }
+
+    func openConnectedSavedReceipts() {
+        tapVisible(app.buttons["tab.argus"])
+        tapVisible(app.buttons["chat-attach"])
+        tapVisible(app.buttons["chat-saved-receipts"])
+        XCTAssertTrue(app.buttons["saved-add-receipt"].waitForExistence(timeout: 5))
+    }
+
     func testConnectedChatDraftAndUpdatesReturnKeepMoneyUnchanged() throws {
         try signIn()
         let balance = homeValue()

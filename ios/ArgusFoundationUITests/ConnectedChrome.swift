@@ -88,4 +88,11 @@ extension FinancialLoopUITests {
     func openAccountsTab() {
         app.openAccountsList()
     }
+
+    func openPersonalAccounts() {
+        app.openAccountsList()
+        let personal = app.buttons["household.personal"]
+        if personal.waitForExistence(timeout: 2) { tapVisible(personal) }
+        XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 10))
+    }
 }

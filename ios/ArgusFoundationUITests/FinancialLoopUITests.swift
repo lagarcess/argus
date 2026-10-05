@@ -245,6 +245,7 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func assertHome(_ expected: Decimal) {
+        openPersonalAccounts()
         app.revealConnectedTabBar()
         XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
@@ -258,6 +259,7 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func homeValue() -> Decimal {
+        openPersonalAccounts()
         app.revealConnectedTabBar()
         XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()

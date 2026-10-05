@@ -209,6 +209,11 @@ extension FinancialLoopUITests {
         XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
     }
 
+    func choosePlanDetailAction(_ identifier: String) {
+        tapVisible(app.buttons["plan-detail-options"])
+        tapVisible(app.buttons[identifier])
+    }
+
     func confirmPlanMoney() {
         reviewMoney()
         tapVisible(app.buttons["loop.confirm"])
