@@ -1,7 +1,7 @@
 # Argus private iPhone execution manifest
 
 **Updated:** October 4, 2026.
-**Execution state:** The runtime baseline remains `a8c37d3a182fbdb3228f6003272418e65286bc1a`. Documentation PRs #808, #813, #815 and #814 landed through `883d289ff8f9c4261f63078d10121de7fb371789`; see the [landing record](../reports/2026-10-04-cuadrao-docs-integration-landing.md). Candidate `03a33ef2` has a completed UI suite (119 passed, 48 skipped, zero failures) and completed screenshot classification. Claude's ledger records phone profiling build 3427; signed candidate build 3428 is saved but uninstalled. The founder has taken the phone offline. The combined candidate has not landed on integration; connected physical-phone acceptance and external TestFlight readiness remain open. The current mobile sequence and completion record are below. Older dated sections retain their evidence and contract history.
+**Execution state:** The code checkpoint in this tree includes #809, #790, #810 and #812, reconciled with the October 4 foundation documents. See the [code landing record](../reports/2026-10-04-cuadrao-code-integration-landing.md) for merge lineage, exact source trees, reviews and verification limits; the final PR landing comment records its merge and terminal integration CI. Fresh Mac verification passed 24 release UI journeys and ten combined invitation/chart/Search journeys, with no skips or failures. The earlier full candidate suite remains 119 passed, 48 skipped and zero failures. The phone is offline; no new build was installed by this landing. Connected physical-phone acceptance and external TestFlight readiness remain open.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
@@ -63,6 +63,11 @@ are separate states.
   environments and reachable writes. Filing and assessment are complete;
   its fix and acceptance checks remain open.
 
+- [x] Independent code review and fresh Mac verification completed for #809,
+  #790, #810 and #812. Debug/Release builds, focused host checks, 24 release UI
+  journeys and ten combined journeys passed. The [code landing record](../reports/2026-10-04-cuadrao-code-integration-landing.md)
+  preserves exact source identities, durable captures and the remaining gates.
+
 ### Later foundation alignment
 
 The founder identified docs-only [#814](https://github.com/lagarcess/argus/pull/814)
@@ -78,10 +83,10 @@ verification recovery into business, runtime, migration or archive work.
 
 | Work | Current state | Next deliverable and completion check |
 | --- | --- | --- |
-| Candidate review and landing | Open PRs #790, #810, #812, #809; documentation #808/#813/#814/#815 landed; candidate `03a33ef2` passes its full UI run and visual classification | Preserve review and verification evidence. #790 has successful CI; #810 and #812 have no executed workflow checks at their stacked heads. The stack lands #790, #810, #812; each merge still needs founder approval. #808 is landed; #809 remains independent. Reconcile shared board edits once and verify affected gates after landing. |
+| Candidate review and landing | The source in this tree includes #809, #790, #810 and #812; independent reviews and affected Mac verification passed | See the [code landing record](../reports/2026-10-04-cuadrao-code-integration-landing.md) and final #812 landing comment for exact heads, merge commits and terminal CI. Preserve remaining device, service and enablement gates. Later design tweaks are separate work. |
 | Device responsiveness and connectivity | Phone profiling and app computation fixes recorded in #812; physical connected acceptance remains open | Retain the measured traces and remaining performance limits. The phone is disconnected; resume physical interaction and persistence checks when it returns. Candidate 3428 is not installed. Simulator never-idle counts are not frame-hitch proof. |
 | Onboarding | Sign-in and invitation building blocks exist; complete first-use acceptance is open | Install, preserve invite intent, enter code, sign in, complete verification, select or join the permitted context, and perform the first useful action. Cover cancellation, invalid/expired codes, denied permissions, interruption, and relaunch. Request permissions when the feature needs them. |
-| Accounts, Plans, Household | Landed services and native paths plus candidate invitation work | Verify the connected financial and shared journeys on the phone, including relaunch, revoked access, recovery, and correct personal/household boundaries. Preserve existing contract owners. |
+| Accounts, Plans, Household | Services, native paths and default-off invitation client included | Verify the connected financial and shared journeys on the phone, including relaunch, revoked access, recovery, and correct personal/household boundaries. Preserve existing contract owners. |
 | Receipts and imports | Capture/review UI and durable draft foundations exist | Connect capture, save for later, reopen, prepare, correct, split, approve, and save through the same financial services. Prove persistence and sharing boundaries. Keep source/extraction enablement gates open until satisfied. |
 | Home, Search, Updates, moves | Designs and partial connected foundations exist | Complete the assigned history/projection, search-to-detail, account-move history, inbox, reminder, and private push paths. Show known zero only with confirmed coverage. Verify authorization, origin navigation, and event-driven data rather than fixtures. |
 | Cuadrao chat identity | Small presentation task remains | Discuss and settle the chat/menu-bar logo within the design system; implement and check accessibility when assigned. Do not make it a dependency of runtime architecture. |
@@ -157,14 +162,16 @@ Apple audit references checked October 4, 2026:
 and [permission design](https://developer.apple.com/design/human-interface-guidelines/privacy/).
 These define an audit to finish, not a completed compliance assessment.
 
-**Checkpoint boundary:** PRs #790 (`53a4d67d`), #810 (`2cd7662a`), #812
-(`122bb232`), #808 (`a1ebf4b4`), and #809 (`ecd2bb57`) remain open. Combined
-candidate `03a33ef2` is for verification, not a replacement integration branch.
-The [candidate evidence](https://github.com/lagarcess/argus/blob/2bde54e48/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
+**Checkpoint boundary:** The October 4 foundation documents and the reviewed
+mobile code are reconciled in this tree. The [code landing record](../reports/2026-10-04-cuadrao-code-integration-landing.md)
+identifies the per-PR heads, accepted tests and final landing evidence. Combined
+candidate `25ce9a4d` has the same iOS source tree as accepted candidate `03a33ef2`.
+Neither local candidate is a replacement integration branch. The
+[earlier candidate evidence](https://github.com/lagarcess/argus/blob/2bde54e48/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
 and [recovery report](../reports/evidence/cuadrao-mobile-recovery-2026-10-04/README.md)
-name the tested heads and remaining limits. Revalidate only evidence affected
-by subsequent changes. This section replaces conflicting current-queue or phone-status wording below;
-it does not erase dated evidence or change the lane contracts.
+retain their named tested heads and limits. Revalidate only evidence affected by
+subsequent changes. This section replaces conflicting current-queue or phone-status
+wording below; it does not erase dated evidence or change the lane contracts.
 
 **Original preservation authorization (historical):** The founder accepted this expanded plan for
 commit and push on September 29, 2026. That grant authorized documentation preservation

@@ -29,7 +29,7 @@ Full PR patch ID before this evidence commit:
 
 - [Profile release availability](profile-release-gates-en.png): DEBUG fixture of release visibility, not a signed-in production session.
 - [Settings clearance at large text](profile-signout-large-clearance.png).
-- [Money entry and saved plan](money-valid-plan-es.png).
+- [Money entry before Create](money-valid-plan-es.png).
 - [No-data and moved-history presentation](no-data-moved-history-es.png).
 - [Actual Release ignores preview arguments](release-preview-arguments-ignored.png): the installed Release app opens the ordinary auth-disabled financial sample, not the preview or gallery.
 
