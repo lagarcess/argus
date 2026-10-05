@@ -4,12 +4,14 @@ import AuthenticationServices
 import SwiftUI
 import Security
 
-/// Synthetic loopback transport exercises the SDK and production recovery screens.
 struct AppleSessionHarness: View {
     private static var didReset = false
     @StateObject private var model: ProfileAuthModel
     @State private var checker: HarnessAppleChecker
     @State private var checks = 0
+    @State private var identityChangePending = false
+    @State private var identityReceipt = ""
+    @State private var checkerWaiting = false
 
     init() {
         if !Self.didReset && ProcessInfo.processInfo.arguments.contains("--reset-apple-session-harness") {
@@ -31,6 +33,8 @@ struct AppleSessionHarness: View {
         VStack(spacing: 8) {
             Text("Synthetic Apple session proof").font(.caption)
             Text("Checks: \(checks)").accessibilityIdentifier("harness.checks")
+            Text(identityReceipt).font(.caption).accessibilityIdentifier("harness.identity-receipt")
+            if checkerWaiting { Text("Checker waiting").accessibilityIdentifier("harness.checker-waiting") }
             HStack {
                 Button("Apple") { Task {
                     _ = await model.signIn(with: .init(provider: .apple, idToken: "a.b.c", nonce: SignInNonce()), appleAuthorizationCode: "synthetic-code")
@@ -41,7 +45,7 @@ struct AppleSessionHarness: View {
                 } }.accessibilityIdentifier("harness.email")
                 Button("Check") { Task { await model.restore(); checks = await checker.count } }
                     .accessibilityIdentifier("harness.check")
-            }.buttonStyle(.bordered).disabled(model.busy)
+            }.buttonStyle(.bordered).disabled(model.busy || identityChangePending)
             HStack {
                 Button("Authorized") { Task { await checker.set(.authorized) } }.accessibilityIdentifier("harness.authorized")
                 Button("Error") { Task { await checker.set(nil) } }.accessibilityIdentifier("harness.error")
@@ -49,8 +53,8 @@ struct AppleSessionHarness: View {
                 Button("Transferred") { Task { await checker.set(.transferred) } }.accessibilityIdentifier("harness.transferred")
             }.font(.caption)
             HStack {
-                Button("Link") { Task { await setLinkedIdentity(true) } }.accessibilityIdentifier("harness.link")
-                Button("No link") { Task { await setLinkedIdentity(false) } }.accessibilityIdentifier("harness.unlink")
+                Button("Link") { setLinkedIdentity(true) }.accessibilityIdentifier("harness.link")
+                Button("No link") { setLinkedIdentity(false) }.accessibilityIdentifier("harness.unlink")
                 Button("Notify twice") {
                 NotificationCenter.default.post(name: ASAuthorizationAppleIDProvider.credentialRevokedNotification, object: nil)
                 NotificationCenter.default.post(name: ASAuthorizationAppleIDProvider.credentialRevokedNotification, object: nil)
@@ -58,9 +62,10 @@ struct AppleSessionHarness: View {
             }
             HStack {
                 Button("Hold check") { Task {
-                    await checker.holdNext()
+                    await checker.holdNext { @MainActor in checkerWaiting = true }
                     await model.restore()
                     checks = await checker.count
+                    checkerWaiting = false
                 } }.accessibilityIdentifier("harness.hold-check").disabled(model.busy)
                 Button("Revoke + notify") { Task {
                     await checker.set(.revoked)
@@ -68,6 +73,8 @@ struct AppleSessionHarness: View {
                 } }.accessibilityIdentifier("harness.revoke-notify")
                 Button("Release") { Task { await checker.release() } }.accessibilityIdentifier("harness.release")
             }.font(.caption)
+            Button("Error after sign-in") { Task { await checker.failAfterAuthorizedCheck() } }
+                .accessibilityIdentifier("harness.error-after-signin")
             Divider()
             if model.state == .credentialValidationRequired || model.state == .reauthenticationRequired || model.state == .pendingSignOut {
                 ConnectedCuadraoAuthFlow().environmentObject(model)
@@ -81,26 +88,43 @@ struct AppleSessionHarness: View {
         } message: { if let key = model.captureNoticeKey { Text(LocalizedStringKey(key)) } }
     }
 
-    private func setLinkedIdentity(_ present: Bool) async {
-        let path = present ? "identity-present" : "identity-missing"
-        _ = try? await URLSession.shared.data(from: URL(string: "http://127.0.0.1:59920/synthetic/" + path)!)
+    private func setLinkedIdentity(_ present: Bool) {
+        identityChangePending = true
+        identityReceipt = ""
+        Task {
+            let path = present ? "identity-present" : "identity-missing"
+            do {
+                let (_, response) = try await URLSession.shared.data(from: URL(string: "http://127.0.0.1:59920/synthetic/" + path)!)
+                identityReceipt = (response as? HTTPURLResponse)?.statusCode == 200 ? (present ? "linked" : "unlinked") : "failed"
+            } catch { identityReceipt = "failed" }
+            identityChangePending = false
+        }
     }
+
 }
 
 private actor HarnessAppleChecker: AppleCredentialChecking {
     var count = 0
     private var answer: AppleCredentialState? = .authorized
+    private var failNext = false
     private var hold = false
+    private var onWaiting: @Sendable () async -> Void = {}
     private var continuation: CheckedContinuation<Void, Never>?
-    func holdNext() { hold = true }
+    func failAfterAuthorizedCheck() { answer = .authorized; failNext = true }
+    func holdNext(onWaiting: @escaping @Sendable () async -> Void) { hold = true; self.onWaiting = onWaiting }
     func release() { continuation?.resume(); continuation = nil }
     func set(_ answer: AppleCredentialState?) { self.answer = answer }
     func state(for subject: String) async throws -> AppleCredentialState {
         count += 1
         let result = answer
+        if failNext { answer = nil; failNext = false }
         if hold {
             hold = false
-            await withCheckedContinuation { continuation = $0 }
+            let notify = onWaiting
+            await withCheckedContinuation {
+                continuation = $0
+                Task { await notify() }
+            }
         }
         guard let result else { throw SessionFailure.unavailable }
         return result

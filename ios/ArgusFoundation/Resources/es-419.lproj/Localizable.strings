@@ -830,10 +830,10 @@
 
 "auth.apple.capture.title" = "Iniciaste sesión";
 "auth.apple.capture.fresh" = "No se guardó la autorización de Apple. Para eliminar tu cuenta, necesitarás una nueva autorización de Apple.";
-"auth.apple.capture.failed" = "No se pudo guardar tu autorización de Apple. Iniciaste sesión, pero para eliminar tu cuenta necesitarás una nueva autorización de Apple.";
+"auth.apple.capture.failed" = "No se pudo guardar tu autorización de Apple. Iniciaste sesión, pero para eliminar tu cuenta podrías necesitar una nueva autorización de Apple.";
 "auth.apple.capture.dismiss" = "Entendido";
 
 "auth.apple.validation.title" = "Verifica tu sesión";
-"auth.apple.validation.detail" = "Necesitamos verificar la autorización de Apple antes de continuar. Inténtalo de nuevo cuando tengas conexión.";
+"auth.apple.validation.detail" = "Necesitamos verificar la autorización de Apple antes de continuar. Inténtalo de nuevo o cierra sesión en esta app.";
 "auth.apple.signInAgain.detail" = "Cierra sesión e inicia sesión de nuevo para verificar cómo comenzó esta sesión.";
 "auth.apple.signInAgain.action" = "Cerrar sesión e iniciar de nuevo";

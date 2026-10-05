@@ -1,5 +1,3 @@
-"""Loopback-only synthetic Auth/API for the DEBUG Apple session harness."""
-
 import base64
 import json
 import time

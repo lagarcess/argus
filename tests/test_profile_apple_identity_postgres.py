@@ -1,5 +1,3 @@
-"""Owner-scoped /me projection over local PostgreSQL auth identities."""
-
 import json
 import os
 from uuid import uuid4

@@ -200,6 +200,7 @@ final class ProfileAuthModel: ObservableObject {
     }
 
     private func accept(_ snapshot: SessionSnapshot) {
+        if snapshot.phase != .authenticated { captureNoticePresented = false }
         household?.bind(snapshot)
         invitations?.bind(snapshot)
         financialSearch?.bind(snapshot)
