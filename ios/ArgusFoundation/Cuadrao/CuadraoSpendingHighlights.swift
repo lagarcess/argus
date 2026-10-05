@@ -4,25 +4,27 @@ struct CuadraoSpendingHighlights: View {
     let story: CanvasSpendingStory
     let currency: String
     let spanish: Bool
-    private var insights: [CanvasSpendingInsight] { story.longitudinalInsights }
-    private var featured: [CanvasSpendingInsight] {
+    private func featuredInsights(_ insights: [CanvasSpendingInsight]) -> [CanvasSpendingInsight] {
         let trend = insights.first { $0.kind == .trend }
         let average = insights.first { $0.kind == .average && $0.category == nil }
         return [trend, average].compactMap { $0 }
     }
-    private var hasMore: Bool {
+    private func hasMore(_ insights: [CanvasSpendingInsight], featured: [CanvasSpendingInsight]) -> Bool {
         let available = insights.count + (story.changedCategory == nil ? 0 : 1) + (story.largestExpense == nil ? 0 : 1)
         let shown = featured.count + (featured.count < 2 && story.changedCategory != nil ? 1 : 0)
         return available > shown
     }
     var body: some View {
+        // The story's months are walked once per pass; every reader below shares them.
+        let insights = story.longitudinalInsights
+        let featured = featuredInsights(insights)
         if !insights.isEmpty || story.changedCategory != nil {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text(spanish ? "Lo que destaca" : "Highlights").font(CuadraoTypography.section)
                     Spacer()
-                    if hasMore {
-                        NavigationLink(spanish ? "Ver todos" : "See all") { allHighlights }
+                    if hasMore(insights, featured: featured) {
+                        NavigationLink(spanish ? "Ver todos" : "See all") { allHighlights(insights) }
                             .font(CuadraoTypography.supporting).frame(minHeight: 44)
                             .accessibilityIdentifier("home-highlights-all")
                     }
@@ -34,7 +36,7 @@ struct CuadraoSpendingHighlights: View {
             }.padding(.top, 12)
         }
     }
-    private var allHighlights: some View {
+    private func allHighlights(_ insights: [CanvasSpendingInsight]) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 Text(spanish ? "Promedios" : "Averages").font(CuadraoTypography.feature)

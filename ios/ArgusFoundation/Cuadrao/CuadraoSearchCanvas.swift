@@ -37,7 +37,8 @@ struct CuadraoSearchCanvas: View {
         availableAccounts.filter { matches($0.displayName(spanish) + " " + subtitle($0)) }
     }
     private var activity: [CanvasActivity] {
-        data.activity.filter { entry in
+        let availableAccounts = availableAccounts
+        return data.activity.filter { entry in
             guard let account = availableAccounts.first(where: { $0.id == entry.accountID }) else { return false }
             return matches(entry.title + " " + account.displayName(spanish) + " " + subtitle(account))
         }.sorted { $0.date > $1.date }

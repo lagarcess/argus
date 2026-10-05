@@ -6,12 +6,14 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-10-04 (PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-10-04 (PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
+
+- October 4, 2026: [Cuadrao code integration checkpoint](../reports/2026-10-04-cuadrao-code-integration-landing.md), #809, #790, #810 and #812. The QA gate, release UI, default-off invitation client and responsiveness changes preserve the latest approved foundation documents. The report and final #812 landing comment record source identity, merge lineage and terminal CI. Thirty-four fresh selected simulator journeys passed. Physical-phone, hosted-service and feature-enablement gates remain open.
 
 - October 4, 2026: [Cuadrao documentation landing](../reports/2026-10-04-cuadrao-docs-integration-landing.md), PRs #808, #813, #815 and #814, through `883d289ff8f9c4261f63078d10121de7fb371789`. Deletion edge-case decisions, the mobile execution checkpoint, October 4 direction and historical-spec archives are recorded together. No runtime, configuration, migration, deployment or phone-build change. The report owns merge lineage, retained evidence and remaining gates.
 

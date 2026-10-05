@@ -90,6 +90,19 @@ enum CanvasBalanceHistory {
     }
 }
 
+/// A history and the day it was built for; the projection reads the clock only through that day.
+struct CanvasBuiltBalanceHistory {
+    let points: [CanvasBalancePoint]
+    let day: Date
+    init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], now: Date) {
+        points = CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: now)
+        day = Calendar.current.startOfDay(for: now)
+    }
+    func points(on now: Date) -> [CanvasBalancePoint]? {
+        Calendar.current.startOfDay(for: now) == day ? points : nil
+    }
+}
+
 /// A shared preview window; each fixture chooses plausible events within it.
 enum CanvasPreviewHistory {
     static func variation(_ date: Date, salt: Int) -> Int {
