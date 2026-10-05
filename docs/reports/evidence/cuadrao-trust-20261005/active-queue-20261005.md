@@ -1,6 +1,6 @@
 # Active queue update
 
-Fetched integration is `d08a133a4e81082ffb3f2738dae92f544cba055a`. Original base is `875de09ac2115acec42e09060b92878aa5f18eff`. Prior7018 integration CI `37360181501` and smoke `37360181570` succeeded. Newd08 integration CI `37379028424` is running; smoke `37379028432` succeeded. GitHub reports runner-allocation mitigation and new exact-head checks execute again.
+Fetched integration is `d08a133a4e81082ffb3f2738dae92f544cba055a`. Original base is `875de09ac2115acec42e09060b92878aa5f18eff`. Prior7018 integration CI `37360181501` and smoke `37360181570` succeeded. New d08 integration CI `37379028424` and smoke `37379028432` both succeeded. GitHub reports runner-allocation mitigation and new exact-head checks execute again.
 
 Landed PRs are851,844,846,858,857,863. Landing housekeeping is still in progress through this documentation PR. No feature activation or hosted mutation occurred.
 
