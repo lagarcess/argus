@@ -6,5 +6,5 @@ privacy-evidence	privacy	needs-verify	codex/cuadrao-privacy-evidence	845	ada3250
 primary-currency	foundations	needs-verify	codex/cuadrao-primary-currency	853	82a5f39c017a8ee1ecb2f4f89a90f9f11f7ca3eb	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 paired-transfers	foundations	needs-verify	codex/cuadrao-paired-transfers	854	b482f575a4d0561c7426517348dc9522adcb0673	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 privacy-manifest	privacy	needs-verify	codex/cuadrao-app-privacy-manifest	849	5a20a16d0f4bad89c0190940cdf62b4c10f4901a	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
-native-buttons	identity	needs-verify	codex/cuadrao-native-provider-appearance	857	e8a5c10e908f45983cbe1023454ee4a52af765cd	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
-apple-binding	identity	needs-verify	codex/apple-identity-binding-800	858	ad2e7d84236bc2bc0f0ffb82d3e0c9e6b9f6f04d	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
+native-buttons	identity	landed	codex/cuadrao-native-provider-appearance	857	fb847fc340a7c7acac55922691fa0f99c50e33a6	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
+apple-binding	identity	landed	codex/apple-identity-binding-800	858	ad2e7d84236bc2bc0f0ffb82d3e0c9e6b9f6f04d	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
