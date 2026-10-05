@@ -595,3 +595,11 @@ def test_a_hung_compensating_revoke_releases_the_request(key, apple, path) -> No
     finally:
         release.set()
         made.close()
+
+
+def test_provider_only_revoke_preserves_credential_until_owner_receipt(service, apple):
+    apple.grant()
+    service.capture(user_id=USER, authorization_code="c.receipt")
+    stored = service.repository.get(user_id=USER)
+    assert service.revoke_stored(stored) is RevokeOutcome.REVOKED
+    assert service.repository.get(user_id=USER) == stored

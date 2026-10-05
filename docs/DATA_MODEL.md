@@ -2507,8 +2507,12 @@ flight: `account_deletion_runs` (the user id and two hashes of it),
 `account_deletion_revocations` (each pending revocation with its encrypted
 credential). The
 [census](specs/lanes/account-deletion-fk-census.md#placeholders-one-per-sharing-scope-none-tied-to-the-person)
-owns what the run keeps once it completes. A run waiting on a third party keeps
-the account locked and its auth user in place. It finishes when the person
+owns what the run keeps once it completes. The existing run's `steps` also owns
+the Apple terminal receipt. After confirmed provider revocation, receipt creation
+and removal of the exact stored Apple credential commit in one transaction,
+fenced by the live run claim. A missing credential without a terminal receipt
+keeps an Apple-linked pending run unresolved. No second deletion journal exists.
+A run waiting on a third party keeps the account locked and its auth user in place. It finishes when the person
 retries or an operator runs `scripts/ops/scheduled_maintenance.py`. Nothing runs
 that sweep on a schedule, by the founder's decision of October 3, 2026, and no
 cron is to be created for it. The
@@ -3191,8 +3195,10 @@ the subject verified for that credential. `auth.identities` remains the owner
 of the account's current linked identity. Existing rows stay NULL with no
 backfill, so they remain unverified. A new capture compares the returned Apple
 subject with the current identity, then repeats that check in the save
-transaction. Reads and existing revocation of legacy credentials remain
-compatible; future deletion admission must distinguish unverified rows.
+transaction. New deletion admission requires a readable credential bound to
+that current subject before inserting its first run. Legacy unverified rows
+require fresh authorization for new admission; their existing pending-run
+revocation remains compatible.
 
 The save transaction uses `READ COMMITTED`, locks the Auth user first, then
 reads and locks all that user's identity rows in a separate statement. The
@@ -3200,9 +3206,10 @@ immediate identity-to-user foreign key blocks new identity inserts and inbound
 moves while those locks are held. Identity row locks block edits and deletion.
 The credential write also compares the pre-exchange ciphertext, so a stale
 capture cannot overwrite or recreate a replaced or removed row. No transaction
-stays open across Apple HTTP. These locks prove agreement at commit, not after
-later Auth changes. Existing deletion admission does not yet share this lock
-order.
+stays open across Apple HTTP. Deletion admission shares this lock order and
+locks the deletion run last. Ordinary capture refuses an active deletion run;
+recovery capture requires its exact claim and checks expiry after acquiring the
+run lock. These locks prove agreement at commit, not after later Auth changes.
 
 The compatibility `upsert` clears `apple_subject` when it writes an unverified
 credential. Older binaries do not know this column. Keep capture disabled
@@ -3216,8 +3223,10 @@ No SECURITY DEFINER function is involved.
 `user_id` references `auth.users` with `on delete restrict`. An auth user who
 still has an unrevoked Apple token cannot be deleted, so no deletion path can
 drop the token without revoking it at Apple. The account-deletion run revokes
-first, deletes this row only after Apple confirms, then deletes the user. The
-row is the pending revoke until then, which matches the contract that the
+first, then atomically removes the unchanged credential and records the terminal
+receipt under its live claim before deleting the user. A failed local transaction
+keeps the row for a retry, while a committed receipt explains an absent row.
+The row is the pending revoke until then, which matches the contract that the
 encrypted credential is kept only while a revoke is pending. Apple's
 `invalid_grant` on revoke is classified as already revoked, so it also deletes
 the row. This classification also applies during an App Store app transfer;
