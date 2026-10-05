@@ -22,6 +22,9 @@ struct NativeProviderConfiguration: Equatable {
     static let off = NativeProviderConfiguration(apple: false, google: nil)
 
     static func load(bundle: Bundle = .main) -> Self {
+        #if !DEBUG
+        return .off
+        #else
         func flag(_ key: String) -> Bool {
             let value = bundle.object(forInfoDictionaryKey: key)
             return (value as? Bool == true) || (value as? String)?.lowercased() == "true"
@@ -31,15 +34,17 @@ struct NativeProviderConfiguration: Equatable {
                   !value.isEmpty, !value.contains("$(") else { return nil }
             return value
         }
+        let apple = flag("ARGUS_APPLE_SIGN_IN_ENABLED")
         var google: Google?
-        if flag("ARGUS_GOOGLE_SIGN_IN_ENABLED"), let clientID = value("GOOGLE_SIGN_IN_IOS_CLIENT_ID"),
+        if apple, flag("ARGUS_GOOGLE_SIGN_IN_ENABLED"), let clientID = value("GOOGLE_SIGN_IN_IOS_CLIENT_ID"),
            let scheme = googleCallbackScheme(clientID), registeredSchemes(bundle).contains(scheme) {
             // GIDSignIn raises an Objective-C exception (a crash) when the reversed client id
             // isn't a registered URL scheme, so a half-configured build hides the button.
             let server = value("GOOGLE_SIGN_IN_WEB_CLIENT_ID").flatMap { googleCallbackScheme($0) == nil ? nil : $0 }
             google = Google(clientID: clientID, serverClientID: server)
         }
-        return Self(apple: flag("ARGUS_APPLE_SIGN_IN_ENABLED"), google: google)
+        return Self(apple: apple, google: google)
+        #endif
     }
 
     /// "123-abc.apps.googleusercontent.com" -> "com.googleusercontent.apps.123-abc".
