@@ -7,3 +7,5 @@ The independent reviewer ran the committed diagnostic patch only in a temporary 
 ![Protected dispatch blocked](notification-admission-blocked.png)
 
 This proves the tested admission interval. It does not prove real Apple authorization or hosted behavior. The remaining full independent review and exact-head CI are separate gates.
+
+Independent full review also ran four unchanged UI journeys, all passing with zero failures. Nine screenshots and their test manifest are saved in [journeys](journeys/). The four earlier local-stack skips were then exercised successfully with synthetic identities. [Local report](report.md) and [Swift output](swift-live.log) preserve the exact counts and bounded fixture-port adaptation. Original local Auth settings and user set were restored. Physical Apple authorization remains open.
