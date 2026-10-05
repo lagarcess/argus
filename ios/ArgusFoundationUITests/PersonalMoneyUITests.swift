@@ -411,6 +411,12 @@ extension FinancialLoopUITests {
         if picker.label.contains(account.name) { return }
         tapVisible(picker)
         let option = app.buttons.matching(NSPredicate(format: "label == %@ AND NOT identifier BEGINSWITH 'loop.' AND NOT identifier BEGINSWITH 'accounts.'", account.name)).firstMatch
+        let menu = app.collectionViews.lastMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        for _ in 0..<40 {
+            if option.exists && option.isHittable { break }
+            menu.swipeUp()
+        }
         XCTAssertTrue(option.waitForExistence(timeout: 5))
         option.tap()
     }

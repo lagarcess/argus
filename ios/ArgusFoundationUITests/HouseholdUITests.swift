@@ -207,7 +207,10 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard(); tapVisible(app.buttons["household.invite.preview"])
         replaceMoneyField("household.join.displayName", with: "Household Bob")
         dismissMoneyKeyboard(); tapVisible(app.buttons["household.accept"])
-        XCTAssertTrue(app.buttons["household.leave"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Household Bob"].waitForExistence(timeout: 15))
+        let leave = app.buttons["household.leave"]
+        for _ in 0..<40 where !leave.exists { app.collectionViews.lastMatch.swipeUp() }
+        XCTAssertTrue(leave.waitForExistence(timeout: 5))
         tapVisible(app.buttons["household.management.done"])
         XCTAssertFalse(home.buttons["household.account." + shared.id].exists)
         capture("household-accepted-with-no-automatic-sharing")
