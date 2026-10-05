@@ -39,6 +39,7 @@ router = APIRouter(prefix="/api/v1", tags=["account"])
 # where guests are made (captcha and the per-visitor guest limits), not here.
 _per_account = SlidingWindowLimiter()
 _PER_ACCOUNT = (6, 60)
+_INCOMPLETE_RETRY_SECONDS = 5
 
 
 def account_deletion_enabled() -> bool:
@@ -184,16 +185,18 @@ def delete_account(
     except Exception:
         service = None
     if service is None:
+        started = getattr(request.state, "account_deletion_started", False)
         raise problem(
             request,
             status_code=503,
             code=(
                 "account_deletion_incomplete"
-                if getattr(request.state, "account_deletion_started", False)
+                if started
                 else "account_deletion_unavailable"
             ),
             title="Account Deletion Unavailable",
             detail="Account deletion is not available right now.",
+            headers={"Retry-After": str(_INCOMPLETE_RETRY_SECONDS)} if started else None,
         )
     try:
         outcome = service.delete_account(
@@ -243,6 +246,6 @@ def delete_account(
             # The run may be open and the account locked; a retry of this
             # route resumes it (the web treats this as in progress).
             detail="Deletion did not finish. Try again to finish it.",
-            headers={"Retry-After": "5"},
+            headers={"Retry-After": str(_INCOMPLETE_RETRY_SECONDS)},
         ) from None
     return AccountDeletionResponse(status="done", pending=sorted(outcome.pending))

@@ -152,14 +152,30 @@ def test_failures_map_to_problems(enabled, error, status, code) -> None:  # noqa
     assert USER_ID not in response.text
 
 
-def test_unavailable_without_postgres_surfaces(enabled) -> None:  # noqa: ANN001
+@pytest.mark.parametrize("construction_error", [None, RuntimeError("unavailable")])
+@pytest.mark.parametrize("started", [False, True])
+def test_service_unavailability_preserves_deletion_state(
+    enabled, construction_error, started
+) -> None:  # noqa: ANN001
+    def requester(request):
+        request.state.account_deletion_started = started
+        return _registered(request)
+
     with (
-        patch.object(account_route, "deletion_requester", _registered),
-        patch.object(account_route, "account_deletion_service", return_value=None),
+        patch.object(account_route, "deletion_requester", requester),
+        patch.object(
+            account_route,
+            "account_deletion_service",
+            return_value=None,
+            side_effect=construction_error,
+        ),
     ):
         response = client.post(URL, json={"confirm": True})
     assert response.status_code == 503
-    assert response.json()["code"] == "account_deletion_unavailable"
+    assert response.json()["code"] == (
+        "account_deletion_incomplete" if started else "account_deletion_unavailable"
+    )
+    assert response.headers.get("Retry-After") == ("5" if started else None)
 
 
 def test_feedback_still_takes_deletion_requests_while_the_command_is_off() -> None:
@@ -346,5 +362,6 @@ def test_unreadable_admission_state_is_unavailable_not_accepted(enabled, code):
         response = client.post(URL, json=body)
     assert response.status_code == 503
     assert response.json()["code"] == "account_deletion_incomplete"
+    assert response.headers["Retry-After"] == "5"
     admin.lock_user.assert_not_called()
     admin.delete_user.assert_not_called()
