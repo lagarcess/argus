@@ -1,63 +1,118 @@
 # Connect the approved Cuadrao interface
 
-The founder rejected the separate Connected presentation on October 5. This lane
-reuses Preview's approved rendering for the real account, movement, recurrence,
-and payment-confirmation journey.
+Cuadrao's connected money flow now uses the approved Preview presentation for
+Home, account details, movement details, and Plan. Preview and live data read the
+same view bodies. AccountsModel, FinancialLoopModel, and FinancialPlanModel still
+own live records, commands, and recovery.
 
-## Source and boundaries
+This completes the assigned UI connection in source and local verification.
+Physical-phone acceptance remains pending. Neither installed phone app changed.
+This record does not close the wider connected-screens issue #824 or claim that
+Chat, Profile, Search, Household, or the App Store release is complete.
 
-The integration base is `875de09ac2115acec42e09060b92878aa5f18eff`.
-The [baseline manifest](baseline/manifest.json) identifies the unchanged Preview
-screens captured before implementation. Both installed phone apps are retained.
-No phone build, merge, deployment, hosted migration, or provider call is part of
-this acceptance record.
+## Source and reconciliation
 
-## Decisions
+| Checkpoint | Revision |
+| --- | --- |
+| Original integration base | `875de09ac2115acec42e09060b92878aa5f18eff` |
+| Current integration at final reconciliation | `f5c83cd88a0af56dc8154a89c6ea4f75d9c518ce` |
+| One-way integration merges | `ae78b7d02`, `195c4839a`, `550202da9` |
+| Last application-source change | `eddb7da97f3c38135bf855cc1c73930154fb0713` |
+| Published branch | `codex/cuadrao-connected-preview` |
 
-The experience-first principle keeps existing view bodies, typography and art.
-The domain-model principle leaves live records and writes in existing owners.
-Shared views accept display values and actions. They do not accept a mutable
-Preview store containing real data.
+The first merge brought in CI and native sign-in configuration changes. The
+second brought in deletion-recovery tests and documentation. The third brought
+in Apple's linked-identity capture fix and migration. None changed the financial
+UI, financial read/write contracts, recurring commands, or their persistence.
+The lane adds no API contract or migration of its own. The shared modularity
+budget passes on the reconciled tree.
 
-The architecture comparison selected small shared views and explicit callbacks.
-A whole-app snapshot would duplicate the financial model. A store protocol would
-force durable review flows to imitate immediate fixture mutations. A third design
-runner was unavailable because its model was at capacity.
+The last change adapts the balance header to accessibility text sizes. Its
+standard-size layout, currency selection, and expand action were checked on the
+running app. The affected Preview captures were repeated. Earlier financial
+journeys remain applicable because that change touches presentation only.
 
-The prove-it-works principle requires both matching fixture screenshots and a
-real local API journey. A simulator result does not replace phone acceptance.
+## Approved appearance
 
-The live Home contract supplies current totals but no portfolio-history series.
-Connected therefore uses the approved history-empty artwork beside the actual
-balance. It does not infer history from current positions or future Plan points.
-The expanded balance retains the supplied cash, asset and debt breakdown.
+The [baseline manifest](baseline/manifest.json) identifies the untouched app and
+screens captured before implementation. Original images were not replaced.
+[Initial comparison](preview-parity.json) records six byte-identical captures.
+Plan light changed 31 pixels by at most one color level at the glass edge. A
+replay using the original app binary matched the candidate byte for byte.
 
-## Verification
+The [final Home comparison](final-preview/manifest.json) covers the selector
+extraction and accessibility fix. All three final Home captures are byte-identical to the original baselines. Account, activity, and Plan presentation
+source did not change after its accepted comparison.
 
-Verification is in progress. The first connected recurring journey passed at
-`a1f2aab31` against the local API and Postgres. It records an expense, prepares its
-next expected payment, checks Home's independent 30-day window, confirms payment,
-and verifies the result after relaunch. Preparing the expectation leaves the
-recorded balance unchanged. Confirmation records one payment and removes the
-expected occurrence once.
+Run `python3 compare-preview.py` from this directory with Pillow and NumPy
+available to recompute image differences. This reports differences without
+rewriting either baseline or candidate images.
 
-The Home detail/linked-account/back journey and account swipe/archive/restore
-journey passed at the same app source. Further gesture, recovery, and release
-checks are running. The final record will identify each result bundle.
+[Connected screenshots](connected/manifest.json) identify the source and method
+for each image. They cover actual local accounts, balance breakdown, Upcoming,
+recurrence review, payment recovery, gestures, Spanish copy, and large text.
+The before images for the two presentation fixes remain in the same directory.
 
-The new account-read state test and six detail-presentation tests pass. They cover
-unread/failed versus successful first use, identity reset, exact monetary
-precision, fractional shares, signed legs, and unavailable amounts.
+The API provides current balances but no balance-history series. Home uses the
+approved empty-history artwork and retains the real cash, asset, and debt
+breakdown. Plan's future points are never presented as past balances.
 
-[The image comparison](preview-parity.json) records six byte-identical original
-Preview captures. Plan light differs by only 31 pixels at one channel level; a
-replay using the untouched original app binary matches the candidate byte for
-byte. The original images remain intact. A later selector extraction requires a
-fresh Home capture before visual acceptance.
+## Local verification
 
-The isolated local stack uses ports 59850 through 59855, synthetic accounts,
-blank provider keys, and all 112 repository migrations. Its smoke check passed
-login, profile, Accounts, and Plan reads for two synthetic users. Credentials stay
-in ignored local files and are not part of this evidence.
+[Verification results](verification.json) retain the result-bundle counts and
+source revisions. Thirteen focused UI runs passed, each executing one test with
+no skips. Those runs cover ten distinct journeys, including two repeated on iOS
+26.5 and the affected unknown-balance rerun. Two earlier driver failures are
+recorded separately with their corrections.
 
-Physical-phone acceptance is pending. Neither installed phone app was modified.
+| Journey | Evidence |
+| --- | --- |
+| Expense to recurring expectation, Home Upcoming, confirm paid, relaunch | Pass on iOS 27. Preparing an expectation does not move the balance. Confirmation records one payment. Home stays at 30 days when Plan changes to 60 days. |
+| Home movement to detail, linked account, and back | Pass on iOS 27. The return retains the Home position. |
+| Account swipe to Add, Edit, More, Archive, and Restore | Pass on iOS 27 and 26.5. |
+| Movement swipe to Edit and Category | Pass on iOS 27 and 26.5. Existing correction review and reason remain. |
+| Plan overview and list return after close and relaunch | Pass on iOS 27. |
+| Spanish recurring setup | Pass on iOS 27. |
+| Lost recurring-save response, relaunch, and retry | Pass. One expected payment is saved. |
+| Lost payment response, another user, then owner retry | Pass. The second user sees no pending command. The owner records one payment. |
+| Unknown USD balance and Spanish presentation | Pass after the fix. No invented forecast or empty known-zero subtotal appears. |
+| Release avatar and photo visibility | Pass in the existing DEBUG release-gate harness. |
+
+Seven focused model tests pass. They cover account-read state, identity reset,
+large exact amounts, fractional shares, signed movement legs, missing dates,
+and known zero versus unknown. Native provider configuration passes eleven cases
+in both Debug and Release. Effective Release settings pass both forced-off
+checks even when ignored developer settings enable the providers.
+
+Debug and Release simulator builds pass at the final application source.
+Release remains a compile check, not a signed-device or store-distribution check.
+
+The manual read-failure check injected one 503 response for financial accounts.
+Home showed Retry without the first-use prompt. Retry restored the existing
+accounts and removed the error. The fault proxy recorded one consumed read fault.
+At Accessibility XXXL, currency and amount now occupy separate rows. Changing
+DOP to USD retained the actual unknown state.
+
+The isolated API and Postgres used synthetic accounts, ports 59850 through 59855,
+and the 112 migrations present when the stack was created. The initial two-user
+smoke passed fourteen checks. Provider keys were blank. The later Apple-only
+migration was not exercised by these financial tests. Hosted Apple verification
+belongs to its owning lane.
+
+## Reviews and limits
+
+[Decision and review history](decisions.md) records the architecture choice,
+findings, fixes, and clean delta reviews. The final accessibility review found no
+actionable issue. Branch CI is checked at the published head; a past green result
+is not a standing release approval.
+
+Xcode reports an invalid-frame warning while the account nickname keyboard opens
+in the financial journeys on both simulators. Those journeys pass. Its runtime
+cause is not established here. Release also reports the existing weak-capture
+warning at ConnectedCuadraoRoot.swift:27, which this lane does not modify. This
+work does not claim to settle the separate lag report or all accessibility work.
+
+No merge, deployment, hosted migration, paid call, or phone installation occurred.
+Automatic approval review rejected creation of the new draft PR. The branch is
+published with evidence, and PR creation awaits explicit approval. A PR was not
+created through an alternative tool.
