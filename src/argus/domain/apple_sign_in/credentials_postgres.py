@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from psycopg import Connection
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
@@ -37,6 +38,7 @@ class PostgresAppleCredentialRepository:
         secret_ciphertext: bytes,
         now: datetime,
         key_id: str,
+        deletion_claim: str | None = None,
     ) -> None:
         with self._pool.connection() as connection:
             with connection.transaction():
@@ -59,6 +61,21 @@ class PostgresAppleCredentialRepository:
                 current = bytes(row[0]) if row else None
                 if current != expected_ciphertext:
                     raise AppleCaptureNotStored("credential_replaced")
+                run = connection.execute(
+                    "select claim_id::text, claimed_until from argus_private.account_deletion_runs "
+                    "where user_id = %s::uuid and status != 'done' for update",
+                    (user_id,),
+                ).fetchone()
+                if deletion_claim is None:
+                    if run is not None:
+                        raise AppleCaptureNotStored("account_deletion_started")
+                elif (
+                    run is None
+                    or run[0] != deletion_claim
+                    or run[1]
+                    <= connection.execute("select clock_timestamp()").fetchone()[0]
+                ):
+                    raise AppleCaptureNotStored("deletion_claim_lost")
                 connection.execute(
                     """insert into public.apple_sign_in_credentials
                         (user_id, client_id, secret_ciphertext, secret_key_fingerprint,
@@ -107,14 +124,21 @@ class PostgresAppleCredentialRepository:
 
     def get(self, *, user_id: str) -> StoredAppleCredential | None:
         with self._pool.connection() as connection:
-            with connection.cursor(row_factory=dict_row) as cursor:
-                cursor.execute(
-                    """select user_id::text, client_id, secret_ciphertext,
-                        captured_at, updated_at, secret_key_fingerprint, apple_subject
-                    from public.apple_sign_in_credentials where user_id = %s::uuid""",
-                    (user_id,),
-                )
-                row = cursor.fetchone()
+            return self.get_on(connection, user_id=user_id)
+
+    @staticmethod
+    def get_on(
+        connection: Connection, *, user_id: str, lock: bool = False
+    ) -> StoredAppleCredential | None:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(
+                "select user_id::text, client_id, secret_ciphertext, captured_at, "
+                "updated_at, secret_key_fingerprint, apple_subject "
+                "from public.apple_sign_in_credentials where user_id = %s::uuid"
+                + (" for update" if lock else ""),
+                (user_id,),
+            )
+            row = cursor.fetchone()
         if row is None:
             return None
         return StoredAppleCredential(
@@ -135,3 +159,24 @@ class PostgresAppleCredentialRepository:
                 (user_id, secret_ciphertext),
             )
             return cursor.rowcount == 1
+
+    @staticmethod
+    def delete_exact_on(connection: Connection, row: StoredAppleCredential) -> bool:
+        return (
+            connection.execute(
+                "delete from public.apple_sign_in_credentials where user_id = %s::uuid "
+                "and client_id = %s and secret_ciphertext = %s and captured_at = %s "
+                "and updated_at = %s and secret_key_fingerprint is not distinct from %s "
+                "and apple_subject is not distinct from %s",
+                (
+                    row.user_id,
+                    row.client_id,
+                    row.secret_ciphertext,
+                    row.captured_at,
+                    row.updated_at,
+                    row.key_id,
+                    row.apple_subject,
+                ),
+            ).rowcount
+            == 1
+        )
