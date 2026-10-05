@@ -16,7 +16,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["Add budget"].exists)
         XCTAssertTrue(app.buttons["Add debt plan"].exists)
         XCTAssertTrue(app.buttons["Add an expectation"].exists)
-        app.buttons["Cancel"].tap()
+        app.staticTexts["plan-heading"].tap()
         capture("plan-approved-overview-with-real-balance")
 
         #if DEBUG

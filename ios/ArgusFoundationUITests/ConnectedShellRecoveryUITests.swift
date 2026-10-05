@@ -43,7 +43,8 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons[id])
         app.buttons["Receipt options"].tap()
         app.buttons["Discard receipt"].tap()
-        app.sheets.buttons["Discard receipt"].tap()
+        XCTAssertTrue(app.staticTexts["Discard this receipt?"].waitForExistence(timeout: 5))
+        app.buttons["Discard receipt"].tap()
         XCTAssertTrue(app.buttons["receipt-later"].waitForNonExistence(timeout: 5))
         assertHome(balance)
         #endif

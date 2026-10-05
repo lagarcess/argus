@@ -281,7 +281,6 @@ extension FinancialLoopUITests {
     private func completeHouseholdEditingJourney(shared: MoneyAccount, privateAccount: MoneyAccount, stamp: String) throws {
         let accounts = app.scrollViews["screen.home"]
         let detail = app.scrollViews["household.detail"]
-        let search = app.scrollViews["screen.search"]
         let sharedRow = accounts.buttons["household.account." + shared.id]
         openAccountsTab(); tapVisible(sharedRow)
         XCTAssertTrue(detail.staticTexts["household.detail.balance"].waitForExistence(timeout: 10))
@@ -313,9 +312,9 @@ extension FinancialLoopUITests {
         tapVisible(detail.buttons["household.back"])
         app.revealConnectedTabBar()
         app.buttons["tab.search"].tap()
-        let searchField = search.textFields["household.search.query"]
+        let searchField = app.textFields["household.search.query"]
         tapVisible(searchField); searchField.typeText("HH reviewed expense " + stamp + "\n")
-        let hit = search.buttons["household.search." + activityID]
+        let hit = app.buttons["household.search." + activityID]
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         tapVisible(hit)
         XCTAssertTrue(detail.staticTexts["Selected search result"].waitForExistence(timeout: 15))
