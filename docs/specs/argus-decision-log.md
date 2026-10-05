@@ -505,3 +505,22 @@ sequence. #826 retains the bounded runtime contract; the foundation choice is
 settled, while exact first-release jobs and memory/voice inclusion remain in the
 scope record. This planning lock does not claim implementation or approve
 merges, hosted changes, paid evaluations or distribution.
+
+
+## October 4, 2026: recurring work, categories and Plan usefulness
+
+The founder approved the reviewed recurring, category, gesture and projection
+direction and explicitly chose expected-payment preparation with confirmation
+when paid. The [MVEE](argus-minimum-viable-ecosystem-experience.md#recurring-setup-upcoming-and-useful-scenarios)
+owns the recurring/Upcoming/scenario behavior and
+[category correction rules](argus-minimum-viable-ecosystem-experience.md#category-suggestions-and-useful-corrections).
+The [native design guide](../../.agent/designs/cuadrao/DESIGN.md#account-and-movement-actions-october-4-target)
+owns the revised account gestures and movement shortcuts.
+
+Implement these behaviors from Cuadrao's own requirements, contracts and tests.
+Midday is a research reference, not a source-rewrite assignment; rewording copied
+code is not independent implementation. Any proposed source reuse requires its
+own license review. Existing #818/#822/#823/#824 track the work. Pattern
+suggestions follow usable recurring setup; forecasting-library selection needs
+measured benefit. No runtime, provider, hosted activation or additional launch
+blocker is created by this documentation lock.

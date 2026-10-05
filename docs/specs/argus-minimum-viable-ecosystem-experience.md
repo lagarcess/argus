@@ -705,6 +705,69 @@ a changed type or account requires review. Removal and restoration re-evaluate
 the link. These are sketch behavior requirements, not production recurrence,
 allocation, or reconciliation contracts.
 
+#### Recurring setup, Upcoming and useful scenarios
+
+Founder-approved October 4, 2026. Connect the existing recurring-expectation and
+cash-projection owners to the designed Home and Plan experience.
+
+- A movement can become a prefilled recurring expectation. Review the copied
+  details, cadence and next date, then confirm. Preserve the original movement;
+  future occurrences are expected payments or income, never actual money merely
+  because their date arrives. Confirm or explicitly link the actual movement
+  when paid or received, fulfilling the occurrence once.
+- Home's Próximamente / Upcoming uses a rolling next-30-days view of confirmed
+  dated commitments and expected income, including one-off items. Keep this Home
+  horizon independent of a longer Plan exploration while using the same
+  canonical projection service. Pending/overdue items retain truthful status;
+  they are not fabricated paid entries or silently rescheduled.
+- Make recurring entry useful first. Pattern detection then suggests a schedule
+  after several consistent occurrences within the authorized account/currency
+  scope, using sensible date and amount tolerances. Explain the evidence and let
+  the person accept, adjust or dismiss. Do not silently turn a detected pattern
+  into a commitment or overwrite a rejected suggestion.
+- Plan distinguishes confirmed schedules, uncertain estimates and hypothetical
+  changes. A dated what-if recalculates the same timeline and explains its impact
+  on upcoming obligations and goals without saving a real transaction. Exclude
+  already scheduled or fulfilled amounts from any variable-spending estimate.
+- With sparse history, use an honest schedule-based projection and show missing
+  coverage. A sample or linear fixture must not be presented as learned behavior.
+  Evaluate the usefulness of the lookforward experience with users before a
+  decision to expand or remove it.
+
+The existing expectations, fulfillment and currency owners remain the starting
+point. #822/#824 own connection work; #818/#826 bound scenario inclusion and
+contracts. Statistical forecasting is a later evidence-based choice: compare
+simple baselines and StatsForecast on chronological holdouts, including errors,
+interval coverage and shortfall warnings. StatsForecast is a candidate, not a
+selected dependency; Prophet, Chronos or paid forecasting do not become launch
+requirements. Approved direction does not make all follow-on detection and
+forecasting work a first-release blocker.
+
+#### Category suggestions and useful corrections
+
+Founder-approved October 4, 2026. One canonical category identity must feed model
+validation, financial records, localized labels, icons/artwork and charts.
+Reconcile the existing preview/backend taxonomy before connecting enrichment.
+
+Preserve explicit user choices and accepted rules first. Reuse valid mapped
+source categories; suggest a category through the existing model for unresolved
+cases under the shared consent policy. Show suggestions as editable in receipt
+or transaction review. Unknown or uncertain results can remain unclassified;
+model-reported confidence is not a calibrated correctness probability. Financial
+posting keeps its existing confirmation boundary.
+
+Correcting one record is immediate through the canonical correction action.
+Offer separate, explicit choices to update selected similar existing records or
+remember a scoped rule for future ones. Bulk correction is not proof of future
+learning. Preserve authorization, revision history and linked-refund rules, and
+never silently overwrite a person's correction. Validate batch results against
+stable record IDs rather than assuming model output order matches input order.
+
+#822 owns category and correction contracts; #823 connects extracted suggestions;
+#824 consumes the same category identities in Home and Search. Use existing
+OpenRouter, Supabase and Render foundations. No separate categorization vendor
+or vector index is required by this direction.
+
 ### Search: find what I already know
 
 Minimum capacity is unified retrieval across transactions, accounts, plans, goals, conversations, saved answers, and prior analyses, with direct links to their owning surfaces.

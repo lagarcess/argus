@@ -487,7 +487,8 @@ its basis and be explicitly applied; no such recommendation is implemented here.
 personal plans and group cards. On integration it came with #783. Since #785
 (design PR 2), personal plans and group cards use it. Since #786 (design PR 3),
 Home account rows use it and Home opens plans and groups, all inside the design
-preview only. Tap opens detail; swipe right reveals Edit
+preview only. This records the implemented baseline; the account-specific
+October 4 target below supersedes its account action arrangement. Tap opens detail; swipe right reveals Edit
 (including rename); swipe left reveals Archive. Neither swipe executes on a full
 swipe. Hold and drag reorders directly in place, without a context menu or an
 ordering tray. Sheets are for actual editing, invitation and review flows.
@@ -499,6 +500,27 @@ account management destination remains an alternative with visible order handles
 `CuadraoCollectionOrder` applies only the visible IDs without moving hidden or
 archived records. Preview owners persist plan/group order and fixture account order;
 connected viewer-specific order is a future contract, not a shared financial edit.
+
+#### Account and movement actions: October 4 target
+
+Founder-approved, not yet a connected implementation claim. For account rows,
+swipe right reveals Add movement; swipe left reveals Edit and More. More holds
+applicable secondary account actions, including Archive. Keep hold-and-drag
+reordering and visible/accessibility alternatives under the existing ordering
+contract. Personal Plan and group-card Edit/Archive actions are unchanged.
+
+Movement rows open the selected transaction detail, preserving their origin.
+Provide Edit and category shortcuts through the same authorized correction
+owner; detail retains secondary actions and an accessible alternative. Do not
+copy message deletion semantics into financial records. No full swipe executes
+a destructive financial action. Only expose actions the current user can perform.
+The exact movement edge arrangement remains part of the bounded UI slice.
+
+The inspected WhatsApp references show [More/Archive](https://mobbin.com/screens/0f157572-5769-4d59-aca4-6b40022c0d57)
+and [Unread/Pin](https://mobbin.com/screens/8b979f79-a8d1-4f0e-873a-f79f803a179b)
+on opposite sides. They inform grouping; Cuadrao's actions and financial
+confirmation rules retain their own meaning. #824 owns connected gesture and
+navigation reconciliation, with command permissions from #822.
 
 Native period paging follows the finger and settles or cancels naturally. Chart
 inspection is tap or hold, leaving ordinary horizontal paging and vertical scrolling
