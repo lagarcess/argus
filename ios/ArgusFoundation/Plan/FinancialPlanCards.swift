@@ -13,17 +13,17 @@ struct FinancialPlanCards: View {
         VStack(alignment: .leading, spacing: 18) {
             Text(spanish ? "Tus planes" : "Your plans").font(CuadraoTypography.section)
             ForEach((projection.goals ?? []).filter { !$0.goal.archived }) { progress in
-                Button { Task { await loop.goals.open(progress.id, origin: .plan) } } label: {
+                Button { Task { await loop.goals.open(progress.id, origin: .planOverview) } } label: {
                     CuadraoPlanCard(display: goal(progress))
                 }.buttonStyle(.plain).accessibilityIdentifier("plan.card.goal." + progress.id.uuidString)
             }
             ForEach(projection.budgets.filter { !$0.budget.archived }) { progress in
-                Button { Task { await loop.budgets.open(progress.id, origin: .plan) } } label: {
+                Button { Task { await loop.budgets.open(progress.id, origin: .planOverview) } } label: {
                     CuadraoPlanCard(display: budget(progress))
                 }.buttonStyle(.plain).accessibilityIdentifier("plan.card.budget." + progress.id.uuidString)
             }
             ForEach((projection.debts ?? []).filter { !$0.debt.archived }) { progress in
-                Button { Task { await loop.debts.open(progress.id, origin: .plan) } } label: {
+                Button { Task { await loop.debts.open(progress.id, origin: .planOverview) } } label: {
                     CuadraoPlanCard(display: debt(progress))
                 }.buttonStyle(.plain).accessibilityIdentifier("plan.card.debt." + progress.id.uuidString)
             }

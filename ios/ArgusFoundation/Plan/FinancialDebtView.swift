@@ -79,7 +79,7 @@ struct FinancialDebtPresenter: View {
             if model.navigation != nil {
                 Color.black.opacity(0.25).ignoresSafeArea()
                 FinancialDebtDetail(model: model, loop: loop) {
-                    switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .search: destination = .search; case .account: destination = .accounts; case nil: break }
+                    switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search; case .account: destination = .accounts; case nil: break }
                     model.close(); Task { await search?.refresh() }
                 }.background(ArgusStyle.background).clipShape(RoundedRectangle(cornerRadius: 24)).padding(12).accessibilityElement(children: .contain).accessibilityIdentifier("debt.detail")
             } else { Color.clear.allowsHitTesting(false) }

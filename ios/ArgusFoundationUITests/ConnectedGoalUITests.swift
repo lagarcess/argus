@@ -1,6 +1,34 @@
 import XCTest
 
 extension FinancialLoopUITests {
+    func testPlanCardKeepsItsOriginAfterCloseAndRelaunch() throws {
+        try signIn()
+        let stamp = String(UUID().uuidString.prefix(5))
+        let account = createMoneyAccount("Plan card " + stamp, type: "savings", amount: "100")
+        let title = "Return to Plan " + stamp
+        app.revealConnectedTabBar()
+        prepareGoal(title, destination: account)
+        tapVisible(app.buttons["goal.save"])
+        XCTAssertTrue(app.buttons["goal.save"].waitForNonExistence(timeout: 15))
+        tapVisible(app.buttons["plan.overview"])
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.card.goal.' AND label CONTAINS %@", title)).firstMatch
+        tapVisible(card)
+        assertGoal("DOP 0.00")
+        app.terminate(); app.launch()
+        assertGoal("DOP 0.00")
+        app.buttons["goal.close"].tap()
+        XCTAssertTrue(app.buttons["plan.overview"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["plan.overview"].isSelected)
+        XCTAssertTrue(card.exists)
+        capture("plan-card-returned-to-overview")
+        _ = openGoal(title)
+        app.terminate(); app.launch()
+        assertGoal("DOP 0.00")
+        app.buttons["goal.close"].tap()
+        XCTAssertTrue(app.buttons["plan.goals"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["plan.goals"].isSelected)
+    }
+
     func testConnectedGoalAllocationContributionCorrectionSearchAndRestore() throws {
         try signIn()
         let stamp = String(UUID().uuidString.prefix(5))

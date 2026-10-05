@@ -247,10 +247,14 @@ extension FinancialLoopUITests {
             app.buttons[daysAhead < 0 ? "Previous Month" : "Next Month"].tap()
         }
         XCTAssertTrue(day.waitForExistence(timeout: 5)); day.tap()
-        // Close the calendar popover without leaving the surface: the sheet's bar, or Plan's own header.
-        let bar = app.navigationBars.firstMatch
-        if bar.exists { bar.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5)).tap() }
-        else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.08)).tap() }
+        let dismissRegion = app.buttons["PopoverDismissRegion"]
+        if dismissRegion.exists {
+            dismissRegion.tap()
+        } else if let bar = app.navigationBars.allElementsBoundByIndex.first(where: \.isHittable) {
+            bar.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.5)).tap()
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.15, dy: 0.08)).tap()
+        }
         XCTAssertTrue(day.waitForNonExistence(timeout: 5))
     }
 }

@@ -169,13 +169,12 @@ struct ConnectedCuadraoHome: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        // Clear selection first; selectedID onChange drops the path.
                         accounts.back()
-                        if homePath.last?.accountID != nil { homePath.removeLast() }
+                        if accounts.selectedID == nil, homePath.last?.accountID != nil { homePath.removeLast() }
                     } label: {
                         Label("accounts.back", systemImage: "chevron.left")
                     }
-                    .accessibilityIdentifier("accounts.back")
+                    .accessibilityIdentifier("accounts.back").disabled(accounts.busy)
                 }
             }
             .navigationBarBackButtonHidden(true)

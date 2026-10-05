@@ -75,7 +75,7 @@ struct FinancialBudgetPresenter: View {
                 Color.black.opacity(0.25).ignoresSafeArea()
                 FinancialBudgetDetailView(model: model, loop: loop) {
                     if let origin = model.navigation?.origin {
-                        switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .budgets; case .search: destination = .search }
+                        switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .budgets; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search }
                     }
                     model.close()
                     Task { await search?.refresh() }

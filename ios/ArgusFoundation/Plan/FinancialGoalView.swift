@@ -87,7 +87,7 @@ struct FinancialGoalPresenter: View {
                 Color.black.opacity(0.25).ignoresSafeArea()
                 FinancialGoalDetail(model: model, loop: loop) {
                     if let origin = model.navigation?.origin {
-                        switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .goals; case .search: destination = .search }
+                        switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .goals; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search }
                     }
                     model.close(); Task { await search?.refresh() }
                 }.background(ArgusStyle.background).clipShape(RoundedRectangle(cornerRadius: 24)).padding(12)
