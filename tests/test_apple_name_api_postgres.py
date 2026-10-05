@@ -11,8 +11,14 @@ from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.routers import auth as auth_router
 from fastapi.testclient import TestClient
+from psycopg_pool import ConnectionPool
 
 from tests.local_supabase_support import local_supabase_gateway
+from tests.test_apple_name_deletion_postgres import (
+    build_apple_service,
+    deletion_service,
+    profile,
+)
 from tests.test_financial_accounts_api_postgres import ORIGIN, _login
 
 pytestmark = pytest.mark.skipif(
@@ -86,11 +92,42 @@ def test_signed_auth_name_retry_relaunch_and_explicit_clear(monkeypatch):
                 headers=headers,
             )
             assert denied.status_code == 422
+            from argus.domain.account_deletion.service import subject_hash
+
+            with ConnectionPool(dsn, min_size=0, max_size=2) as pool:
+                apple, provider = build_apple_service(user_id, pool)
+                try:
+                    deletion_service(pool, apple)._claim(user_id, subject_hash(user_id))
+                    with psycopg.connect(dsn) as connection:
+                        before = profile(connection, user_id)
+                    with patch(
+                        "argus.api.routers.profile_apple_name.initialize_apple_display_name"
+                    ) as command:
+                        denied = client.post(
+                            "/api/v1/me/apple-name",
+                            json={"display_name": "Later name"},
+                            headers=headers,
+                        )
+                    assert denied.status_code == 401
+                    command.assert_not_called()
+                    with psycopg.connect(dsn) as connection:
+                        assert profile(connection, user_id) == before
+                    assert provider.calls == []
+                finally:
+                    apple.close()
     finally:
         for user_id in created:
             with psycopg.connect(dsn) as connection:
                 connection.execute(
                     "delete from auth.identities where user_id=%s and provider='apple'",
+                    (user_id,),
+                )
+                connection.execute(
+                    "delete from public.apple_sign_in_credentials where user_id=%s",
+                    (user_id,),
+                )
+                connection.execute(
+                    "delete from argus_private.account_deletion_runs where user_id=%s",
                     (user_id,),
                 )
             gateway.client.auth.admin.delete_user(user_id)

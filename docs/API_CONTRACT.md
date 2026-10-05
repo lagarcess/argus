@@ -1095,8 +1095,10 @@ identity/database returns 503 `apple_name_unavailable`; an account closed or
 admitted to deletion returns 403 `account_unavailable`. Ordinary session and guest
 denials still apply. This server command does not establish native callback,
 journal/relaunch or real first-authorization acceptance. Those remain separate
-work. Concurrent deletion admission requires the shared parent-lock contract in
-the account-deletion slice #862 before activation.
+work. Name initialization and deletion admission serialize on the same Auth-parent
+lock. A deletion run admitted before initialization acquires that lock prevents
+any name write, including retries. A name transaction that obtains it first can
+finish before deletion admission commits.
 
 ## Conversation
 

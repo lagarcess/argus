@@ -67,10 +67,12 @@ Ruff, whitespace and the combined modularity budget pass with zero violations.
 
 ## Remaining gates
 
-Full concurrent deletion-admission serialization depends on #862 taking the
+At this initial checkpoint, concurrent deletion-admission serialization depended on #862 taking the
 same Auth-parent lock. This slice is sequenced after #862 in the captain's merge
 queue; current prior deletion admission is not claimed race-safe. Combined
-admission proof must be rerun after that landing and normal reconciliation.
+admission proof had to be rerun after that landing and normal reconciliation.
+The [subsequent combined proof](reconciliation-862.md) now closes that local
+dependency. Native, provider, phone and hosted gates below remain open.
 
 Native callback extraction, durable command journaling, refreshed/reconstructed
 session replay, account retirement and user-visible recovery belong to the
