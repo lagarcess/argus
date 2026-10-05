@@ -24,6 +24,7 @@ from argus.domain.apple_sign_in.credentials import (
     InMemoryAppleCredentialRepository,
     RevokeOutcome,
 )
+from argus.domain.apple_sign_in.identity import LinkedAppleIdentity
 from argus.domain.ingestion.secrets import SecretBox
 
 from tests.apple_sign_in_support import (
@@ -180,13 +181,16 @@ def test_unreachable_apple_is_bounded(key) -> None:  # noqa: ANN001
 @pytest.fixture
 def service(client):  # noqa: ANN001, ANN201
     return AppleCredentialService(
-        InMemoryAppleCredentialRepository(), box=_box(), client=client, clock=lambda: NOW
+        InMemoryAppleCredentialRepository(lambda _: LinkedAppleIdentity(SUBJECT)),
+        box=_box(),
+        client=client,
+        clock=lambda: NOW,
     )
 
 
 def test_capture_keeps_only_the_sealed_refresh_token(service, apple) -> None:  # noqa: ANN001
     refresh = apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=USER, authorization_code="c.code")
 
     row = service.repository.get(user_id=USER)
     assert row is not None and row.client_id == BUNDLE_ID
@@ -203,14 +207,14 @@ def test_capture_for_another_apple_id_stores_nothing_and_revokes_it(
 ) -> None:  # noqa: ANN001
     refresh = apple.grant(sub="000999.other")
     with pytest.raises(AppleIdentityMismatch):
-        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+        service.capture(user_id=USER, authorization_code="c.code")
     assert service.repository.get(user_id=USER) is None
     assert apple.calls[-1] == ("/auth/revoke", apple.calls[-1][1])
     assert apple.calls[-1][1]["token"] == refresh
 
 
 class _BrokenRepository(InMemoryAppleCredentialRepository):
-    def upsert(self, **_: object) -> None:
+    def save_capture(self, **_: object) -> None:
         raise ConnectionError("database down")
 
 
@@ -218,11 +222,14 @@ def test_a_storage_failure_revokes_the_exchanged_token(client, apple) -> None:  
     # Apple already consumed the one-time code, so the token is revoked rather
     # than dropped; the next Apple sign-in yields a fresh code.
     service = AppleCredentialService(
-        _BrokenRepository(), box=_box(), client=client, clock=lambda: NOW
+        _BrokenRepository(lambda _: LinkedAppleIdentity(SUBJECT)),
+        box=_box(),
+        client=client,
+        clock=lambda: NOW,
     )
     refresh = apple.grant()
     with pytest.raises(AppleCaptureNotStored) as raised:
-        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+        service.capture(user_id=USER, authorization_code="c.code")
     assert refresh not in str(raised.value)
     path, form = apple.calls[-1]
     assert path == "/auth/revoke"
@@ -231,19 +238,22 @@ def test_a_storage_failure_revokes_the_exchanged_token(client, apple) -> None:  
 
 def test_a_storage_failure_still_reports_when_the_revoke_fails(client, apple) -> None:  # noqa: ANN001
     service = AppleCredentialService(
-        _BrokenRepository(), box=_box(), client=client, clock=lambda: NOW
+        _BrokenRepository(lambda _: LinkedAppleIdentity(SUBJECT)),
+        box=_box(),
+        client=client,
+        clock=lambda: NOW,
     )
     apple.grant()
     apple.revoke_responses.append((400, {"error": "invalid_client"}))
     with pytest.raises(AppleCaptureNotStored):
-        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+        service.capture(user_id=USER, authorization_code="c.code")
 
 
 def test_a_later_sign_in_replaces_the_token_without_revoking_it(service, apple) -> None:  # noqa: ANN001
     apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.1")
+    service.capture(user_id=USER, authorization_code="c.1")
     second = apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.2")
+    service.capture(user_id=USER, authorization_code="c.2")
 
     row = service.repository.get(user_id=USER)
     assert (
@@ -255,7 +265,7 @@ def test_a_later_sign_in_replaces_the_token_without_revoking_it(service, apple) 
 
 def test_revoke_deletes_the_row_only_after_apple_confirms(service, apple) -> None:  # noqa: ANN001
     refresh = apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=USER, authorization_code="c.code")
 
     assert service.revoke(user_id=USER) is RevokeOutcome.REVOKED
     assert apple.calls[-1][1]["token"] == refresh
@@ -268,7 +278,7 @@ def test_a_failed_revoke_keeps_the_sealed_token_as_the_pending_revoke(
     apple,  # noqa: ANN001
 ) -> None:
     apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=USER, authorization_code="c.code")
     apple.revoke_responses += [(503, {"error": "server_error"})] * 3
 
     with pytest.raises(AppleRevocationPending) as raised:
@@ -282,14 +292,14 @@ def test_a_failed_revoke_keeps_the_sealed_token_as_the_pending_revoke(
 
 def test_a_token_replaced_mid_revoke_stays_pending(service, apple) -> None:  # noqa: ANN001
     apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.1")
+    service.capture(user_id=USER, authorization_code="c.1")
     replacement = apple.grant()
 
     real_revoke = service._client.revoke
 
     def revoke_then_sign_in_again(token: str, *, client_id: str) -> None:
         real_revoke(token, client_id=client_id)
-        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.2")
+        service.capture(user_id=USER, authorization_code="c.2")
 
     service._client.revoke = revoke_then_sign_in_again
     with pytest.raises(AppleRevocationPending) as raised:
@@ -306,12 +316,12 @@ def test_a_credential_sealed_under_another_key_is_pending_not_dropped(
     client,
     apple,  # noqa: ANN001
 ) -> None:
-    repository = InMemoryAppleCredentialRepository()
+    repository = InMemoryAppleCredentialRepository(lambda _: LinkedAppleIdentity(SUBJECT))
     writer = AppleCredentialService(
         repository, box=_box(), client=client, clock=lambda: NOW
     )
     apple.grant()
-    writer.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    writer.capture(user_id=USER, authorization_code="c.code")
     rotated = AppleCredentialService(
         repository, box=_box(), client=client, clock=lambda: NOW
     )
@@ -327,7 +337,7 @@ def test_a_sealed_token_does_not_open_for_another_user(service, apple) -> None: 
     from argus.domain.ingestion.secrets import SecretUnreadable
 
     apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=USER, authorization_code="c.code")
     row = service.repository.get(user_id=USER)
     with pytest.raises(SecretUnreadable):
         service._box.open(
@@ -380,7 +390,7 @@ def test_service_revokes_with_the_stored_client_not_the_configured_one(
 
 def test_apple_invalid_grant_on_revoke_counts_as_already_revoked(service, apple) -> None:  # noqa: ANN001
     apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=USER, authorization_code="c.code")
     apple.revoke_responses.append((400, {"error": "invalid_grant"}))
     assert service.revoke(user_id=USER) is RevokeOutcome.ALREADY_REVOKED
     assert service.repository.get(user_id=USER) is None
@@ -389,7 +399,7 @@ def test_apple_invalid_grant_on_revoke_counts_as_already_revoked(service, apple)
 
 def test_other_revoke_refusals_still_keep_the_pending_row(service, apple) -> None:  # noqa: ANN001
     apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=USER, authorization_code="c.code")
     apple.revoke_responses.append((400, {"error": "invalid_client"}))
     with pytest.raises(AppleRevocationPending):
         service.revoke(user_id=USER)
@@ -401,9 +411,9 @@ def test_the_compensating_revoke_is_one_short_attempt(client, apple, path) -> No
     # Inside the person's capture request: no retry, no backoff sleep, and a
     # two-second timeout instead of thirty, even while Apple answers 503.
     repository = (
-        _BrokenRepository()
+        _BrokenRepository(lambda _: LinkedAppleIdentity(SUBJECT))
         if path == "failed_save"
-        else InMemoryAppleCredentialRepository()
+        else InMemoryAppleCredentialRepository(lambda _: LinkedAppleIdentity(SUBJECT))
     )
     service = AppleCredentialService(
         repository, box=_box(), client=client, clock=lambda: NOW
@@ -412,7 +422,7 @@ def test_the_compensating_revoke_is_one_short_attempt(client, apple, path) -> No
     apple.revoke_responses += [(503, None), (503, None), (200, None)]
     expected = AppleIdentityMismatch if path == "mismatch" else AppleCaptureNotStored
     with pytest.raises(expected):
-        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+        service.capture(user_id=USER, authorization_code="c.code")
     revokes = [i for i, (p, _) in enumerate(apple.calls) if p == "/auth/revoke"]
     assert len(revokes) == 1
     assert apple.timeouts[revokes[0]] == _phases(DISCARD_TIMEOUT_SECONDS)
@@ -424,9 +434,9 @@ def test_an_unexpected_compensating_revoke_error_keeps_the_outcome(
     client, apple, path
 ) -> None:  # noqa: ANN001
     repository = (
-        _BrokenRepository()
+        _BrokenRepository(lambda _: LinkedAppleIdentity(SUBJECT))
         if path == "failed_save"
-        else InMemoryAppleCredentialRepository()
+        else InMemoryAppleCredentialRepository(lambda _: LinkedAppleIdentity(SUBJECT))
     )
     service = AppleCredentialService(
         repository, box=_box(), client=client, clock=lambda: NOW
@@ -435,7 +445,7 @@ def test_an_unexpected_compensating_revoke_error_keeps_the_outcome(
     apple.revoke_raises = RuntimeError("unexpected")
     expected = AppleIdentityMismatch if path == "mismatch" else AppleCaptureNotStored
     with pytest.raises(expected):
-        service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+        service.capture(user_id=USER, authorization_code="c.code")
 
 
 def _logged(records: list) -> str:  # noqa: ANN001
@@ -493,7 +503,7 @@ def test_discard_keeps_a_token_another_key_may_open(service, apple, sealed_by) -
 
 def test_discard_never_drops_a_token_that_can_still_be_revoked(service, apple) -> None:  # noqa: ANN001
     apple.grant()
-    service.capture(user_id=USER, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=USER, authorization_code="c.code")
     assert service.repository.get(user_id=USER).key_id == service._box.key_id
     assert service.discard_unreadable(user_id=USER) is DiscardOutcome.READABLE
     assert service.repository.get(user_id=USER) is not None
@@ -567,9 +577,9 @@ def test_a_hung_compensating_revoke_releases_the_request(key, apple, path) -> No
         config(key), transport=httpx.MockTransport(hang_on_revoke), sleep=lambda _s: None
     )
     repository = (
-        _BrokenRepository()
+        _BrokenRepository(lambda _: LinkedAppleIdentity(SUBJECT))
         if path == "failed_save"
-        else InMemoryAppleCredentialRepository()
+        else InMemoryAppleCredentialRepository(lambda _: LinkedAppleIdentity(SUBJECT))
     )
     service = AppleCredentialService(
         repository, box=_box(), client=made, clock=lambda: NOW, discard_deadline=0.2
@@ -579,9 +589,7 @@ def test_a_hung_compensating_revoke_releases_the_request(key, apple, path) -> No
     started = time.monotonic()
     try:
         with pytest.raises(expected):
-            service.capture(
-                user_id=USER, apple_subject=SUBJECT, authorization_code="c.code"
-            )
+            service.capture(user_id=USER, authorization_code="c.code")
         assert time.monotonic() - started < 2.0
         assert revoking.is_set()
     finally:

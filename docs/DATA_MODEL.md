@@ -3193,12 +3193,36 @@ verified session's user), `client_id` (the Apple client the token was issued
 to, the bundle id for the native app), `secret_ciphertext` (Apple's refresh
 token sealed with AES-256-GCM under `ARGUS_INGESTION_SECRET_KEY`, bound to
 `apple_sign_in:<user_id>`), `captured_at`, `updated_at` and
-`secret_key_fingerprint`. A later sign-in replaces the row.
+`secret_key_fingerprint` and nullable `apple_subject`. A later sign-in replaces
+the row.
 `secret_key_fingerprint` (Lane 6, `20261004090000_account_deletion.sql`) names
 the key that sealed the token without revealing it (`SecretBox.key_id`: 32 hex
 characters of HMAC-SHA256 of a fixed label under the key); capture sets it, and
 rows stored before Lane 6 have none. A token that doesn't open is discarded
 only when its fingerprint is the running key's.
+
+`apple_subject` (`20261005160000_apple_credential_subject_binding.sql`) records
+the subject verified for that credential. `auth.identities` remains the owner
+of the account's current linked identity. Existing rows stay NULL with no
+backfill, so they remain unverified. A new capture compares the returned Apple
+subject with the current identity, then repeats that check in the save
+transaction. Reads and existing revocation of legacy credentials remain
+compatible; future deletion admission must distinguish unverified rows.
+
+The save transaction uses `READ COMMITTED`, locks the Auth user first, then
+reads and locks all that user's identity rows in a separate statement. The
+immediate identity-to-user foreign key blocks new identity inserts and inbound
+moves while those locks are held. Identity row locks block edits and deletion.
+The credential write also compares the pre-exchange ciphertext, so a stale
+capture cannot overwrite or recreate a replaced or removed row. No transaction
+stays open across Apple HTTP. These locks prove agreement at commit, not after
+later Auth changes. Existing deletion admission does not yet share this lock
+order.
+
+The compatibility `upsert` clears `apple_subject` when it writes an unverified
+credential. Older binaries do not know this column. Keep capture disabled
+during their replacement, and do not run old capture writers alongside
+binding-aware consumers.
 
 RLS is on with no policy, and every client privilege is revoked: no client
 role can read or write any column. The API's service role is the only writer.
@@ -3210,8 +3234,11 @@ drop the token without revoking it at Apple. The account-deletion run revokes
 first, deletes this row only after Apple confirms, then deletes the user. The
 row is the pending revoke until then, which matches the contract that the
 encrypted credential is kept only while a revoke is pending. Apple's
-`invalid_grant` on revoke means the token is already dead, so it also deletes
-the row.
+`invalid_grant` on revoke is classified as already revoked, so it also deletes
+the row. This classification also applies during an App Store app transfer;
+the service does not distinguish transferred credentials from revoked or
+expired tokens. Transfer handling and the separate `invalid_request` pending
+path remain operator/release concerns in #803.
 
 If `ARGUS_INGESTION_SECRET_KEY` was rotated, the token can't be opened and so
 can't be revoked, and the restrict key would keep that user undeletable
