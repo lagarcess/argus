@@ -1,9 +1,14 @@
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 root = Path(__file__).resolve().parents[2]
 canvas = root / "ios/ArgusFoundation/Cuadrao"
+tests = Path(__file__).resolve().parent
+checks = (tests / (sys.argv[1] if len(sys.argv) > 1 else "ReceiptPreviewChecks.swift")).resolve()
+if len(sys.argv) > 2 or checks.parent != tests or checks.suffix != ".swift" or not checks.is_file():
+    raise SystemExit("Choose one Swift checks file in ios/DesignPreviewTests.")
 with tempfile.TemporaryDirectory(prefix="cuadrao-receipt-checks-") as temporary:
     folder = Path(temporary)
     source = (canvas / "CuadraoAccountsPreview.swift").read_text().split("struct CanvasAccountIcon:")[0]
@@ -16,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix="cuadrao-receipt-checks-") as temporary:
         "Planning/CuadraoPlanPreview.swift", "Planning/CuadraoGroupPreview.swift",
         "Receipts/CuadraoReceipt.swift", "Receipts/CuadraoReceiptStore.swift", "CuadraoDesignPreview.swift",
     ]]
-    files.append(Path(__file__).with_name("ReceiptPreviewChecks.swift"))
+    files.append(checks)
     subprocess.run(["xcrun", "swiftc", "-module-cache-path", str(folder / "modules"),
                     *map(str, files), "-o", str(folder / "checks")], check=True)
     subprocess.run([str(folder / "checks")], check=True)

@@ -1,13 +1,24 @@
 import Foundation
 import Observation
 
+enum ReceiptPostingCapability {
+    case preview, draftOnly
+    enum Failure: Error { case unavailable }
+    var allowsPosting: Bool { self == .preview }
+    func requirePosting() throws {
+        guard allowsPosting else { throw Failure.unavailable }
+    }
+}
+
 @Observable final class CuadraoReceiptStore {
     private(set) var receipts: [ReceiptDraft] = []
     private(set) var loadFailed = false
     let directory: URL
+    let postingCapability: ReceiptPostingCapability
     private var indexURL: URL { directory.appendingPathComponent("receipts.json") }
-    init(directory: URL? = nil, reset: Bool = false) {
+    init(directory: URL? = nil, reset: Bool = false, postingCapability: ReceiptPostingCapability = .preview) {
         self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("CuadraoReceipts")
+        self.postingCapability = postingCapability
         // Default on-device storage exists only in the design preview; checks inject a directory.
         guard directory != nil || CuadraoDesignPreview.isActive else { loadFailed = true; return }
         do {
@@ -17,6 +28,12 @@ import Observation
                 receipts = try JSONDecoder().decode([ReceiptDraft].self, from: Data(contentsOf: indexURL))
             }
         } catch { loadFailed = true }
+    }
+    static func connectedDrafts(userID: UUID, applicationSupport: URL? = nil) -> CuadraoReceiptStore {
+        let root = applicationSupport ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let directory = root.appendingPathComponent("CuadraoConnectedReceiptDrafts", isDirectory: true)
+            .appendingPathComponent(userID.uuidString, isDirectory: true)
+        return CuadraoReceiptStore(directory: directory, postingCapability: .draftOnly)
     }
     func receipt(_ id: UUID) -> ReceiptDraft? { receipts.first { $0.id == id } }
     func url(_ source: ReceiptSource) -> URL { directory.appendingPathComponent(source.filename) }
@@ -77,6 +94,7 @@ import Observation
         for source in draft.source { try? FileManager.default.removeItem(at: url(source)) }
     }
     func confirm(_ id: UUID, groups: CuadraoGroupPreview, accounts: CuadraoAccountsPreview) throws {
+        try postingCapability.requirePosting()
         guard var draft = receipt(id) else { throw ReceiptError.missing }
         guard draft.prepared else { return }
         try draft.validate()
@@ -97,6 +115,7 @@ import Observation
         projectPersonal(into: accounts)
     }
     func reconcile(groups: CuadraoGroupPreview, accounts: CuadraoAccountsPreview) throws {
+        try postingCapability.requirePosting()
         var repaired = receipts
         for index in repaired.indices where repaired[index].prepared {
             let draft = repaired[index]
@@ -109,6 +128,7 @@ import Observation
         projectPersonal(into: accounts)
     }
     func projectPersonal(into accounts: CuadraoAccountsPreview) {
+        guard postingCapability.allowsPosting else { return }
         for draft in receipts where !draft.prepared {
             if case .personal(let accountID) = draft.destination, let accountID {
                 accounts.projectReceipt(draft, accountID: accountID)
