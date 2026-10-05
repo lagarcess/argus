@@ -62,7 +62,7 @@ class AccountDeletionResponse(BaseModel):
     # out, its tokens refused everywhere but here), but a step hasn't finished
     # (``pending``: apple, gmail, plaid, analytics; empty when another request
     # holds the run or the data step must be retried). A retry of this route
-    # or the operator-run sweep resumes it; nothing is asked of the person.
+    # or the operator-run sweep resumes it.
     status: Literal["done", "in_progress"]
     pending: list[str]
 

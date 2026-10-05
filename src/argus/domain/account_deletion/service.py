@@ -104,6 +104,10 @@ class AccountDeletionRejected(Exception):
     placeholder)."""
 
 
+class AccountDeletionStateUnknown(RuntimeError):
+    """The command could not establish whether a deletion run exists."""
+
+
 class AccountDeletionIncomplete(Exception):
     """The run is open and the account locked, but a step could not finish yet.
 
@@ -281,7 +285,7 @@ class AccountDeletionService:
         except AccountDeletionRejected:
             raise
         except Exception:
-            raise AccountDeletionIncomplete("admission_unknown") from None
+            raise AccountDeletionStateUnknown from None
 
     def _run(self, user_id: str, subject: str, run: dict[str, Any]) -> DeletionOutcome:
         # Idempotent: every attempt re-applies the ban, so a refresh token

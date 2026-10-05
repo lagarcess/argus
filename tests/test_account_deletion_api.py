@@ -324,3 +324,27 @@ def test_admission_refusal_is_distinct_from_started_failure(enabled, code, statu
         response = client.post(URL, json={"confirm": True})
     assert response.status_code == status
     assert response.json()["code"] == code
+
+
+@pytest.mark.parametrize("code", [None, "fresh-apple-code"])
+def test_unreadable_admission_state_is_unavailable_not_accepted(enabled, code):
+    from argus.domain.account_deletion.service import AccountDeletionService
+
+    households = MagicMock()
+    households.connection.side_effect = RuntimeError("database unavailable")
+    admin = MagicMock()
+    service = AccountDeletionService(
+        households=households, auth_admin=admin, revoker=None, analytics=MagicMock()
+    )
+    body = {"confirm": True}
+    if code is not None:
+        body["apple_authorization_code"] = code
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(URL, json=body)
+    assert response.status_code == 503
+    assert response.json()["code"] == "account_deletion_incomplete"
+    admin.lock_user.assert_not_called()
+    admin.delete_user.assert_not_called()
