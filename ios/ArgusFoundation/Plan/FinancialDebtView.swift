@@ -118,7 +118,7 @@ struct FinancialDebtDetail: View {
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     var body: some View {
         ScrollViewReader { reader in
-            CuadraoPlanDetailPage {
+            CuadraoPlanDetailPage(scroll: nativeNavigation ? model.scrollContext : nil) {
                 if !nativeNavigation, let id = model.navigation?.activityID { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) } }
                 else if let progress = model.detail {
                     heading(progress)
@@ -145,12 +145,13 @@ struct FinancialDebtDetail: View {
                     Text("debt.payments").font(CuadraoTypography.section)
                     if progress.payments.isEmpty { Text("debt.noPayments").foregroundStyle(ArgusStyle.secondary) }
                     ForEach(progress.payments) { payment in
-                        Button { model.activity(payment.activityId) } label: {
+                        Button { model.activity(payment.activityId, preservingScrollPosition: nativeNavigation) } label: {
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack { Text(payment.activity?.note ?? NSLocalizedString("debt.payment", comment: "")); Spacer(); Text(verbatim: money(payment.netPaidMinor.map(String.init), progress)); Image(systemName: "chevron.right") }
                                 Text(LocalizedStringKey("debt.payment." + payment.status)).foregroundStyle(ArgusStyle.secondary)
                             }.frame(minHeight: 48).contentShape(Rectangle())
                         }.buttonStyle(.plain).id(payment.activityId).accessibilityIdentifier("debt.activity." + payment.activityId.uuidString)
+                            .financialScrollAnchor(payment.activityId.uuidString)
                     }
                     if progress.debt.archived {
                         PlanPrimaryButton(title: NSLocalizedString("debt.restore", comment: "")) { Task { await model.archive(false) } }
@@ -160,7 +161,12 @@ struct FinancialDebtDetail: View {
                 if model.loading { ProgressView("accounts.loading") }
                 if let key = model.errorKey { Text(LocalizedStringKey(key)).accessibilityIdentifier("debt.error"); Button("accounts.retry") { Task { await model.refreshIfOpen() } } }
                 if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
-            }.disabled(model.saving).task(id: model.detail?.payments.map(\.activityId)) { if let anchor = model.navigation?.anchor { await Task.yield(); reader.scrollTo(anchor, anchor: .top) } }
+            }.disabled(model.saving).task(id: model.detail?.payments.map(\.activityId)) {
+                guard !nativeNavigation, let anchor = model.navigation?.anchor else { return }
+                await Task.yield()
+                guard !Task.isCancelled else { return }
+                reader.scrollTo(anchor, anchor: .top)
+            }
         }
         .navigationDestination(isPresented: activityPresented) {
             if let id = model.navigation?.activityID {

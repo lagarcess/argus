@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import ArgusSession
 
 struct FinancialSearchDestination: View {
@@ -33,7 +32,7 @@ struct FinancialSearchView: View {
     var nativePlanNavigation = false
     var detailChanged: (Bool) -> Void = { _ in }
     @Environment(\.locale) private var locale
-    @StateObject private var scroll = SearchScrollOffset()
+    @StateObject private var scroll = FinancialScrollOffset()
     @State private var unavailableKind: CanvasSearchKind?
     @FocusState private var focused: Bool
 
@@ -85,14 +84,14 @@ struct FinancialSearchView: View {
                 kinds: CanvasSearchKind.allCases.filter { $0 != .memory }, spanish: spanish,
                 filterCount: filterCount, filterSummary: filterSummary, clearFilters: clearFilters,
                 focused: $focused, accessibility: .connected, loading: unavailableKind == nil && (model.loading || model.opening)) {
-                SearchScrollProbe(controller: scroll).frame(height: 0)
+                FinancialScrollProbe(controller: scroll).frame(height: 0)
                 results
             } filters: {
                 filterControls
             }
             .refreshable { if unavailableKind == nil { await model.refresh() } }
             .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.userScrolled() })
-            .onPreferenceChange(SearchRowFrames.self) { rememberFrames($0) }
+            .onPreferenceChange(FinancialScrollRowFrames.self) { rememberFrames($0) }
             .onChange(of: model.restoration) { _, restoration in
                 guard !hasPlanDetail, let restoration else { return }
                 Task { @MainActor in
@@ -159,9 +158,7 @@ struct FinancialSearchView: View {
                             FinancialSearchRow(hit: hit)
                         }.buttonStyle(.plain).disabled(model.opening)
                             .id(hit.id).accessibilityIdentifier("search.row." + hit.id)
-                            .background(GeometryReader { geometry in
-                                Color.clear.preference(key: SearchRowFrames.self, value: [hit.id: geometry.frame(in: .named("search.viewport"))])
-                            })
+                            .financialScrollAnchor(hit.id, in: "search.viewport")
                         Divider().foregroundStyle(WelcomePalette.separator)
                     }
                 }
@@ -321,44 +318,6 @@ struct FinancialSearchRow: View {
         case .budget: "chart.bar"
         case .goal: "target"
         case .debt: "creditcard"
-        }
-    }
-}
-
-private struct SearchRowFrames: PreferenceKey {
-    static let defaultValue: [String: CGRect] = [:]
-    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) { value.merge(nextValue(), uniquingKeysWith: { _, new in new }) }
-}
-
-@MainActor
-private final class SearchScrollOffset: ObservableObject {
-    weak var view: UIScrollView?
-    var frames: [String: CGRect] = [:]
-    func restore(_ restoration: FinancialSearchRestoration, currentRowOffset: Double) -> Bool {
-        guard let view else { return false }
-        let minimum = -view.adjustedContentInset.top
-        let maximum = max(minimum, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
-        switch restoration.adjustment(rowOffset: currentRowOffset, contentOffset: view.contentOffset.y,
-                                      minimum: minimum, maximum: maximum) {
-        case .complete: return true
-        case .waitForLayout: return false
-        case .move(let y):
-            view.setContentOffset(CGPoint(x: view.contentOffset.x, y: y), animated: false)
-            return false
-        }
-    }
-}
-
-private struct SearchScrollProbe: UIViewRepresentable {
-    let controller: SearchScrollOffset
-    func makeUIView(context: Context) -> UIView { UIView() }
-    func updateUIView(_ view: UIView, context: Context) {
-        DispatchQueue.main.async {
-            var parent = view.superview
-            while let current = parent {
-                if let scroll = current as? UIScrollView { controller.view = scroll; return }
-                parent = current.superview
-            }
         }
     }
 }

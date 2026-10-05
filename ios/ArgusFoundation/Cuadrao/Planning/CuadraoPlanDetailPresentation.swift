@@ -11,15 +11,24 @@ struct CuadraoPlanDetailDisplay {
 
 struct CuadraoPlanDetailPage<Content: View>: View {
     var bottomSpace: CGFloat = 90
+    var scroll: FinancialScrollContext?
     @ViewBuilder let content: () -> Content
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                content()
-            }.padding(24).padding(.bottom, bottomSpace)
+        Group {
+            if let scroll {
+                FinancialRestoringScrollView(context: scroll) { pageContent }.id(scroll.id)
+            } else {
+                ScrollView { pageContent }
+            }
         }
         .background(WelcomePalette.background).cuadraoSoftScrollEdges()
+    }
+
+    private var pageContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            content()
+        }.padding(24).padding(.bottom, bottomSpace)
     }
 }
 

@@ -26,6 +26,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     navigation = (root / "ios/ArgusFoundation/SampleDestinations.swift").read_text()
     (source / "PlanSection.swift").write_text("import SwiftUI\n" + navigation[navigation.index("enum PlanSection:"):navigation.index("struct PlanSampleView:")])
     shutil.copy(root / "ios/ArgusFoundation/Search/FinancialSearchModel.swift", source / "FinancialSearchModel.swift")
+    shutil.copy(root / "ios/ArgusFoundation/FinancialScrollRestoration.swift", source / "FinancialScrollRestoration.swift")
     # The formatter remains one production source; copy its exact declaration.
     presentation = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
     (source / "AccountPresentation.swift").write_text("import Foundation\nimport ArgusSession\n" + presentation[presentation.index("enum AccountPresentation {"):])
@@ -42,6 +43,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     shutil.copy(root / "ios/ArgusFoundation/Accounts/FinancialActivityPresentation.swift", source / "FinancialActivityPresentation.swift")
     shutil.copy(root / "ios/Packages/ArgusSession/Tests/ArgusSessionTests/TestSupport.swift", tests / "TestSupport.swift")
     shutil.copy(Path(__file__).with_name("FinancialModelTests.swift"), tests / "FinancialModelTests.swift")
+    shutil.copy(Path(__file__).with_name("FinancialScrollRestorationTests.swift"), tests / "FinancialScrollRestorationTests.swift")
     shutil.copy(Path(__file__).with_name("ConnectedDetailPresentationTests.swift"), tests / "ConnectedDetailPresentationTests.swift")
     (package / "Package.swift").write_text('''// swift-tools-version: 6.0
 import PackageDescription

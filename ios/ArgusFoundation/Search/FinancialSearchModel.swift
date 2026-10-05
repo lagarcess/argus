@@ -10,25 +10,6 @@ struct FinancialSearchOrigin: Codable, Equatable {
     var anchorOffset: Double = 0
 }
 
-struct FinancialSearchRestoration: Equatable {
-    let id = UUID()
-    let anchor: String
-    let offset: Double
-    var permitsBoundaryFallback = false
-
-    enum Adjustment: Equatable { case complete, move(Double), waitForLayout }
-
-    func adjustment(rowOffset: Double, contentOffset: Double, minimum: Double, maximum: Double) -> Adjustment {
-        let delta = rowOffset - offset
-        if abs(delta) < 0.5 { return .complete }
-        let target = min(maximum, max(minimum, contentOffset + delta))
-        if abs(target - contentOffset) < 0.5 {
-            return permitsBoundaryFallback ? .complete : .waitForLayout
-        }
-        return .move(target)
-    }
-}
-
 @MainActor
 final class FinancialSearchModel: ObservableObject {
     enum Destination { case account(UUID), activity(UUID) }
@@ -40,7 +21,7 @@ final class FinancialSearchModel: ObservableObject {
     @Published private(set) var destination: Destination?
     @Published private(set) var opening = false
     @Published private(set) var destinationError: String?
-    @Published private(set) var restoration: FinancialSearchRestoration?
+    @Published private(set) var restoration: FinancialScrollRestoration?
     @Published private(set) var ownerID: String?
     var sessionChanged: ((SessionSnapshot) -> Void)?
     private let controller: SessionController
@@ -144,7 +125,7 @@ final class FinancialSearchModel: ObservableObject {
             loaded = true; dirty = false; persist()
             if !append || restarted {
                 restoration = origin.anchor.map {
-                    FinancialSearchRestoration(anchor: $0, offset: origin.anchorOffset, permitsBoundaryFallback: anchorRemoved)
+                    FinancialScrollRestoration(anchor: $0, offset: origin.anchorOffset, permitsBoundaryFallback: anchorRemoved)
                 }
             }
         } catch {

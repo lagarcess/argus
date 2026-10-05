@@ -797,11 +797,11 @@ extension FinancialModelTests {
     }
 
     func testSearchRestorationWaitsForLayoutAndAllowsRemovedRowBoundary() {
-        let saved = FinancialSearchRestoration(anchor: "account.saved", offset: -51)
+        let saved = FinancialScrollRestoration(anchor: "account.saved", offset: -51)
         XCTAssertEqual(saved.adjustment(rowOffset: 0, contentOffset: 1000, minimum: 0, maximum: 1000), .waitForLayout)
         XCTAssertEqual(saved.adjustment(rowOffset: 0, contentOffset: 1000, minimum: 0, maximum: 1100), .move(1051))
         XCTAssertEqual(saved.adjustment(rowOffset: -51, contentOffset: 1051, minimum: 0, maximum: 1100), .complete)
-        let fallback = FinancialSearchRestoration(anchor: "account.survivor", offset: -51, permitsBoundaryFallback: true)
+        let fallback = FinancialScrollRestoration(anchor: "account.survivor", offset: -51, permitsBoundaryFallback: true)
         XCTAssertEqual(fallback.adjustment(rowOffset: 0, contentOffset: 800, minimum: 0, maximum: 800), .complete)
     }
 

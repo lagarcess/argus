@@ -7,6 +7,7 @@ struct FinancialGoalNavigation: Codable, Equatable {
     var origin: Origin
     var activityID: UUID?
     var anchor: UUID?
+    var anchorOffset: Double?
     var occurrenceID: String?
 }
 
@@ -60,7 +61,26 @@ final class FinancialGoalModel: ObservableObject {
         }
     }
     func close() { request = UUID(); navigation = nil; detail = nil; errorKey = nil; persist() }
-    func activity(_ id: UUID?) { navigation?.activityID = id; if let id { navigation?.anchor = id }; persist() }
+    func activity(_ id: UUID?, preservingScrollPosition: Bool = false) {
+        navigation?.activityID = id
+        if let id, !preservingScrollPosition { navigation?.anchor = id; navigation?.anchorOffset = nil }
+        persist()
+    }
+    var scrollContext: FinancialScrollContext? {
+        guard let navigation else { return nil }
+        let ticket = generation
+        return .init(id: ticket.uuidString + navigation.goalID.uuidString + navigation.origin.rawValue,
+            anchor: navigation.anchor?.uuidString, offset: navigation.anchorOffset,
+            availableAnchors: !loading && detail?.goal.id == navigation.goalID ? detail?.contributions.map { $0.activityId.uuidString } : nil,
+            active: navigation.activityID == nil,
+            remember: { [weak self] anchor, offset in
+                guard let self, self.generation == ticket, !self.loading, let anchor = UUID(uuidString: anchor), offset.isFinite,
+                      self.navigation?.goalID == navigation.goalID, self.navigation?.origin == navigation.origin,
+                      self.navigation?.activityID == nil, self.detail?.contributions.contains(where: { $0.activityId == anchor }) == true,
+                      self.navigation?.anchor != anchor || self.navigation?.anchorOffset != offset else { return }
+                self.navigation?.anchor = anchor; self.navigation?.anchorOffset = offset; self.persist()
+            })
+    }
     func create() {
         guard loop.pendingConfirmation == nil, let projection = loop.plan.projection else { return }
         draft = FinancialGoalDraft(start: projection.startDate, currency: "DOP")

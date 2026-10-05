@@ -122,7 +122,7 @@ struct FinancialGoalDetail: View {
                 ScrollView { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24) }
             } else {
                 ScrollViewReader { reader in
-                    CuadraoPlanDetailPage {
+                    CuadraoPlanDetailPage(scroll: nativeNavigation ? model.scrollContext : nil) {
                         if let progress = model.detail {
                             heading(progress)
                             if progress.state == "reached" {
@@ -142,7 +142,7 @@ struct FinancialGoalDetail: View {
                             if progress.contributions.isEmpty { Text("goal.noContributions").foregroundStyle(ArgusStyle.secondary) }
                             ForEach(progress.contributions) { claim in
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Button { model.activity(claim.activityId) } label: {
+                                    Button { model.activity(claim.activityId, preservingScrollPosition: nativeNavigation) } label: {
                                         HStack {
                                             Text(claim.activity?.note ?? NSLocalizedString("loop.kind.transfer", comment: ""))
                                             Spacer(); Text(verbatim: money(claim.currentPersonalMinor, progress))
@@ -153,7 +153,7 @@ struct FinancialGoalDetail: View {
                                     if claim.counting {
                                         Button("goal.stopCounting") { releasing = claim }.frame(minHeight: 44).accessibilityIdentifier("goal.release." + claim.id.uuidString)
                                     }
-                                }.id(claim.activityId)
+                                }.id(claim.activityId).financialScrollAnchor(claim.activityId.uuidString)
                             }
                             if progress.goal.archived {
                                 Text("goal.archived")
@@ -168,7 +168,7 @@ struct FinancialGoalDetail: View {
                         }
                         if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                     }.disabled(model.saving).task(id: model.detail?.contributions.map(\.activityId)) {
-                        guard let anchor = model.navigation?.anchor else { return }
+                        guard !nativeNavigation, let anchor = model.navigation?.anchor else { return }
                         await Task.yield(); guard !Task.isCancelled else { return }; reader.scrollTo(anchor, anchor: .top)
                     }
                 }

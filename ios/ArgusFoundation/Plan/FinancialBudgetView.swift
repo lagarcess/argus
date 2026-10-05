@@ -114,7 +114,7 @@ struct FinancialBudgetDetailView: View {
                 ScrollView { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24) }
             } else {
                 ScrollViewReader { reader in
-                    CuadraoPlanDetailPage {
+                    CuadraoPlanDetailPage(scroll: nativeNavigation ? model.scrollContext : nil) {
                         if let progress = model.detail {
                             heading(progress)
                             if progress.contributors.isEmpty {
@@ -130,8 +130,9 @@ struct FinancialBudgetDetailView: View {
                             Text("budget.contributors").font(CuadraoTypography.section)
                             if progress.contributors.isEmpty { Text("budget.noActivity").foregroundStyle(ArgusStyle.secondary) }
                             ForEach(progress.contributors, id: \.activityId) { item in
-                                Button { model.activity(item.activityId) } label: { contributor(item) }
+                                Button { model.activity(item.activityId, preservingScrollPosition: nativeNavigation) } label: { contributor(item) }
                                     .buttonStyle(.plain).id(item.activityId).accessibilityIdentifier("budget.activity." + item.activityId.uuidString)
+                                    .financialScrollAnchor(item.activityId.uuidString)
                             }
                             if progress.budget.archived {
                                 Text("budget.archived").foregroundStyle(ArgusStyle.secondary)
@@ -146,7 +147,7 @@ struct FinancialBudgetDetailView: View {
                         }
                         if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                     }.disabled(model.saving).task(id: model.detail?.contributors.map(\.activityId)) {
-                        guard let anchor = model.navigation?.anchor,
+                        guard !nativeNavigation, let anchor = model.navigation?.anchor,
                               model.detail?.contributors.contains(where: { $0.activityId == anchor }) == true else { return }
                         await Task.yield()
                         guard !Task.isCancelled else { return }
