@@ -71,6 +71,32 @@ and only reconciliation confirmation through MoneyService writes financial activ
 Plan proposals grant no sharing or authority to change plan currency. No separate
 ledger, draft store, OCR vendor or conversational runtime is introduced.
 
+## Cuadrao action and integration principles
+
+These principles constrain future assigned Cuadrao contracts. They do not declare
+new APIs, business services or a replacement chat runtime implemented.
+
+Screens, chat, jobs and external tools use the same canonical record and action
+owners. A model can propose or explain an action. Validated domain services own
+financial calculations, authorization and durable writes.
+
+An approval applies to the reviewed revision, destination and action. Execution
+rechecks current permissions and rejects a changed basis. Duplicate delivery
+must not repeat a financial effect. An uncertain external result requires
+reconciliation before resubmission, not a blind retry. Endpoint payloads and
+idempotency behavior remain with the assigned [API contract](API_CONTRACT.md).
+
+Fiscal integration follows the [partner-first decision](specs/argus-decision-log.md#fiscal-route).
+Cuadrao-owned fiscal tooling remains a parallel direction. Canonical records and
+business rules stay independent of provider adapters, so replacing a provider
+does not replace the customer's records. This neither chooses the provider nor
+authorizes live fiscal issuance. Regulatory eligibility and signing authority
+need separate evidence for the selected route.
+
+The blueprint's entities, queues, MCP tools and runtime mechanisms remain
+proposals until their scoped technical contracts are approved. Its diagrams do
+not authorize another active chat brain or decide Cuadrao's future agent runtime.
+
 ## Agent Quality Pillars
 
 The four assistant-quality pillars (Intelligence, Evaluation, Platform, User
@@ -156,9 +182,11 @@ API Control Plane (argus-api / FastAPI / Render)
 ---
 # 5. Frontend Architecture
 
-## Current Launch Surface
+## Existing Alpha web surface
 
-Web app / PWA.
+The existing Alpha runs as a web app / PWA. The
+[Cuadrao launch boundary](specs/argus-minimum-viable-ecosystem-experience.md#consumer-and-business-launch-boundary)
+owns the later consumer iPhone and business web direction.
 
 **Chosen because:**
 

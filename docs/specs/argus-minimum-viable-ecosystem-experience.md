@@ -1,8 +1,9 @@
 # Argus minimum viable ecosystem experience
 
 **Status:** Founder-approved experience direction, recorded September 26, 2026.
-**Latest founder lock:** September 28, 2026: complete scope, agent-first direction,
-private iPhone delivery, existing infrastructure reuse, and web-work hold.
+**Latest reconciled founder locks:** October 4, 2026: consumer/business launch
+boundary and no-conversion currency rule. Earlier experience locks remain within
+that boundary; the [decision log](argus-decision-log.md) records their provenance.
 **Audience:** Product, design, engineering, and collaborating agents.
 **Decision source:** Founder conversation approving the ecosystem structure and asking to lock it into a document, including information ingestion.
 **Purpose:** Define the smallest cohesive ecosystem, its surfaces, and the movement of information between them. This is an experience specification, not an implementation schedule or a claim of shipped capability.
@@ -38,6 +39,24 @@ Existing production documentation continues to describe current implementation a
 
 Wave sequencing and engineering breakdown are deliberately outside this document, except for explicit founder sequencing decisions recorded below. The guest access boundary is locked below; the exact registration and return-to-action flow still needs its technical contract.
 
+### Consumer and business launch boundary
+
+The October 4 launch decision narrows the public consumer iPhone release to
+personal and household spaces. It starts with an invite-only TestFlight, then a
+public release. Earlier Business and Custom space sketches below remain future
+experience references; they do not add entries to that public consumer build.
+
+Business is a separate full web service. Its thin iPhone experience covers
+capture, quick approvals and where money stands, and goes only to business
+TestFlight testers. Consumer completion does not require the full business
+workflow. The approved space-model work precedes consumer TestFlight; the exact
+schema, roles and migration steps still require their assigned contracts.
+
+The [October 4 decisions](argus-decision-log.md#october-4-2026-cuadrao-launch-shape)
+record provider selections and delivery direction. Source catalogs labeled NOW
+or LATER do not replace assigned scope or establish new release prerequisites.
+The [execution manifest](argus-execution-board.md) owns delivery status.
+
 ### 1.1 Locked audience and experience emphasis
 
 **Founder approval, September 26, 2026:** Following the social-research discussion, the founder explicitly approved the proposed niche and ecosystem emphasis with “Yes you got it lock it.” This section is the canonical decision; supporting research retains its provenance and does not own approved scope.
@@ -70,7 +89,9 @@ founder must be able to hand the phone to someone and demonstrate working
 journeys. Simulator screens, sample figures, isolated API tests and merged
 components do not establish this outcome.
 
-Public App Store publication is not required. Select and verify an appropriate
+For this September 28 private-device checkpoint, public App Store publication is
+not required. The later [consumer launch boundary](#consumer-and-business-launch-boundary)
+adds TestFlight and public release after that checkpoint. Select and verify an appropriate
 signed private installation route. Real data means deliberately entered or
 authorized data; it does not authorize copying production data into tests.
 
@@ -102,8 +123,8 @@ remains outstanding. Explicit later/experimental items stay distinguished below.
 | Reconciliation | Recorded versus observed balance; explicit gaps/adjustments; missing and earlier activity; per-account inclusion review; statement overlap; no invented activity or duplicate money | [Balance checks](#account-activity-and-balance-checks); [trust requirements](#5-shared-ingestion-and-trust-requirements) |
 | Home | Assets/debts/net worth by currency, cash/debt breakdown, freshness/unknowns, recent activity, upcoming commitments, expected versus received income, cash forecast, shortfalls, Record and resume review | [Home](#home-understand-where-i-stand) |
 | Plan | Budgets, savings goals, debt plans, recurring/occasional obligations and variable income; funding/dates; actual versus projected progress; shared allocation and matching actual entries to commitments | [Plan](#plan-decide-what-i-want-to-change) |
-| Spaces | Personal, Household, private Business and Custom; create/rename/archive/restore, constrained deletion/recovery, account moves with history and linked-record review | [Spaces](#financial-spaces); [account moves](#reassigning-accounts-between-spaces) |
-| Household | Link/email invitations, acceptance/expiry/revocation, separate identities, explicit sharing/editing rights, joint records, private contributions, shared plans, leave/remove semantics and no indirect disclosure | [Household](#12-household-collaboration-approved-minimum-capacity) |
+| Spaces | Public consumer uses Personal and Household; Business and Custom sketches remain outside that launch boundary. Broader space behavior includes create/rename/archive/restore, constrained deletion/recovery, account moves with history and linked-record review | [Spaces](#financial-spaces); [account moves](#reassigning-accounts-between-spaces) |
+| Household | Share-link, code and QR invitations under section 12, acceptance/expiry/revocation, separate identities, explicit sharing/editing rights, joint records, private contributions, shared plans, leave/remove semantics and no indirect disclosure | [Household](#12-household-collaboration-approved-minimum-capacity) |
 | Intake | Manual, text, voice, supported PDFs/structured files/images, photos/scans/screenshots; editable drafts, source preview, destination/currency/date review, uncertainty/duplicates, batch confirmation, resume and manual fallback | [Ingestion](#4-information-ingestion-one-destination-several-entry-methods) |
 | Argus | Inherit finance explanations, research, calculations, simulations, comparisons and evidence; permitted personal/shared context; confirmed record/plan actions through shared services; distinguish hypothetical and actual | [Argus](#argus-ask-understand-and-get-things-done); [runtime sequence](#agentic-ecosystem-direction-and-sequence) |
 | Voice | xAI direction; dictation/transcription, spoken replies, interruption/cancellation, editable interpretation, text handoff, confirmation, permission/consent/retention and latency/cost acceptance | [Voice](#43-speak-to-argus); architecture's provider contract |
@@ -239,7 +260,20 @@ scope above when producing assignments or status reports.
 - Native iOS and Android apps are the intended mobile products, not PWA shells. Web remains a useful product surface. The [interface stacks are founder-locked](../ARCHITECTURE.md#approved-platform-direction); detailed client contracts and delivery sequencing remain separate decisions.
 - Use progressive disclosure: clear summaries first, details when requested. Avoid walls of charts, dense tables, decorative widgets, and unnecessary setup.
 - Preserve Spanish and English support, with the Dominican audience informing language and examples.
-- Treat DOP and USD separately. Do not silently combine currencies. Any future conversion must expose its rate, date, and source.
+- Apply the [currency rule](#currency-rule) to every financial summary and input path.
+
+### Currency rule
+
+Founder-locked October 4, 2026. Cuadrao never converts currencies or shows a
+blended total. Every account retains its own currency. Home shows a separate
+total for each currency, with the person's primary currency first. They choose
+that preference at onboarding and can change it later.
+
+Charts and comparisons show one currency at a time, with a switcher when needed.
+Plans keep a fixed currency. For a payment from an account in another currency,
+the person records both amounts exactly as their bank charged them. Cuadrao does
+not supply an exchange rate. The founder's design lane owns the final screens;
+this rule does not assert the posting contract is implemented.
 
 ### Navigation
 
@@ -303,10 +337,9 @@ when relevant. Keep a short account preview with View all leading to Accounts;
 [DESIGN growing lists](../../.agent/designs/argus/DESIGN.md#growing-lists-across-ecosystem-surfaces)
 owns the row limits and inherited disclosure/loading interaction.
 
-Net worth stays separate by currency. A future combined view is optional and
-requires explicit display-currency and exchange-rate source/date rules; no FX
-conversion is approved or implemented by this mock. Original account currencies
-must remain intact. Below the recorded summary, Coming up previews the same
+Net worth follows the [currency rule](#currency-rule). The October 4 lock
+supersedes the sketch's earlier optional combined view.
+Below the recorded summary, Coming up previews the same
 dated expectations and projected cash shown in Plan, with View plan as its
 destination. Do not present that estimate as net worth or guaranteed spendable
 money. Without expectations, invite the person to add their next income or bill;
@@ -407,6 +440,9 @@ handoff. Preserve the optional 200-character note across every financial activit
 form, including refunds and balance checks.
 
 #### Financial spaces
+
+The [consumer launch boundary](#consumer-and-business-launch-boundary) governs
+availability. The following September 28 sketch describes the broader experience.
 
 Founder-approved sketch boundary: Personal is the default. Add a space offers
 Household, a named private Business space, and Custom for another named private
@@ -663,7 +699,7 @@ Every update should explain what changed, why it matters, and where to act. Deli
 
 Distinguish changes in user records from external market changes. Argus can observe what its sources provide; without fresh banking information it cannot claim to see every transaction. Investment-performance updates require an appropriate data source, time window, and comparison basis.
 
-Notifications should invite a return without exposing financial amounts in push/email previews. Details belong inside the authenticated experience.
+Notifications should invite a return without exposing financial amounts in push previews. Details belong inside the authenticated experience.
 
 ### Profile: control Argus
 
@@ -976,10 +1012,10 @@ The boundary for adding a capability is: **does it help someone understand, main
 - Wallet/device automation feasibility and permissions by platform.
 - Secure design and institution-specific conditions for browser-assisted bank access.
 - Source-file/audio retention details and any future automatic acceptance policy.
-- Notification delivery channels and scheduling defaults.
+- Remaining notification scheduling defaults within the locked inbox and opted-in push channels.
 - Maintained market-product inventory, commercial relationships, and execution permissions.
 - Engineering breakdown, release order, timelines, and platform sequencing, subject to the [deferred ecosystem runtime lane](#agentic-ecosystem-direction-and-sequence).
-- Household invitation security and delivery integration, membership, removal, retention, and permission mechanics. Copy link and email delivery are selected in section 12; the integration contracts must preserve its visibility and consent boundaries.
+- Household invitation security and delivery integration, membership, removal, retention, and permission mechanics. Section 12 owns the share-link, code and QR flow and the current exclusion of household email. The integration contracts must preserve its visibility and consent boundaries.
 
 These open implementation choices do not reopen the approved ecosystem structure. Agents should preserve the distinction between the intended experience, an exploratory integration, and a currently working feature.
 
@@ -1087,13 +1123,15 @@ The personal view contains the person's own financial picture and any joint acco
 - **Copy invite link** is the simple sharing action. People can paste it into
   WhatsApp, Messages, or another channel themselves; Argus does not send a
   WhatsApp Business API message for this flow.
-- Reuse the founder's **do-blitz** URL shortener as the selected integration
-  direction. Argus must own invitation authorization, expiry, revocation and
-  acceptance; a short URL is only delivery. This choice does not attest that
-  do-blitz currently meets the required security or deployment contract.
-- **Email invitations through Resend** are also selected. Both delivery methods
-  refer to the same invitation lifecycle. Email contents contain no financial
-  amounts or account details.
+- The [October 2 invitation decision](argus-decision-log.md#invitations) narrows
+  the September 27 delivery selection. Provide a share link, an invite code and
+  a QR code for the same invitation lifecycle.
+- Invite links use a direct cuadrao.ai universal link. do-blitz is no longer the
+  invitation path; it remains an option for later marketing links. Cuadrao owns
+  authorization, expiry, revocation and acceptance.
+- Household email invitations are outside this pass. Resend remains the selected
+  email service, including authentication and recovery. Its availability does
+  not enable household invitation emails or consumer Updates emails.
 - Invitations carry no rewards or incentives in this iteration.
 - Acceptance does not create a joint financial account or share personal accounts
   automatically. Joint account creation and account sharing are explicit actions.

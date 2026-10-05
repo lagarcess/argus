@@ -1,6 +1,6 @@
 # Cuadrao constitution source package
 
-**Received:** October 4, 2026. **Status:** Supporting sources and proposed principles.
+**Received:** October 4, 2026. **Status:** Preserved sources and reconciled principles index.
 **Integration baseline:** `76b6afcb4080c6e639e8c50bdabf51621d862190`.
 
 The founder supplied these three documents and requested a principles package to
@@ -11,8 +11,8 @@ runtime contracts.
 
 ## Read in this order
 
-1. [Proposed principles](PRINCIPLES.md) distills the durable rules and names their canonical destinations.
-2. [Reconciliation](RECONCILIATION.md) records conflicts, the governing decisions and recommended treatment.
+1. [Principles index](PRINCIPLES.md) links to the adopted rules in their canonical owners.
+2. [Reconciliation](RECONCILIATION.md) records conflicts, the governing decisions and their settled treatment.
 3. Consult the original sources for detail and rationale.
 
 | Original document | Contribution | Readable companion |
@@ -35,8 +35,9 @@ The [documentation authority map](../../DOCUMENTATION_AUTHORITY.md) still owns
 which canonical document answers each question. This folder is a supporting
 source package, not a second product authority or execution board.
 
-A later canonical update should cite the relevant principle and reconciliation
-row, change the existing owner, and leave only a link here. Do not copy the same
+The founder authorized the canonical reconciliation after the source upload.
+The principles index now links to those owners. Future changes should cite the
+reconciliation row and change the existing owner. Do not copy the same
 rule into several owners. An unresolved product choice needs an explicit founder
 decision before promotion. Technical contracts still need scoped design and
 verification; business hypotheses still need customer evidence.

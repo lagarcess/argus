@@ -32,11 +32,10 @@ Current delivered work, remaining scope and action authority live in the
 ## Constitution source material
 
 The [October 4 Cuadrao constitution package](research/cuadrao-constitution-2026-10-04/README.md)
-preserves three founder-supplied originals, proposed principles and a reconciliation
-table. It is supporting input. Existing founder locks and the owners above still
-govern; the package does not assign implementation or add launch gates. Promote
-accepted principles into their existing owners rather than creating a competing
-canon.
+preserves three founder-supplied originals and the settled conflict dispositions.
+Its principles index links to the adopted rules in the existing canonical owners.
+The originals remain supporting input, including their superseded proposals.
+This package does not assign implementation or add launch gates.
 
 ## What is settled
 

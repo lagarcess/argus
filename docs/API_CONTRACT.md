@@ -25,6 +25,14 @@ No undocumented payload shapes.
 
 Use consistent field names across endpoints.
 
+## Cuadrao action contract ownership
+
+Future assigned Cuadrao endpoints derive their approval, authorization and retry
+requirements from the [architecture action principles](ARCHITECTURE.md#cuadrao-action-and-integration-principles).
+Specify each endpoint's payload and failure behavior in its own contract before
+implementation. The constitution sources introduce no routes or envelopes and
+do not change the behavior of existing endpoints.
+
 ## Forward Evolvable
 
 Prefer shapes that can grow without breaking clients.

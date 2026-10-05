@@ -52,6 +52,33 @@ remain in Supabase.
 
 ---
 
+## Cuadrao record design principles
+
+These principles guide assigned financial and business schema work. Existing
+entity contracts below remain the implementation reference; this section adds
+no table, role or retention exception.
+
+- Each durable fact has one record owner. Screens and tools derive views from
+  that owner rather than maintain independent financial truth.
+- Financial values use exact decimal or integer minor-unit arithmetic with
+  explicit precision and rounding. Preserve original amounts, currency and
+  provenance. Apply the [product currency rule](specs/argus-minimum-viable-ecosystem-experience.md#currency-rule).
+- Accepted corrections remain distinguishable from extraction output. Reprocessing
+  cannot silently overwrite a user's correction. Keep the source, accepted
+  revision and resulting record connected during their permitted lifetime.
+- Processing a document does not discard its evidence. Retention remains subject
+  to [account deletion](#account-deletion-lane-6) and the applicable approved policy.
+  Business retention exceptions remain open; source preservation is not a promise
+  of indefinite storage.
+- Commercial, fiscal, payment and settlement events represent different facts.
+  A document marked fiscally accepted does not prove payment. A net deposit and
+  its fee must not create another sale. Assigned business contracts must define
+  these states and their evidence before implementation.
+
+The quality guide's [partial-payment example](research/cuadrao-constitution-2026-10-04/QUALITY-SOURCE.md)
+is a future business acceptance case. It does not require consumer launch to
+include invoicing or payment-provider integration.
+
 # 3. Core Entities
 
 Alpha MVP requires these primary entities:

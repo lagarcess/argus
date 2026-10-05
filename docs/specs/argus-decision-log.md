@@ -456,3 +456,18 @@ Engineering's sequencing in the master plan's
 [§B2.3](cuadrao-master-plan.md#b23-mapping-today-onto-it-and-the-migration-path-proposed).
 The model itself, including business roles and the business retention rule,
 is still open for the founder.
+
+## October 4, 2026: constitution reconciliation
+
+After the source upload in [PR #835](https://github.com/lagarcess/argus/pull/835),
+the founder instructed the mobile lane to settle the conflicts using existing
+decisions and carry the principles into their canonical owners. The
+[reconciliation record](../research/cuadrao-constitution-2026-10-04/RECONCILIATION.md)
+records the dispositions; the [principles index](../research/cuadrao-constitution-2026-10-04/PRINCIPLES.md)
+links to the updated owners.
+
+This adopts the bounded principles and resolves conflicting documentation. It
+does not select unresolved business pricing, fiscal providers, the full space
+model, Gmail import or the Cuadrao agent architecture. The source originals stay
+unchanged. Feature catalog priorities do not add launch requirements, and this
+documentation authorization does not authorize runtime, deployment or provider work.

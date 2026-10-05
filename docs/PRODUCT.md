@@ -49,12 +49,25 @@ scenarios must not silently change actual balances.
 - Make the picture understandable without dense dashboards or financial jargon.
 - Preserve current Argus typography, chat detail, motion, and grounded answers.
 - Explain assumptions, currency, source coverage, and freshness.
+- Complete the user job across capture, correction, understanding and return to evidence.
 - Make corrections easy and consistent across surfaces.
+- Keep manual records and capture useful when a connector fails. Preserve drafts
+  and show how to recover without duplicating financial effects.
+- Keep one identity usable across independent spaces. Membership, billing and
+  conversation context do not grant access to another space's private records.
+- Fit each interface to its task. Consumer mobile favors quick capture and return;
+  business web can support detailed review without changing shared financial truth.
 - Keep market questions and historical comparisons accessible without a debt gate.
 - Show the limits of planning: an app cannot create income or guarantee outcomes.
 - Design for phones, with native iOS/Android and web as intended platforms.
 
-[DESIGN.md](../.agent/designs/argus/DESIGN.md) owns visual conventions. Native
+The [constitution source index](research/cuadrao-constitution-2026-10-04/PRINCIPLES.md)
+records the rationale and technical owners for these principles. They do not add
+features to the assigned launch scope. [Consumer launch scope](specs/argus-minimum-viable-ecosystem-experience.md#consumer-and-business-launch-boundary)
+defines the public product boundary.
+
+The [Argus web guide](../.agent/designs/argus/DESIGN.md) and
+[Cuadrao native guide](../.agent/designs/cuadrao/DESIGN.md) own their platforms' visual conventions. Native
 implementation contracts, sequencing, remaining providers, and the new account-onboarding flow remain
 open as specified in the MVEE. The [voice and chart direction](ARCHITECTURE.md#voice-and-chart-direction)
 is selected; integration and acceptance remain to be completed. Follow the [authority map](DOCUMENTATION_AUTHORITY.md)
