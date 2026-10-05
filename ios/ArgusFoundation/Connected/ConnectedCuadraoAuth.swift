@@ -186,7 +186,7 @@ struct ConnectedCreateAccount: View {
                             .foregroundColor(.secondary)
                          + Text(signingIn ? (spanish ? "Crea una cuenta" : "Create an account")
                                : (spanish ? "Inicia sesión" : "Sign in"))
-                            .foregroundColor(WelcomePalette.pine).bold())
+                            .foregroundColor(.primary).bold())
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
                     }
@@ -200,8 +200,8 @@ struct ConnectedCreateAccount: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .foregroundStyle(Color.primary)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
