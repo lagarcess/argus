@@ -1,18 +1,38 @@
 import SwiftUI
 
+enum CuadraoProfilePageConnection {
+    case preview
+    case connected(appearance: Binding<AppearancePreference>, webURL: URL?)
+}
+
 struct CuadraoProfilePage: View {
     let route: CanvasProfileRoute
-    @Binding var profile: CanvasProfileDraft
+    @Binding var settings: CuadraoProfileSettingsDraft
     let spanish: Bool
     let includeExamples: Bool
+    let connection: CuadraoProfilePageConnection
     @State private var notice: String?
+
+    init(route: CanvasProfileRoute, profile: Binding<CanvasProfileDraft>, spanish: Bool, includeExamples: Bool) {
+        self.init(route: route, settings: profile.settings, spanish: spanish,
+                  includeExamples: includeExamples, connection: .preview)
+    }
+
+    init(route: CanvasProfileRoute, settings: Binding<CuadraoProfileSettingsDraft>, spanish: Bool,
+         includeExamples: Bool, connection: CuadraoProfilePageConnection) {
+        self.route = route; _settings = settings; self.spanish = spanish
+        self.includeExamples = includeExamples; self.connection = connection
+    }
 
     var body: some View {
         Group {
             if route == .feedback {
-                CuadraoFeedbackPage(saved: $profile.feedback, spanish: spanish)
+                CuadraoFeedbackPage(saved: $settings.feedback, spanish: spanish)
             } else {
-                Form { content.listRowBackground(CanvasSettingsStyle.surface) }
+                Form {
+                    developmentNotice
+                    content.listRowBackground(CanvasSettingsStyle.surface)
+                }
             }
         }
             .environment(\.defaultMinListRowHeight, 52)
@@ -27,6 +47,31 @@ struct CuadraoProfilePage: View {
             }
     }
 
+    @ViewBuilder private var developmentNotice: some View {
+        if case .connected = connection {
+            Section {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(spanish ? "Vista de desarrollo" : "Development preview").font(.subheadline.weight(.medium))
+                    Text(developmentDetail).font(.footnote).foregroundStyle(.secondary)
+                }.accessibilityElement(children: .combine).accessibilityIdentifier("cuadrao.profile.development")
+            }.listRowBackground(Color.clear)
+        }
+    }
+
+    private var developmentDetail: String {
+        switch route {
+        case .preferences:
+            spanish ? "La apariencia funciona en este dispositivo. Las demás opciones son ejemplos y no cambian tu cuenta."
+                : "Appearance works on this device. The other options are examples and do not change your account."
+        case .help:
+            spanish ? "Ayuda y comentarios son ejemplos de desarrollo. Los enlaces legales abren el sitio de Cuadrao."
+                : "Help and feedback are development examples. Legal links open Cuadrao's website."
+        default:
+            spanish ? "Estos ejemplos y controles no leen ni cambian tu cuenta. Los cambios duran solo esta sesión."
+                : "These examples and controls do not read or change your account. Changes last only for this session."
+        }
+    }
+
     @ViewBuilder private var content: some View {
         switch route {
         case .preferences: preferences
@@ -37,7 +82,7 @@ struct CuadraoProfilePage: View {
         case .usage:
             Section {
                 ContentUnavailableView(spanish ? "Tu uso, aquí" : "Your usage, here", systemImage: "chart.bar",
-                    description: Text(spanish ? "Verás tu disponibilidad y cuándo se renueva al conectar tu cuenta." : "Your allowance and reset time will appear when your account is connected."))
+                    description: Text(spanish ? "Esta vista previa no consulta tu disponibilidad ni cuándo se renueva." : "This preview does not load your allowance or reset time."))
             }
         case .help: help
         case .feedback: EmptyView()
@@ -64,14 +109,17 @@ struct CuadraoProfilePage: View {
                 previewAction(spanish ? "Sugerencias" : "Suggestions")
                 previewAction(spanish ? "Agitar para reportar un problema" : "Shake to report a problem")
             }
-        case .personal: EmptyView()
+        case .personal, .invitations: EmptyView()
         }
     }
 
     private var preferences: some View {
         Group {
             Section {
-                CuadraoAppearancePicker(spanish: spanish)
+                switch connection {
+                case .preview: CuadraoAppearancePicker(spanish: spanish)
+                case .connected(let appearance, _): CuadraoAppearanceChoices(spanish: spanish, selection: appearance)
+                }
             } header: { Text(spanish ? "Apariencia" : "Appearance") }
               footer: { Text(spanish ? "Sistema sigue la apariencia de tu iPhone." : "System follows your iPhone’s appearance.") }
             Section {
@@ -81,7 +129,7 @@ struct CuadraoProfilePage: View {
                 LabeledContent(spanish ? "Región" : "Region", value: spanish ? "República Dominicana" : "Dominican Republic")
                 LabeledContent(spanish ? "Moneda preferida" : "Preferred currency") {
                     CuadraoChoiceMenu(title: spanish ? "Moneda preferida" : "Preferred currency",
-                        selection: $profile.currency, values: PlanCurrency.supported, valueTitle: { $0 })
+                        selection: $settings.currency, values: PlanCurrency.supported, valueTitle: { $0 })
                         .accessibilityIdentifier("cuadrao.profile.currency")
                 }
             } header: { Text(spanish ? "Región y moneda" : "Region and currency") }
@@ -95,19 +143,19 @@ struct CuadraoProfilePage: View {
     private var personalization: some View {
         Group {
             Section {
-                Picker(spanish ? "Extensión" : "Length", selection: $profile.responseLength) {
+                Picker(spanish ? "Extensión" : "Length", selection: $settings.responseLength) {
                     Text(spanish ? "Automática" : "Automatic").tag(0)
                     Text(spanish ? "Breve" : "Brief").tag(1)
                     Text(spanish ? "Detallada" : "Detailed").tag(2)
                 }
-                Picker(spanish ? "Tono" : "Tone", selection: $profile.tone) {
+                Picker(spanish ? "Tono" : "Tone", selection: $settings.tone) {
                     Text(spanish ? "Natural" : "Natural").tag(0)
                     Text(spanish ? "Directo" : "Direct").tag(1)
                     Text(spanish ? "Didáctico" : "Educational").tag(2)
                 }
             } header: { Text(spanish ? "Respuestas" : "Responses") }
             Section {
-                TextField(spanish ? "Qué debería tener en cuenta" : "What should it keep in mind", text: $profile.instructions, axis: .vertical)
+                TextField(spanish ? "Qué debería tener en cuenta" : "What should it keep in mind", text: $settings.instructions, axis: .vertical)
                     .lineLimit(4...8)
             } header: { Text(spanish ? "Tus instrucciones" : "Your instructions") }
               footer: { Text(spanish ? "Son preferencias que tú eliges. No son recuerdos inferidos de tus chats. En esta vista previa no se envían al asistente." : "These are preferences you choose, not memories inferred from chats. This preview does not send them to the assistant.") }
@@ -119,22 +167,22 @@ struct CuadraoProfilePage: View {
         Group {
             Section {
                 // Release rule (fc7650ea/#787): the "Por correo / By email" toggle is removed.
-                Toggle(spanish ? "En este dispositivo" : "On this device", isOn: $profile.push)
+                Toggle(spanish ? "En este dispositivo" : "On this device", isOn: $settings.push)
             } header: { Text(spanish ? "Dónde recibirlas" : "Delivery") }
               footer: { Text(spanish ? "Novedades sigue disponible aunque desactives estos avisos. Los controles de esta vista previa no solicitan permisos ni envían notificaciones." : "Updates remain available when these alerts are off. Preview controls do not request permission or send notifications.") }
             Section {
-                Toggle(spanish ? "Presupuestos" : "Budgets", isOn: $profile.budgets)
-                Toggle(spanish ? "Metas" : "Goals", isOn: $profile.goals)
-                Toggle(spanish ? "Pagos próximos" : "Upcoming payments", isOn: $profile.payments)
-                Toggle(spanish ? "Por revisar" : "Needs review", isOn: $profile.records)
-                Toggle(spanish ? "Hogar" : "Household", isOn: $profile.household)
+                Toggle(spanish ? "Presupuestos" : "Budgets", isOn: $settings.budgets)
+                Toggle(spanish ? "Metas" : "Goals", isOn: $settings.goals)
+                Toggle(spanish ? "Pagos próximos" : "Upcoming payments", isOn: $settings.payments)
+                Toggle(spanish ? "Por revisar" : "Needs review", isOn: $settings.records)
+                Toggle(spanish ? "Hogar" : "Household", isOn: $settings.household)
             } header: { Text(spanish ? "Sobre qué" : "Topics") }
             Section {
-                Toggle(spanish ? "Horario de descanso" : "Quiet hours", isOn: $profile.quietHours)
-                if profile.quietHours {
-                    DatePicker(spanish ? "Desde" : "From", selection: $profile.quietStart, displayedComponents: .hourAndMinute)
+                Toggle(spanish ? "Horario de descanso" : "Quiet hours", isOn: $settings.quietHours)
+                if settings.quietHours {
+                    DatePicker(spanish ? "Desde" : "From", selection: $settings.quietStart, displayedComponents: .hourAndMinute)
                         .accessibilityIdentifier("cuadrao.quiet.start")
-                    DatePicker(spanish ? "Hasta" : "Until", selection: $profile.quietEnd, displayedComponents: .hourAndMinute)
+                    DatePicker(spanish ? "Hasta" : "Until", selection: $settings.quietEnd, displayedComponents: .hourAndMinute)
                         .accessibilityIdentifier("cuadrao.quiet.end")
                 }
             }
@@ -149,7 +197,7 @@ struct CuadraoProfilePage: View {
                 previewAction(spanish ? "Cerrar otras sesiones" : "Sign out other sessions")
                 previewAction(spanish ? "Cerrar todas las sesiones" : "Sign out all sessions")
             } header: { Text(spanish ? "Sesiones" : "Sessions") }
-              footer: { Text(spanish ? "Las sesiones reales se mostrarán al conectar tu cuenta." : "Real sessions will appear when your account is connected.") }
+              footer: { Text(spanish ? "Estos ejemplos no consultan ni cierran sesiones reales." : "These examples do not load or sign out real sessions.") }
         }
     }
 
@@ -217,8 +265,20 @@ struct CuadraoProfilePage: View {
                 link(.feedback)
             }
             Section {
-                previewAction(spanish ? "Términos de uso" : "Terms of use")
-                previewAction(spanish ? "Política de privacidad" : "Privacy policy")
+                switch connection {
+                case .preview:
+                    previewAction(spanish ? "Términos de uso" : "Terms of use")
+                    previewAction(spanish ? "Política de privacidad" : "Privacy policy")
+                case .connected(_, let webURL):
+                    if let webURL {
+                        Link(spanish ? "Términos de uso" : "Terms of use", destination: webURL.appendingPathComponent("terms"))
+                            .accessibilityIdentifier("release.legal.terms")
+                        Link(spanish ? "Política de privacidad" : "Privacy policy", destination: webURL.appendingPathComponent("privacy"))
+                            .accessibilityIdentifier("release.legal.privacy")
+                    } else {
+                        Text(spanish ? "Los enlaces no están disponibles en este momento." : "These links aren't available right now.")
+                    }
+                }
             } header: { Text(spanish ? "Acerca de Cuadrao" : "About Cuadrao") }
         }
     }
