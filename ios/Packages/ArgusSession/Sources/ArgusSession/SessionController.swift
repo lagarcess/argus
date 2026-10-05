@@ -28,25 +28,28 @@ public actor SessionController {
 
     public func restore(onValidationRequired: @Sendable (SessionSnapshot) async -> Void = { _ in }) async throws -> SessionSnapshot {
         guard !mutating else { throw SessionFailure.busy }
-        let method: SessionSignInMethod?
-        let hasPending: Bool
         do {
-            hasPending = try vault.pending() != nil
-            method = try vault.signInMethod()
+            if try vault.pending() != nil {
+                try beginMutation(); defer { mutating = false }
+                setState(.signOutPending)
+                return try await performPendingRevoke()
+            }
         } catch {
+            if state.phase != .signOutPending { setState(.credentialValidationRequired) }
+            await onValidationRequired(state)
+            throw safe(error)
+        }
+        let method: SessionSignInMethod?
+        do { method = try vault.signInMethod() }
+        catch {
             setState(.credentialValidationRequired)
             await onValidationRequired(state)
             throw SessionFailure.storageUnavailable
         }
-        if state.phase == .authenticated, !hasPending, let method, method != .apple {
-            guard !mutating else { throw SessionFailure.busy }
+        if state.phase == .authenticated, let method, method != .apple {
             return try await loadProfile(using: activeAuth(), epoch: vault.epoch())
         }
         try beginMutation(); defer { mutating = false }
-        if try vault.pending() != nil {
-            setState(.signOutPending)
-            return try await performPendingRevoke()
-        }
         guard let existing = try vault.session() else { endAccountEpoch(as: .signedOut); return state }
         if existing.user.isAnonymous { setState(.unsupportedAnonymousSession); return state }
         return try await loadProfile(using: activeAuth(), epoch: vault.epoch(), onValidationRequired: onValidationRequired)

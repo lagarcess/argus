@@ -212,4 +212,20 @@ final class AppleCredentialValidationTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(captured, 0)
     }
 
+    func testPendingRevocationTakesPriorityOverMalformedOrUnreadableOrdinarySession() async throws {
+        for unreadable in [false, true] {
+            let fixture = try SessionFixture()
+            let client = try fixture.controller()
+            _ = try await fixture.login(client)
+            await fixture.server.configure(logoutStatus: 503)
+            _ = try await client.signOut()
+            try fixture.storage.store(key: fixture.configuration.storagePrefix + ".session", value: Data("malformed".utf8))
+            if unreadable { fixture.storage.failedReadSuffix = ".session" }
+            await fixture.server.configure()
+            let restored = try await fixture.controller().restore()
+            XCTAssertEqual(restored.phase, .signedOut)
+            XCTAssertNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending"))
+        }
+    }
+
 }
