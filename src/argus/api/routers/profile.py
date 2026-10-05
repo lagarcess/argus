@@ -355,7 +355,11 @@ def patch_me(
             # A derived field is not a column; the row stores what it derives from.
             updated = api_state.supabase_gateway.update_user(
                 user.id,
-                updated.model_dump(mode="json", exclude=set(User.model_computed_fields)),
+                {
+                    "id": user.id,
+                    **updated.model_dump(mode="json", include=set(updates)),
+                    "updated_at": updated.updated_at.isoformat(),
+                },
             )
         except Exception as exc:
             if not dev_memory_fallback_enabled():

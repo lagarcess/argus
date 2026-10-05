@@ -61,6 +61,7 @@ actor AuthServer {
     var idTokenErrorCode = "bad_jwt"
     var anonymousIdToken = false
     var captureStatus = 204
+    var currencyOverride: String?
 
     func configure(meStatuses: [Int] = [], logoutStatus: Int = 204, refreshStatus: Int = 200, refreshErrorCode: String = "refresh_token_not_found", mismatch: Bool = false, expired: Bool = false) {
         self.meStatuses = meStatuses
@@ -118,7 +119,9 @@ actor AuthServer {
             let id = mismatchedProfile ? bob : (accessUsers[bearer] ?? alice)
             if let gate = meGate { await gate.enter() }
             let status = meStatuses.isEmpty ? 200 : meStatuses.removeFirst()
-            return response(url, status, status == 200 ? ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": "Sample", "language": "en"]] : ["code": "unauthorized"])
+            if status == 200, request.httpMethod == "PATCH" { currencyOverride = body["currency_override"] as? String }
+
+            return response(url, status, status == 200 ? ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": "Sample", "language": "en", "currency": currencyOverride ?? "DOP", "currency_override": currencyOverride as Any? ?? NSNull()]] : ["code": "unauthorized"])
         }
         return response(url, 404, [:])
     }

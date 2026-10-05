@@ -94,6 +94,20 @@ public actor SessionController {
         return try await loadProfile(using: activeAuth(), epoch: vault.epoch())
     }
 
+    public func setPrimaryCurrency(_ currency: String, expectedIdentity: SessionSnapshot) async throws -> SessionSnapshot {
+        guard state.phase == .authenticated, state.revision == expectedIdentity.revision,
+              state.profile?.id == expectedIdentity.profile?.id else { throw SessionFailure.staleOperation }
+        try beginMutation(); defer { mutating = false }
+        if try vault.pending() != nil { throw SessionFailure.pendingSignOut }
+        let epoch = vault.epoch()
+        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/me"))
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoded(["currency_override": currency])
+        _ = try await authenticatedResponse(using: activeAuth(), epoch: epoch, request: request)
+        return try await loadProfile(using: activeAuth(), epoch: epoch)
+    }
+
     public func signOut() async throws -> SessionSnapshot {
         try beginMutation(); defer { mutating = false }
         if try vault.pending() == nil {
