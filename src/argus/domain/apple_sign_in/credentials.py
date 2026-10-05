@@ -14,7 +14,8 @@ subject mismatch or a storage failure, capture revokes it at Apple right away
 (best effort). The person's next Apple sign-in then asks again and yields a
 fresh code, instead of leaving an Apple authorization nothing can revoke.
 
-Revoke is what the account-deletion lane calls. It opens the stored token,
+Account deletion calls provider-only ``revoke_stored`` and commits its receipt
+and exact credential removal together. The compatibility ``revoke`` opens the token,
 asks Apple to revoke it, and deletes the row only after Apple answers 200, and
 only if the row still holds the token that was revoked. Apple's
 ``invalid_grant`` means the token is already dead (revoked from the person's
@@ -123,6 +124,7 @@ class AppleCredentialRepository(Protocol):
         secret_ciphertext: bytes,
         now: datetime,
         key_id: str,
+        deletion_claim: str | None = None,
     ) -> None: ...
 
     def upsert(
@@ -165,6 +167,7 @@ class InMemoryAppleCredentialRepository:
         secret_ciphertext: bytes,
         now: datetime,
         key_id: str,
+        deletion_claim: str | None = None,
     ) -> None:
         with self._lock:
             if self.linked_identity(user_id=user_id) != identity:
@@ -234,7 +237,13 @@ class AppleCredentialService:
     def close(self) -> None:
         self._client.close()
 
-    def capture(self, *, user_id: str, authorization_code: str) -> None:
+    def capture(
+        self,
+        *,
+        user_id: str,
+        authorization_code: str,
+        deletion_claim: str | None = None,
+    ) -> None:
         """Save only for a current, unambiguous linked Apple identity."""
 
         try:
@@ -259,6 +268,7 @@ class AppleCredentialService:
                 ),
                 now=self._clock(),
                 key_id=self._box.key_id,
+                **({"deletion_claim": deletion_claim} if deletion_claim else {}),
             )
         except AppleIdentityMismatch:
             self._discard(grant.refresh_token, reason="identity_mismatch")
@@ -317,9 +327,30 @@ class AppleCredentialService:
         row = self.repository.get(user_id=user_id)
         if row is None:
             return RevokeOutcome.NOTHING_STORED
+        outcome = self.revoke_stored(row)
+        self.repository.delete_if_unchanged(
+            user_id=user_id, secret_ciphertext=row.secret_ciphertext
+        )
+        if self.repository.get(user_id=user_id) is not None:
+            # A sign-in replaced the token while this revoke was in flight.
+            # Apple ended the whole authorization, but only a confirmed revoke
+            # of the token now stored may clear it, so the caller retries.
+            raise AppleRevocationPending("credential_replaced")
+        return outcome
+
+    def ensure_readable(self, row: StoredAppleCredential) -> None:
+        try:
+            self._box.open(
+                row.secret_ciphertext, source=SOURCE, connection_id=row.user_id
+            )
+        except SecretUnreadable:
+            raise AppleRevocationPending("credential_unreadable") from None
+
+    def revoke_stored(self, row: StoredAppleCredential) -> RevokeOutcome:
+        """Confirm provider revocation; the receipt owner removes the exact row."""
         try:
             token = self._box.open(
-                row.secret_ciphertext, source=SOURCE, connection_id=user_id
+                row.secret_ciphertext, source=SOURCE, connection_id=row.user_id
             )
         except SecretUnreadable:
             raise AppleRevocationPending("credential_unreadable") from None
@@ -330,15 +361,18 @@ class AppleCredentialService:
             if not exc.invalid_grant:
                 raise AppleRevocationPending(exc.reason) from None
             outcome = RevokeOutcome.ALREADY_REVOKED
-        self.repository.delete_if_unchanged(
-            user_id=user_id, secret_ciphertext=row.secret_ciphertext
-        )
-        if self.repository.get(user_id=user_id) is not None:
-            # A sign-in replaced the token while this revoke was in flight.
-            # Apple ended the whole authorization, but only a confirmed revoke
-            # of the token now stored may clear it, so the caller retries.
-            raise AppleRevocationPending("credential_replaced")
         return outcome
+
+    def unreadable_discard_status(self, row: StoredAppleCredential) -> DiscardOutcome:
+        try:
+            self.ensure_readable(row)
+        except AppleRevocationPending:
+            if row.key_id is None or not hmac.compare_digest(
+                row.key_id, self._box.key_id
+            ):
+                raise AppleRevocationPending("key_unproven") from None
+            return DiscardOutcome.DISCARDED
+        return DiscardOutcome.READABLE
 
     def discard_unreadable(self, *, user_id: str) -> DiscardOutcome:
         """Delete this user's row only while its token can't be opened.
@@ -358,18 +392,8 @@ class AppleCredentialService:
             row = self.repository.get(user_id=user_id)
             if row is None:
                 return DiscardOutcome.NOTHING_STORED
-            try:
-                self._box.open(
-                    row.secret_ciphertext, source=SOURCE, connection_id=user_id
-                )
-            except SecretUnreadable:
-                pass
-            else:
+            if self.unreadable_discard_status(row) is DiscardOutcome.READABLE:
                 return DiscardOutcome.READABLE
-            if row.key_id is None or not hmac.compare_digest(
-                row.key_id, self._box.key_id
-            ):
-                raise AppleRevocationPending("key_unproven")
             if self.repository.delete_if_unchanged(
                 user_id=user_id, secret_ciphertext=row.secret_ciphertext
             ):
