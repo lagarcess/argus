@@ -22,17 +22,18 @@ extension FinancialLoopUITests {
         capture("home-movement-detail")
         tapVisible(app.buttons["activity-detail-account." + account.id])
         XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 10))
-        tapVisible(app.buttons["accounts.back"])
-        XCTAssertTrue(app.buttons["activity.back"].waitForExistence(timeout: 10))
+        app.swipeBack(cancel: true)
+        XCTAssertTrue(app.buttons["accounts.record"].exists, "A cancelled swipe keeps the account open")
+        app.swipeBack()
+        XCTAssertTrue(app.buttons["activity.correct"].waitForExistence(timeout: 10))
         assertText("Bus " + stamp)
-        tapVisible(app.buttons["activity.back"])
+        app.swipeBack()
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         XCTAssertEqual(row.frame.minY, before.minY, accuracy: 2, "Home returns to the same scroll position")
         XCTAssertEqual(row.frame.height, before.height, accuracy: 2)
         capture("home-movement-back-same-position")
-        // The row at that same frame still opens its detail: the real meaning of "still hittable".
         openMovement(row)
-        tapVisible(app.buttons["activity.back"])
+        app.navigationBars.buttons.matching(identifier: "BackButton").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["screen.activity"].waitForNonExistence(timeout: 10))
     }
 
@@ -121,7 +122,7 @@ extension FinancialLoopUITests {
             capture("movement-swipe-category")
             tapVisible(app.buttons["home.activity.swipe.category"])
         } else {
-            if app.buttons["activity.back"].exists { app.buttons["activity.back"].tap() }
+            app.revealConnectedTabBar()
             revealOnHome(row); row.tap()
             tapVisible(app.buttons["activity.correct"])
         }
@@ -132,7 +133,7 @@ extension FinancialLoopUITests {
         capture("movement-category-shortcut")
         cancelEditor()
         XCTAssertTrue(app.textFields["loop.reason"].waitForNonExistence(timeout: 10))
-        if app.buttons["activity.back"].exists { app.buttons["activity.back"].tap() }
+        app.revealConnectedTabBar()
     }
 
     /// The Archived accounts entry sits in the Accounts header; scroll Home itself back up to it.
