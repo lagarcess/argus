@@ -204,9 +204,9 @@ def public(
     for cid, link in claimed.items():
         entry = actual.get(link["activity_id"])
         accepted = link["attribution"]
+        in_plan_currency = bool(entry and activity_in_currency(entry, body["currency"]))
         valid = bool(
-            entry
-            and activity_in_currency(entry, body["currency"])
+            in_plan_currency
             and entry["kind"] == accepted["kind"]
             and {(leg["role"], leg["account_id"]) for leg in entry["legs"]}
             == {tuple(leg) for leg in accepted["legs"]}
@@ -259,7 +259,7 @@ def public(
             dict(
                 id=cid,
                 person=person(people, link["contributor_mid"]),
-                amount_minor=str(entry["amount_minor"]) if entry else None,
+                amount_minor=str(entry["amount_minor"]) if in_plan_currency else None,
                 applied_minor=str(applied) if applied is not None else None,
                 currency=body["currency"],
                 currency_fraction_digits=currency_exponent(body["currency"]),

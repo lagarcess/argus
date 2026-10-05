@@ -4,6 +4,41 @@ October 5, 2026. Original integration base is
 `875de09ac2115acec42e09060b92878aa5f18eff`. This is a default-off backend slice
 of #820. It does not complete the native two-amount flow or enable transfers.
 
+## Shared Plan denomination review fix
+
+The [P1 review](https://github.com/lagarcess/argus/pull/854#issuecomment-5999583701)
+reproduced a shared DOP Goal publishing a private USD source amount as DOP after
+correction. The untouched PR head was
+`334e1dcb37c1006f51fbe6e780831cf9e2c2a048`. Credit was already unknown, but the
+full public amount bypassed the complete denomination check.
+
+The projection now derives both decisions from `activity_in_currency`. An
+unsupported denomination publishes null `amount_minor`. A valid DOP amount
+remains visible when an account change requires review. No destination amount
+is substituted and no Plan credit rule is expanded.
+
+The [failing-before regression](shared-denomination-red.txt) records two failures,
+both `assert '100' == None`, and one passing DOP control. The real PostgreSQL
+test creates a consented 20 DOP contribution, corrects the original through
+MoneyService, and reads the shared Goal as its owner without private account
+grants. It covers both mixed directions and a DOP-only account change.
+It verifies null credit, private original/account/note redaction, denied
+correction, unchanged account records and no extra receipts for either actor.
+
+The [affected suite](shared-denomination-focused.txt) passes 232 tests with
+zero failures and zero skips. The 57 warnings are the existing psycopg-pool
+deprecation. The [final focused run](shared-denomination-green.txt) passes all
+four Household paired-transfer tests after formatting and the final receipt
+assertion. The [original review probe](shared-denomination-probe.txt) now returns
+null public amount and passes. These runs use the supplied isolated Python
+3.11.15 runtime, synthetic configuration and local PostgreSQL on port 60332.
+Existing UUID fixtures remove their records after each run.
+
+Focused Ruff, formatting, whitespace and worker-tree modularity checks pass.
+OpenAPI compatibility is included in the 232-test run. The bounded no-comments
+review found no added comments or suppressions to remove. The root retains
+integration reconciliation and final independent correctness review ownership.
+
 ## Reproduction and verification
 
 On the untouched baseline, a synthetic USD/DOP transfer fails with
