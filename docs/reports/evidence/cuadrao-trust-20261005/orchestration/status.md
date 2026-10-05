@@ -1,10 +1,10 @@
 # Orchestrate status
 
-Generated: 2026-10-05T20:38:20.358Z
+Generated: 2026-10-05T22:28:04.193Z
 
 ## Units
 
-States: landed=5, needs-verify=10
+States: landed=7, needs-verify=8
 
 | ID | Track | State | Branch | PR | SHA | Brief |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -12,21 +12,21 @@ States: landed=5, needs-verify=10
 | deletion-recovery | deletion | landed | codex/cuadrao-deletion-recovery-proof | 846 | cea9f6e18c582615dee44cf1a7d3a05b936b660a | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | analytics-deletion | deletion | needs-verify | codex/cuadrao-personless-deletion | 847 | 0334808e08e41baa0305fe28a8c167dbb89ebbbc | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | privacy-evidence | privacy | needs-verify | codex/cuadrao-privacy-evidence | 845 | bdb276c656e160ca39c419d9d61a2dc1ec1fcebc | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| primary-currency | foundations | needs-verify | codex/cuadrao-primary-currency | 853 | 82a5f39c017a8ee1ecb2f4f89a90f9f11f7ca3eb | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| paired-transfers | foundations | needs-verify | codex/cuadrao-paired-transfers | 854 | 95c01e8c08d8315f5cb2e5439c70e0b467d223e8 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| privacy-manifest | privacy | needs-verify | codex/cuadrao-app-privacy-manifest | 849 | 20c2252d0e97197ef1e200b3063750191432f371 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| primary-currency | foundations | landed | codex/cuadrao-primary-currency | 853 | c86981c076d4512aaee8d6c61d278f60ef597e75 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| paired-transfers | foundations | needs-verify | codex/cuadrao-paired-transfers | 854 | c986d060deb7bd7ce50ec13093e175371164c7d0 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| privacy-manifest | privacy | needs-verify | codex/cuadrao-app-privacy-manifest | 849 | 3c6c95b9a9ea6ee1a5c7b12d3ab96f45ce8ba6c3 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | native-buttons | identity | landed | codex/cuadrao-native-provider-appearance | 857 | fb847fc340a7c7acac55922691fa0f99c50e33a6 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | apple-binding | identity | landed | codex/apple-identity-binding-800 | 858 | ad2e7d84236bc2bc0f0ffb82d3e0c9e6b9f6f04d | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| apple-deletion | deletion | needs-verify | codex/apple-deletion-admission-20261005 | 862 | d11390cd816688463f4669ad90471685d427c24d | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| apple-session | identity | needs-verify | codex/cuadrao-apple-session-20261005 | 864 | 9419001712dc9f070741909312982f19d1e08e72 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| apple-deletion | deletion | needs-verify | codex/apple-deletion-admission-20261005 | 862 | 916b4b94e32603405615dfaef5f2e415e4b5f2cf | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| apple-session | identity | needs-verify | codex/cuadrao-apple-session-20261005 | 864 | 70b2f25646f1d05445704ae25e3d791a2a913568 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | recovery-address | operations | needs-verify | codex/recovery-trusted-client-ip | 865 | 45939369dcf915660c43a83d3cf54d1348ee4dc3 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | ci-release-resolution | operations | landed | codex/cuadrao-ci-release-resolution | 851 | c4f9a08b6fc9cf429b47c4cd024183db02fcd959 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| canary-fixture | operations | needs-verify | codex/issue-861-canary-fixture-close | 863 | d2347166f78df1a1e67f52ab194936ee14ab210b | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| apple-lock-observer | operations | needs-verify | codex/867-apple-lock-observer | 868 | 511660c642b6208de46bf1bd3990f9c70b756517 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| canary-fixture | operations | landed | codex/issue-861-canary-fixture-close | 863 | d2347166f78df1a1e67f52ab194936ee14ab210b | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| apple-lock-observer | operations | needs-verify | codex/867-apple-lock-observer | 868 | 8a3e80daaf8947a5dfd43268eeb3f2459427de97 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 
 ## Verification ledger
 
-Verdicts: live-ui-verified=2, unit-test-verified=17
+Verdicts: live-ui-verified=2, unit-test-verified=22
 
 | PR | SHA | Verdict | Evidence | Verifier | Timestamp |
 | --- | --- | --- | --- | --- | --- |
@@ -45,10 +45,15 @@ Verdicts: live-ui-verified=2, unit-test-verified=17
 | 854 | 95c01e8c08d8315f5cb2e5439c70e0b467d223e8 | unit-test-verified | https://github.com/lagarcess/argus/pull/854#issuecomment-6001859083 | gpt-6-astra | 2026-10-05T20:16:34.648Z |
 | 845 | bdb276c656e160ca39c419d9d61a2dc1ec1fcebc | unit-test-verified | https://github.com/lagarcess/argus/pull/845#issuecomment-6001966060 | gpt-6-astra | 2026-10-05T20:16:34.729Z |
 | 862 | d11390cd816688463f4669ad90471685d427c24d | unit-test-verified | https://github.com/lagarcess/argus/pull/862#pullrequestreview-5419720370 | gpt-6-astra | 2026-10-05T20:16:34.820Z |
-| 863 | d2347166f78df1a1e67f52ab194936ee14ab210b | unit-test-verified | https://github.com/lagarcess/argus/pull/863#issuecomment-6001780582 | gpt-6-astra | 2026-10-05T20:27:06.578Z |
+| 863 | d2347166f78df1a1e67f52ab194936ee14ab210b | unit-test-verified | docs/reports/evidence/cuadrao-trust-20261005/pr863-landing-record.json | independent fixture reviewer | 2026-10-05T22:28:04.096Z |
 | 865 | 45939369dcf915660c43a83d3cf54d1348ee4dc3 | unit-test-verified | https://github.com/lagarcess/argus/pull/865#issuecomment-6002222420 | gpt-6-astra | 2026-10-05T20:27:06.670Z |
 | 851 | c4f9a08b6fc9cf429b47c4cd024183db02fcd959 | unit-test-verified | https://github.com/lagarcess/argus/pull/851#issuecomment-5998839785 | gpt-6-astra | 2026-10-05T20:38:19.893Z |
 | 868 | 511660c642b6208de46bf1bd3990f9c70b756517 | unit-test-verified | https://github.com/lagarcess/argus/pull/868#issuecomment-6002426471 | gpt-6.1-sol | 2026-10-05T20:38:20.238Z |
+| 853 | c86981c076d4512aaee8d6c61d278f60ef597e75 | unit-test-verified | docs/reports/evidence/cuadrao-trust-20261005/pr853-landing-record.json | currency_d08_context_review | 2026-10-05T22:28:04.076Z |
+| 868 | 8a3e80daaf8947a5dfd43268eeb3f2459427de97 | unit-test-verified | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md | observer_d08_context_review | 2026-10-05T22:28:04.113Z |
+| 849 | 3c6c95b9a9ea6ee1a5c7b12d3ab96f45ce8ba6c3 | unit-test-verified | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md | manifest_currency_context_review | 2026-10-05T22:28:04.131Z |
+| 862 | 916b4b94e32603405615dfaef5f2e415e4b5f2cf | unit-test-verified | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md | deletion_currency_context_review | 2026-10-05T22:28:04.150Z |
+| 854 | c986d060deb7bd7ce50ec13093e175371164c7d0 | unit-test-verified | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md | paired_currency_context_review | 2026-10-05T22:28:04.167Z |
 
 ## Frontier
 
@@ -69,4 +74,4 @@ Lowest unmerged: none
 | release-jobs | open | Settle #818 first-release retained chat jobs and connected memory/voice inclusion. Recommendation: bounded financial read and revision-confirmed proposed-write jobs; defer unassigned connected memory/voice activation. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 | apple-late-cleanup | open | Accept #803 rare provider-side late revocation recovery or require stronger coordination. Recommendation: documented forced-sign-out recovery with activation/phone gates; do not claim local CAS cancels an Apple request already received. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 
-<!-- orch-summary {"unitStates":{"landed":5,"needs-verify":10},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":17},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->
+<!-- orch-summary {"unitStates":{"landed":7,"needs-verify":8},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":22},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->

@@ -14,7 +14,12 @@ pr	sha	verdict	evidence	verifier	ts
 854	95c01e8c08d8315f5cb2e5439c70e0b467d223e8	unit-test-verified	https://github.com/lagarcess/argus/pull/854#issuecomment-6001859083	gpt-6-astra	2026-10-05T20:16:34.648Z
 845	bdb276c656e160ca39c419d9d61a2dc1ec1fcebc	unit-test-verified	https://github.com/lagarcess/argus/pull/845#issuecomment-6001966060	gpt-6-astra	2026-10-05T20:16:34.729Z
 862	d11390cd816688463f4669ad90471685d427c24d	unit-test-verified	https://github.com/lagarcess/argus/pull/862#pullrequestreview-5419720370	gpt-6-astra	2026-10-05T20:16:34.820Z
-863	d2347166f78df1a1e67f52ab194936ee14ab210b	unit-test-verified	https://github.com/lagarcess/argus/pull/863#issuecomment-6001780582	gpt-6-astra	2026-10-05T20:27:06.578Z
+863	d2347166f78df1a1e67f52ab194936ee14ab210b	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/pr863-landing-record.json	independent fixture reviewer	2026-10-05T22:28:04.096Z
 865	45939369dcf915660c43a83d3cf54d1348ee4dc3	unit-test-verified	https://github.com/lagarcess/argus/pull/865#issuecomment-6002222420	gpt-6-astra	2026-10-05T20:27:06.670Z
 851	c4f9a08b6fc9cf429b47c4cd024183db02fcd959	unit-test-verified	https://github.com/lagarcess/argus/pull/851#issuecomment-5998839785	gpt-6-astra	2026-10-05T20:38:19.893Z
 868	511660c642b6208de46bf1bd3990f9c70b756517	unit-test-verified	https://github.com/lagarcess/argus/pull/868#issuecomment-6002426471	gpt-6.1-sol	2026-10-05T20:38:20.238Z
+853	c86981c076d4512aaee8d6c61d278f60ef597e75	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/pr853-landing-record.json	currency_d08_context_review	2026-10-05T22:28:04.076Z
+868	8a3e80daaf8947a5dfd43268eeb3f2459427de97	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md	observer_d08_context_review	2026-10-05T22:28:04.113Z
+849	3c6c95b9a9ea6ee1a5c7b12d3ab96f45ce8ba6c3	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md	manifest_currency_context_review	2026-10-05T22:28:04.131Z
+862	916b4b94e32603405615dfaef5f2e415e4b5f2cf	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md	deletion_currency_context_review	2026-10-05T22:28:04.150Z
+854	c986d060deb7bd7ce50ec13093e175371164c7d0	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md	paired_currency_context_review	2026-10-05T22:28:04.167Z
