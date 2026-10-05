@@ -25,6 +25,23 @@ struct ConnectedCuadraoProfile: View {
                         row(spanish ? "Apariencia" : "Appearance", symbol: "paintpalette")
                     }.accessibilityIdentifier("profile.preferences")
                     Divider()
+                    if auth.state == .authenticated {
+                        Menu {
+                            ForEach(PlanCurrency.supported, id: \.self) { currency in
+                                Button(currency) { Task { await auth.setPrimaryCurrency(currency) } }
+                            }
+                        } label: {
+                            HStack {
+                                Text(spanish ? "Moneda principal" : "Primary currency")
+                                Spacer()
+                                Text(auth.profile?.currency ?? (spanish ? "Elegir" : "Choose"))
+                                    .foregroundStyle(.secondary)
+                            }.frame(minHeight: 58)
+                        }.disabled(auth.busy).accessibilityIdentifier("profile.primaryCurrency")
+                        Text(spanish ? "Elegir una moneda no convierte ni combina tus balances." : "Choosing a currency does not convert or combine your balances.")
+                            .font(.footnote).foregroundStyle(.secondary).padding(.bottom, 12)
+                        Divider()
+                    }
                     NavigationLink(value: CuadraoProfileDestination.legal) {
                         row(spanish ? "Privacidad y términos" : "Privacy and terms", symbol: "hand.raised")
                     }.accessibilityIdentifier("release.profile.legal")
