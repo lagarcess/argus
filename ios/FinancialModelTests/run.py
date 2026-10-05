@@ -29,8 +29,22 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     # The formatter remains one production source; copy its exact declaration.
     presentation = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
     (source / "AccountPresentation.swift").write_text("import Foundation\nimport ArgusSession\n" + presentation[presentation.index("enum AccountPresentation {"):])
+    # Exercise the connected projections using the same immutable display values.
+    # Extract artwork vocabulary only; no Preview records or fixture store enter this target.
+    canvas = root / "ios/ArgusFoundation/Cuadrao"
+    kinds = (canvas / "CuadraoAccountsPreview.swift").read_text()
+    (source / "CanvasAccountKind.swift").write_text("import Foundation\n" + kinds[kinds.index("enum CanvasAccountKind:"):kinds.index("struct CanvasAccount:")])
+    values = (canvas / "CanvasAccountPresentation.swift").read_text()
+    declarations = [("struct CanvasAccountRowValue {", "struct CanvasAccountRowContent:"),
+                    ("struct CanvasAccountDetailValue {", "struct CanvasAccountDetailHeader:")]
+    (source / "CanvasAccountDisplayValues.swift").write_text("import Foundation\n" + "\n".join(
+        values[values.index(start):values.index(end)] for start, end in declarations))
+    connected = (root / "ios/ArgusFoundation/Connected/ConnectedAccountPresentation.swift").read_text()
+    (source / "ConnectedAccountPresentation.swift").write_text("import Foundation\nimport ArgusSession\n@MainActor\n" + connected[connected.index("enum ConnectedAccountPresentation {"):])
+    shutil.copy(root / "ios/ArgusFoundation/Accounts/FinancialActivityPresentation.swift", source / "FinancialActivityPresentation.swift")
     shutil.copy(root / "ios/Packages/ArgusSession/Tests/ArgusSessionTests/TestSupport.swift", tests / "TestSupport.swift")
     shutil.copy(Path(__file__).with_name("FinancialModelTests.swift"), tests / "FinancialModelTests.swift")
+    shutil.copy(Path(__file__).with_name("ConnectedDetailPresentationTests.swift"), tests / "ConnectedDetailPresentationTests.swift")
     (package / "Package.swift").write_text('''// swift-tools-version: 6.0
 import PackageDescription
 let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], dependencies: [

@@ -8,38 +8,18 @@ struct CuadraoAccountCanvas: View {
     let record: (UUID) -> Void
     @State private var showingBalanceInfo = false
     @State private var chatFocus: CanvasChatFocus?
+    @Environment(\.locale) private var locale
 
     var body: some View {
         if let account = data.account(accountID) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 30) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        CanvasAccountIcon(kind: account.kind, size: 30)
-                            .frame(width: 58, height: 58)
-                            .background(WelcomePalette.sage, in: RoundedRectangle(cornerRadius: 18))
-                        Text(account.displayName(spanish)).font(CuadraoTypography.screen)
-                            .accessibilityIdentifier("account-detail-title")
-                            .fixedSize(horizontal: false, vertical: true)
-                        VStack(alignment: .leading, spacing: 9) {
-                            Text(account.balanceLabel(spanish)).font(.subheadline).foregroundStyle(.secondary)
-                            HStack(alignment: .firstTextBaseline, spacing: 9) {
-                                Text(account.currency).font(.subheadline).foregroundStyle(.secondary)
-                                Text(account.balance.map { CanvasMoney.format($0, currency: account.currency) } ?? "—")
-                                    .font(CuadraoTypography.amount)
-                                    .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
-                            }
-                            Text(account.balance == nil ? (spanish ? "Sin balance registrado" : "No balance recorded")
-                                 : (spanish ? "Actualizado hoy" : "Updated today"))
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
-                    VStack(spacing: 12) {
-                        RegistrationButton(title: spanish ? "Añadir movimiento" : "Add transaction") { record(accountID) }
-                            .accessibilityIdentifier("account-detail-record")
-                        Button(spanish ? "Comprobar balance" : "Check balance") { showingBalanceInfo = true }
-                            .font(.system(size: 13, weight: .medium)).padding(.horizontal, 16).frame(minHeight: 44)
-                            .overlay { Capsule().stroke(WelcomePalette.border, lineWidth: 1) }
-                    }
+                CanvasAccountDetailContent(
+                    value: CanvasAccountDetailValue(title: account.displayName(spanish), artwork: account.kind,
+                        balanceLabel: account.balanceLabel(spanish), currency: account.currency,
+                        amount: account.balance.map { CanvasMoney.format($0, currency: account.currency) } ?? "—",
+                        freshness: account.balance == nil ? (spanish ? "Sin balance registrado" : "No balance recorded")
+                            : (spanish ? "Actualizado hoy" : "Updated today")),
+                    spanish: spanish, record: { record(accountID) }, check: { showingBalanceInfo = true }) {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         Text(spanish ? "Movimientos" : "Activity").font(CuadraoTypography.section)
                         let entries = data.activity.filter { $0.accountID == accountID }.sorted { $0.date > $1.date }
@@ -54,19 +34,11 @@ struct CuadraoAccountCanvas: View {
                                 NavigationLink {
                                     CuadraoActivityDetail(data: data, activityID: entry.id, spanish: spanish, actions: actions, record: record)
                                 } label: {
-                                    HStack(spacing: 14) {
-                                        Image(systemName: entry.income ? "arrow.down.left" : "arrow.up.right")
-                                            .frame(width: 38, height: 38)
-                                            .background(WelcomePalette.surface, in: Circle()).accessibilityHidden(true)
-                                        VStack(alignment: .leading, spacing: 5) {
-                                            Text(entry.title).font(.body)
-                                            Text(entry.date, format: .dateTime.day().month(.abbreviated))
-                                                .font(.caption).foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Text((entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                                            .font(CuadraoTypography.rowAmount)
-                                    }.padding(.vertical, 10).contentShape(Rectangle())
+                                    CanvasAccountActivityRowContent(value: CanvasAccountActivityRowValue(
+                                        title: entry.title,
+                                        detail: entry.date.formatted(.dateTime.day().month(.abbreviated).locale(locale)),
+                                        amount: (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
+                                        symbol: entry.income ? "arrow.down.left" : "arrow.up.right"))
                                 }.buttonStyle(.plain).accessibilityIdentifier("account-detail-activity.\(entry.id)")
                                 Divider()
                             }
