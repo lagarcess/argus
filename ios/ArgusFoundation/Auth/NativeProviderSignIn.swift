@@ -66,6 +66,7 @@ struct NativeProviderConfiguration: Equatable {
 /// Apple uses the system button (HIG); Google uses the official GoogleSignInSwift button.
 struct ConnectedProviderButtons: View {
     let spanish: Bool
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var auth: ProfileAuthModel
     @State private var appleNonce: SignInNonce?
     @State private var failed = false
@@ -83,7 +84,7 @@ struct ConnectedProviderButtons: View {
                     } onCompletion: { result in
                         completeApple(result)
                     }
-                    .signInWithAppleButtonStyle(.black)
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
                     .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .disabled(auth.busy)
@@ -91,7 +92,7 @@ struct ConnectedProviderButtons: View {
                 }
                 #if canImport(GoogleSignIn)
                 if let google = providers.google {
-                    GoogleSignInButton(scheme: .light, style: .wide, state: auth.busy ? .disabled : .normal) {
+                    GoogleSignInButton(scheme: colorScheme == .dark ? .dark : .light, style: .wide, state: auth.busy ? .disabled : .normal) {
                         Task { await signInWithGoogle(google) }
                     }
                     .disabled(auth.busy)
