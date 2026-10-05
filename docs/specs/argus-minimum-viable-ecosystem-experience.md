@@ -631,6 +631,34 @@ that lane explicitly changes its architecture; do not create a parallel chat
 brain or modify model-facing prompts as part of the mobile foundation. Existing
 chat maintenance and security fixes continue independently.
 
+#### Continuous Cuadrao conversation
+
+Founder direction, October 4, 2026. Cuadrao should support an ongoing conversation
+that carries a person's work forward. The first runtime contract in
+[#826](https://github.com/lagarcess/argus/issues/826) must define the following
+behavior before implementation:
+
+- Enter from chat or a plan, receipt or chart without losing the unfinished
+  message or the route back to the originating screen. Context is visible and
+  removable.
+- Keep the active space clear. A space change does not grant access to earlier
+  private context. Define which history, attachments and memory can be used or
+  displayed, including after household membership or a grant is revoked.
+- Reconnect to durable jobs after the person closes and reopens the app. Show
+  their real status and results, with retry or cancellation appropriate to the
+  underlying action. Changing chat context cannot retarget an in-flight job.
+- Bind an approval to its specific action, revision, recipient and space. A
+  later message or changed space must not silently approve stale work.
+- Define consent, correction, forgetting and deletion for permitted memory.
+  Preserve the Temporary chat boundary below. Record whether memory and voice
+  are in the first release rather than assuming their presence.
+
+An ongoing conversation is an experience direction. It does not require one
+unbounded model transcript, one global permission context or a particular
+thread/checkpoint schema. The reference apps inform interaction goals, not our
+backend topology. The [reuse decisions](../ARCHITECTURE.md#cuadrao-reuse-decisions)
+guide the implementation assessment.
+
 #### Temporary chat and conversation recovery
 
 Founder-locked mobile presentation, September 28, 2026: one Temporary chat mode replaces separate private/incognito names. Optional Use my context starts off; neither temporary variant creates new memories or enters chat history. Context choice locks after the first message. A nonempty session asks before discarding; returning can restore the prior regular draft. This is the experience target, not a shipped retention or anonymity guarantee. Context authorization, provider handling and retention need explicit technical contracts before implementation.

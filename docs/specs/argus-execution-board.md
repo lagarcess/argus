@@ -90,7 +90,7 @@ verification recovery into business, runtime, migration or archive work.
 | Receipts and imports | Capture/review UI and durable draft foundations exist | Connect capture, save for later, reopen, prepare, correct, split, approve, and save through the same financial services. Prove persistence and sharing boundaries. Keep source/extraction enablement gates open until satisfied. |
 | Home, Search, Updates, moves | Designs and partial connected foundations exist | Complete the assigned history/projection, search-to-detail, account-move history, inbox, reminder, and private push paths. Show known zero only with confirmed coverage. Verify authorization, origin navigation, and event-driven data rather than fixtures. |
 | Cuadrao chat identity | Small presentation task remains | Discuss and settle the chat/menu-bar logo within the design system; implement and check accessibility when assigned. Do not make it a dependency of runtime architecture. |
-| Agentic Cuadrao | Product direction approved; runtime lane remains unimplemented | Discuss the first supported jobs, authorized context, read/write tools, confirmations, recovery, draft continuity, and evaluation. Compare reuse with changes to Argus orchestration. Produce the bounded runtime assignment before implementation; a different architecture is an open decision, not a conclusion. |
+| Agentic Cuadrao | Continuous-conversation direction and reuse baseline recorded; runtime lane remains unimplemented | [#826](https://github.com/lagarcess/argus/issues/826) defines the first jobs, space/context transitions, permitted memory, confirmations, durable-job recovery and evaluation under the [experience owner](argus-minimum-viable-ecosystem-experience.md#continuous-cuadrao-conversation) and [reuse decisions](../ARCHITECTURE.md#cuadrao-reuse-decisions). [#827](https://github.com/lagarcess/argus/issues/827) delivers only the approved contract. |
 | Privacy, Terms, and Apple readiness | Draft #781, consent/deletion presentation, and backend foundations exist | Reconcile actual data flows, permissions, retention, deletion, provider handling, manifests, published policies, and review access. Complete the release audit and connected acceptance before claiming external TestFlight readiness. |
 | Profile backend features | Full design retained in development; unfinished release entries gated | Keep the complete development experience. Persist avatar selections before restoring the connected release editor. Track other unfinished Profile backends after chat; the removal of email notifications remains permanent. |
 
@@ -101,6 +101,12 @@ already says the research/backtest-oriented chat alone does not satisfy Cuadrao.
 Preserve useful Argus services and the existing single runtime until its separate
 assignment explicitly changes the architecture. No financial write follows from
 a hypothetical question or unapproved model output.
+
+All customer-journey issues use the [customer work removed](../PRIVATE_LAUNCH_RUNBOOK.md#customer-work-removed)
+acceptance questions. The [scope matrix issue](https://github.com/lagarcess/argus/issues/818)
+records each owner, baseline and completion evidence. Use the existing
+[consumer tracker](https://github.com/lagarcess/argus/issues/817); no second queue
+is created. Tool retirement must follow the architecture's reuse boundary.
 
 ### Parallel execution and priority
 

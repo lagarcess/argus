@@ -471,3 +471,18 @@ does not select unresolved business pricing, fiscal providers, the full space
 model, Gmail import or the Cuadrao agent architecture. The source originals stay
 unchanged. Feature catalog priorities do not add launch requirements, and this
 documentation authorization does not authorize runtime, deployment or provider work.
+
+## October 4, 2026: runtime reuse and customer work removed
+
+The founder clarified that Argus already uses Render Workflows for backtests and
+approved extending that foundation rather than evaluating it as a new platform.
+The subsequent alignment request records an ongoing Cuadrao conversation as the
+experience direction and requires the existing issues to measure customer work
+removed.
+
+The [architecture reuse map](../ARCHITECTURE.md#cuadrao-reuse-decisions),
+[continuous conversation requirements](argus-minimum-viable-ecosystem-experience.md#continuous-cuadrao-conversation)
+and [journey acceptance questions](../PRIVATE_LAUNCH_RUNBOOK.md#customer-work-removed)
+own the details. #826 still owns the bounded runtime contract before #827
+implementation. Reuse does not claim memory or voice is connected, choose a new
+schema, authorize paid evaluations or permit deletion of active Argus services.

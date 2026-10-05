@@ -693,7 +693,7 @@ The server is the real boundary in both flavors. A consumer build that called bu
 | `NEXT_PUBLIC_APP_ENV` | Set on `argus-app`; no reader | Render | Drop | Set but unused |
 | `NODE_ENV`, `NEXT_DEV_ALLOWED_ORIGINS`, `NEXT_DIST_DIR` | `web/next.config.ts`, `web/proxy.ts` | Next.js | Keep | Framework |
 | **Render Workflows: backtest jobs** | | | | |
-| `ARGUS_BACKTEST_JOBS_{DISPATCH,SHADOW}_ENABLED`, `ARGUS_BACKTEST_JOBS_{GLOBAL,USER}_{QUEUED,RUNNING}_LIMIT` (4), `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED`, `ARGUS_BACKTEST_WORKFLOW_TASK`, `ARGUS_BACKTEST_REAL_WORKFLOW_TASK`, `ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS` (10) | `api/chat/backtest_jobs.py`, `domain/backtest_admission.py`, `workflows/main.py` | Render Workflows | Drop (blocked) | Backtests |
+| `ARGUS_BACKTEST_JOBS_{DISPATCH,SHADOW}_ENABLED`, `ARGUS_BACKTEST_JOBS_{GLOBAL,USER}_{QUEUED,RUNNING}_LIMIT` (4), `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED`, `ARGUS_BACKTEST_WORKFLOW_TASK`, `ARGUS_BACKTEST_REAL_WORKFLOW_TASK`, `ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS` (10) | `api/chat/backtest_jobs.py`, `domain/backtest_admission.py`, `workflows/main.py` | Render Workflows | Retire old tasks only after reuse audit | Backtest-specific settings; preserve Render Workflows for assigned Cuadrao job families. |
 | `ARGUS_RENDER_WORKFLOW_PROOF_{TASK,POLL_SECONDS,TIMEOUT_SECONDS}`, `ARGUS_RENDER_WORKFLOW_RELEASE_{COMMIT,VERSION_ID}`, `ARGUS_WORKFLOW_PROOF_{PLAN,USER_ID}`, `ARGUS_WORKFLOW_DATABASE_URL`, `RENDER_TASK_RUN_ID`, `RENDER_USE_LOCAL_DEV`, `RENDER_LOCAL_DEV_URL` (11) | `workflows/trigger_proof.py`, `workflows/proof.py`, `workflows/main.py`, `api/chat/backtest_jobs.py`, release profile, GitHub secret `ARGUS_WORKFLOW_DATABASE_URL` | Render Workflows | Drop (blocked) | Backtest proof harness. Re-create the pattern as `CUADRAO_*` with the extraction/import task family (§B4). |
 | `ARGUS_STALE_JOBS_SUPABASE_URL`, `_SERVICE_ROLE_KEY` | `scripts/ops/stale_backtest_jobs.py`, `.github/stale-backtest-jobs.sh` | Supabase | Drop (blocked) | Backtest job reaper |
 | `ARGUS_BENCHMARK_LIVE_PROVIDER`, `ARGUS_ENABLE_EXECUTION_REALISM` | `scripts/benchmarks/backtest_infra_benchmark.py`, `domain/backtesting/config.py` | none | Drop (blocked) | Backtests |
@@ -745,11 +745,11 @@ The server is the real boundary in both flavors. A consumer build that called bu
 | `ARGUS_API_URL`, `ARGUS_WEB_URL`, `ARGUS_AUTH_ENABLED`, `ARGUS_LOCAL_BUNDLE_IDENTIFIER`, `CUADRAO_DESIGN_PREVIEW` | `ios/Config/*.xcconfig`, Info.plist, `NativeAuthConfiguration.swift`, `Cuadrao/CuadraoDesignPreview.swift` | own (iOS) | Keep (4 →C) | iOS build settings |
 | `NEXT_PUBLIC_ARGUS_API_URL`, `NEXT_PUBLIC_ENABLE_SPANISH` | `web/lib/argus-api-transport.ts`, `web/lib/guest-captcha.ts`, `web/lib/language-features.ts` | own (web) | Keep (API URL →C) | Web shell |
 | **Argus chat, share pages and guest (own)** | | | | |
-| `ARGUS_CHECKPOINTER_MODE`, `ARGUS_CONTEXT_PACKETS_ENABLED`, `ARGUS_CONTEXT_PACKET_BUDGET_SECONDS`, `ARGUS_RUNTIME_EVENT_{TIMEOUT,KEEPALIVE}_SECONDS`, `ARGUS_RUNTIME_STREAM_WORKER(S)` (2), `ARGUS_TURN_DEADLINE_SECONDS`, `ARGUS_TURN_CALL_ALLOWANCE`, `ARGUS_REGISTERED_DAILY_TURN_CEILING`, `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`, `ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS` (12) | `api/chat/*`, `api/state.py`, `agent_runtime/turn_execution.py`, `api/routers/agent.py`, `domain/edit_contract_config.py`, `domain/usage_limits.py` | own | Drop (blocked) | Web chat runtime (`web/lib/chat-runtime-timeout.ts` too) |
+| `ARGUS_CHECKPOINTER_MODE`, `ARGUS_CONTEXT_PACKETS_ENABLED`, `ARGUS_CONTEXT_PACKET_BUDGET_SECONDS`, `ARGUS_RUNTIME_EVENT_{TIMEOUT,KEEPALIVE}_SECONDS`, `ARGUS_RUNTIME_STREAM_WORKER(S)` (2), `ARGUS_TURN_DEADLINE_SECONDS`, `ARGUS_TURN_CALL_ALLOWANCE`, `ARGUS_REGISTERED_DAILY_TURN_CEILING`, `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`, `ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS` (12) | `api/chat/*`, `api/state.py`, `agent_runtime/turn_execution.py`, `api/routers/agent.py`, `domain/edit_contract_config.py`, `domain/usage_limits.py` | own | Reconcile before retirement | Old web-chat configuration (`web/lib/chat-runtime-timeout.ts` too). Preserve settings needed by the reused orchestration/checkpoint owner; #826 decides the migration. |
 | `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED`, `NEXT_PUBLIC_OMNISEARCH_ENABLED` | `api/public_excerpts.py`, `web/lib/private-alpha-flags.ts` | own | Drop (blocked) | `/r/` share pages, chat omnisearch |
 | `ARGUS_GUEST_ACCESS_ENABLED`, `NEXT_PUBLIC_GUEST_ACCESS_ENABLED`, `ARGUS_GUEST_SESSION_DAILY_TURN_CEILING`, `ARGUS_VISITOR_KEY_SECRET` | `api/guest_access.py`, `domain/usage_limits.py`, `domain/visitor_usage.py` | own | Drop (blocked) | Guest flow |
 | `ARGUS_TITLE_AUTOGEN_ENABLED`, `ARGUS_TITLE_AUTOGEN_TIMEOUT_MS` | Set on `argus-api`; **no reader** | own | Drop | Set but unused. Not blocked. |
-| `ARGUS_ENABLE_PERSONALIZATION_MEMORY`, `ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL`, `ARGUS_MEMORY_EMBEDDING_{MODEL,DIMENSIONS,TIMEOUT_SECONDS}`, `ARGUS_MEMORY_VECTOR_COLLECTION`, `MEM0_TELEMETRY` (7) | `memory/service.py`, `api/personalization_memory*.py`, `llm/memory_embedding.py` | Mem0 + Perplexity embeddings | Drop (blocked) | Chat memory. Dropping it doesn't touch the Perplexity key. |
+| `ARGUS_ENABLE_PERSONALIZATION_MEMORY`, `ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL`, `ARGUS_MEMORY_EMBEDDING_{MODEL,DIMENSIONS,TIMEOUT_SECONDS}`, `ARGUS_MEMORY_VECTOR_COLLECTION`, `MEM0_TELEMETRY` (7) | `memory/service.py`, `api/personalization_memory*.py`, `llm/memory_embedding.py` | Mem0 + Perplexity embeddings | Reconcile before retirement | Preserve reusable memory code and controls for #826. Existing settings may retire only after the successor and active consumers are established; Cuadrao memory is not thereby enabled. |
 | **GitHub Actions, canary, benchmarks** | | | | |
 | `ARGUS_CANARY_{API_URL,APP_URL,EMAIL,PASSWORD,SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY}` | `.github/canary-render.sh`, `.github/workflows/private-alpha-canary.yml` (3 are GitHub secrets), `scripts/benchmarks/render_internet_benchmark.py` | GitHub | Keep →C | Deploy canary. Re-point to cuadrao.ai; the canary inbox moves (§B3.2 step 4). |
 | `ARGUS_DISPOSABLE_DATABASE_URL`, `ARGUS_LOCAL_SUPABASE_{URL,ANON_KEY,SERVICE_ROLE_KEY}` | `.github/workflows/ci.yml`, real-PG tests | GitHub | Keep →C | CI real-Postgres matrix |
@@ -762,6 +762,13 @@ The server is the real boundary in both flavors. A consumer build that called bu
 
 Android (`mobile/android/app/build.gradle.kts` reads `API_URL` and `SUPABASE_ANON_KEY`) stays parked with Android (§B1.1).
 
+**October 4 reuse correction.** The [canonical reuse decisions](../ARCHITECTURE.md#cuadrao-reuse-decisions)
+govern the inventory above. Its Drop labels for old workflow/chat/memory tasks and
+settings are retirement candidates, not authorization to delete Render Workflows,
+LangGraph or reusable memory foundations. Reconcile each consumer and replacement
+through [#826](https://github.com/lagarcess/argus/issues/826) before removal. Existing
+service availability and secret consumers must be verified separately.
+
 **Safe removal order [proposed].** For every Drop or Park, in this order:
 1. **Stop reading it in code**, in one PR per provider family. Keep the Park code paths behind a default-off mode. Don't make them fail at import. Update `.env.example`, the release profile (`.github/private-alpha-release-profile.json`), `.github/argus-env.sh` and `.github/render-env-sync.sh` and the pinned tests in the same PR, because the release-profile tests fail on drift. Remove the asset check from `/ops` readiness before parking Alpaca.
 2. **Promote it** through the normal integration → `main` path, and let one deploy run clean.
@@ -771,7 +778,7 @@ Android (`mobile/android/app/build.gradle.kts` reads `API_URL` and `SUPABASE_ANO
 
 **What can go now, and what waits for the Argus freeze-then-retire:**
 - **Not blocked (16 names):** the 3 env-name aliases, `NEXT_PUBLIC_APP_ENV`, `NEXT_PUBLIC_POSTHOG_KEY`, `ARGUS_TITLE_AUTOGEN_*` ×2, `ARGUS_DOCUMENT_EXTRACTION_MAX_{BYTES,PAGES}`, the `INTERPRETATION`/`CHAT_COMPOSER` timeouts and the 5 dead `.env.example` names. The Park group (12) can move now, but only if Lucas accepts that the frozen arguschat.ai chat loses backtests and market answers. Otherwise park it together with the chat freeze.
-- **Blocked until arguschat.ai `/chat` is retired:** chat runtime, memory, research-rail web flag, chat model tiers and task timeouts, share pages, browser canary, load and alpha metrics. Blocked by the backtest retirement: Render Workflows backtest jobs, stale-job reaper, discovery and execution realism. Blocked by the guest deletion PR: the guest flags, `ARGUS_VISITOR_KEY_SECRET`, the guest OpenRouter key and `ARGUS_GUEST_QA_*`.
+- **Blocked until arguschat.ai `/chat` is retired:** old chat-specific settings after the reuse assessment, research-rail web flag, chat model tiers and task timeouts, share pages, browser canary, load and alpha metrics. Blocked by the backtest retirement: Render Workflows backtest jobs, stale-job reaper, discovery and execution realism. Blocked by the guest deletion PR: the guest flags, `ARGUS_VISITOR_KEY_SECRET`, the guest OpenRouter key and `ARGUS_GUEST_QA_*`.
 - **The `→C` renames ride on §B3.2 step 7** (read `CUADRAO_*` with an `ARGUS_*` fallback, flip Render, drop the fallback). Do the renames after the drops, so dead names never get a `CUADRAO_*` twin.
 
 ---
@@ -814,7 +821,7 @@ Sizes [estimate]: S = 1 eng-week or less, M = 2-4, L = 5+. **Now** = buildable n
 | Entitlement service (§B5) | Now | M | Entity for the live providers | Yes |
 | Scoped storage (#778 plus space paths) | Now | M | Space model step 1 | Yes |
 | Audit log and approvals framework | Now | M | Space model | Yes |
-| Durable jobs beyond backtests | Now | M | Render Workflows exists | Yes |
+| Durable jobs beyond backtests | Now | M | Extend existing Render Workflows under the [reuse decisions](../ARCHITECTURE.md#cuadrao-reuse-decisions); receipt recovery acceptance in #823 | Yes |
 | Agentic Cuadrao: financial read and propose tools | Now (OpenRouter), behind the AI consent gate (#813) | L | Bounded runtime assignment (#813), space-scoped retrieval | After the manual services |
 
 **Consumer (personal + household, iOS)**

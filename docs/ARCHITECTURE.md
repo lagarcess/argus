@@ -97,6 +97,37 @@ The blueprint's entities, queues, MCP tools and runtime mechanisms remain
 proposals until their scoped technical contracts are approved. Its diagrams do
 not authorize another active chat brain or decide Cuadrao's future agent runtime.
 
+## Cuadrao reuse decisions
+
+Founder-aligned October 4, 2026. Reuse the existing foundations below. This is
+implementation direction, not proof of connected availability or permission to
+enable a provider. [#826](https://github.com/lagarcess/argus/issues/826) owns the
+bounded runtime contract and its migration plan.
+
+| Foundation | Direction | What remains to deliver |
+| --- | --- | --- |
+| Render Workflows | Extend the existing backtest execution foundation to assigned receipt, import and export jobs. | Separate task families, persisted product state, duplicate-safe effects, bounded retries and recovery after interruption. Document preparation currently uses FastAPI background tasks; this extension is not already delivered. |
+| LangGraph | Start from the existing orchestration and checkpointing foundation. | Define Cuadrao's state and action contract. Preserve the active Argus runtime until its authorized transition; do not start a second chat brain per client. |
+| Memory, including existing Mem0 work | Preserve reusable code and controls for the runtime assessment. | Decide scoped recall, consent, revocation, deletion and launch inclusion. Existing code does not establish active or approved Cuadrao memory. |
+| Supabase and financial services | Keep identity, storage and canonical financial operations under existing owners. | Complete the approved space contract and share the same actions across manual and conversational entry points. |
+| OpenRouter, Perplexity and Grok voice | Retain the [selected provider direction](specs/argus-decision-log.md#ai-providers). | Connect only assigned capabilities with shared consent and server-side credentials. Voice selection does not settle first-release inclusion. |
+| Resend and Apple push | Keep Resend for approved email uses; use direct APNs for iOS push. | Deliver the assigned inbox/push journey with private payloads. Email templates do not expand consumer Updates or household invitation channels. |
+
+React Email and react-pdf are candidates for their assigned template and business
+PDF work, not new consumer launch dependencies. Specialist OCR needs evidence of
+lower total correction effort and cost against the existing vision path. Trigger.dev,
+Novu, pgvector and framework replacement remain outside the launch plan unless a
+measured gap justifies a separately scoped decision. No library license or copied
+application-code rights are established by this reuse map.
+
+Retirement inventories describe old tasks and configuration, not blanket deletion
+of these foundations. Before removal, name current callers, the replacement
+owner, retained state and migration evidence. A retired backtest task does not
+retire Render Workflows; a retired chat route does not authorize deletion of
+checkpoints or memory infrastructure needed by its successor. Preserve current
+behavior until its authorized transition and verify secret consumers before
+revocation or renaming.
+
 ## Agent Quality Pillars
 
 The four assistant-quality pillars (Intelligence, Evaluation, Platform, User
