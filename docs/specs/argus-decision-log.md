@@ -524,3 +524,10 @@ own license review. Existing #818/#822/#823/#824 track the work. Pattern
 suggestions follow usable recurring setup; forecasting-library selection needs
 measured benefit. No runtime, provider, hosted activation or additional launch
 blocker is created by this documentation lock.
+
+
+## October 5, 2026: Apple session revocation applicability
+
+The founder approved Apple credential-state checks for sessions signed in with Apple. Known email and Google sessions retain access when the account also links Apple. Older mixed-provider sessions whose sign-in method is unknown require one explicit sign-in to establish it. Linked identities do not prove the current session's sign-in method.
+
+The existing native session journal owns successful grant provenance. Other callers derive admission from SessionController; they do not infer a provider from email, linked identities or a second cache. PR864 carries the implementation and local proof, pending its exact-head CI and integration landing. Real Apple authorization/revocation, hosted settings and feature activation remain separate gates. This decision does not select #798's orphan or Hide My Email linking policy.

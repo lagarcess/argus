@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "resources": [
+    {
+      "resource": "postgres60332",
+      "container": "supabase_db_cuadrao-trust-20261005",
+      "created_by": "root",
+      "physical_owner": "root",
+      "lease_owner": null,
+      "worker_stop_allowed": false,
+      "release_action": "mark lease_owner null; preserve running container",
+      "health": "healthy after exact-container restart"
+    },
+    {
+      "resource": "mac_simulator_build",
+      "physical_owner": "shared Mac",
+      "lease_owner": "Counsel",
+      "worker_stop_allowed": false,
+      "simulator": "C0F6EE74-6F69-4F0B-B614-2DB422ADDB8A",
+      "release_action": "Counsel confirms combined checks finished; no new reservation yet"
+    }
+  ]
+}

@@ -147,6 +147,10 @@ off the launch critical path.
 
 ### Release gates still open
 
+October 5 Trust checkpoint through integration `7018e0edebbc370b999005a857230bf3c3a1ad8b` includes [#851](https://github.com/lagarcess/argus/pull/851), [#844](https://github.com/lagarcess/argus/pull/844), [#846](https://github.com/lagarcess/argus/pull/846), [#858](https://github.com/lagarcess/argus/pull/858) and [#857](https://github.com/lagarcess/argus/pull/857). These slices add release sign-in safeguards, local deletion recovery proof, Apple credential subject binding and official button appearance. They do not complete their parent issues or enable social sign-in/deletion. [The run record](../reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md) owns exact lineage, independent proof, current integration checks and the remaining queue.
+
+The founder selected the existing approved Preview3427 interface for mobile recovery. Counsel owns that presentation work on `codex/cuadrao-connected-preview`; Trust preserves the session, consent and deletion action owners. Money or auth tests alone do not prove full UI acceptance. New worker-head CI is pending during the GitHub runner incident. Phone, hosted/provider proof and legal approval remain open.
+
 - [x] October 5 overnight landing: #835, #837, #838, #836 and #839 merged with
   independent reviews; integration `19f0dc3af`. Bounded slices of #822 and #824
   (recurring movement to Home Upcoming to confirmed payment; Home movement detail

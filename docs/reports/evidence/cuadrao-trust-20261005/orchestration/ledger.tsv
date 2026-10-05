@@ -8,3 +8,13 @@ pr	sha	verdict	evidence	verifier	ts
 847	9cf4d9f9b3b45de257b68b5a49269703f7c995f0	unit-test-verified	https://github.com/lagarcess/argus/pull/847#issuecomment-5999893237	gpt-6-astra	2026-10-05T18:11:38.762Z
 849	5a20a16d0f4bad89c0190940cdf62b4c10f4901a	unit-test-verified	https://github.com/lagarcess/argus/pull/849#issuecomment-5999893593	gpt-6-astra	2026-10-05T18:11:38.780Z
 858	ad2e7d84236bc2bc0f0ffb82d3e0c9e6b9f6f04d	unit-test-verified	https://github.com/lagarcess/argus/pull/858#pullrequestreview-5418732816	gpt-6-astra	2026-10-05T18:11:38.797Z
+864	9419001712dc9f070741909312982f19d1e08e72	live-ui-verified	https://github.com/lagarcess/argus/pull/864#pullrequestreview-5419906859	gpt-6-astra	2026-10-05T20:12:31.972Z
+847	0334808e08e41baa0305fe28a8c167dbb89ebbbc	unit-test-verified	https://github.com/lagarcess/argus/pull/847#issuecomment-6001886300	gpt-6-astra	2026-10-05T20:16:34.482Z
+849	20c2252d0e97197ef1e200b3063750191432f371	unit-test-verified	https://github.com/lagarcess/argus/pull/849#issuecomment-6001853802	gpt-6-astra	2026-10-05T20:16:34.565Z
+854	95c01e8c08d8315f5cb2e5439c70e0b467d223e8	unit-test-verified	https://github.com/lagarcess/argus/pull/854#issuecomment-6001859083	gpt-6-astra	2026-10-05T20:16:34.648Z
+845	bdb276c656e160ca39c419d9d61a2dc1ec1fcebc	unit-test-verified	https://github.com/lagarcess/argus/pull/845#issuecomment-6001966060	gpt-6-astra	2026-10-05T20:16:34.729Z
+862	d11390cd816688463f4669ad90471685d427c24d	unit-test-verified	https://github.com/lagarcess/argus/pull/862#pullrequestreview-5419720370	gpt-6-astra	2026-10-05T20:16:34.820Z
+863	d2347166f78df1a1e67f52ab194936ee14ab210b	unit-test-verified	https://github.com/lagarcess/argus/pull/863#issuecomment-6001780582	gpt-6-astra	2026-10-05T20:27:06.578Z
+865	45939369dcf915660c43a83d3cf54d1348ee4dc3	unit-test-verified	https://github.com/lagarcess/argus/pull/865#issuecomment-6002222420	gpt-6-astra	2026-10-05T20:27:06.670Z
+851	c4f9a08b6fc9cf429b47c4cd024183db02fcd959	unit-test-verified	https://github.com/lagarcess/argus/pull/851#issuecomment-5998839785	gpt-6-astra	2026-10-05T20:38:19.893Z
+868	511660c642b6208de46bf1bd3990f9c70b756517	unit-test-verified	https://github.com/lagarcess/argus/pull/868#issuecomment-6002426471	gpt-6.1-sol	2026-10-05T20:38:20.238Z
