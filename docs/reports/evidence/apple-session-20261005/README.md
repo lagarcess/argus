@@ -1,6 +1,6 @@
 # Apple session validation evidence — 2026-10-05
 
-Candidate source: `8d2d5acd427a3ce94f99d70a340ae8125abc48ff`.
+Candidate source: `caa7e702705a78ae925f2e06d749d3e524d22f6f`.
 Original integration base: `f5c83cd88a0af56dc8154a89c6ea4f75d9c518ce`.
 Branch: `codex/cuadrao-apple-session-20261005`.
 Fetched integration: `7018e0edebbc370b999005a857230bf3c3a1ad8b`.
@@ -22,25 +22,29 @@ and physical Apple authorization remain separate gates.
 The candidate was committed before the final simulator run. The later evidence
 commit changes only this directory. Candidate tree hashes:
 
-- `ios`: `11e0240eeaab6b428aacbbd459d8bddcd8d04d62`
+- `ios`: `a4e7ba0644e59421067a193e20876f8d2fd4f390`
 - `src`: `33fc11bd35d0a0d99c11a969aec22f787b853f16`
 - `tests`: `4e56653201b6747beff980f0328af322960def69`
 
 ## Verification
 
-Final simulator build and four UI tests passed in 80.537 seconds, zero failures.
+Final simulator build and four UI tests passed in 80.176 seconds, zero failures.
 Screenshots capture English/Spanish capture failure, held validation with both
 recovery actions, revocation, known email access, explicit sign-in again, and
 notification coalescing. Focused backend: **79 passed, 70 deselected**.
 
-- ArgusSession: **131 executed, 127 passed, four skipped, zero failures**.
+- ArgusSession: **136 executed, 132 passed, four skipped, zero failures**.
   This includes pending-journal priority, unreadable Keychain reads, canonical
   subject/owner validation, grant method refresh/epoch ownership, rollback-compatible
   SDK decoding, old SDK metadata removal, capture bounds and one-attempt semantics.
+  It also covers immediate signal admission, stale checker answers, capture during
+  a notification, adoption, and failed Keychain reads.
 - Financial message mappings: **one passed**, testing both affected mappers at
   422 and 503. Household models: **50 passed**, including its 503 fallback.
 - Mocked eval README's ten-file command: **272 passed** on the reconciled tree;
-  no provider calls. Modularity budget: **zero violations** on that tree.
+  no provider calls. Modularity budget: **zero violations**, rerun on the final
+  reconciled source. Backend and eval source files did not change in the final
+  native admission fix; their evidence is retained.
 - Native provider configuration: **22 passed**, 11 each in Debug and Release,
   preserving release force-off and Google dependence on Apple.
 - Real PostgreSQL projection: **four passed** using an explicit synthetic
@@ -70,8 +74,10 @@ later button action can overtake its setup.
 Only Auth/API HTTP and Apple credential state are synthetic. A held checker
 proves a revocation notification arriving while the actual model is busy is
 retained and causes a second check followed by retirement. The UI test observes
-that final state; it does not prove atomic dispatch exclusion between checks. The harness resets only
-its dedicated Keychain service when the explicit test launch argument is present.
+that final state. A separate [direct actor probe](notification-admission/README.md)
+pauses the queued restore and proves the protected request count changes from one
+before the fix to zero after it. A positive control dispatches once in both runs.
+The harness resets only its dedicated Keychain service when the explicit test launch argument is present.
 It is excluded from release builds.
 
 ## Reproduction
@@ -97,19 +103,15 @@ existing local cache, never modified in that cache.
 Final simulator build and test, with the loopback fake started by
 `python3 ios/scripts/auth/apple-session-server.py`:
 
-The same command first ran with `build-for-testing` instead of
-`test-without-building` and without `-only-testing`/`-resultBundlePath`; the
-candidate commit did not change any built source bytes.
-
 ```sh
-xcodebuild test-without-building -project ios/ArgusFoundation.xcodeproj \
+xcodebuild test -project ios/ArgusFoundation.xcodeproj \
   -scheme ArgusFoundation -configuration Debug \
-  -destination 'platform=iOS Simulator,id=E027949A-2B75-4679-8D82-8F04FD08E735' \
+  -destination 'platform=iOS Simulator,id=1F378304-B575-47B3-AD39-5A1DFE87047D' \
   -derivedDataPath /private/tmp/cuadrao-apple-session-xcode \
   -clonedSourcePackagesDirPath /private/tmp/cuadrao-apple-session-xcode-packages \
   -disableAutomaticPackageResolution -parallel-testing-enabled NO \
   -only-testing:ArgusFoundationUITests/AppleSessionJourneyUITests \
-  -resultBundlePath /private/tmp/cuadrao-apple-session-controls-final.xcresult \
+  -resultBundlePath /private/tmp/cuadrao-apple-session-admission-journeys.xcresult \
   CODE_SIGNING_REQUIRED=NO ARGUS_LOCAL_BUNDLE_IDENTIFIER=local.argus.apple-session-proof
 ```
 
@@ -171,6 +173,10 @@ one redundant test comment removed. The independent app review and final harness
 on the final source after the stale-modal fix, truthful copy changes, and shared
 control ordering fix. No unresolved findings, MUST KILL flags, or comment
 removals remain.
+The later notification admission delta `371fffc961..caa7e7027` also received a
+clean independent review. It added and removed zero source comments; no MUST KILL
+or deslop finding remained. The confirmed race, red test and zero-dispatch proof
+are recorded in the linked admission report.
 This report is acceptance evidence, not a merge, deployment or release approval.
 API timeout wording is documentation truth only; it does not claim a hard total
 wall-clock deadline or cancel an already requested Apple revocation.
@@ -178,7 +184,10 @@ wall-clock deadline or cancel an already requested Apple revocation.
 Local logs use the prefix `/private/tmp/cuadrao-apple-session-`: `swift-compatible.log`,
 `pending-priority.log`, `compatible-red.log`, `financial-models3.log`,
 `household-models.log`, `mocked-evals.log`, `real-auth.log`, `backend-final.log`,
-`controls-final.log`, `build-controls.log`, `provider-configuration.log`, `mocked-merged.log`, `modularity.log`. Screenshots below are committed durable artifacts from the final run.
+`controls-final.log`, `build-controls.log`, `provider-configuration.log`, `mocked-merged.log`, `modularity.log`.
+Final admission logs: `admission-journeys.log`, `interval-before4.log`,
+`interval-after.log`, `admission-modularity.log`. Package logs use
+`/private/tmp/cuadrao-apple-admission-{red,green,suite}.log`. Screenshots below are committed durable artifacts from the final run.
 
 
 ## Screenshots
@@ -198,14 +207,15 @@ identifiers are in `attachments.json`.
 
 ## Cleanup and handoff
 
-The synthetic server was stopped. The owned simulator
-`E027949A-2B75-4679-8D82-8F04FD08E735` was shut down and deleted; its absence was
-verified. All owned build/test processes completed or were explicitly stopped.
+The synthetic server was stopped and port 59920 was verified closed. The final
+owned simulator `1F378304-B575-47B3-AD39-5A1DFE87047D` was shut down and deleted;
+its absence was verified. The earlier owned simulator
+`E027949A-2B75-4679-8D82-8F04FD08E735` was also removed at its checkpoint. All owned build/test processes completed or were explicitly stopped.
 PostgreSQL was released after scoped teardown, and the Mac slot was released
 after final evidence export. Existing external caches and unrelated fixtures were
 not modified. No source edits remain after the final source candidate; only this
-evidence directory is added by the final commit.
+evidence directory changes in the final commit.
 
 The parent owns PR publication, terminal CI, and any later #853 reconciliation.
-No PR, push, merge into integration, deployment, or provider activation was done
-by this implementation worker.
+The implementation workers did not push or merge. Publication is handled by the
+parent. Integration review, merge and activation remain separate actions.
