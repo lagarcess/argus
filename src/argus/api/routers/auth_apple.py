@@ -15,7 +15,6 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from argus.api import state as api_state
 from argus.api.apple_sign_in import apple_credentials_service, capture_enabled
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context
@@ -26,6 +25,7 @@ from argus.domain.apple_sign_in.credentials import (
     AppleCaptureNotStored,
     AppleCredentialService,
     AppleIdentityMismatch,
+    AppleIdentityMissing,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["auth"])
@@ -78,6 +78,12 @@ def _problem(description: str) -> dict:  # type: ignore[type-arg]
         400: _problem(
             "`apple_authorization_invalid`: Apple says the code expired, was used, or is malformed."
         ),
+        401: _problem("The session is invalid or expired."),
+        403: _problem("Registered-account or private-alpha access is required."),
+        503: _problem(
+            "`apple_sign_in_unconfigured` or `apple_sign_in_unavailable`: "
+            "identity could not be verified, exchange failed, or capture was not stored."
+        ),
         404: {
             "description": (
                 'Capture is off: `{"detail": "Not Found"}`, the plain answer of '
@@ -120,13 +126,19 @@ def capture_apple_authorization_code(
             detail="Too many Apple sign-in attempts. Please wait before trying again.",
             headers={"Retry-After": str(retry_after)},
         )
-    subject = _linked_apple_subject(request, user.id)
     try:
         service.capture(
             user_id=user.id,
-            apple_subject=subject,
             authorization_code=body.authorization_code,
         )
+    except AppleIdentityMissing:
+        raise problem(
+            request,
+            status_code=409,
+            code="apple_identity_missing",
+            title="Apple Identity Missing",
+            detail="This account is not signed in with Apple.",
+        ) from None
     except AppleIdentityMismatch:
         raise problem(
             request,
@@ -164,48 +176,3 @@ def capture_apple_authorization_code(
             detail="Apple could not be reached. Please try again.",
         ) from None
     return Response(status_code=204)
-
-
-def _linked_apple_subject(request: Request, user_id: str) -> str:
-    """The Apple ``sub`` Supabase Auth linked to this user, read server-side."""
-
-    gateway = api_state.supabase_gateway
-    if gateway is None:
-        raise problem(
-            request,
-            status_code=503,
-            code="apple_sign_in_unconfigured",
-            title="Apple Sign-In Unavailable",
-            detail="Apple token capture is not configured.",
-        )
-    try:
-        auth_user = gateway.get_auth_user_by_id(user_id)
-    except Exception:
-        raise problem(
-            request,
-            status_code=503,
-            code="apple_sign_in_unavailable",
-            title="Apple Sign-In Unavailable",
-            detail="Argus could not read this account. Please try again.",
-        ) from None
-    subject = apple_subject(auth_user)
-    if subject is None:
-        raise problem(
-            request,
-            status_code=409,
-            code="apple_identity_missing",
-            title="Apple Identity Missing",
-            detail="This account is not signed in with Apple.",
-        )
-    return subject
-
-
-def apple_subject(auth_user: dict) -> str | None:  # type: ignore[type-arg]
-    for identity in auth_user.get("identities") or ():
-        if not isinstance(identity, dict) or identity.get("provider") != "apple":
-            continue
-        data = identity.get("identity_data")
-        subject = data.get("sub") if isinstance(data, dict) else None
-        if isinstance(subject, str) and subject:
-            return subject
-    return None

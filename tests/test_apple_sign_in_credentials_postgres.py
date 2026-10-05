@@ -56,6 +56,11 @@ def users():  # noqa: ANN201
                 "insert into auth.users (id, email) values (%s, %s)",
                 (user_id, f"siwa-{label}-{user_id}@example.test"),
             )
+        connection.execute(
+            "insert into auth.identities (id, user_id, provider, provider_id, identity_data) "
+            "values (%s::uuid, %s::uuid, 'apple', %s, %s::jsonb)",
+            (str(uuid4()), ids["apple"], SUBJECT, json.dumps({"sub": SUBJECT})),
+        )
     yield ids
     with psycopg.connect(DSN) as connection:
         connection.execute(
@@ -68,7 +73,15 @@ def users():  # noqa: ANN201
 
 @pytest.fixture
 def pool():  # noqa: ANN201
-    made = psycopg_pool.ConnectionPool(DSN, min_size=0, max_size=4, open=True)
+    application_name = f"apple-credentials-test-{uuid4()}"
+    made = psycopg_pool.ConnectionPool(
+        DSN,
+        min_size=0,
+        max_size=4,
+        open=True,
+        name=application_name,
+        kwargs={"application_name": application_name},
+    )
     yield made
     made.close()
 
@@ -223,7 +236,7 @@ def test_capture_then_revoke_against_the_migration(repo, users) -> None:  # noqa
     user = users["apple"]
 
     refresh = apple.grant()
-    service.capture(user_id=user, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=user, authorization_code="c.code")
     row = repo.get(user_id=user)
     assert refresh.encode() not in row.secret_ciphertext
     assert row.key_id == box.key_id  # secret_key_fingerprint, read back
@@ -264,7 +277,7 @@ def test_invalid_grant_on_revoke_deletes_the_row_and_frees_the_user(repo, users)
     service, apple = _service(repo, SecretBox(os.urandom(32)))
     user = users["apple"]
     apple.grant()
-    service.capture(user_id=user, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=user, authorization_code="c.code")
 
     apple.revoke_responses.append((400, {"error": "invalid_grant"}))
     assert service.revoke(user_id=user) is RevokeOutcome.ALREADY_REVOKED
@@ -329,7 +342,7 @@ def test_discard_keeps_a_readable_row_and_the_restrict_key(repo, users) -> None:
     service, apple = _service(repo, SecretBox(os.urandom(32)))
     user = users["apple"]
     apple.grant()
-    service.capture(user_id=user, apple_subject=SUBJECT, authorization_code="c.code")
+    service.capture(user_id=user, authorization_code="c.code")
 
     assert service.discard_unreadable(user_id=user) is DiscardOutcome.READABLE
     assert repo.get(user_id=user) is not None
