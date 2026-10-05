@@ -3197,7 +3197,7 @@ confirmation, and any other field is a `422`:
 The command runs the Lane 6 order (`docs/specs/lanes/account-deletion-fk-census.md`
 and #787). It hands over or closes the person's households and plans, keeps their
 amounts in other people's plans under a nameless former-member placeholder (one
-per household or standalone shared group, shown as "Former member" or
+per household or [standalone shared group](specs/lanes/account-deletion-fk-census.md#sharing-scopes-and-the-standalone-shared-group), shown as "Former member" or
 "Exmiembro" in the viewer's language), deletes everything else of theirs,
 revokes provider tokens, and deletes the auth user. A retry resumes the same run.
 

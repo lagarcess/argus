@@ -1,9 +1,170 @@
 # Argus private iPhone execution manifest
 
-**Updated:** October 1, 2026.
-**Execution state:** Tip lineage includes [PR #766](https://github.com/lagarcess/argus/pull/766) Household native consent + canonical financial activity (product squash `079ec8d819f8e2513cc624bfa7a4eb9ca60c7627` from Exact head `04831ccb12a46b89a3cd5f5391139d3589321815` onto tip `09ce4e0a…`), [PR #760](https://github.com/lagarcess/argus/pull/760) Connected Cuadrao auth/Home (product squash `819870e6…`; docs landing `#765`), and [PR #763](https://github.com/lagarcess/argus/pull/763) default-off Household membership API (`fbcc399b…`; docs landing `#764`). Household remains server-default-off. Physical iPhone/internet delivery and hosted enablement remain pending. Design checkpoints remain founder-named only. Chat/voice stack remains parked. All landed personal financial journeys and their demonstrations remain preserved. No deployment, hosted enablement, paid providers, signing or `main` promotion is authorized by these landings.
+**Updated:** October 4, 2026.
+**Execution state:** The runtime baseline remains `a8c37d3a182fbdb3228f6003272418e65286bc1a`. Documentation PRs #808, #813, #815 and #814 landed through `883d289ff8f9c4261f63078d10121de7fb371789`; see the [landing record](../reports/2026-10-04-cuadrao-docs-integration-landing.md). Candidate `03a33ef2` has a completed UI suite (119 passed, 48 skipped, zero failures) and completed screenshot classification. Claude's ledger records phone profiling build 3427; signed candidate build 3428 is saved but uninstalled. The founder has taken the phone offline. The combined candidate has not landed on integration; connected physical-phone acceptance and external TestFlight readiness remain open. The current mobile sequence and completion record are below. Older dated sections retain their evidence and contract history.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
+
+## Current mobile roadmap: October 4 founder lock
+
+The founder approved this execution update on October 4 after reviewing build
+3423 and the mobile roadmap. The immediate work is to connect and verify the
+product, complete onboarding, discuss Cuadrao's agentic runtime, and reconcile
+privacy and release requirements. Broader Liquid Glass polish is deferred;
+measured responsiveness fixes preserve the approved artwork and interactions.
+
+This section owns the current high-level sequence. The six-lane contract and
+the release UI table below retain their detailed requirements. This lock does
+not authorize a merge, deployment, hosted flag, migration, paid provider run,
+new runtime implementation, or automatic restart of a parked lane. Claude's
+existing scoped assignments are preserved. The founder transferred mobile
+ownership to Codex on October 4 after Claude exhausted usage. The runtime
+discussion must produce a
+separate bounded assignment before architecture or model instructions change.
+
+### Completed checkpoints, with limits
+
+A checked item means only the named checkpoint is complete. Implementation,
+merge, simulator verification, phone installation, and connected acceptance
+are separate states.
+
+- [x] Core design graft landed on integration: foundation, Plans, receipts,
+  contextual chat, Home, Search, Updates, Profile, Settings, and preview tests
+  through [#783](https://github.com/lagarcess/argus/pull/783),
+  [#785](https://github.com/lagarcess/argus/pull/785),
+  [#786](https://github.com/lagarcess/argus/pull/786), and
+  [#792](https://github.com/lagarcess/argus/pull/792). Preview availability does
+  not establish connected service behavior.
+- [x] Backend and native foundations landed for invitations, sign-in, and
+  deletion through #788, #794, #793, #795, #802, #791, #799, and #801. The
+  [Grok handoff](https://github.com/lagarcess/argus/pull/790#issuecomment-5975107437)
+  pins their merges and enablement limits. This does not mark live features done.
+- [x] Local verification checkpoint recorded. The
+  [round-two candidate ledger](https://github.com/lagarcess/argus/blob/2bde54e48/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
+  records the uncontended `03a33ef2` UI run: 119 passed, 48 skipped, zero
+  failures. Both earlier failing tests pass in that full run. Mac builds,
+  backend/database/web results and local connected walks retain their named
+  tested commits. Codex checked the original UI log during recovery.
+- [x] Interrupted visual classification completed: all 92 differing pairs and
+  six new-only captures inspected. No new layout or money-format regression
+  established. Scroll, slider-input, persisted-hint and transition differences
+  retain explicit limits in the [recovery evidence](../reports/evidence/cuadrao-mobile-recovery-2026-10-04/README.md).
+  This is not pixel equality or connected-device acceptance.
+- [x] Signed preview build 3423 from candidate
+  `0408469282a4fe3c5c7857fa668544f7cff7624c` installed and launched on the iPhone
+  15 on October 4. Codex observed successful `devicectl` install and launch
+  results for `local.cuadrao.design.47R3855RTJ` after reading build 3423 from
+  the app's Info.plist. This updates the earlier ledger's unavailable-phone
+  statement; it does not prove physical journeys, live auth, or reduced lag.
+- [x] Invite-hardening issue [#789](https://github.com/lagarcess/argus/issues/789)
+  closed on October 4 after #794. Related follow-ups remain separately owned.
+- [x] Default-grants finding recorded as
+  [#811](https://github.com/lagarcess/argus/issues/811), including affected
+  environments and reachable writes. Filing and assessment are complete;
+  its fix and acceptance checks remain open.
+
+### Later foundation alignment
+
+The founder identified docs-only [#814](https://github.com/lagarcess/argus/pull/814)
+and [#815](https://github.com/lagarcess/argus/pull/815) as the foundation for later
+builds. #814 retains this board as the delivery checkpoint. Its currency rule,
+pre-TestFlight space-model timing and provider direction inform future assigned
+mobile slices; they are not implemented by candidate `03a33ef2`. The new model
+still has its stated design/engineering decisions open. #815 archives three
+historical specs with compatibility pointers. Neither PR expands this mobile
+verification recovery into business, runtime, migration or archive work.
+
+### Remaining work and acceptance
+
+| Work | Current state | Next deliverable and completion check |
+| --- | --- | --- |
+| Candidate review and landing | Open PRs #790, #810, #812, #809; documentation #808/#813/#814/#815 landed; candidate `03a33ef2` passes its full UI run and visual classification | Preserve review and verification evidence. #790 has successful CI; #810 and #812 have no executed workflow checks at their stacked heads. The stack lands #790, #810, #812; each merge still needs founder approval. #808 is landed; #809 remains independent. Reconcile shared board edits once and verify affected gates after landing. |
+| Device responsiveness and connectivity | Phone profiling and app computation fixes recorded in #812; physical connected acceptance remains open | Retain the measured traces and remaining performance limits. The phone is disconnected; resume physical interaction and persistence checks when it returns. Candidate 3428 is not installed. Simulator never-idle counts are not frame-hitch proof. |
+| Onboarding | Sign-in and invitation building blocks exist; complete first-use acceptance is open | Install, preserve invite intent, enter code, sign in, complete verification, select or join the permitted context, and perform the first useful action. Cover cancellation, invalid/expired codes, denied permissions, interruption, and relaunch. Request permissions when the feature needs them. |
+| Accounts, Plans, Household | Landed services and native paths plus candidate invitation work | Verify the connected financial and shared journeys on the phone, including relaunch, revoked access, recovery, and correct personal/household boundaries. Preserve existing contract owners. |
+| Receipts and imports | Capture/review UI and durable draft foundations exist | Connect capture, save for later, reopen, prepare, correct, split, approve, and save through the same financial services. Prove persistence and sharing boundaries. Keep source/extraction enablement gates open until satisfied. |
+| Home, Search, Updates, moves | Designs and partial connected foundations exist | Complete the assigned history/projection, search-to-detail, account-move history, inbox, reminder, and private push paths. Show known zero only with confirmed coverage. Verify authorization, origin navigation, and event-driven data rather than fixtures. |
+| Cuadrao chat identity | Small presentation task remains | Discuss and settle the chat/menu-bar logo within the design system; implement and check accessibility when assigned. Do not make it a dependency of runtime architecture. |
+| Agentic Cuadrao | Product direction approved; runtime lane remains unimplemented | Discuss the first supported jobs, authorized context, read/write tools, confirmations, recovery, draft continuity, and evaluation. Compare reuse with changes to Argus orchestration. Produce the bounded runtime assignment before implementation; a different architecture is an open decision, not a conclusion. |
+| Privacy, Terms, and Apple readiness | Draft #781, consent/deletion presentation, and backend foundations exist | Reconcile actual data flows, permissions, retention, deletion, provider handling, manifests, published policies, and review access. Complete the release audit and connected acceptance before claiming external TestFlight readiness. |
+| Profile backend features | Full design retained in development; unfinished release entries gated | Keep the complete development experience. Persist avatar selections before restoring the connected release editor. Track other unfinished Profile backends after chat; the removal of email notifications remains permanent. |
+
+The assistant must use the same financial actions, permissions, and confirmation
+rules as manual controls. The
+[agentic direction](argus-minimum-viable-ecosystem-experience.md#agentic-ecosystem-direction-and-sequence)
+already says the research/backtest-oriented chat alone does not satisfy Cuadrao.
+Preserve useful Argus services and the existing single runtime until its separate
+assignment explicitly changes the architecture. No financial write follows from
+a hypothetical question or unapproved model output.
+
+### Parallel execution and priority
+
+1. Preserve the completed candidate review, test disposition and phone traces.
+   Close the remaining security and connected-device gates. These tracks can progress
+   together under separate ownership. One Mac scheduler owns native tests and
+   profiling so competing runs do not invalidate measurements.
+2. Discuss end-to-end onboarding and the first agentic chat jobs next. Keep the
+   logo task separate. Define shared service contracts before runtime work;
+   this roadmap does not require choosing a replacement framework in advance.
+3. Run privacy/policy reconciliation alongside those tracks. Close remaining
+   connected journeys through their existing owners before release acceptance.
+4. Assemble one connected candidate and complete physical-phone checks before
+   external TestFlight. Keep broader Liquid Glass adoption off the launch
+   critical path. Do not remove gestures or artwork to disguise lag.
+
+### Release gates still open
+
+- [ ] Complete the sign-in gates in
+  [#800](https://github.com/lagarcess/argus/issues/800), required credentials,
+  provider configuration, and device checks. Apple, Google, and email remain
+  the selected choices.
+- [ ] Complete native connected deletion and its enablement dependencies
+  [#805](https://github.com/lagarcess/argus/issues/805) and
+  [#806](https://github.com/lagarcess/argus/issues/806). Retain truthful
+  pending/retry handling and the agreed flag-off support fallback. The operator
+  retry process remains manual; no schedule is authorized here.
+- [ ] Close [#811](https://github.com/lagarcess/argus/issues/811) against its
+  acceptance and environment gates. A safer existing hosted configuration does
+  not certify a newly built database.
+- [ ] Finish [#784](https://github.com/lagarcess/argus/issues/784) for the actual
+  combined candidate and the relevant physical journeys. Keep
+  [#778](https://github.com/lagarcess/argus/issues/778) before document extraction
+  enablement. Setup for universal links and push remains separate from UI completion.
+- [ ] Enforce explicit AI consent before personal data reaches an external
+  model through chat, voice, or documents. Decline must preserve local capture
+  and drafts. Disclosure fixtures do not prove dispatch enforcement.
+- [ ] Complete [#781](https://github.com/lagarcess/argus/pull/781): legal entity,
+  contact details, permitted source use, actual retention/backups, deletion,
+  provider sharing, and approved reachable Privacy/Terms pages. Do not substitute
+  vendor maximums or promises for the actual configured behavior.
+- [ ] Reconcile App Store privacy answers, app/SDK privacy manifests and required
+  API reasons with actual collection. Check permission purpose strings and
+  denied-access recovery. Finish VoiceOver, large text, contrast, reduced motion,
+  localization, and supported-device acceptance.
+- [ ] Prepare reviewer access through the invite gate, available review services,
+  accurate screenshots/metadata, support details, age rating, export-compliance
+  answers, and evidence of rights to shipped assets. Check applicable purchasing
+  and user-content rules against the features actually included.
+- [ ] Obtain the existing migration, backup, hosted-flag, share-pages, and
+  promotion approvals. Neither candidate verification nor this roadmap opens
+  those gates.
+
+Apple audit references checked October 4, 2026:
+[review guidelines](https://developer.apple.com/app-store/review/guidelines/),
+[account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app),
+[privacy details](https://developer.apple.com/app-store/app-privacy-details/),
+[required API reasons](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api),
+and [permission design](https://developer.apple.com/design/human-interface-guidelines/privacy/).
+These define an audit to finish, not a completed compliance assessment.
+
+**Checkpoint boundary:** PRs #790 (`53a4d67d`), #810 (`2cd7662a`), #812
+(`122bb232`), #808 (`a1ebf4b4`), and #809 (`ecd2bb57`) remain open. Combined
+candidate `03a33ef2` is for verification, not a replacement integration branch.
+The [candidate evidence](https://github.com/lagarcess/argus/blob/2bde54e48/docs/reports/evidence/cuadrao-iphone-candidate/LEDGER.md)
+and [recovery report](../reports/evidence/cuadrao-mobile-recovery-2026-10-04/README.md)
+name the tested heads and remaining limits. Revalidate only evidence affected
+by subsequent changes. This section replaces conflicting current-queue or phone-status wording below;
+it does not erase dated evidence or change the lane contracts.
 
 **Original preservation authorization (historical):** The founder accepted this expanded plan for
 commit and push on September 29, 2026. That grant authorized documentation preservation
@@ -29,15 +190,15 @@ that still say that lane is unmerged predate the squash on this tip.
 
 ## Cuadrao release UI landing order
 
-**Founder pivot, October 2, 2026. UI implemented by #790; connected graft remains open.**
+**Founder pivot, October 2, 2026. Retained UI requirements; current completion and order are in the [October 4 roadmap](#current-mobile-roadmap-october-4-founder-lock).**
 Ported from design commit
 [`fc7650ea`](https://github.com/lagarcess/argus/commit/fc7650eab4eac9298a09eea37eddc3964a709fba)
 on `codex/cuadrao-design-scan-recents` and reconciled with the
 [October 2 lane locks](argus-decision-log.md#october-2-2026-cuadrao-lane-locks) and
 the [six-lane handoff](lanes/mvee-five-lane-handoff.md). Where they differ, the locks
-and the handoff win. This is the current remaining-design queue. It refines the
-[design dispositions](#cuadrao-design-dispositions) C01 to C10, which #790
-brought onto integration from the design branch. Earlier preview screenshots and build
+and the handoff win. This table retains the detailed design scope. It refines the
+[design dispositions](#cuadrao-design-dispositions) C01 to C10, carried by #790
+from the design branch. Earlier preview screenshots and build
 3419 acceptance remain valid historical evidence; they do not prove the release
 behaviors below.
 [Cuadrao's guide](../../.agent/designs/cuadrao/DESIGN.md#13-release-readiness-interaction-rules)
@@ -59,27 +220,34 @@ replace them with `CuadraoHouseholdSheet`, fictional invite acceptance,
 `CanvasProfileDraft` or preview sign-out. Do not wholesale merge the divergent
 preview branch to obtain the style.
 
-Existing `ConnectedCuadraoAuthFlow` handles email auth; Apple is hidden and Google
-is not a connected native choice. Sign-in for TestFlight is **Apple, Google and
+Existing `ConnectedCuadraoAuthFlow` handles email auth. Native Apple and Google
+sign-in exist on iOS behind the default-off `ARGUS_APPLE_SIGN_IN_ENABLED` and
+`ARGUS_GOOGLE_SIGN_IN_ENABLED` switches (#795; later Mac verification is recorded in the current mobile roadmap above), and the
+backend's Apple token capture and revocation sits behind
+`ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` (#793, #802). None is enabled: the keys
+are still owed by the founder and the [#800](https://github.com/lagarcess/argus/issues/800)
+gates stand. Sign-in for TestFlight is **Apple, Google and
 email** ([October 2 founder
 decision](argus-decision-log.md#sign-in-for-testflight)). Apple and Google are
 built behind default-off flags until the founder supplies the keys, and connected
 buttons stay hidden while a flag is off. Email has an in-app confirmation step,
 which does not exist yet: today's sign-up ends on an emailed confirmation link. `HouseholdManagement`
 owns member/invitation management and explicit account consent;
-`HouseholdPlanPeople` owns shared-plan permissions. Current login deletion is a
-support request, and account archive is not an account move. In-app deletion is
-[Lane 6](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion). The team
+`HouseholdPlanPeople` owns shared-plan permissions. In-app deletion,
+[Lane 6](lanes/mvee-five-lane-handoff.md#lane-6-account-deletion), is built
+behind the default-off `ARGUS_ACCOUNT_DELETION_ENABLED` (#799, #801); while it is
+off, login deletion stays a support request. Account archive is not an account
+move. The team
 connecting each checkpoint owns the remaining contract gaps; simulated UI acceptance
 must stay distinguished from connected acceptance.
 
 | Landing checkpoint | User items | UI deliverable | Closure evidence and existing responsibility |
 | --- | --- | --- | --- |
-| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English, with Iris's founder-locked copy | Ordinary member, admin and financial-owner variants; "Exmiembro" / "Former member" in other people's plans and plan handover per decision 17; a shared debt plan archived read-only with Iris's banner instead (decision 19, Head of Engineering); no false success or deletion of another owner's data. C07/C10, identity and Household owners, Lane 6 |
+| 1. Trust and profile | 1 | Delete-account consequences, verification, pending/retry and confirmed signed-out finish, Spanish and English, with Iris's founder-locked copy | Ordinary member, admin and financial-owner variants; "Exmiembro" / "Former member" in other people's plans and plan handover per decision 17; a shared debt plan archived read-only with Iris's banner instead (decision 19, Head of Engineering); no false success or deletion of another owner's data. C07/C10, identity and Household owners, Lane 6. Backend and web landed default-off: census #791, command #799, route and web flow #801, behind `ARGUS_ACCOUNT_DELETION_ENABLED`, which #805 and #806 block. No native flow is on integration. The [API contract](../API_CONTRACT.md#post-accountdelete) and the [launch runbook](../PRIVATE_LAUNCH_RUNBOOK.md#account-deletion-runs-lane-6) own the deletion model. The resume sweep is operator-run with no cron, by founder decision (October 3), and none is to be created |
 | 1. Trust and profile | 2 | Signed-in Privacy and Terms destinations | Actual approved links, return to Settings, both languages. C07, native identity/support |
 | 1. Trust and profile | 3 | Apple and Google auth alongside email | Founder decision, October 2: Apple, Google and email, Apple and Google behind default-off flags until the keys arrive; email with an in-app confirmation step. Loading, cancellation, error, missing-name recovery and return to invitation; connected credentials/session owned by auth; Apple token revocation, and revoking every Google token Argus holds, at deletion is Lane 6. C07/C10 |
-| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows (including Memory, Usage, More options and conversation bulk actions) and the avatar-editing entry, which release builds hide and development builds keep in full ([decision of October 3, 2026](argus-decision-log.md#october-3-2026-avatar-editing-in-release)) | `fc7650ea`, from Yelena's UI checklist, hides Personalization, Security and sessions, Shared conversations, Removed activity and photos; `26055a28` hides the avatar-editing entry; #786 (`a20362d3`) hides Usage, More options and conversation bulk actions as a Head of Engineering judgment call; Memory (`.memory`) waits for native memory. They are designed rows whose backend is owed, hidden only in release builds: `CuadraoFirstRelease` shows every row, including the avatar editor, in development builds (#790). Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
-| 2. Access and Household | 4 | Invitation gate after install and cuadrao.ai waitlist | Valid, invalid, expired, already-used, cancelled auth and admitted-user return. Preserve link intent/manual code recovery. C02/C08 plus auth, Lane 1. The connected iPhone invitation client for items 4 to 8 is built default-off behind `ARGUS_BETA_INVITES_ENABLED` and `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED` (#810), verified against a local backend ([evidence](../reports/evidence/cuadrao-household-invites/README.md)) and enabled nowhere; universal links wait on AASA and Associated Domains. |
+| 1. Trust and profile | 13–14 | Remove email-notification toggle; hide unsupported rows (including Memory, Usage, More options and conversation bulk actions) and the avatar-editing entry, which release builds hide and development builds keep in full ([decision of October 3, 2026](argus-decision-log.md#october-3-2026-avatar-editing-in-release)) | `fc7650ea`, from Yelena's UI checklist, hides Personalization, Security and sessions, Shared conversations, Removed activity and photos; `26055a28` hides the avatar-editing entry; #786 (`a20362d3`) hides Usage, More options and conversation bulk actions as a Head of Engineering judgment call; Memory (`.memory`) waits for native memory. They are designed rows whose backend is owed, hidden only in release builds: `CuadraoFirstRelease` shows every row, including the avatar editor, in development builds (#790). The [hidden-rows backend list](lanes/cuadrao-profile-hidden-rows-backend.md) names what each needs, ordered after chat. Audit all entry paths for hidden destinations and preserve supported preferences/sign-out. C07/C08 |
+| 2. Access and Household | 4 | Invitation gate after install and cuadrao.ai waitlist | Valid, invalid, expired, already-used, cancelled auth and admitted-user return. Preserve link intent/manual code recovery. C02/C08 plus auth, Lane 1. The connected iPhone invitation client for items 4 to 8 is built default-off behind `ARGUS_BETA_INVITES_ENABLED` and `ARGUS_INVITE_UNIVERSAL_LINK_ENABLED` (#810), verified with host model and simulator checks ([evidence](../reports/evidence/cuadrao-household-invites/README.md)) and enabled nowhere; universal links wait on AASA and Associated Domains. |
 | 2. Access and Household | 5–6 | Personal invitation link/code/QR, remaining quota out of ten and accepted notice | Sharing is not acceptance; counter and notice derive from canonical status; QR scans; the QR card names its purpose. C02/C08, Lane 1 |
 | 2. Access and Household | 7 | Administrator-only household invitation without personal quota charge, which also admits a new person to the beta | Existing integration invitation preview/accept and account-sharing boundaries preserved. C02/C05, Household, Lane 1 |
 | 2. Access and Household | 8 | Founder-only group access link: creation, cap, expiry, usage and full/waitlist states | Beta only, never household membership. Capacity race/expiry recovery; confirmed enrollment before joined-waitlist wording. Redemptions do not use a personal quota, per Lane 1. C02/C08, Lane 1 |
@@ -2811,21 +2979,21 @@ The native design preview history remains on
 [checkpoint fc7650e](https://github.com/lagarcess/argus/tree/fc7650eab4eac9298a09eea37eddc3964a709fba/docs/reports/evidence/cuadrao-native-design).
 The rows below preserve its follow-up decisions. Historical UI verification is
 not connected-service verification or proof that every preview screen has landed
-on integration. This register is the sole future-work queue.
+on integration. The [October 4 roadmap](#current-mobile-roadmap-october-4-founder-lock) owns current execution order; this register preserves design detail and follow-up ownership.
 
-The [release UI landing order](#cuadrao-release-ui-landing-order) above is the
-current remaining-design queue. The
+The [release UI landing order](#cuadrao-release-ui-landing-order) above retains the detailed release requirements. The
 [UI checkpoint and evidence](../reports/evidence/cuadrao-release-ui/README.md)
 records the release UI's shared presentation states, native journeys and service
 dependencies. Review fixtures launch with `--cuadrao-release-ui` in DEBUG builds.
-The connected Profile uses the avatar editor and signed-in legal links; connected
+The connected Profile offers signed-in legal links and displays the current avatar;
+avatar editing remains DEBUG-only until selections survive relaunch. Connected
 Household management uses the shared invitation/QR presentation. Pending auth,
 delete, admission, inbox delivery, moves, AI, sources and memory operations still
 require their service owners. This is not external-TestFlight acceptance.
 
 ### Follow-up ownership and disposition
 
-The release UI landing order above is the current assignment. C01–C10 retain
+The October 4 roadmap owns current assignments. C01–C10 retain
 follow-up ownership under the existing D01–D15 work map,
 not a parallel delivery team. Owners below are responsibility areas, not a claim
 that a named worker has been dispatched. Link the assigned lane and its evidence
