@@ -38,19 +38,19 @@ struct AppleSessionHarness: View {
             HStack {
                 Button("Apple") { Task {
                     _ = await model.signIn(with: .init(provider: .apple, idToken: "a.b.c", nonce: SignInNonce()), appleAuthorizationCode: "synthetic-code")
-                    checks = await checker.count
+                    checks = checker.count
                 } }.accessibilityIdentifier("harness.apple")
                 Button("Email") { Task {
                     await model.authenticate(email: "synthetic@example.test", password: "synthetic", captchaToken: "synthetic", signup: false, language: "en", displayName: "")
                 } }.accessibilityIdentifier("harness.email")
-                Button("Check") { Task { await model.restore(); checks = await checker.count } }
+                Button("Check") { Task { await model.restore(); checks = checker.count } }
                     .accessibilityIdentifier("harness.check")
             }.buttonStyle(.bordered).disabled(model.busy || identityChangePending)
             HStack {
-                Button("Authorized") { Task { await checker.set(.authorized) } }.accessibilityIdentifier("harness.authorized")
-                Button("Error") { Task { await checker.set(nil) } }.accessibilityIdentifier("harness.error")
-                Button("Revoked") { Task { await checker.set(.revoked) } }.accessibilityIdentifier("harness.revoked")
-                Button("Transferred") { Task { await checker.set(.transferred) } }.accessibilityIdentifier("harness.transferred")
+                Button("Authorized") { checker.set(.authorized) }.accessibilityIdentifier("harness.authorized")
+                Button("Error") { checker.set(nil) }.accessibilityIdentifier("harness.error")
+                Button("Revoked") { checker.set(.revoked) }.accessibilityIdentifier("harness.revoked")
+                Button("Transferred") { checker.set(.transferred) }.accessibilityIdentifier("harness.transferred")
             }.font(.caption)
             HStack {
                 Button("Link") { setLinkedIdentity(true) }.accessibilityIdentifier("harness.link")
@@ -61,19 +61,21 @@ struct AppleSessionHarness: View {
                 }.accessibilityIdentifier("harness.notify")
             }
             HStack {
-                Button("Hold check") { Task {
-                    await checker.holdNext { @MainActor in checkerWaiting = true }
-                    await model.restore()
-                    checks = await checker.count
-                    checkerWaiting = false
-                } }.accessibilityIdentifier("harness.hold-check").disabled(model.busy)
-                Button("Revoke + notify") { Task {
-                    await checker.set(.revoked)
+                Button("Hold check") {
+                    checker.holdNext { checkerWaiting = true }
+                    Task {
+                        await model.restore()
+                        checks = checker.count
+                        checkerWaiting = false
+                    }
+                }.accessibilityIdentifier("harness.hold-check").disabled(model.busy || identityChangePending)
+                Button("Revoke + notify") {
+                    checker.set(.revoked)
                     NotificationCenter.default.post(name: ASAuthorizationAppleIDProvider.credentialRevokedNotification, object: nil)
-                } }.accessibilityIdentifier("harness.revoke-notify")
-                Button("Release") { Task { await checker.release() } }.accessibilityIdentifier("harness.release")
+                }.accessibilityIdentifier("harness.revoke-notify")
+                Button("Release") { checker.release() }.accessibilityIdentifier("harness.release")
             }.font(.caption)
-            Button("Error after sign-in") { Task { await checker.failAfterAuthorizedCheck() } }
+            Button("Error after sign-in") { checker.failAfterAuthorizedCheck() }
                 .accessibilityIdentifier("harness.error-after-signin")
             Divider()
             if model.state == .credentialValidationRequired || model.state == .reauthenticationRequired || model.state == .pendingSignOut {
@@ -103,15 +105,16 @@ struct AppleSessionHarness: View {
 
 }
 
-private actor HarnessAppleChecker: AppleCredentialChecking {
+@MainActor
+private final class HarnessAppleChecker: AppleCredentialChecking {
     var count = 0
     private var answer: AppleCredentialState? = .authorized
     private var failNext = false
     private var hold = false
-    private var onWaiting: @Sendable () async -> Void = {}
+    private var onWaiting: () -> Void = {}
     private var continuation: CheckedContinuation<Void, Never>?
     func failAfterAuthorizedCheck() { answer = .authorized; failNext = true }
-    func holdNext(onWaiting: @escaping @Sendable () async -> Void) { hold = true; self.onWaiting = onWaiting }
+    func holdNext(onWaiting: @escaping () -> Void) { hold = true; self.onWaiting = onWaiting }
     func release() { continuation?.resume(); continuation = nil }
     func set(_ answer: AppleCredentialState?) { self.answer = answer }
     func state(for subject: String) async throws -> AppleCredentialState {
@@ -123,7 +126,7 @@ private actor HarnessAppleChecker: AppleCredentialChecking {
             let notify = onWaiting
             await withCheckedContinuation {
                 continuation = $0
-                Task { await notify() }
+                notify()
             }
         }
         guard let result else { throw SessionFailure.unavailable }
