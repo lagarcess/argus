@@ -215,16 +215,21 @@ extension FinancialLoopUITests {
     /// Scrolls Home until the element sits inside the viewport without tapping it.
     /// Frame bounds, not `isHittable`: hidden tabs stay in the shell ZStack and their
     /// UIKit-backed views shadow XCUITest hit tests although real touches pass through.
+    /// Each drag covers the remaining distance (capped) and holds before release, so there is
+    /// no fling: a Home with many accounts converges instead of running out of fixed steps.
     func revealOnHome(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
         let home = app.scrollViews["screen.home"]
-        for _ in 0..<14 {
+        let top: CGFloat = 120, bottom = app.frame.height - 130
+        let center = home.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        for _ in 0..<40 {
             let y = element.frame.midY
-            if y > 120 && y < app.frame.height - 130 { return }
-            // Drag the Home scroll view itself a fixed distance; app-level swipes can land on hidden tabs.
-            let (from, to): (CGFloat, CGFloat) = y < 120 ? (0.3, 0.7) : (0.7, 0.3)
-            home.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: from))
-                .press(forDuration: 0.05, thenDragTo: home.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: to)))
+            if y > top && y < bottom { return }
+            let limit = home.frame.height * 0.6
+            let travel = max(-limit, min(limit, (top + bottom) / 2 - y))
+            center.withOffset(CGVector(dx: 0, dy: -travel / 2)).press(
+                forDuration: 0.05, thenDragTo: center.withOffset(CGVector(dx: 0, dy: travel / 2)),
+                withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         XCTFail("\(element.identifier) stays off screen at \(element.frame)")
     }
