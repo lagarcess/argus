@@ -17,7 +17,7 @@ ________ test_render_blueprint_declares_shared_render_env_contract_vars ________
         assert set(_contract_array("ARGUS_RENDER_API_ENV")) == set(_render_env("argus-api"))
 >       assert set(_contract_array("ARGUS_RENDER_WEB_ENV")) == set(_render_env("argus-app"))
 E       AssertionError: assert {'ARGUS_APP_O...SPANISH', ...} == {'ARGUS_APP_O...ITE_KEY', ...}
-E         
+E
 E         Extra items in the right set:
 E         'ARGUS_TRUSTED_CLIENT_IP_HEADER'
 E         Use -v to get more diff
@@ -32,7 +32,7 @@ ______ test_render_blueprint_matches_the_authoritative_nonsecret_profile _______
             service["name"]: {entry["key"]: entry for entry in service.get("envVars", [])}
             for service in render_blueprint["services"]
         }
-    
+
         for surface in ("api", "web"):
             service_profile = profile["services"][surface]
             rendered_service = next(
@@ -49,7 +49,7 @@ ______ test_render_blueprint_matches_the_authoritative_nonsecret_profile _______
             expected_keys.update(service_profile["optional"])
 >           assert set(rendered_env) == expected_keys
 E           AssertionError: assert {'ARGUS_APP_O...ITE_KEY', ...} == {'ARGUS_APP_O...SPANISH', ...}
-E             
+E
 E             Extra items in the left set:
 E             'ARGUS_TRUSTED_CLIENT_IP_HEADER'
 E             Use -v to get more diff

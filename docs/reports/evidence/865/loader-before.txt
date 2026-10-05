@@ -30,7 +30,7 @@ category = 'env'
         assert result.returncode == 0, result.stderr
 >       assert set(result.stdout.splitlines()) == set(web['env']) | set(web['required_present']) | set(web['optional']) | {'CONTRACT_LOADED'}
 E       AssertionError: assert {'ARGUS_APP_O...ITE_KEY', ...} == {'ARGUS_APP_O...T_EMAIL', ...}
-E         
+E
 E         Extra items in the right set:
 E         'ARGUS_SYNTHETIC_PROFILE_KEY'
 E         Use -v to get more diff
@@ -56,7 +56,7 @@ category = 'required_present'
         assert result.returncode == 0, result.stderr
 >       assert set(result.stdout.splitlines()) == set(web['env']) | set(web['required_present']) | set(web['optional']) | {'CONTRACT_LOADED'}
 E       AssertionError: assert {'ARGUS_APP_O...ITE_KEY', ...} == {'ARGUS_APP_O...T_EMAIL', ...}
-E         
+E
 E         Extra items in the right set:
 E         'ARGUS_SYNTHETIC_PROFILE_KEY'
 E         Use -v to get more diff
@@ -82,7 +82,7 @@ category = 'optional'
         assert result.returncode == 0, result.stderr
 >       assert set(result.stdout.splitlines()) == set(web['env']) | set(web['required_present']) | set(web['optional']) | {'CONTRACT_LOADED'}
 E       AssertionError: assert {'ARGUS_APP_O...ITE_KEY', ...} == {'ARGUS_APP_O...T_EMAIL', ...}
-E         
+E
 E         Extra items in the right set:
 E         'ARGUS_SYNTHETIC_PROFILE_KEY'
 E         Use -v to get more diff
