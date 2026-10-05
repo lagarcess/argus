@@ -126,3 +126,31 @@ def test_no_run_waiting_is_a_failure(service, capsys) -> None:  # noqa: ANN001
     )
     assert force.main([*ARGS, "--reason", "app removed", "--confirm"]) == 1
     service.delete_account.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("DATABASE_URL", ""),
+        ("DATABASE_URL", "not-a-url"),
+        ("SUPABASE_URL", ""),
+        ("SUPABASE_SERVICE_ROLE_KEY", ""),
+    ],
+)
+def test_refused_target_never_constructs_the_deletion_service(
+    monkeypatch,
+    name,
+    value,
+) -> None:
+    from argus.api import account_deletion_runtime
+
+    for key, configured in ENV.items():
+        monkeypatch.setenv(key, configured)
+    monkeypatch.delenv("SUPABASE_PROJECT_URL", raising=False)
+    monkeypatch.setenv(name, value)
+    build = MagicMock()
+    monkeypatch.setattr(account_deletion_runtime, "build_service", build)
+    with pytest.raises(SystemExit) as exited:
+        force.main([*ARGS, "--reason", "synthetic provider unavailable", "--confirm"])
+    assert exited.value.code == 2
+    build.assert_not_called()
