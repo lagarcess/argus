@@ -1,0 +1,110 @@
+[
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "60DE5599-BA91-4E57-8A0B-204FA50ECE83.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-revoked-signed-out-es-419_0_9917ACDC-955D-448B-8B9B-F6420E79700B.png",
+        "timestamp": 1791228485.608,
+        "committedFileName": "apple-revoked-signed-out-es-419.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "132E5B10-7909-4FB5-A273-9972F201888E.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-validation-retry-es-419_0_B75F24FC-60DB-40CA-9364-6FBDEDC45A39.png",
+        "timestamp": 1791228480.679,
+        "committedFileName": "apple-validation-retry-es-419.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "60029D9B-3D85-4B83-8AC3-3BEB304B26FD.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-capture-failed-es-419_0_4BAADD4C-D231-4121-B70C-79A51E4B779A.png",
+        "timestamp": 1791228477.511,
+        "committedFileName": "apple-capture-failed-es-419.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "E4679CB6-45D5-47E5-967F-D0B053ECE70B.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-revoked-signed-out-en_0_E6A77D09-5DA5-48C8-8793-F5866C1AA3DB.png",
+        "timestamp": 1791228468.508,
+        "committedFileName": "apple-revoked-signed-out-en.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "43C5F81B-EE91-4AA7-8F71-F6D88C05C620.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-validation-retry-en_0_4F0E3D45-4B5C-4BAE-88A8-EFFCC710758F.png",
+        "timestamp": 1791228463.603,
+        "committedFileName": "apple-validation-retry-en.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "D8C968C9-9A4A-466A-B7CE-6001E9E1A698.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-capture-failed-en_0_1E208832-35E2-4A92-8101-D2B483265516.png",
+        "timestamp": 1791228460.426,
+        "committedFileName": "apple-capture-failed-en.png"
+      }
+    ],
+    "testIdentifier": "AppleSessionJourneyUITests/testCaptureFailureRecoveryAndRevocationInEnglishAndSpanish()",
+    "testIdentifierURL": "test://com.apple.xcode/ArgusFoundation/ArgusFoundationUITests/AppleSessionJourneyUITests/testCaptureFailureRecoveryAndRevocationInEnglishAndSpanish"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "D685A205-73D4-4FAB-8F98-03566CEC94FC.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-explicit-sign-in-again_0_F506F43B-D128-4464-BCB5-06722CE09B6F.png",
+        "timestamp": 1791228503.505,
+        "committedFileName": "apple-explicit-sign-in-again.png"
+      },
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "94BC9EF4-B461-4FFF-928B-4275926776A3.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "email-with-apple-link_0_9AA71B96-B647-4309-913D-9D9D92658F00.png",
+        "timestamp": 1791228495.701,
+        "committedFileName": "email-with-apple-link.png"
+      }
+    ],
+    "testIdentifier": "AppleSessionJourneyUITests/testKnownEmailIgnoresLinkedAppleAndMissingAppleSubjectRequiresNewSignIn()",
+    "testIdentifierURL": "test://com.apple.xcode/ArgusFoundation/ArgusFoundationUITests/AppleSessionJourneyUITests/testKnownEmailIgnoresLinkedAppleAndMissingAppleSubjectRequiresNewSignIn"
+  },
+  {
+    "attachments": [
+      {
+        "configurationName": "Test Scheme Action",
+        "deviceId": "E027949A-2B75-4679-8D82-8F04FD08E735",
+        "deviceName": "Cuadrao Apple session proof",
+        "exportedFileName": "6B00748B-52C9-401C-925F-DE7F0D8FD402.png",
+        "isAssociatedWithFailure": false,
+        "suggestedHumanReadableName": "apple-notification-during-validation_0_12646007-6650-4C61-86F4-1A40F2CA021D.png",
+        "timestamp": 1791228518.458,
+        "committedFileName": "apple-notification-during-validation.png"
+      }
+    ],
+    "testIdentifier": "AppleSessionJourneyUITests/testNotificationDuringBusyValidationIsCoalescedByTheActualModel()",
+    "testIdentifierURL": "test://com.apple.xcode/ArgusFoundation/ArgusFoundationUITests/AppleSessionJourneyUITests/testNotificationDuringBusyValidationIsCoalescedByTheActualModel"
+  }
+]
