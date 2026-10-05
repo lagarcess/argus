@@ -267,8 +267,8 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
         deletion_op.setdefault("responses", {})["503"] = _error_response(
             "`account_deletion_incomplete`: the run did not finish and may have "
             "locked the account; retrying this route resumes it (Retry-After: "
-            "5). `account_deletion_unavailable`: deletion isn't configured on "
-            "this server. `auth_session_verification_unavailable`: the session "
+            "5). `account_deletion_unavailable`: no deletion has started and its "
+            "identity, credential, or deletion service is unavailable. `auth_session_verification_unavailable`: the session "
             "could not be verified; retry."
         )
 

@@ -271,3 +271,56 @@ def test_the_deletion_repository_is_built_without_any_feature_service() -> None:
 
     repository = household_repository(MagicMock())
     assert isinstance(repository, PostgresHouseholdRepository)
+
+
+def test_fresh_apple_code_uses_current_session(enabled):
+    service = MagicMock()
+    service.delete_account.return_value = DeletionOutcome(status="done")
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(
+            URL, json={"confirm": True, "apple_authorization_code": "fresh"}
+        )
+    assert response.status_code == 200
+    service.delete_account.assert_called_once_with(
+        user_id=USER_ID, apple_authorization_code="fresh"
+    )
+
+
+@pytest.mark.parametrize("code", ["", "x" * 513, "é"])
+def test_fresh_code_bounds(enabled, code):
+    service = MagicMock()
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(
+            URL, json={"confirm": True, "apple_authorization_code": code}
+        )
+    assert response.status_code == 422
+    service.delete_account.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "code,status",
+    [
+        ("apple_reauthorization_required", 409),
+        ("apple_identity_mismatch", 409),
+        ("apple_authorization_invalid", 400),
+        ("account_deletion_unavailable", 503),
+    ],
+)
+def test_admission_refusal_is_distinct_from_started_failure(enabled, code, status):
+    from argus.domain.account_deletion.apple import AccountDeletionAdmissionError
+
+    service = MagicMock()
+    service.delete_account.side_effect = AccountDeletionAdmissionError(code, status)
+    with (
+        patch.object(account_route, "deletion_requester", _registered),
+        patch.object(account_route, "account_deletion_service", return_value=service),
+    ):
+        response = client.post(URL, json={"confirm": True})
+    assert response.status_code == status
+    assert response.json()["code"] == code

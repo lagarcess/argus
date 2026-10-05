@@ -60,9 +60,25 @@ from typing import Any, Literal, Protocol
 import psycopg
 from loguru import logger
 
+from argus.domain.account_deletion.apple import (
+    AccountDeletionAdmissionError,
+    lock_apple_state,
+    require_admission,
+)
 from argus.domain.account_deletion.auth_admin import AuthAdmin, placeholder_email
 from argus.domain.account_deletion.key_check import KeyCheck, check_current_key
-from argus.domain.apple_sign_in.credentials import AppleRevocationPending
+from argus.domain.apple_sign_in.client import AppleError
+from argus.domain.apple_sign_in.credentials import (
+    AppleIdentityMismatch,
+    AppleIdentityMissing,
+    AppleRevocationPending,
+    DiscardOutcome,
+    RevokeOutcome,
+    StoredAppleCredential,
+)
+from argus.domain.apple_sign_in.credentials_postgres import (
+    PostgresAppleCredentialRepository,
+)
 from argus.domain.household import deletion as household_deletion
 from argus.domain.ingestion.secrets import SecretBox
 from argus.observability.analytics_deletion import AnalyticsDeletion
@@ -114,17 +130,15 @@ class ProviderRevoker(Protocol):
 
 
 class AppleCredentials(Protocol):
-    """#793's ``AppleCredentialService`` with #802's ``discard_unreadable``."""
+    def capture(
+        self, *, user_id: str, authorization_code: str, deletion_claim: str | None = None
+    ) -> None: ...
 
-    repository: Any
+    def ensure_readable(self, row: StoredAppleCredential) -> None: ...
 
-    def revoke(self, *, user_id: str) -> Any:
-        """Raises ``AppleRevocationPending`` while the token is kept."""
-        ...
+    def revoke_stored(self, row: StoredAppleCredential) -> RevokeOutcome: ...
 
-    def discard_unreadable(self, *, user_id: str) -> Any:
-        """Deletes the row only while it still does not open."""
-        ...
+    def unreadable_discard_status(self, row: StoredAppleCredential) -> DiscardOutcome: ...
 
 
 @dataclass
@@ -184,14 +198,90 @@ class AccountDeletionService:
 
     # -- entry point -------------------------------------------------------------
 
-    def delete_account(self, *, user_id: str) -> DeletionOutcome:
+    def delete_account(
+        self, *, user_id: str, apple_authorization_code: str | None = None
+    ) -> DeletionOutcome:
         user_id = _uuid(user_id)
         subject = subject_hash(user_id)
-        run = self._claim(user_id, subject)
+        run = None
         try:
+            if apple_authorization_code is not None:
+                run = self._claim_classified(user_id, subject, existing_only=True)
+                try:
+                    if self._apple is None:
+                        raise AccountDeletionAdmissionError(
+                            "account_deletion_unavailable"
+                        )
+                    self._apple.capture(
+                        user_id=user_id,
+                        authorization_code=apple_authorization_code,
+                        deletion_claim=run["claim"] if run else None,
+                    )
+                except Exception as exc:
+                    if run is not None or self._has_started(user_id):
+                        raise AccountDeletionIncomplete(
+                            "third_party_pending", ["apple"]
+                        ) from None
+                    if isinstance(exc, AppleError) and (
+                        exc.invalid_grant or exc.reason == "malformed_code"
+                    ):
+                        raise AccountDeletionAdmissionError(
+                            "apple_authorization_invalid", 400
+                        ) from None
+                    if isinstance(exc, (AppleIdentityMismatch, AppleIdentityMissing)):
+                        raise AccountDeletionAdmissionError(
+                            "apple_identity_mismatch", 409
+                        ) from None
+                    raise AccountDeletionAdmissionError(
+                        "account_deletion_unavailable"
+                    ) from None
+            if run is None:
+                run = self._claim_classified(user_id, subject)
             return self._run(user_id, subject, run)
         finally:
-            self._release(run["id"], run["claim"])
+            if run is not None:
+                self._release(run["id"], run["claim"])
+
+    def _claim_classified(
+        self, user_id: str, subject: str, *, existing_only: bool = False
+    ) -> dict[str, Any] | None:
+        try:
+            return self._claim(user_id, subject, existing_only=existing_only)
+        except (
+            AccountDeletionAdmissionError,
+            AccountDeletionIncomplete,
+            AccountDeletionRejected,
+        ):
+            raise
+        except Exception:
+            if self._has_started(user_id):
+                raise AccountDeletionIncomplete("admission_unknown") from None
+            raise AccountDeletionAdmissionError("account_deletion_unavailable") from None
+
+    def _has_started(self, user_id: str) -> bool:
+        try:
+            with self._households.connection() as connection:
+                if (
+                    connection.execute(
+                        "select 1 from argus_private.account_deletion_runs where user_id = %s",
+                        (user_id,),
+                    ).fetchone()
+                    is not None
+                ):
+                    return True
+                if (
+                    connection.execute(
+                        "select 1 from auth.users where id = %s",
+                        (user_id,),
+                    ).fetchone()
+                    is None
+                ):
+                    raise AccountDeletionRejected("unknown_user")
+                return False
+        except AccountDeletionRejected:
+            raise
+        except Exception:
+            raise AccountDeletionIncomplete("admission_unknown") from None
 
     def _run(self, user_id: str, subject: str, run: dict[str, Any]) -> DeletionOutcome:
         # Idempotent: every attempt re-applies the ban, so a refresh token
@@ -209,8 +299,9 @@ class AccountDeletionService:
         # Every third-party step is attempted on each pass, so one provider's
         # outage doesn't hide another's; the account delete waits for all.
         pending: dict[str, str] = {}
-        apple = self._revoke_apple(user_id, subject)
+        apple = self._revoke_apple(user_id, subject, run)
         if apple is not None:
+            self._record_step(subject, "apple_revoke", "pending", run=run)
             pending["apple"] = apple
         pending.update(self._revoke_providers(user_id, subject))
         analytics = self._delete_analytics(subject)
@@ -341,7 +432,7 @@ class AccountDeletionService:
             # One more revoke first, recorded like any pass: forcing must
             # never skip a token that would revoke now.
             if step == "apple":
-                left = self._revoke_apple(user_id, subject)
+                left = self._revoke_apple(user_id, subject, run)
             elif step == "analytics":
                 left = self._delete_analytics(subject)
             else:
@@ -370,13 +461,8 @@ class AccountDeletionService:
     ) -> None:
         now = self._clock()
         with self._households.connection() as connection, connection.transaction():
-            held = connection.execute(
-                "select 1 from argus_private.account_deletion_runs"
-                " where id = %s and claim_id = %s for update",
-                (run["id"], run["claim"]),
-            ).fetchone()
-            if held is None:
-                raise AccountDeletionIncomplete("in_progress")
+            lock_apple_state(connection, user_id)
+            self._lock_live_claim(connection, run)
             if step == "apple":
                 connection.execute(
                     "delete from public.apple_sign_in_credentials where user_id = %s",
@@ -409,23 +495,23 @@ class AccountDeletionService:
 
     # -- 1. the run and its claim --------------------------------------------------
 
-    def _claim(self, user_id: str, subject: str) -> dict[str, Any]:
+    def _claim(
+        self, user_id: str, subject: str, *, existing_only: bool = False
+    ) -> dict[str, Any] | None:
         """Open the run if this is the first request (idempotent: two first
         requests open one run), then take its claim for this pass."""
 
-        now = self._clock()
         select = (
             "select id, status, steps, claim_id, claimed_until"
             " from argus_private.account_deletion_runs"
             " where subject_hash = %s for update"
         )
         with self._households.connection() as connection, connection.transaction():
+            user, apple_state = lock_apple_state(connection, user_id)
             row = connection.execute(select, (subject,)).fetchone()
             if row is None:
-                user = connection.execute(
-                    "select raw_app_meta_data from auth.users where id = %s",
-                    (user_id,),
-                ).fetchone()
+                if existing_only:
+                    return None
                 if user is None:
                     raise AccountDeletionRejected("unknown_user")
                 # A guest is deleted by this same command (Lane 6 acceptance);
@@ -436,6 +522,7 @@ class AccountDeletionService:
                 ).fetchone()[0]
                 if placeholder:
                     raise AccountDeletionRejected("placeholder")
+                require_admission(apple_state, self._apple)
                 # A concurrent first request waits here on the unique keys,
                 # then inserts nothing and locks the row the other one made.
                 connection.execute(
@@ -449,6 +536,7 @@ class AccountDeletionService:
                     # Finished by another pass in between.
                     raise AccountDeletionIncomplete("in_progress")
             run_id, status, steps, claim_id, claimed_until = row
+            now = self._clock()
             if claim_id is not None and claimed_until > now:
                 raise AccountDeletionIncomplete("in_progress")
             claim = str(uuid.uuid4())
@@ -458,6 +546,16 @@ class AccountDeletionService:
                 (claim, now + timedelta(seconds=CLAIM_SECONDS), run_id),
             )
         return {"id": str(run_id), "status": status, "steps": steps or {}, "claim": claim}
+
+    def _lock_live_claim(self, connection: Any, run: dict[str, Any]) -> dict[str, Any]:
+        held = connection.execute(
+            "select claim_id::text, claimed_until, steps from argus_private.account_deletion_runs "
+            "where id = %s for update",
+            (run["id"],),
+        ).fetchone()
+        if held is None or held[0] != run["claim"] or held[1] <= self._clock():
+            raise AccountDeletionIncomplete("in_progress")
+        return held[2] or {}
 
     def _renew(self, run_id: str, claim: str) -> None:
         """Extend this pass's claim before the account delete (Marcus re-check
@@ -701,62 +799,63 @@ class AccountDeletionService:
 
     # -- 4. Apple, before the account delete ------------------------------------
 
-    def _revoke_apple(self, user_id: str, subject: str) -> str | None:
-        """The reason while the Apple row must stay (the RESTRICT key would
-        refuse step 7 anyway), or None once it is gone."""
-
-        with self._households.connection() as connection:
-            stored = connection.execute(
-                "select 1 from public.apple_sign_in_credentials where user_id = %s",
-                (user_id,),
-            ).fetchone()
-        if stored is None:
-            # Never stored (no capture, or a sign-in before #793), or revoked
-            # by an earlier attempt of this run.
-            self._record_step(subject, "apple_revoke", None, keep_existing=True)
-            return None
+    def _revoke_apple(
+        self, user_id: str, subject: str, run: dict[str, Any]
+    ) -> str | None:
+        with self._households.connection() as connection, connection.transaction():
+            _, state = lock_apple_state(connection, user_id)
+            steps = self._lock_live_claim(connection, run)
+            receipt = steps.get("apple_revoke")
+            stored = state.credential
+            if stored is None:
+                if receipt in {
+                    "revoked",
+                    "already_revoked",
+                    "unrecoverable",
+                    "operator_forced",
+                }:
+                    return None
+                if state.unavailable:
+                    return "identity_unavailable"
+                if state.identity is not None:
+                    return "credential_missing"
+                return None
+            if state.unavailable:
+                return "identity_unavailable"
+            if stored.apple_subject is not None and (
+                state.identity is None or stored.apple_subject != state.identity.subject
+            ):
+                return "credential_identity_mismatch"
         if self._apple is None:
-            # No Apple service on this process: fail safe, never skip.
-            self._record_step(subject, "apple_revoke", "pending")
             return "apple_unconfigured"
         try:
-            outcome = _value(self._apple.revoke(user_id=user_id))
+            outcome = _value(self._apple.revoke_stored(stored))
         except AppleRevocationPending as exc:
             if exc.reason != "credential_unreadable":
-                self._record_step(subject, "apple_revoke", "pending")
-                logger.warning("Apple revoke pending", reason=exc.reason)
                 return exc.reason
-            return self._discard_unreadable_apple(user_id, subject)
+            check = self._key_check("apple", key_id=stored.key_id)
+            if check != "verified":
+                return f"key_{check}"
+            try:
+                if _value(self._apple.unreadable_discard_status(stored)) == "readable":
+                    return "credential_readable"
+            except AppleRevocationPending as unreadable:
+                return unreadable.reason
+            outcome = "unrecoverable"
+        with self._households.connection() as connection, connection.transaction():
+            _, current = lock_apple_state(connection, user_id)
+            self._lock_live_claim(connection, run)
+            if current != state:
+                return "credential_replaced"
+            if not PostgresAppleCredentialRepository.delete_exact_on(connection, stored):
+                return "credential_replaced"
+            connection.execute(
+                "update argus_private.account_deletion_runs set steps = steps || "
+                "jsonb_build_object('apple_revoke', %s::text), updated_at = %s where id = %s",
+                (outcome, self._clock(), run["id"]),
+            )
         if outcome == "already_revoked":
-            self._record_step(subject, "apple_revoke", "already_revoked")
             self._note_already_revoked(subject, "apple")
-        elif outcome == "nothing_stored":
-            self._record_step(subject, "apple_revoke", None, keep_existing=True)
-        else:
-            self._record_step(subject, "apple_revoke", "revoked")
-        return None
-
-    def _discard_unreadable_apple(self, user_id: str, subject: str) -> str | None:
-        with self._households.connection() as connection:
-            row = connection.execute(
-                "select secret_key_fingerprint from public.apple_sign_in_credentials"
-                " where user_id = %s",
-                (user_id,),
-            ).fetchone()
-        check = self._key_check("apple", key_id=row[0] if row else None)
-        if check != "verified":
-            self._record_step(subject, "apple_revoke", "pending")
-            return f"key_{check}"
-        try:
-            discarded = _value(self._apple.discard_unreadable(user_id=user_id))
-        except AppleRevocationPending as exc:
-            self._record_step(subject, "apple_revoke", "pending")
-            return exc.reason
-        if discarded == "readable":
-            # A token captured meanwhile opens: the next pass revokes it.
-            self._record_step(subject, "apple_revoke", "pending")
-            return "credential_readable"
-        self._record_step(subject, "apple_revoke", "unrecoverable")
         return None
 
     def _key_check(self, step: str, *, key_id: str | None) -> KeyCheck:
@@ -779,8 +878,11 @@ class AccountDeletionService:
         value: str | None,
         *,
         keep_existing: bool = False,
+        run: dict[str, Any] | None = None,
     ) -> None:
         with self._households.connection() as connection, connection.transaction():
+            if run is not None:
+                self._lock_live_claim(connection, run)
             if keep_existing:
                 # "none" only when no earlier attempt recorded an outcome.
                 connection.execute(

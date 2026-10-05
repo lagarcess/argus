@@ -4,8 +4,10 @@ test_account_deletion_postgres.py."""
 
 from __future__ import annotations
 
+import json
 import secrets
 from datetime import timedelta
+from uuid import uuid4
 
 import psycopg
 import pytest
@@ -216,9 +218,32 @@ class _Apple:
             clock=lambda: NOW,
         )
 
-    def store(self, user_id: str, *, box: SecretBox | None = None, key_id=...) -> None:  # noqa: ANN001
+    def store(
+        self,
+        user_id: str,
+        *,
+        box: SecretBox | None = None,
+        key_id=...,
+        legacy: bool = False,
+    ) -> None:  # noqa: ANN001
         """As capture stores it: sealed under box with box's fingerprint, or
         key_id (None: stored before the fingerprint existed)."""
+        if not legacy:
+            with psycopg.connect(DSN) as c:
+                c.execute(
+                    "insert into auth.identities (id,user_id,provider,provider_id,identity_data) "
+                    "values (%s,%s,'apple',%s,%s::jsonb)",
+                    (
+                        str(uuid4()),
+                        user_id,
+                        apple_support.SUBJECT,
+                        json.dumps({"sub": apple_support.SUBJECT}),
+                    ),
+                )
+            self.fake.grant()
+            self.service.capture(user_id=user_id, authorization_code="fresh")
+            self.fake.calls.clear()
+            return
         sealed = (box or self.box).seal(
             "r.apple-refresh-0", source="apple_sign_in", connection_id=user_id
         )
@@ -233,6 +258,17 @@ class _Apple:
     def close(self) -> None:
         self.service.close()
         self.pool.close()
+
+
+def _legacy_apple_run(user_id: str) -> None:
+    from argus.observability.product_events import actor_hash_for_user
+
+    with psycopg.connect(DSN) as c:
+        c.execute(
+            "insert into argus_private.account_deletion_runs "
+            "(user_id,subject_hash,analytics_distinct_id,status) values (%s,%s,%s,'started')",
+            (user_id, subject_hash(user_id), actor_hash_for_user(user_id)),
+        )
 
 
 def _apple_state(
@@ -369,7 +405,13 @@ def test_an_unreadable_apple_token_is_discarded_only_under_its_own_key(lane, wor
     a = world["a"]
     apple = _Apple([])
     try:
-        apple.store(a, box=SecretBox(secrets.token_bytes(32)), key_id=apple.box.key_id)
+        apple.store(
+            a,
+            box=SecretBox(secrets.token_bytes(32)),
+            key_id=apple.box.key_id,
+            legacy=True,
+        )
+        _legacy_apple_run(a)
         admin = SqlAuthAdmin()
         with pytest.raises(AccountDeletionIncomplete) as raised:
             _service(
