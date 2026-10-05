@@ -886,10 +886,14 @@ What the logs and run record tell you:
   under a key no process holds any more stays pending; after 7 days force it
   (below), which tries one more revoke first.
 - **Key rotation.** Don't rotate `ARGUS_INGESTION_SECRET_KEY` in the deploy
-  that ships the Lane 6 migration (`20261004090000`): a process still on the
-  old code re-seals without updating the fingerprint, which is only wrong if it
-  also holds a different key. Any later rotation is safe for deletion: tokens
-  sealed under the old key are held, never dropped.
+  that ships the Lane 6 migration (`20261004090000`), or while any pre-Lane 6
+  process can still run, including a rollback. Older writers can re-seal a
+  token without updating its fingerprint. Keep the key unchanged through that
+  deployment and its rollback window. Before a later rotation, verify that
+  every running process and every permitted rollback writes the fingerprint
+  with the ciphertext. Retain access to the old key for credentials it sealed.
+  A newer process holds those credentials pending; it cannot revoke them
+  without that key. Rotation does not complete their deletion.
 - **Apple.** No stored credential records `apple_revoke: none` (nothing to
   revoke). `apple_unconfigured` means this process has no `ARGUS_APPLE_*`
   config: the step stays pending, never silently done. `already_revoked` means

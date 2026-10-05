@@ -1,6 +1,8 @@
 """Provider credentials sealed at rest and bound to their connection."""
 
 import base64
+import hashlib
+import hmac
 import os
 
 import pytest
@@ -71,3 +73,12 @@ def test_key_id_names_the_key_without_revealing_it():
     assert len(first.key_id) == 32 and set(first.key_id) <= set("0123456789abcdef")
     assert raw.hex()[:32] != first.key_id
     assert first.key_id not in first.digest("argus-ingestion-key-id:v1", purpose="x")
+
+
+def test_key_id_uses_the_versioned_hmac_contract():
+    raw = os.urandom(32)
+    expected = hmac.new(raw, b"argus-ingestion-key-id:v1", hashlib.sha256).hexdigest()[
+        :32
+    ]
+    assert SecretBox(raw).key_id == expected
+    assert SecretBox(raw).key_id != hashlib.sha256(raw).hexdigest()[:32]
