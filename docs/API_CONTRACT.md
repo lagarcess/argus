@@ -7129,7 +7129,12 @@ connected debt-payment plans extend this same projection as specified below.
 
 `GET /financial-plan?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` returns the shared
 Plan/Home projection. Defaults are today through 30 days later in the saved time zone;
-start must be today and end is inclusive, at most 366 days later. The response is:
+start must be today and end is inclusive, at most 366 days later. A request without
+parameters always receives that default window, whatever longer `end_date` an earlier
+request used. Home's rolling next-30-days Coming up must read this route with no
+parameters, and Plan may request a longer `end_date` for its own exploration from the
+same projection service. Native Home adopts this independent window through #824's
+connected Upcoming work. The response is:
 
 ```
 {home:HomeResponse,selection:{version,account_ids:[uuid],time_zone},accounts:[FinancialAccountResponse],
