@@ -39,7 +39,6 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
 
     var body: some View {
         ScrollView {
-            // Eager row measurement lets connected search restore a partially visible row.
             VStack(alignment: .leading, spacing: 0, content: results)
                 .padding(.horizontal, 24).padding(.bottom, 24)
         }.coordinateSpace(name: "search.viewport")

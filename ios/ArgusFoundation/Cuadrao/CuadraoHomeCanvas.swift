@@ -7,7 +7,6 @@ struct CuadraoHomeCanvas: View {
     @State private var selectedTab: CuadraoTab = .home
     @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
         includeExamples: CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var plans = CuadraoPlanPreview(
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
         reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
@@ -25,7 +24,6 @@ struct CuadraoHomeCanvas: View {
     @State private var searchChatOrigin = false
     @State private var chatEditing = false
     @State private var voiceProposal: CanvasVoiceProposal?
-    @State private var pendingTab: CuadraoTab?
     @State private var navigationScroll = CuadraoNavigationScroll()
     @State private var sheet: HomeSheet?
     @State private var data = CuadraoAccountsPreview(
@@ -34,7 +32,6 @@ struct CuadraoHomeCanvas: View {
     private enum HomeRoute: Hashable { case account(UUID), activity(UUID) }
     @State private var accountPath: [HomeRoute] = []
     @State private var archivedID: UUID?
-    private let navigationBarHeight: CGFloat = 72
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
@@ -44,7 +41,12 @@ struct CuadraoHomeCanvas: View {
     }
 
     var body: some View {
-        TabView(selection: tabSelection) {
+        CuadraoAppShell(selection: $selectedTab, chat: chat, spanish: spanish,
+            showsNavigation: (accountPath.isEmpty || selectedTab != .home) &&
+                (profilePath.isEmpty || selectedTab != .profile) && !(selectedTab == .assistant && chatEditing),
+            compact: selectedTab == .home && navigationScroll.compact,
+            avatar: profile.avatar, profileName: profile.name,
+            showProposal: { voiceProposal = .proposed }) { selection in
             NavigationStack(path: $accountPath) {
                 CuadraoHomeLayout(order: CuadraoHomeSection.decode(homeOrder),
                     canCustomize: !data.active.isEmpty, spanish: spanish, customize: { sheet = .customize }) {
@@ -78,54 +80,12 @@ struct CuadraoHomeCanvas: View {
             .toolbar(.hidden, for: .tabBar)
             .tag(CuadraoTab.home)
             ForEach(CuadraoTab.allCases.filter { $0 != .home }) { tab in
-                destination(tab).tag(tab)
+                destination(tab, selection: selection).tag(tab)
             }
         }
-        .cuadraoScrollBar(edge: .bottom) {
-            VStack(spacing: 0) {
-            if chat.voiceContextOwner == nil && selectedTab != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
-                CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
-            }
-            if (accountPath.isEmpty || selectedTab != .home) &&
-                (profilePath.isEmpty || selectedTab != .profile) && !(selectedTab == .assistant && chatEditing) {
-            ZStack {
-                if chat.voiceMessage.state != .recording {
-                    CuadraoNavigationBar(selection: tabSelection,
-                        compact: selectedTab == .home && navigationScroll.compact, spanish: spanish,
-                        avatar: profile.avatar, profileName: profile.name)
-                        .padding(.horizontal, 20)
-                        .frame(height: 64, alignment: .bottom)
-                        .padding(.bottom, 8)
-                        .transition(.opacity)
-                }
-            }.frame(height: navigationBarHeight)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chat.voiceMessage.state == .recording)
-            }
-            }
-        }
-        .cuadraoSoftScrollEdges()
-        .cuadraoVoicePresentation(chat: chat, spanish: spanish, ownsPresentation: chat.voiceContextOwner == nil,
-            keyboard: {
-                selectedTab = .assistant
-                chat.voice.presentation = .keyboard
-            }, showProposal: {
-                voiceProposal = .proposed
-                selectedTab = .plan
-                chat.voice.presentation = .compact
-            })
-        .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
-            isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {
-            Button(spanish ? "Terminar y salir" : "End and leave", role: .destructive) {
-                let destination = pendingTab; chat.leaveTemporary(for: .returnToRegular); pendingTab = nil
-                if let destination { selectedTab = destination }
-            }
-            Button(spanish ? "Seguir aquí" : "Stay here", role: .cancel) { pendingTab = nil }
-        } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
-        .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
         .receiptPresentation(route: $receiptRoute, workspace: receiptWorkspace, spanish: spanish)
         .environment(\.receiptWorkspace, receiptWorkspace)
-        .environment(\.cuadraoChat, chat)
         .task {
             do { try receipts.reconcile(groups: groups, accounts: data) }
             catch { receiptRecoveryError = true }
@@ -156,16 +116,6 @@ struct CuadraoHomeCanvas: View {
                     .padding(.horizontal, 20).padding(.bottom, 90)
             }
         }
-    }
-
-    private var tabSelection: Binding<CuadraoTab> {
-        Binding(get: { selectedTab }, set: { next in
-            if selectedTab == .assistant && next != .assistant && chat.hasTemporaryContent { pendingTab = next }
-            else {
-                if selectedTab == .assistant && next != .assistant && chat.temporary { chat.leaveTemporary(for: .returnToRegular) }
-                selectedTab = next
-            }
-        })
     }
 
     @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
@@ -278,7 +228,7 @@ struct CuadraoHomeCanvas: View {
                          capture: { receiptRoute = .capture($0, $1) }, open: { receiptRoute = .review($0) })
     }
 
-    @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
+    @ViewBuilder private func destination(_ tab: CuadraoTab, selection: Binding<CuadraoTab>) -> some View {
         if tab == .search {
             // Design-preview Search. Connected keeps FinancialSearchDestination; these results stay sample-only.
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
@@ -288,7 +238,7 @@ struct CuadraoHomeCanvas: View {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if searchChatOrigin {
-                        Button { tabSelection.wrappedValue = .search } label: {
+                        Button { selection.wrappedValue = .search } label: {
                             Label(spanish ? "Volver a Buscar" : "Back to Search", systemImage: "chevron.left")
                                 .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         }.padding(.horizontal, 24).background(WelcomePalette.background)
@@ -297,7 +247,7 @@ struct CuadraoHomeCanvas: View {
                 }
         } else if tab == .profile {
             CuadraoProfileCanvas(spanish: spanish, includeExamples: populated, profile: $profile,
-                path: $profilePath, bottomSpace: navigationBarHeight + 8 + (chat.voice.active ? 64 : 0))
+                path: $profilePath, bottomSpace: CuadraoAppShellMetrics.navigationHeight + 8 + (chat.voice.active ? 64 : 0))
         } else if tab == .plan && voiceProposal == nil {
             CuadraoPlanCanvas(store: plans, accounts: data, spanish: spanish,
                 bottomSpace: chat.voice.active ? 160 : 90, groups: groups)

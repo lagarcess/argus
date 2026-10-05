@@ -26,7 +26,6 @@ struct ConnectedBalanceSummary {
     func fraction(_ component: Component) -> Double {
         guard known, let assets = Decimal(string: summary.assetsMinor), assets > 0,
               let value = Decimal(string: minor(component)) else { return 0 }
-        // Only bar geometry uses a floating-point value. Money labels retain the exact minor-unit string.
         return NSDecimalNumber(decimal: value / assets).doubleValue
     }
 }

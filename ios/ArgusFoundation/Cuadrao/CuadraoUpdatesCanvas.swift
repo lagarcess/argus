@@ -35,43 +35,22 @@ struct CuadraoUpdatesCanvas: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
-                Section {
-                    Picker(spanish ? "Mostrar" : "Show", selection: $unreadOnly) {
-                        Text(spanish ? "Todas" : "All").tag(false)
-                        Text(spanish ? "Sin leer" : "Unread").tag(true)
-                    }.pickerStyle(.segmented).accessibilityIdentifier("cuadrao.updates.filter")
-                    if !unread.isEmpty {
-                        Button(spanish ? "Marcar todas como leídas" : "Mark all as read") {
-                            readIDs.formUnion(visible)
-                        }.font(.subheadline).accessibilityIdentifier("cuadrao.updates.read-all")
-                    }
-                }.listRowBackground(Color.clear).listRowSeparator(.hidden)
-                if visible.isEmpty {
-                    emptyState.listRowBackground(Color.clear).listRowSeparator(.hidden)
-                } else {
-                    updateSection(spanish ? "Por revisar" : "To review", entries: visible.filter {
-                        if case .accountReview = $0 { return true }; return false
-                    })
-                    updateSection(spanish ? "Tus planes" : "Your plans", entries: visible.filter {
-                        if case .planProgress = $0 { return true }; return false
-                    })
-                }
-            }
-            .listStyle(.plain).scrollContentBackground(.hidden).background(WelcomePalette.background)
-            .navigationTitle(spanish ? "Novedades" : "Updates").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink {
-                        CuadraoProfilePage(route: .notifications, profile: $profile, spanish: spanish, includeExamples: false)
-                    } label: {
-                        Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
-                    }.accessibilityLabel(spanish ? "Preferencias de notificaciones" : "Notification preferences")
-                        .accessibilityIdentifier("cuadrao.updates.preferences")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(spanish ? "Listo" : "Done") { dismiss() }.accessibilityIdentifier("cuadrao.updates.done")
-                }
+            CuadraoUpdatesLayout(spanish: spanish, unreadOnly: $unreadOnly,
+                hasUnread: !unread.isEmpty,
+                emptyState: visible.isEmpty ? (items.isEmpty ? .empty : .read) : nil,
+                markAllRead: { readIDs.formUnion(visible) }) {
+                updateSection(spanish ? "Por revisar" : "To review", entries: visible.filter {
+                    if case .accountReview = $0 { return true }; return false
+                })
+                updateSection(spanish ? "Tus planes" : "Your plans", entries: visible.filter {
+                    if case .planProgress = $0 { return true }; return false
+                })
+            } preferences: {
+                NavigationLink {
+                    CuadraoProfilePage(route: .notifications, profile: $profile, spanish: spanish, includeExamples: false)
+                } label: { CuadraoUpdatesPreferencesLabel() }
+                    .accessibilityLabel(spanish ? "Preferencias de notificaciones" : "Notification preferences")
+                    .accessibilityIdentifier("cuadrao.updates.preferences")
             }
             .navigationDestination(for: CanvasUpdate.self) { item in
                 switch item {
@@ -143,21 +122,6 @@ struct CuadraoUpdatesCanvas: View {
             Circle().fill(readIDs.contains(item) ? .clear : WelcomePalette.pine).frame(width: 7, height: 7)
                 .padding(.top, 8).accessibilityHidden(true)
         }.fixedSize(horizontal: false, vertical: true).padding(.vertical, 10).contentShape(Rectangle())
-    }
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            PlanLandscape(look: .bloom).frame(width: 130, height: 90).accessibilityHidden(true)
-            Text(items.isEmpty ? (spanish ? "Todo tranquilo por aquí" : "It's quiet here")
-                 : (spanish ? "Estás al día" : "You're all caught up"))
-                .font(CuadraoTypography.section)
-            Text(items.isEmpty ? (spanish ? "Aquí podrás revisar tus cuentas y el progreso que registres en tus planes." : "Review your accounts and recorded plan progress here.")
-                 : (spanish ? "Puedes volver a ver tus novedades en Todas." : "You can revisit your updates in All."))
-                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            if !items.isEmpty {
-                Button(spanish ? "Ver todas" : "View all") { unreadOnly = false }
-                    .accessibilityIdentifier("cuadrao.updates.show-all")
-            }
-        }.frame(maxWidth: .infinity).padding(.vertical, 36).accessibilityIdentifier("cuadrao.updates.empty")
     }
     private var unavailable: some View {
         ContentUnavailableView(spanish ? "Ya no está disponible" : "No longer available", systemImage: "tray")

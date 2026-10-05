@@ -22,7 +22,7 @@ struct ConnectedCuadraoSpaces: View {
                         }
                         Button("household.manage") { model.showManagement = true }
                     } label: {
-                        CuadraoSpaceLabel(title: NSLocalizedString("household.title", comment: ""), selected: model.active)
+                        CuadraoSpaceLabel(title: model.household?.name ?? NSLocalizedString("household.title", comment: ""), selected: model.active)
                     }.id("household").accessibilityIdentifier("household.selector")
                         .accessibilityAddTraits(model.active ? [.isSelected] : [])
                 }.buttonStyle(.plain)

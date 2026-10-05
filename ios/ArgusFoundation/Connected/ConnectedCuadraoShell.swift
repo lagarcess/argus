@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Connected Cuadrao shell: Home hosts accounts; no Accounts tab.
 struct ConnectedCuadraoShell: View {
     @Binding var appearance: AppearancePreference
     @EnvironmentObject private var auth: ProfileAuthModel
@@ -10,28 +9,36 @@ struct ConnectedCuadraoShell: View {
     @State private var sheet: FoundationSheet?
     @State private var navigationScroll = CuadraoNavigationScroll()
     @State private var homePath: [ConnectedHomeRoute] = []
-    @State private var profilePath: [CuadraoProfileDestination] = []
+    @State private var profilePath: [CanvasProfileRoute] = []
     @State private var avatar: CuadraoAvatarSelection = .none
+    @State private var chat = CuadraoChatPreview(spanish: Locale.current.language.languageCode?.identifier == "es", includeExamples: false)
+    @State private var chatEditing = false
+    @State private var searchDetail = false
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
+    @ViewBuilder
     var body: some View {
-        TabView(selection: $tab) {
+        if let household = auth.household {
+            HouseholdNavigationVisibility(model: household, tab: householdTab(tab),
+                active: tab != .profile && tab != .assistant) { allowed in
+                shell(allowsHouseholdNavigation: allowed)
+            }
+        } else {
+            shell(allowsHouseholdNavigation: true)
+        }
+    }
+
+    private func shell(allowsHouseholdNavigation: Bool) -> some View {
+        CuadraoAppShell(selection: $tab, chat: chat, spanish: spanish,
+            showsNavigation: showsNavigation && allowsHouseholdNavigation, compact: tab == .home && navigationScroll.compact,
+            avatar: avatar, profileName: auth.profile?.displayName ?? "") { _ in
             ForEach(CuadraoTab.allCases) { item in
                 tabContent(item)
                     .toolbar(.hidden, for: .tabBar)
                     .tag(item)
             }
         }
-        .cuadraoScrollBar(edge: .bottom) {
-            if (homePath.isEmpty || tab != .home) && (profilePath.isEmpty || tab != .profile) {
-                CuadraoNavigationBar(selection: $tab, compact: tab == .home && navigationScroll.compact, spanish: spanish, avatar: avatar, profileName: auth.profile?.displayName ?? "")
-                    .padding(.horizontal, 20)
-                    .frame(height: 64, alignment: .bottom)
-                    .padding(.bottom, 8)
-            }
-        }
-        .cuadraoSoftScrollEdges()
         .background { if let household = auth.household { HouseholdPresenter(model: household) } }
         .background { if let household = auth.household { HouseholdPlanPresenter(model: household.plan) } }
         .financialBudgetBackground(auth.financialLoop?.budgets)
@@ -62,13 +69,10 @@ struct ConnectedCuadraoShell: View {
         }
         .sheet(item: $sheet) { selected in
             if selected == .updates {
-                NavigationStack {
-                    ReleaseUpdatesInbox(state: .unavailable, spanish: spanish)
-                        .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button(spanish ? "Listo" : "Done") { sheet = nil }.accessibilityIdentifier("sheet.close")
-                            }
-                        }
+                ConnectedCuadraoUpdates(spanish: spanish) {
+                    sheet = nil
+                    tab = .profile
+                    profilePath = [.notifications]
                 }.preferredColorScheme(appearance.colorScheme)
             } else {
                 FoundationSheetView(sheet: selected, appearance: $appearance)
@@ -82,12 +86,25 @@ struct ConnectedCuadraoShell: View {
         .background(WelcomePalette.background.ignoresSafeArea())
         .onChange(of: destination) { _, value in mapDestination(value) }
         .onChange(of: tab) { _, value in mapTab(value) }
-        .onChange(of: auth.profile?.id) { _, _ in avatar = .none; profilePath = [] }
+        .onChange(of: auth.profile?.id) { _, _ in
+            avatar = .none
+            profilePath = []
+            homePath = []
+            searchDetail = false
+            chat = CuadraoChatPreview(spanish: spanish, includeExamples: false)
+        }
+    }
+
+    private var showsNavigation: Bool {
+        guard (homePath.isEmpty || tab != .home), (profilePath.isEmpty || tab != .profile),
+              !(tab == .assistant && chatEditing), !(tab == .search && searchDetail) else { return false }
+        return true
     }
 
     @ViewBuilder private func tabContent(_ item: CuadraoTab) -> some View {
-        if item != .profile, let household = auth.household {
-            HouseholdDestinationRouter(model: household, tab: householdTab(item), active: tab == item, destination: $destination) { personalTabContent(item) }
+        if item != .profile && item != .assistant, let household = auth.household {
+            HouseholdDestinationRouter(model: household, tab: householdTab(item), active: tab == item, destination: $destination,
+                navigationScroll: navigationScroll, showUpdates: { sheet = .updates }) { personalTabContent(item) }
         } else { personalTabContent(item) }
     }
 
@@ -103,24 +120,31 @@ struct ConnectedCuadraoShell: View {
             }
         case .plan:
             NavigationStack {
-                FinancialPlanDestination(showProfile: { tab = .profile })
+                FinancialPlanDestination(showProfile: { tab = .profile }, audience: planAudience)
                     .toolbar(.hidden, for: .navigationBar)
             }
         case .assistant:
             NavigationStack {
-                ChatSampleView(showSample: { sheet = .sample })
+                CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing, showsPreviewNotice: true)
                     .toolbar(.hidden, for: .navigationBar)
             }
         case .search:
-            NavigationStack {
-                FinancialSearchDestination(active: tab == .search, showProfile: { tab = .profile })
-                    .toolbar(.hidden, for: .navigationBar)
-            }
+            FinancialSearchDestination(active: tab == .search, showProfile: { tab = .profile }, detailChanged: { searchDetail = $0 })
         case .profile:
-            NavigationStack(path: $profilePath) {
-                ConnectedCuadraoProfile(appearance: $appearance, avatar: $avatar)
-            }
+            ConnectedCuadraoProfile(appearance: $appearance, avatar: $avatar, path: $profilePath)
         }
+    }
+
+    private var planAudience: Binding<Bool>? {
+        guard let household = auth.household, household.isAvailable else { return nil }
+        return Binding(get: { household.active }, set: { together in
+            guard together else { return }
+            if household.households.count == 1, let only = household.households.first {
+                Task { await household.select(only.id) }
+            } else {
+                household.showManagement = true
+            }
+        })
     }
 
     private func householdTab(_ item: CuadraoTab) -> AppDestination {
@@ -157,5 +181,27 @@ struct ConnectedCuadraoShell: View {
         case .search: destination = .search
         case .profile: break
         }
+    }
+}
+
+private struct HouseholdNavigationVisibility<Content: View>: View {
+    @ObservedObject var model: HouseholdModel
+    @ObservedObject private var plan: HouseholdPlanModel
+    let tab: AppDestination
+    let active: Bool
+    @ViewBuilder let content: (Bool) -> Content
+
+    init(model: HouseholdModel, tab: AppDestination, active: Bool, @ViewBuilder content: @escaping (Bool) -> Content) {
+        self.model = model
+        plan = model.plan
+        self.tab = tab
+        self.active = active
+        self.content = content
+    }
+
+    var body: some View {
+        let detail = (model.detail != nil && tab != .plan) ||
+            (plan.openedRef != nil && plan.origin.rawValue == tab.rawValue)
+        content(!active || !model.active || !detail)
     }
 }

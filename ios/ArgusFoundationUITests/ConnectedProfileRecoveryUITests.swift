@@ -3,6 +3,10 @@ import XCTest
 extension FinancialLoopUITests {
     func testConnectedProfileUsesRealIdentityAndApprovedDestinations() throws {
         try signIn()
+        app.terminate()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 15))
         app.openProfileSurface()
         let email = try XCTUnwrap(ProcessInfo.processInfo.environment["ARGUS_TEST_EMAIL"])
         let identity = app.buttons["cuadrao.profile.identity"]
