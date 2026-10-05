@@ -34,10 +34,22 @@ on this branch it passes, 1 test, 0 failures.
 
 ## Track 3: Home movement detail and row gestures (#824)
 
-See the Track 3 PR body for its capture table; files are prefixed `home-movement-`,
-`account-swipe-`, `account-more-`, `account-archived-`, `account-restored-`,
-`movement-swipe-` and `movement-category-`. Captures suffixed `-ios26` come from
-the iOS 26.5 fallback run (context menu and detail actions instead of swipes).
+| Capture | What it shows |
+| --- | --- |
+| `home-movement-row-before-open.png` | Home scrolled to a movement row before the tap. |
+| `home-movement-detail.png` | The movement's authorized detail pushed from Home with its own back button. |
+| `home-movement-back-same-position.png` | Home after back: the same row at the same frame. |
+| `account-swipe-add-movement.png` | Account row swiped right: Add movement. |
+| `account-swipe-edit-more.png` | Account row swiped left: Edit and More. |
+| `account-more-menu.png` | More: Check balance and Archive. |
+| `account-archived-from-more.png` | The row gone from Home after Archive. |
+| `account-restored-after-more-archive.png` | The account restored from Archived accounts and back on Home. |
+| `movement-swipe-edit.png` | Movement row swiped right: Edit. |
+| `movement-swipe-category.png` | Movement row swiped left: Category. |
+| `movement-category-shortcut.png` | The correction editor opened by the Category shortcut with the category control in view. |
+
+Captures suffixed `-ios26` come from the iOS 26.5 fallback run (context menu and
+detail actions instead of swipes).
 
 Raw `.xcresult` bundles stay ignored because authentication diagnostics can carry
 synthetic credentials; these PNGs were exported from them.

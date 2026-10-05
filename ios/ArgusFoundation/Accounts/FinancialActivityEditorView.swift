@@ -9,6 +9,7 @@ struct FinancialActivityEditorView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     if let occurrence = model.planOccurrence {
@@ -79,6 +80,10 @@ struct FinancialActivityEditorView: View {
             }
             .interactiveDismissDisabled(model.busy || model.phase == .uncertain)
             .task { await model.load() }
+            .onChange(of: model.options == nil) { _, loading in
+                if !loading, model.focusCategory { withAnimation { proxy.scrollTo("loop.category", anchor: .center) } }
+            }
+            }
         }
     }
 
@@ -159,7 +164,7 @@ struct FinancialActivityEditorView: View {
                     ForEach(model.options?.categories ?? [], id: \.self) { category in
                         Text(LocalizedStringKey("loop.category." + category)).tag(Optional(category))
                     }
-                }.accessibilityIdentifier("loop.category")
+                }.accessibilityIdentifier("loop.category").id("loop.category")
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("loop.note")

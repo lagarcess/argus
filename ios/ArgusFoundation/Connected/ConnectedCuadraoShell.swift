@@ -9,7 +9,7 @@ struct ConnectedCuadraoShell: View {
     @State private var destination: AppDestination = .home
     @State private var sheet: FoundationSheet?
     @State private var navigationScroll = CuadraoNavigationScroll()
-    @State private var accountPath: [UUID] = []
+    @State private var homePath: [ConnectedHomeRoute] = []
     @State private var profilePath: [CuadraoProfileDestination] = []
     @State private var avatar: CuadraoAvatarSelection = .none
 
@@ -25,7 +25,7 @@ struct ConnectedCuadraoShell: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if (accountPath.isEmpty || tab != .home) && (profilePath.isEmpty || tab != .profile) {
+            if (homePath.isEmpty || tab != .home) && (profilePath.isEmpty || tab != .profile) {
                 CuadraoNavigationBar(selection: $tab, compact: tab == .home && navigationScroll.compact, spanish: spanish, avatar: avatar, profileName: auth.profile?.displayName ?? "")
                     .padding(.horizontal, 20)
                     .frame(height: 64, alignment: .bottom)
@@ -95,7 +95,7 @@ struct ConnectedCuadraoShell: View {
         switch item {
         case .home:
             if let loop = auth.financialLoop, let accounts = auth.accounts {
-                ConnectedCuadraoHome(loop: loop, accounts: accounts, tab: $tab, accountPath: $accountPath,
+                ConnectedCuadraoHome(loop: loop, accounts: accounts, tab: $tab, homePath: $homePath,
                                      navigationScroll: navigationScroll, showUpdates: { sheet = .updates })
             } else {
                 ProgressView("accounts.loading")
@@ -133,10 +133,10 @@ struct ConnectedCuadraoShell: View {
             tab = .home
             if let accounts = auth.accounts, let loop = auth.financialLoop {
                 if let account = accounts.selected {
-                    if accountPath != [account.id] { accountPath = [account.id] }
+                    if homePath != [.account(account.id)] { homePath = [.account(account.id)] }
                     Task { await accounts.open(account); await loop.open(account) }
                 } else if let id = accounts.selectedID {
-                    if accountPath != [id] { accountPath = [id] }
+                    if homePath != [.account(id)] { homePath = [.account(id)] }
                 }
             }
             if destination != .home { destination = .home }
@@ -144,7 +144,7 @@ struct ConnectedCuadraoShell: View {
         case .search: tab = .search
         case .home:
             tab = .home
-            if !accountPath.isEmpty { accountPath = [] }
+            if !homePath.isEmpty { homePath = [] }
         case .argus: tab = .assistant
         }
     }

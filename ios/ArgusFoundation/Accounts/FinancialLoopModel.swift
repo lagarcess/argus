@@ -159,16 +159,22 @@ final class FinancialLoopModel: ObservableObject {
         return account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")
     }
 
-    func correct(_ activity: FinancialActivityDetail) {
-        guard activity.originalAmountAvailable, let id = activity.legs.first?.accountId,
-              let account = accounts.accounts.first(where: { $0.id == id }) else { return }
-        record(account, correcting: activity)
+    func canCorrect(_ activity: FinancialActivityDetail) -> Bool { correctionAccount(activity) != nil }
+
+    func correct(_ activity: FinancialActivityDetail, focusCategory: Bool = false) {
+        guard let account = correctionAccount(activity) else { return }
+        record(account, correcting: activity, focusCategory: focusCategory)
     }
 
-    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil) {
+    private func correctionAccount(_ activity: FinancialActivityDetail) -> FinancialAccount? {
+        guard activity.originalAmountAvailable, let id = activity.legs.first?.accountId else { return nil }
+        return accounts.accounts.first { $0.id == id }
+    }
+
+    func record(_ account: FinancialAccount, correcting activity: FinancialActivityDetail? = nil, occurrence: FinancialPlanOccurrence? = nil, goal: FinancialGoal? = nil, goalOccurrenceId: String? = nil, debt: FinancialDebt? = nil, debtOccurrenceId: String? = nil, returning: FinancialActivityDetail? = nil, focusCategory: Bool = false) {
         guard let identity, pendingConfirmation == nil, correctingAmountAvailable(activity), correctingAmountAvailable(returning) else { return }
         let ticket = generation
-        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, goal: goal, goalOccurrenceId: goalOccurrenceId, debt: debt, debtOccurrenceId: debtOccurrenceId, returning: returning, controller: controller,
+        activityEditor = FinancialActivityEditor(origin: account, correcting: activity, planOccurrence: occurrence, goal: goal, goalOccurrenceId: goalOccurrenceId, debt: debt, debtOccurrenceId: debtOccurrenceId, returning: returning, focusCategory: focusCategory, controller: controller,
             journal: journal, identity: identity, started: { [weak self] write in
                 guard let self, self.generation == ticket else { return }
                 self.pendingConfirmation = write

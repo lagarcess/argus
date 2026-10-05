@@ -7,7 +7,7 @@ struct ConnectedCuadraoHome: View {
     @ObservedObject var accounts: AccountsModel
     @ObservedObject private var plan: FinancialPlanModel
     @Binding var tab: CuadraoTab
-    @Binding var accountPath: [UUID]
+    @Binding var homePath: [ConnectedHomeRoute]
     let navigationScroll: CuadraoNavigationScroll
     let showUpdates: () -> Void
 
@@ -17,6 +17,7 @@ struct ConnectedCuadraoHome: View {
     @Environment(\.locale) private var locale
     @State private var sheet: HomeSheet?
     @State private var choosingAccount = false
+    @State private var moreAccount: FinancialAccount?
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var activeAccounts: [FinancialAccount] { accounts.accounts.filter { !$0.archived } }
@@ -34,18 +35,18 @@ struct ConnectedCuadraoHome: View {
     }
 
     init(loop: FinancialLoopModel, accounts: AccountsModel, tab: Binding<CuadraoTab>,
-         accountPath: Binding<[UUID]>, navigationScroll: CuadraoNavigationScroll, showUpdates: @escaping () -> Void) {
+         homePath: Binding<[ConnectedHomeRoute]>, navigationScroll: CuadraoNavigationScroll, showUpdates: @escaping () -> Void) {
         self.loop = loop
         self.accounts = accounts
         self.plan = loop.plan
         self._tab = tab
-        self._accountPath = accountPath
+        self._homePath = homePath
         self.navigationScroll = navigationScroll
         self.showUpdates = showUpdates
     }
 
     var body: some View {
-        NavigationStack(path: $accountPath) {
+        NavigationStack(path: $homePath) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 36) {
                     VStack(alignment: .leading, spacing: 18) {
@@ -79,34 +80,15 @@ struct ConnectedCuadraoHome: View {
             }
             .accessibilityIdentifier("screen.home")
             .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
-                enabled: tab == .home && sheet == nil && accountPath.isEmpty))
+                enabled: tab == .home && sheet == nil && homePath.isEmpty))
             .safeAreaPadding(.bottom, 80)
             .background(Color.white)
             .navigationTitle("").navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: UUID.self) { id in
-                if let account = accounts.accounts.first(where: { $0.id == id }) ?? accounts.selected {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            AccountDetailView(account: account, model: accounts, loop: loop)
-                        }.padding(24)
-                    }
-                    .accessibilityIdentifier("screen.accounts")
-                    .background(Color.white)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar(.visible, for: .navigationBar)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button {
-                                // Clear selection first; selectedID onChange drops the path.
-                                accounts.back()
-                            } label: {
-                                Label("accounts.back", systemImage: "chevron.left")
-                            }
-                            .accessibilityIdentifier("accounts.back")
-                        }
-                    }
-                    .navigationBarBackButtonHidden(true)
+            .navigationDestination(for: ConnectedHomeRoute.self) { route in
+                switch route {
+                case .activity(let id): activityDetail(id)
+                case .account(let id): accountDetail(id)
                 }
             }
         }
@@ -114,17 +96,17 @@ struct ConnectedCuadraoHome: View {
         .onChange(of: accounts.accounts) { _, _ in Task { await loop.refresh() } }
         .onChange(of: accounts.selectedID) { _, id in
             if let id {
-                if accountPath != [id] { accountPath = [id] }
-            } else if !accountPath.isEmpty {
-                accountPath = []
+                if homePath != [.account(id)] { homePath = [.account(id)] }
+            } else if !homePath.isEmpty, !showsActivity {
+                homePath = []
             }
         }
-        .onChange(of: accountPath) { _, path in
+        .onChange(of: homePath) { _, path in
             // Sheet dismiss can empty the stack under a still-selected account.
             // Re-push instead of clearing selection (back button clears selection).
             if path.isEmpty, let id = accounts.selectedID,
                loop.activityEditor == nil, loop.editor == nil {
-                accountPath = [id]
+                homePath = [.account(id)]
             }
         }
         .onChange(of: loop.activityEditor == nil) { _, closed in
@@ -141,13 +123,73 @@ struct ConnectedCuadraoHome: View {
                 }
             }
         }
+        .confirmationDialog(Text(verbatim: moreAccount.map(accountName) ?? ""), isPresented: Binding(get: { moreAccount != nil }, set: { if !$0 { moreAccount = nil } }),
+                            titleVisibility: .visible, presenting: moreAccount) { account in
+            if !account.isOptionalAsset {
+                Button(NSLocalizedString("loop.check.title", comment: "")) { loop.check(account) }.accessibilityIdentifier("accounts.more.check")
+            }
+            Button(spanish ? "Archivar" : "Archive", role: .destructive) { Task { await accounts.archive(account) } }
+                .accessibilityIdentifier("accounts.more.archive")
+        }
         .sheet(item: $sheet) { item in modal(item) }
     }
 
+    /// Activity routes never belong to the accounts selection, so selection changes leave them alone.
+    private var showsActivity: Bool { homePath.contains { $0.accountID == nil } }
+
+    private func accountName(_ account: FinancialAccount) -> String {
+        account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")
+    }
+
+    @ViewBuilder private func activityDetail(_ id: UUID) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }
+            }.padding(24)
+        }
+        .accessibilityIdentifier("screen.activity")
+        .background(Color.white)
+        .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { homePath.removeAll { $0.accountID == nil } } label: { Label("accounts.back", systemImage: "chevron.left") }
+                    .accessibilityIdentifier("activity.back")
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+    }
+
+    @ViewBuilder private func accountDetail(_ id: UUID) -> some View {
+        if let account = accounts.accounts.first(where: { $0.id == id }) ?? accounts.selected {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    AccountDetailView(account: account, model: accounts, loop: loop)
+                }.padding(24)
+            }
+            .accessibilityIdentifier("screen.accounts")
+            .background(Color.white)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        // Clear selection first; selectedID onChange drops the path.
+                        accounts.back()
+                    } label: {
+                        Label("accounts.back", systemImage: "chevron.left")
+                    }
+                    .accessibilityIdentifier("accounts.back")
+                }
+            }
+            .navigationBarBackButtonHidden(true)
+        }
+    }
+
     private func restoreDetailPath() {
-        guard loop.activityEditor == nil, loop.editor == nil,
-              let id = accounts.selectedID, accountPath != [id] else { return }
-        accountPath = [id]
+        guard loop.activityEditor == nil, loop.editor == nil, !showsActivity,
+              let id = accounts.selectedID, homePath != [.account(id)] else { return }
+        homePath = [.account(id)]
     }
 
     private var header: some View {
@@ -243,30 +285,69 @@ struct ConnectedCuadraoHome: View {
                         .accessibilityIdentifier("accounts.manage")
                 }
             }
-            ForEach(activeAccounts) { account in
-                ConnectedAccountRow(account: account, spanish: spanish)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        Task {
-                            await accounts.open(account)
-                            await loop.open(account)
-                        }
+            VStack(spacing: 0) {
+                ForEach(activeAccounts) { account in
+                    ConnectedSwipeRow(leading: accountActions(account, edge: .leading), trailing: accountActions(account, edge: .trailing)) {
+                        ConnectedAccountRow(account: account, spanish: spanish)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                Task {
+                                    await accounts.open(account)
+                                    await loop.open(account)
+                                }
+                            }
+                            .contextMenu {
+                                Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.edit(account) }
+                                Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
+                                Button(spanish ? "Archivar" : "Archive", role: .destructive) {
+                                    Task { await accounts.archive(account) }
+                                }
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityIdentifier("accounts.row.\(account.id)")
                     }
-                    .contextMenu {
-                        Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.edit(account) }
-                        Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
-                        Button(spanish ? "Archivar" : "Archive", role: .destructive) {
-                            Task { await accounts.archive(account) }
-                        }
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityIdentifier("accounts.row.\(account.id)")
                     .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
-            }
+                }
+            }.connectedSwipeContainer()
             if activeAccounts.isEmpty {
                 personalEmpty
             }
+        }
+    }
+
+    /// Swipe right adds a movement; swipe left edits or opens More (Archive and other existing commands).
+    private func accountActions(_ account: FinancialAccount, edge: HorizontalEdge) -> [ConnectedSwipeAction] {
+        guard loop.pendingConfirmation == nil else { return [] }
+        switch edge {
+        case .leading:
+            return [.init(id: "accounts.swipe.record", title: spanish ? "Añadir movimiento" : "Add movement", symbol: "plus", tint: WelcomePalette.pine) { loop.record(account) }]
+        case .trailing:
+            return [.init(id: "accounts.swipe.edit", title: spanish ? "Editar" : "Edit", symbol: "pencil", tint: .blue) { accounts.edit(account) },
+                    .init(id: "accounts.swipe.more", title: spanish ? "Más" : "More", symbol: "ellipsis", tint: .gray) { moreAccount = account }]
+        }
+    }
+
+    /// Edit and Category both go through the same correction owner, so every gate the detail applies applies here.
+    private func movementActions(_ entry: FinancialActivity, edge: HorizontalEdge) -> [ConnectedSwipeAction] {
+        guard loop.pendingConfirmation == nil, entry.active != false else { return [] }
+        let id = entry.activityId ?? entry.recordId
+        switch edge {
+        case .leading:
+            return [.init(id: "home.activity.swipe.edit", title: spanish ? "Editar" : "Edit", symbol: "pencil", tint: .blue) { correct(id, focusCategory: false) }]
+        case .trailing:
+            guard entry.kind == "expense" else { return [] }
+            return [.init(id: "home.activity.swipe.category", title: spanish ? "Categoría" : "Category", symbol: "tag", tint: .orange) { correct(id, focusCategory: true) }]
+        }
+    }
+
+    private func correct(_ activityID: UUID, focusCategory: Bool) {
+        Task {
+            // The detail explains a failed read or why this movement cannot be corrected, so a swipe never does nothing.
+            guard let detail = try? await loop.detail(id: activityID), loop.canCorrect(detail) else {
+                homePath.append(.activity(activityID)); return
+            }
+            loop.correct(detail, focusCategory: focusCategory)
         }
     }
 
@@ -308,18 +389,19 @@ struct ConnectedCuadraoHome: View {
                 .disabled(activeAccounts.isEmpty || loop.pendingConfirmation != nil)
                 .accessibilityIdentifier("home.record")
             }
-            ForEach(home.recentActivity, id: \.recordId) { entry in
-                if let account = accounts.accounts.first(where: { $0.id == entry.accountId }) {
-                    Button {
-                        Task {
-                            await accounts.open(account)
-                            await loop.open(account)
+            VStack(spacing: 0) {
+                ForEach(home.recentActivity, id: \.recordId) { entry in
+                    if let account = accounts.accounts.first(where: { $0.id == entry.accountId }) {
+                        ConnectedSwipeRow(leading: movementActions(entry, edge: .leading), trailing: movementActions(entry, edge: .trailing)) {
+                            FinancialActivityRow(activity: entry, currency: account.currency)
+                                .onTapGesture { homePath.append(.activity(entry.activityId ?? entry.recordId)) }
+                                .accessibilityElement(children: .combine)
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityIdentifier("home.activity." + (entry.activityId ?? entry.recordId).uuidString)
                         }
-                    } label: {
-                        FinancialActivityRow(activity: entry, currency: account.currency)
-                    }.buttonStyle(.plain)
+                    }
                 }
-            }
+            }.connectedSwipeContainer()
         }
     }
 
