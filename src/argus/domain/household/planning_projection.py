@@ -12,7 +12,7 @@ from argus.domain.planning import (
     storage,
 )
 from argus.domain.recording.currency import currency_exponent
-from argus.domain.recording.money_reads import render_activity
+from argus.domain.recording.money_reads import activity_in_currency, render_activity
 from argus.domain.recording.spending import spending
 
 from . import planning_definitions as definitions
@@ -206,7 +206,7 @@ def public(
         accepted = link["attribution"]
         valid = bool(
             entry
-            and entry["currency"] == body["currency"]
+            and activity_in_currency(entry, body["currency"])
             and entry["kind"] == accepted["kind"]
             and {(leg["role"], leg["account_id"]) for leg in entry["legs"]}
             == {tuple(leg) for leg in accepted["legs"]}

@@ -4,7 +4,12 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+)
 
 ActivityKind = Literal[
     "expense",
@@ -47,6 +52,9 @@ class MoneyRequest(BaseModel):
     source_account_id: str | None = None
     destination_account_id: str | None = None
     amount: str = Field(max_length=40)
+    destination_amount: str | None = Field(
+        default=None, max_length=40, exclude_if=lambda value: value is None
+    )
     principal: str | None = Field(default=None, max_length=40)
     interest: str | None = Field(default=None, max_length=40)
     fees: str | None = Field(default=None, max_length=40)
@@ -80,6 +88,7 @@ class MoneyRequest(BaseModel):
         if any(v < 1 for v in value.values()):
             raise ValueError("Account versions must be positive.")
         return {str(UUID(k)): v for k, v in value.items()}
+
 
 DESTINATION_ELIGIBILITY = {
     "transfer": LIQUID_TYPES,

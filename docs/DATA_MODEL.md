@@ -2839,6 +2839,21 @@ details and enforce an owner-qualified FK to the exact reviewed purchase revisio
 This preserves one source for refund provenance while making cross-owner references
 unrepresentable. The additive integrity migration is 20260929130000.
 
+### Paired currency transfer facts (#820)
+
+No schema or backfill is added. Each exact leg revision retains its own integer
+`amount_minor`; the corresponding canonical account owns its immutable currency.
+Group revisions, memberships, coverage and receipt transactions remain unchanged.
+No rate, converted total or duplicate amount is stored. Per-leg read denomination
+and formatted amount derive from that account and revision after visibility filtering.
+A hidden source does not disclose its denomination through the legacy summary.
+
+The destination input is included in request identity only when non-null. Existing
+receipt and preview preimages remain identical when it is absent. Plan currency
+stays fixed and current attribution rejects pairs with any different-currency leg.
+The write flag and acceptance boundary live in the
+[transfer contract](specs/lanes/cuadrao-cross-currency-transfers.md).
+
 ### Connected Plan storage
 
 The additive connected Plan migration stores owner-scoped expectations with versioned
