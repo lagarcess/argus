@@ -20,9 +20,15 @@ DOCS_READING_TESTS_SCRIPT = ROOT / ".github" / "docs-reading-tests.sh"
 RUNBOOK_PATH = ROOT / "docs" / "PRIVATE_LAUNCH_RUNBOOK.md"
 FAKE = Faker()
 
-_HEAVY_CI_JOBS = ("backend-checks", "frontend-checks", "guest-release-gates")
+_HEAVY_CI_JOBS = ("backend-checks", "frontend-checks")
+# A push or a ready pull request runs the full CI; the scheduled and manual
+# probe runs only the latest-CLI real-Postgres leg.
 _DRAFT_OR_PUSH = (
-    "github.event.pull_request.draft == false || github.event_name == 'push'"
+    "github.event_name == 'push' || (github.event_name == 'pull_request' && "
+    "github.event.pull_request.draft == false)"
+)
+_LATEST_CLI_PROBE = (
+    "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
 )
 _DRAFT_OR_NON_PR = (
     "github.event.pull_request.draft == false || "
@@ -88,7 +94,10 @@ def test_ci_runs_on_main_codex_and_jules_without_deploying() -> None:
 def test_ci_queues_integration_branch_runs_without_canceling_evidence() -> None:
     concurrency = _workflow()["concurrency"]
 
-    assert concurrency["group"] == "${{ github.workflow }}-${{ github.ref }}"
+    # The event name keeps a scheduled probe on main from canceling a push run.
+    assert concurrency["group"] == (
+        "${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}"
+    )
     assert concurrency["cancel-in-progress"] == (
         "${{ github.ref != 'refs/heads/codex/private-alpha-next' && "
         "github.ref != 'refs/heads/codex/private-alpha-next-jules-intake' }}"
@@ -158,7 +167,13 @@ def test_ci_runs_guest_release_gates_with_disposable_local_supabase() -> None:
     }
 
     assert "supabase/setup-cli@v1" in uses_steps
-    assert uses_steps["supabase/setup-cli@v1"]["with"]["version"] == "2.109.0"
+    assert _workflow()["env"]["ARGUS_CI_SUPABASE_CLI_VERSION"] == "2.109.0"
+    assert uses_steps["supabase/setup-cli@v1"]["with"]["version"] == (
+        "${{ matrix.supabase-cli == 'latest' && 'latest' || "
+        "env.ARGUS_CI_SUPABASE_CLI_VERSION }}"
+    )
+    assert "supabase --version" in joined_steps
+    assert '--format \'{{.Names}} {{.Image}}\'' in joined_steps
     assert "supabase start" in joined_steps
     assert "supabase db reset" in joined_steps
     assert "ARGUS_DISPOSABLE_DATABASE_URL" in joined_steps
@@ -685,7 +700,7 @@ def test_pull_request_heavy_jobs_use_the_shared_docs_change_gate() -> None:
         step for step in gate["steps"] if step.get("id") == "classify"
     )
 
-    assert gate["if"] == _DRAFT_OR_PUSH
+    assert gate["if"] == f"{_DRAFT_OR_PUSH} || {_LATEST_CLI_PROBE}"
     assert gate["outputs"]["run_heavy"] == "${{ steps.classify.outputs.run_heavy }}"
     assert classify["run"] == ".github/docs-only-changes.sh"
     assert classify["env"]["PR_BASE_SHA"] == (
@@ -702,6 +717,12 @@ def test_pull_request_heavy_jobs_use_the_shared_docs_change_gate() -> None:
         job = jobs[job_name]
         assert _job_needs(job) == ["docs-change-gate"]
         assert job["if"] == heavy_if
+    guest_job = jobs["guest-release-gates"]
+    assert _job_needs(guest_job) == ["docs-change-gate"]
+    assert guest_job["if"] == (
+        f"({_DRAFT_OR_PUSH} || {_LATEST_CLI_PROBE}) && "
+        "needs.docs-change-gate.outputs.run_heavy == 'true'"
+    )
 
     smoke = _smoke_workflow()
     smoke_gate = smoke["jobs"]["docs-change-gate"]
@@ -780,3 +801,49 @@ def test_ci_aggregator_allows_skipped_docs_checks_when_not_docs_only() -> None:
     )[1]
     assert "require_success_or_skipped docs-checks" in not_docs_only_branch
     assert "require_success docs-checks" not in not_docs_only_branch.split("fi", 1)[0]
+
+
+def test_real_postgres_matrix_runs_on_pinned_and_latest_supabase_cli() -> None:
+    workflow = _workflow()
+    guest_job = workflow["jobs"]["guest-release-gates"]
+
+    assert workflow["on"]["schedule"] == [{"cron": "17 9 * * 1"}]
+    assert "workflow_dispatch" in workflow["on"]
+    assert guest_job["strategy"]["fail-fast"] is False
+    assert guest_job["strategy"]["matrix"]["supabase-cli"] == (
+        "${{ fromJSON((github.event_name == 'schedule' || "
+        "github.event_name == 'workflow_dispatch') && '[\"latest\"]' || "
+        "'[\"pinned\", \"latest\"]') }}"
+    )
+    by_name = {step.get("name"): step for step in guest_job["steps"]}
+    always = (
+        "Start disposable local Supabase and reset migrations",
+        "Print Supabase CLI and image versions",
+        "Run required real-PostgreSQL matrix",
+    )
+    for name in always:
+        assert "if" not in by_name[name], name
+    pinned_only = [
+        name
+        for name, step in by_name.items()
+        if step.get("if") == "matrix.supabase-cli == 'pinned'"
+    ]
+    assert pinned_only == [
+        "Run provider-free guest backend tests",
+        "Run required local anonymous Auth matrix",
+        "Set up Bun",
+        "Install frontend dependencies",
+        "Run guest frontend tests",
+    ]
+
+
+def test_scheduled_probe_runs_no_other_job() -> None:
+    jobs = _workflow()["jobs"]
+    probe_jobs = {"docs-change-gate", "guest-release-gates"}
+
+    for name, job in jobs.items():
+        if name in probe_jobs:
+            assert _LATEST_CLI_PROBE in job["if"], name
+        else:
+            assert _LATEST_CLI_PROBE not in job["if"], name
+            assert _DRAFT_OR_PUSH in job["if"], name
