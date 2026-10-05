@@ -126,6 +126,7 @@ final class FinancialScrollRestorationTests: XCTestCase {
         var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         legacy.removeValue(forKey: "anchorOffset")
         let restored = try JSONDecoder().decode(Route.self, from: JSONSerialization.data(withJSONObject: legacy))
-        XCTAssertEqual(restored, route, "Missing offset must not discard the existing route", file: file, line: line)
+        let legacyMatches = restored == route
+        XCTAssertTrue(legacyMatches, "Missing offset must not discard the existing route", file: file, line: line)
     }
 }
