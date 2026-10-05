@@ -131,3 +131,34 @@ def test_me_openapi_documents_identity_unavailable():
 
     response = app.openapi()["paths"]["/api/v1/me"]["get"]["responses"]["503"]
     assert "apple_identity_unavailable" in response["description"]
+
+
+@pytest.mark.parametrize("subject", [SUBJECT, None])
+def test_profile_patch_preserves_current_identity_envelope(owner, monkeypatch, subject):
+    from argus.api.schemas import ProfilePatch
+
+    user, request = owner
+    monkeypatch.setattr(profile, "require_account_capability", lambda *a, **k: None)
+    identity = LinkedAppleIdentity(subject) if subject else None
+    read = MagicMock(return_value=identity)
+    monkeypatch.setattr(profile, "_apple_identity", read)
+    result = profile.patch_me(ProfilePatch(currency_override="USD"), request, user)
+    assert result.user.currency == "USD"
+    assert result.apple_identity == (
+        profile.AppleIdentity(subject=subject) if subject else None
+    )
+    read.assert_called_once_with(request, user.id)
+
+
+def test_profile_patch_identity_failure_has_no_profile_side_effect(owner, monkeypatch):
+    from argus.api.schemas import ProfilePatch
+
+    user, request = owner
+    monkeypatch.setattr(profile, "require_account_capability", lambda *a, **k: None)
+    before = api_state.store.users.get(user.id)
+    read = MagicMock(side_effect=HTTPException(status_code=503))
+    monkeypatch.setattr(profile, "_apple_identity", read)
+    with pytest.raises(HTTPException) as raised:
+        profile.patch_me(ProfilePatch(currency_override="EUR"), request, user)
+    assert raised.value.status_code == 503
+    assert api_state.store.users.get(user.id) == before

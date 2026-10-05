@@ -59,12 +59,17 @@ def owners(monkeypatch):
         connection.execute("delete from auth.users where id = any(%s::uuid[])", (ids,))
 
 
-def test_me_reads_only_authenticated_owners_linked_subject(owners):
+@pytest.mark.parametrize("method", ["GET", "PATCH"])
+def test_me_reads_only_authenticated_owners_linked_subject(owners, method):
     ids, client = owners
     for user_id, subject in zip(
         ids, ["session-owner-apple", "session-other-apple"], strict=True
     ):
-        response = client.get("/api/v1/me", headers={"X-Synthetic-Owner": user_id})
+        response = client.request(
+            method, "/api/v1/me",
+            headers={"X-Synthetic-Owner": user_id},
+            **({"json": {"currency_override": "USD"}} if method == "PATCH" else {}),
+        )
         assert response.status_code == 200
         assert response.json()["user"]["id"] == user_id
         assert response.json()["apple_identity"] == {"subject": subject}

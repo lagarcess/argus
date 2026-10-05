@@ -210,7 +210,10 @@ def test_the_profile_row_stores_the_override_and_never_the_resolved_currency(
             written.append(dict(updates))
             return User.model_validate(stored.model_dump() | updates)
 
+    from argus.api.routers import profile
+
     monkeypatch.setattr(api_state, "supabase_gateway", _ProfileGateway())
+    monkeypatch.setattr(profile, "_apple_identity", lambda *_: None)
 
     response = TestClient(app).patch("/api/v1/me", json={"currency_override": "USD"})
 

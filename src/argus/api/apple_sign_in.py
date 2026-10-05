@@ -42,6 +42,7 @@ from argus.domain.ingestion.secrets import SecretBox, SecretBoxUnavailable
 
 FLAG = "ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED"
 CAPTURE_PATH = "/api/v1/auth/apple/authorization-code"
+APPLE_NAME_PATH = "/api/v1/me/apple-name"
 TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 _service: AppleCredentialService | None = None
@@ -65,7 +66,7 @@ class AppleCaptureFlagGateMiddleware:
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         if (
             scope.get("type") == "http"
-            and scope.get("path", "").rstrip("/") == CAPTURE_PATH
+            and scope.get("path", "").rstrip("/") in {CAPTURE_PATH, APPLE_NAME_PATH}
             and not capture_enabled()
         ):
             response = JSONResponse({"detail": "Not Found"}, status_code=404)

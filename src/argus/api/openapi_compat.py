@@ -266,16 +266,25 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             "`auth_session_verification_unavailable`: the session could not be verified."
         )
 
+    profile_patch = spec.get("paths", {}).get(f"{API_PREFIX}/me", {}).get("patch")
+    if profile_patch is not None:
+        profile_patch.setdefault("responses", {})["503"] = _error_response(
+            "`apple_identity_unavailable`: current linked identity could not be verified; "
+            "no profile update is applied. "
+            "`auth_session_verification_unavailable`: the session could not be verified."
+        )
+
     deletion_op = (
         spec.get("paths", {}).get(f"{API_PREFIX}/account/delete", {}).get("post")
     )
     if deletion_op is not None:
         # Starting and resuming a deletion are the same POST (Lane 6).
         deletion_op.setdefault("responses", {})["503"] = _error_response(
-            "`account_deletion_incomplete`: the run did not finish and may have "
-            "locked the account; retrying this route resumes it (Retry-After: "
-            "5). `account_deletion_unavailable`: deletion isn't configured on "
-            "this server. `auth_session_verification_unavailable`: the session "
+            "`account_deletion_incomplete`: the run may be open or its admission "
+            "state could not be established; retry this route (Retry-After: 5). "
+            "`account_deletion_unavailable`: no deletion has started and its "
+            "identity, credential, or deletion service is unavailable. "
+            "`auth_session_verification_unavailable`: the session "
             "could not be verified; retry."
         )
 

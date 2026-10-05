@@ -385,6 +385,7 @@ def patch_me(
             context={"errors": exc.errors()},
         ) from exc
 
+    identity = _apple_identity(request, user.id)
     if api_state.supabase_gateway is not None:
         try:
             # A derived field is not a column; the row stores what it derives from.
@@ -410,4 +411,4 @@ def patch_me(
         user_id=user.id,
         fields=updated_fields,
     )
-    return _user_response(updated, context)
+    return _user_response(updated, context, identity)

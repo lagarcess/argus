@@ -34,6 +34,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountDeletionResponse'
+        '400':
+          description: '`apple_authorization_invalid`: fresh Apple code is invalid or consumed;
+            no run started.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: '`apple_reauthorization_required` or `apple_identity_mismatch`: fresh
+            authorization is required before deletion starts.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: 'No valid session: missing or invalid token, an ended session, or on
             resume a token that doesn''t name the person''s own live session (or lacks `sub`,
@@ -69,10 +83,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
-          description: '`account_deletion_incomplete`: the run did not finish and may have
-            locked the account; retrying this route resumes it (Retry-After: 5). `account_deletion_unavailable`:
-            deletion isn''t configured on this server. `auth_session_verification_unavailable`:
-            the session could not be verified; retry.'
+          description: '`account_deletion_incomplete`: the run may be open or its admission
+            state could not be established; retry this route (Retry-After: 5). `account_deletion_unavailable`:
+            no deletion has started and its identity, credential, or deletion service is unavailable.
+            `auth_session_verification_unavailable`: the session could not be verified; retry.'
           content:
             application/json:
               schema:
@@ -7571,6 +7585,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
+          description: '`apple_identity_unavailable`: current linked identity could not be
+            verified; no profile update is applied. `auth_session_verification_unavailable`:
+            the session could not be verified.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/me/apple-name:
+    post:
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppleDisplayNameRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
           $ref: '#/components/responses/AuthSessionVerificationUnavailable'
         '500':
           description: An unexpected server error occurred.
@@ -8418,6 +8469,13 @@ components:
         confirm:
           type: boolean
           const: true
+        apple_authorization_code:
+          anyOf:
+          - type: string
+            maxLength: 512
+            minLength: 1
+            pattern: ^[\x00-\x7f]+$
+          - type: 'null'
       additionalProperties: false
       type: object
       required:
@@ -8805,6 +8863,16 @@ components:
       type: object
       required:
       - authorization_code
+    AppleDisplayNameRequest:
+      properties:
+        display_name:
+          type: string
+          maxLength: 200
+          minLength: 1
+      additionalProperties: false
+      type: object
+      required:
+      - display_name
     AppleIdentity:
       properties:
         subject:
