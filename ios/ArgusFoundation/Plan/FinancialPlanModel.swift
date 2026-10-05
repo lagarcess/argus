@@ -55,19 +55,20 @@ final class FinancialPlanModel: ObservableObject {
             await loop.budgets.refreshIfOpen()
             await loop.goals.refreshIfOpen()
             await loop.debts.refreshIfOpen()
-        } catch { if request == query { await failed(error, ticket: ticket) } }
+        } catch { if request == query { await failed(error, ticket: ticket, home: endDate == nil) } }
         guard generation == ticket, request == query else { return }
         if endDate != nil {
             do {
                 let upcoming = try await controller.financialPlan(endDate: nil, expectedIdentity: identity)
                 guard generation == ticket, request == query else { return }
                 homeProjection = upcoming
-            } catch { if request == query { await failed(error, ticket: ticket, home: true) } }
+            } catch { if request == query { await failed(error, ticket: ticket, plan: false, home: true) } }
         }
         guard generation == ticket, request == query else { return }
         // An occurrence opened from Home can sit outside Plan's window; keep it as long as either read still has it.
+        // Home is read last, so its copy is the freshest when both windows hold the occurrence.
         if let selectedOccurrence {
-            self.selectedOccurrence = ((projection?.occurrences ?? []) + (homeProjection?.occurrences ?? [])).first { $0.id == selectedOccurrence.id }
+            self.selectedOccurrence = ((homeProjection?.occurrences ?? []) + (projection?.occurrences ?? [])).first { $0.id == selectedOccurrence.id }
         }
     }
 
@@ -202,13 +203,14 @@ final class FinancialPlanModel: ObservableObject {
         }
     }
 
-    private func failed(_ error: Error, ticket: UUID, home: Bool = false) async {
+    private func failed(_ error: Error, ticket: UUID, plan: Bool = true, home: Bool = false) async {
         guard generation == ticket else { return }
         let current = await controller.snapshot()
         guard generation == ticket else { return }
-        if current != identity { loop.bind(current); loop.sessionChanged?(current) }
-        else if home { homeErrorKey = FinancialActivityEditor.message(error) }
-        else { errorKey = FinancialActivityEditor.message(error) }
+        if current != identity { loop.bind(current); loop.sessionChanged?(current); return }
+        let message = FinancialActivityEditor.message(error)
+        if plan { errorKey = message }
+        if home { homeErrorKey = message }
     }
 }
 
