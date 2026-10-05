@@ -3310,7 +3310,7 @@ moment the run opens and the auth user is banned, so clients sign out. A third
 party hasn't confirmed yet, so the auth delete waits. `pending` names it
 (`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
 itself is being retried. Every third-party step (Sign in with Apple through
-#793, Google/Gmail and Plaid tokens, PostHog person deletion) runs before the
+#793, Google/Gmail and Plaid tokens, PostHog personless event deletion) runs before the
 auth delete. A repeat request resumes the run, and so does the operator-run
 sweep (`scripts/ops/resume_account_deletions.py` inside
 `scheduled_maintenance.py`; nothing runs it on a schedule, see
@@ -3323,6 +3323,15 @@ once, on the result; closing the confirmation only clears local state.
 ```json
 { "status": "in_progress", "pending": ["plaid"] }
 ```
+
+The default-off `ARGUS_ANALYTICS_DELETION_ENABLED` adapter submits a project-scoped
+personless event deletion request using the durable run UUID as its submission
+UUID. Acceptance keeps `analytics` pending. Only a separate provider read with
+matching request and submission UUIDs and status `completed` completes that step.
+Pending, failed and operator-needed outcomes keep the account locked and the
+auth delete waiting. User retries and the existing operator sweep resume the
+same request. Provider approval, credentials and activation remain external
+gates described in the [adapter evidence](reports/evidence/806-personless-deletion/README.md).
 
 Existing runs bypass new-run admission. A linked Apple identity without a
 stored credential remains pending unless the existing run has a terminal Apple

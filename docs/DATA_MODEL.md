@@ -2529,6 +2529,14 @@ cron is to be created for it. The
 the cadence and the 7-day operator force; the
 [API contract](API_CONTRACT.md#post-accountdelete) owns the route.
 
+The personless analytics adapter stores `analytics_evidence` in the existing
+run `steps`. It contains submission and request UUIDs, parsed provider status,
+selected-event count, HTTP status and local outcome. The run UUID owns submission
+identity, so retries do not create a separate identity store. Provider bodies,
+queries, distinct IDs and credentials are excluded from this evidence. A selected
+event count is not an independently verified deletion count. The
+[API contract](API_CONTRACT.md#post-accountdelete) owns completion and retry behavior.
+
 ---
 
 # 17. Recents / History Model
