@@ -78,7 +78,9 @@ def linked(identities, gateway):  # noqa: ANN001, ANN201, F811
         sub = SUBJECT if provider == "apple" else user_id
         return {
             **user,
-            "identities": [{"provider": provider, "identity_data": {"sub": sub}}],
+            "identities": [
+                {"provider": provider, "provider_id": sub, "identity_data": {"sub": sub}}
+            ],
         }
 
     gateway.get_auth_user_by_id.side_effect = by_id
@@ -256,7 +258,7 @@ def test_a_storage_failure_is_503_and_revokes_the_token(
     def down(**_: object) -> None:
         raise ConnectionError("database down")
 
-    monkeypatch.setattr(repository, "upsert", down)
+    monkeypatch.setattr(repository, "save_capture", down)
     refresh = apple.grant()
     response = client.post(URL, json={"authorization_code": "c"}, headers=bearer(ALICE))
     assert response.status_code == 503
@@ -275,7 +277,7 @@ def test_a_failed_save_stays_503_whatever_the_compensating_revoke_does(
     def down(**_: object) -> None:
         raise ConnectionError("database down")
 
-    monkeypatch.setattr(repository, "upsert", down)
+    monkeypatch.setattr(repository, "save_capture", down)
     if failure == "unexpected":
         apple.revoke_raises = RuntimeError("unexpected client failure")
     else:
@@ -341,3 +343,57 @@ def test_identity_lookup_failure_is_503(client, apple, linked) -> None:  # noqa:
 def test_gateway_mock_is_spec_bound(linked) -> None:  # noqa: ANN001
     assert isinstance(linked, MagicMock)
     assert hasattr(linked, "get_auth_user_by_id")
+
+
+def test_conflicting_apple_identities_fail_before_exchange(client, apple, linked):
+    linked.get_auth_user_by_id.side_effect = None
+    linked.get_auth_user_by_id.return_value = {
+        "identities": [
+            {
+                "provider": "apple",
+                "provider_id": SUBJECT,
+                "identity_data": {"sub": SUBJECT},
+            },
+            {
+                "provider": "apple",
+                "provider_id": "other",
+                "identity_data": {"sub": "other"},
+            },
+        ]
+    }
+    apple.grant()
+    response = client.post(
+        URL, headers=bearer(ALICE), json={"authorization_code": "c.code"}
+    )
+    assert response.status_code == 503
+    assert apple.calls == []
+
+
+@pytest.mark.parametrize("failure", ["mismatch", "storage"])
+def test_discard_worker_exception_does_not_change_http_outcome(
+    client, apple, monkeypatch, failure
+):
+    import threading
+
+    escaped = []
+    monkeypatch.setattr(threading, "excepthook", escaped.append)
+    apple.grant(sub="other" if failure == "mismatch" else SUBJECT)
+    apple.revoke_raises = RuntimeError("unexpected_transport_failure")
+    if failure == "storage":
+
+        def unavailable(**kwargs):
+            raise ConnectionError("unavailable")
+
+        monkeypatch.setattr(
+            apple_credentials_service().repository, "save_capture", unavailable
+        )
+    response = client.post(
+        URL, headers=bearer(ALICE), json={"authorization_code": "c.code"}
+    )
+    assert response.status_code == (409 if failure == "mismatch" else 503)
+    assert response.json()["code"] == (
+        "apple_identity_mismatch"
+        if failure == "mismatch"
+        else "apple_sign_in_unavailable"
+    )
+    assert escaped == []
