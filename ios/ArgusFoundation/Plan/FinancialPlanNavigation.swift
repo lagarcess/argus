@@ -62,11 +62,15 @@ private struct FinancialPlanDestinations: ViewModifier {
     func body(content: Content) -> some View {
         content
             .navigationDestination(isPresented: goalPresented) {
-                FinancialGoalDetail(model: goals, loop: loop, nativeNavigation: true, close: closeGoal)
+                FinancialPlanDetailLoader(plan: loop.plan) {
+                    FinancialGoalDetail(model: goals, loop: loop, nativeNavigation: true, close: closeGoal)
+                }
                     .accessibilityElement(children: .contain).accessibilityIdentifier("goal.detail")
             }
             .navigationDestination(isPresented: budgetPresented) {
-                FinancialBudgetDetailView(model: budgets, loop: loop, nativeNavigation: true, close: closeBudget)
+                FinancialPlanDetailLoader(plan: loop.plan) {
+                    FinancialBudgetDetailView(model: budgets, loop: loop, nativeNavigation: true, close: closeBudget)
+                }
                     .accessibilityElement(children: .contain).accessibilityIdentifier("budget.detail")
             }
     }
@@ -115,7 +119,9 @@ private struct FinancialDebtDestination: ViewModifier {
 
     func body(content: Content) -> some View {
         content.navigationDestination(isPresented: presented) {
-            FinancialDebtDetail(model: model, loop: loop, nativeNavigation: true, close: close)
+            FinancialPlanDetailLoader(plan: loop.plan) {
+                FinancialDebtDetail(model: model, loop: loop, nativeNavigation: true, close: close)
+            }
                 .accessibilityElement(children: .contain).accessibilityIdentifier("debt.detail")
         }
     }
@@ -130,6 +136,29 @@ private struct FinancialDebtDestination: ViewModifier {
     }
 
     private func close() { model.close(); Task { await search?.refresh() } }
+}
+
+private struct FinancialPlanDetailLoader<Content: View>: View {
+    @ObservedObject var plan: FinancialPlanModel
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Group {
+            if plan.projection != nil { content() }
+            else {
+                VStack(spacing: 16) {
+                    if plan.loading { ProgressView("accounts.loading") }
+                    if let error = plan.errorKey {
+                        Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
+                        Button("accounts.retry") { Task { await plan.refresh() } }.frame(minHeight: 44)
+                    }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(WelcomePalette.background)
+        .toolbar(.visible, for: .navigationBar)
+        .task { if plan.projection == nil { await plan.refresh() } }
+    }
 }
 
 struct FinancialPlanNavigationState<Content: View>: View {

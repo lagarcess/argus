@@ -162,9 +162,6 @@ struct FinancialDebtDetail: View {
                 if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
             }.disabled(model.saving).task(id: model.detail?.payments.map(\.activityId)) { if let anchor = model.navigation?.anchor { await Task.yield(); reader.scrollTo(anchor, anchor: .top) } }
         }
-        .task(id: model.navigation?.debtID) {
-            if nativeNavigation, model.detail == nil, !model.loading { await model.refreshIfOpen() }
-        }
         .navigationDestination(isPresented: activityPresented) {
             if let id = model.navigation?.activityID {
                 ScrollView {

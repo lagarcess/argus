@@ -24,6 +24,13 @@ extension FinancialLoopUITests {
         assertGoal("DOP 0.00")
         app.terminate(); app.launch()
         assertGoal("DOP 0.00")
+        tapVisible(app.buttons["goal.allocate"])
+        let allocation = app.textFields.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.allocation.amount.'")).firstMatch
+        XCTAssertTrue(allocation.waitForExistence(timeout: 10))
+        app.buttons["goal.action.cancel"].tap()
+        tapVisible(app.buttons["goal.record"])
+        XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons["Cancel"].tap()
         app.returnFromDetail("goal.close")
         revealPlanManagement()
         XCTAssertTrue(app.buttons["plan.overview"].waitForExistence(timeout: 10))
