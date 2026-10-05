@@ -2569,6 +2569,14 @@ permanent accounts rather than allowing them.
 The response includes `user`, `account_kind`, a nullable `guest` summary with
 expiry plus limits `1/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
+`GET /api/v1/me` also returns nullable `apple_identity: {"subject": "..."}`
+beside `user`. For registered owners it derives from the shared `auth.identities`
+reader. A successful read without an Apple identity returns null; unavailable,
+malformed or conflicting identity data returns `503 apple_identity_unavailable`.
+Guests never trigger this read and always receive null. The explicit in-memory
+mock-auth development path has no provider identity. Native clients hold this
+projection only in the current session snapshot and use it for Apple credential
+validation on launch and foreground return. It is not a profile preference.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
 (`can_search_current_workspace`) from broader Grounded Discovery
@@ -2836,17 +2844,20 @@ once per request; there is no automatic code replay or durable capture receipt.
 A later sign-in replaces the stored token without revoking the old one,
 because revoking any token ends the whole Apple authorization for the app.
 The compensating revoke on the 409 and 503 paths is a single attempt with no
-retry, 2 seconds in total, and the request waits at most 4 seconds for it
-however slowly Apple answers. The code exchange before it keeps its 30-second
-limit, so these provider waits can total about 34 seconds before local work.
+retry. Cleanup uses two-second HTTP phase timeouts and elapsed-time checks
+after headers and chunks; the code exchange uses a 30-second HTTP timeout.
+These controls do not guarantee a total wall-clock deadline across stalled
+transport phases. The client must keep a waiting state until the request finishes
+and must not replay an authorization code when the result is uncertain.
 A delayed cleanup revoke can end a newer Apple authorization. Subject binding
 and database locks do not cancel a revoke Apple has already received. Acceptance
 of that recovery policy remains open in #803.
 
 The binding proves the identity at credential commit. Later unlink/relink needs
 a fresh authoritative read before use. Account-deletion admission, its terminal
-receipt, missing-token recovery, and the native `/me` identity projection remain
-separate work in #800. This capture change does not establish those guarantees.
+receipt and missing-token recovery remain separate work in #800. The native
+`/me` projection above establishes current linked identity, not those deletion
+guarantees.
 
 No route revokes or discards. Account deletion (Lane 6) calls
 `AppleCredentialService.revoke`. It deletes the row after Apple answers 200

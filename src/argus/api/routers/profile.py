@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
 from loguru import logger
+from psycopg import connect
 from pydantic import ValidationError
 
 from argus.api import state as api_state
@@ -20,7 +22,7 @@ from argus.api.guest_access import (
     client_identity,
     public_account_access_enabled,
 )
-from argus.api.schemas import ProfilePatch, User, UserResponse
+from argus.api.schemas import AppleIdentity, ProfilePatch, User, UserResponse
 from argus.api.usage_allowance_schemas import (
     UnboundedAllowance,
     UsageAllowance,
@@ -28,6 +30,7 @@ from argus.api.usage_allowance_schemas import (
     UsageAllowances,
     UsageWindow,
 )
+from argus.domain.apple_sign_in.identity import LinkedAppleIdentity, linked_apple_identity
 from argus.domain.store import utcnow
 from argus.domain.usage_counter_reader import align_usage_period
 from argus.domain.usage_limits import (
@@ -47,9 +50,14 @@ from argus.domain.visitor_usage import (
 router = APIRouter(prefix="/api/v1", tags=["profile"])
 
 
-def _user_response(user: User, context: AccountContext) -> UserResponse:
+def _user_response(
+    user: User, context: AccountContext, apple_identity: LinkedAppleIdentity | None = None
+) -> UserResponse:
     return UserResponse(
         user=user,
+        apple_identity=AppleIdentity(subject=apple_identity.subject)
+        if apple_identity
+        else None,
         account_kind=context.kind,
         guest=(
             {
@@ -67,17 +75,44 @@ def _user_response(user: User, context: AccountContext) -> UserResponse:
     )
 
 
+def _apple_identity(request: Request, user_id: str) -> LinkedAppleIdentity | None:
+    mock_auth = any(
+        os.getenv(name, "").strip().lower() == "true"
+        for name in ("NEXT_PUBLIC_MOCK_AUTH", "ARGUS_MOCK_AUTH")
+    )
+    if mock_auth and api_state.supabase_gateway is None and not api_state.DATABASE_URL:
+        return None
+    try:
+        if not api_state.DATABASE_URL:
+            raise RuntimeError("identity_storage_unconfigured")
+        with connect(
+            api_state.DATABASE_URL,
+            connect_timeout=2,
+            options="-c statement_timeout=2000 -c default_transaction_read_only=on",
+        ) as connection:
+            return linked_apple_identity(connection, user_id)
+    except Exception:
+        raise problem(
+            request,
+            status_code=503,
+            code="apple_identity_unavailable",
+            title="Identity unavailable",
+            detail="Account identity could not be verified. Try again.",
+        ) from None
+
+
 @router.get("/me", response_model=UserResponse)
 def get_me(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> UserResponse:
     context = account_context(request)
+    identity = _apple_identity(request, user.id) if context.kind == "registered" else None
     if api_state.supabase_gateway is not None:
         try:
             profile = api_state.supabase_gateway.get_user(user_id=user.id)
             if profile:
-                return _user_response(profile, context)
+                return _user_response(profile, context, identity)
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -86,7 +121,7 @@ def get_me(
                 error=str(exc),
                 user_id=user.id,
             )
-    return _user_response(user, context)
+    return _user_response(user, context, identity)
 
 
 @router.get("/me/usage", response_model=UsageAllowanceResponse)
