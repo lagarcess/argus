@@ -129,6 +129,12 @@ final class ProfileAuthModel: ObservableObject {
         }
     }
 
+    func setPrimaryCurrency(_ currency: String) async {
+        guard let controller, state == .authenticated else { return }
+        let identity = await controller.snapshot()
+        await perform { try await controller.setPrimaryCurrency(currency, expectedIdentity: identity) }
+    }
+
     func signOut() async {
         guard let controller else { return }
         household?.bind(nil)
