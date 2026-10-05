@@ -88,3 +88,34 @@ contracts remain open. The worker started no persistent service, database or
 simulator. Temporary canary servers exited with their test contexts. Locked web
 dependencies remain isolated in this recoverable worker checkout. Branch writes
 stop after the evidence commit and push.
+
+## Subsequent observer-test landing
+
+PR #868 landed into integration as
+`fc4057c8789d3e3504fcb0e980344d6bf51e66c0`, with parent
+`2b2d0d9e8ed311c11b7585fbd757fb37f915e12f`. The previous published worker head
+was `c986d060deb7bd7ce50ec13093e175371164c7d0`. A fresh fetch and normal merge
+completed without conflicts at `8cd9a3a8c484171919da9b9b642b34282405a5ba`.
+Pending-merge inspection and cancellation readback again confirmed no auto-merge
+or queue request.
+
+The incoming executable diff changes only `tests/test_apple_identity_postgres.py`.
+Its observer uses autocommit so each activity-statistics poll can see a fresh
+snapshot, and an event deliberately orders the first poll before the capture
+attempt. Parent locking, the five-second deadline and denied-credential assertions
+remain. All production source, financial fixtures, OpenAPI and release
+configuration are byte-identical to the previous worker head. The proof and
+PR #865 shared configuration ownership warning above therefore remain valid.
+
+The [focused run](reconcile-observer-focused.txt) passes 44 tests with 38 explicit
+no-database skips. The passing tests are 11 pure Apple identity checks and 33 pure
+paired-transfer checks. Twelve Apple identity PostgreSQL cases and 26 paired
+PostgreSQL cases skip. This run does not claim execution of the changed observer
+or substitute for the root's real PostgreSQL acceptance and exact-head CI.
+The [combined-tree budget](reconcile-observer-budget.txt) has zero violations.
+Whitespace checks pass. Unchanged boundary, mocked, canary and financial proof
+above are retained without repeating their runs.
+
+No database lease, simulator, Mac setting, provider or hosted service was used.
+This evidence commit is the only post-merge change. Root owns independent final
+context review and CI. Worker branch writes stop after publication.
