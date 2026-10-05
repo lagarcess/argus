@@ -1,7 +1,8 @@
 import Foundation
 
-/// Calendar rules shared with the server's planning recurrence: a monthly anchor
-/// keeps its day and clamps to the last day of shorter months.
+/// Client default for a prepared start date only. `src/argus/domain/planning/recurrence.py`
+/// owns the calendar rule (keep the anchor day, clamp to shorter months); the server
+/// re-validates the schedule and generates every occurrence.
 public enum FinancialRecurrence {
     public static func calendarDay(of instant: String, timeZone: String) -> String? {
         let parser = ISO8601DateFormatter()
@@ -76,7 +77,8 @@ public struct FinancialExpectationSeed: Equatable, Sendable {
               let next = FinancialRecurrence.nextMonthlyDate(after: movementDay, onOrAfter: today) else { return nil }
         let note = activity.note?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         self.kind = kind
-        title = String((note.isEmpty ? fallbackTitle : note).prefix(Self.titleLimit))
+        // The server limit counts code points, so truncate by scalar, not by grapheme.
+        title = String(String.UnicodeScalarView((note.isEmpty ? fallbackTitle : note).unicodeScalars.prefix(Self.titleLimit)))
         currency = activity.currency
         self.amount = amount
         let legAccount = activity.legs.first { $0.role == "single" }?.accountId

@@ -95,7 +95,7 @@ struct FinancialHomeView: View {
                     }
                 }
                 if plan.loading { ProgressView("accounts.loading") }
-                if let error = plan.errorKey {
+                if let error = plan.homeErrorKey {
                     Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                     Button("accounts.retry") { Task { await loop.refresh() } }.frame(minHeight: 44)
                 }

@@ -41,7 +41,7 @@ struct FinancialComingUpView: View {
                 if !projection.hasExpectations || projection.selection.accountIds.isEmpty { Text("plan.empty").foregroundStyle(ArgusStyle.secondary) }
                 Text("plan.home.disclosure").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
             } else if model.loading { ProgressView("accounts.loading") }
-            else if let error = model.errorKey {
+            else if let error = model.homeErrorKey {
                 Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary)
                 Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
             }
