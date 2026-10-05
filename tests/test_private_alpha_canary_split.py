@@ -116,6 +116,7 @@ def _supabase_session_stub(
             self.send_response(status_code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
             self.send_header("X-Total-Count", "1")
             self.end_headers()
             self.wfile.write(body)
