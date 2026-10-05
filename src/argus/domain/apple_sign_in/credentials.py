@@ -51,6 +51,10 @@ from argus.domain.apple_sign_in.client import (
     AppleAuthClient,
     AppleError,
 )
+from argus.domain.apple_sign_in.identity import (
+    AppleIdentityUnavailable,
+    LinkedAppleIdentity,
+)
 from argus.domain.ingestion.secrets import SecretBox, SecretUnreadable
 
 SOURCE = "apple_sign_in"
@@ -63,8 +67,12 @@ class AppleIdentityMismatch(RuntimeError):
     """The code's Apple subject is not the signed-in user's Apple identity."""
 
 
+class AppleIdentityMissing(RuntimeError):
+    """The current Auth account has no Apple identity."""
+
+
 class AppleCaptureNotStored(RuntimeError):
-    """The exchanged token couldn't be stored; it was revoked instead."""
+    """Capture was not saved; an exchanged token gets a best-effort revoke."""
 
 
 class AppleRevocationPending(RuntimeError):
@@ -99,9 +107,24 @@ class StoredAppleCredential:
     updated_at: datetime
     # ``SecretBox.key_id`` of the key that sealed it; None before Lane 6.
     key_id: str | None = None
+    apple_subject: str | None = field(default=None, repr=False)
 
 
 class AppleCredentialRepository(Protocol):
+    def linked_identity(self, *, user_id: str) -> LinkedAppleIdentity | None: ...
+
+    def save_capture(
+        self,
+        *,
+        user_id: str,
+        identity: LinkedAppleIdentity,
+        expected_ciphertext: bytes | None,
+        client_id: str,
+        secret_ciphertext: bytes,
+        now: datetime,
+        key_id: str,
+    ) -> None: ...
+
     def upsert(
         self,
         *,
@@ -120,9 +143,44 @@ class AppleCredentialRepository(Protocol):
 
 
 class InMemoryAppleCredentialRepository:
-    def __init__(self) -> None:
+    def __init__(
+        self, identity_reader: Callable[[str], LinkedAppleIdentity | None] | None = None
+    ) -> None:
+        self._identity_reader = identity_reader
         self._rows: dict[str, StoredAppleCredential] = {}
         self._lock = Lock()
+
+    def linked_identity(self, *, user_id: str) -> LinkedAppleIdentity | None:
+        if self._identity_reader is None:
+            raise AppleIdentityUnavailable("identity_reader_unconfigured")
+        return self._identity_reader(user_id)
+
+    def save_capture(
+        self,
+        *,
+        user_id: str,
+        identity: LinkedAppleIdentity,
+        expected_ciphertext: bytes | None,
+        client_id: str,
+        secret_ciphertext: bytes,
+        now: datetime,
+        key_id: str,
+    ) -> None:
+        with self._lock:
+            if self.linked_identity(user_id=user_id) != identity:
+                raise AppleIdentityMismatch("linked_identity_changed")
+            row = self._rows.get(user_id)
+            if (row.secret_ciphertext if row else None) != expected_ciphertext:
+                raise AppleCaptureNotStored("credential_replaced")
+            self._rows[user_id] = StoredAppleCredential(
+                user_id=user_id,
+                client_id=client_id,
+                secret_ciphertext=secret_ciphertext,
+                captured_at=row.captured_at if row else now,
+                updated_at=now,
+                key_id=key_id,
+                apple_subject=identity.subject,
+            )
 
     def upsert(
         self,
@@ -176,20 +234,25 @@ class AppleCredentialService:
     def close(self) -> None:
         self._client.close()
 
-    def capture(
-        self, *, user_id: str, apple_subject: str, authorization_code: str
-    ) -> None:
-        """Raises ``AppleError`` (Apple refused or is unreachable),
-        ``AppleIdentityMismatch`` or ``AppleCaptureNotStored``; nothing is
-        stored in any of those cases."""
+    def capture(self, *, user_id: str, authorization_code: str) -> None:
+        """Save only for a current, unambiguous linked Apple identity."""
 
+        try:
+            identity = self.repository.linked_identity(user_id=user_id)
+            previous = self.repository.get(user_id=user_id)
+        except Exception:
+            raise AppleCaptureNotStored("identity_or_storage_unavailable") from None
+        if identity is None:
+            raise AppleIdentityMissing("apple_identity_missing")
         grant = self._client.exchange_code(authorization_code)
-        if grant.subject != apple_subject:
+        if grant.subject != identity.subject:
             self._discard(grant.refresh_token, reason="identity_mismatch")
             raise AppleIdentityMismatch("apple subject does not match the user")
         try:
-            self.repository.upsert(
+            self.repository.save_capture(
                 user_id=user_id,
+                identity=identity,
+                expected_ciphertext=previous.secret_ciphertext if previous else None,
                 client_id=self._client.config.client_id,
                 secret_ciphertext=self._box.seal(
                     grant.refresh_token, source=SOURCE, connection_id=user_id
@@ -197,6 +260,9 @@ class AppleCredentialService:
                 now=self._clock(),
                 key_id=self._box.key_id,
             )
+        except AppleIdentityMismatch:
+            self._discard(grant.refresh_token, reason="identity_mismatch")
+            raise
         except Exception as exc:  # noqa: BLE001 - any storage failure loses the token
             self._discard(grant.refresh_token, reason="storage_unavailable")
             raise AppleCaptureNotStored(type(exc).__name__) from None

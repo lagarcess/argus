@@ -33,6 +33,11 @@ from argus.domain.apple_sign_in.credentials import (
     AppleCredentialService,
     InMemoryAppleCredentialRepository,
 )
+from argus.domain.apple_sign_in.identity import (
+    AppleIdentityUnavailable,
+    LinkedAppleIdentity,
+    parse_linked_apple_identity,
+)
 from argus.domain.ingestion.secrets import SecretBox, SecretBoxUnavailable
 
 FLAG = "ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED"
@@ -112,7 +117,7 @@ def start_apple_sign_in(app) -> None:  # noqa: ANN001
             app.state.apple_sign_in_pool = pool
             repository = PostgresAppleCredentialRepository(pool)
         else:
-            repository = InMemoryAppleCredentialRepository()
+            repository = InMemoryAppleCredentialRepository(_memory_linked_identity)
         configure_apple_credentials_service(
             AppleCredentialService(
                 repository, box=box, client=AppleAuthClient(config), clock=_clock
@@ -138,3 +143,14 @@ def stop_apple_sign_in(app) -> None:  # noqa: ANN001
         except Exception:
             logger.warning("Apple sign-in pool close failed")
         app.state.apple_sign_in_pool = None
+
+
+def _memory_linked_identity(user_id: str) -> LinkedAppleIdentity | None:
+    gateway = api_state.supabase_gateway
+    if gateway is None:
+        raise AppleIdentityUnavailable("identity_reader_unconfigured")
+    auth_user = gateway.get_auth_user_by_id(user_id)
+    identities = auth_user.get("identities")
+    if not isinstance(identities, list):
+        raise AppleIdentityUnavailable("malformed_identity_response")
+    return parse_linked_apple_identity(identities)

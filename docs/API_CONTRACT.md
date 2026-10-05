@@ -2804,6 +2804,15 @@ refresh token, sealed with `ARGUS_INGESTION_SECRET_KEY`, so account deletion
 can revoke it (App Store Review Guideline 5.1.1(v)). The user id comes only
 from the verified session; the body accepts no other field.
 
+`auth.identities` owns the current linked Apple subject. Capture uses one
+shared reader before exchange and inside the credential-write transaction.
+Malformed or conflicting identities fail closed as unavailable. Only a
+successful read with no Apple identity produces `apple_identity_missing`.
+The saved credential records its verified subject as protected metadata.
+An identity change, or replacement/removal of the credential during exchange,
+prevents the capture from overwriting the current row. The code is exchanged
+once per request; there is no automatic code replay or durable capture receipt.
+
 **Request:**
 ```json
 {
@@ -2819,17 +2828,25 @@ from the verified session; the body accepts no other field.
 | 503 | `apple_sign_in_unconfigured` | Flag on, but an Apple client-secret input, the credential key or durable storage is missing. Fails closed |
 | 401 / 403 | `unauthorized` / `account_conversion_required` | No session, or a guest session |
 | 409 | `apple_identity_missing` | The account has no Apple identity |
-| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID. Nothing is stored, and the exchanged token is revoked at Apple in one short attempt. The answer is 409 whatever that revoke returns |
+| 409 | `apple_identity_mismatch` | The code belongs to another Apple ID, or the linked identity changed before storage. The returned token is not saved, and a single best-effort revoke is attempted. The answer remains 409 whatever that revoke returns |
 | 400 | `apple_authorization_invalid` | Apple says the code expired, was used, or is malformed |
 | 429 | `too_many_requests` | Five attempts per user per ten minutes |
-| 503 | `apple_sign_in_unavailable` | Apple refused the client or is unreachable, or the token could not be stored (it is then revoked at Apple in one short attempt, and the next Apple sign-in sends a fresh code). The answer is 503 whatever that revoke returns, never 500 |
+| 503 | `apple_sign_in_unavailable` | Current identity is unavailable, malformed or conflicting; Apple refused the client or is unreachable; or the token could not be stored, including a credential replacement/removal during exchange. A returned token gets one best-effort revoke, and another attempt needs a fresh code. The answer remains 503 whatever that revoke returns |
 
 A later sign-in replaces the stored token without revoking the old one,
 because revoking any token ends the whole Apple authorization for the app.
 The compensating revoke on the 409 and 503 paths is a single attempt with no
 retry, 2 seconds in total, and the request waits at most 4 seconds for it
 however slowly Apple answers. The code exchange before it keeps its 30-second
-limit.
+limit, so these provider waits can total about 34 seconds before local work.
+A delayed cleanup revoke can end a newer Apple authorization. Subject binding
+and database locks do not cancel a revoke Apple has already received. Acceptance
+of that recovery policy remains open in #803.
+
+The binding proves the identity at credential commit. Later unlink/relink needs
+a fresh authoritative read before use. Account-deletion admission, its terminal
+receipt, missing-token recovery, and the native `/me` identity projection remain
+separate work in #800. This capture change does not establish those guarantees.
 
 No route revokes or discards. Account deletion (Lane 6) calls
 `AppleCredentialService.revoke`. It deletes the row after Apple answers 200
