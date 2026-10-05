@@ -1,0 +1,5 @@
+#include "Development.xcconfig"
+
+// Social providers stay disabled until their activation gates have been accepted.
+ARGUS_APPLE_SIGN_IN_ENABLED = false
+ARGUS_GOOGLE_SIGN_IN_ENABLED = false
