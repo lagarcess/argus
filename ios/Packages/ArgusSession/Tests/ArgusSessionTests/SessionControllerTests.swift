@@ -17,6 +17,50 @@ final class SessionControllerTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(requests.filter { $0.url!.path.hasSuffix("/me") }.allSatisfy { $0.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true })
     }
 
+    func testPrimaryCurrencyReadsServerTruthAndSurvivesRelaunch() async throws {
+        let fixture = try SessionFixture()
+        let client = try fixture.controller()
+        let identity = try await fixture.login(client)
+        XCTAssertEqual(identity.profile?.currency, "DOP")
+        let saved = try await client.setPrimaryCurrency("USD", expectedIdentity: identity)
+        XCTAssertEqual(saved.profile?.currency, "USD")
+        XCTAssertEqual(saved.profile?.currencyOverride, "USD")
+        let restored = try await fixture.controller().restore()
+        XCTAssertEqual(restored.profile, saved.profile)
+        let writes = await fixture.server.captured().filter { $0.httpMethod == "PATCH" }
+        XCTAssertEqual(writes.count, 1)
+        let body = try XCTUnwrap(writes.first?.httpBody)
+        XCTAssertEqual(try JSONSerialization.jsonObject(with: body) as? [String: String], ["currency_override": "USD"])
+    }
+
+    func testRefusedCurrencyWriteLeavesProfileAndRelaunchUnchanged() async throws {
+        let fixture = try SessionFixture()
+        let client = try fixture.controller()
+        let identity = try await fixture.login(client)
+        await fixture.server.configure(meStatuses: [422])
+        do { _ = try await client.setPrimaryCurrency("INVALID", expectedIdentity: identity); XCTFail("Expected rejection") }
+        catch { XCTAssertEqual(error as? SessionFailure, .rejected(status: 422, code: "unauthorized")) }
+        let unchanged = await client.snapshot()
+        XCTAssertEqual(unchanged.profile, identity.profile)
+        let restored = try await fixture.controller().restore()
+        XCTAssertEqual(restored.profile, identity.profile)
+    }
+
+    func testLegacyProfileHasUnknownCurrencyAndSignedOutWriteHasNoDispatch() async throws {
+        let legacy = try JSONDecoder().decode(SessionProfile.self, from: Data("{\"id\":\"synthetic\",\"language\":\"en\"}".utf8))
+        XCTAssertNil(legacy.currency)
+        XCTAssertNil(legacy.currencyOverride)
+        let fixture = try SessionFixture()
+        let client = try fixture.controller()
+        let identity = try await fixture.login(client)
+        _ = try await client.signOut()
+        let before = await fixture.server.captured().count
+        do { _ = try await client.setPrimaryCurrency("USD", expectedIdentity: identity); XCTFail("Expected stale operation") }
+        catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
+        let after = await fixture.server.captured().count
+        XCTAssertEqual(after, before)
+    }
+
     func testSignupWithoutSessionRequiresConfirmationWithoutAutomaticLogin() async throws {
         let fixture = try SessionFixture()
         let result = try await fixture.controller().signup(email: "new@example.test", password: "synthetic-password", captchaToken: "synthetic-captcha", language: "es-419")

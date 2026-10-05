@@ -957,12 +957,13 @@ def test_me_usage_returns_problem_details_when_durable_truth_is_unavailable(
     assert response.headers["X-Request-Id"] == "usage-read-failure"
 
 
-def test_patch_me_supabase_ignores_retired_profile_fields(mock_gateway):
+def test_patch_me_supabase_ignores_retired_profile_fields(mock_gateway, monkeypatch):
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
     before = _mock_profile(stage="language_selection")
     mock_gateway.get_user.return_value = before
 
     def _updated_user(_user_id: str, payload: dict) -> User:
-        return User.model_validate(payload)
+        return User.model_validate(before.model_dump() | payload)
 
     mock_gateway.update_user.side_effect = _updated_user
 
@@ -986,12 +987,13 @@ def test_patch_me_supabase_ignores_retired_profile_fields(mock_gateway):
     assert "theme" not in mock_gateway.update_user.call_args.args[1]
 
 
-def test_patch_me_persists_a_curated_avatar_theme(mock_gateway):
+def test_patch_me_persists_a_curated_avatar_theme(mock_gateway, monkeypatch):
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
     before = _mock_profile()
     mock_gateway.get_user.return_value = before
 
     def _updated_user(_user_id: str, payload: dict) -> User:
-        return User.model_validate(payload)
+        return User.model_validate(before.model_dump() | payload)
 
     mock_gateway.update_user.side_effect = _updated_user
 

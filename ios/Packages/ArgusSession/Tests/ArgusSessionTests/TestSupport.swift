@@ -70,6 +70,7 @@ actor AuthServer {
     var captureGate: RequestGate?
     var captureCode: String?
     var appleSubject: String?
+    var currencyOverride: String?
 
     func configure(meStatuses: [Int] = [], logoutStatus: Int = 204, refreshStatus: Int = 200, refreshErrorCode: String = "refresh_token_not_found", mismatch: Bool = false, expired: Bool = false) {
         self.meStatuses = meStatuses
@@ -131,7 +132,8 @@ actor AuthServer {
             let id = mismatchedProfile ? bob : (accessUsers[bearer] ?? alice)
             if let gate = meGate { await gate.enter() }
             let status = meStatuses.isEmpty ? 200 : meStatuses.removeFirst()
-            var envelope: [String: Any] = ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": "Sample", "language": "en"]]
+            if status == 200, request.httpMethod == "PATCH" { currencyOverride = body["currency_override"] as? String }
+            var envelope: [String: Any] = ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": "Sample", "language": "en", "currency": currencyOverride ?? "DOP", "currency_override": currencyOverride as Any? ?? NSNull()]]
             if let appleSubject { envelope["apple_identity"] = ["subject": appleSubject] }
             return response(url, status, status == 200 ? envelope : ["code": "unauthorized"])
         }
