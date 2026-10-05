@@ -11,6 +11,8 @@ final class FinancialPlanModel: ObservableObject {
     @Published private(set) var saving = false
     @Published private(set) var loadingDetails = false
     @Published private(set) var errorKey: String?
+    /// Home's read fails on its own; the last good Home window stays visible.
+    @Published private(set) var homeErrorKey: String?
     @Published var draft: FinancialExpectationDraft?
     @Published var selectedOccurrence: FinancialPlanOccurrence?
     @Published private(set) var candidates: [FinancialActivityDetail] = []
@@ -35,27 +37,38 @@ final class FinancialPlanModel: ObservableObject {
         identity = snapshot?.phase == .authenticated ? snapshot : nil
         section = .overview
         projection = nil; homeProjection = nil; draft = nil; selectedOccurrence = nil; candidates = []; linkedActivity = nil
-        endDate = nil; afterOccurrence = nil; loading = false; loadingDetails = false; saving = false; errorKey = nil
+        endDate = nil; afterOccurrence = nil; loading = false; loadingDetails = false; saving = false; errorKey = nil; homeErrorKey = nil
     }
 
     func refresh(until: String? = nil) async {
         guard let identity else { return }
         if let until { endDate = until }
         let ticket = generation; let query = UUID(); request = query
-        loading = true; errorKey = nil
+        loading = true; errorKey = nil; homeErrorKey = nil
         defer { if generation == ticket, request == query { loading = false } }
         do {
             let next = try await controller.financialPlan(endDate: endDate, expectedIdentity: identity)
-            let upcoming = endDate == nil ? next : try await controller.financialPlan(endDate: nil, expectedIdentity: identity)
             guard generation == ticket, request == query else { return }
-            projection = next; homeProjection = upcoming
+            projection = next
+            if endDate == nil { homeProjection = next }
             loop.acceptPlanHome(next.home)
             await loop.budgets.refreshIfOpen()
             await loop.goals.refreshIfOpen()
             await loop.debts.refreshIfOpen()
-            guard generation == ticket, request == query else { return }
-            if let selectedOccurrence { self.selectedOccurrence = next.occurrences.first { $0.id == selectedOccurrence.id } }
         } catch { if request == query { await failed(error, ticket: ticket) } }
+        guard generation == ticket, request == query else { return }
+        if endDate != nil {
+            do {
+                let upcoming = try await controller.financialPlan(endDate: nil, expectedIdentity: identity)
+                guard generation == ticket, request == query else { return }
+                homeProjection = upcoming
+            } catch { if request == query { await failed(error, ticket: ticket, home: true) } }
+        }
+        guard generation == ticket, request == query else { return }
+        // An occurrence opened from Home can sit outside Plan's window; keep it as long as either read still has it.
+        if let selectedOccurrence {
+            self.selectedOccurrence = ((projection?.occurrences ?? []) + (homeProjection?.occurrences ?? [])).first { $0.id == selectedOccurrence.id }
+        }
     }
 
     func create() {
@@ -189,11 +202,12 @@ final class FinancialPlanModel: ObservableObject {
         }
     }
 
-    private func failed(_ error: Error, ticket: UUID) async {
+    private func failed(_ error: Error, ticket: UUID, home: Bool = false) async {
         guard generation == ticket else { return }
         let current = await controller.snapshot()
         guard generation == ticket else { return }
         if current != identity { loop.bind(current); loop.sessionChanged?(current) }
+        else if home { homeErrorKey = FinancialActivityEditor.message(error) }
         else { errorKey = FinancialActivityEditor.message(error) }
     }
 }

@@ -54,6 +54,13 @@ final class FinancialExpectationSeedTests: XCTestCase {
         let verbose = try Self.activity(kind: "income", amount: "1.00", note: long, account: cash, occurredAt: "2026-10-05T16:00:00Z")
         let truncated = try XCTUnwrap(FinancialExpectationSeed(activity: verbose, accounts: [], today: "2026-10-05", fallbackTitle: "Salary"))
         XCTAssertEqual(truncated.title, String(repeating: "x", count: 100))
+        // A family emoji is one Character but five code points; the server counts code points.
+        let family = String(repeating: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", count: 25)
+        XCTAssertEqual(family.count, 25); XCTAssertEqual(family.unicodeScalars.count, 125)
+        let emoji = try Self.activity(kind: "expense", amount: "1.00", note: family, account: cash, occurredAt: "2026-10-05T16:00:00Z")
+        let scalars = try XCTUnwrap(FinancialExpectationSeed(activity: emoji, accounts: [], today: "2026-10-05", fallbackTitle: "x"))
+        XCTAssertEqual(scalars.title.unicodeScalars.count, 100)
+        XCTAssertEqual(scalars.title, String(repeating: "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", count: 20))
     }
 
     func testAccountStaysUnsetUnlessEligibleInTheSameCurrency() throws {
