@@ -6,21 +6,27 @@ name: CI
   pull_request:
     branches: [main, "codex/private-alpha-next", "codex/private-alpha-next-jules-intake"]
     types: [opened, synchronize, reopened, ready_for_review]
+  # Only the real-Postgres matrix on the latest Supabase CLI runs on these, so
+  # a new Supabase image that breaks a migration shows up before a PR does.
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 env:
   ARGUS_CI_BUN_VERSION: "1.3.14"
+  ARGUS_CI_SUPABASE_CLI_VERSION: "2.109.0"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/codex/private-alpha-next' && github.ref != 'refs/heads/codex/private-alpha-next-jules-intake' }}
 
 jobs:
   docs-change-gate:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     outputs:
       run_heavy: ${{ steps.classify.outputs.run_heavy }}
       docs_only: ${{ steps.classify.outputs.docs_only }}
@@ -38,7 +44,7 @@ jobs:
 
   ownership-gate:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,7 +62,7 @@ jobs:
   docs-checks:
     runs-on: ubuntu-latest
     needs: docs-change-gate
-    if: (github.event.pull_request.draft == false || github.event_name == 'push') && needs.docs-change-gate.outputs.docs_only == 'true'
+    if: (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) && needs.docs-change-gate.outputs.docs_only == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,7 +122,7 @@ jobs:
   backend-checks:
     runs-on: ubuntu-latest
     needs: docs-change-gate
-    if: (github.event.pull_request.draft == false || github.event_name == 'push') && needs.docs-change-gate.outputs.run_heavy == 'true'
+    if: (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) && needs.docs-change-gate.outputs.run_heavy == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -163,7 +169,7 @@ jobs:
   frontend-checks:
     runs-on: ubuntu-latest
     needs: docs-change-gate
-    if: (github.event.pull_request.draft == false || github.event_name == 'push') && needs.docs-change-gate.outputs.run_heavy == 'true'
+    if: (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)) && needs.docs-change-gate.outputs.run_heavy == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -199,7 +205,13 @@ jobs:
   guest-release-gates:
     runs-on: ubuntu-latest
     needs: docs-change-gate
-    if: (github.event.pull_request.draft == false || github.event_name == 'push') && needs.docs-change-gate.outputs.run_heavy == 'true'
+    if: (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.docs-change-gate.outputs.run_heavy == 'true'
+    # "pinned" is the CLI every gate runs on; "latest" runs only the
+    # real-Postgres matrix so a newer image's default grants cannot pass unseen.
+    strategy:
+      fail-fast: false
+      matrix:
+        supabase-cli: ${{ fromJSON((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '["latest"]' || '["pinned", "latest"]') }}
     env:
       OPENROUTER_API_KEY: ""
       ALPACA_API_KEY: ""
@@ -225,7 +237,7 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.109.0
+          version: ${{ matrix.supabase-cli == 'latest' && 'latest' || env.ARGUS_CI_SUPABASE_CLI_VERSION }}
 
       - name: Start disposable local Supabase and reset migrations
         run: |
@@ -239,7 +251,13 @@ jobs:
             echo "ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
           } >> "$GITHUB_ENV"
 
+      - name: Print Supabase CLI and image versions
+        run: |
+          supabase --version
+          docker ps --filter "name=supabase_" --format '{{.Names}} {{.Image}}' | sort
+
       - name: Run provider-free guest backend tests
+        if: matrix.supabase-cli == 'pinned'
         run: |
           poetry run pytest \
             tests/evals/test_chat_runtime_trajectory_harness.py \
@@ -265,6 +283,7 @@ jobs:
             temp/guest-postgres-junit.xml
 
       - name: Run required local anonymous Auth matrix
+        if: matrix.supabase-cli == 'pinned'
         run: |
           poetry run pytest \
             tests/test_guest_auth_local_supabase.py \
@@ -274,14 +293,17 @@ jobs:
             temp/guest-auth-junit.xml
 
       - name: Set up Bun
+        if: matrix.supabase-cli == 'pinned'
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}
 
       - name: Install frontend dependencies
+        if: matrix.supabase-cli == 'pinned'
         run: cd web && bun install --frozen-lockfile
 
       - name: Run guest frontend tests
+        if: matrix.supabase-cli == 'pinned'
         run: |
           cd web
           bun test \
@@ -298,7 +320,7 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
-    if: always() && (github.event.pull_request.draft == false || github.event_name == 'push')
+    if: always() && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false))
     needs:
       - docs-change-gate
       - ownership-gate

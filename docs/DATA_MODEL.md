@@ -2574,6 +2574,18 @@ Every user-owned table must enforce strict Row Level Security (RLS).
   `UPDATE`, or `DELETE` rows where `user_id = auth.uid()`. Server-owned or
   immutable tables may revoke some of those operations; this default never
   grants a client write that a table-specific rule forbids.
+- RLS policies are not the only guard: client table, column and function
+  privileges in `public` and `argus_private` are owned by
+  `tests/test_client_grants_postgres.py`. The early tables `backtest_jobs`,
+  `backtest_runs`, `collection_strategies`, `collections`, `context_packets`,
+  `conversations`, `decision_notes`, `evidence_artifacts`, `feedback`,
+  `idea_versions`, `ideas`, `messages`, `profiles`, `route_receipts`,
+  `run_context_packets`, `strategies` and `usage_counters` carry no `anon` or
+  `authenticated` privilege except `authenticated` `SELECT` on `backtest_jobs`
+  and `SELECT (id, avatar_theme, country, currency_override, preferred_name)`
+  plus `UPDATE (avatar_theme, country, currency_override, preferred_name)` on
+  `profiles` (`20261005090000_explicit_client_grants.sql`). The backend writes
+  these tables with the service role.
 
 ### Chat-turn lifecycle
 - `chat_turn_lifecycles` grants authenticated owners `SELECT` only. No client
