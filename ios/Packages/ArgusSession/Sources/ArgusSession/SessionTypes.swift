@@ -12,7 +12,13 @@ public struct SessionProfile: Equatable, Sendable, Decodable {
     public let email: String?
     public let displayName: String?
     public let language: String?
-    enum CodingKeys: String, CodingKey { case id, email, language; case displayName = "display_name" }
+    public let currency: String?
+    public let currencyOverride: String?
+    init(id: String, email: String?, displayName: String?, language: String?, currency: String? = nil, currencyOverride: String? = nil) {
+        self.id = id; self.email = email; self.displayName = displayName; self.language = language
+        self.currency = currency; self.currencyOverride = currencyOverride
+    }
+    enum CodingKeys: String, CodingKey { case id, email, language; case displayName = "display_name"; case currency; case currencyOverride = "currency_override" }
 }
 
 public struct SessionSnapshot: Equatable, Sendable {
