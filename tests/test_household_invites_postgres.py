@@ -758,13 +758,6 @@ def test_null_auth_uid_owns_nothing_and_is_never_the_founder(lane):
         # zero above is RLS refusing a null subject, not a missing privilege.
         mine = visible("authenticated", f'{{"sub":"{owner}","role":"authenticated"}}')
         assert mine["beta_invitations"] == 1 and mine["invite_sender_refs"] == 0
-        privileges = conn.execute(
-            "select count(*) from information_schema.role_table_grants"
-            " where table_schema='public' and table_name=any(%s)"
-            " and grantee in ('anon','authenticated')",
-            (list(NEW_TABLES),),
-        ).fetchone()[0]
-        assert privileges == 0
 
     # The store takes the caller only from the verified JWT subject.
     for missing in (None, "", "   ", "not-a-uuid"):

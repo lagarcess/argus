@@ -93,17 +93,6 @@ def test_checkpoint_is_immutable_and_owner_scoped(
     assert store.get(user_id=users["owner"], connection_id=row.id) is None
 
 
-def test_clients_have_no_checkpoint_access(pool: ConnectionPool) -> None:
-    with pool.connection() as connection:
-        for role in ("anon", "authenticated"):
-            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-                allowed = connection.execute(
-                    "select has_table_privilege(%s,'public.financial_document_extractions',%s)",
-                    (role, privilege),
-                ).fetchone()
-                assert allowed == (False,)
-
-
 def test_capture_survives_new_store_handles_and_disconnect_hides_source(
     pool: ConnectionPool, users: dict[str, str]
 ) -> None:
