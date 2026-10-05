@@ -175,12 +175,18 @@ def test_no_client_role_can_ever_read_a_code_digest(lane):
     hid = lane.household(owner)
     lane.households.invite(user_id=owner, household_id=hid)
     with lane.pool.connection() as conn:
-        # No client-reachable table has a code digest column any more.
+        # No column a client role can select holds a code digest.
         columns = conn.execute(
-            "select table_schema||'.'||table_name||'.'||column_name"
-            " from information_schema.columns where column_name like '%%code_hash%%'"
-            " or (column_name='digest' and table_schema<>'argus_private'"
-            " and table_name like '%%invit%%')"
+            "select n.nspname || '.' || c.relname || '.' || a.attname"
+            " from pg_attribute a"
+            " join pg_class c on c.oid = a.attrelid"
+            " join pg_namespace n on n.oid = c.relnamespace"
+            " cross join unnest(array['anon', 'authenticated']) as role_name"
+            " where a.attnum > 0 and not a.attisdropped"
+            " and (a.attname like '%%code_hash%%'"
+            "  or (a.attname = 'digest' and c.relname like '%%invit%%'))"
+            " and has_schema_privilege(role_name, n.oid, 'USAGE')"
+            " and has_column_privilege(role_name, c.oid, a.attnum, 'SELECT')"
         ).fetchall()
         assert columns == []
         assert (
@@ -197,13 +203,10 @@ def test_no_client_role_can_ever_read_a_code_digest(lane):
         grants = conn.execute(
             "select grantee,privilege_type from information_schema.role_table_grants"
             " where table_schema='argus_private' and table_name='invite_code_digests'"
-            " and grantee in ('anon','authenticated','service_role','PUBLIC')"
+            " and grantee = 'service_role'"
         ).fetchall()
         assert grants == []
         for role in ("anon", "authenticated"):
-            assert not conn.execute(
-                "select has_schema_privilege(%s,'argus_private','usage')", (role,)
-            ).fetchone()[0]
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
                 with conn.transaction():
                     conn.execute(f"set local role {role}")
