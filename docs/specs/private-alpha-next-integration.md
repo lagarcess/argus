@@ -13,7 +13,7 @@ Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
 
-- October 5, 2026: bounded Trust slices #851, #844, #846, #858 and #857 landed through `7018e0edebbc370b999005a857230bf3c3a1ad8b`. [The run record](../reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md) preserves merge records and independent evidence. Current integration CI and smoke passed. Housekeeping proceeds by PR under branch protection. New worker slices remain unmerged until their exact-head checks pass. No social/deletion activation, hosted migration, legal publication, main promotion or deployment.
+- October 5, 2026: bounded Trust and Foundations slices #851, #844, #846, #858, #857, #863 and #853 landed through `2b2d0d9e8ed311c11b7585fbd757fb37f915e12f`. [The run record](../reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md) preserves merge records, independent evidence and exact integration check state. Housekeeping proceeds by PR under branch protection. Narrow fixture/profile defects #861/#848 are resolved; parents remain open. New worker slices remain unmerged until their exact-head checks pass. No social/deletion activation, hosted migration, legal publication, main promotion or deployment.
 
 - October 4, 2026: [Cuadrao code integration checkpoint](../reports/2026-10-04-cuadrao-code-integration-landing.md), #809, #790, #810 and #812. The QA gate, release UI, default-off invitation client and responsiveness changes preserve the latest approved foundation documents. The report and final #812 landing comment record source identity, merge lineage and terminal CI. Thirty-four fresh selected simulator journeys passed. Physical-phone, hosted-service and feature-enablement gates remain open.
 

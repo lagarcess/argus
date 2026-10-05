@@ -1,10 +1,10 @@
 # Active queue update
 
-Fetched integration is `d08a133a4e81082ffb3f2738dae92f544cba055a`. Original base is `875de09ac2115acec42e09060b92878aa5f18eff`. Prior7018 integration CI `37360181501` and smoke `37360181570` succeeded. New d08 integration CI `37379028424` and smoke `37379028432` both succeeded. GitHub reports runner-allocation mitigation and new exact-head checks execute again.
+Fetched integration is `2b2d0d9e8ed311c11b7585fbd757fb37f915e12f`. Original base is `875de09ac2115acec42e09060b92878aa5f18eff`. Prior7018 integration CI `37360181501` and smoke `37360181570` succeeded. New d08 integration CI `37379028424` and smoke `37379028432` both succeeded. GitHub reports runner-allocation mitigation and new exact-head checks execute again.
 
-Landed PRs are851,844,846,858,857,863. Landing housekeeping is still in progress through this documentation PR. No feature activation or hosted mutation occurred.
+Landed PRs are851,844,846,858,857,863,853. Landing housekeeping is still in progress through this documentation PR. No feature activation or hosted mutation occurred.
 
-Independent final review is recorded for847,849,854,845,862,864,865 and863 at the unit ledger's exact heads. This records code and local proof, not merge readiness while CI is queued. PR853 has merged d08 normally at33d9123d504c38ee2b202e94324727afd7650fee; its newheadc86981c076d4512aaee8d6c61d278f60ef597e75 awaits fresh context review and CI.
+Independent final review is recorded for847,849,854,845,862,864,865 and863 at the unit ledger's exact heads. This records code and local proof, not merge readiness while CI is queued. PR853 landed after normal d08 reconciliation, clean final context review and terminal17-success/3-skip CI. Its headc86981c076d4512aaee8d6c61d278f60ef597e75 matches the landed tree. Current2b integration checks are a separate pending landing gate.
 
 The founder approved Apple-origin revocation validation and explicit reauthentication for older mixed-provider sessions without known sign-in provenance. Known email/Google sessions retain access despite an Apple link. The existing session journal owns grant provenance. PR864 contains the implementation and has independent actual-model notification proof with one positive-control request and zero forbidden requests. The four initially skipped local-stack cases were subsequently exercised, all passing.
 
@@ -19,3 +19,5 @@ Open product gates remain798 orphan/linking policy,819 shared roots, decision17 
 The landing housekeeping tree normally reconciled current integration as `508bba6a1458c7e9bb73d4e6f412024c5749d243`. Root focused release-profile/environment checks passed72 tests with zero failures/skips, and combined modularity passed. No new environment names were introduced by the five landed slices; the CI action uses the existing job token input.
 
 PR863 landed under an expected-head guard with16 successful checks,3 expected skips and zero review threads. Independent local proof passed295 checks with zero skips. Production session code is unchanged. The controlled-delay baseline reproduces ECONNRESET; attribution of the original CI socket failure remains inference. No new configuration names require template changes.
+
+PR853 adds authoritative primary-currency persistence and explicit-field profile PATCH. It closes only848. Native Home/forecast consumers and complete820 acceptance remain. PR868 and849 have normally reconciled2b and await new-head CI; PR864 shared session/currency reconciliation invalidates affected prior native proof and needs the Mac slot after Counsel releases it. No new environment names or hosted changes accompany853.
