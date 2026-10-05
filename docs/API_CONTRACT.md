@@ -2576,7 +2576,11 @@ malformed or conflicting identity data returns `503 apple_identity_unavailable`.
 Guests never trigger this read and always receive null. The explicit in-memory
 mock-auth development path has no provider identity. Native clients hold this
 projection only in the current session snapshot and use it for Apple credential
-validation on launch and foreground return. It is not a profile preference.
+validation on launch and foreground return. This is linked-account identity,
+not evidence of the current sign-in method. The native session journal records
+the successful grant method; its [validation contract](../ios/Packages/ArgusSession/README.md)
+keeps known email and Google sessions independent of a linked Apple identity.
+It is not a profile preference.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
 (`can_search_current_workspace`) from broader Grounded Discovery

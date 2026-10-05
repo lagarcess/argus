@@ -136,3 +136,31 @@ create/replay, unknown/zero, nickname clearing, initial opening, debt amount and
 date-only correction, history, stale save, archive/restore, and new-controller
 Keychain restoration with authoritative reread. It does not itself restart the
 API process or app process; those acceptance checks belong to the app lane.
+
+
+Apple credential validation uses the linked subject projected beside `/me.user`.
+The projection says which Apple identity is linked to the account, not which
+provider created this session. The existing Keychain session value is a versioned
+envelope containing the SDK session and the successful grant method (email,
+Apple or Google). SDK refresh preserves the method only within the same account
+and epoch. No Apple subject is persisted locally.
+
+Known email and Google sessions remain usable even when an Apple identity is
+linked. Known Apple sessions require the canonical profile owner to match the
+stored SDK user and the platform credential state to be authorized. Revoked or
+not-found credentials retire through the existing pending-sign-out journal.
+Platform errors and transferred credentials block product requests while keeping
+the stored session available for validation retry. The shared authenticated
+transport checks that validation still holds before sending and after responses.
+
+Legacy raw SDK sessions have an unknown method. A legacy session with a linked
+Apple identity, or a known Apple session without a linked subject, requires the
+explicit “Sign out and sign in again” action. It retires the old session through
+the existing journal before ordinary sign-in establishes the method. Interrupted
+or failed revocation remains pending; no provider is chosen automatically.
+
+Apple code capture is awaited after successful adoption. Its outcome is separate
+from sign-in and visible to the person. Each supplied code receives one request;
+401, uncertain transport failure and server failure never replay that code.
+A later attempt requires fresh Apple authorization. Capture does not initialize
+a name or link accounts.
