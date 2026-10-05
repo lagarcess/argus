@@ -23,6 +23,11 @@ final class AuthJourneyUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-AppleLocale", spanish ? "es_DO" : "en_US"]
         app.launch()
+        app.revealConnectedTabBar()
+        if app.buttons["header.profile"].waitForExistence(timeout: 3) {
+            app.openProfileSurface()
+            if app.buttons["auth.signOut"].waitForExistence(timeout: 3) { signOutFromProfile() }
+        }
         app.openSignedOutAuthEntry()
         app.textFields["auth.email"].tap(); app.textFields["auth.email"].typeText(email)
         pastePassword(password)
@@ -36,6 +41,10 @@ final class AuthJourneyUITests: XCTestCase {
         preferences.tap()
         let choice = app.buttons["profile.primaryCurrency"]
         XCTAssertTrue(choice.waitForExistence(timeout: 10))
+        choice.tap(); app.buttons["DOP"].tap()
+        let initial = NSPredicate(format: "label CONTAINS %@", "DOP")
+        expectation(for: initial, evaluatedWith: choice)
+        waitForExpectations(timeout: 15)
         choice.tap(); app.buttons["USD"].tap()
         let saved = NSPredicate(format: "label CONTAINS %@", "USD")
         expectation(for: saved, evaluatedWith: choice)
@@ -50,7 +59,14 @@ final class AuthJourneyUITests: XCTestCase {
         XCTAssertTrue(choice.label.contains("USD"))
         capture(spanish ? "primary-currency-es-restored" : "primary-currency-en-restored")
         app.navigationBars.buttons.matching(identifier: "BackButton").firstMatch.tap()
-        app.buttons["auth.signOut"].tap()
+        signOutFromProfile()
+    }
+
+    private func signOutFromProfile() {
+        let signOut = app.buttons["auth.signOut"]
+        XCTAssertTrue(signOut.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !signOut.isHittable { app.swipeUp() }
+        signOut.tap()
     }
 
     func testRegisteredSessionSurvivesRelaunchAndSignsOut() throws {

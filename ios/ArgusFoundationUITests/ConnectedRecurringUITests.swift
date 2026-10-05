@@ -41,7 +41,7 @@ extension FinancialLoopUITests {
         revealOnHome(row)
         capture("home-upcoming-recurring")
         // Plan explores a longer horizon; Home's window and totals stay as they are.
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         revealPlanForecastControls()
         chooseDate("plan.until", daysAhead: 60)
         assertPlanProjected("DOP -50.00")
@@ -161,7 +161,7 @@ extension FinancialLoopUITests {
 
     func planExpectationRows(_ title: String) -> XCUIElementQuery {
         app.revealConnectedTabBar()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         let manage = app.buttons["Manage expectations"].exists ? app.buttons["Manage expectations"] : app.staticTexts["Manage expectations"]
         tapVisible(manage)
         return app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.expectation.' AND label CONTAINS %@", title))

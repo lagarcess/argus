@@ -82,7 +82,7 @@ extension FinancialLoopUITests {
         app.buttons["File"].tap()
         XCTAssertTrue(app.buttons["Attach example"].waitForExistence(timeout: 5))
         app.buttons["Attach example"].tap()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         XCTAssertTrue(app.staticTexts["plan-heading"].waitForExistence(timeout: 5))
         app.buttons["tab.argus"].tap()
         XCTAssertEqual(composer.value as? String, draft)

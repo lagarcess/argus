@@ -119,7 +119,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["loop.pending.retry"].waitForExistence(timeout: 30))
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         app.terminate(); app.launch()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         tapVisible(app.scrollViews["screen.plan"].buttons["loop.pending.retry"])
         XCTAssertTrue(app.buttons["loop.pending.retry"].waitForNonExistence(timeout: 20))
         _ = openGoal(title)
@@ -188,7 +188,7 @@ extension FinancialLoopUITests {
     }
 
     func prepareGoal(_ title: String, destination: MoneyAccount) {
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         selectPlanSection("goals")
         tapVisible(app.buttons["goal.add"])
         fillMoneyField("goal.name", with: title)
@@ -199,7 +199,7 @@ extension FinancialLoopUITests {
     }
 
     @discardableResult func openGoal(_ title: String) -> String {
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         selectPlanSection("goals")
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.row.plan.' AND label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15))

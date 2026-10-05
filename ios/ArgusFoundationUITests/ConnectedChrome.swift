@@ -15,6 +15,11 @@ extension XCUIApplication {
     func revealConnectedTabBar() {
         for _ in 0..<6 {
             if buttons["tab.home"].exists { return }
+            let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+            if nativeBack.waitForExistence(timeout: 1) {
+                nativeBack.tap()
+                continue
+            }
             if buttons["accounts.back"].waitForExistence(timeout: 1) {
                 buttons["accounts.back"].tap()
                 continue
@@ -35,13 +40,14 @@ extension XCUIApplication {
                 buttons["sheet.close"].tap()
                 continue
             }
-            let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
-            if nativeBack.waitForExistence(timeout: 1) {
-                nativeBack.tap()
-                continue
-            }
             break
         }
+    }
+
+    func openPlanSurface() {
+        revealConnectedTabBar()
+        XCTAssertTrue(buttons["tab.plan"].waitForExistence(timeout: 10))
+        buttons["tab.plan"].tap()
     }
 
     var accountBack: XCUIElement {
