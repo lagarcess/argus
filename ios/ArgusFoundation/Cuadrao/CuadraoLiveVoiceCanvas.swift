@@ -72,7 +72,7 @@ struct CuadraoLiveVoiceCanvas: View {
                 Image(systemName: "chevron.down").font(.system(size: 18, weight: .medium))
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
-            }.accessibilityLabel(es ? "Minimizar conversación de voz" : "Minimize voice conversation")
+            }.buttonStyle(.plain).accessibilityLabel(es ? "Minimizar conversación de voz" : "Minimize voice conversation")
                 .accessibilityIdentifier("voice-minimize")
             Spacer()
             Text("Cuadrao").font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
@@ -82,13 +82,13 @@ struct CuadraoLiveVoiceCanvas: View {
                     Image(systemName: "slider.horizontal.3").font(.system(size: 20))
                         .frame(width: 48, height: 48)
                         .background(.ultraThinMaterial, in: Circle())
-                }.accessibilityLabel(es ? "Elegir voz" : "Choose voice")
+                }.buttonStyle(.plain).accessibilityLabel(es ? "Elegir voz" : "Choose voice")
                     .accessibilityIdentifier("voice-choose")
             } else {
                 // Keeps the title centered while voice selection is off.
                 Color.clear.frame(width: 48, height: 48).accessibilityHidden(true)
             }
-        }.buttonStyle(.plain).padding(.horizontal, 24).padding(.top, 12)
+        }.padding(.horizontal, 24).padding(.top, 12)
     }
 
     private var controls: some View {
@@ -105,7 +105,7 @@ struct CuadraoLiveVoiceCanvas: View {
     private var previewNotice: some View {
         Button { previewDetails = true } label: {
             Label(es ? "Vista previa · Sin conexión" : "Preview · Not connected", systemImage: "info.circle")
-                .font(.caption).foregroundStyle(.secondary).frame(minHeight: 44)
+                .font(.caption).foregroundStyle(.secondary).frame(minHeight: 44).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier("voice-preview-info")
     }
 
@@ -114,7 +114,7 @@ struct CuadraoLiveVoiceCanvas: View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 22, weight: .regular))
                 .frame(width: 52, height: 52)
-                .background(selected ? WelcomePalette.sage : Color.clear, in: Circle())
+                .background(selected ? WelcomePalette.sage : Color.clear, in: Circle()).contentShape(Rectangle())
         }.buttonStyle(.plain).accessibilityIdentifier(id)
             .accessibilityLabel(title).accessibilityValue(selected ? (es ? "Activado" : "On") : "")
     }

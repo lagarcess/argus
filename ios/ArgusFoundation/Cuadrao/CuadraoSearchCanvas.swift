@@ -156,7 +156,7 @@ struct CuadraoSearchCanvas: View {
                                         .frame(minHeight: 44)
                                         .overlay(alignment: .bottom) {
                                             Rectangle().fill(kind == value ? WelcomePalette.pine : .clear).frame(height: 2)
-                                        }
+                                        }.contentShape(Rectangle())
                                 }.buttonStyle(.plain)
                                     .accessibilityAddTraits(kind == value ? .isSelected : [])
                                     .accessibilityIdentifier("cuadrao.search.kind.\(value)")

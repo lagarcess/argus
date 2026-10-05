@@ -25,7 +25,7 @@ struct FinancialBudgetList: View {
                     DisclosureGroup("budget.archived") {
                         ForEach(archived) { progress in
                             Button { Task { await model.open(progress.id, origin: origin) } } label: {
-                                HStack { Text(verbatim: progress.budget.name); Spacer(); Image(systemName: "chevron.right") }.frame(minHeight: 48)
+                                HStack { Text(verbatim: progress.budget.name); Spacer(); Image(systemName: "chevron.right") }.frame(minHeight: 48).contentShape(Rectangle())
                             }.buttonStyle(.plain).accessibilityIdentifier("budget.archived." + progress.id.uuidString)
                         }
                     }

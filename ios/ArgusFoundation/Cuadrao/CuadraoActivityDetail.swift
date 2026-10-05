@@ -49,7 +49,7 @@ struct CuadraoActivityDetail: View {
                             chatFocus = .activity(id: entry.id, title: entry.title)
                         } label: {
                             Label(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble")
-                                .font(.subheadline).frame(minHeight: 44)
+                                .font(.subheadline).frame(minHeight: 44).contentShape(Rectangle())
                         }.buttonStyle(.plain).foregroundStyle(WelcomePalette.pine)
                             .accessibilityIdentifier("activity-detail-ask")
                     }.padding(24)

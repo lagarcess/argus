@@ -58,7 +58,7 @@ struct CanvasAvatarCropSheet: View {
                     }
                 }.padding(24).frame(maxWidth: 440).frame(maxWidth: .infinity)
                     .disabled(rendering)
-            }.background(WelcomePalette.background)
+            }.background(Color(uiColor: .systemBackground))
                 .navigationTitle(spanish ? "Ajustar foto" : "Adjust photo").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {

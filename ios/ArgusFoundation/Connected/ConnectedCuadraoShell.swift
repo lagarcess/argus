@@ -10,6 +10,8 @@ struct ConnectedCuadraoShell: View {
     @State private var sheet: FoundationSheet?
     @State private var navigationScroll = CuadraoNavigationScroll()
     @State private var accountPath: [UUID] = []
+    @State private var profilePath: [CuadraoProfileDestination] = []
+    @State private var avatar: CuadraoAvatarSelection = .none
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -23,8 +25,8 @@ struct ConnectedCuadraoShell: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if accountPath.isEmpty || tab != .home {
-                CuadraoNavigationBar(selection: $tab, compact: tab == .home && navigationScroll.compact, spanish: spanish)
+            if (accountPath.isEmpty || tab != .home) && (profilePath.isEmpty || tab != .profile) {
+                CuadraoNavigationBar(selection: $tab, compact: tab == .home && navigationScroll.compact, spanish: spanish, avatar: avatar, profileName: auth.profile?.displayName ?? "")
                     .padding(.horizontal, 20)
                     .frame(height: 64, alignment: .bottom)
                     .padding(.bottom, 8)
@@ -59,16 +61,28 @@ struct ConnectedCuadraoShell: View {
             }
         }
         .sheet(item: $sheet) { selected in
-            FoundationSheetView(sheet: selected, appearance: $appearance)
-                .preferredColorScheme(appearance.colorScheme)
-                .tint(ArgusStyle.ink)
-                .foregroundStyle(ArgusStyle.ink)
+            if selected == .updates {
+                NavigationStack {
+                    ReleaseUpdatesInbox(state: .unavailable, spanish: spanish)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(spanish ? "Listo" : "Done") { sheet = nil }.accessibilityIdentifier("sheet.close")
+                            }
+                        }
+                }.preferredColorScheme(appearance.colorScheme)
+            } else {
+                FoundationSheetView(sheet: selected, appearance: $appearance)
+                    .preferredColorScheme(appearance.colorScheme)
+                    .tint(ArgusStyle.ink)
+                    .foregroundStyle(ArgusStyle.ink)
+            }
         }
         .tint(WelcomePalette.pine)
         .foregroundStyle(Color(white: 0.08))
         .background(Color.white.ignoresSafeArea())
         .onChange(of: destination) { _, value in mapDestination(value) }
         .onChange(of: tab) { _, value in mapTab(value) }
+        .onChange(of: auth.profile?.id) { _, _ in avatar = .none; profilePath = [] }
     }
 
     @ViewBuilder private func tabContent(_ item: CuadraoTab) -> some View {
@@ -103,8 +117,8 @@ struct ConnectedCuadraoShell: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
         case .profile:
-            NavigationStack {
-                ConnectedCuadraoProfile(appearance: $appearance)
+            NavigationStack(path: $profilePath) {
+                ConnectedCuadraoProfile(appearance: $appearance, avatar: $avatar)
             }
         }
     }
@@ -143,38 +157,5 @@ struct ConnectedCuadraoShell: View {
         case .search: destination = .search
         case .profile: break
         }
-    }
-}
-
-private struct ConnectedCuadraoProfile: View {
-    @Binding var appearance: AppearancePreference
-    @EnvironmentObject private var auth: ProfileAuthModel
-    @Environment(\.locale) private var locale
-
-    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                Text(spanish ? "Perfil" : "Profile")
-                    .font(.system(.largeTitle, design: .serif))
-                    .accessibilityAddTraits(.isHeader)
-                if auth.enabled {
-                    ProfileAccountSection(model: auth)
-                }
-                NavigationLink {
-                    AppearancePreferencesView(appearance: $appearance)
-                } label: {
-                    SampleRow(title: "profile.preferences", subtitle: "profile.preferences.detail", symbol: "paintpalette")
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("profile.preferences")
-            }
-            .padding(24)
-        }
-        .background(Color.white.ignoresSafeArea())
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .navigationBar)
     }
 }

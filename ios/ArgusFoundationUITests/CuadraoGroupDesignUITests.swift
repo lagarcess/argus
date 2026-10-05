@@ -45,15 +45,21 @@ final class CuadraoGroupDesignUITests: XCTestCase {
         replace(app.textFields["Parte de Ana"], with: "300")
         if app.toolbars.buttons["Listo"].exists { app.toolbars.buttons["Listo"].tap() }
         reveal(app, app.buttons["group-expense-save"])
-        XCTAssertTrue(app.buttons["group-expense-save"].isEnabled)
+        XCTAssertTrue(app.buttons["group-expense-save"].wait(for: \.isEnabled, toEqual: true, timeout: 2), "A split that adds up can be saved")
         shot(app, "plan-unequal-split-es")
         app.buttons["group-expense-save"].tap()
         app.segmentedControls["group-sections"].buttons["El plan"].tap()
         reveal(app, app.buttons["group-settle"]); app.buttons["group-settle"].tap()
-        replace(app.textFields["group-repayment-amount"], with: "500")
+        let repayment = app.textFields["group-repayment-amount"], record = app.buttons["group-repayment-save"]
+        XCTAssertEqual(repayment.value as? String, "3,300.00", "Ana owes her 3,000 house share plus 300 of the dinner")
+        replace(repayment, with: "3301")
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "3,301"), object: repayment)], timeout: 3), .completed, "The over-cap amount is in the field before the refusal is read")
+        XCTAssertTrue(record.wait(for: \.isEnabled, toEqual: false, timeout: 2), "A repayment cannot exceed what the sender owes")
+        replace(repayment, with: "500")
+        XCTAssertTrue(record.wait(for: \.isEnabled, toEqual: true, timeout: 2), "A partial repayment under the cap can be recorded")
         shot(app, "plan-partial-repayment-es")
-        app.buttons["group-repayment-save"].tap()
-        XCTAssertFalse(app.textFields["group-repayment-amount"].exists)
+        record.tap()
+        XCTAssertTrue(repayment.waitForNonExistence(timeout: 3), "Recording a repayment closes the sheet")
     }
     func testSampleCardNativeSharing() {
         continueAfterFailure = false
@@ -166,6 +172,9 @@ final class CuadraoGroupDesignUITests: XCTestCase {
     }
     private func replace(_ field: XCUIElement, with text: String) {
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap(); field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: (field.value as? String ?? "").count)); field.typeText(text)
+        let typed = NSPredicate { _, _ in (field.value as? String)?.replacingOccurrences(of: ",", with: "") == text }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: typed, object: nil)], timeout: 3), .completed,
+                       "\(field) holds '\(field.value as? String ?? "")' after replacing it with '\(text)'")
     }
     private func reveal(_ app: XCUIApplication, _ element: XCUIElement) {
         for _ in 0..<7 {

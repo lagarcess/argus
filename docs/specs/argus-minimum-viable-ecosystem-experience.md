@@ -670,6 +670,8 @@ Notifications should invite a return without exposing financial amounts in push/
 Own app preferences, notification preferences, security, data controls, export and the Argus login account. Keep this separate from Accounts and Home so “my profile” does not ambiguously mean “my finances.” Financial space organization and household invitations/membership remain at their existing space controls, without duplicate Settings entries.
 
 The September 28 mobile lock keeps Personal details above three groups: App (Preferences, Personalization, Notifications), Account (Security, Data & privacy, Usage), and Support (Help & feedback). Language lives only in Preferences. Personal details offers an avatar theme or profile photo; response preferences remain distinct from remembered context and financial records. Light, Dark and System persist as appearance preferences.
+With no avatar selection the Profile tab keeps its original icon; otherwise it
+shows the same selected avatar that Profile reads.
 
 For the October 2 native release pivot, identity uses initials and avatar themes.
 Hide personal photos, Personalization, Security and sessions, Shared
@@ -680,9 +682,10 @@ sessions, Shared conversations, Removed activity and photos. Usage, More options
 and conversation bulk actions are hidden by #786 (`a20362d3`) as a Head of
 Engineering judgment call. Memory (`.memory`) is hidden until native memory
 arrives with its controls. These are designed rows whose backend is still owed, not cuts, and Yelena is
-ordering their backends after chat. The first-release switch is meant to hide them
-only in release builds, with every row shown in development builds; today
-`CuadraoFirstRelease` hides them in every build. This does not remove them from
+ordering their backends after chat. `CuadraoFirstRelease` hides them only in
+release builds and shows every row in development builds. Release builds hide
+the avatar-editing entry and development builds keep the full editor, including
+photos ([decision of October 3, 2026](argus-decision-log.md#october-3-2026-avatar-editing-in-release)). This does not remove them from
 the September 28 grouping. Remove only the notification preference named Por
 correo, because Updates go to the inbox and push only. This does not
 remove email authentication or recovery. Household email invitations and update

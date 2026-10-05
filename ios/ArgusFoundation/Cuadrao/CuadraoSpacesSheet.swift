@@ -27,7 +27,7 @@ struct CuadraoSpacesSheet: View {
                     CuadraoManageSpaces(data: data, spanish: spanish, open: { dismiss() })
                 } label: {
                     Label(spanish ? "Gestionar espacios" : "Manage spaces", systemImage: "slider.horizontal.3")
-                        .font(.subheadline).foregroundStyle(.secondary).frame(minHeight: 52)
+                        .font(.subheadline).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(.plain)
                 Spacer(minLength: 0)
             }.padding(.horizontal, 24).padding(.top, 12)
@@ -136,7 +136,7 @@ private struct CuadraoManageSpaces: View {
                     Text(space.title(spanish)).foregroundStyle(.primary)
                     Text(space.deleted || space.archived ? (spanish ? "Restaurar y abrir" : "Restore and open")
                          : space.kind.title(spanish)).font(.caption).foregroundStyle(.secondary)
-                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
             }.buttonStyle(.plain)
             if space.isPrivate && !space.deleted {
                 Menu {

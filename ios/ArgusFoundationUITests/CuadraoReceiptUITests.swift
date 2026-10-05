@@ -152,7 +152,7 @@ final class CuadraoReceiptUITests: XCTestCase {
         tap(app, "group-add-receipt")
         tap(app, "receipt-sample")
         tap(app, "receipt-payer")
-        app.buttons["Ana"].tap()
+        app.buttons.matching(NSPredicate(format: "label == %@ AND identifier == %@", "Ana", "")).firstMatch.tap()
         let direction = app.staticTexts["You owe"]
         reveal(app, direction)
         XCTAssertTrue(direction.exists)

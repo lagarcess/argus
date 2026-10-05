@@ -86,6 +86,7 @@ private struct ReceiptEditor: View {
                         }
                     } label: {
                         Label(es ? "Elegir moneda" : "Choose currency", systemImage: "chevron.up.chevron.down")
+                            .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                     }.accessibilityIdentifier("receipt-currency")
                     Text(es ? "El recibo ya está guardado. Elige su moneda para revisar los montos; después quedará fija." : "Your receipt is saved. Choose its currency to review amounts; it stays fixed afterward.")
                         .font(CuadraoTypography.caption).foregroundStyle(.secondary)
@@ -308,7 +309,7 @@ private struct ReceiptEditor: View {
                     }
                         .font(.subheadline).fixedSize(horizontal: !vertical, vertical: true)
                         .padding(.horizontal, 8).frame(minHeight: 44)
-                        .background(line.members.contains(member.id) ? WelcomePalette.sage : .clear, in: Capsule())
+                        .background(line.members.contains(member.id) ? WelcomePalette.sage : .clear, in: Capsule()).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityIdentifier("receipt-assign-\(draft.lines.firstIndex(where: { $0.id == line.id }) ?? 0)-\(group.activeMembers.firstIndex(where: { $0.id == member.id }) ?? 0)")
                     .accessibilityLabel("\(line.name), \(member.name)")
                     .accessibilityValue(line.members.contains(member.id) ? (es ? "Asignado" : "Assigned") : (es ? "Sin asignar" : "Not assigned"))

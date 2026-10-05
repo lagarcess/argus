@@ -38,7 +38,7 @@ struct CuadraoHomeCanvas: View {
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
-        case add, updates, spaces, customize, household, gallery
+        case add, updates, spaces, customize, household, gallery, releaseReview
         case account(CanvasAccountSheet)
         var id: String { "home-modal" }
     }
@@ -54,7 +54,7 @@ struct CuadraoHomeCanvas: View {
                             if data.selectedSpace.kind == .household {
                                 Button { sheet = .household } label: {
                                     PlanAvatarStack(members: data.acceptedHouseholdMembers(spanish: spanish))
-                                        .frame(minHeight: 44)
+                                        .frame(minHeight: 44).contentShape(Rectangle())
                                 }.buttonStyle(.plain)
                                     .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")
                                     .accessibilityValue(String(data.acceptedHouseholdMembers(spanish: spanish).count))
@@ -106,7 +106,8 @@ struct CuadraoHomeCanvas: View {
             ZStack {
                 if chat.voiceMessage.state != .recording {
                     CuadraoNavigationBar(selection: tabSelection,
-                        compact: selectedTab == .home && navigationScroll.compact, spanish: spanish)
+                        compact: selectedTab == .home && navigationScroll.compact, spanish: spanish,
+                        avatar: profile.avatar, profileName: profile.name)
                         .padding(.horizontal, 20)
                         .frame(height: 64, alignment: .bottom)
                         .padding(.bottom, 8)
@@ -203,6 +204,9 @@ struct CuadraoHomeCanvas: View {
                     .font(.title2.weight(.semibold)).accessibilityIdentifier("home-greeting")
             }
                 .contextMenu {
+                    #if DEBUG
+                    Button(spanish ? "Revisión de lanzamiento" : "Release UI review") { sheet = .releaseReview }
+                    #endif
                     Button(spanish ? "Guía visual" : "Visual guide") { sheet = .gallery }
                         .accessibilityIdentifier("cuadrao-gallery-open")
                     Button(spanish ? "Vista previa: primer uso" : "Preview: first use") {
@@ -241,7 +245,7 @@ struct CuadraoHomeCanvas: View {
                         HStack(spacing: 8) {
                             sectionTitle(spanish ? "Cuentas" : "Accounts")
                             Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
-                        }.frame(minHeight: 44)
+                        }.frame(minHeight: 44).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityIdentifier("home-accounts-open")
                     Spacer()
                     CuadraoSectionAddButton(title: spanish ? "Añadir cuenta" : "Add account") { sheet = .add }
@@ -307,7 +311,7 @@ struct CuadraoHomeCanvas: View {
             }
             Spacer()
             Text(amount).font(CuadraoTypography.rowAmount)
-        }.padding(.vertical, 6)
+        }.padding(.vertical, 6).contentShape(Rectangle())
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -357,6 +361,12 @@ struct CuadraoHomeCanvas: View {
     @ViewBuilder private func modal(_ item: HomeSheet) -> some View {
         switch item {
         case .gallery: CuadraoDesignGallery()
+        case .releaseReview:
+            #if DEBUG
+            ReleaseUIReview()
+            #else
+            EmptyView()
+            #endif
         case .household: CuadraoHouseholdSheet(data: data, spanish: spanish)
         case .customize: CuadraoHomeLayoutSheet(savedOrder: $homeOrder, spanish: spanish)
         case .spaces: CuadraoSpacesSheet(data: data, spanish: spanish)

@@ -75,6 +75,7 @@ struct ConnectedCuadraoAuthFlow: View {
                                     RoundedRectangle(cornerRadius: 16)
                                         .stroke(Color(white: 0.80), lineWidth: 1)
                                 }
+                                .contentShape(Rectangle())
                         }.buttonStyle(.plain)
                         .accessibilityIdentifier("cuadrao.welcome.signin")
                     }.padding(.bottom, 28)
@@ -187,7 +188,7 @@ struct ConnectedCreateAccount: View {
                                : (spanish ? "Inicia sesión" : "Sign in"))
                             .foregroundColor(WelcomePalette.pine).bold())
                             .font(.subheadline)
-                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 16)
