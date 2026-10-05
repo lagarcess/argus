@@ -28,10 +28,7 @@ struct CuadraoPlanCanvas: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     header
-                    Picker(spanish ? "Tus planes" : "Your plans", selection: $together) {
-                        Text(spanish ? "Para ti" : "For you").tag(false)
-                        Text(spanish ? "En grupo" : "Together").tag(true)
-                    }.pickerStyle(.segmented).accessibilityIdentifier("plan-audience")
+                    CuadraoPlanAudiencePicker(spanish: spanish, together: $together)
                     if together {
                         CuadraoGroupCollection(store: groups, spanish: spanish, bottomSpace: bottomSpace, create: { newGroup = true }, open: { path.append($0) })
                     } else {
@@ -71,21 +68,14 @@ struct CuadraoPlanCanvas: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(spanish ? "Lo que viene" : "What’s ahead").font(CuadraoTypography.screen)
-                    .accessibilityIdentifier("plan-heading")
-                    .contextMenu {
-                        Button(spanish ? "Ver primer uso" : "See first use") { showEmpty = true; resetConfirmation = true }
-                        Button(spanish ? "Restablecer ejemplos" : "Reset examples") { showEmpty = false; resetConfirmation = true }
-                    }
+        CuadraoPlanHeader(spanish: spanish,
+            createTitle: together ? (spanish ? "Crear grupo" : "Create group") : (spanish ? "Crear plan" : "Create plan")) {
+                if together { newGroup = true } else { creation = PlanEditorRoute(plan: newPlan) }
             }
-            Spacer()
-            Button { if together { newGroup = true } else { creation = PlanEditorRoute(plan: newPlan) } } label: {
-                Image(systemName: "plus").font(.system(size: 20, weight: .medium))
-                    .frame(width: 44, height: 44).background(WelcomePalette.sage, in: Circle())
-            }.accessibilityLabel(together ? (spanish ? "Crear grupo" : "Create group") : (spanish ? "Crear plan" : "Create plan")).accessibilityIdentifier("plan-create")
-        }
+            .contextMenu {
+                Button(spanish ? "Ver primer uso" : "See first use") { showEmpty = true; resetConfirmation = true }
+                Button(spanish ? "Restablecer ejemplos" : "Reset examples") { showEmpty = false; resetConfirmation = true }
+            }
     }
 
     private var forecastSpaces: [CanvasSpace] { accounts.visibleSpaces.filter { $0.kind == .personal || $0.kind == .household } }
@@ -96,10 +86,7 @@ struct CuadraoPlanCanvas: View {
 
     private var forecastOverview: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(spanish ? "Tu mes" : "Your month")
-                    .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                Spacer()
+            CuadraoPlanForecastHeading(period: spanish ? "Tu mes" : "Your month") {
                 if forecastSpaces.count > 1 {
                     CuadraoChoiceMenu(title: spanish ? "Espacio del pronóstico" : "Forecast space",
                         selection: Binding(get: { scope }, set: { scope = $0; selectedDay = nil }),
@@ -110,14 +97,10 @@ struct CuadraoPlanCanvas: View {
                 } else { CuadraoChoiceLabel(title: scopeName, selectable: false) }
             }
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(selectedPoint.map { "\($0.day) oct. · \($0.day > CanvasForecast.today ? (spanish ? "estimado" : "estimated") : (spanish ? "registrado" : "recorded"))" } ?? (store.dailyAssumptions[scope] == nil ? (spanish ? "Balance estimado al cierre" : "Estimated closing balance") : (spanish ? "Con tu plan, cerrarías con" : "With your plan, you'd end with")))
-                    .font(.subheadline).foregroundStyle(.secondary)
-                Text(PlanFormat.amount(selectedPoint?.balance ?? forecast.ending(daily: store.daily(for: scope))))
-                    .font(CuadraoTypography.amount).monospacedDigit()
-                    .contentTransition(.numericText()).minimumScaleFactor(0.65).lineLimit(1)
-                    .accessibilityIdentifier("plan-month-ending")
-            }
+            CuadraoPlanForecastValue(
+                title: selectedPoint.map { "\($0.day) oct. · \($0.day > CanvasForecast.today ? (spanish ? "estimado" : "estimated") : (spanish ? "registrado" : "recorded"))" } ?? (store.dailyAssumptions[scope] == nil ? (spanish ? "Balance estimado al cierre" : "Estimated closing balance") : (spanish ? "Con tu plan, cerrarías con" : "With your plan, you'd end with")),
+                amount: PlanFormat.amount(selectedPoint?.balance ?? forecast.ending(daily: store.daily(for: scope))),
+                identifier: "plan-month-ending")
             PlanForecastChart(forecast: forecast, daily: store.daily(for: scope), spanish: spanish, selectedDay: $selectedDay, compact: true)
             NavigationLink {
                 CuadraoForecastPlayground(store: store, scope: scope, scopeName: scopeName, spanish: spanish, bottomSpace: bottomSpace)

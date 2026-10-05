@@ -35,11 +35,11 @@ struct FinancialExpectationForm: View {
                     }
                     VStack(alignment: .leading, spacing: 8) {
                         Text("loop.amount")
-                        HStack {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(verbatim: draft.currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                             TextField("0.00", text: $draft.amount).keyboardType(.decimalPad).focused($focused)
-                                .monospacedDigit().accessibilityIdentifier("plan.expectation.amount")
-                            Text(verbatim: draft.currency).foregroundStyle(ArgusStyle.secondary)
-                        }.padding(14).overlay(RoundedRectangle(cornerRadius: 14).stroke(ArgusStyle.line))
+                                .font(CuadraoTypography.amount).monospacedDigit().accessibilityIdentifier("plan.expectation.amount")
+                        }.padding(18).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 20))
                     }
                     Picker("loop.activity.account", selection: $draft.accountId) {
                         Text("plan.account.unassigned").tag(nil as UUID?)
@@ -78,13 +78,14 @@ struct FinancialExpectationForm: View {
                     if loop.pendingConfirmation != nil {
                         PlanPendingView(loop: loop)
                     } else {
-                        Button("plan.saveExpectation") { focused = false; Task { await model.save(locale: locale) } }
-                            .buttonStyle(PillButtonStyle()).disabled(!draft.ready || model.saving)
+                        PlanPrimaryButton(title: NSLocalizedString("plan.saveExpectation", comment: "")) { focused = false; Task { await model.save(locale: locale) } }
+                            .disabled(!draft.ready || model.saving)
                             .accessibilityIdentifier("plan.expectation.save")
                     }
                     if model.saving { ProgressView("accounts.loading") }
-                }.padding(24).font(ArgusStyle.body())
-            }.background(ArgusStyle.background).scrollDismissesKeyboard(.interactively)
+                }.padding(24).font(CuadraoTypography.body)
+            }.background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+                .scrollDismissesKeyboard(.interactively)
                 .environment(\.timeZone, TimeZone(secondsFromGMT: 0)!)
                 .navigationTitle(draft.existing == nil ? "plan.add.title" : "plan.editExpectation.title")
                 .navigationBarTitleDisplayMode(.inline)
@@ -161,7 +162,8 @@ struct FinancialPlanSelectionView: View {
                             .buttonStyle(PillButtonStyle()).disabled(model.saving).accessibilityIdentifier("plan.selection.save")
                     }
                 }.padding(24)
-            }.background(ArgusStyle.background).navigationTitle("plan.includedAccounts").navigationBarTitleDisplayMode(.inline)
+            }.background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+                .navigationTitle("plan.includedAccounts").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving) } }
                 .interactiveDismissDisabled(model.saving)
         }
@@ -191,8 +193,8 @@ struct FinancialOccurrenceView: View {
                             .buttonStyle(PillButtonStyle()).disabled(loop.pendingConfirmation != nil).accessibilityIdentifier("plan.viewActivity")
                     }
                     if occurrence.activityId == nil {
-                        Button(occurrence.kind == .income ? "plan.recordIncome" : "plan.recordBill") { model.record(occurrence) }
-                            .buttonStyle(PillButtonStyle()).disabled(occurrence.status == .needsReview || occurrence.exclusionReason == "account_changed" || occurrence.accountId == nil || loop.pendingConfirmation != nil)
+                        PlanPrimaryButton(title: NSLocalizedString(occurrence.kind == .income ? "plan.recordIncome" : "plan.recordBill", comment: "")) { model.record(occurrence) }
+                            .disabled(occurrence.status == .needsReview || occurrence.exclusionReason == "account_changed" || occurrence.accountId == nil || loop.pendingConfirmation != nil)
                             .accessibilityIdentifier("plan.record")
                     }
                     Button("plan.link.title") { linking = true; Task { await model.loadCandidates(occurrence) } }
@@ -212,8 +214,8 @@ struct FinancialOccurrenceView: View {
                         if let candidate {
                             activityReview(candidate)
                             Text("plan.link.confirmHint").font(ArgusStyle.body(13, relativeTo: .subheadline))
-                            Button("plan.link.confirmTitle") { Task { _ = await model.link(candidate, to: occurrence) } }
-                                .buttonStyle(PillButtonStyle()).disabled(model.saving || loop.pendingConfirmation != nil)
+                            PlanPrimaryButton(title: NSLocalizedString("plan.link.confirmTitle", comment: "")) { Task { _ = await model.link(candidate, to: occurrence) } }
+                                .disabled(model.saving || loop.pendingConfirmation != nil)
                                 .accessibilityIdentifier("plan.link.confirm")
                         }
                     }
@@ -225,14 +227,15 @@ struct FinancialOccurrenceView: View {
                     if let error = model.errorKey { Text(LocalizedStringKey(error)).foregroundStyle(ArgusStyle.secondary) }
                     if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
                 }.padding(24)
-            }.background(ArgusStyle.background).navigationTitle(occurrence.title).navigationBarTitleDisplayMode(.inline)
+            }.background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+                .navigationTitle(occurrence.title).navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .cancellationAction) { Button("action.close") { model.selectedOccurrence = nil }.disabled(model.saving) } }
                 .interactiveDismissDisabled(model.saving)
         }
     }
     private func activityReview(_ activity: FinancialActivityDetail) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("plan.recordedActivity").font(ArgusStyle.display(22))
+            Text("plan.recordedActivity").font(CuadraoTypography.section)
             Text(LocalizedStringKey("loop.kind." + activity.kind.rawValue))
             Text(verbatim: activity.currency + " " + AccountPresentation.amount(activity.amount, locale: locale)).monospacedDigit()
             Text(verbatim: AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
