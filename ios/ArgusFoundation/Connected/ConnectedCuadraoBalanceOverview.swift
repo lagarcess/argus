@@ -4,7 +4,7 @@ import ArgusSession
 struct ConnectedCuadraoBalanceOverview: View {
     let home: FinancialHome
     let spanish: Bool
-    @Environment(\.locale) private var locale
+    var space = "Personal"
     @State private var chosenCurrency: String?
     @State private var expanded = false
     private var summary: FinancialCurrencySummary? {
@@ -13,69 +13,111 @@ struct ConnectedCuadraoBalanceOverview: View {
 
     var body: some View {
         if let summary {
-            content(summary, expanded: false)
+            ConnectedBalanceReading(summary: summary, currencies: home.currencies.map(\.currency),
+                spanish: spanish, timeZone: home.period?.timeZone ?? TimeZone.current.identifier,
+                chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
                 .fullScreenCover(isPresented: $expanded) {
-                    NavigationStack {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 28) {
-                                content(summary, expanded: true)
-                                VStack(alignment: .leading, spacing: 18) {
-                                    Text(spanish ? "Tu balance" : "Your balance").font(CuadraoTypography.section)
-                                    breakdown("loop.home.cash", minor: summary.cashMinor, summary: summary)
-                                    if summary.otherAssetsMinor != "0" {
-                                        breakdown("loop.home.other", minor: summary.otherAssetsMinor, summary: summary)
-                                    }
-                                    breakdown("loop.home.debt", minor: summary.debtsMinor, summary: summary)
-                                }
-                            }.padding(24)
-                        }.background(WelcomePalette.background)
-                            .navigationTitle("Balance").navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                ToolbarItem(placement: .confirmationAction) {
-                                    Button(spanish ? "Listo" : "Done") { expanded = false }
-                                        .accessibilityIdentifier("home.balance.close")
-                                }
-                            }
-                    }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+                    ConnectedCuadraoInsights(summary: summary, spanish: spanish, space: space,
+                        timeZone: home.period?.timeZone ?? TimeZone.current.identifier)
                 }
         }
     }
+}
 
-    private func content(_ summary: FinancialCurrencySummary, expanded: Bool) -> some View {
+private struct ConnectedBalanceReading: View {
+    let summary: FinancialCurrencySummary
+    let currencies: [String]
+    let spanish: Bool
+    let timeZone: String
+    var expanded = false
+    var chooseCurrency: (String) -> Void = { _ in }
+    var expand: () -> Void = {}
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        let value = ConnectedBalanceSummary(summary: summary)
         VStack(alignment: .leading, spacing: 12) {
-            CuadraoBalanceAmount(amount: summary.knownAccounts > 0 ? amount(summary.netWorthMinor, summary) : "—",
-                currency: summary.currency, currencies: home.currencies.map(\.currency), spanish: spanish,
-                expanded: expanded, amountIdentifier: "home.netWorth." + summary.currency,
-                chooseCurrency: { chosenCurrency = $0 }, expand: { self.expanded = true })
+            CuadraoBalanceAmount(amount: value.balance(locale: locale) ?? "—", currency: summary.currency,
+                currencies: currencies, spanish: spanish, expanded: expanded,
+                amountIdentifier: expanded ? "home-chart-amount" : "home.netWorth." + summary.currency,
+                chooseCurrency: chooseCurrency, expand: expand)
             Text(summary.unknownAccounts > 0
                  ? (spanish ? "Balance parcial" : "Partial balance")
                  : (spanish ? "Balance neto" : "Net balance"))
                 .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 .accessibilityIdentifier("home-chart-date")
+            if expanded, let asOf = summary.asOf {
+                Text(AccountPresentation.date(asOf, zone: timeZone, locale: locale))
+                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            }
             if summary.unknownAccounts > 0 {
                 Text(verbatim: String(format: NSLocalizedString("loop.home.unknownCount", comment: ""), summary.unknownAccounts))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
             CuadraoChartState(title: spanish ? "Tu balance, a tu ritmo" : "Your balance, at your pace",
-                detail: spanish ? "Puedes ver tu balance actual. El historial aún no está disponible."
-                    : "You can see your current balance. History is not available yet.")
+                detail: value.known
+                    ? (spanish ? "Puedes ver tu balance actual. El historial aún no está disponible."
+                        : "You can see your current balance. History is not available yet.")
+                    : (spanish ? "Los balances que registres darán forma a este espacio."
+                        : "Your recorded balances will give this space its shape."))
                 .accessibilityIdentifier("home-chart-empty")
-            if expanded, let asOf = summary.asOf {
-                Text(AccountPresentation.date(asOf, zone: home.period?.timeZone ?? TimeZone.current.identifier, locale: locale))
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-            }
         }
     }
+}
 
-    private func breakdown(_ title: LocalizedStringKey, minor: String, summary: FinancialCurrencySummary) -> some View {
-        HStack {
-            Text(title).font(CuadraoTypography.body)
-            Spacer(minLength: 12)
-            Text(summary.knownAccounts > 0 ? amount(minor, summary) : "—").font(CuadraoTypography.rowAmount)
-        }
+private struct ConnectedCuadraoInsights: View {
+    let summary: FinancialCurrencySummary
+    let spanish: Bool
+    let space: String
+    let timeZone: String
+    @State private var range: CanvasHistoryRange = .month
+    @State private var periodOffset = 0
+    @State private var distribution = false
+    @State private var activity = false
+    @State private var selectedGroup: String?
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        NavigationStack {
+            CuadraoHomeInsightsLayout(spanish: spanish, range: $range, periodOffset: $periodOffset,
+                distribution: $distribution, activity: $activity, oldestOffset: { _ in 0 }) { _ in
+                    if activity {
+                        VStack(alignment: .leading, spacing: 20) {
+                            CuadraoSpendingReading(currency: summary.currency, amount: CuadraoMissingCoverage.amount(spanish),
+                                caption: spanish ? "Gastos registrados" : "Recorded spending")
+                            CuadraoChartState(title: CuadraoMissingCoverage.title(spanish), detail: CuadraoMissingCoverage.detail(spanish))
+                                .accessibilityElement(children: .contain).accessibilityIdentifier("home-spending-chart")
+                        }
+                    } else if distribution {
+                        allocation
+                    } else {
+                        ConnectedBalanceReading(summary: summary, currencies: [summary.currency], spanish: spanish,
+                            timeZone: timeZone, expanded: true)
+                    }
+                }.modifier(CuadraoHomeInsightsChrome(title: space, spanish: spanish))
+        }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
     }
 
-    private func amount(_ minor: String, _ summary: FinancialCurrencySummary) -> String {
-        AccountPresentation.amount(AccountPresentation.decimal(minor, digits: summary.currencyFractionDigits), locale: locale)
+    private var allocation: some View {
+        let value = ConnectedBalanceSummary(summary: summary)
+        let groups = value.components.map { component in
+            let fraction = value.fraction(component)
+            return CuadraoDistributionGroup(id: component.rawValue,
+                title: String(localized: String.LocalizationValue(component.titleKey), locale: locale),
+                amount: value.amount(value.minor(component), locale: locale),
+                percentage: fraction.formatted(.percent.precision(.fractionLength(1)).locale(locale)),
+                fraction: fraction, color: component == .cash ? WelcomePalette.sunshine : WelcomePalette.overlap)
+        }
+        return CuadraoDistributionContent(currency: summary.currency, spanish: spanish,
+            balanceTitle: balanceTitle, balance: value.balance(locale: locale) ?? "—",
+            partial: summary.unknownAccounts > 0, assets: value.amount(summary.assetsMinor, locale: locale),
+            groups: groups, deductions: value.deductions.map { value.amount($0, locale: locale) },
+            selectedGroup: $selectedGroup) { _ in EmptyView() } deductionRows: { EmptyView() }
+    }
+
+    private var balanceTitle: String {
+        let title = spanish ? "Balance neto actual" : "Current net balance"
+        guard let asOf = summary.asOf else { return title }
+        return title + " · " + AccountPresentation.date(asOf, zone: timeZone, locale: locale)
     }
 }
