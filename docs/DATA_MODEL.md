@@ -2462,6 +2462,33 @@ conversation recovery is exposed in the current product.
 
 ### Archive
 Used specifically for **conversations** to hide them from the primary sidebar without deleting the data.
+
+### Account deletion (Lane 6)
+`POST /account/delete`, behind the default-off `ARGUS_ACCOUNT_DELETION_ENABLED`,
+runs one deletion command for registered and guest accounts. The
+[account deletion census](specs/lanes/account-deletion-fk-census.md) owns what
+happens to each table. Rows other people still rely on, such as the person's
+amounts in their plans and legs of shared activities, move to a nameless
+placeholder, one per
+[sharing scope](specs/lanes/account-deletion-fk-census.md#sharing-scopes-and-the-standalone-shared-group).
+Everything else of the person's is deleted, their feedback loses its email and
+user id, and the anonymous invite record stays.
+
+Three `argus_private` tables hold identifying data only while a run is in
+flight: `account_deletion_runs` (the user id and two hashes of it),
+`account_deletion_placeholders` (the map from the run to its placeholders) and
+`account_deletion_revocations` (each pending revocation with its encrypted
+credential). The
+[census](specs/lanes/account-deletion-fk-census.md#placeholders-one-per-sharing-scope-none-tied-to-the-person)
+owns what the run keeps once it completes. A run waiting on a third party keeps
+the account locked and its auth user in place. It finishes when the person
+retries or an operator runs `scripts/ops/scheduled_maintenance.py`. Nothing runs
+that sweep on a schedule, by the founder's decision of October 3, 2026, and no
+cron is to be created for it. The
+[launch runbook](PRIVATE_LAUNCH_RUNBOOK.md#account-deletion-runs-lane-6) owns
+the cadence and the 7-day operator force; the
+[API contract](API_CONTRACT.md#post-accountdelete) owns the route.
+
 ---
 
 # 17. Recents / History Model
