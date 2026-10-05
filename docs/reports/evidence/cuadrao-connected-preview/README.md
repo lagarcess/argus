@@ -1,5 +1,10 @@
 # Connect the approved Cuadrao interface
 
+**October 5 correction:** the completion statement below covered the narrow money
+slice. The founder rejected it as full interface restoration after reviewing Check
+3431. The subsequent full recovery is tracked in [full-recovery](full-recovery/README.md).
+Keep this earlier evidence as the record of what was actually checked at that time.
+
 Cuadrao's connected money flow now uses the approved Preview presentation for
 Home, account details, movement details, and Plan. Preview and live data read the
 same view bodies. AccountsModel, FinancialLoopModel, and FinancialPlanModel still

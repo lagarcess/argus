@@ -1,0 +1,79 @@
+[
+  {
+    "file": "chat-draft-preserved.jpg",
+    "source_revision": "e6b7cf325",
+    "meaning": "Chat draft after Plan and return",
+    "original_attachment": "AFF5877E-548A-40DC-AA53-BFEDF7B27FD3.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "method": "XCUITest screenshot from passing journey on iOS 27 simulator; local API and Postgres, synthetic accounts"
+  },
+  {
+    "file": "profile-connected.jpg",
+    "source_revision": "e6b7cf325",
+    "meaning": "Connected Profile with real identity",
+    "original_attachment": "8F0C638F-7C61-4964-BBC5-EC143AA2BFB4.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "method": "XCUITest screenshot from passing journey on iOS 27 simulator; local API and Postgres, synthetic accounts"
+  },
+  {
+    "file": "search-spanish-relaunch.jpg",
+    "source_revision": "e6b7cf325",
+    "meaning": "Spanish Search after durable edits and relaunch",
+    "original_attachment": "F0AEC87B-441D-4E9C-91AB-35F8A4B11542.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "method": "XCUITest screenshot from passing journey on iOS 27 simulator; local API and Postgres, synthetic accounts"
+  },
+  {
+    "file": "updates-settings-return.jpg",
+    "source_revision": "e6b7cf325",
+    "meaning": "Updates to notification settings return",
+    "original_attachment": "9E8C1898-D06B-4BB3-AB04-3D352036FAA7.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "method": "XCUITest screenshot from passing journey on iOS 27 simulator; local API and Postgres, synthetic accounts"
+  },
+  {
+    "file": "upcoming-relaunch.jpg",
+    "source_revision": "f02ad86c9",
+    "meaning": "Real Upcoming after payment and relaunch",
+    "original_attachment": "B5EC033D-FCDA-4C6C-930D-9D7ACDD480B0.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "method": "XCUITest screenshot from passing journey on iOS 27 simulator; local API and Postgres, synthetic accounts"
+  },
+  {
+    "file": "recurring-review.jpg",
+    "source_revision": "f02ad86c9",
+    "meaning": "Recurring review prefills the existing movement",
+    "original_attachment": "A145D32A-9D8A-4FB2-BC8B-47E96B8A57E6.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "method": "XCUITest screenshot from passing journey on iOS 27 simulator; local API and Postgres, synthetic accounts"
+  },
+  {
+    "file": "upcoming-payment-confirmed.jpg",
+    "source_revision": "f02ad86c9",
+    "meaning": "Upcoming after confirmed payment",
+    "original_attachment": "EB6D5AD4-77C0-4EC3-88AA-B636AE9E02D9.png",
+    "dimensions": [
+      1206,
+      2622
+    ],
+    "method": "XCUITest screenshot from passing journey on iOS 27 simulator; local API and Postgres, synthetic accounts"
+  }
+]
