@@ -353,9 +353,9 @@ final class FinancialLoopUITests: XCTestCase {
         let connected = app.usesConnectedChrome
             || app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 2)
         if connected {
-            if fresh, app.buttons["header.profile"].waitForExistence(timeout: 2) {
+            if app.buttons["header.profile"].waitForExistence(timeout: 2) {
                 app.buttons["header.profile"].tap()
-                if app.buttons["auth.signOut"].waitForExistence(timeout: 3) {
+                if fresh, app.buttons["auth.signOut"].waitForExistence(timeout: 3) {
                     app.buttons["auth.signOut"].tap()
                     XCTAssertTrue(app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 20))
                 }
