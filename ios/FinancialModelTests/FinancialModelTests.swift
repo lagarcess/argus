@@ -599,6 +599,24 @@ extension FinancialModelTests {
         XCTAssertNil(loop.plan.homeErrorKey)
     }
 
+    func testSharedDefaultWindowFailureShowsOnHomeAndPlan() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        let loop = FinancialLoopModel(controller: fixture.client, accounts: accounts, journal: fixture.journal)
+        accounts.bind(identity); loop.bind(identity)
+        await fixture.server.readReply("/api/v1/financial-plan", body: #"{"code":"unavailable"}"#, status: 503)
+        await loop.plan.refresh()
+        XCTAssertNil(loop.plan.homeProjection)
+        XCTAssertEqual(loop.plan.homeErrorKey, "loop.error.connection", "Home offers its own retry when the shared read fails")
+        XCTAssertEqual(loop.plan.errorKey, "loop.error.connection")
+        await fixture.server.readReply("/api/v1/financial-plan", body: Self.planWindow(endDate: "2026-11-04", occurrences: []))
+        await loop.plan.refresh()
+        XCTAssertEqual(loop.plan.homeProjection?.endDate, "2026-11-04")
+        XCTAssertNil(loop.plan.homeErrorKey)
+        XCTAssertNil(loop.plan.errorKey)
+    }
+
     func testPlanConfirmationSurvivesRelaunchAndDifferentOwnerCannotReplay() async throws {
         let fixture = try PresentationFixture()
         let alice = try await fixture.login()
