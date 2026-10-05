@@ -41,8 +41,12 @@ extension FinancialLoopUITests {
         try signIn(fresh: true)
         openConnectedSavedReceipts()
         tapVisible(app.buttons[id])
-        app.buttons["Receipt options"].tap()
-        app.buttons["Discard receipt"].tap()
+        let options = app.buttons["Receipt options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 5))
+        options.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let discard = app.buttons["Discard receipt"]
+        XCTAssertTrue(discard.waitForExistence(timeout: 5))
+        discard.tap()
         XCTAssertTrue(app.staticTexts["Discard this receipt?"].waitForExistence(timeout: 5))
         app.buttons["Discard receipt"].tap()
         XCTAssertTrue(app.buttons["receipt-later"].waitForNonExistence(timeout: 5))
