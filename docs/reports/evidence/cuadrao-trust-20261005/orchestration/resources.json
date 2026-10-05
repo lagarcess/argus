@@ -6,11 +6,12 @@
       "container": "supabase_db_cuadrao-trust-20261005",
       "created_by": "root",
       "physical_owner": "root",
-      "lease_owner": null,
+      "lease_owner": "apple_name_backend",
       "worker_stop_allowed": false,
       "release_action": "mark lease_owner null; preserve running container",
       "health": "healthy after exact-container restart",
-      "lease_scope": null
+      "lease_scope": "name eligibility invariant fix and combined deletion/name regression only",
+      "local_tcp_execution": "Use authorized escalated execution for local bind/TCP tests; default sandbox denies these operations."
     },
     {
       "resource": "mac_simulator_build",
