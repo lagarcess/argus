@@ -110,3 +110,17 @@ def test_identity_read_uses_owner_and_read_only_connection(owner, monkeypatch):
     read.assert_called_once_with(connection, user.id)
     assert "default_transaction_read_only=on" in connect.call_args.kwargs["options"]
     connection.__exit__.assert_called_once()
+
+
+def test_guest_schema_redacts_supplied_identity(owner):
+    from dataclasses import replace
+
+    user, _ = owner
+    context = replace(
+        registered_account_context(user.id),
+        kind="guest",
+        expires_at=datetime.now(timezone.utc),
+    )
+    response = profile._user_response(user, context, LinkedAppleIdentity(SUBJECT))
+    assert response.apple_identity is None
+    assert SUBJECT not in response.model_dump_json()
