@@ -14,27 +14,27 @@ _ test_session_tool_mints_private_storage_state_and_revokes_it[immediate-close] 
 tests/test_private_alpha_canary_split.py:460: in test_session_tool_mints_private_storage_state_and_revokes_it
     assert minted.returncode == 0, minted.stderr
 E   AssertionError: error: Cannot find module '@supabase/supabase-js' from '<worker-checkout>/web/node_modules/.bun-cache/@supabase/ssr@0.12.7@@@1/dist/main/createBrowserClient.js'
-E     
+E
 E     Bun v1.3.14 (macOS arm64)
-E     
+E
 E   assert 1 == 0
 E    +  where 1 = CompletedProcess(args=['<bun-bin>/bun', 'e2e/support/private-alpha-canary-session.ts', 'mint'], returncod...web/node_modules/.bun-cache/@supabase/ssr@0.12.7@@@1/dist/main/createBrowserClient.js'\n\nBun v1.3.14 (macOS arm64)\n").returncode
 _ test_session_tool_mints_private_storage_state_and_revokes_it[delayed-close] __
 tests/test_private_alpha_canary_split.py:460: in test_session_tool_mints_private_storage_state_and_revokes_it
     assert minted.returncode == 0, minted.stderr
 E   AssertionError: error: Cannot find module '@supabase/ssr' from '<worker-checkout>/web/e2e/support/private-alpha-canary-session.ts'
-E     
+E
 E     Bun v1.3.14 (macOS arm64)
-E     
+E
 E   assert 1 == 0
 E    +  where 1 = CompletedProcess(args=['<bun-bin>/bun', 'e2e/support/private-alpha-canary-session.ts', 'mint'], returncod.../tmp/cuadrao-paired-transfer-20261005/web/e2e/support/private-alpha-canary-session.ts'\n\nBun v1.3.14 (macOS arm64)\n").returncode
 ____ test_session_tool_retries_a_transient_allowlist_lookup_and_reports_it _____
 tests/test_private_alpha_canary_split.py:527: in test_session_tool_retries_a_transient_allowlist_lookup_and_reports_it
     assert minted.returncode == 0, minted.stderr
 E   AssertionError: error: Cannot find module '@supabase/ssr' from '<worker-checkout>/web/e2e/support/private-alpha-canary-session.ts'
-E     
+E
 E     Bun v1.3.14 (macOS arm64)
-E     
+E
 E   assert 1 == 0
 E    +  where 1 = CompletedProcess(args=['<bun-bin>/bun', 'e2e/support/private-alpha-canary-session.ts', 'mint'], returncod.../tmp/cuadrao-paired-transfer-20261005/web/e2e/support/private-alpha-canary-session.ts'\n\nBun v1.3.14 (macOS arm64)\n").returncode
 ____ test_session_tool_revokes_a_minted_session_that_fails_least_privilege _____
@@ -56,9 +56,9 @@ _________ test_session_tool_provisions_only_a_safe_dedicated_identity __________
 tests/test_private_alpha_canary_split.py:828: in test_session_tool_provisions_only_a_safe_dedicated_identity
     assert result.returncode == 0, result.stderr
 E   AssertionError: error: Cannot find module '@supabase/ssr' from '<worker-checkout>/web/e2e/support/private-alpha-canary-session.ts'
-E     
+E
 E     Bun v1.3.14 (macOS arm64)
-E     
+E
 E   assert 1 == 0
 E    +  where 1 = CompletedProcess(args=['<bun-bin>/bun', 'e2e/support/private-alpha-canary-session.ts', 'provision'], retu.../tmp/cuadrao-paired-transfer-20261005/web/e2e/support/private-alpha-canary-session.ts'\n\nBun v1.3.14 (macOS arm64)\n").returncode
 _____ test_session_tool_revokes_and_rolls_back_a_failed_profile_bootstrap ______
