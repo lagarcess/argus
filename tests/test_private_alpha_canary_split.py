@@ -8,6 +8,7 @@ import stat
 import subprocess
 import sys
 import threading
+import time
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -60,6 +61,7 @@ def _supabase_session_stub(
     profile_is_admin: bool = False,
     profile_bootstrap_status: int = 200,
     logout_statuses: tuple[int, ...] = (204,),
+    response_close_delay: float = 0,
 ) -> Iterator[tuple[str, list[dict[str, Any]]]]:
     calls: list[dict[str, Any]] = []
     access_token = _jwt(
@@ -96,6 +98,10 @@ def _supabase_session_stub(
     allowlist_state = {"failures_left": allowlist_lookup_failures}
 
     class Handler(BaseHTTPRequestHandler):
+        def finish(self) -> None:
+            time.sleep(response_close_delay)
+            super().finish()
+
         def log_message(self, *_: Any) -> None:
             return
 
@@ -110,6 +116,7 @@ def _supabase_session_stub(
             self.send_response(status_code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
+            self.send_header("Connection", "close")
             self.send_header("X-Total-Count", "1")
             self.end_headers()
             self.wfile.write(body)
@@ -410,9 +417,13 @@ def test_session_tool_retries_only_lookup_transport_failures() -> None:
         assert "withLookupRetry" not in body
 
 
+@pytest.mark.parametrize(
+    "response_close_delay", [0, 0.05], ids=["immediate-close", "delayed-close"]
+)
 def test_session_tool_mints_private_storage_state_and_revokes_it(
     tmp_path: Path,
     faker: Faker,
+    response_close_delay: float,
 ) -> None:
     email = faker.email().lower()
     user_id = faker.uuid4()
@@ -425,6 +436,7 @@ def test_session_tool_mints_private_storage_state_and_revokes_it(
         email=email,
         user_id=user_id,
         session_id=session_id,
+        response_close_delay=response_close_delay,
     ) as (supabase_url, calls):
         env = os.environ.copy()
         env.update(
