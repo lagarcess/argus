@@ -6,8 +6,8 @@ final class CuadraoSignInPresentationUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    /// Auth on, social flags at their defaults: Connected's sign-up and sign-in entries offer email only.
-    /// The default build has auth off and never shows these entries, so the run must opt in.
+    /// Auth is on. Provider expectations describe the flags and public ids of the tested build.
+    /// The test runner must opt in because the default build has auth off.
     func testDefaultLaunchOffersNoAppleSignIn() throws {
         guard ProcessInfo.processInfo.environment["ARGUS_TEST_AUTH_UI_ENABLED"] == "true" else {
             throw XCTSkip("Requires a build with ARGUS_AUTH_ENABLED=true (cuadrao-design-mac-pass.sh tests builds one).")
@@ -22,7 +22,7 @@ final class CuadraoSignInPresentationUITests: XCTestCase {
             welcome.tap()
             let email = app.buttons[createAccount ? "cuadrao.signup.email" : "cuadrao.signin.emailChoice"]
             XCTAssertTrue(email.waitForExistence(timeout: 10))
-            assertNoSocialSignIn(app)
+            assertConnectedProviders(app)
             app.terminate()
         }
     }
@@ -40,6 +40,15 @@ final class CuadraoSignInPresentationUITests: XCTestCase {
             XCTAssertTrue(app.buttons[email].waitForExistence(timeout: 10))
             assertNoSocialSignIn(app)
             app.terminate()
+        }
+    }
+
+    private func assertConnectedProviders(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let environment = ProcessInfo.processInfo.environment
+        for (id, key) in [("cuadrao.auth.apple", "ARGUS_TEST_EXPECT_APPLE"),
+                          ("cuadrao.auth.google", "ARGUS_TEST_EXPECT_GOOGLE")] {
+            let expected = environment[key] == "true"
+            XCTAssertEqual(app.buttons[id].exists, expected, "Unexpected availability for \(id)", file: file, line: line)
         }
     }
 

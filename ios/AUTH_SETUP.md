@@ -28,14 +28,20 @@ requires approved signing access.
 
 ## Native Apple and Google sign-in
 
-Both are **off by default** and sit on top of `ARGUS_AUTH_ENABLED`. With a switch
-off, its button is not shown and the email flow is unchanged. The buttons appear
-on the connected create-account and sign-in screen, above "Continue with email".
+Both are **off by default** and sit on top of `ARGUS_AUTH_ENABLED`. Debug builds
+can expose the buttons on the connected create-account and sign-in screen above
+"Continue with email". Google also requires Apple and valid callback configuration.
+
+`Config/Release.xcconfig` forces both flags off after ignored local overrides.
+The Release runtime disables both providers even if command-line build settings
+force the flags on. Activation requires a reviewed code change after the remaining
+[#800 gates](https://github.com/lagarcess/argus/issues/800) are accepted. Email
+entry remains available.
 
 | Key | Value |
 | --- | --- |
-| `ARGUS_APPLE_SIGN_IN_ENABLED` | `true` to show the system Sign in with Apple button |
-| `ARGUS_GOOGLE_SIGN_IN_ENABLED` | `true` to show the official Google button |
+| `ARGUS_APPLE_SIGN_IN_ENABLED` | `true` to show the system Sign in with Apple button in Debug |
+| `ARGUS_GOOGLE_SIGN_IN_ENABLED` | `true` to show the official Google button in Debug, when Apple is also enabled |
 | `GOOGLE_SIGN_IN_IOS_CLIENT_ID` | The iOS OAuth client, `<number>-<id>.apps.googleusercontent.com` |
 | `GOOGLE_SIGN_IN_WEB_CLIENT_ID` | Optional: the web OAuth client Supabase also lists |
 | `GOOGLE_SIGN_IN_IOS_URL_SCHEME` | The iOS client's reversed id, `com.googleusercontent.apps.<number>-<id>` |
