@@ -110,25 +110,52 @@ struct CuadraoBalanceAmount: View {
     var amountIdentifier = "home-chart-amount"
     let chooseCurrency: (String) -> Void
     let expand: () -> Void
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            if currencies.count > 1 {
-                CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency",
-                    selection: Binding(get: { currency }, set: chooseCurrency),
-                    values: currencies, valueTitle: { $0 })
-                    .accessibilityIdentifier("home-chart-currency")
-            } else { Text(currency).foregroundStyle(.secondary) }
-            Text(amount).font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
-                .accessibilityIdentifier(amountIdentifier)
-                .accessibilityLabel(currency + " " + amount)
-            if !expanded {
-                Spacer(minLength: 0)
-                Button(action: expand) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right").font(.body)
-                        .frame(width: 44, height: 44).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityLabel(spanish ? "Explorar balance" : "Explore balance")
-                    .accessibilityIdentifier("home-history-expand")
+        Group {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline) {
+                        currencyLabel
+                        Spacer(minLength: 8)
+                        expandButton
+                    }
+                    amountLabel
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    currencyLabel
+                    amountLabel
+                    if !expanded { Spacer(minLength: 0) }
+                    expandButton
+                }
             }
         }.font(CuadraoTypography.supporting)
+    }
+
+    @ViewBuilder private var currencyLabel: some View {
+        if currencies.count > 1 {
+            CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency",
+                selection: Binding(get: { currency }, set: chooseCurrency),
+                values: currencies, valueTitle: { $0 })
+                .accessibilityIdentifier("home-chart-currency")
+        } else { Text(currency).foregroundStyle(.secondary) }
+    }
+
+    private var amountLabel: some View {
+        Text(amount).font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
+            .accessibilityIdentifier(amountIdentifier)
+            .accessibilityLabel(currency + " " + amount)
+    }
+
+    @ViewBuilder private var expandButton: some View {
+        if !expanded {
+            Button(action: expand) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.body)
+                    .frame(width: 44, height: 44).contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel(spanish ? "Explorar balance" : "Explore balance")
+                .accessibilityIdentifier("home-history-expand")
+        }
     }
 }
