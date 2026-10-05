@@ -6,7 +6,7 @@
   "merged_at": "2026-10-05T21:54:54Z",
   "tree_equal": true,
   "tree": "d924c663ce2088e1801b7743b5cf018187200f34",
-  "review": "https://github.com/lagarcess/argus/pull/863#pullrequestreview-6001780582",
+  "review": "https://github.com/lagarcess/argus/pull/863#issuecomment-6001780582",
   "terminal_audit": "https://github.com/lagarcess/argus/pull/863#issuecomment-6003820838",
   "ci": {
     "success": 16,
