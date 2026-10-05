@@ -14,6 +14,7 @@ struct ConnectedProfileCurrencyRow: View {
                 .disabled(model.busy)
                 .accessibilityIdentifier("profile.primaryCurrency")
         }
+        .accessibilityElement(children: .contain)
         if let key = model.errorKey {
             Text(LocalizedStringKey(key)).foregroundStyle(.red)
                 .accessibilityIdentifier("profile.primaryCurrency.error")
