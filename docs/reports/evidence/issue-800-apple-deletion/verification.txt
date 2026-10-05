@@ -30,3 +30,7 @@ Unknown admission regression before fix:
 Both optional-code cases: expected503, received202 Accepted.
 After fix:124 unit/API/auth/operator tests passed,0 skipped/failed.
 After schema generation:53 OpenAPI compatibility/API tests passed,0 skipped/failed.
+
+Reconciled tree bfbe3b0292c97176f3510c69cbfbf53c9cf49001:
+148 combined unit/API/auth/operator/OpenAPI tests passed,0 failed,0 skipped.
+Merged-tree modularity budget: no violations.

@@ -39,3 +39,9 @@ The PostgreSQL slot was released after teardown. New fixtures tracked exact run 
 ## Remaining gates
 
 This evidence makes no real-provider, hosted, physical-phone, native-flow or release-readiness claim. Capture/deletion/provider flags remain unchanged. The native consumer and combined OpenAPI must reconcile through integration before landing. Real Apple reauthorization/revocation and banned-session recovery on a phone remain acceptance gates. #798 orphan/Hide My Email decisions, #803 late cleanup race acceptance, #805 money-policy blockers, #819 permission ownership, and #807 operator/escalation decisions remain with their existing owners. No cron, operator assignment, live alert, migration, provider call or hosted configuration was added.
+
+## Integration reconciliation
+
+Before final delivery, integration advanced to `7018e0edebbc370b999005a857230bf3c3a1ad8b` via #857. One-way merge `bfbe3b0292c97176f3510c69cbfbf53c9cf49001` brought it into this branch. Semantic overlap: none. #857 changes native provider button appearance and its native UI tests/evidence; this branch changes backend deletion/capture owners, API error/request contracts and their Python tests. No shared API/data contract, migration, environment variable or direct test owner changed in the intervening commit. PostgreSQL evidence is retained; no provider, phone or broad database matrix was repeated.
+
+The reconciled tree passed148 combined unit/API/auth/operator/OpenAPI tests with0 skips/failures, and its merged-tree modularity check passed. The subsequent evidence-only commit changes no runtime or test input, so these results remain valid. Terminal CI and unresolved-review-thread status are reported on the PR after its final publication.
