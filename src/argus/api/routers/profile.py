@@ -101,18 +101,7 @@ def _apple_identity(request: Request, user_id: str) -> LinkedAppleIdentity | Non
         ) from None
 
 
-@router.get(
-    "/me",
-    response_model=UserResponse,
-    responses={
-        503: {
-            "description": "apple_identity_unavailable: current linked identity could not be verified.",
-            "content": {
-                "application/json": {"schema": {"$ref": "#/components/schemas/Error"}}
-            },
-        }
-    },
-)
+@router.get("/me", response_model=UserResponse)
 def get_me(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008

@@ -124,3 +124,10 @@ def test_guest_schema_redacts_supplied_identity(owner):
     response = profile._user_response(user, context, LinkedAppleIdentity(SUBJECT))
     assert response.apple_identity is None
     assert SUBJECT not in response.model_dump_json()
+
+
+def test_me_openapi_documents_identity_unavailable():
+    from argus.api.main import app
+
+    response = app.openapi()["paths"]["/api/v1/me"]["get"]["responses"]["503"]
+    assert "apple_identity_unavailable" in response["description"]
