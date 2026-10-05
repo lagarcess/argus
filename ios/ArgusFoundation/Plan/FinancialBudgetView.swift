@@ -72,15 +72,16 @@ struct FinancialBudgetPresenter: View {
     var body: some View {
         ZStack {
             if model.navigation != nil {
-                Color.black.opacity(0.25).ignoresSafeArea()
-                FinancialBudgetDetailView(model: model, loop: loop) {
-                    if let origin = model.navigation?.origin {
-                        switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .budgets; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search }
+                NavigationStack {
+                    FinancialBudgetDetailView(model: model, loop: loop) {
+                        if let origin = model.navigation?.origin {
+                            switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .budgets; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search }
+                        }
+                        model.close()
+                        Task { await search?.refresh() }
                     }
-                    model.close()
-                    Task { await search?.refresh() }
-                }.background(ArgusStyle.background).clipShape(RoundedRectangle(cornerRadius: 24))
-                    .padding(12).accessibilityElement(children: .contain).accessibilityIdentifier("budget.detail")
+                }.tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("budget.detail")
             } else { Color.clear.allowsHitTesting(false) }
         }
         .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
@@ -95,53 +96,45 @@ struct FinancialBudgetDetailView: View {
     let close: () -> Void
     @State private var removing = false
     @Environment(\.locale) private var locale
+    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                if model.navigation?.activityID != nil {
-                    Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("budget.back", systemImage: "chevron.left") }
-                        .accessibilityIdentifier("budget.activity.back")
-                }
-                if model.navigation?.activityID == nil, let progress = model.detail {
-                    Text(verbatim: progress.budget.name).font(ArgusStyle.display(23))
-                }
-                Spacer()
-                Button(action: close) { Image(systemName: "xmark").frame(width: 48, height: 48) }
-                    .accessibilityLabel("action.close").accessibilityIdentifier("budget.close")
-            }.padding(.horizontal, 20)
+        Group {
             if let id = model.navigation?.activityID {
                 ScrollView { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) }.padding(24) }
             } else {
                 ScrollViewReader { reader in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            if let progress = model.detail {
-                                Text(verbatim: month(progress.budget.month)).foregroundStyle(ArgusStyle.secondary)
-                                FinancialBudgetSummary(progress: progress)
+                    CuadraoPlanDetailPage {
+                        if let progress = model.detail {
+                            heading(progress)
+                            if progress.contributors.isEmpty {
+                                PlanLandscape(look: .sunshine).frame(height: 100)
+                            }
+                            Text("budget.recordedOnly").font(.caption).foregroundStyle(.secondary)
+                            CuadraoPlanDetailFacts(spanish: spanish) {
+                                HStack(spacing: 4) {
+                                    Text("budget.of"); Text(verbatim: amount(String(progress.budget.limitMinor), progress))
+                                }
                                 scope(progress)
-                                Text("budget.recordedOnly").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
-                                Text("budget.contributors").font(ArgusStyle.display(21))
-                                if progress.contributors.isEmpty { Text("budget.noActivity").foregroundStyle(ArgusStyle.secondary) }
-                                ForEach(progress.contributors, id: \.activityId) { item in
-                                    Button { model.activity(item.activityId) } label: { contributor(item) }
-                                        .buttonStyle(.plain).id(item.activityId).accessibilityIdentifier("budget.activity." + item.activityId.uuidString)
-                                }
-                                if progress.budget.archived {
-                                    Text("budget.archived").foregroundStyle(ArgusStyle.secondary)
-                                    Button("budget.restore") { Task { await model.archive(false) } }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("budget.restore")
-                                } else {
-                                    Button("budget.edit") { Task { await model.edit() } }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("budget.edit")
-                                    Button("budget.remove", role: .destructive) { removing = true }.frame(minHeight: 48).accessibilityIdentifier("budget.remove")
-                                }
                             }
-                            if model.loading { ProgressView("accounts.loading") }
-                            if let error = model.errorKey {
-                                Text(LocalizedStringKey(error)).accessibilityIdentifier("budget.error")
-                                Button("accounts.retry") { Task { await model.refreshIfOpen() } }.frame(minHeight: 44)
+                            Text("budget.contributors").font(CuadraoTypography.section)
+                            if progress.contributors.isEmpty { Text("budget.noActivity").foregroundStyle(ArgusStyle.secondary) }
+                            ForEach(progress.contributors, id: \.activityId) { item in
+                                Button { model.activity(item.activityId) } label: { contributor(item) }
+                                    .buttonStyle(.plain).id(item.activityId).accessibilityIdentifier("budget.activity." + item.activityId.uuidString)
                             }
-                            if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
-                        }.padding(24).disabled(model.saving)
-                    }.task(id: model.detail?.contributors.map(\.activityId)) {
+                            if progress.budget.archived {
+                                Text("budget.archived").foregroundStyle(ArgusStyle.secondary)
+                                PlanPrimaryButton(title: NSLocalizedString("budget.restore", comment: "")) { Task { await model.archive(false) } }
+                                    .accessibilityIdentifier("budget.restore")
+                            }
+                        }
+                        if model.loading { ProgressView("accounts.loading") }
+                        if let error = model.errorKey {
+                            Text(LocalizedStringKey(error)).accessibilityIdentifier("budget.error")
+                            Button("accounts.retry") { Task { await model.refreshIfOpen() } }.frame(minHeight: 44)
+                        }
+                        if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
+                    }.disabled(model.saving).task(id: model.detail?.contributors.map(\.activityId)) {
                         guard let anchor = model.navigation?.anchor,
                               model.detail?.contributors.contains(where: { $0.activityId == anchor }) == true else { return }
                         await Task.yield()
@@ -150,11 +143,56 @@ struct FinancialBudgetDetailView: View {
                     }
                 }
             }
-        }.background(ArgusStyle.background)
+        }.background(WelcomePalette.background)
+            .navigationTitle("").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if model.navigation?.activityID != nil {
+                        Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("budget.back", systemImage: "chevron.left") }
+                            .accessibilityIdentifier("budget.activity.back")
+                    } else {
+                        Button(action: close) { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
+                            .accessibilityLabel("action.close").accessibilityIdentifier("budget.close")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if model.navigation?.activityID == nil, let progress = model.detail, !progress.budget.archived {
+                        CuadraoPlanDetailOptions(spanish: spanish) {
+                            Button { Task { await model.edit() } } label: { Label("budget.edit", systemImage: "pencil") }.accessibilityIdentifier("budget.edit")
+                            Button(role: .destructive) { removing = true } label: { Label("budget.remove", systemImage: "archivebox") }.accessibilityIdentifier("budget.remove")
+                        }.disabled(model.saving)
+                    } else if model.navigation?.activityID != nil {
+                        Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                            .accessibilityLabel("action.close").accessibilityIdentifier("budget.close")
+                    }
+                }
+            }
             .confirmationDialog("budget.remove.confirm", isPresented: $removing, titleVisibility: .visible) {
                 Button("budget.remove", role: .destructive) { Task { await model.archive(true) } }.accessibilityIdentifier("budget.remove.confirm")
                 Button("accounts.cancel", role: .cancel) { }
             } message: { Text("budget.remove.body") }
+    }
+    private func heading(_ progress: FinancialBudgetProgress) -> some View {
+        CuadraoPlanDetailHeading(display: .init(
+            name: progress.budget.name, space: NSLocalizedString("context.personal", comment: ""), look: .sunshine,
+            amount: amount(progress.spentMinor, progress), annotation: NSLocalizedString("loop.home.netSpending", comment: ""),
+            amountIdentifier: "budget.spent")) {
+            Text(verbatim: month(progress.budget.month)).font(.caption).foregroundStyle(.secondary)
+            GeometryReader { geometry in
+                Capsule().fill(WelcomePalette.sunshine.opacity(0.1))
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(WelcomePalette.sunshine).frame(width: geometry.size.width * progress.meterFraction)
+                    }
+            }.frame(height: 4).accessibilityHidden(true)
+            HStack(spacing: 4) {
+                Text(verbatim: amount(progress.isOverBudget ? progress.overBudgetMinor : progress.remainingMinor, progress))
+                Text(progress.isOverBudget ? "budget.over" : "budget.remaining")
+            }.font(.subheadline).foregroundStyle(progress.isOverBudget ? ArgusStyle.negative : ArgusStyle.secondary)
+                .accessibilityElement(children: .combine).accessibilityIdentifier("budget.remaining")
+        }
+    }
+    private func amount(_ value: String, _ progress: FinancialBudgetProgress) -> String {
+        PlanPresentation.money(value, currency: progress.budget.currency, digits: progress.budget.currencyFractionDigits, locale: locale)
     }
     private func month(_ value: String) -> String {
         let formatter = DateFormatter(); formatter.locale = locale; formatter.timeZone = TimeZone(secondsFromGMT: 0)

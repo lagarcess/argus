@@ -25,37 +25,33 @@ struct CuadraoPlanDetail: View {
     var body: some View {
         Group {
             if let plan {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        heading(plan)
-                        if plan.remaining == 0 && plan.kind != .budget {
-                            PlanLandscape(look: plan.look).frame(height: 135)
-                        } else if plan.kind == .budget && plan.recorded == 0 {
-                            VStack(alignment: .leading, spacing: 12) {
-                                PlanLandscape(look: plan.look).frame(height: 100)
-                                Text(spanish ? "Tu ritmo aparecerá con tus primeros movimientos." : "Your pace will appear with your first transactions.")
-                                    .font(.subheadline).foregroundStyle(.secondary)
-                            }
+                CuadraoPlanDetailPage(bottomSpace: bottomSpace) {
+                    heading(plan)
+                    if plan.remaining == 0 && plan.kind != .budget {
+                        PlanLandscape(look: plan.look).frame(height: 135)
+                    } else if plan.kind == .budget && plan.recorded == 0 {
+                        VStack(alignment: .leading, spacing: 12) {
+                            PlanLandscape(look: plan.look).frame(height: 100)
+                            Text(spanish ? "Tu ritmo aparecerá con tus primeros movimientos." : "Your pace will appear with your first transactions.")
+                                .font(.subheadline).foregroundStyle(.secondary)
                         }
-                        if plan.remaining > 0 || plan.kind == .budget { playground(plan) }
-                        Button { progressEntry = true } label: {
-                            Label(spanish ? "Actualizar progreso" : "Update progress", systemImage: "plus.circle").frame(minHeight: 44)
-                        }.accessibilityIdentifier("plan-record-progress")
-                        facts(plan)
-                        if plan.spaceID == "household" { household(plan) }
-                        PlanPreviewFootnote(spanish: spanish)
-                    }.padding(24).padding(.bottom, bottomSpace)
+                    }
+                    if plan.remaining > 0 || plan.kind == .budget { playground(plan) }
+                    Button { progressEntry = true } label: {
+                        Label(spanish ? "Actualizar progreso" : "Update progress", systemImage: "plus.circle").frame(minHeight: 44)
+                    }.accessibilityIdentifier("plan-record-progress")
+                    facts(plan)
+                    if plan.spaceID == "household" { household(plan) }
+                    PlanPreviewFootnote(spanish: spanish)
                 }
-                .background(WelcomePalette.background).cuadraoSoftScrollEdges()
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
+                        CuadraoPlanDetailOptions(spanish: spanish) {
                             Button(spanish ? "Preguntar a Cuadrao" : "Ask Cuadrao", systemImage: "bubble") { chatFocus = .plan(id: plan.id, title: plan.name) }
                                 .accessibilityIdentifier("plan-open-chat")
                             Button { editing = .init(plan: plan) } label: { Label(spanish ? "Editar plan" : "Edit plan", systemImage: "pencil") }
                             Button { archive = true } label: { Label(spanish ? "Archivar" : "Archive", systemImage: "archivebox") }
-                        } label: { Image(systemName: "ellipsis").frame(width: 44, height: 44) }
-                            .accessibilityLabel(spanish ? "Opciones del plan" : "Plan options").accessibilityIdentifier("plan-detail-options")
+                        }
                     }
                 }
                 .sheet(isPresented: $exact) {
@@ -85,17 +81,10 @@ struct CuadraoPlanDetail: View {
     }
 
     private func heading(_ plan: CanvasPlan) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(PlanFormat.space(plan.spaceID, accounts: accounts, spanish: spanish)).font(.caption).foregroundStyle(.secondary)
-            HStack(alignment: .center, spacing: 16) {
-                Text(plan.name).font(CuadraoTypography.feature).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-                PlanLandscape(look: plan.look).frame(width: 70, height: 76)
-            }
-            HStack {
-                Text(PlanFormat.amount(plan.kind == .debt ? plan.remaining : plan.recorded, currency: plan.currency)).font(CuadraoTypography.secondaryAmount)
-                Text(plan.kind == .debt ? (spanish ? "por pagar" : "left to pay") : plan.kind.recordedTitle(spanish)).font(.caption).foregroundStyle(.secondary)
-            }
+        CuadraoPlanDetailHeading(display: .init(
+            name: plan.name, space: PlanFormat.space(plan.spaceID, accounts: accounts, spanish: spanish), look: plan.look,
+            amount: PlanFormat.amount(plan.kind == .debt ? plan.remaining : plan.recorded, currency: plan.currency),
+            annotation: plan.kind == .debt ? (spanish ? "por pagar" : "left to pay") : plan.kind.recordedTitle(spanish))) {
             if plan.remaining == 0 && plan.kind != .budget {
                 Label(spanish ? "Lo hiciste. Un plan menos, más posibilidades." : "You did it. One plan down, more possibilities ahead.", systemImage: "checkmark.seal").font(.subheadline).foregroundStyle(plan.look.color)
             }
@@ -170,19 +159,17 @@ struct CuadraoPlanDetail: View {
     }
 
     private func facts(_ plan: CanvasPlan) -> some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: 16) {
-                LabeledContent(plan.kind.amountTitle(spanish), value: PlanFormat.amount(plan.target, currency: plan.currency))
-                LabeledContent(plan.kind.recordedTitle(spanish), value: PlanFormat.amount(plan.recorded, currency: plan.currency))
-                if plan.kind == .debt {
-                    LabeledContent(spanish ? "Interés anual" : "Annual interest", value: "\(plan.annualRate.formatted())%")
-                }
-                Text(plan.kind == .budget
-                    ? (spanish ? "Proyección simple con 12 días registrados de un mes de 31 días. No es un gasto confirmado." : "Simple projection using 12 recorded days in a 31-day month. This is not confirmed spending.")
-                    : (spanish ? "Escenario al 12 de octubre de 2026. Aportes mensuales constantes. Sin rendimientos, compras nuevas ni comisiones. El plan no mueve dinero." : "Scenario as of October 12, 2026. Fixed monthly contributions. No returns, new purchases, or fees. The plan doesn't move money."))
-                    .font(.caption).foregroundStyle(.secondary)
-            }.font(.subheadline).padding(.top, 16)
-        } label: { Text(spanish ? "Los detalles, claros" : "The details, clearly").font(.subheadline.weight(.medium)) }
+        CuadraoPlanDetailFacts(spanish: spanish) {
+            LabeledContent(plan.kind.amountTitle(spanish), value: PlanFormat.amount(plan.target, currency: plan.currency))
+            LabeledContent(plan.kind.recordedTitle(spanish), value: PlanFormat.amount(plan.recorded, currency: plan.currency))
+            if plan.kind == .debt {
+                LabeledContent(spanish ? "Interés anual" : "Annual interest", value: "\(plan.annualRate.formatted())%")
+            }
+            Text(plan.kind == .budget
+                ? (spanish ? "Proyección simple con 12 días registrados de un mes de 31 días. No es un gasto confirmado." : "Simple projection using 12 recorded days in a 31-day month. This is not confirmed spending.")
+                : (spanish ? "Escenario al 12 de octubre de 2026. Aportes mensuales constantes. Sin rendimientos, compras nuevas ni comisiones. El plan no mueve dinero." : "Scenario as of October 12, 2026. Fixed monthly contributions. No returns, new purchases, or fees. The plan doesn't move money."))
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
     private func household(_ plan: CanvasPlan) -> some View {
         VStack(alignment: .leading, spacing: 16) {

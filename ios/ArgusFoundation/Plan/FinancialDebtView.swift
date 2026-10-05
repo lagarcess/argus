@@ -77,11 +77,13 @@ struct FinancialDebtPresenter: View {
     var body: some View {
         ZStack {
             if model.navigation != nil {
-                Color.black.opacity(0.25).ignoresSafeArea()
-                FinancialDebtDetail(model: model, loop: loop) {
-                    switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search; case .account: destination = .accounts; case nil: break }
-                    model.close(); Task { await search?.refresh() }
-                }.background(ArgusStyle.background).clipShape(RoundedRectangle(cornerRadius: 24)).padding(12).accessibilityElement(children: .contain).accessibilityIdentifier("debt.detail")
+                NavigationStack {
+                    FinancialDebtDetail(model: model, loop: loop) {
+                        switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search; case .account: destination = .accounts; case nil: break }
+                        model.close(); Task { await search?.refresh() }
+                    }
+                }.tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("debt.detail")
             } else { Color.clear.allowsHitTesting(false) }
         }
         .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in FinancialDebtForm(model: model, loop: loop, draft: draft) }
@@ -102,57 +104,91 @@ struct FinancialDebtDetail: View {
     let close: () -> Void
     @State private var archiving = false
     @Environment(\.locale) private var locale
+    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                if model.navigation?.activityID != nil { Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("debt.back", systemImage: "chevron.left") }.accessibilityIdentifier("debt.activity.back") }
-                else if let detail = model.detail { Text(verbatim: detail.debt.name).font(ArgusStyle.display(23)) }
-                Spacer(); Button(action: close) { Image(systemName: "xmark").frame(width: 48, height: 48) }.accessibilityLabel("action.close").accessibilityIdentifier("debt.close")
-            }.padding(.horizontal, 20)
-            ScrollViewReader { reader in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        if let id = model.navigation?.activityID { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) } }
-                        else if let progress = model.detail {
-                            FinancialDebtSummary(progress: progress)
-                            PlanValueRow(title: "debt.source", value: loop.accountName(progress.debt.sourceAccountId))
-                            PlanValueRow(title: "debt.amount", value: money(String(progress.debt.amountMinor), progress))
-                            Text(LocalizedStringKey("plan.repeat." + progress.debt.schedule.cadence.rawValue))
-                            Text("debt.plan.disclosure").foregroundStyle(ArgusStyle.secondary)
-                            if let pool = progress.fundingPool { FinancialDebtFunding(pool: pool, digits: progress.debt.currencyFractionDigits) }
-                            if !progress.debt.archived {
-                                occurrencePicker(progress)
-                                Button("debt.record") { model.record() }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("debt.record")
-                                Button("debt.extra") { model.record(extra: true) }.frame(minHeight: 44).accessibilityIdentifier("debt.extra")
-                                Button("debt.link") { Task { await model.loadCandidates() } }.frame(minHeight: 44).accessibilityIdentifier("debt.link")
-                            }
-                            DisclosureGroup("debt.estimate") { payoff(progress).padding(.top, 12) }
-                            Text("debt.payments").font(ArgusStyle.display(21))
-                            if progress.payments.isEmpty { Text("debt.noPayments").foregroundStyle(ArgusStyle.secondary) }
-                            ForEach(progress.payments) { payment in
-                                Button { model.activity(payment.activityId) } label: {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        HStack { Text(payment.activity?.note ?? NSLocalizedString("debt.payment", comment: "")); Spacer(); Text(verbatim: money(payment.netPaidMinor.map(String.init), progress)); Image(systemName: "chevron.right") }
-                                        Text(LocalizedStringKey("debt.payment." + payment.status)).foregroundStyle(ArgusStyle.secondary)
-                                    }.frame(minHeight: 48).contentShape(Rectangle())
-                                }.buttonStyle(.plain).id(payment.activityId).accessibilityIdentifier("debt.activity." + payment.activityId.uuidString)
-                            }
-                            if progress.debt.archived { Button("debt.restore") { Task { await model.archive(false) } }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("debt.restore") }
-                            else {
-                                Button("debt.edit") { model.edit() }.buttonStyle(PillButtonStyle(primary: false)).accessibilityIdentifier("debt.edit")
-                                Button("debt.archive") { archiving = true }.frame(minHeight: 48).accessibilityIdentifier("debt.archive")
-                            }
-                        }
-                        if model.loading { ProgressView("accounts.loading") }
-                        if let key = model.errorKey { Text(LocalizedStringKey(key)).accessibilityIdentifier("debt.error"); Button("accounts.retry") { Task { await model.refreshIfOpen() } } }
-                        if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
-                    }.padding(24).disabled(model.saving)
-                }.task(id: model.detail?.payments.map(\.activityId)) { if let anchor = model.navigation?.anchor { await Task.yield(); reader.scrollTo(anchor, anchor: .top) } }
+        ScrollViewReader { reader in
+            CuadraoPlanDetailPage {
+                if let id = model.navigation?.activityID { FinancialActivityDetailView(loop: loop, activityID: id) { loop.correct($0) } }
+                else if let progress = model.detail {
+                    heading(progress)
+                    if progress.state == "recorded_clear" {
+                        PlanLandscape(look: .bloom).frame(height: 135)
+                    }
+                    if let pool = progress.fundingPool { FinancialDebtFunding(pool: pool, digits: progress.debt.currencyFractionDigits) }
+                    if !progress.debt.archived {
+                        occurrencePicker(progress)
+                        Button { model.record() } label: {
+                            Label("debt.record", systemImage: "plus.circle").frame(minHeight: 44)
+                        }.accessibilityIdentifier("debt.record")
+                        Button("debt.extra") { model.record(extra: true) }.frame(minHeight: 44).accessibilityIdentifier("debt.extra")
+                        Button("debt.link") { Task { await model.loadCandidates() } }.frame(minHeight: 44).accessibilityIdentifier("debt.link")
+                    }
+                    CuadraoPlanDetailFacts(spanish: spanish) {
+                        PlanValueRow(title: "debt.source", value: loop.accountName(progress.debt.sourceAccountId))
+                        PlanValueRow(title: "debt.amount", value: money(String(progress.debt.amountMinor), progress))
+                        Text(LocalizedStringKey("plan.repeat." + progress.debt.schedule.cadence.rawValue))
+                        Text("debt.plan.disclosure").foregroundStyle(.secondary)
+                        Text("debt.estimate").font(CuadraoTypography.section)
+                        payoff(progress)
+                    }
+                    Text("debt.payments").font(CuadraoTypography.section)
+                    if progress.payments.isEmpty { Text("debt.noPayments").foregroundStyle(ArgusStyle.secondary) }
+                    ForEach(progress.payments) { payment in
+                        Button { model.activity(payment.activityId) } label: {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack { Text(payment.activity?.note ?? NSLocalizedString("debt.payment", comment: "")); Spacer(); Text(verbatim: money(payment.netPaidMinor.map(String.init), progress)); Image(systemName: "chevron.right") }
+                                Text(LocalizedStringKey("debt.payment." + payment.status)).foregroundStyle(ArgusStyle.secondary)
+                            }.frame(minHeight: 48).contentShape(Rectangle())
+                        }.buttonStyle(.plain).id(payment.activityId).accessibilityIdentifier("debt.activity." + payment.activityId.uuidString)
+                    }
+                    if progress.debt.archived {
+                        PlanPrimaryButton(title: NSLocalizedString("debt.restore", comment: "")) { Task { await model.archive(false) } }
+                            .accessibilityIdentifier("debt.restore")
+                    }
+                }
+                if model.loading { ProgressView("accounts.loading") }
+                if let key = model.errorKey { Text(LocalizedStringKey(key)).accessibilityIdentifier("debt.error"); Button("accounts.retry") { Task { await model.refreshIfOpen() } } }
+                if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
+            }.disabled(model.saving).task(id: model.detail?.payments.map(\.activityId)) { if let anchor = model.navigation?.anchor { await Task.yield(); reader.scrollTo(anchor, anchor: .top) } }
+        }
+        .navigationTitle("").navigationBarTitleDisplayMode(.inline).toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if model.navigation?.activityID != nil {
+                    Button { model.activity(nil); Task { await model.refreshIfOpen() } } label: { Label("debt.back", systemImage: "chevron.left") }
+                        .accessibilityIdentifier("debt.activity.back")
+                } else {
+                    Button(action: close) { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
+                        .accessibilityLabel("action.close").accessibilityIdentifier("debt.close")
+                }
             }
-        }.confirmationDialog("debt.archive", isPresented: $archiving, titleVisibility: .visible) {
+            ToolbarItem(placement: .topBarTrailing) {
+                if model.navigation?.activityID == nil, let progress = model.detail, !progress.debt.archived {
+                    CuadraoPlanDetailOptions(spanish: spanish) {
+                        Button { model.edit() } label: { Label("debt.edit", systemImage: "pencil") }.accessibilityIdentifier("debt.edit")
+                        Button { archiving = true } label: { Label("debt.archive", systemImage: "archivebox") }.accessibilityIdentifier("debt.archive")
+                    }.disabled(model.saving)
+                } else if model.navigation?.activityID != nil {
+                    Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                        .accessibilityLabel("action.close").accessibilityIdentifier("debt.close")
+                }
+            }
+        }
+        .confirmationDialog("debt.archive", isPresented: $archiving, titleVisibility: .visible) {
             Button("debt.archive") { Task { await model.archive(true) } }.accessibilityIdentifier("debt.archive.confirm")
             Button("accounts.cancel", role: .cancel) { }
         } message: { Text("debt.archive.disclosure") }
+    }
+    private func heading(_ progress: FinancialDebtProgress) -> some View {
+        let credit = progress.balance.creditMinor != nil && progress.balance.creditMinor != 0
+        return CuadraoPlanDetailHeading(display: .init(
+            name: progress.debt.name, space: NSLocalizedString("context.personal", comment: ""), look: .bloom,
+            amount: money((credit ? progress.balance.creditMinor : progress.balance.amountMinor).map(String.init), progress),
+            annotation: NSLocalizedString(credit ? "debt.credit" : "debt.recorded", comment: ""), amountIdentifier: "debt.recorded")) {
+            Text(LocalizedStringKey("debt.state." + progress.state)).font(.subheadline)
+                .foregroundStyle(progress.state == "needs_review" ? ArgusStyle.negative : ArgusStyle.secondary)
+                .accessibilityIdentifier("debt.state")
+        }
     }
     private func occurrencePicker(_ progress: FinancialDebtProgress) -> some View {
         VStack(alignment: .leading, spacing: 10) {
