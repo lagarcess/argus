@@ -339,9 +339,11 @@ owns the row limits and inherited disclosure/loading interaction.
 
 Net worth follows the [currency rule](#currency-rule). The October 4 lock
 supersedes the sketch's earlier optional combined view.
-Below the recorded summary, Coming up previews the same
-dated expectations and projected cash shown in Plan, with View plan as its
-destination. Do not present that estimate as net worth or guaranteed spendable
+Below the recorded summary, Coming up shows those dated expectations and
+projected cash within Home's rolling next-30-days window, read from the same
+projection service as Plan (see [Recurring setup, Upcoming and useful
+scenarios](#recurring-setup-upcoming-and-useful-scenarios)), with View plan as
+its destination. Do not present that estimate as net worth or guaranteed spendable
 money. Without expectations, invite the person to add their next income or bill;
 do not assume future expenses are zero.
 
