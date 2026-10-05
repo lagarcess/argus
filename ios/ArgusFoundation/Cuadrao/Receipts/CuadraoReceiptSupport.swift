@@ -70,12 +70,12 @@ private struct ReceiptPDF: UIViewRepresentable {
 @Observable final class ReceiptLocationRequest: NSObject, CLLocationManagerDelegate {
     var value: ReceiptLocation?
     var unavailable = false
+    var isAvailable: Bool { CuadraoDesignPreview.isActive }
     private let manager = CLLocationManager()
     private var requested = false
     override init() { super.init(); manager.delegate = self; manager.desiredAccuracy = kCLLocationAccuracyHundredMeters }
     func request() {
-        // Location is requested only inside the design preview.
-        guard CuadraoDesignPreview.isActive else { unavailable = true; return }
+        guard isAvailable else { unavailable = true; return }
         requested = true; unavailable = false
         switch manager.authorizationStatus {
         case .notDetermined: manager.requestWhenInUseAuthorization()

@@ -72,13 +72,11 @@ import Foundation
               "Blocked personal confirmation changes no activity or balance")
         check(groups.groups == originalGroups, "Blocked group confirmation adds no expense")
 
-        // An existing group posting cannot make draft-only reconciliation change receipt state.
         let interrupted = store.receipt(groupReceiptID!)!
         try groups.confirmReceipt(interrupted, groupID: group.id)
         try postingBlocked { try store.reconcile(groups: groups, accounts: accounts) }
         check(store.receipt(interrupted.id) == interrupted, "Draft-only reconciliation cannot confirm a receipt")
 
-        // Even a previously confirmed Preview snapshot cannot be projected by a draft-only store.
         let confirmedID = try preview.capture(files: [(source, "confirmed.jpg", false)], currency: account.currency,
             origin: origin, group: nil, example: true, spanish: false)
         var confirmed = preview.receipt(confirmedID)!

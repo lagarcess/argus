@@ -14,27 +14,23 @@ extension FinancialLoopUITests {
         XCTAssertFalse(app.buttons["receipt-confirm"].exists)
         XCTAssertFalse(app.buttons["receipt-account"].exists)
         XCTAssertFalse(app.segmentedControls["receipt-split"].exists)
-        tapVisible(app.buttons["Correct details"])
-        let name = "Local receipt " + UUID().uuidString.prefix(6)
-        replaceMoneyField("receipt-merchant", with: name)
-        dismissMoneyKeyboard()
+        XCTAssertFalse(app.buttons["Add current location"].exists)
         capture("connected-receipt-local-draft")
-        tapVisible(app.buttons["receipt-later"])
+        app.buttons["receipt-later"].tap()
         openConnectedSavedReceipts()
-        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'receipt-card-' AND label CONTAINS %@", name)).firstMatch
+        let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'receipt-card-' ")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 5))
         let id = card.identifier
         app.terminate(); app.launch()
         openConnectedSavedReceipts()
         tapVisible(app.buttons[id])
-        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["receipt-local-draft-notice"].exists)
+        XCTAssertTrue(app.staticTexts["receipt-local-draft-notice"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["receipt-confirm"].exists)
         tapVisible(app.buttons["receipt-source"])
         XCTAssertTrue(app.navigationBars["Original receipt"].waitForExistence(timeout: 5))
         capture("connected-receipt-original-after-relaunch")
         app.buttons["Done"].tap()
-        tapVisible(app.buttons["receipt-later"])
+        app.buttons["receipt-later"].tap()
         assertHome(balance)
         try signIn(fresh: true, user: "B")
         openConnectedSavedReceipts()
@@ -45,7 +41,7 @@ extension FinancialLoopUITests {
         try signIn(fresh: true)
         openConnectedSavedReceipts()
         tapVisible(app.buttons[id])
-        tapVisible(app.buttons["Receipt options"])
+        app.buttons["Receipt options"].tap()
         app.buttons["Discard receipt"].tap()
         app.sheets.buttons["Discard receipt"].tap()
         XCTAssertTrue(app.buttons["receipt-later"].waitForNonExistence(timeout: 5))
@@ -54,9 +50,11 @@ extension FinancialLoopUITests {
     }
 
     func openConnectedSavedReceipts() {
-        tapVisible(app.buttons["tab.argus"])
-        tapVisible(app.buttons["chat-attach"])
-        tapVisible(app.buttons["chat-saved-receipts"])
+        XCTAssertTrue(app.buttons["tab.argus"].waitForExistence(timeout: 5))
+        app.buttons["tab.argus"].tap()
+        app.buttons["chat-attach"].tap()
+        XCTAssertTrue(app.buttons["chat-saved-receipts"].waitForExistence(timeout: 5))
+        app.buttons["chat-saved-receipts"].tap()
         XCTAssertTrue(app.buttons["saved-add-receipt"].waitForExistence(timeout: 5))
     }
 

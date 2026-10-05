@@ -151,7 +151,7 @@ private struct ReceiptEditor: View {
                     }.frame(height: 150).clipShape(RoundedRectangle(cornerRadius: 16))
                     Text((es ? "Ubicación añadida el " : "Location added on ") + pin.recordedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                     if draft.prepared { Button(es ? "Quitar ubicación" : "Remove location", role: .destructive) { draft.captureLocation = nil } }
-                } else if draft.prepared {
+                } else if draft.prepared && location.isAvailable {
                     Button { location.request() } label: { Label(es ? "Añadir ubicación actual" : "Add current location", systemImage: "location").frame(minHeight: 44) }
                     Text(es ? "Opcional. No es la dirección del comercio." : "Optional. This is not the merchant's address.").font(.caption).foregroundStyle(.secondary)
                 }
