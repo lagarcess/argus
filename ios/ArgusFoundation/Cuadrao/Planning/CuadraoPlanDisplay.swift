@@ -4,6 +4,7 @@ struct CuadraoPlanHeader: View {
     let spanish: Bool
     let createTitle: String
     var canCreate = true
+    var createIdentifier = "plan-create"
     let create: () -> Void
 
     var body: some View {
@@ -16,7 +17,7 @@ struct CuadraoPlanHeader: View {
             Button(action: create) {
                 Image(systemName: "plus").font(.system(size: 20, weight: .medium))
                     .frame(width: 44, height: 44).background(WelcomePalette.sage, in: Circle())
-            }.accessibilityLabel(createTitle).accessibilityIdentifier("plan-create")
+            }.accessibilityLabel(createTitle).accessibilityIdentifier(createIdentifier)
                 .disabled(!canCreate)
         }
     }

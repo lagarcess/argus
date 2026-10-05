@@ -1,21 +1,22 @@
 import SwiftUI
 import ArgusSession
 
-struct FinancialPlanForecast: View {
+struct FinancialPlanForecast<Details: View>: View {
     let projection: FinancialPlanProjection
+    let chooseAccounts: () -> Void
+    var canChooseAccounts = true
+    var bottomSpace: CGFloat = 90
+    @ViewBuilder let details: () -> Details
     @State private var selectedCurrency: String?
     @Environment(\.locale) private var locale
+    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var currency: FinancialForecastCurrency? {
         projection.currencies.first { $0.currency == selectedCurrency } ?? projection.currencies.first
-    }
-    private var period: String {
-        PlanPresentation.dateLabel(projection.startDate, locale: locale) + " – " +
-            PlanPresentation.dateLabel(projection.endDate, locale: locale)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            CuadraoPlanForecastHeading(period: period) {
+            CuadraoPlanForecastSection(period: spanish ? "Tu previsión" : "Your forecast") {
                 if projection.currencies.count > 1 {
                     CuadraoChoiceMenu(title: NSLocalizedString("accounts.currency", comment: ""),
                         selection: Binding(get: { currency?.currency ?? "" }, set: { selectedCurrency = $0 }),
@@ -24,17 +25,71 @@ struct FinancialPlanForecast: View {
                 } else {
                     CuadraoChoiceLabel(title: NSLocalizedString("context.personal", comment: ""), selectable: false)
                 }
+            } content: {
+                if let currency {
+                    FinancialPlanForecastCurrency(currency: currency, start: projection.startDate, end: projection.endDate)
+                        .id(currency.currency)
+                    Text(spanish ? "Según tus saldos y compromisos registrados. No estima gastos sin programar." : "Based on your balances and scheduled items. Unplanned spending is not estimated.")
+                        .font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("plan.coverage")
+                } else {
+                    CuadraoPlanColdStart(spanish: spanish,
+                        detail: spanish ? "Puedes hacer tu primer plan hoy. Elige las cuentas que quieres incluir para ver lo que viene." : "Make your first plan today. Choose the accounts to include to see what's ahead.") {
+                        Button("plan.chooseMoney", action: chooseAccounts).disabled(!canChooseAccounts)
+                            .accessibilityIdentifier("plan.chooseAccounts")
+                    }
+                }
+            } explore: {
+                #if DEBUG
+                CuadraoPlanExploreLink(spanish: spanish, example: true) {
+                    FinancialPlanScenarioExample(spanish: spanish, bottomSpace: bottomSpace)
+                }
+                #endif
             }
-            if let currency {
-                FinancialPlanForecastCurrency(currency: currency, start: projection.startDate, end: projection.endDate)
-                    .id(currency.currency)
-            } else {
-                CuadraoChartState(title: NSLocalizedString("plan.chooseMoney", comment: ""),
-                    detail: NSLocalizedString("plan.selection.hint", comment: ""))
-            }
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let currency {
+                        PlanValueRow(title: "plan.income", value: amount(currency.expectedIncomeMinor, in: currency))
+                        PlanValueRow(title: "plan.bills", value: amount(currency.expectedBillsMinor, in: currency))
+                        if let effect = currency.transferEffectMinor {
+                            PlanValueRow(title: "goal.transferEffect", value: amount(effect, in: currency))
+                        }
+                        PlanValueRow(title: "plan.netChange", value: amount(currency.netCashChangeMinor, in: currency))
+                        if let asOf = currency.asOf {
+                            Text(NSLocalizedString("plan.asOf", comment: "") + " " + AccountPresentation.date(asOf, zone: projection.selection.timeZone, locale: locale))
+                                .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    details()
+                    Text("plan.assumptions").font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                }.padding(.top, 16)
+            } label: {
+                Text(spanish ? "¿De dónde sale?" : "What's behind this?").font(.subheadline.weight(.medium))
+            }.padding(.top, 8).accessibilityIdentifier("plan.forecast.details")
         }
     }
+    private func amount(_ minor: String, in currency: FinancialForecastCurrency) -> String {
+        PlanPresentation.money(minor, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale)
+    }
 }
+
+#if DEBUG
+private struct FinancialPlanScenarioExample: View {
+    let spanish: Bool
+    let bottomSpace: CGFloat
+    @State private var example: CuadraoPlanPreview
+
+    init(spanish: Bool, bottomSpace: CGFloat) {
+        self.spanish = spanish; self.bottomSpace = bottomSpace
+        _example = State(initialValue: CuadraoPlanPreview(spanish: spanish, defaults: nil, reset: true))
+    }
+
+    var body: some View {
+        CuadraoForecastPlayground(store: example, scope: CanvasSpace.personalID,
+            scopeName: spanish ? "Ejemplo" : "Example", spanish: spanish,
+            bottomSpace: bottomSpace, isolatedExample: true)
+    }
+}
+#endif
 
 private struct FinancialPlanForecastCurrency: View {
     let currency: FinancialForecastCurrency
@@ -68,24 +123,14 @@ private struct FinancialPlanForecastCurrency: View {
                 Text("\(currency.unknownAccountIds.count) · " + NSLocalizedString("accounts.unknown", comment: ""))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
-            if let asOf = currency.asOf {
-                Text(NSLocalizedString("plan.asOf", comment: "") + " " + AccountPresentation.date(asOf, zone: TimeZone.current.identifier, locale: locale))
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-            }
             if currency.unknownAccountIds.isEmpty, currency.points.allSatisfy({ $0.balanceMinor != nil }), !currency.points.isEmpty {
                 FinancialForecastChart(currency: currency, start: start, end: end, selected: $selected)
             } else {
+                Text(PlanPresentation.dateLabel(start, locale: locale) + " · " + PlanPresentation.dateLabel(end, locale: locale))
+                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 CuadraoChartState(title: NSLocalizedString("accounts.unknown", comment: ""),
                     detail: NSLocalizedString("plan.unknown", comment: ""))
             }
-            DisclosureGroup("plan.overview") {
-                VStack(alignment: .leading, spacing: 12) {
-                    PlanValueRow(title: "plan.income", value: amount(currency.expectedIncomeMinor))
-                    PlanValueRow(title: "plan.bills", value: amount(currency.expectedBillsMinor))
-                    if let effect = currency.transferEffectMinor { PlanValueRow(title: "goal.transferEffect", value: amount(effect)) }
-                    PlanValueRow(title: "plan.netChange", value: amount(currency.netCashChangeMinor))
-                }.padding(.top, 12)
-            }.font(CuadraoTypography.supporting).padding(.top, 8)
             if let shortfall = currency.firstShortfallDate {
                 Label { Text("plan.shortfall") + Text(verbatim: " · " + PlanPresentation.dateLabel(shortfall, locale: locale)) }
                     icon: { Image(systemName: "exclamationmark.circle") }
@@ -136,21 +181,20 @@ struct FinancialForecastChart: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            CuadraoPlanForecastChart(recorded: [], projected: points, xRange: xRange, yRange: yRange,
-                ticks: ticks, selected: points.first { $0.id == selected },
-                selection: Binding(get: { points.first { $0.id == selected }?.position }, set: { position in
-                    selected = position.flatMap { value in points.reversed().min { abs($0.position - value) < abs($1.position - value) }?.id }
-                }), compact: true, identifier: "plan.chart",
-                accessibilityTitle: NSLocalizedString("plan.chart.title", comment: ""),
-                accessibilityAmount: readout ?? currency.endingMinor.map { PlanPresentation.money($0, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale) } ?? "")
-            if let readout {
-                Text(readout).font(CuadraoTypography.supporting).monospacedDigit().accessibilityIdentifier("plan.chart.readout")
-            } else {
-                Text("plan.chart.title").font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+        CuadraoPlanForecastChart(recorded: [], projected: points, xRange: xRange, yRange: yRange,
+            ticks: ticks, selected: points.first { $0.id == selected },
+            selection: Binding(get: { points.first { $0.id == selected }?.position }, set: { position in
+                selected = position.flatMap { value in points.reversed().min { abs($0.position - value) < abs($1.position - value) }?.id }
+            }), compact: true, identifier: "plan.chart",
+            accessibilityTitle: NSLocalizedString("plan.chart.title", comment: ""),
+            accessibilityAmount: readout ?? currency.endingMinor.map { PlanPresentation.money($0, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale) } ?? "")
+            .accessibilityHint(Text("plan.chart.accessibility"))
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: selected = min((selected ?? 0) + 1, max(0, currency.points.count - 1))
+                case .decrement: selected = max((selected ?? 0) - 1, 0)
+                @unknown default: break
+                }
             }
-            Stepper("plan.chart.accessibility", value: Binding(get: { selected ?? 0 }, set: { selected = $0 }), in: 0...max(0, currency.points.count - 1))
-                .font(CuadraoTypography.supporting).accessibilityIdentifier("plan.chart.step")
-        }
     }
 }

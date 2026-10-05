@@ -5,9 +5,10 @@ struct FinancialPlanDestination: View {
     @EnvironmentObject private var auth: ProfileAuthModel
     let showProfile: () -> Void
     var audience: Binding<Bool>? = nil
+    var bottomSpace: CGFloat = 90
     var body: some View {
         if auth.state == .authenticated, let loop = auth.financialLoop {
-            FinancialPlanView(model: loop.plan, loop: loop, audience: audience)
+            FinancialPlanView(model: loop.plan, loop: loop, audience: audience, bottomSpace: bottomSpace)
         } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -25,41 +26,49 @@ struct FinancialPlanView: View {
     @ObservedObject var model: FinancialPlanModel
     @ObservedObject var loop: FinancialLoopModel
     var audience: Binding<Bool>? = nil
+    var bottomSpace: CGFloat = 90
     @State private var selectingAccounts = false
     @State private var expanded = false
+    @State private var creating = false
+    @State private var managing = false
     @Environment(\.locale) private var locale
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
+    private var canCreate: Bool { model.projection != nil && loop.pendingConfirmation == nil && !model.saving }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                CuadraoPlanHeader(spanish: spanish, createTitle: NSLocalizedString(createKey, comment: ""),
-                    canCreate: model.projection != nil && loop.pendingConfirmation == nil && !model.saving, create: create)
-                if let audience { CuadraoPlanAudiencePicker(spanish: spanish, together: audience) }
-                if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
-                if model.loading { ProgressView("accounts.loading") }
-                if let error = model.errorKey {
-                    Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
-                    Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
+        CuadraoPlanPage(spanish: spanish, audience: audience, bottomSpace: bottomSpace) {
+            CuadraoPlanHeader(spanish: spanish, createTitle: createTitle, canCreate: canCreate, create: create)
+        } content: {
+            if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
+            if model.loading { ProgressView("accounts.loading") }
+            if let error = model.errorKey {
+                Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
+                Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
+            }
+            if model.section == .overview {
+                if let projection = model.projection { overview(projection) }
+            } else {
+                sections
+                if model.section == .goals {
+                    FinancialGoalList(plan: model, model: loop.goals, origin: .plan)
+                } else if model.section == .debts {
+                    FinancialDebtList(plan: model, model: loop.debts, origin: .plan)
+                } else if model.section == .budgets {
+                    FinancialBudgetList(plan: model, model: loop.budgets, origin: .plan)
                 }
-                if model.section == .overview {
-                    if let projection = model.projection { overview(projection) }
-                } else {
-                    sections
-                    if model.section == .goals {
-                        FinancialGoalList(plan: model, model: loop.goals, origin: .plan)
-                    } else if model.section == .debts {
-                        FinancialDebtList(plan: model, model: loop.debts, origin: .plan)
-                    } else if model.section == .budgets {
-                        FinancialBudgetList(plan: model, model: loop.budgets, origin: .plan)
-                    }
-                }
-            }.padding(.horizontal, 24).padding(.top, 20).padding(.bottom, 24)
+            }
+        } footer: {
+            EmptyView()
         }
-        .scrollIndicators(.hidden).background(WelcomePalette.background)
-        .foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine).cuadraoSoftScrollEdges()
         .task { if model.projection == nil { await model.refresh() } }
         .refreshable { await loop.refresh() }
+        .confirmationDialog(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?", isPresented: $creating, titleVisibility: .visible) {
+            Button("goal.add") { loop.goals.create() }.disabled(!canCreate)
+            Button("budget.add") { Task { await loop.budgets.create() } }.disabled(!canCreate)
+            Button("debt.add") { loop.debts.create() }.disabled(!canCreate)
+            Button("plan.add.title") { model.create() }.disabled(!canCreate)
+        }
         .sheet(isPresented: $selectingAccounts) {
             if let projection = model.projection { FinancialPlanSelectionView(model: model, loop: loop, projection: projection) }
         }
@@ -84,7 +93,23 @@ struct FinancialPlanView: View {
 
     private func overview(_ projection: FinancialPlanProjection) -> some View {
         VStack(alignment: .leading, spacing: 24) {
-            FinancialPlanForecast(projection: projection)
+            FinancialPlanForecast(projection: projection, chooseAccounts: { selectingAccounts = true },
+                canChooseAccounts: loop.pendingConfirmation == nil && !model.saving, bottomSpace: bottomSpace) {
+                forecastControls(projection)
+            }
+            FinancialPlanCards(model: model, loop: loop, projection: projection,
+                create: { creating = true }, bottomSpace: bottomSpace)
+            expected(projection)
+            DisclosureGroup(isExpanded: $managing) {
+                sections.padding(.top, 8)
+            } label: {
+                Text(spanish ? "Administrar mis planes" : "Manage my plans").font(.subheadline.weight(.medium))
+            }.accessibilityIdentifier("plan.manage")
+        }
+    }
+
+    private func forecastControls(_ projection: FinancialPlanProjection) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
             DatePicker("plan.until.label", selection: Binding(get: { PlanPresentation.date(projection.endDate) },
                 set: { date in Task { await model.refresh(until: PlanPresentation.day(date)) } }),
                 in: PlanPresentation.date(projection.startDate)...PlanPresentation.date(projection.startDate).addingTimeInterval(366 * 86400),
@@ -96,28 +121,34 @@ struct FinancialPlanView: View {
                     HStack { Text("plan.includedAccounts"); Spacer(); Image(systemName: "chevron.right").font(.caption2) }
                     Text(includedNames(projection)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 }.font(CuadraoTypography.supporting).frame(minHeight: 48).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityIdentifier("plan.accounts").disabled(loop.pendingConfirmation != nil)
+            }.buttonStyle(.plain).accessibilityIdentifier("plan.accounts").disabled(loop.pendingConfirmation != nil || model.saving)
             Text(projection.selection.timeZone).font(CuadraoTypography.caption).foregroundStyle(.secondary)
-            if !projection.hasExpectations { Text("plan.empty").font(CuadraoTypography.supporting).foregroundStyle(.secondary) }
-            FinancialPlanCards(model: model, loop: loop, projection: projection)
-            sections
-            VStack(alignment: .leading, spacing: 4) {
+        }
+    }
+
+    private func expected(_ projection: FinancialPlanProjection) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
                 Text("plan.expected").font(CuadraoTypography.section)
-                ForEach(Array(projection.occurrences.prefix(expanded ? projection.occurrences.count : 6))) { occurrence in
-                    Button {
-                        if let current = model.projection?.occurrences.first(where: { $0.id == occurrence.id }) {
-                            Task { await model.open(current) }
-                        }
-                    } label: { FinancialOccurrenceRow(occurrence: occurrence) }
-                        .buttonStyle(.plain).accessibilityIdentifier("plan.occurrence." + occurrence.id)
-                }
-                if projection.occurrences.count > 6 {
-                    Button(expanded ? "plan.showLess" : "plan.showMore") { expanded.toggle() }.frame(minHeight: 44)
-                        .accessibilityIdentifier("plan.showMore")
-                }
+                Spacer()
+                CuadraoSectionAddButton(title: NSLocalizedString("plan.add.title", comment: "")) { model.create() }
+                    .accessibilityIdentifier("plan.add").disabled(!canCreate)
             }
-            PlanPrimaryButton(title: NSLocalizedString("plan.add.title", comment: ""), symbol: "plus") { model.create() }
-                .accessibilityIdentifier("plan.add").disabled(loop.pendingConfirmation != nil || model.saving)
+            if !projection.hasExpectations {
+                Text("plan.empty").font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+            }
+            ForEach(Array(projection.occurrences.prefix(expanded ? projection.occurrences.count : 6))) { occurrence in
+                Button {
+                    if let current = model.projection?.occurrences.first(where: { $0.id == occurrence.id }) {
+                        Task { await model.open(current) }
+                    }
+                } label: { FinancialOccurrenceRow(occurrence: occurrence) }
+                    .buttonStyle(.plain).accessibilityIdentifier("plan.occurrence." + occurrence.id)
+            }
+            if projection.occurrences.count > 6 {
+                Button(expanded ? "plan.showLess" : "plan.showMore") { expanded.toggle() }.frame(minHeight: 44)
+                    .accessibilityIdentifier("plan.showMore")
+            }
             if !projection.expectations.isEmpty {
                 DisclosureGroup("plan.manageExpectations") {
                     ForEach(projection.expectations) { expectation in
@@ -128,10 +159,13 @@ struct FinancialPlanView: View {
                         }.buttonStyle(.plain).disabled(loop.pendingConfirmation != nil)
                             .accessibilityIdentifier("plan.expectation." + expectation.id.uuidString)
                     }
-                }
+                }.padding(.top, 16)
             }
-            Text("plan.assumptions").font(CuadraoTypography.caption).foregroundStyle(.secondary)
         }
+    }
+    private var createTitle: String {
+        if model.section == .overview { return spanish ? "Crear plan" : "Create plan" }
+        return NSLocalizedString(createKey, comment: "")
     }
     private var createKey: String {
         switch model.section {
@@ -143,16 +177,17 @@ struct FinancialPlanView: View {
     }
     private func create() {
         switch model.section {
-        case .overview: model.create()
+        case .overview: creating = true
         case .goals: loop.goals.create()
         case .budgets: Task { await loop.budgets.create() }
         case .debts: loop.debts.create()
         }
     }
     private func includedNames(_ projection: FinancialPlanProjection) -> String {
-        projection.accounts.filter { projection.selection.accountIds.contains($0.id) }.map {
+        let names = projection.accounts.filter { projection.selection.accountIds.contains($0.id) }.map {
             $0.nickname ?? NSLocalizedString("accounts.type." + $0.type, comment: "")
         }.joined(separator: " · ")
+        return names.isEmpty ? (spanish ? "Ninguna cuenta seleccionada" : "No accounts selected") : names
     }
 }
 

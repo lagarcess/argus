@@ -42,6 +42,7 @@ extension FinancialLoopUITests {
         capture("home-upcoming-recurring")
         // Plan explores a longer horizon; Home's window and totals stay as they are.
         app.buttons["tab.plan"].tap()
+        revealPlanForecastControls()
         chooseDate("plan.until", daysAhead: 60)
         assertPlanProjected("DOP -50.00")
         assertHomeProjected("DOP 300.00")

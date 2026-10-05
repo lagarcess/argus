@@ -25,23 +25,19 @@ struct CuadraoPlanCanvas: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    header
-                    CuadraoPlanAudiencePicker(spanish: spanish, together: $together)
-                    if together {
-                        CuadraoGroupCollection(store: groups, spanish: spanish, bottomSpace: bottomSpace, create: { newGroup = true }, open: { path.append($0) })
-                    } else {
-                        if store.hasForecast { forecastOverview } else { forecastColdStart }
-                        plans
-                    }
-                    PlanPreviewFootnote(spanish: spanish)
-                }.padding(.horizontal, 24).padding(.top, 20).padding(.bottom, bottomSpace)
+            CuadraoPlanPage(spanish: spanish, audience: $together, bottomSpace: bottomSpace) {
+                header
+            } content: {
+                if together {
+                    CuadraoGroupCollection(store: groups, spanish: spanish, bottomSpace: bottomSpace, create: { newGroup = true }, open: { path.append($0) })
+                } else {
+                    if store.hasForecast { forecastOverview } else { forecastColdStart }
+                    plans
+                }
+            } footer: {
+                PlanPreviewFootnote(spanish: spanish)
             }
-            .scrollIndicators(.hidden)
-            .background(WelcomePalette.background)
             .toolbar(.hidden, for: .navigationBar).toolbar(.hidden, for: .tabBar)
-            .cuadraoSoftScrollEdges()
             .navigationDestination(for: UUID.self) { id in
                 if store.plan(id) != nil {
                     CuadraoPlanDetail(store: store, accounts: accounts, planID: id, spanish: spanish, bottomSpace: bottomSpace)
@@ -85,71 +81,49 @@ struct CuadraoPlanCanvas: View {
     }
 
     private var forecastOverview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            CuadraoPlanForecastHeading(period: spanish ? "Tu mes" : "Your month") {
-                if forecastSpaces.count > 1 {
-                    CuadraoChoiceMenu(title: spanish ? "Espacio del pronóstico" : "Forecast space",
-                        selection: Binding(get: { scope }, set: { scope = $0; selectedDay = nil }),
-                        values: forecastSpaces.map(\.id),
-                        valueTitle: { PlanFormat.space($0, accounts: accounts, spanish: spanish) })
-                        .accessibilityLabel(spanish ? "Espacio del pronóstico, \(scopeName)" : "Forecast space, \(scopeName)")
-                        .accessibilityIdentifier("plan-forecast-scope")
-                } else { CuadraoChoiceLabel(title: scopeName, selectable: false) }
-            }
-
+        CuadraoPlanForecastSection(period: spanish ? "Tu mes" : "Your month") {
+            if forecastSpaces.count > 1 {
+                CuadraoChoiceMenu(title: spanish ? "Espacio del pronóstico" : "Forecast space",
+                    selection: Binding(get: { scope }, set: { scope = $0; selectedDay = nil }),
+                    values: forecastSpaces.map(\.id),
+                    valueTitle: { PlanFormat.space($0, accounts: accounts, spanish: spanish) })
+                    .accessibilityLabel(spanish ? "Espacio del pronóstico, \(scopeName)" : "Forecast space, \(scopeName)")
+                    .accessibilityIdentifier("plan-forecast-scope")
+            } else { CuadraoChoiceLabel(title: scopeName, selectable: false) }
+        } content: {
             CuadraoPlanForecastValue(
                 title: selectedPoint.map { "\($0.day) oct. · \($0.day > CanvasForecast.today ? (spanish ? "estimado" : "estimated") : (spanish ? "registrado" : "recorded"))" } ?? (store.dailyAssumptions[scope] == nil ? (spanish ? "Balance estimado al cierre" : "Estimated closing balance") : (spanish ? "Con tu plan, cerrarías con" : "With your plan, you'd end with")),
                 amount: PlanFormat.amount(selectedPoint?.balance ?? forecast.ending(daily: store.daily(for: scope))),
                 identifier: "plan-month-ending")
             PlanForecastChart(forecast: forecast, daily: store.daily(for: scope), spanish: spanish, selectedDay: $selectedDay, compact: true)
-            NavigationLink {
+        } explore: {
+            CuadraoPlanExploreLink(spanish: spanish) {
                 CuadraoForecastPlayground(store: store, scope: scope, scopeName: scopeName, spanish: spanish, bottomSpace: bottomSpace)
-            } label: {
-                HStack {
-                    Text(spanish ? "Explorar escenarios" : "Explore scenarios")
-                    Image(systemName: "chevron.right").font(.caption2).accessibilityHidden(true)
-                }.font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityIdentifier("plan-explore")
+            }
         }
     }
 
     private var forecastColdStart: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            PlanLandscape(look: .sunshine).frame(height: 135)
-            Text(spanish ? "Lo que viene empieza aquí." : "What's next starts here.")
-                .font(CuadraoTypography.feature)
-            Text(spanish ? "Puedes hacer tu primer plan hoy. La proyección llegará cuando tengas movimientos e ingresos previstos." : "Make your first plan today. Your forecast will take shape with transactions and expected income.")
-                .font(.subheadline).foregroundStyle(.secondary)
+        CuadraoPlanColdStart(spanish: spanish,
+            detail: spanish ? "Puedes hacer tu primer plan hoy. La proyección llegará cuando tengas movimientos e ingresos previstos." : "Make your first plan today. Your forecast will take shape with transactions and expected income.") {
             Button(spanish ? "Explorar un mes de ejemplo" : "Explore an example month") {
                 store.enableForecastExample()
-            }.font(.subheadline.weight(.medium)).frame(minHeight: 44)
+            }
         }
     }
 
     private var plans: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(spanish ? "Tus planes" : "Your plans").font(CuadraoTypography.section)
+        CuadraoPlanCollection(spanish: spanish, isEmpty: active.isEmpty,
+            create: { creation = .init(plan: newPlan) }) {
             CuadraoOrderedCollection(items: active, spanish: spanish,
                 identifier: { "plan-row-\($0.kind.rawValue)-\($0.spaceID)" },
                 open: { path.append($0.id) }, edit: { creation = .init(plan: $0) },
                 archive: { store.archive($0.id, true) }, reorder: store.reorder) { plan in
                     PlanCard(plan: plan, space: PlanFormat.space(plan.spaceID, accounts: accounts, spanish: spanish), spanish: spanish)
                 }
-            NavigationLink {
+        } archives: {
+            CuadraoPlanArchiveLink(spanish: spanish) {
                 CuadraoArchivedPlans(store: store, accounts: accounts, spanish: spanish, bottomSpace: bottomSpace)
-            } label: {
-                Label(spanish ? "Archivados" : "Archived", systemImage: "archivebox")
-                    .font(CuadraoTypography.supporting).foregroundStyle(.secondary).frame(minHeight: 44)
-            }.accessibilityIdentifier("plan-archives")
-            if active.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?").font(CuadraoTypography.section)
-                    Text(spanish ? "Un viaje, un respiro, llegar a fin de mes con más espacio." : "A trip, a little breathing room, a month with more left over.")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    PlanPrimaryButton(title: spanish ? "Crear mi primer plan" : "Make my first plan", symbol: "plus") {
-                        creation = .init(plan: newPlan)
-                    }
-                }.padding(24).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 26))
             }
         }
     }

@@ -140,7 +140,7 @@ extension FinancialLoopUITests {
 
     func prepareBudget(_ title: String, accounts: [MoneyAccount]) {
         app.buttons["tab.plan"].tap()
-        tapVisible(app.buttons["plan.budgets"])
+        selectPlanSection("budgets")
         tapVisible(app.buttons["budget.add"])
         fillMoneyField("budget.name", with: title)
         fillMoneyField("budget.limit", with: "150")
@@ -159,7 +159,7 @@ extension FinancialLoopUITests {
 
     func openBudget(_ title: String) {
         app.buttons["tab.plan"].tap()
-        tapVisible(app.buttons["plan.budgets"])
+        selectPlanSection("budgets")
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.plan.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(row)
         XCTAssertTrue(app.staticTexts["budget.spent"].waitForExistence(timeout: 15))

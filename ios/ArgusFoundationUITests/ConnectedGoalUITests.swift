@@ -10,13 +10,14 @@ extension FinancialLoopUITests {
         prepareGoal(title, destination: account)
         tapVisible(app.buttons["goal.save"])
         XCTAssertTrue(app.buttons["goal.save"].waitForNonExistence(timeout: 15))
-        tapVisible(app.buttons["plan.overview"])
+        selectPlanSection("overview")
         let card = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.card.goal.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(card)
         assertGoal("DOP 0.00")
         app.terminate(); app.launch()
         assertGoal("DOP 0.00")
         app.buttons["goal.close"].tap()
+        revealPlanManagement()
         XCTAssertTrue(app.buttons["plan.overview"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["plan.overview"].isSelected)
         XCTAssertTrue(card.exists)
@@ -172,7 +173,7 @@ extension FinancialLoopUITests {
 
     func prepareGoal(_ title: String, destination: MoneyAccount) {
         app.buttons["tab.plan"].tap()
-        tapVisible(app.buttons["plan.goals"])
+        selectPlanSection("goals")
         tapVisible(app.buttons["goal.add"])
         fillMoneyField("goal.name", with: title)
         fillMoneyField("goal.target", with: "2000")
@@ -183,7 +184,7 @@ extension FinancialLoopUITests {
 
     @discardableResult func openGoal(_ title: String) -> String {
         app.buttons["tab.plan"].tap()
-        tapVisible(app.buttons["plan.goals"])
+        selectPlanSection("goals")
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.row.plan.' AND label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15))
         let id = String(row.identifier.dropFirst("goal.row.plan.".count))
