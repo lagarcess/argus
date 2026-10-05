@@ -39,6 +39,30 @@ struct PendingCredentials: Codable, Sendable {
     let refreshToken: String
 }
 
+enum SessionSignInMethod: String, Codable, Sendable {
+    case email, apple, google
+}
+
+struct StoredSession: Codable {
+    let version: Int
+    var session: Session
+    let signInMethod: SessionSignInMethod?
+
+    init(session: Session, signInMethod: SessionSignInMethod?) {
+        self.version = 1; self.session = session; self.signInMethod = signInMethod
+    }
+
+    static func decode(_ data: Data) throws -> Self {
+        let decoder = JSONDecoder()
+        if let object = try JSONSerialization.jsonObject(with: data) as? [String: Any], object["version"] != nil || object["session"] != nil {
+            let stored = try decoder.decode(Self.self, from: data)
+            guard stored.version == 1 else { throw SessionFailure.storageUnavailable }
+            return stored
+        }
+        return .init(session: try decoder.decode(Session.self, from: data), signInMethod: nil)
+    }
+}
+
 /// One lock binds generation validation to the actual storage operation. Checking only
 /// before an async refresh would let a retired SDK overwrite the next account's tokens.
 final class CredentialVault: @unchecked Sendable {
@@ -60,7 +84,16 @@ final class CredentialVault: @unchecked Sendable {
             guard !failed else { throw SessionFailure.storageUnavailable }
         }
     }
-    func session() throws -> Session? { try read("session") }
+    func session() throws -> Session? { try storedSession()?.session }
+    func signInMethod() throws -> SessionSignInMethod? { try storedSession()?.signInMethod }
+    private func storedSession() throws -> StoredSession? {
+        try locked {
+            do {
+                guard let data = try backing.retrieve(key: prefix + ".session") else { return nil }
+                return try StoredSession.decode(data)
+            } catch { throw SessionFailure.storageUnavailable }
+        }
+    }
     func pending() throws -> PendingCredentials? {
         try locked {
             if let recovery { return recovery }
@@ -96,12 +129,23 @@ final class CredentialVault: @unchecked Sendable {
     }
 
     func sdkRead(key: String, epoch: UInt64) throws -> Data? {
-        try scoped(epoch) { key == "argus.session" ? try backing.retrieve(key: prefix + ".session") : nil }
+        try scoped(epoch) {
+            guard key == "argus.session", let data = try backing.retrieve(key: prefix + ".session") else { return nil }
+            return try JSONEncoder().encode(StoredSession.decode(data).session)
+        }
     }
-    func sdkWrite(key: String, value: Data, epoch: UInt64) throws {
+    func sdkWrite(key: String, value: Data, epoch: UInt64, adoptingMethod: SessionSignInMethod? = nil) throws {
         try scoped(epoch) {
             guard key == "argus.session" else { throw SessionFailure.storageUnavailable }
-            do { try backing.store(key: prefix + ".session", value: value) }
+            do {
+                let session = try JSONDecoder().decode(Session.self, from: value)
+                let previous = try backing.retrieve(key: prefix + ".session").map(StoredSession.decode)
+                if let previous, previous.session.user.id != session.user.id {
+                    throw SessionFailure.staleOperation
+                }
+                let stored = StoredSession(session: session, signInMethod: previous?.signInMethod ?? adoptingMethod)
+                try backing.store(key: prefix + ".session", value: JSONEncoder().encode(stored))
+            }
             catch {
                 // A refresh can already have rotated the server token. Preserve the
                 // returned credentials for revocation before reporting the failure.
@@ -148,8 +192,9 @@ final class CredentialVault: @unchecked Sendable {
 struct EpochStorage: AuthLocalStorage {
     let vault: CredentialVault
     let epoch: UInt64
+    var adoptingMethod: SessionSignInMethod? = nil
     func retrieve(key: String) throws -> Data? { try vault.sdkRead(key: key, epoch: epoch) }
-    func store(key: String, value: Data) throws { try vault.sdkWrite(key: key, value: value, epoch: epoch) }
+    func store(key: String, value: Data) throws { try vault.sdkWrite(key: key, value: value, epoch: epoch, adoptingMethod: adoptingMethod) }
     func remove(key: String) throws { try vault.sdkRemove(key: key, epoch: epoch) }
 }
 

@@ -7,23 +7,41 @@ public actor SessionController {
     private let configuration: SessionConfiguration
     private let vault: CredentialVault
     private let transport: SessionTransport
+    private let appleChecker: any AppleCredentialChecking
     private var auth: AuthClient?
     private var mutating = false
     private var state = SessionSnapshot(phase: .signedOut, profile: nil, revision: 0)
 
-    public init(configuration: SessionConfiguration) throws {
+    public init(configuration: SessionConfiguration, appleChecker: any AppleCredentialChecking) throws {
+        self.appleChecker = appleChecker
         self.configuration = configuration
         self.vault = CredentialVault(backing: DeviceKeychain(service: configuration.keychainService), prefix: configuration.storagePrefix)
         self.transport = SessionTransport()
     }
-    init(configuration: SessionConfiguration, storage: any AuthLocalStorage, fetch: @escaping AuthClient.FetchHandler) throws {
+    init(configuration: SessionConfiguration, storage: any AuthLocalStorage, appleChecker: any AppleCredentialChecking = UnavailableAppleCredentialChecker(), fetch: @escaping AuthClient.FetchHandler) throws {
+        self.appleChecker = appleChecker
         self.configuration = configuration
         self.vault = CredentialVault(backing: storage, prefix: configuration.storagePrefix)
         self.transport = SessionTransport(fetch: fetch)
     }
     public func snapshot() -> SessionSnapshot { state }
 
-    public func restore() async throws -> SessionSnapshot {
+    public func restore(onValidationRequired: @Sendable (SessionSnapshot) async -> Void = { _ in }) async throws -> SessionSnapshot {
+        guard !mutating else { throw SessionFailure.busy }
+        let method: SessionSignInMethod?
+        let hasPending: Bool
+        do {
+            hasPending = try vault.pending() != nil
+            method = try vault.signInMethod()
+        } catch {
+            setState(.credentialValidationRequired)
+            await onValidationRequired(state)
+            throw SessionFailure.storageUnavailable
+        }
+        if state.phase == .authenticated, !hasPending, let method, method != .apple {
+            guard !mutating else { throw SessionFailure.busy }
+            return try await loadProfile(using: activeAuth(), epoch: vault.epoch())
+        }
         try beginMutation(); defer { mutating = false }
         if try vault.pending() != nil {
             setState(.signOutPending)
@@ -31,7 +49,7 @@ public actor SessionController {
         }
         guard let existing = try vault.session() else { endAccountEpoch(as: .signedOut); return state }
         if existing.user.isAnonymous { setState(.unsupportedAnonymousSession); return state }
-        return try await loadProfile(using: activeAuth(), epoch: vault.epoch())
+        return try await loadProfile(using: activeAuth(), epoch: vault.epoch(), onValidationRequired: onValidationRequired)
     }
 
     public func login(email: String, password: String, captchaToken: String) async throws -> SessionSnapshot {
@@ -39,7 +57,7 @@ public actor SessionController {
         try requireEntry()
         let response = try await entry(path: "auth/login", body: ["email": email, "password": password, "captcha_token": captchaToken])
         guard let credentials = response.session else { throw SessionFailure.invalidResponse }
-        return try await adopt(credentials)
+        return try await adopt(credentials, method: .email)
     }
 
     public func signup(email: String, password: String, captchaToken: String, language: String,
@@ -50,7 +68,7 @@ public actor SessionController {
         if let displayName { body["display_name"] = displayName }
         let response = try await entry(path: "auth/signup", body: body)
         guard let credentials = response.session else { return .confirmationRequired }
-        return .authenticated(try await adopt(credentials))
+        return .authenticated(try await adopt(credentials, method: .email))
     }
 
     /// Native Apple or Google sign-in. The provider's ID token and the raw nonce go to
@@ -58,7 +76,7 @@ public actor SessionController {
     /// then take the same journaled adoption path as email sign-in (pending journal,
     /// setSession, then the canonical /me profile). If Argus refuses the new session
     /// (for example the private-alpha allowlist at /me), it is revoked before returning.
-    public func signIn(with credential: IdentityTokenCredential) async throws -> SessionSnapshot {
+    public func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil) async throws -> ProviderSignInOutcome {
         try beginMutation(); defer { mutating = false }
         try requireEntry()
         guard credential.wellFormed else { throw SessionFailure.invalidResponse }
@@ -77,7 +95,24 @@ public actor SessionController {
         }
         guard !issued.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
         do {
-            return try await adopt(Credentials(accessToken: issued.accessToken, refreshToken: issued.refreshToken))
+            let snapshot = try await adopt(Credentials(accessToken: issued.accessToken, refreshToken: issued.refreshToken), method: credential.provider == .apple ? .apple : .google)
+            guard credential.provider == .apple else { return .init(session: snapshot, appleCapture: nil) }
+            guard snapshot.phase == .authenticated else {
+                let needsFreshCode = snapshot.phase == .credentialValidationRequired || snapshot.phase == .reauthenticationRequired
+                return .init(session: snapshot, appleCapture: needsFreshCode ? .freshAuthorizationRequired : nil)
+            }
+            let capture: AppleCaptureOutcome
+            if let appleAuthorizationCode {
+                do {
+                    try await captureAppleCode(appleAuthorizationCode, expectedIdentity: snapshot)
+                    capture = .saved
+                } catch {
+                    let failure = safe(error)
+                    capture = failure == .rejected(status: 400, code: "apple_authorization_invalid")
+                        ? .freshAuthorizationRequired : .failed(failure)
+                }
+            } else { capture = .freshAuthorizationRequired }
+            return .init(session: state, appleCapture: capture)
         } catch {
             // adopt() has journaled the issued session as pending; revoke it now so a
             // refused provider account doesn't leave the person on the sign-out screen.
@@ -86,12 +121,26 @@ public actor SessionController {
         }
     }
 
+    public func captureAppleAuthorizationCode(_ code: String, expectedIdentity: SessionSnapshot) async throws {
+        try beginMutation(); defer { mutating = false }
+        try await captureAppleCode(code, expectedIdentity: expectedIdentity)
+    }
+
+    private func captureAppleCode(_ code: String, expectedIdentity: SessionSnapshot) async throws {
+        guard !code.isEmpty, code.utf8.count <= 512, code.allSatisfy(\.isASCII) else {
+            throw SessionFailure.invalidResponse
+        }
+        guard sameIdentity(as: expectedIdentity) else { throw SessionFailure.staleOperation }
+        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/auth/apple/authorization-code"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoded(["authorization_code": code])
+        // The one-time code may have been consumed even when the response is uncertain.
+        _ = try await authenticatedResponse(using: activeAuth(), epoch: vault.epoch(), request: request, retryUnauthorized: false)
+    }
+
     public func profile() async throws -> SessionSnapshot {
-        guard !mutating else { throw SessionFailure.busy }
-        if try vault.pending() != nil { throw SessionFailure.pendingSignOut }
-        guard let session = try vault.session() else { throw SessionFailure.unauthorized }
-        guard !session.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
-        return try await loadProfile(using: activeAuth(), epoch: vault.epoch())
+        try await restore()
     }
 
     public func signOut() async throws -> SessionSnapshot {
@@ -126,9 +175,9 @@ public actor SessionController {
         }
         try vault.preflight()
     }
-    private func activeAuth() -> AuthClient {
+    private func activeAuth(adoptingMethod: SessionSignInMethod? = nil) -> AuthClient {
         if let auth { return auth }
-        let client = makeAuth(storage: EpochStorage(vault: vault, epoch: vault.epoch()), fetch: transport.sdkFetch(origin: configuration.supabaseURL))
+        let client = makeAuth(storage: EpochStorage(vault: vault, epoch: vault.epoch(), adoptingMethod: adoptingMethod), fetch: transport.sdkFetch(origin: configuration.supabaseURL))
         auth = client
         return client
     }
@@ -137,8 +186,8 @@ public actor SessionController {
                    headers: ["apikey": configuration.publicAnonKey], storageKey: "argus.session",
                    localStorage: storage, logger: nil, fetch: fetch, autoRefreshToken: false)
     }
-    private func setState(_ phase: SessionSnapshot.Phase, profile: SessionProfile? = nil) {
-        state = .init(phase: phase, profile: profile, revision: vault.epoch())
+    private func setState(_ phase: SessionSnapshot.Phase, profile: SessionProfile? = nil, appleIdentity: AppleIdentity? = nil) {
+        state = .init(phase: phase, profile: profile, revision: vault.epoch(), appleIdentity: appleIdentity)
     }
     private func endAccountEpoch(as phase: SessionSnapshot.Phase) {
         vault.retire()
@@ -164,7 +213,7 @@ public actor SessionController {
             return try JSONDecoder().decode(EntryResponse.self, from: data)
         } catch { throw safe(error) }
     }
-    private func adopt(_ credentials: Credentials) async throws -> SessionSnapshot {
+    private func adopt(_ credentials: Credentials, method: SessionSignInMethod) async throws -> SessionSnapshot {
         guard !credentials.accessToken.isEmpty, !credentials.refreshToken.isEmpty else { throw SessionFailure.invalidResponse }
         // Journal before SDK adoption: a crash or swallowed persistence error must not
         // leave an issued server session invisible to the next launch.
@@ -172,56 +221,114 @@ public actor SessionController {
         try vault.savePending(.init(accessToken: credentials.accessToken, refreshToken: credentials.refreshToken))
         endAccountEpoch(as: .signOutPending)
         let epoch = vault.epoch()
-        let client = activeAuth()
+        let client = activeAuth(adoptingMethod: method)
         do {
             let session = try await client.setSession(accessToken: credentials.accessToken, refreshToken: credentials.refreshToken)
             try vault.check(epoch)
             guard let stored = try vault.session(), stored.refreshToken == session.refreshToken else { throw SessionFailure.storageUnavailable }
             guard !session.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
-            let result = try await loadProfile(using: client, epoch: epoch)
+            _ = try await loadProfile(using: client, epoch: epoch, validateCredential: false)
             try vault.removePending()
-            return result
         } catch {
             try suspendUsableSession()
             throw safe(error)
         }
+        return try await validateAppleCredential(epoch: epoch)
     }
 
-    private func loadProfile(using client: AuthClient, epoch: UInt64) async throws -> SessionSnapshot {
+    private func loadProfile(using client: AuthClient, epoch: UInt64, validateCredential: Bool = true,
+                             onValidationRequired: @Sendable (SessionSnapshot) async -> Void = { _ in }) async throws -> SessionSnapshot {
+        let method = try vault.signInMethod()
+        if method == .apple || (method == nil && state.appleIdentity != nil) {
+            setState(.credentialValidationRequired)
+            await onValidationRequired(state)
+            try vault.check(epoch)
+        }
         let request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/me"))
-        let result = try await authenticatedResponse(using: client, epoch: epoch, request: request)
+        let result = try await authenticatedResponse(using: client, epoch: epoch, request: request, access: .validation)
         do {
-            struct ProfileEnvelope: Decodable { let user: SessionProfile }
-            let profile = try JSONDecoder().decode(ProfileEnvelope.self, from: result.0).user
-            guard UUID(uuidString: profile.id) == (try vault.session())?.user.id else {
+            struct ProfileEnvelope: Decodable {
+                let user: SessionProfile
+                let appleIdentity: AppleIdentity?
+                enum CodingKeys: String, CodingKey { case user; case appleIdentity = "apple_identity" }
+            }
+            let envelope = try JSONDecoder().decode(ProfileEnvelope.self, from: result.0)
+            guard UUID(uuidString: envelope.user.id) == (try vault.session())?.user.id else {
                 try suspendUsableSession()
                 throw SessionFailure.invalidResponse
             }
             try vault.check(epoch)
-            setState(.authenticated, profile: profile)
-            return state
+            setState(.credentialValidationRequired, profile: envelope.user, appleIdentity: envelope.appleIdentity)
+            if method == nil && envelope.appleIdentity != nil { await onValidationRequired(state) }
+            return validateCredential ? try await validateAppleCredential(epoch: epoch) : state
         } catch { throw safe(error) }
+    }
+
+    private func validateAppleCredential(epoch: UInt64) async throws -> SessionSnapshot {
+        try vault.check(epoch)
+        let method = try vault.signInMethod()
+        if method == nil && state.appleIdentity != nil || method == .apple && state.appleIdentity == nil {
+            setState(.reauthenticationRequired)
+            return state
+        }
+        if method == .apple, let identity = state.appleIdentity {
+            let answer: AppleCredentialState
+            do { answer = try await appleChecker.state(for: identity.subject) }
+            catch {
+                try vault.check(epoch)
+                return state
+            }
+            try vault.check(epoch)
+            switch answer {
+            case .authorized: break
+            case .transferred: return state
+            case .revoked, .notFound:
+                try suspendUsableSession()
+                return try await performPendingRevoke()
+            }
+        }
+        setState(.authenticated, profile: state.profile, appleIdentity: state.appleIdentity)
+        return state
+    }
+
+    private enum AuthenticatedAccess { case validated, validation }
+
+    private func checkAccess(_ access: AuthenticatedAccess, identity: SessionSnapshot) throws {
+        if access == .validation { return }
+        guard state.phase == .authenticated else { throw SessionFailure.credentialValidationRequired }
+        guard sameIdentity(as: identity) else { throw SessionFailure.staleOperation }
+    }
+
+    private func sameIdentity(as identity: SessionSnapshot) -> Bool {
+        state.phase == .authenticated && identity.phase == .authenticated
+            && state.revision == identity.revision && state.profile?.id == identity.profile?.id
     }
     /// Shared authenticated transport for /me and financial records. SDK owns
     /// refresh coalescing; this layer permits only one 401 refresh/retry.
     private func authenticatedResponse(using client: AuthClient, epoch: UInt64,
-                                       request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+                                       request: URLRequest, retryUnauthorized: Bool = true, access: AuthenticatedAccess = .validated) async throws -> (Data, HTTPURLResponse) {
         var retiring = false
+        let identity = state
         do {
+            try checkAccess(access, identity: identity)
             try vault.check(epoch)
             let session = try await client.session
             try vault.check(epoch)
+            try checkAccess(access, identity: identity)
             guard !session.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
             var authorized = request
             authorized.setValue("Bearer " + session.accessToken, forHTTPHeaderField: "Authorization")
             var result = try await transport.send(authorized, origin: configuration.argusAPIURL)
             try vault.check(epoch)
-            if result.1.statusCode == 401 {
+            try checkAccess(access, identity: identity)
+            if result.1.statusCode == 401 && retryUnauthorized {
                 let refreshed = try await client.refreshSession()
                 try vault.check(epoch)
+                try checkAccess(access, identity: identity)
                 authorized.setValue("Bearer " + refreshed.accessToken, forHTTPHeaderField: "Authorization")
                 result = try await transport.send(authorized, origin: configuration.argusAPIURL)
                 try vault.check(epoch)
+                try checkAccess(access, identity: identity)
             }
             guard result.1.statusCode != 401 else {
                 retiring = true
@@ -298,14 +405,15 @@ public actor SessionController {
         return state
     }
     private func problem(_ data: Data, status: Int) -> SessionFailure {
-        if status >= 500 { return .unavailable }
         struct Problem: Decodable { let code: String? }
         let raw = (try? JSONDecoder().decode(Problem.self, from: data))?.code
-        return .rejected(status: status, code: raw.flatMap(bounded))
+        let code = raw.flatMap(bounded)
+        if status >= 500 && code == nil { return .unavailable }
+        return .rejected(status: status, code: code)
     }
     /// Only a bounded identifier reaches UI, never arbitrary server detail.
     private func bounded(_ value: String) -> String? {
-        value.count <= 80 && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") } ? value : nil
+        !value.isEmpty && value.count <= 80 && value.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_") } ? value : nil
     }
     private func safe(_ error: any Error) -> SessionFailure {
         if let failure = error as? SessionFailure { return failure }

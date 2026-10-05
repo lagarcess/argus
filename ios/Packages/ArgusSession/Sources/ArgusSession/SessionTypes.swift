@@ -3,7 +3,7 @@ import Foundation
 /// Safe, bounded failures. Never includes server prose, passwords, tokens or SDK errors.
 public enum SessionFailure: Error, Equatable, Sendable {
     case busy, invalidConfiguration, invalidResponse, unauthorized, unavailable
-    case storageUnavailable, pendingSignOut, unsupportedAnonymousTransfer, staleOperation
+    case storageUnavailable, pendingSignOut, unsupportedAnonymousTransfer, staleOperation, credentialValidationRequired
     case rejected(status: Int, code: String?)
 }
 
@@ -15,16 +15,33 @@ public struct SessionProfile: Equatable, Sendable, Decodable {
     enum CodingKeys: String, CodingKey { case id, email, language; case displayName = "display_name" }
 }
 
+public struct AppleIdentity: Equatable, Sendable, Decodable {
+    public let subject: String
+}
+
+public enum AppleCredentialState: Sendable {
+    case authorized, revoked, notFound, transferred
+}
+
+public protocol AppleCredentialChecking: Sendable {
+    func state(for subject: String) async throws -> AppleCredentialState
+}
+
+struct UnavailableAppleCredentialChecker: AppleCredentialChecking {
+    func state(for subject: String) async throws -> AppleCredentialState { throw SessionFailure.unavailable }
+}
+
 public struct SessionSnapshot: Equatable, Sendable {
     public enum Phase: Equatable, Sendable {
-        case signedOut, authenticated, signOutPending, unsupportedAnonymousSession
+        case signedOut, authenticated, signOutPending, unsupportedAnonymousSession, credentialValidationRequired, reauthenticationRequired
     }
     public let phase: Phase
     public let profile: SessionProfile?
     public let revision: UInt64
+    public let appleIdentity: AppleIdentity?
     /// A snapshot names an identity; only `SessionController` can make one usable for requests.
-    public init(phase: Phase, profile: SessionProfile?, revision: UInt64) {
-        self.phase = phase; self.profile = profile; self.revision = revision
+    public init(phase: Phase, profile: SessionProfile?, revision: UInt64, appleIdentity: AppleIdentity? = nil) {
+        self.phase = phase; self.profile = profile; self.revision = revision; self.appleIdentity = appleIdentity
     }
 }
 

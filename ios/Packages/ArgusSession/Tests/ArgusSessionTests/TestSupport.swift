@@ -9,6 +9,7 @@ final class MemoryStore: AuthLocalStorage, @unchecked Sendable {
     var failWrites = false
     var failRemoves = false
     var failedWriteSuffix: String?
+    var failedReadSuffix: String?
     func store(key: String, value: Data) throws {
         lock.lock(); defer { lock.unlock() }
         if failWrites || failedWriteSuffix.map({ key.hasSuffix($0) }) == true { throw SessionFailure.storageUnavailable }
@@ -16,6 +17,7 @@ final class MemoryStore: AuthLocalStorage, @unchecked Sendable {
     }
     func retrieve(key: String) throws -> Data? {
         lock.lock(); defer { lock.unlock() }
+        if failedReadSuffix.map({ key.hasSuffix($0) }) == true { throw SessionFailure.storageUnavailable }
         return values[key]
     }
     func remove(key: String) throws {
@@ -41,6 +43,10 @@ actor RequestGate {
     func release() { released = true; releases.forEach { $0.resume() }; releases.removeAll() }
 }
 
+struct AuthorizedAppleChecker: AppleCredentialChecking {
+    func state(for subject: String) async throws -> AppleCredentialState { .authorized }
+}
+
 actor AuthServer {
     let alice = UUID()
     let bob = UUID()
@@ -61,6 +67,9 @@ actor AuthServer {
     var idTokenErrorCode = "bad_jwt"
     var anonymousIdToken = false
     var captureStatus = 204
+    var captureGate: RequestGate?
+    var captureCode: String?
+    var appleSubject: String?
 
     func configure(meStatuses: [Int] = [], logoutStatus: Int = 204, refreshStatus: Int = 200, refreshErrorCode: String = "refresh_token_not_found", mismatch: Bool = false, expired: Bool = false) {
         self.meStatuses = meStatuses
@@ -75,7 +84,9 @@ actor AuthServer {
         idTokenErrorCode = errorCode
         anonymousIdToken = anonymous
     }
-    func configureCapture(status: Int) { captureStatus = status }
+    func configureCapture(status: Int, code: String? = nil) { captureStatus = status; captureCode = code }
+    func holdCapture(_ gate: RequestGate) { captureGate = gate }
+    func configureApple(subject: String?) { appleSubject = subject }
     func holdMe(_ gate: RequestGate) { meGate = gate }
     func holdRefresh(_ gate: RequestGate) { refreshGate = gate }
     func count(_ suffix: String) -> Int { requests.filter { $0.url!.path.hasSuffix(suffix) }.count }
@@ -99,10 +110,12 @@ actor AuthServer {
                 return response(url, idTokenStatus, ["error_code": idTokenErrorCode, "msg": "Synthetic failure"])
             }
             let id = body["id_token"] as? String == Self.bobIdToken ? bob : alice
+            if body["provider"] as? String == "apple", appleSubject == nil { appleSubject = "canonical-apple-subject" }
             return response(url, 200, makeSession(id, anonymous: anonymousIdToken))
         }
         if path.hasSuffix("/auth/apple/authorization-code") {
-            return response(url, captureStatus, captureStatus == 204 ? [:] : ["code": "apple_token_capture_unavailable"])
+            if let captureGate { await captureGate.enter() }
+            return response(url, captureStatus, captureCode.map { ["code": $0] } ?? (captureStatus == 404 ? ["detail": "Not Found"] : [:]))
         }
         if path.hasSuffix("/token") {
             if let gate = refreshGate { await gate.enter() }
@@ -118,7 +131,9 @@ actor AuthServer {
             let id = mismatchedProfile ? bob : (accessUsers[bearer] ?? alice)
             if let gate = meGate { await gate.enter() }
             let status = meStatuses.isEmpty ? 200 : meStatuses.removeFirst()
-            return response(url, status, status == 200 ? ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": "Sample", "language": "en"]] : ["code": "unauthorized"])
+            var envelope: [String: Any] = ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": "Sample", "language": "en"]]
+            if let appleSubject { envelope["apple_identity"] = ["subject": appleSubject] }
+            return response(url, status, status == 200 ? envelope : ["code": "unauthorized"])
         }
         return response(url, 404, [:])
     }
@@ -158,8 +173,8 @@ struct SessionFixture {
     init() throws {
         configuration = try SessionConfiguration(argusAPIURL: URL(string: "https://api.example.test")!, supabaseURL: URL(string: "https://auth.example.test")!, publicAnonKey: "sb_publishable_test", keychainService: UUID().uuidString)
     }
-    func controller() throws -> SessionController {
-        try SessionController(configuration: configuration, storage: storage, fetch: { [server] in try await server.send($0) })
+    func controller(appleChecker: any AppleCredentialChecking = AuthorizedAppleChecker()) throws -> SessionController {
+        try SessionController(configuration: configuration, storage: storage, appleChecker: appleChecker, fetch: { [server] in try await server.send($0) })
     }
     func login(_ controller: SessionController, email: String = "alice@example.test") async throws -> SessionSnapshot {
         try await controller.login(email: email, password: "synthetic-password", captchaToken: "synthetic-captcha")
