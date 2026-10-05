@@ -38,6 +38,16 @@ final class NativeProviderAppearanceUITests: XCTestCase {
                         screenshot.name = name
                         screenshot.lifetime = .keepAlways
                         add(screenshot)
+                        let footerText = createAccount
+                            ? (language == "en" ? "Already have an account?" : "¿Ya tienes cuenta?")
+                            : (language == "en" ? "New here?" : "¿Primera vez aquí?")
+                        let footer = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", footerText)).firstMatch
+                        for _ in 0..<4 where !footer.isHittable { app.swipeUp() }
+                        XCTAssertTrue(footer.isHittable, name)
+                        let footerScreenshot = XCTAttachment(screenshot: app.screenshot())
+                        footerScreenshot.name = name + "-footer"
+                        footerScreenshot.lifetime = .keepAlways
+                        add(footerScreenshot)
                         app.terminate()
                     }
                 }

@@ -186,7 +186,7 @@ struct ConnectedCreateAccount: View {
                             .foregroundColor(.secondary)
                          + Text(signingIn ? (spanish ? "Crea una cuenta" : "Create an account")
                                : (spanish ? "Inicia sesión" : "Sign in"))
-                            .foregroundColor(WelcomePalette.pine).bold())
+                            .foregroundColor(.primary).bold())
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
                     }
