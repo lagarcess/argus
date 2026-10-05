@@ -90,7 +90,7 @@ verification recovery into business, runtime, migration or archive work.
 | Receipts and imports | Capture/review UI and durable draft foundations exist | Connect capture, save for later, reopen, prepare, correct, split, approve, and save through the same financial services. Prove persistence and sharing boundaries. Keep source/extraction enablement gates open until satisfied. |
 | Home, Search, Updates, moves | Designs and partial connected foundations exist | Complete the assigned history/projection, search-to-detail, account-move history, inbox, reminder, and private push paths. Show known zero only with confirmed coverage. Verify authorization, origin navigation, and event-driven data rather than fixtures. |
 | Cuadrao chat identity | Small presentation task remains | Discuss and settle the chat/menu-bar logo within the design system; implement and check accessibility when assigned. Do not make it a dependency of runtime architecture. |
-| Agentic Cuadrao | Product direction approved; runtime lane remains unimplemented | Discuss the first supported jobs, authorized context, read/write tools, confirmations, recovery, draft continuity, and evaluation. Compare reuse with changes to Argus orchestration. Produce the bounded runtime assignment before implementation; a different architecture is an open decision, not a conclusion. |
+| Agentic Cuadrao | Continuous-conversation direction and reuse baseline recorded; runtime lane remains unimplemented | [#826](https://github.com/lagarcess/argus/issues/826) defines the first jobs, space/context transitions, permitted memory, confirmations, durable-job recovery and evaluation under the [experience owner](argus-minimum-viable-ecosystem-experience.md#continuous-cuadrao-conversation) and [reuse decisions](../ARCHITECTURE.md#cuadrao-reuse-decisions). [#827](https://github.com/lagarcess/argus/issues/827) delivers only the approved contract. |
 | Privacy, Terms, and Apple readiness | Draft #781, consent/deletion presentation, and backend foundations exist | Reconcile actual data flows, permissions, retention, deletion, provider handling, manifests, published policies, and review access. Complete the release audit and connected acceptance before claiming external TestFlight readiness. |
 | Profile backend features | Full design retained in development; unfinished release entries gated | Keep the complete development experience. Persist avatar selections before restoring the connected release editor. Track other unfinished Profile backends after chat; the removal of email notifications remains permanent. |
 
@@ -102,20 +102,48 @@ Preserve useful Argus services and the existing single runtime until its separat
 assignment explicitly changes the architecture. No financial write follows from
 a hypothetical question or unapproved model output.
 
+All customer-journey issues use the [customer work removed](../PRIVATE_LAUNCH_RUNBOOK.md#customer-work-removed)
+acceptance questions. The [scope matrix issue](https://github.com/lagarcess/argus/issues/818)
+records each owner, baseline and completion evidence. Use the existing
+[consumer tracker](https://github.com/lagarcess/argus/issues/817); no second queue
+is created. Tool retirement must follow the architecture's reuse boundary.
+
 ### Parallel execution and priority
 
-1. Preserve the completed candidate review, test disposition and phone traces.
-   Close the remaining security and connected-device gates. These tracks can progress
-   together under separate ownership. One Mac scheduler owns native tests and
-   profiling so competing runs do not invalidate measurements.
-2. Discuss end-to-end onboarding and the first agentic chat jobs next. Keep the
-   logo task separate. Define shared service contracts before runtime work;
-   this roadmap does not require choosing a replacement framework in advance.
-3. Run privacy/policy reconciliation alongside those tracks. Close remaining
-   connected journeys through their existing owners before release acceptance.
-4. Assemble one connected candidate and complete physical-phone checks before
-   external TestFlight. Keep broader Liquid Glass adoption off the launch
-   critical path. Do not remove gestures or artwork to disguise lag.
+The [consumer launch tracker #817](https://github.com/lagarcess/argus/issues/817)
+owns the linked issue checklist. This table groups that same work, not a second
+queue. Leverage reflects dependencies and customer value, not an estimated date.
+Landed foundations above remain complete; none of these rows claims connected
+release acceptance. Scope selection does not silently remove approved journeys.
+
+| Pillar | Customer outcome and issues | Parallel work and true handoff | Launch leverage |
+| --- | --- | --- | --- |
+| Scope, spaces and money rules | A finite release; consistent ownership, permissions and currency. #818, #819, #820. | Scope and contract work first. Auth/security and service preparation can run alongside it. Serialize shared ownership, money and migration changes. | Highest dependency leverage: every connected reader and writer relies on these rules. |
+| Connected everyday money | Install, sign in, create accounts/plans, invite household members, correct records and split a receipt. #821, #822, #823, with #778 storage. | Prepare onboarding/capture UI in parallel. Connect and verify each journey as its shared contracts stabilize; receipts reuse the confirmed financial-write owner. | Highest customer leverage: one complete receipt-to-reviewed-expense journey proves the central loop. |
+| Continuous agentic chat | Resume work with scoped context and approved actions. #826, #827, with #828 consent. | Define the bounded contract alongside manual workflows. Implement against accepted financial actions and the shared consent owner; serialize runtime changes. | High, after shared actions exist. Reuse the [locked stack](../ARCHITECTURE.md#cuadrao-reuse-decisions); do not restart framework selection. |
+| Home, Search, Updates and Profile | See accurate summaries, find records, receive notices and reach honest account controls. #824, #825, #829. | Separate read/presentation owners can work in parallel after read/event contracts settle. Native navigation and shared state still have one writer. | High integration value; reuse canonical records and events instead of duplicating calculations. |
+| Trust, privacy and operations | Safe sign-in/deletion, permissions, consent, recovery and accurate policies. #800, #798, #805, #806, #811, #828, #831, #832. | Start applicability audits, policy evidence and existing fixes now. Coordinate auth/deletion/RLS edits with space migration. Final signoff follows actual included behavior. | High release leverage: early work avoids discovering launch blockers at the end. |
+| Service and distribution setup | Working credentials, app links, push, signing and reviewer access. #830; prepare #833/#834 materials. | Prepare alongside engineering; feature activation waits for its own verified gates and approval. Ask for founder-only account access early, in one batch. | High schedule leverage: external setup must not wait for the UI to finish. |
+| Combined acceptance and release | One working phone build, short TestFlight, then submission readiness. #784, #833, #834. | Test completed slices early. Serialize final candidate/device acceptance, beta exit and submission approval. One Mac scheduler owns tests and profiling. | Final sequence; preparation and focused checks run earlier. |
+
+Recommended first allocation: scope/space/money owner, identity/security owner,
+service/privacy preparation owner, and consumer-journey owner preparing the
+first complete loop. Chat-contract work can progress alongside that loop; it
+does not require all Home/Profile polish to finish. Split additional UI work
+only after its shared contracts and file ownership are clear.
+
+The main completion chain is scope and shared contracts -> connected money
+and receipt/chat journeys -> one accepted device candidate -> TestFlight exit
+-> submission approval. Trust and service work must join that chain before the
+relevant feature or distribution gate. Existing native GitHub prerequisites
+remain authoritative for specific issue closure; scheduling priority is not a
+new blocked-by relationship.
+
+Do not defer performance and accessibility to the last candidate. Check real
+journeys as they become available, preserve the artwork and gestures, and
+measure reported lag rather than removing interaction. Final acceptance still
+needs the actual connected phone build. Broader Liquid Glass adoption remains
+off the launch critical path.
 
 ### Release gates still open
 

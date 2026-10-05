@@ -456,3 +456,71 @@ Engineering's sequencing in the master plan's
 [§B2.3](cuadrao-master-plan.md#b23-mapping-today-onto-it-and-the-migration-path-proposed).
 The model itself, including business roles and the business retention rule,
 is still open for the founder.
+
+## October 4, 2026: constitution reconciliation
+
+After the source upload in [PR #835](https://github.com/lagarcess/argus/pull/835),
+the founder instructed the mobile lane to settle the conflicts using existing
+decisions and carry the principles into their canonical owners. The
+[reconciliation record](../research/cuadrao-constitution-2026-10-04/RECONCILIATION.md)
+records the dispositions; the [principles index](../research/cuadrao-constitution-2026-10-04/PRINCIPLES.md)
+links to the updated owners.
+
+This adopts the bounded principles and resolves conflicting documentation. It
+does not select unresolved business pricing, fiscal providers, the full space
+model, Gmail import or the Cuadrao agent architecture. The source originals stay
+unchanged. Feature catalog priorities do not add launch requirements, and this
+documentation authorization does not authorize runtime, deployment or provider work.
+
+## October 4, 2026: runtime reuse and customer work removed
+
+The founder clarified that Argus already uses Render Workflows for backtests and
+approved extending that foundation rather than evaluating it as a new platform.
+The subsequent alignment request records an ongoing Cuadrao conversation as the
+experience direction and requires the existing issues to measure customer work
+removed.
+
+The [architecture reuse map](../ARCHITECTURE.md#cuadrao-reuse-decisions),
+[continuous conversation requirements](argus-minimum-viable-ecosystem-experience.md#continuous-cuadrao-conversation)
+and [journey acceptance questions](../PRIVATE_LAUNCH_RUNBOOK.md#customer-work-removed)
+own the details. #826 still owns the bounded runtime contract before #827
+implementation. Reuse does not claim memory or voice is connected, choose a new
+schema, authorize paid evaluations or permit deletion of active Argus services.
+
+
+## October 4, 2026: continuous-chat stack and launch pillars
+
+The founder approved LangGraph, the existing Mem0/pgvector integration, scoped
+on-demand context injection and Render Workflows as the starting stack for
+Cuadrao's continuous agentic chat. The [architecture owner](../ARCHITECTURE.md#cuadrao-reuse-decisions)
+records the choice and corrects the earlier blanket pgvector deferral. Temporal
+and Inngest require a demonstrated workflow gap; Braintrust is optional quality
+tooling. Neither workflow selection nor memory retrieval changes the canonical
+owner of financial records or grants access across spaces.
+
+The founder also requested a complete launch breakdown and updates to missing
+issue acceptance. The [execution pillars](argus-execution-board.md#parallel-execution-and-priority)
+map the existing #817 checklist to parallel tracks and the final serial release
+sequence. #826 retains the bounded runtime contract; the foundation choice is
+settled, while exact first-release jobs and memory/voice inclusion remain in the
+scope record. This planning lock does not claim implementation or approve
+merges, hosted changes, paid evaluations or distribution.
+
+
+## October 4, 2026: recurring work, categories and Plan usefulness
+
+The founder approved the reviewed recurring, category, gesture and projection
+direction and explicitly chose expected-payment preparation with confirmation
+when paid. The [MVEE](argus-minimum-viable-ecosystem-experience.md#recurring-setup-upcoming-and-useful-scenarios)
+owns the recurring/Upcoming/scenario behavior and
+[category correction rules](argus-minimum-viable-ecosystem-experience.md#category-suggestions-and-useful-corrections).
+The [native design guide](../../.agent/designs/cuadrao/DESIGN.md#account-and-movement-actions-october-4-target)
+owns the revised account gestures and movement shortcuts.
+
+Implement these behaviors from Cuadrao's own requirements, contracts and tests.
+Midday is a research reference, not a source-rewrite assignment; rewording copied
+code is not independent implementation. Any proposed source reuse requires its
+own license review. Existing #818/#822/#823/#824 track the work. Pattern
+suggestions follow usable recurring setup; forecasting-library selection needs
+measured benefit. No runtime, provider, hosted activation or additional launch
+blocker is created by this documentation lock.

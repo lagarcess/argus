@@ -71,6 +71,74 @@ and only reconciliation confirmation through MoneyService writes financial activ
 Plan proposals grant no sharing or authority to change plan currency. No separate
 ledger, draft store, OCR vendor or conversational runtime is introduced.
 
+## Cuadrao action and integration principles
+
+These principles constrain future assigned Cuadrao contracts. They do not declare
+new APIs, business services or a replacement chat runtime implemented.
+
+Screens, chat, jobs and external tools use the same canonical record and action
+owners. A model can propose or explain an action. Validated domain services own
+financial calculations, authorization and durable writes.
+
+An approval applies to the reviewed revision, destination and action. Execution
+rechecks current permissions and rejects a changed basis. Duplicate delivery
+must not repeat a financial effect. An uncertain external result requires
+reconciliation before resubmission, not a blind retry. Endpoint payloads and
+idempotency behavior remain with the assigned [API contract](API_CONTRACT.md).
+
+Fiscal integration follows the [partner-first decision](specs/argus-decision-log.md#fiscal-route).
+Cuadrao-owned fiscal tooling remains a parallel direction. Canonical records and
+business rules stay independent of provider adapters, so replacing a provider
+does not replace the customer's records. This neither chooses the provider nor
+authorizes live fiscal issuance. Regulatory eligibility and signing authority
+need separate evidence for the selected route.
+
+The blueprint's entities, queues, MCP tools and runtime mechanisms remain
+proposals until their scoped technical contracts are approved. Its diagrams do
+not authorize another active chat brain or decide Cuadrao's future agent runtime.
+
+## Cuadrao reuse decisions
+
+Founder-aligned October 4, 2026. Reuse the existing foundations below. This is
+implementation direction, not proof of connected availability or permission to
+enable a provider. [#826](https://github.com/lagarcess/argus/issues/826) owns the
+bounded runtime contract and its migration plan.
+
+| Foundation | Direction | What remains to deliver |
+| --- | --- | --- |
+| Render Workflows | Extend the existing backtest execution foundation to assigned receipt, import and export jobs. | Separate task families, persisted product state, duplicate-safe effects, bounded retries and recovery after interruption. Document preparation currently uses FastAPI background tasks; this extension is not already delivered. |
+| LangGraph | Start from the existing orchestration and checkpointing foundation. | Define Cuadrao's state and action contract. Preserve the active Argus runtime until its authorized transition; do not start a second chat brain per client. |
+| Mem0 and pgvector | Reuse the existing semantic-recall integration; retain Supabase/Postgres as the storage foundation rather than adding a second memory database. | Define Cuadrao recall scope, consent, correction, revocation, deletion and first-release availability in #826. The current adapter configures pgvector and returns canonical record IDs; this is code evidence, not hosted enablement evidence. |
+| On-demand context injection | Retrieve the permitted records and memories needed for the current request. | Resolve retrieved IDs through current authorization and canonical records before model dispatch. Define bounded context selection and stale/deleted/revoked-result handling; similarity is not authority or financial truth. |
+| Supabase and financial services | Keep identity, storage and canonical financial operations under existing owners. | Complete the approved space contract and share the same actions across manual and conversational entry points. |
+| OpenRouter, Perplexity and Grok voice | Retain the [selected provider direction](specs/argus-decision-log.md#ai-providers). | Connect only assigned capabilities with shared consent and server-side credentials. Voice selection does not settle first-release inclusion. |
+| Resend and Apple push | Keep Resend for approved email uses; use direct APNs for iOS push. | Deliver the assigned inbox/push journey with private payloads. Email templates do not expand consumer Updates or household invitation channels. |
+
+React Email and react-pdf are candidates for their assigned template and business
+PDF work, not new consumer launch dependencies. Specialist OCR needs evidence of
+lower total correction effort and cost against the existing vision path.
+
+Founder-locked clarification, October 4: LangGraph, Mem0/pgvector, scoped
+on-demand context injection and Render Workflows are the starting stack for
+Cuadrao's continuous agentic chat. Temporal, Inngest, Trigger.dev and Novu are
+not additional launch dependencies. Evaluate a replacement or addition only
+against a demonstrated unmet requirement in the assigned slice, including
+recovery, approval waits or scheduling. Braintrust is optional evaluation and
+tracing tooling; quality evaluation remains required without selecting it.
+Reconcile any external trace content and retention before transmitting user data.
+This lock supersedes the earlier blanket pgvector deferral for Cuadrao memory;
+it does not authorize a general vector-search rewrite, provider activation or a
+new runtime. No library license or copied application-code rights are established
+by this reuse map.
+
+Retirement inventories describe old tasks and configuration, not blanket deletion
+of these foundations. Before removal, name current callers, the replacement
+owner, retained state and migration evidence. A retired backtest task does not
+retire Render Workflows; a retired chat route does not authorize deletion of
+checkpoints or memory infrastructure needed by its successor. Preserve current
+behavior until its authorized transition and verify secret consumers before
+revocation or renaming.
+
 ## Agent Quality Pillars
 
 The four assistant-quality pillars (Intelligence, Evaluation, Platform, User
@@ -156,9 +224,11 @@ API Control Plane (argus-api / FastAPI / Render)
 ---
 # 5. Frontend Architecture
 
-## Current Launch Surface
+## Existing Alpha web surface
 
-Web app / PWA.
+The existing Alpha runs as a web app / PWA. The
+[Cuadrao launch boundary](specs/argus-minimum-viable-ecosystem-experience.md#consumer-and-business-launch-boundary)
+owns the later consumer iPhone and business web direction.
 
 **Chosen because:**
 
@@ -840,12 +910,11 @@ Alpha search is implemented using **Postgres Full-Text Search (FTS)** + recency 
 
 ## Deferred Direction
 
-Semantic retrieval (Vector embeddings) is deferred from Alpha.
-- Use SQL/Text search first.
-- Re-evaluate semantic search for Beta.
-- Do not add pgvector or embedding tables for the launch chat/backtest branch.
-  Structured Supabase product records and run metadata are sufficient until
-  Argus needs semantic recall across large histories.
+The global Search surface retains SQL/text search. A vector-search replacement
+is not part of this launch assignment. This boundary does not prohibit reuse of
+the existing Mem0/pgvector adapter for scoped Cuadrao memory under the
+[reuse decision](#cuadrao-reuse-decisions). Memory recall and global Search have
+different owners and acceptance criteria.
 
 ## Structured Recall Versus Memory
 

@@ -29,6 +29,14 @@ Current delivered work, remaining scope and action authority live in the
 | How is work reviewed and released? | AGENTS.md, [CI/CD discipline](specs/private-alpha-ci-cd-sota.md), [launch runbook](PRIVATE_LAUNCH_RUNBOOK.md), [manifest template](release-manifests/TEMPLATE.md) | Existing evaluation, privacy, branch, merge, and deployment gates remain in force |
 | What evidence or thinking informed a direction? | Linked research and historical strategy docs | Inputs and provenance, not independent scope authority |
 
+## Constitution source material
+
+The [October 4 Cuadrao constitution package](research/cuadrao-constitution-2026-10-04/README.md)
+preserves three founder-supplied originals and the settled conflict dispositions.
+Its principles index links to the adopted rules in the existing canonical owners.
+The originals remain supporting input, including their superseded proposals.
+This package does not assign implementation or add launch gates.
+
 ## What is settled
 
 The MVEE is the single detailed owner of the approved ecosystem. Its section 1.1 locks the audience and near-term financial emphasis; section 12 includes partner invitations and personal/household views. Sections 3–5 define surfaces and information ingestion. Sections 8–9 distinguish boundaries and open decisions. Section 11 defines pain-point coverage and the reinforcing loop.

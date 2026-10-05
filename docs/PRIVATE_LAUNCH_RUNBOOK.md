@@ -20,6 +20,53 @@
 
 This runbook is for the first trusted-user internet tests on Render.
 
+## Cuadrao capability acceptance
+
+For an assigned Cuadrao capability, use the selected user journey to define its
+acceptance evidence. The [consumer launch boundary](specs/argus-minimum-viable-ecosystem-experience.md#consumer-and-business-launch-boundary)
+and existing release gates still apply. The constitution's feature catalog does
+not add a fiscal, business or connector prerequisite to every release.
+
+### Customer work removed
+
+Each in-scope customer journey answers these questions in its issue:
+
+1. What job does it finish?
+2. What trusted records does it use or create?
+3. Who is allowed to do it?
+4. What happens when it is wrong or fails?
+5. How will we know it worked?
+
+Record the work the customer does today and the work left after the feature.
+Use realistic samples to measure completion, active review time, fields corrected,
+manual re-entry and successful recovery where applicable. Agree the relevant
+thresholds from a baseline; do not invent a universal target or waive correctness
+and authorization to reduce taps. Test data is labeled as such.
+
+For receipts, the outcome is a confirmed expense with retrievable source evidence,
+not successful OCR alone. Evaluate capture through review, confirmation, relaunch
+and correction. Automatic preparation does not replace explicit confirmation of
+financial writes under the current policy.
+
+### Journey evidence
+
+Record the following in the assigned issue and release evidence:
+
+- The actor, space, source records, confirmed effect and path back to the evidence.
+- The applicable failure and recovery cases, including duplicate submission,
+  interruption, missing data, changed permissions and corrections.
+- The exact candidate, environment and observations. Distinguish fixture tests,
+  connected physical-device journeys and live-provider checks. One does not
+  substitute for another.
+- Relevant measures of correctness, user correction effort, latency and cost.
+  Set numeric thresholds from an agreed baseline and the selected workflow.
+  Low latency does not excuse incorrect money or unauthorized access.
+
+Apply fiscal issuance, provider settlement and other specialist checks when that
+capability is in scope. Mark an inapplicable check with the reason. This does not
+waive an existing mandatory security, privacy or release gate. Regulatory and
+vendor claims from research need current evidence before a release relies on them.
+
 ## Launch URLs
 
 - App: `https://arguschat.ai`
