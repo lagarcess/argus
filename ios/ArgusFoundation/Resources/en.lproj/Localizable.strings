@@ -827,3 +827,13 @@
 "sharedPlan.departureNotice" = "When you leave, your shared plans become archived and read-only for people who still have access. History and linked contributions are retained. Future projections stop; your private accounts are not transferred.";
 "sharedPlan.monthResponsibility" = "Agreements apply to the same budget month.";
 "sharedPlan.noAccounts" = "A budget or debt payment needs your recorded accounts. A goal or bill may start without an account; Argus will check the currency.";
+
+"auth.apple.capture.title" = "You are signed in";
+"auth.apple.capture.fresh" = "Apple authorization was not saved. Account deletion will require a fresh Apple authorization.";
+"auth.apple.capture.failed" = "Your Apple authorization could not be saved. You are signed in, but account deletion will require a fresh Apple authorization.";
+"auth.apple.capture.dismiss" = "OK";
+
+"auth.apple.validation.title" = "Verify your session";
+"auth.apple.validation.detail" = "Apple authorization needs to be checked before you can continue. Try again when you have a connection.";
+"auth.apple.signInAgain.detail" = "Sign out and sign in again to verify how this session was started.";
+"auth.apple.signInAgain.action" = "Sign out and sign in again";

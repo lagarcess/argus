@@ -41,8 +41,8 @@ If Argus refuses the new session (for example the private-alpha allowlist at
 Provider 4xx errors surface as `rejected` with a bounded code, 5xx as
 `unavailable`. `captureAppleAuthorizationCode` posts Apple's one-time code to
 `POST /api/v1/auth/apple/authorization-code` for revocation at account deletion;
-the composite sign-in awaits one ordinary attempt. Capture failure preserves the
-accepted session and produces a visible result; a consumed code is never replayed. The server answers a plain 404 while capture is off and
+the composite sign-in awaits one ordinary attempt. Capture produces a separate visible
+result while ordinary session invalidation rules still apply; a consumed code is never replayed. The server answers a plain 404 while capture is off and
 `409 apple_identity_mismatch` when the code belongs to another Apple ID.
 
 ## Credential and error behavior
@@ -167,7 +167,7 @@ the existing journal before ordinary sign-in establishes the method. Interrupted
 or failed revocation remains pending; no provider is chosen automatically.
 
 Apple code capture is awaited after successful adoption. Its outcome is separate
-from sign-in and visible to the person. Each supplied code receives one request;
+from sign-in and visible to the person. Each supplied code receives at most one request;
 401, uncertain transport failure and server failure never replay that code.
 A later attempt requires fresh Apple authorization. Capture does not initialize
 a name or link accounts.

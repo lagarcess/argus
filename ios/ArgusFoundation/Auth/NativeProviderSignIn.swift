@@ -167,3 +167,21 @@ struct ConnectedProviderButtons: View {
     }
     #endif
 }
+
+
+struct NativeAppleCredentialChecker: AppleCredentialChecking {
+    func state(for subject: String) async throws -> AppleCredentialState {
+        try await withCheckedThrowingContinuation { continuation in
+            ASAuthorizationAppleIDProvider().getCredentialState(forUserID: subject) { state, error in
+                if error != nil { continuation.resume(throwing: SessionFailure.unavailable); return }
+                switch state {
+                case .authorized: continuation.resume(returning: .authorized)
+                case .revoked: continuation.resume(returning: .revoked)
+                case .notFound: continuation.resume(returning: .notFound)
+                case .transferred: continuation.resume(returning: .transferred)
+                @unknown default: continuation.resume(throwing: SessionFailure.unavailable)
+                }
+            }
+        }
+    }
+}

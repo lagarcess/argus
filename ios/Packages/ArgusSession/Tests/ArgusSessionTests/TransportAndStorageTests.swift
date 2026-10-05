@@ -89,7 +89,6 @@ final class TransportAndStorageTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(try vault.signInMethod(), .apple)
         try backing.store(key: prefix + ".session", value: JSONEncoder().encode(olderSession))
         XCTAssertNil(try vault.signInMethod())
-        // The same adapter retains its initial grant method across refreshes.
         try storage.store(key: "argus.session", value: raw)
         XCTAssertNil(try vault.signInMethod())
     }
