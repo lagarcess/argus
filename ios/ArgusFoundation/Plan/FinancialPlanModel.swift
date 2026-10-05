@@ -5,6 +5,8 @@ import ArgusSession
 final class FinancialPlanModel: ObservableObject {
     @Published var section = PlanSection.overview
     @Published private(set) var projection: FinancialPlanProjection?
+    /// Home's rolling window: the server default horizon, never Plan's chosen end date.
+    @Published private(set) var homeProjection: FinancialPlanProjection?
     @Published private(set) var loading = false
     @Published private(set) var saving = false
     @Published private(set) var loadingDetails = false
@@ -32,7 +34,7 @@ final class FinancialPlanModel: ObservableObject {
         generation = UUID(); request = UUID(); detailRequest = UUID()
         identity = snapshot?.phase == .authenticated ? snapshot : nil
         section = .overview
-        projection = nil; draft = nil; selectedOccurrence = nil; candidates = []; linkedActivity = nil
+        projection = nil; homeProjection = nil; draft = nil; selectedOccurrence = nil; candidates = []; linkedActivity = nil
         endDate = nil; afterOccurrence = nil; loading = false; loadingDetails = false; saving = false; errorKey = nil
     }
 
@@ -44,8 +46,9 @@ final class FinancialPlanModel: ObservableObject {
         defer { if generation == ticket, request == query { loading = false } }
         do {
             let next = try await controller.financialPlan(endDate: endDate, expectedIdentity: identity)
+            let upcoming = endDate == nil ? next : try await controller.financialPlan(endDate: nil, expectedIdentity: identity)
             guard generation == ticket, request == query else { return }
-            projection = next
+            projection = next; homeProjection = upcoming
             loop.acceptPlanHome(next.home)
             await loop.budgets.refreshIfOpen()
             await loop.goals.refreshIfOpen()
@@ -64,6 +67,17 @@ final class FinancialPlanModel: ObservableObject {
     func edit(_ expectation: FinancialExpectation) {
         guard loop.pendingConfirmation == nil else { return }
         errorKey = nil; draft = FinancialExpectationDraft(expectation: expectation)
+    }
+
+    /// Prefills a review form from a recorded income or expense. The movement stays untouched.
+    func prepareRecurring(from activity: FinancialActivityDetail) {
+        guard loop.pendingConfirmation == nil else { return }
+        let today = (homeProjection ?? projection)?.startDate
+            ?? FinancialRecurrence.calendarDay(of: ISO8601DateFormatter().string(from: Date()), timeZone: activity.timeZone)
+        let fallback = activity.categoryId.map { NSLocalizedString("loop.category." + $0, comment: "") }
+            ?? NSLocalizedString("loop.kind." + activity.kind.rawValue, comment: "")
+        guard let today, let seed = FinancialExpectationSeed(activity: activity, accounts: accounts.accounts, today: today, fallbackTitle: fallback) else { return }
+        errorKey = nil; draft = FinancialExpectationDraft(seed: seed)
     }
 
     func save(locale: Locale) async {
@@ -188,6 +202,7 @@ final class FinancialPlanModel: ObservableObject {
 final class FinancialExpectationDraft: ObservableObject, Identifiable {
     let id = UUID()
     let existing: FinancialExpectation?
+    let seededFromActivity: Bool
     @Published var kind: FinancialExpectationKind = .bill
     @Published var title = ""
     @Published var currency: String
@@ -202,12 +217,21 @@ final class FinancialExpectationDraft: ObservableObject, Identifiable {
     @Published var effectiveDate: Date
 
     init(startDate: String, currency: String) {
-        existing = nil; self.currency = currency
+        existing = nil; seededFromActivity = false; self.currency = currency
         let start = PlanPresentation.date(startDate)
         date = start; end = start; effectiveDate = start
     }
+    init(seed: FinancialExpectationSeed) {
+        existing = nil; seededFromActivity = true
+        kind = seed.kind; title = seed.title; currency = seed.currency
+        amount = AccountPresentation.amount(seed.amount, locale: .current); accountId = seed.accountId
+        cadence = seed.cadence; firstMonthDay = seed.monthDay
+        let start = PlanPresentation.date(seed.startDate)
+        date = start; end = start; effectiveDate = start
+    }
     init(expectation: FinancialExpectation) {
-        existing = expectation; kind = expectation.kind; title = expectation.title; currency = expectation.currency
+        existing = expectation; seededFromActivity = false
+        kind = expectation.kind; title = expectation.title; currency = expectation.currency
         amount = AccountPresentation.amount(expectation.amount, locale: .current); accountId = expectation.accountId
         date = PlanPresentation.date(expectation.schedule.startDate); cadence = expectation.schedule.cadence
         firstMonthDay = expectation.schedule.monthDays.first ?? PlanPresentation.monthDay(expectation.schedule.startDate)

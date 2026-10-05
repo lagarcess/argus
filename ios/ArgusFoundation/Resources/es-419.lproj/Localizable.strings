@@ -215,6 +215,9 @@
 "loop.check.missing" = "Si conoces el gasto que falta, cancela y regístralo primero.";
 "loop.correction.title" = "Corregir registro";
 "loop.activity.title" = "Detalles de actividad";
+"loop.activity.repeat" = "Configurar como recurrente";
+"loop.activity.repeat.hint" = "Prepara un pago o ingreso esperado para revisar. El movimiento no cambia.";
+"plan.fromActivity.hint" = "Preparado a partir de un movimiento registrado. Revisa el monto, cada cuánto se repite y la próxima fecha. El movimiento original no cambia y guardar no registra un pago.";
 "loop.amount" = "Monto";
 "loop.date" = "Fecha";
 "loop.note" = "Nota (opcional)";
