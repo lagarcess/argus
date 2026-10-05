@@ -7,28 +7,24 @@ struct ConnectedCuadraoSpaces: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if model.isAvailable {
-                HStack(spacing: 4) {
-                    HStack(spacing: 24) {
-                        Button("household.personal") { Task { await model.select(nil) } }
-                            .font(.subheadline.weight(model.active ? .regular : .semibold))
-                            .foregroundStyle(model.active ? Color.secondary : Color.primary)
-                            .frame(minHeight: 44).accessibilityIdentifier("household.personal")
-                        Menu {
-                            ForEach(model.households) { item in
-                                Button(item.name ?? NSLocalizedString("household.title", comment: "")) {
-                                    Task { await model.select(item.id) }
-                                }.accessibilityIdentifier("household.select." + item.id.uuidString)
-                            }
-                            Button("household.manage") { model.showManagement = true }
-                        } label: {
-                            Text("household.title").font(.subheadline.weight(model.active ? .semibold : .regular))
-                                .foregroundStyle(model.active ? Color.primary : Color.secondary).frame(minHeight: 44)
-                        }.accessibilityIdentifier("household.selector")
-                    }
-                    Spacer(minLength: 8)
-                    CuadraoSectionAddButton(title: NSLocalizedString("household.manage", comment: "")) {
-                        Task { await model.select(nil); if model.isAvailable { model.showManagement = true } }
-                    }.accessibilityIdentifier("household.add")
+                CuadraoSpaceSelectorLayout(selection: model.active ? "household" : "personal",
+                    addTitle: NSLocalizedString("household.manage", comment: ""), addIdentifier: "household.add",
+                    add: { Task { await model.select(nil); if model.isAvailable { model.showManagement = true } } }) {
+                    Button { Task { await model.select(nil) } } label: {
+                        CuadraoSpaceLabel(title: NSLocalizedString("household.personal", comment: ""), selected: !model.active)
+                    }.id("personal").accessibilityIdentifier("household.personal")
+                        .accessibilityAddTraits(model.active ? [] : [.isSelected])
+                    Menu {
+                        ForEach(model.households) { item in
+                            Button(item.name ?? NSLocalizedString("household.title", comment: "")) {
+                                Task { await model.select(item.id) }
+                            }.accessibilityIdentifier("household.select." + item.id.uuidString)
+                        }
+                        Button("household.manage") { model.showManagement = true }
+                    } label: {
+                        CuadraoSpaceLabel(title: NSLocalizedString("household.title", comment: ""), selected: model.active)
+                    }.id("household").accessibilityIdentifier("household.selector")
+                        .accessibilityAddTraits(model.active ? [.isSelected] : [])
                 }.buttonStyle(.plain)
                 if model.errorKey == "household.accessEnded" {
                     Text("household.accessEnded").font(.caption).accessibilityIdentifier("household.accessEnded")
