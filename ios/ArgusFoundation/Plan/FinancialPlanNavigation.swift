@@ -1,6 +1,5 @@
 import SwiftUI
 
-// The models own the saved route. These hosts only choose its existing stack.
 enum FinancialPlanHost: Equatable {
     case home, plan, search
 
