@@ -121,6 +121,12 @@ def test_apple_upsert_replaces_the_old_fingerprint(credential_owner, fingerprint
 
 def test_apple_recapture_passes_the_new_key_to_postgres(credential_owner):
     pool, user_id = credential_owner
+    with pool.connection() as connection:
+        connection.execute(
+            "insert into auth.identities(id,user_id,provider,provider_id,identity_data) "
+            "values(%s,%s,'apple',%s,%s)",
+            (uuid4(), user_id, apple.SUBJECT, Jsonb({"sub": apple.SUBJECT})),
+        )
     repository = PostgresAppleCredentialRepository(pool)
     signing_key = apple.generated_key()
     endpoint = apple.FakeApple(public_key=signing_key.public_key())
@@ -139,13 +145,13 @@ def test_apple_recapture_passes_the_new_key_to_postgres(credential_owner):
         try:
             service.capture(
                 user_id=user_id,
-                apple_subject=apple.SUBJECT,
                 authorization_code=f"synthetic-code-{index}",
             )
         finally:
             service.close()
         stored = repository.get(user_id=user_id)
         assert stored.key_id == key.key_id
+        assert stored.apple_subject == apple.SUBJECT
         assert (
             key.open(
                 stored.secret_ciphertext, source="apple_sign_in", connection_id=user_id
