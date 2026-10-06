@@ -34,8 +34,8 @@ struct ConnectedCuadraoAuthFlow: View {
                 .environmentObject(auth)
         }
         .tint(WelcomePalette.pine)
-        .foregroundStyle(Color(white: 0.08))
-        .background(Color.white.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
+        .background(WelcomePalette.background.ignoresSafeArea())
     }
 
     private var welcome: some View {
@@ -61,7 +61,7 @@ struct ConnectedCuadraoAuthFlow: View {
                             Text(spanish ? "Crear cuenta" : "Create account")
                                 .font(.system(.body, weight: .semibold))
                                 .frame(maxWidth: .infinity, minHeight: 56)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(WelcomePalette.onAccent)
                                 .background(WelcomePalette.pine, in: RoundedRectangle(cornerRadius: 16))
                         }.buttonStyle(.plain)
                         .accessibilityIdentifier("cuadrao.welcome.signup")
@@ -73,7 +73,7 @@ struct ConnectedCuadraoAuthFlow: View {
                                 .frame(maxWidth: .infinity, minHeight: 56)
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color(white: 0.80), lineWidth: 1)
+                                        .stroke(WelcomePalette.border, lineWidth: 1)
                                 }
                                 .contentShape(Rectangle())
                         }.buttonStyle(.plain)
@@ -84,7 +84,7 @@ struct ConnectedCuadraoAuthFlow: View {
                 .frame(minHeight: geometry.size.height, alignment: .topLeading)
             }.scrollIndicators(.hidden)
         }
-        .background(Color.white.ignoresSafeArea())
+        .background(WelcomePalette.background.ignoresSafeArea())
     }
 
     private var pendingSignOut: some View {
@@ -103,7 +103,7 @@ struct ConnectedCuadraoAuthFlow: View {
         }
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.white.ignoresSafeArea())
+        .background(WelcomePalette.background.ignoresSafeArea())
     }
 
     private func authNotice(title: String, detail: String) -> some View {
@@ -113,7 +113,7 @@ struct ConnectedCuadraoAuthFlow: View {
         }
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.white.ignoresSafeArea())
+        .background(WelcomePalette.background.ignoresSafeArea())
     }
 }
 
@@ -151,7 +151,7 @@ struct ConnectedCreateAccount: View {
                             .frame(maxWidth: .infinity, minHeight: 56)
                             .overlay {
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color(white: 0.80), lineWidth: 1)
+                                    .stroke(WelcomePalette.border, lineWidth: 1)
                             }
                             .contentShape(RoundedRectangle(cornerRadius: 16))
                     }
@@ -186,7 +186,7 @@ struct ConnectedCreateAccount: View {
                             .foregroundColor(.secondary)
                          + Text(signingIn ? (spanish ? "Crea una cuenta" : "Create an account")
                                : (spanish ? "Inicia sesión" : "Sign in"))
-                            .foregroundColor(.primary).bold())
+                            .foregroundColor(WelcomePalette.pine).bold())
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, minHeight: 48).contentShape(Rectangle())
                     }
@@ -200,8 +200,8 @@ struct ConnectedCreateAccount: View {
             }
             .scrollIndicators(.hidden)
         }
-        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
-        .foregroundStyle(Color.primary)
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -265,10 +265,10 @@ struct ConnectedEmailSignIn: View {
             .accessibilityLabel(Text("auth.signIn"))
             .accessibilityIdentifier("auth.submit")
             .padding(.horizontal, 28).padding(.top, 16).padding(.bottom, 20)
-            .background(Color.white)
+            .background(WelcomePalette.background)
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
         .navigationTitle("").navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .onChange(of: focus) { old, _ in if old == .email { emailEdited = true } }
@@ -463,10 +463,10 @@ struct ConnectedEmailRegistration: View {
                 .padding(.horizontal, 28)
                 .padding(.top, 16)
                 .padding(.bottom, 20)
-                .background(Color.white)
+                .background(WelcomePalette.background)
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
@@ -636,7 +636,7 @@ struct ConnectedEmailConfirmation: View {
                         Text(spanish ? "Ir a iniciar sesión" : "Go to sign in")
                             .font(.body.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 56)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(WelcomePalette.onAccent)
                             .background(WelcomePalette.pine, in: RoundedRectangle(cornerRadius: 16))
                     }.buttonStyle(.plain)
                 }
@@ -646,8 +646,8 @@ struct ConnectedEmailConfirmation: View {
                 .frame(minHeight: geometry.size.height, alignment: .topLeading)
             }
         }
-        .background(Color.white.ignoresSafeArea())
-        .foregroundStyle(Color(white: 0.08))
+        .background(WelcomePalette.background.ignoresSafeArea())
+        .foregroundStyle(WelcomePalette.ink)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
