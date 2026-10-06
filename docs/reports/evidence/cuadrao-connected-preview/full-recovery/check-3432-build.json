@@ -1,0 +1,18 @@
+{
+  "source": "0a512315142c8d59b71146b0e24e1848072634e2",
+  "bundle": "local.argus.founder.47R3855RTJ",
+  "display_name": "Cuadrao Check",
+  "version": "3432",
+  "privacy_manifest": true,
+  "signature_verified": true,
+  "release_build": "passed",
+  "release_source": "0a512315142c8d59b71146b0e24e1848072634e2",
+  "phone_api_profile_status": 200,
+  "phone_api_accounts_status": 200,
+  "phone_install": "blocked: CoreDevice4016, phone not available",
+  "preview": "untouched; separate bundle local.cuadrao.design.47R3855RTJ",
+  "remaining": [
+    "iOS26.5 Budget, Debt and Goal journeys running",
+    "Physical Check installation and acceptance"
+  ]
+}

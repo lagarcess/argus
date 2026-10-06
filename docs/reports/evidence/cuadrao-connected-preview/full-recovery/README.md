@@ -13,7 +13,8 @@ or physical-device acceptance claim.
 | Original integration base | `875de09ac2115acec42e09060b92878aa5f18eff` |
 | Integration used for this recovery | `7018e0edebbc370b999005a857230bf3c3a1ad8b` |
 | One-way reconciliation merge | `9b85a4a1329d1cdcaf574f71f325993420bf3eb9` |
-| Latest integration | `2b2d0d9e8ed311c11b7585fbd757fb37f915e12f` |
+| Latest integration | `70b0cd3891937f026900aceb96ce5f556c76b0b3` |
+| Privacy reconciliation merge | `0a512315142c8d59b71146b0e24e1848072634e2` |
 | Currency reconciliation merge | `2808ae2c1` |
 | First full-shell checkpoint | `e6b7cf325187f0c717634ab750cc258025bbf9a9` |
 | Linked Plan detail recovery | `ba8c9e4f1` |
@@ -36,6 +37,16 @@ backend code is retained unchanged. The approved Preferences currency row now
 reads that server-owned value and calls the existing setter. It shows save errors
 and is disabled during a write. The separate old Profile layout is not restored.
 PR #863 changes a canary fixture and has no native interface overlap.
+
+The final one-way reconciliation at `0a512315142c8d59b71146b0e24e1848072634e2`
+retains integration through `70b0cd3891937f026900aceb96ce5f556c76b0b3`.
+The only new native file is the required-reason privacy manifest from #849.
+Apple deletion admission, first-name initialization and personless analytics
+work retain their backend owners and existing flag boundaries. There are no
+changes to the recovered financial models, presentation, migration ownership
+or native routes. Prior financial and interface evidence is retained. The
+combined modularity budget passes. This is branch reconciliation, not an
+integration merge or hosted migration.
 
 ## One presentation, existing record owners
 
@@ -66,8 +77,8 @@ backend coverage. The connected journeys below provide that separate evidence.
 The first comparison covers Home, Plan, Chat, Search and Profile in Spanish,
 light and dark, plus expanded balance, Updates, Household and linked Plan detail in Spanish light.
 [The comparison file](preview-comparison.json) records dimensions, comparison
-regions, and unrounded differences. Eleven of fourteen captures are pixel-identical
-inside the comparison region. Home light, expanded balance, and Updates have
+regions, and unrounded differences. Ten of fourteen captures are pixel-identical
+inside the comparison region. Home light, expanded balance, Updates and linked Plan detail have
 small differences and are not described as exact matches. System status and
 home-indicator regions are excluded.
 
@@ -83,7 +94,9 @@ home-indicator regions are excluded.
 
 These first captures cover application source at `e6b7cf325`. Its later
 accessibility identifier changes do not change those view layouts. The linked
-Plan detail capture at `2f243fac2` is also pixel-identical within that region.
+Plan detail capture at `2f243fac2` preserves the approved layout. Its measured
+mean absolute RGB difference is 0.00729 on the 0–255 scale, so it is not called
+pixel-identical.
 
 ## Connected verification
 
@@ -168,8 +181,19 @@ Chat, Profile, Search, Updates and recurring journeys, with each source revision
 
 The pure balance checks passed 20 connected cases and 82 existing history cases.
 The application compiled, including test products. The shared modularity budget
-passed after one-way reconciliation. Final Release compilation, linked-detail
-checks, Household permission checks and physical-phone acceptance remain open.
+passed after one-way reconciliation. Release compilation and signed Check3432
+compilation passed at `0a512315142c8d59b71146b0e24e1848072634e2`. The signature,
+bundle identity, build number and embedded privacy manifest were read back from
+the actual app bundle. The build used the direct iPhone target with IDE indexing
+disabled after Xcode's generic destination resolution failed. This affects the
+local build command, not app source.
+
+The local phone API was restarted from this reconciled source without resetting
+its database or Auth. Existing synthetic sign-in, `/me` and financial-account
+reads passed. Installation returned CoreDevice4016 because the physical phone
+was unavailable. No installation or phone-acceptance claim is made. Three full
+Budget, Debt and Goal journeys are running on the owned iOS26.5 fallback simulator.
+[Build readback](check-3432-build.json) records the current delivery state.
 
 ## Review and delivery
 
@@ -249,7 +273,8 @@ fixture evidence remain the reference.
 
 Lucas returned with the physical phone during verification. The trust and privacy
 lane was informed that this lane owns the next Check install and review. The
-phone is available; installation still waits for the affected simulator checks.
+phone was reachable initially, then became unavailable during installation.
+An unlock/reconnect request is pending while simulator verification continues.
 
 Automatic approval review previously rejected creation of a new draft PR.
 No alternative PR-creation route has been used. Publication and device evidence
