@@ -771,6 +771,8 @@
 "sharedPlan.history" = "Ver historial";
 "sharedPlan.restore" = "Restaurar plan";
 "sharedPlan.archive" = "Archivar plan";
+"sharedPlan.archive.confirm" = "¿Dejamos este plan en pausa?";
+"sharedPlan.archive.body" = "Podrás retomarlo desde Archivados. Su progreso se conserva.";
 "sharedPlan.original" = "Ver movimiento original";
 "sharedPlan.release" = "Quitar vínculo";
 "sharedPlan.purpose.funding" = "Financiar el plan";

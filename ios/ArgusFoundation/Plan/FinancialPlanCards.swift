@@ -7,6 +7,7 @@ struct FinancialPlanCards: View {
     let projection: FinancialPlanProjection
     let create: () -> Void
     var bottomSpace: CGFloat = 90
+    @State private var archiving: FinancialPlanCardItem?
     @Environment(\.locale) private var locale
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var items: [FinancialPlanCardItem] { FinancialPlanCardItem.items(in: projection).filter { !$0.archived } }
@@ -14,15 +15,34 @@ struct FinancialPlanCards: View {
     var body: some View {
         CuadraoPlanCollection(spanish: spanish, isEmpty: items.isEmpty,
             canCreate: loop.pendingConfirmation == nil && !model.saving, create: create) {
-            ForEach(items) { item in
-                Button { Task { await item.open(in: loop) } } label: {
-                    CuadraoPlanCard(display: item.display(locale: locale))
-                }.buttonStyle(.plain).accessibilityIdentifier("plan.card." + item.id)
-            }
+            VStack(spacing: 18) {
+                ForEach(items) { item in
+                    ConnectedSwipeRow(leading: actions(item, edge: .leading), trailing: actions(item, edge: .trailing)) {
+                        Button { Task { await item.open(in: loop) } } label: {
+                            CuadraoPlanCard(display: item.display(locale: locale))
+                        }.buttonStyle(.plain).accessibilityIdentifier("plan.card." + item.id)
+                    }
+                }
+            }.connectedSwipeContainer()
         } archives: {
             CuadraoPlanArchiveLink(spanish: spanish) {
                 FinancialArchivedPlans(model: model, loop: loop, bottomSpace: bottomSpace)
             }
+        }
+        .confirmationDialog(archiving?.archiveCopy.title ?? "", isPresented: Binding(get: { archiving != nil }, set: { if !$0 { archiving = nil } }),
+            titleVisibility: .visible, presenting: archiving) { item in
+            Button(item.archiveCopy.confirm, role: item.archiveCopy.role) { Task { await item.archive(in: loop) } }
+            Button("accounts.cancel", role: .cancel) {}
+        } message: { item in Text(item.archiveCopy.message) }
+    }
+
+    private func actions(_ item: FinancialPlanCardItem, edge: HorizontalEdge) -> [ConnectedSwipeAction] {
+        guard loop.pendingConfirmation == nil, !model.saving else { return [] }
+        switch edge {
+        case .leading:
+            return [.init(id: "plan.swipe.edit", title: spanish ? "Editar" : "Edit", symbol: "pencil", tint: .blue) { Task { await item.edit(in: loop) } }]
+        case .trailing:
+            return [.init(id: "plan.swipe.archive", title: spanish ? "Archivar" : "Archive", symbol: "archivebox", tint: .orange) { archiving = item }]
         }
     }
 }
@@ -95,6 +115,27 @@ private enum FinancialPlanCardItem: Identifiable {
         case .goal(let item): await loop.goals.open(item.id, origin: .planOverview)
         case .budget(let item): await loop.budgets.open(item.id, origin: .planOverview)
         case .debt(let item): await loop.debts.open(item.id, origin: .planOverview)
+        }
+    }
+    @MainActor func edit(in loop: FinancialLoopModel) async {
+        switch self {
+        case .goal(let item): loop.goals.edit(item.goal)
+        case .budget(let item): await loop.budgets.edit(item.budget)
+        case .debt(let item): loop.debts.edit(item.debt)
+        }
+    }
+    @MainActor func archive(in loop: FinancialLoopModel) async {
+        switch self {
+        case .goal(let item): await loop.goals.archive(item.goal, archived: true)
+        case .budget(let item): await loop.budgets.archive(item.budget, archived: true)
+        case .debt(let item): await loop.debts.archive(item.debt, archived: true)
+        }
+    }
+    var archiveCopy: (title: LocalizedStringKey, confirm: LocalizedStringKey, message: LocalizedStringKey, role: ButtonRole?) {
+        switch self {
+        case .goal: ("goal.archive", "goal.archive", "goal.archive.disclosure", nil)
+        case .budget: ("budget.remove.confirm", "budget.remove", "budget.remove.body", .destructive)
+        case .debt: ("debt.archive", "debt.archive", "debt.archive.disclosure", nil)
         }
     }
     func display(locale: Locale) -> CuadraoPlanCardDisplay {

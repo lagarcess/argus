@@ -771,6 +771,8 @@
 "sharedPlan.history" = "View history";
 "sharedPlan.restore" = "Restore plan";
 "sharedPlan.archive" = "Archive plan";
+"sharedPlan.archive.confirm" = "Put this plan aside?";
+"sharedPlan.archive.body" = "You can restore it from Archived. Its progress stays with it.";
 "sharedPlan.original" = "View original activity";
 "sharedPlan.release" = "Release link";
 "sharedPlan.purpose.funding" = "Fund the plan";

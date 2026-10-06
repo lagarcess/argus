@@ -84,6 +84,7 @@ struct HouseholdPlanDetailView: View {
     @ObservedObject var model: HouseholdPlanModel
     @Environment(\.locale) private var locale
     @State private var section = Section.overview
+    @State private var confirmingArchive = false
     private enum Section: Hashable { case overview, contributions, people }
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -189,9 +190,16 @@ struct HouseholdPlanDetailView: View {
             }.accessibilityIdentifier("sharedPlan.history." + String(previous.version))
         }
         if plan.canEdit || plan.canRestore {
-            Button(plan.archived ? "sharedPlan.restore" : "sharedPlan.archive") { Task { await model.archive(plan) } }
-                .frame(minHeight: 44).accessibilityIdentifier(plan.archived ? "sharedPlan.restore" : "sharedPlan.archive")
-                .disabled(model.pending || model.busy)
+            Button(plan.archived ? "sharedPlan.restore" : "sharedPlan.archive") {
+                if plan.archived { Task { await model.archive(plan) } } else { confirmingArchive = true }
+            }
+            .frame(minHeight: 44).accessibilityIdentifier(plan.archived ? "sharedPlan.restore" : "sharedPlan.archive")
+            .disabled(model.pending || model.busy)
+            .confirmationDialog("sharedPlan.archive.confirm", isPresented: $confirmingArchive, titleVisibility: .visible) {
+                Button("sharedPlan.archive") { Task { await model.archive(plan) } }
+                    .accessibilityIdentifier("sharedPlan.archive.confirm")
+                Button("accounts.cancel", role: .cancel) {}
+            } message: { Text("sharedPlan.archive.body") }
         }
     }
 
