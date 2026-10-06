@@ -224,10 +224,12 @@ def test_identity_insert_committed_while_parent_lock_waits_is_seen(repo, users, 
     user = users["apple"]
     failures = []
     started = Event()
+    first_poll = Event()
 
     def capture():
         started.set()
         try:
+            assert first_poll.wait(5)
             save(repo, user)
         except BaseException as exc:
             failures.append(exc)
@@ -238,7 +240,7 @@ def test_identity_insert_committed_while_parent_lock_waits_is_seen(repo, users, 
             add_identity(writer, user, "conflict")
             thread.start()
             assert started.wait(5)
-            with psycopg.connect(DSN) as observer:
+            with psycopg.connect(DSN, autocommit=True) as observer:
                 import time
 
                 deadline = time.monotonic() + 5
@@ -249,12 +251,14 @@ def test_identity_insert_committed_while_parent_lock_waits_is_seen(repo, users, 
                         "and application_name=%s",
                         (pool.name,),
                     ).fetchone()[0]
+                    first_poll.set()
                     if count:
                         break
                     time.sleep(0.02)
                 assert count
             writer.commit()
     finally:
+        first_poll.set()
         if thread.ident is not None:
             thread.join(5)
     assert not thread.is_alive()

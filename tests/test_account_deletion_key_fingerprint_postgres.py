@@ -258,7 +258,12 @@ def test_an_apple_token_from_another_key_is_never_discarded(
     monkeypatch.setattr(apple.service, "discard_unreadable", spy)
     made = []
     try:
-        apple.store(a, box=k2, key_id=k2.key_id if fingerprint == "new_key" else None)
+        apple.store(
+            a, box=k2, key_id=k2.key_id if fingerprint == "new_key" else None, legacy=True
+        )
+        from tests.test_account_deletion_third_parties_postgres import _legacy_apple_run
+
+        _legacy_apple_run(a)
         made.append(_other_credential(k1, b))
         admin = SqlAuthAdmin()
         with pytest.raises(AccountDeletionIncomplete) as raised:
