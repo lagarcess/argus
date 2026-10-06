@@ -2,7 +2,7 @@ id	track	state	branch	pr	sha	brief
 identity-safety	identity	landed	codex/cuadrao-social-release-safety	844	36c70b91ef03ffcfcc7482a7714a0f244fe5fe4e	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 deletion-recovery	deletion	landed	codex/cuadrao-deletion-recovery-proof	846	cea9f6e18c582615dee44cf1a7d3a05b936b660a	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 analytics-deletion	deletion	landed	codex/cuadrao-personless-deletion	847	ea9d9e57a26cd788d4a92adde4c0984b964ae94d	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
-privacy-evidence	privacy	needs-verify	codex/cuadrao-privacy-evidence	845	c9f53b75f13c51c24a4680be9a1c052f960db562	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
+privacy-evidence	privacy	landed	codex/cuadrao-privacy-evidence	845	c9f53b75f13c51c24a4680be9a1c052f960db562	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 primary-currency	foundations	landed	codex/cuadrao-primary-currency	853	c86981c076d4512aaee8d6c61d278f60ef597e75	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 paired-transfers	foundations	landed	codex/cuadrao-paired-transfers	854	8efd724a0a3f48139745e2c741dc2e23f2612320	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 privacy-manifest	privacy	landed	codex/cuadrao-app-privacy-manifest	849	944515d21d54aa4d0b926e78a070cecdde4baa54	docs/reports/evidence/cuadrao-trust-20261005/preflight.md

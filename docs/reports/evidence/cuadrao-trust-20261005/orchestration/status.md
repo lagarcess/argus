@@ -1,17 +1,17 @@
 # Orchestrate status
 
-Generated: 2026-10-06T00:36:19.644Z
+Generated: 2026-10-06T00:39:38.295Z
 
 ## Units
 
-States: landed=13, needs-verify=3
+States: landed=14, needs-verify=2
 
 | ID | Track | State | Branch | PR | SHA | Brief |
 | --- | --- | --- | --- | --- | --- | --- |
 | identity-safety | identity | landed | codex/cuadrao-social-release-safety | 844 | 36c70b91ef03ffcfcc7482a7714a0f244fe5fe4e | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | deletion-recovery | deletion | landed | codex/cuadrao-deletion-recovery-proof | 846 | cea9f6e18c582615dee44cf1a7d3a05b936b660a | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | analytics-deletion | deletion | landed | codex/cuadrao-personless-deletion | 847 | ea9d9e57a26cd788d4a92adde4c0984b964ae94d | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| privacy-evidence | privacy | needs-verify | codex/cuadrao-privacy-evidence | 845 | c9f53b75f13c51c24a4680be9a1c052f960db562 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| privacy-evidence | privacy | landed | codex/cuadrao-privacy-evidence | 845 | c9f53b75f13c51c24a4680be9a1c052f960db562 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | primary-currency | foundations | landed | codex/cuadrao-primary-currency | 853 | c86981c076d4512aaee8d6c61d278f60ef597e75 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | paired-transfers | foundations | landed | codex/cuadrao-paired-transfers | 854 | 8efd724a0a3f48139745e2c741dc2e23f2612320 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | privacy-manifest | privacy | landed | codex/cuadrao-app-privacy-manifest | 849 | 944515d21d54aa4d0b926e78a070cecdde4baa54 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
@@ -75,4 +75,4 @@ Lowest unmerged: none
 | release-jobs | open | Settle #818 first-release retained chat jobs and connected memory/voice inclusion. Recommendation: bounded financial read and revision-confirmed proposed-write jobs; defer unassigned connected memory/voice activation. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 | apple-late-cleanup | open | Accept #803 rare provider-side late revocation recovery or require stronger coordination. Recommendation: documented forced-sign-out recovery with activation/phone gates; do not claim local CAS cancels an Apple request already received. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 
-<!-- orch-summary {"unitStates":{"landed":13,"needs-verify":3},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":22},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->
+<!-- orch-summary {"unitStates":{"landed":14,"needs-verify":2},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":22},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->
