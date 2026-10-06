@@ -5,6 +5,7 @@ struct PlanCurrencyChoice: View {
     let locked: Bool
     let spanish: Bool
     var showLock = true
+    var identifier = "plan-edit-currency"
     var body: some View {
         if locked {
             CuadraoChoiceLabel(title: currency, selectable: false, locked: showLock)
@@ -17,7 +18,7 @@ struct PlanCurrencyChoice: View {
                 values: PlanCurrency.supported, valueTitle: { $0 })
                 .buttonStyle(.plain).foregroundStyle(WelcomePalette.pine)
                 .accessibilityLabel(spanish ? "Moneda, \(currency)" : "Currency, \(currency)")
-                .accessibilityIdentifier("plan-edit-currency")
+                .accessibilityIdentifier(identifier)
         }
     }
 }

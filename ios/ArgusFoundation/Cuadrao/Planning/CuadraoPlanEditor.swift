@@ -1,11 +1,11 @@
 import SwiftUI
 
-struct CuadraoPlanEditor: View {
-    let store: CuadraoPlanPreview
-    let accounts: CuadraoAccountsPreview
+struct CuadraoPlanEditor<Details: View, Footer: View>: View {
+    let host: CuadraoPlanEditorHost
     let initial: CanvasPlan
     let spanish: Bool
-    var onSave: ((UUID) -> Void)?
+    let details: (CanvasPlan) -> Details
+    let footer: () -> Footer
     @State private var draft: CanvasPlan
     @State private var amountErrors: [String: String] = [:]
     @State private var showDetails = false
@@ -13,44 +13,56 @@ struct CuadraoPlanEditor: View {
     @FocusState private var nameFocused: Bool
     @FocusState private var rateFocused: Bool
     @Environment(\.dismiss) private var dismiss
-    private var editing: Bool { store.plan(initial.id) != nil }
+    private var editing: Bool { host.editing }
+    private var ids: CuadraoPlanEditorIdentifiers { host.identifiers }
+    private var currencyLocked: Bool { editing || host.currencyLocked }
+    private var showsStartingPoint: Bool { host.showsRecorded || (draft.kind == .debt && host.showsRate) }
     private var valid: Bool {
-        amountErrors.allSatisfy { id, error in error.isEmpty || (draft.kind == .budget && id == "plan-monthly") } && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.target.isFinite && (0.01...CanvasMoney.maximumValue).contains(draft.target)
+        amountErrors.allSatisfy { id, error in error.isEmpty || (draft.kind == .budget && id == ids.monthly) || (!host.showsTarget && id == ids.target) }
+        && !draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && (!host.showsTarget || (draft.target.isFinite && (0.01...CanvasMoney.maximumValue).contains(draft.target)))
         && draft.recorded.isFinite && (0...CanvasMoney.maximumValue).contains(draft.recorded)
-        && (draft.kind == .budget || (draft.monthly.isFinite && (0.01...CanvasMoney.maximumValue).contains(draft.monthly)))
+        && (draft.kind == .budget || (draft.monthly.isFinite && ((host.monthlyRequired ? 0.01 : 0)...CanvasMoney.maximumValue).contains(draft.monthly)))
         && draft.annualRate.isFinite && (0...100).contains(draft.annualRate)
-        && (draft.kind != .debt || draft.recorded <= draft.target)
-        && accounts.visibleSpaces.contains { $0.id == draft.spaceID }
+        && (draft.kind != .debt || !host.showsTarget || draft.recorded <= draft.target)
+        && host.spaces.contains { $0.id == draft.spaceID }
+        && host.canSave(draft)
     }
-    init(store: CuadraoPlanPreview, accounts: CuadraoAccountsPreview, initial: CanvasPlan, spanish: Bool, onSave: ((UUID) -> Void)? = nil) {
-        self.store = store; self.accounts = accounts; self.initial = initial; self.spanish = spanish; self.onSave = onSave
+    init(host: CuadraoPlanEditorHost, initial: CanvasPlan, spanish: Bool,
+         @ViewBuilder details: @escaping (CanvasPlan) -> Details, @ViewBuilder footer: @escaping () -> Footer) {
+        self.host = host; self.initial = initial; self.spanish = spanish; self.details = details; self.footer = footer
         _draft = State(initialValue: initial)
     }
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    if !editing { kindPicker }
+                    if !editing && !host.kindLocked { kindPicker }
                     HStack(spacing: 18) {
                         PlanLandscape(look: draft.look).frame(width: 64, height: 70)
                         VStack(alignment: .leading, spacing: 8) {
                             Text(spanish ? "Dale un nombre." : "Make it yours.").font(CuadraoTypography.section)
                             TextField(spanish ? "Por ejemplo, mi próximo viaje" : "For example, my next trip", text: $draft.name)
                                 .font(.body).focused($nameFocused).submitLabel(.done).onSubmit { nameFocused = false }
-                                .accessibilityIdentifier("plan-name")
+                                .accessibilityIdentifier(ids.name)
                         }
                     }
                     VStack(spacing: 0) {
-                        amountRow(draft.kind.amountTitle(spanish), value: $draft.target, id: "plan-target", primary: true)
-                        if draft.kind != .budget {
-                            Divider().padding(.horizontal, 18)
-                            amountRow(spanish ? "Cada mes" : "Each month", value: $draft.monthly, id: "plan-monthly")
+                        if host.showsTarget {
+                            amountRow(draft.kind.amountTitle(spanish), value: $draft.target, id: ids.target, primary: true)
+                            if draft.kind != .budget {
+                                Divider().padding(.horizontal, 18)
+                                amountRow(monthlyTitle, value: $draft.monthly, id: ids.monthly)
+                            }
+                        } else {
+                            amountRow(monthlyTitle, value: $draft.monthly, id: ids.monthly, primary: true)
                         }
                     }.background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 20))
+                    details(draft)
                     HStack {
                         CuadraoChoiceMenu(title: spanish ? "Espacio" : "Space", selection: $draft.spaceID,
-                            values: accounts.visibleSpaces.map(\.id),
-                            valueTitle: { PlanFormat.space($0, accounts: accounts, spanish: spanish) })
+                            values: host.spaces.map(\.id),
+                            valueTitle: { id in host.spaces.first { $0.id == id }?.title ?? (spanish ? "Espacio archivado" : "Archived space") })
                             .accessibilityIdentifier("plan-edit-space")
                         Spacer()
                     }
@@ -61,28 +73,34 @@ struct CuadraoPlanEditor: View {
                         Text(spanish ? "Este plan pertenece a Hogar. Sus miembros podrán verlo; tus cuentas personales siguen siendo privadas." : "This plan belongs to Household. Its members will see it; your personal accounts stay private.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    DisclosureGroup(spanish ? "Darle mi estilo" : "Make it mine") {
-                        PlanLookPicker(look: $draft.look, spanish: spanish).padding(.top, 12)
-                    }.font(.subheadline)
-                    DisclosureGroup(isExpanded: $showDetails) {
-                        VStack(spacing: 12) {
-                            amountRow(draft.kind.recordedTitle(spanish), value: $draft.recorded, id: "plan-recorded")
-                            if draft.kind == .debt {
-                                HStack {
-                                    Text(spanish ? "Interés anual (%)" : "Annual interest (%)")
-                                    TextField("0", value: $draft.annualRate, format: .number).keyboardType(.decimalPad).focused($rateFocused).multilineTextAlignment(.trailing)
-                                        .accessibilityIdentifier("plan-rate")
-                                }.padding(18)
-                                Text(spanish ? "La estimación supone una tasa fija, pagos mensuales, sin compras nuevas ni comisiones." : "The estimate assumes a fixed rate, monthly payments, no new purchases or fees.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                        }.padding(.top, 12)
-                    } label: { Text(spanish ? "Punto de partida" : "Starting point").font(.subheadline.weight(.medium)) }
-                    if draft.kind == .debt && !showDetails {
+                    if host.showsLook {
+                        DisclosureGroup(spanish ? "Darle mi estilo" : "Make it mine") {
+                            PlanLookPicker(look: $draft.look, spanish: spanish).padding(.top, 12)
+                        }.font(.subheadline)
+                    }
+                    if showsStartingPoint {
+                        DisclosureGroup(isExpanded: $showDetails) {
+                            VStack(spacing: 12) {
+                                if host.showsRecorded {
+                                    amountRow(draft.kind.recordedTitle(spanish), value: $draft.recorded, id: "plan-recorded")
+                                }
+                                if draft.kind == .debt && host.showsRate {
+                                    HStack {
+                                        Text(spanish ? "Interés anual (%)" : "Annual interest (%)")
+                                        TextField("0", value: $draft.annualRate, format: .number).keyboardType(.decimalPad).focused($rateFocused).multilineTextAlignment(.trailing)
+                                            .accessibilityIdentifier(ids.rate)
+                                    }.padding(18)
+                                    Text(spanish ? "La estimación supone una tasa fija, pagos mensuales, sin compras nuevas ni comisiones." : "The estimate assumes a fixed rate, monthly payments, no new purchases or fees.")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }.padding(.top, 12)
+                        } label: { Text(spanish ? "Punto de partida" : "Starting point").font(.subheadline.weight(.medium)) }
+                    }
+                    if draft.kind == .debt && host.showsRate && !showDetails {
                         Text(spanish ? "Supuesto: interés anual de \(draft.annualRate.formatted())%. Puedes cambiarlo en Punto de partida." : "Assumption: \(draft.annualRate.formatted())% annual interest. Change it in Starting point.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    if draft.kind != .budget {
+                    if draft.kind != .budget && host.showsTarget && host.showsRecorded {
                         let months = draft.months(at: draft.monthly)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(months.map { $0 == 0 ? (spanish ? "Ya llegaste." : "You're there.") : PlanFormat.month(after: $0, spanish: spanish) }
@@ -96,7 +114,7 @@ struct CuadraoPlanEditor: View {
                         Text(spanish ? "Añade un nombre y revisa los montos." : "Add a name and check the amounts.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
-                    PlanPreviewFootnote(spanish: spanish)
+                    footer()
                 }.padding(24)
             }.safeAreaInset(edge: .bottom) {
                 VStack(spacing: 12) {
@@ -108,23 +126,25 @@ struct CuadraoPlanEditor: View {
                     PlanPrimaryButton(title: editing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Crear plan" : "Create plan")) {
                         draft.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
                         if draft.kind == .budget { draft.monthly = draft.target }
-                        store.save(draft); dismiss(); onSave?(draft.id)
-                    }.disabled(!valid).opacity(valid ? 1 : 0.45).accessibilityIdentifier("plan-save")
+                        host.save(draft)
+                        if host.dismissesOnSave { dismiss() }
+                    }.disabled(!valid || host.saving).opacity(valid && !host.saving ? 1 : 0.45).accessibilityIdentifier(ids.save)
                 }.padding(.horizontal, 24).padding(.vertical, 12).background(.regularMaterial)
             }.cuadraoFormKeyboard().background(WelcomePalette.background)
                 .navigationTitle(editing ? (spanish ? "Editar plan" : "Edit plan") : (spanish ? "Un nuevo plan" : "A new plan"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button(spanish ? "Cancelar" : "Cancel") { if draft != initial { discard = true } else { dismiss() } }
+                        Button(spanish ? "Cancelar" : "Cancel") { if draft != initial { discard = true } else { dismiss() } }.disabled(host.saving)
                     }
                 }
                 .confirmationDialog(spanish ? "¿Descartar cambios?" : "Discard changes?", isPresented: $discard, titleVisibility: .visible) {
                     Button(spanish ? "Descartar" : "Discard", role: .destructive) { dismiss() }
                 }
         }.sensoryFeedback(.selection, trigger: draft.look)
-            .presentationDragIndicator(.visible).interactiveDismissDisabled(draft != initial)
+            .presentationDragIndicator(.visible).interactiveDismissDisabled(draft != initial || host.saving)
     }
+    private var monthlyTitle: String { host.monthlyTitle ?? (spanish ? "Cada mes" : "Each month") }
     private var kindPicker: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?").font(CuadraoTypography.section)
@@ -141,15 +161,22 @@ struct CuadraoPlanEditor: View {
                     .padding(.horizontal, 14).frame(minHeight: 44)
                     .foregroundStyle(draft.kind == kind ? WelcomePalette.onAccent : WelcomePalette.ink)
                     .background(draft.kind == kind ? WelcomePalette.pine : WelcomePalette.surface, in: Capsule())
-            }.accessibilityIdentifier("plan-kind-\(kind.rawValue)").accessibilityAddTraits(draft.kind == kind ? .isSelected : [])
+            }.accessibilityIdentifier(ids.kind(kind)).accessibilityAddTraits(draft.kind == kind ? .isSelected : [])
         }
     }
     private func amountRow(_ title: String, value: Binding<Double>, id: String, primary: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title).font(.caption).foregroundStyle(.secondary)
             PlanAmountInput(value: value, currency: $draft.currency, error: $amountErrors.message(for: id), title: title,
-                            identifier: id, spanish: spanish, currencySelectable: primary && !editing,
-                            showCurrencyLock: primary && editing, prominent: primary)
+                            identifier: id, spanish: spanish, currencySelectable: primary && !currencyLocked,
+                            showCurrencyLock: primary && currencyLocked, prominent: primary, currencyIdentifier: ids.currency)
         }.padding(18)
+    }
+}
+
+extension CuadraoPlanEditor where Details == EmptyView, Footer == PlanPreviewFootnote {
+    init(store: CuadraoPlanPreview, accounts: CuadraoAccountsPreview, initial: CanvasPlan, spanish: Bool, onSave: ((UUID) -> Void)? = nil) {
+        self.init(host: .init(store: store, accounts: accounts, initial: initial, spanish: spanish, onSave: onSave), initial: initial, spanish: spanish,
+                  details: { _ in EmptyView() }, footer: { PlanPreviewFootnote(spanish: spanish) })
     }
 }
