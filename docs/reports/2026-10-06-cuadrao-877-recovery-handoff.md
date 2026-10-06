@@ -33,7 +33,7 @@ phone work.
 | Integration | `codex/private-alpha-next` was `df3882668413e7978d3983adfe1f054cb83595c4` when this reconciliation started. This documentation change lands on top of it. Fetch again; record the new tip as the R0 starting point. |
 | Recovery branch | `codex/cuadrao-connected-preview` at `1eca92329c62c012fc789beb3b9c973c49aaaef2`, pushed. Worktree `/Users/garces/.codex/worktrees/cuadrao-connected-preview/private-alpha-next`, clean at that head when read on October 6. No recovery PR exists. |
 | Integration already inside recovery | `70b0cd3891937f026900aceb96ce5f556c76b0b3` through merge `0a512315142c8d59b71146b0e24e1848072634e2`. Original base `875de09ac2115acec42e09060b92878aa5f18eff`. |
-| Not yet inside recovery | #864 session validation `5d46a73d4`, #874 first Apple name `a2c65549b`, #875 journaled deletion `8146d16e9`, #876 atomic cleanup `184d2614e`, #871, #865 and #873 housekeeping. |
+| Not yet inside recovery | Every integration commit after `70b0cd389`, including #864 session validation `5d46a73d4`, #874 first Apple name `a2c65549b`, #875 journaled deletion `8146d16e9`, #876 atomic cleanup `184d2614e`, #854 paired transfers `7d037b07d`, #845 privacy evidence `dd04130e8`, #871, #865, #860 and #873 housekeeping. |
 | Approved Preview source | `5753b5d7cb3e4a13b4bac58a87fa32127b6fcf37`. Installed Preview build 3427, `local.cuadrao.design.47R3855RTJ`. |
 | Last installed Check | Build 3433, `local.argus.founder.47R3855RTJ`, source `2a1d911b3993b208a25b51ecd156af8a31b6121c`. Predates the final recovery source and later Trust changes. Both build statements are recorded history, not a fresh device readback. |
 | Candidate branches | `codex/cuadrao-primary-home-bindings-20261005` at `87a616ef09ef2e8f746f7a5db29b03bd6d40a31e` (Home summaries ordered by primary currency). `codex/cuadrao-primary-forecast-binding-20261005` at `27dc03711ab93b5a6273da6ab1394ab4d97f6f78` (Plan forecast bound to the selected currency). Both sit on integration `70b0cd389`. Reviewed candidates, not accepted runtime. Check each branch head and owner again before reuse, and never copy stale presentation into the recovered views. |
@@ -69,7 +69,7 @@ points below are what to do first and what the lead must not skip.
    separate.
    - R2 binds Home balance history, Actividad insights and primary-currency Home
      and Forecast to canonical records and coverage. Use the existing
-     `FinancialLoopModel.observations(accountID:period:)` and
+     `FinancialLoopModel.observations(accountID:period:)` (on the recovery branch) and
      `FinancialObservationRead.swift`; do not add another transport or balance
      cache. The reader has a 64-page bound and returns incomplete, not false
      completion.
@@ -83,7 +83,7 @@ points below are what to do first and what the lead must not skip.
    comparisons and real local API journeys separately. A zero-test run is a
    failed setup. Do not weaken money, privacy or persistence assertions to get a
    pass.
-5. **R5.** Resolve the publication gate, then open the recovery PR.
+5. **R5.** Ask Lucas for explicit authorization (see Publication gate below) and open the recovery PR only after his yes.
 6. **R6.** Install one reviewed candidate over Check, preserve Preview, and run
    the applicable phone checks with Lucas.
 7. **R7.** Land only after R6 acceptance and recorded landing authority.
@@ -96,7 +96,7 @@ approval.
 ## History rules for R2
 
 Recorded-position observations with real dates and gaps are the approved first
-meaning (Cuadrao design guide, lines 257 to 267 and 390 to 404). One observation
+meaning (`.agent/designs/cuadrao/DESIGN.md`, lines 257 to 267 and 390 to 404; the known-zero and `Sin datos` wording is near lines 440 to 442). One observation
 has no comparison. Partial accounts are named. A confirmed zero is 0. Missing or
 unknown coverage is `Sin datos`. Compare against zero with an amount difference.
 Never invent a flat history, never apply today's account type or ownership share
@@ -137,6 +137,8 @@ promote to `main` or deploy as part of this issue.
 
 ## Local resources
 
+The old chat checkout `/Users/garces/.codex/worktrees/baaf/private-alpha-next` is on `codex/native-interface-decision`, whose upstream no longer exists, and holds unrelated dirty documentation. Do not write from it, treat its files as authority, discard them or commit them into this work.
+
 The October 5 cleanup stopped 76 containers in 15 unused projects and deleted
 nothing. Retained allocations were `ios-accounts-59650` (phone),
 `ios-accounts-59850` (recovery simulator) and `argus-qa` (shared QA). The
@@ -154,7 +156,7 @@ The six open product decisions in the
 [reconciliation](2026-10-06-cuadrao-launch-reconciliation.md#open-product-decisions)
 do not block accepted UI recovery. They gate downstream work: the scope matrix
 #818, the space migration #819, consent #828, the frozen balance #805 and the
-chat jobs #826. Business and fiscal features, Gmail, a broad Liquid Glass
+chat jobs #826, plus #798 identity policy and #803 late revocation. Business and fiscal features, Gmail, a broad Liquid Glass
 redesign and advanced Profile backends are not consumer-launch requirements.
 
 ## Restart prompt
@@ -164,7 +166,7 @@ You are the engineering lead for #877 in lagarcess/argus: one combined Cuadrao C
 
 Read first: issue #877 (execution map R0-R7, acceptance A1-A12, entry points), docs/reports/2026-10-06-cuadrao-877-recovery-handoff.md, and docs/reports/2026-10-06-cuadrao-launch-reconciliation.md on codex/private-alpha-next. Then AGENTS.md and docs/DOCUMENTATION_AUTHORITY.md.
 
-Start at R0. Run git fetch origin. Record the current integration SHA, the recovery branch codex/cuadrao-connected-preview (1eca92329c62c012fc789beb3b9c973c49aaaef2 when last verified), and the two candidate branches codex/cuadrao-primary-home-bindings-20261005 (87a616ef0) and codex/cuadrao-primary-forecast-binding-20261005 (27dc03711). Confirm one writer per branch and shared state. Preserve Preview 3427 (local.cuadrao.design.47R3855RTJ) and all unrelated worktrees, Docker allocations and local credentials. Do not use the dirty old baaf checkout.
+Start at R0. Run git fetch origin. Record the current integration SHA, the recovery branch codex/cuadrao-connected-preview (1eca92329c62c012fc789beb3b9c973c49aaaef2 when last verified), and the two candidate branches codex/cuadrao-primary-home-bindings-20261005 (87a616ef0) and codex/cuadrao-primary-forecast-binding-20261005 (27dc03711). Confirm one writer per branch and shared state. Preserve Preview 3427 (local.cuadrao.design.47R3855RTJ) and all unrelated worktrees, Docker allocations and local credentials. Do not write from the old checkout /Users/garces/.codex/worktrees/baaf/private-alpha-next (branch codex/native-interface-decision, unrelated dirty documentation) and do not discard its files.
 
 Then R1: merge current integration one way into the recovery branch, keeping the newer Apple session, first-name, journaled deletion and atomic cleanup protections (#864, #874, #875, #876). Do not rebase published history. Then R2 and R3 (separate file ownership), R4 verification, and R5 publication.
 
