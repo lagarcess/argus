@@ -139,6 +139,8 @@ are not ancestors. Both are labeled as eval heads beside the real merge commits
 
 ## Open product decisions
 
+*October 6 update, after this record was first written:* the founder decided the assistant and memory and voice scope (see the two rows marked partly answered below). The other four gates remain unanswered.
+
 The Trust ledger [gates.md](evidence/cuadrao-trust-20261005/orchestration/gates.md)
 records six open gates. A search of the decision log, master plan, execution
 board, MVEE, lane documents and every comment on #808, #813, #814, #815 and #744
@@ -149,9 +151,9 @@ resolved.
 | --- | --- | --- |
 | `identity-policy`: #798 allowlist orphans and Hide My Email linking | Absent. The October 5 Apple-session lock states that it does not select this policy. | #798 items 1 and 3, #821 acceptance |
 | `balance-source`: #805 canonical source and settlement owner | Partial. Decision 17 locks the outcome and copy. The source and who may settle are not decided. | #805, #822 deletion journey |
-| `consent-policy`: #828 consent scope, versioning, memory and voice | Absent. Option A is a proposal, not a lock. | #828, #827, #823 dispatch, #831 AI disclosure |
+| `consent-policy`: #828 consent scope, versioning, memory and voice | Partly answered October 6: memory and voice are in release 1. Consent scope and versioning are still not decided; Option A is a proposal, not a lock. | #828, #827, #823 dispatch, #831 AI disclosure |
 | `space-model`: #819 personal roots with household grants versus household-owned roots | Partial. Timing is locked before TestFlight. The model choice is open. | #819, #818, #820 consumers |
-| `release-jobs`: #818 and #826 first retained chat jobs and memory/voice | Absent. Stack and providers are locked and explicitly do not settle inclusion. | #818, #826, #827, #829 memory rows |
+| `release-jobs`: #818 and #826 first retained chat jobs and memory/voice | Partly answered October 6: memory and voice are in release 1, and the assistant is the agentic one, with old Argus code kept until removed ([decision](../specs/argus-decision-log.md#october-6-2026-first-release-assistant-and-memory-and-voice-scope)). Which first jobs it does is still not named. | #818, #826, #827, #829 memory rows |
 | `apple-late-cleanup`: #803 late provider revocation | Absent. | #803 only |
 
 The recommendations on file are in `foundation-contract-map-proposed.md` and
@@ -216,8 +218,7 @@ was written. No go exists on the PR or on #606.
 
 ## What needs Lucas
 
-1. Answer `space-model` and `release-jobs`. They gate #818, which blocks eleven
-   issues, and they unlock the matrix, the migration and the first chat jobs.
+1. Answer `space-model`, and name the first chat jobs (the rest of `release-jobs`). They gate #818, which blocks eleven issues, and they unlock the matrix, the migration and the first chat jobs.
 2. Authorize publication of the recovery pull request and set a phone window for
    the combined Check build, once the recovery lead reports R1 to R4 done.
 3. Later and independent: the other four gates, the PostHog deletion access, the

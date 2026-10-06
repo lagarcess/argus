@@ -204,7 +204,7 @@ Tags: **[exists]** code on integration (mostly default-off) · **[partial]** fou
 | Imports and connectors: statement/CSV, Plaid, Gmail, Shortcuts, review queue | partial | #768–#772 as foundations, not enabled; no DR bank feeds. **Plaid is kept** (Lucas, Oct 4): the Plaid sandbox plus Faker-generated data is how we stress-test financial data, and real Plaid serves Dominicans in the US or with accounts abroad. Manual entry covers everyone else. Gmail import is still open for Lucas |
 | Home, Search, Updates inbox, private push | partial | Designs #786; connected paths and push setup open (#813) |
 | Ask Cuadrao (chat, then agentic actions) | partial/new | Argus runtime exists (explanations, calculations, research); Cuadrao chat design #785; agentic runtime not implemented (#813). Lucas starts chat work Oct 5 |
-| Voice | new | Researched, parked |
+| Voice | new | Included in release 1 (founder, Oct 6, [decision log](argus-decision-log.md#october-6-2026-first-release-assistant-and-memory-and-voice-scope)); provider Grok voice; not built or wired |
 | Profile, controls, AI consent, deletion, legal | partial | Release UI #790 (open), deletion #799/#801, Terms/Privacy draft #781 |
 | Android | partial | Shell #730; accounts branch stopped |
 
