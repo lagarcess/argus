@@ -840,3 +840,8 @@
 
 "auth.deletion.uncertain" = "No pudimos confirmar si la eliminación comenzó. Compruébalo antes de usar tu cuenta.";
 "auth.deletion.pending" = "Estamos eliminando tu cuenta. Ya cerraste sesión. Si necesitas ayuda, contacta a soporte.";
+"auth.deletion.checkAgain" = "Comprobar de nuevo";
+"auth.deletion.uncertain.support" = "No pudimos confirmar la eliminación desde este dispositivo. Contacta a soporte para recibir ayuda.";
+"auth.deletion.apple" = "Para eliminar tu cuenta, vuelve a confirmar con Apple.";
+"auth.deletion.support.requested" = "Solicitud enviada. Soporte eliminará tu cuenta y te escribirá por correo electrónico.";
+"auth.deletion.support.unavailable" = "Todavía no se puede eliminar desde la app aquí. Soporte puede eliminar tu cuenta por ti.";

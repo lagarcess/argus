@@ -66,6 +66,11 @@ private struct DeletionFixture: View {
                                 Button(spanish ? "Pendiente" : "Pending") { state = .pending }
                                 Button(spanish ? "Error" : "Error") { state = .failed }
                                 Button(spanish ? "Completada" : "Completed") { state = .completed }
+                                Button(spanish ? "Sin confirmar" : "Unconfirmed") { state = .uncertain(canRetry: true) }
+                                Button(spanish ? "Sin confirmar, soporte" : "Unconfirmed, support") { state = .uncertain(canRetry: false) }
+                                Button("Apple") { state = .appleAuthorizationRequired }
+                                Button(spanish ? "Solicitud enviada" : "Support request sent") { state = .supportRequested }
+                                Button(spanish ? "Solicitud no enviada" : "Support request failed") { state = .supportUnavailable }
                             }
                             Section(spanish ? "Cuenta" : "Account") {
                                 Button(spanish ? "Personal" : "Personal") { profile = 0; state = .ready }
