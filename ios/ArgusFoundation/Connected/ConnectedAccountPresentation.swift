@@ -28,6 +28,20 @@ enum ConnectedAccountPresentation {
         }
     }
 
+    nonisolated static func type(_ kind: CanvasAccountKind) -> String {
+        switch kind {
+        case .cash: "cash"
+        case .checking: "checking"
+        case .savings: "savings"
+        case .investment: "investment"
+        case .card: "credit_card"
+        case .loan: "other_debt"
+        case .property: "property"
+        case .vehicle: "vehicle"
+        case .asset: "other_asset"
+        }
+    }
+
     static func title(_ account: FinancialAccount, spanish: Bool) -> String {
         account.nickname ?? artwork(account.type)?.title(spanish) ?? (spanish ? "Cuenta" : "Account")
     }
@@ -85,5 +99,17 @@ enum ConnectedAccountPresentation {
     private static func share(_ account: FinancialAccount, spanish: Bool, locale: Locale) -> String {
         (spanish ? "Tu parte: " : "Your share: ")
             + AccountPresentation.amount(AssetShareControl.percent(account.ownershipShareBps), locale: locale) + "%"
+    }
+}
+
+extension AccountDraft {
+    /// The canvas entry holds a plain "1234.56" amount, so the create saves with a POSIX locale.
+    mutating func apply(_ entry: CanvasAccountEntry) {
+        guard let kind = entry.kind else { return }
+        type = ConnectedAccountPresentation.type(kind)
+        nickname = entry.trimmedName
+        currency = entry.currency
+        amount = entry.amount
+        share = kind.isAsset ? String(entry.sharePercent) : "100"
     }
 }

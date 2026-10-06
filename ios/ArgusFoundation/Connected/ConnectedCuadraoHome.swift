@@ -274,7 +274,7 @@ struct ConnectedCuadraoHome: View {
                                 }
                             }
                             .contextMenu {
-                                Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.edit(account) }
+                                Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.rename(account) }
                                 Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
                                 Button(spanish ? "Archivar" : "Archive", role: .destructive) { sheet = .archive(account) }
                             }
@@ -299,7 +299,7 @@ struct ConnectedCuadraoHome: View {
         case .leading:
             return [.init(id: "accounts.swipe.record", title: spanish ? "Añadir movimiento" : "Add movement", symbol: "plus", tint: WelcomePalette.pine) { loop.record(account) }]
         case .trailing:
-            return [.init(id: "accounts.swipe.edit", title: spanish ? "Editar" : "Edit", symbol: "pencil", tint: .blue) { accounts.edit(account) },
+            return [.init(id: "accounts.swipe.edit", title: spanish ? "Editar" : "Edit", symbol: "pencil", tint: .blue) { accounts.rename(account) },
                     .init(id: "accounts.swipe.more", title: spanish ? "Más" : "More", symbol: "ellipsis", tint: .gray) { moreAccount = account }]
         }
     }

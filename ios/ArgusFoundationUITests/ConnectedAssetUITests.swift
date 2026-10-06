@@ -149,7 +149,10 @@ extension FinancialLoopUITests {
         fillMoneyField("accounts.nickname", with: name)
         if let amount { fillMoneyField("accounts.amount", with: amount) }
         dismissMoneyKeyboard()
-        if half { tapVisible(app.buttons["assets.share.change"]); tapVisible(app.buttons["assets.share.half"]) }
+        if half {
+            let spanish = ProcessInfo.processInfo.environment["ARGUS_TEST_LANGUAGE"] == "es-419"
+            tapVisible(app.buttons["assets.share.change"]); tapVisible(app.buttons[spanish ? "La mitad · 50%" : "Half · 50%"])
+        }
         tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.scrollViews["screen.accounts"].buttons["assets.update"].waitForExistence(timeout: 15))
         scrollMoneyTop(); tapVisible(app.accountBack)

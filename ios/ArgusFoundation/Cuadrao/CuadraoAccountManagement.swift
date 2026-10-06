@@ -71,25 +71,55 @@ struct CuadraoRenameAccount: View {
     let account: CanvasAccount
     let spanish: Bool
     @State private var name = ""
-    @FocusState private var focused: Bool
     @Environment(\.dismiss) private var dismiss
+    var body: some View {
+        CuadraoRenameAccountForm(name: $name, placeholder: account.kind.title(spanish), spanish: spanish,
+            cancel: { dismiss() }) {
+            var updated = account
+            updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            data.replace(updated); dismiss()
+        }
+        .onAppear { name = account.displayName(spanish) }
+    }
+}
+
+struct CuadraoRenameAccountForm: View {
+    @Binding var name: String
+    let placeholder: String
+    let spanish: Bool
+    var nameIdentifier = "account-rename-name"
+    var saveIdentifier = "account-rename-save"
+    var cancelIdentifier = "account-rename-cancel"
+    /// A connected save reports progress or a server answer under the field.
+    var status: String? = nil
+    var statusIdentifier = "account-rename-status"
+    var primaryTitle: String? = nil
+    var busy = false
+    let cancel: () -> Void
+    let save: () -> Void
+    @FocusState private var focused: Bool
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
                 Text(spanish ? "Nombre" : "Name").font(.subheadline)
-                TextField(account.kind.title(spanish), text: $name)
+                TextField(placeholder, text: $name)
                     .autocorrectionDisabled().focused($focused).modifier(RegistrationField(focused: focused))
                     .onChange(of: name) { _, value in if value.count > 60 { name = String(value.prefix(60)) } }
-                RegistrationButton(title: spanish ? "Guardar" : "Save", enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
-                    var updated = account
-                    updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    data.replace(updated); dismiss()
+                    .disabled(busy).accessibilityIdentifier(nameIdentifier)
+                if let status {
+                    Text(status).font(.subheadline).foregroundStyle(.secondary).accessibilityIdentifier(statusIdentifier)
                 }
+                RegistrationButton(title: primaryTitle ?? (spanish ? "Guardar" : "Save"),
+                                   enabled: !busy && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, action: save)
+                    .accessibilityIdentifier(saveIdentifier)
                 Spacer(minLength: 0)
             }.padding(24).background(WelcomePalette.background)
                 .navigationTitle(spanish ? "Cambiar nombre" : "Rename account").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button(spanish ? "Cancelar" : "Cancel") { dismiss() } } }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(spanish ? "Cancelar" : "Cancel", action: cancel).disabled(busy).accessibilityIdentifier(cancelIdentifier)
+                    }
+                }
         }.tint(WelcomePalette.pine).presentationDetents([.medium, .large])
-            .onAppear { name = account.displayName(spanish) }
     }
 }

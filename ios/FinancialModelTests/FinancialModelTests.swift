@@ -155,6 +155,60 @@ final class FinancialModelTests: XCTestCase {
         XCTAssertNil(reopenedAccounts.selected, "Recovering a write does not navigate the Accounts tab")
     }
 
+    func testRenameSendsOnlyTheNicknameAgainstTheReadVersion() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let model = AccountsModel(controller: fixture.client)
+        model.bind(identity)
+        await model.load()
+        let account = try XCTUnwrap(model.accounts.first)
+        model.rename(account)
+        XCTAssertEqual(model.draft?.mode, .rename)
+        model.draft?.nickname = "Everyday"
+        await model.save()
+        XCTAssertNil(model.errorKey)
+        XCTAssertNil(model.draft, "An accepted rename closes the sheet")
+        let patches = await fixture.server.archivePatches
+        XCTAssertEqual(patches.count, 1)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(patches.first?.httpBody)) as? [String: Any])
+        XCTAssertEqual(Set(payload.keys), ["expected_version", "nickname"], "Rename never resends type, currency or ownership")
+        XCTAssertEqual(payload["nickname"] as? String, "Everyday")
+        XCTAssertEqual(payload["expected_version"] as? Int, account.version)
+    }
+
+    func testCanvasEntryCreatesOneRequestWithTheConnectedTypeAndPlainAmount() async throws {
+        XCTAssertEqual(CanvasAccountKind.allCases.map { ConnectedAccountPresentation.type($0) },
+                       ["cash", "checking", "savings", "investment", "credit_card", "other_debt", "property", "vehicle", "other_asset"])
+        for kind in CanvasAccountKind.allCases {
+            XCTAssertEqual(ConnectedAccountPresentation.artwork(ConnectedAccountPresentation.type(kind)), kind)
+        }
+        let cases: [(CanvasAccountEntry, type: String, amount: String?, share: Int)] = [
+            (CanvasAccountEntry(kind: .property, name: "  Casa  ", amount: "8000000.5", currency: "USD", share: 50), "property", "8000000.5", 5000),
+            (CanvasAccountEntry(kind: .checking, name: "Banco", amount: "-25.50", currency: "DOP", share: 50), "checking", "-25.50", 10000),
+            (CanvasAccountEntry(kind: .card, name: "", amount: "", currency: "DOP"), "credit_card", nil, 10000),
+        ]
+        for (entry, type, amount, share) in cases {
+            let fixture = try PresentationFixture()
+            let identity = try await fixture.login()
+            let model = AccountsModel(controller: fixture.client)
+            model.bind(identity)
+            let created = try fixture.account()
+            var sent: [CreateFinancialAccountRequest] = []
+            model.confirmCreate = { request in sent.append(request); return created }
+            model.create()
+            model.draft?.apply(entry)
+            await model.save(locale: Locale(identifier: "en_US_POSIX"))
+            XCTAssertNil(model.errorKey)
+            XCTAssertEqual(sent.count, 1)
+            XCTAssertEqual(sent.first?.type, type)
+            XCTAssertEqual(sent.first?.nickname, entry.trimmedName)
+            XCTAssertEqual(sent.first?.currency, entry.currency)
+            XCTAssertEqual(sent.first?.amount, amount)
+            XCTAssertEqual(sent.first?.ownershipShareBps, share, "Only assets carry a partial share")
+            XCTAssertEqual(model.selected?.id, created.id, "A created account opens its detail")
+        }
+    }
+
     func testArchiveReloadAndRestorePreserveBalanceAndListPlacement() async throws {
         for unknown in [false, true] {
             let fixture = try PresentationFixture()
@@ -422,7 +476,7 @@ private actor PresentationServer {
         let body: String
         if request.httpMethod == "PATCH", path.hasSuffix(Self.id.uuidString) {
             let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
-            archived = payload["archived"] as! Bool
+            if let value = payload["archived"] as? Bool { archived = value }
             accountVersion += 1
             archivePatches.append(request)
             // A concurrent matching write (409), or an accepted write with a lost response (503).
