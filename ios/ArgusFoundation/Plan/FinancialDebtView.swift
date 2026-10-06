@@ -125,6 +125,9 @@ struct FinancialDebtDetail: View {
                     if progress.state == "recorded_clear" {
                         PlanLandscape(look: .bloom).frame(height: 135)
                     }
+                    if let scenario = ConnectedPlanScenario.debt(progress, now: Date()) {
+                        CuadraoPlanWhatIf(scenario: scenario, spanish: spanish, apply: applyMonthly(progress), showsDisclosure: true)
+                    }
                     if let pool = progress.fundingPool { FinancialDebtFunding(pool: pool, digits: progress.debt.currencyFractionDigits) }
                     if !progress.debt.archived {
                         occurrencePicker(progress)
@@ -256,6 +259,14 @@ struct FinancialDebtDetail: View {
                 PlanValueRow(title: "debt.fees", value: progress.debt.currency + " " + AccountPresentation.amount(assumptions.recurringFees, locale: locale))
             }
             Text("debt.estimate.assumptions").font(ArgusStyle.body(12, relativeTo: .caption)).foregroundStyle(ArgusStyle.secondary)
+        }
+    }
+    private func applyMonthly(_ progress: FinancialDebtProgress) -> ((Double) -> Void)? {
+        guard progress.debt.schedule.cadence == .monthly, !progress.debt.archived, loop.pendingConfirmation == nil else { return nil }
+        return { monthly in
+            let draft = FinancialDebtDraft(debt: progress.debt)
+            draft.amount = ConnectedPlanScenario.draftAmount(monthly, digits: progress.debt.currencyFractionDigits, locale: locale)
+            Task { await model.save(draft, locale: locale) }
         }
     }
     private func money(_ value: String?, _ progress: FinancialDebtProgress) -> String { value.map { PlanPresentation.money($0, currency: progress.debt.currency, digits: progress.debt.currencyFractionDigits, locale: locale) } ?? NSLocalizedString("accounts.unknown", comment: "") }
