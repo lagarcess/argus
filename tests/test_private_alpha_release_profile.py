@@ -75,9 +75,9 @@ def test_release_profile_is_non_secret_and_defines_the_fixed_canary() -> None:
         "https://argus-app-suz5.onrender.com,https://arguschat.ai,"
         "https://www.arguschat.ai"
     )
-    assert (
-        "ARGUS_CORS_ALLOW_ORIGINS" not in profile["services"]["api"]["required_present"]
-    )
+    assert "ARGUS_CORS_ALLOW_ORIGINS" not in profile["services"]["api"][
+        "required_present"
+    ]
     assert profile["services"]["web"]["env"]["ARGUS_APP_ORIGIN"] == (
         "https://arguschat.ai"
     )
@@ -109,7 +109,8 @@ def test_release_profile_is_non_secret_and_defines_the_fixed_canary() -> None:
     assert "sk-" not in serialized
     assert "ARGUS_GUEST_ACCESS_ENABLED" not in profile["services"]["api"]["env"]
     assert (
-        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"] == "true"
+        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
+        == "true"
     )
     assert "NEXT_PUBLIC_GUEST_ACCESS_ENABLED" not in profile["services"]["web"]["env"]
 
@@ -130,7 +131,9 @@ def test_release_profile_is_non_secret_and_defines_the_fixed_canary() -> None:
             "auto_deploy_trigger must be one of",
         ),
         (
-            lambda profile: profile["canary"]["required_steps"].append("decision_note"),
+            lambda profile: profile["canary"]["required_steps"].append(
+                "decision_note"
+            ),
             "required_steps must be exactly",
         ),
         (
@@ -167,9 +170,13 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
     profile = _profile()
     render_config = yaml.safe_load((ROOT / "render.yaml").read_text(encoding="utf-8"))
     render_api = next(
-        service for service in render_config["services"] if service["name"] == "argus-api"
+        service
+        for service in render_config["services"]
+        if service["name"] == "argus-api"
     )
-    render_api_env = {item["key"]: item.get("value") for item in render_api["envVars"]}
+    render_api_env = {
+        item["key"]: item.get("value") for item in render_api["envVars"]
+    }
     env_contract = subprocess.run(
         [
             "bash",
@@ -185,7 +192,8 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
 
     assert render_api_env["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"] == "true"
     assert (
-        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"] == "true"
+        profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
+        == "true"
     )
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" in env_contract
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
@@ -280,10 +288,9 @@ def test_render_blueprint_matches_the_authoritative_nonsecret_profile() -> None:
             for service in render_blueprint["services"]
             if service["name"] == service_profile["name"]
         )
-        assert (
-            rendered_service["autoDeployTrigger"]
-            == service_profile["auto_deploy_trigger"]
-        )
+        assert rendered_service["autoDeployTrigger"] == service_profile[
+            "auto_deploy_trigger"
+        ]
         rendered_env = render_services[service_profile["name"]]
         expected_keys = set(service_profile["env"])
         expected_keys.update(service_profile["required_present"])
@@ -309,8 +316,12 @@ def test_api_and_app_share_a_registrable_domain() -> None:
     """
 
     blueprint = (ROOT / "render.yaml").read_text(encoding="utf-8")
-    app_origin = re.search(r"key: ARGUS_APP_ORIGIN\s*\n\s*value: (\S+)", blueprint)
-    api_url = re.search(r"key: NEXT_PUBLIC_ARGUS_API_URL\s*\n\s*value: (\S+)", blueprint)
+    app_origin = re.search(
+        r"key: ARGUS_APP_ORIGIN\s*\n\s*value: (\S+)", blueprint
+    )
+    api_url = re.search(
+        r"key: NEXT_PUBLIC_ARGUS_API_URL\s*\n\s*value: (\S+)", blueprint
+    )
     assert app_origin and api_url, "render.yaml must declare both hosts"
 
     def registrable(url: str) -> str:
