@@ -64,9 +64,9 @@ extracted shared components. These are fixture comparisons, not proof of live
 backend coverage. The connected journeys below provide that separate evidence.
 
 The first comparison covers Home, Plan, Chat, Search and Profile in Spanish,
-light and dark, plus expanded balance, Updates and Household in Spanish light.
+light and dark, plus expanded balance, Updates, Household and linked Plan detail in Spanish light.
 [The comparison file](preview-comparison.json) records dimensions, comparison
-regions, and unrounded differences. Ten of thirteen captures are pixel-identical
+regions, and unrounded differences. Eleven of fourteen captures are pixel-identical
 inside the comparison region. Home light, expanded balance, and Updates have
 small differences and are not described as exact matches. System status and
 home-indicator regions are excluded.
@@ -76,13 +76,14 @@ home-indicator regions are excluded.
 | Home | [Light](before/home-es-light.jpg) | [Light](after/home-es-light.jpg) |
 | Chat | [Dark](before/chat-es-dark.jpg) | [Dark](after/chat-es-dark.jpg) |
 | Plan | [Light](before/plan-es-light.jpg) | [Light](after/plan-es-light.jpg) |
+| Linked Plan detail | [Light](before/plan-detail-es-light.jpg) | [Light](after/plan-detail-es-light.jpg) |
 | Search | [Light](before/search-es-light.jpg) | [Light](after/search-es-light.jpg) |
 | Profile | [Light](before/profile-es-light.jpg) | [Light](after/profile-es-light.jpg) |
 | Household | [Light](before/household-es-light.jpg) | [Light](after/household-es-light.jpg) |
 
 These first captures cover application source at `e6b7cf325`. Its later
 accessibility identifier changes do not change those view layouts. The linked
-Plan detail extraction receives a separate before/after capture.
+Plan detail capture at `2f243fac2` is also pixel-identical within that region.
 
 ## Connected verification
 
@@ -191,13 +192,64 @@ covering server truth across relaunch, refused writes, and unknown legacy values
 The test-navigation delta at `80e06c44f` also received a clean independent review.
 Its simulator run is pending; source review is not a runtime pass.
 
+At `80e06c44f`, the seven-journey run passed receipt capture, Later, source
+reopening, identity isolation and discard. Plan return and cold restore also
+passed, including opening the allocation fields and Record editor. Five checks
+failed. Budget retained the correct record but lost its exact scroll position
+after relaunch. Currency's identifier targeted a whole labelled row instead of
+the actual menu. Debt and Goal menus opened, but the desired accounts were below
+their virtualized rows. Household joined successfully and showed both members;
+its test expected the leave control to exist before scrolling the long Form.
+
+`63345b7ff` includes the focused corrections. The existing Plan routes own the
+saved anchor and offset. The shared scroll helper reuses Search's offset math
+with the intent of restoring recreated pages once. Its runtime acceptance is
+still open. Native Back keeps the existing page position.
+The currency label and native menu have separate accessibility elements. Test
+drivers scroll the actual native collections without changing account matching,
+money assertions, permission checks or the Budget position tolerance. The first
+currency containment-only attempt did not fix the failure and is superseded by
+the separate control. Independent source review through `63345b7ff` is clean.
+
+Five new restoration model tests and six existing Search tests passed. The
+existing Search selected-account preservation assertion failed in code unchanged
+from integration. PR #839 records four pre-existing model failures; this is not
+a clean full model-suite claim. In the affected simulator rerun, currency passed
+and survived relaunch. Budget again failed the unchanged 12-point viewport
+tolerance after returning from a contributor and relaunching. Its record totals,
+correction and refund checks passed before that assertion. The final run executed five tests. Currency and the full Household journey
+passed. The latter includes explicit sharing, view-only and edit permission,
+correction, Search, Spanish relaunch and revocation. Budget failed its viewport
+assertion. Debt and Goal reached the native options menu but their shared test
+helper swiped down to reposition an already-visible option, dismissing the menu.
+Their money assertions before that point passed. The helper now taps the native
+menu item directly.
+
+A retained Budget rerun at the same application source reproduced the drift.
+Runtime geometry showed the saved first anchor stayed at 399.67 points. Each row
+became 13.33 points taller because cold restore had not loaded AccountsModel.
+Internal account IDs appeared in place of names and wrapped to another line.
+The detail loader now loads the existing account owner as well as Plan before
+showing Goal, Budget or Debt. Temporary tracing was removed. The focused test
+checks unchanged row labels and position, then opens correction and Edit after
+relaunch. This is a correction to the earlier diagnosis that attributed the
+Budget failure to scroll state alone. Source review and pure tests did not
+establish viewport restoration; simulator evidence takes precedence.
+
+At `2f243fac2`, the retained Budget test passed (one executed, no failures or
+skips). Account labels and row position survive cold relaunch; correction and
+native Edit both open. A fresh independent review of the loader and test delta
+found no actionable issue. Its comment review found no added or changed comments.
+The same source was built for the test before this commit; the commit contains
+that exact source diff.
+
 Preview 3427 and Check 3431 were verified as separate installed apps before this
 recovery. The delivery target is Check only. Preview's installed app, source and
 fixture evidence remain the reference.
 
-Lucas took the physical phone away during verification. The trust and privacy
-lane was informed. Installation and physical acceptance wait for his return;
-source review and simulator verification continue.
+Lucas returned with the physical phone during verification. The trust and privacy
+lane was informed that this lane owns the next Check install and review. The
+phone is available; installation still waits for the affected simulator checks.
 
 Automatic approval review previously rejected creation of a new draft PR.
 No alternative PR-creation route has been used. Publication and device evidence

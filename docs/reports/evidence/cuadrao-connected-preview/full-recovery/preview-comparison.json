@@ -193,5 +193,21 @@
     ],
     "mean_absolute_rgb_difference": 0.009410571536790065,
     "exact": false
+  },
+  {
+    "screen": "plan-detail-es-light.jpg",
+    "size": [
+      368,
+      800
+    ],
+    "comparison_box": [
+      0,
+      55,
+      368,
+      782
+    ],
+    "mean_absolute_rgb_difference": 0.007288738711799535,
+    "exact": false,
+    "source_revision": "2f243fac2"
   }
 ]
