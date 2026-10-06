@@ -84,7 +84,7 @@ struct FinancialSearchView: View {
                 kinds: CanvasSearchKind.allCases.filter { $0 != .memory }, spanish: spanish,
                 filterCount: filterCount, filterSummary: filterSummary, clearFilters: clearFilters,
                 focused: $focused, accessibility: .connected, loading: showsProgress,
-                refresh: { if unavailableKind == nil { await model.refresh() } }) {
+                refresh: { if unavailableKind == nil { await model.refresh() } }, eagerRows: true) {
                 FinancialScrollProbe(controller: scroll).frame(height: 0)
                 results
             } filters: {
