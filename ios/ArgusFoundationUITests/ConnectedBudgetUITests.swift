@@ -76,6 +76,10 @@ extension FinancialLoopUITests {
         let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.activity.'"))
         XCTAssertEqual(rows.count, 3)
         let oldest = rows.element(boundBy: rows.count - 1)
+        app.swipeDown()
+        let topPosition = oldest.frame.minY
+        app.swipeUp()
+        XCTAssertLessThan(oldest.frame.minY, topPosition - 12)
         tapVisible(oldest)
         app.returnFromDetail("budget.activity.back")
         XCTAssertTrue(oldest.waitForExistence(timeout: 15))

@@ -310,6 +310,13 @@ final class FinancialLoopUITests: XCTestCase {
     }
     func tapVisible(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
+        let reference = element.identifier.isEmpty ? element.label : element.identifier
+        let toolbarControl = app.navigationBars.descendants(matching: element.elementType)
+            .matching(identifier: reference).firstMatch
+        if toolbarControl.exists && toolbarControl.frame == element.frame && element.isHittable {
+            element.tap()
+            return
+        }
         var scrolled = false
         for _ in 0..<12 {
             if element.isHittable && element.frame.midY > 115 && element.frame.midY < app.frame.height - 130 { break }

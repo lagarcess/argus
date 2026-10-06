@@ -194,8 +194,7 @@ extension FinancialLoopUITests {
         fillMoneyField("goal.name", with: title)
         fillMoneyField("goal.target", with: "2000")
         dismissMoneyKeyboard()
-        tapVisible(app.buttons["goal.destination"])
-        app.buttons[destination.name].tap()
+        chooseMoneyAccount("goal.destination", account: destination)
     }
 
     @discardableResult func openGoal(_ title: String) -> String {

@@ -415,7 +415,15 @@ extension FinancialLoopUITests {
         XCTAssertTrue(menu.waitForExistence(timeout: 5))
         for _ in 0..<40 {
             if option.exists && option.isHittable { break }
-            menu.swipeUp()
+            let visibleOptions = menu.buttons.allElementsBoundByIndex.filter(\.isHittable)
+            guard !visibleOptions.isEmpty else {
+                XCTFail("The account menu has no visible options")
+                return
+            }
+            let start = visibleOptions[visibleOptions.count / 2]
+                .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -100)),
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         XCTAssertTrue(option.waitForExistence(timeout: 5))
         option.tap()
