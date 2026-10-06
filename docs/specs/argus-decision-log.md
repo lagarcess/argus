@@ -531,3 +531,39 @@ blocker is created by this documentation lock.
 The founder approved Apple credential-state checks for sessions signed in with Apple. Known email and Google sessions retain access when the account also links Apple. Older mixed-provider sessions whose sign-in method is unknown require one explicit sign-in to establish it. Linked identities do not prove the current session's sign-in method.
 
 The existing native session journal owns successful grant provenance. Other callers derive admission from SessionController; they do not infer a provider from email, linked identities or a second cache. PR864 carries the implementation and local proof, pending its exact-head CI and integration landing. Real Apple authorization/revocation, hosted settings and feature activation remain separate gates. This decision does not select #798's orphan or Hide My Email linking policy.
+
+
+## October 6, 2026: first-release assistant and memory and voice scope
+
+The founder decided in chat:
+
+1. The consumer app's chat assistant is the agentic assistant described in the
+   [MVEE](argus-minimum-viable-ecosystem-experience.md#agentic-ecosystem-direction-and-sequence),
+   a goal-to-action assistant for personal and household finances in the style of
+   the founder's cited references (Meta Muse and similar assistants). What the
+   earlier Argus research and backtest chat did is not the target experience of
+   the consumer app.
+2. The old code, services, prompts and gates **stay until the founder decides to
+   remove them**. This decision removes, hides and changes nothing. It changes
+   what the consumer assistant is meant to be, not the existing runtime.
+   [MVEE section 7](argus-minimum-viable-ecosystem-experience.md#7-carry-forward-the-existing-argus-investment)
+   is read together with this entry: existing capabilities stay until explicitly
+   removed, and this entry does not remove any.
+3. **Memory and voice are included in release 1.** This answers the inclusion
+   question that #818, #826, #828, #829 and #831 left open. The master plan's
+   "Researched, parked" voice row is superseded. Grok voice stays the selected
+   provider, behind the server, per the October 4 provider lock.
+
+What this makes required: the acceptance items those issues already wrote as
+conditional on included memory or voice now apply. They are memory consent,
+correction and forgetting controls reachable and persistent in release (#829,
+#827); consent checked before any chat, document, memory or voice transmission
+(#828); disclosure and microphone purpose audit covering voice and memory
+(#831); and connected recall, consent-decline and forgetting journeys (#833).
+No new requirement is invented here.
+
+Still open, and not answered by this entry: which first jobs the assistant does in
+release 1 (#818 and #826), and the consent scope and versioning policy (#828).
+This entry does not authorize implementation, a model-instruction change, a paid
+provider run, hosted activation or deployment. The #826 contract still precedes
+#827.
