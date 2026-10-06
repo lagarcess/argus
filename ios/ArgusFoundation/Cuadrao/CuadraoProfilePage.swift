@@ -12,6 +12,7 @@ struct CuadraoProfilePage: View {
     let includeExamples: Bool
     let connection: CuadraoProfilePageConnection
     @State private var notice: String?
+    @State private var deletingAccount = false
 
     init(route: CanvasProfileRoute, profile: Binding<CanvasProfileDraft>, spanish: Bool, includeExamples: Bool) {
         self.init(route: route, settings: profile.settings, spanish: spanish,
@@ -39,6 +40,9 @@ struct CuadraoProfilePage: View {
             .scrollContentBackground(.hidden).background(WelcomePalette.background)
             .navigationTitle(route.title(spanish)).navigationBarTitleDisplayMode(.large)
             .toolbar(.visible, for: .navigationBar)
+            .navigationDestination(isPresented: $deletingAccount) {
+                if let deletion = connectedDeletion { ConnectedAccountDeletion(model: deletion) }
+            }
             .alert(notice ?? "", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
                 Button(spanish ? "Entendido" : "Got it", role: .cancel) { notice = nil }
             } message: {
@@ -63,6 +67,9 @@ struct CuadraoProfilePage: View {
         case .preferences:
             spanish ? "La apariencia funciona en este dispositivo y la moneda preferida se guarda en tu cuenta. Las demás opciones son ejemplos."
                 : "Appearance works on this device and preferred currency is saved to your account. The other options are examples."
+        case .privacy:
+            spanish ? "Eliminar cuenta usa tu cuenta real. Las demás opciones son ejemplos."
+                : "Delete account uses your real account. The other options are examples."
         case .help:
             spanish ? "Ayuda y comentarios son ejemplos de desarrollo. Los enlaces legales abren el sitio de Cuadrao."
                 : "Help and feedback are development examples. Legal links open Cuadrao's website."
@@ -217,10 +224,15 @@ struct CuadraoProfilePage: View {
                 } header: { Text(spanish ? "Compartir y recuperar" : "Sharing and recovery") }
             }
             Section {
-                // Entry point only; the consequences/verification flow ships separately (DESIGN.md §13).
                 Button(spanish ? "Eliminar cuenta" : "Delete account", role: .destructive) {
-                    notice = spanish ? "Eliminar cuenta" : "Delete account"
+                    if let deletion = connectedDeletion {
+                        deletion.finish()
+                        deletingAccount = true
+                    } else {
+                        notice = spanish ? "Eliminar cuenta" : "Delete account"
+                    }
                 }
+                .accessibilityIdentifier("cuadrao.profile.deleteAccount")
             } footer: {
                 if CuadraoFirstRelease.shows(.memory) {
                     Text(spanish ? "Compartir un hogar no comparte tus chats, archivos ni memoria." : "Joining a household does not share your chats, files or memory.")
@@ -229,6 +241,10 @@ struct CuadraoProfilePage: View {
                 }
             }
         }
+    }
+
+    private var connectedDeletion: AccountDeletionModel? {
+        if case .connected(_, let profile) = connection { profile.deletion } else { nil }
     }
 
     private var records: some View {

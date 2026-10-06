@@ -8,6 +8,7 @@ public struct ReleaseDeleteAccountView: View {
     public let onRetry: () -> Void
     public let onComplete: () -> Void
     public let onResendCode: (() -> Void)?
+    public let appleAuthorization: AnyView?
     @Environment(\.locale) private var locale
     @State private var showingVerification = false
     @State private var confirmation = ""
@@ -16,10 +17,10 @@ public struct ReleaseDeleteAccountView: View {
     public init(consequences: ReleaseDeletionConsequences, state: ReleaseDeletionState,
                 verification: ReleaseDeletionVerification = .typedDelete,
                 onSubmit: @escaping (String) -> Void, onRetry: @escaping () -> Void,
-                onComplete: @escaping () -> Void, onResendCode: (() -> Void)? = nil) {
+                onComplete: @escaping () -> Void, onResendCode: (() -> Void)? = nil, appleAuthorization: AnyView? = nil) {
         self.consequences = consequences; self.state = state; self.verification = verification
         self.onSubmit = onSubmit; self.onRetry = onRetry; self.onComplete = onComplete
-        self.onResendCode = onResendCode
+        self.onResendCode = onResendCode; self.appleAuthorization = appleAuthorization
         _showingVerification = State(initialValue: state == .verificationRejected || state == .verificationResending)
     }
 
@@ -61,6 +62,38 @@ public struct ReleaseDeleteAccountView: View {
                         .foregroundStyle(.secondary)
                     Button(text("Listo", "Done"), action: onComplete)
                         .accessibilityIdentifier("identity.delete.complete")
+                }
+            case .uncertain(let canRetry):
+                Section {
+                    Label("auth.deletion.uncertain", systemImage: "exclamationmark.triangle")
+                        .accessibilityIdentifier("identity.delete.uncertain")
+                    if canRetry {
+                        Button("auth.deletion.checkAgain", action: onRetry)
+                            .accessibilityIdentifier("identity.delete.checkAgain")
+                    } else {
+                        Text("auth.deletion.uncertain.support").foregroundStyle(.secondary)
+                            .accessibilityIdentifier("identity.delete.uncertainSupport")
+                    }
+                }
+            case .appleAuthorizationRequired:
+                Section {
+                    Label("auth.deletion.apple", systemImage: "apple.logo")
+                        .accessibilityIdentifier("identity.delete.apple")
+                    if let appleAuthorization { appleAuthorization }
+                }
+            case .supportRequested:
+                Section {
+                    Label("auth.deletion.support.requested", systemImage: "envelope")
+                        .accessibilityIdentifier("identity.delete.supportRequested")
+                    Button(text("Listo", "Done"), action: onComplete)
+                        .accessibilityIdentifier("identity.delete.supportDone")
+                }
+            case .supportUnavailable:
+                Section {
+                    Label("auth.deletion.support.unavailable", systemImage: "exclamationmark.circle")
+                        .accessibilityIdentifier("identity.delete.supportUnavailable")
+                    Button(text("Volver a intentar", "Try again"), action: onRetry)
+                        .accessibilityIdentifier("identity.delete.supportRetry")
                 }
             }
         }

@@ -15,7 +15,8 @@ struct ReleaseIdentityChecks {
         for state in [ReleaseDeletionState.ready, .verificationRejected] {
             precondition(state.allowsVerificationInput)
         }
-        for state in [ReleaseDeletionState.verificationResending, .submitting, .pending, .failed, .completed] {
+        for state in [ReleaseDeletionState.verificationResending, .submitting, .pending, .failed, .completed,
+                      .appleAuthorizationRequired, .uncertain(canRetry: true), .uncertain(canRetry: false), .supportRequested, .supportUnavailable] {
             precondition(!state.allowsVerificationInput, "Verification cannot change while an operation is pending")
         }
 

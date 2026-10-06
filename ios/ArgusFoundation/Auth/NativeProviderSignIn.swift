@@ -76,7 +76,7 @@ struct ConnectedProviderButtons: View {
         if providers.apple || providers.google != nil {
             VStack(spacing: 12) {
                 if providers.apple {
-                    SignInWithAppleButton(.continue) { request in
+                    AppleAuthorizationButton(busy: auth.busy) { request in
                         let nonce = SignInNonce()
                         appleNonce = nonce
                         request.requestedScopes = [.fullName, .email]
@@ -84,10 +84,6 @@ struct ConnectedProviderButtons: View {
                     } onCompletion: { result in
                         completeApple(result)
                     }
-                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                    .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .disabled(auth.busy)
                     .accessibilityIdentifier("cuadrao.auth.apple")
                 }
                 #if canImport(GoogleSignIn)
@@ -127,7 +123,7 @@ struct ConnectedProviderButtons: View {
                 failed = true
                 return
             }
-            let code = apple.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
+            let code = apple.authorizationCodeText
             let formattedName = apple.fullName.map { PersonNameComponentsFormatter().string(from: $0) }
             let nameAuthorization: AppleNameAuthorization
             do { nameAuthorization = try auth.prepareAppleName(displayName: formattedName, subject: apple.user) }
@@ -173,6 +169,25 @@ struct ConnectedProviderButtons: View {
     #endif
 }
 
+/// The one Apple request control: sign-in and the fresh authorization account deletion asks for.
+struct AppleAuthorizationButton: View {
+    let busy: Bool
+    let onRequest: (ASAuthorizationAppleIDRequest) -> Void
+    let onCompletion: (Result<ASAuthorization, Error>) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .disabled(busy)
+    }
+}
+
+extension ASAuthorizationAppleIDCredential {
+    var authorizationCodeText: String? { authorizationCode.flatMap { String(data: $0, encoding: .utf8) } }
+}
 
 struct NativeAppleCredentialChecker: AppleCredentialChecking {
     func state(for subject: String) async throws -> AppleCredentialState {

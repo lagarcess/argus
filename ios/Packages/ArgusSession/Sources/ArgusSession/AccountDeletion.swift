@@ -27,6 +27,19 @@ public enum AccountDeletionRefusal: Equatable, Sendable, Codable {
     case invalidRequest
 }
 
+extension SessionController {
+    /// The agreed fallback while the deletion command is off (404): a support ticket that the server
+    /// binds to this session's account. It never records or implies deletion.
+    public func requestAccountDeletionSupport(expectedIdentity: SessionSnapshot) async throws {
+        struct Ticket: Encodable {
+            let type = "account_deletion_request"
+            let message = "Account deletion requested in the iOS app."
+            let context = ["source": "ios_profile"]
+        }
+        _ = try await financialRequest(route: "feedback", method: "POST", body: encoded(Ticket()), expectedIdentity: expectedIdentity)
+    }
+}
+
 struct AccountDeletionRequest: Encodable {
     let confirm = true
     let appleAuthorizationCode: String?

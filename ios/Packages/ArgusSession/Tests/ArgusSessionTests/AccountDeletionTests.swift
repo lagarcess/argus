@@ -10,6 +10,7 @@ private actor DeletionServer {
     var retry: String?
     var loseResponse = false
     var requests: [URLRequest] = []
+    var tickets: [URLRequest] = []
     var gate: RequestGate?
     var sdkUserGate: RequestGate?
     func configure(_ status: Int, _ body: [String: Any], retry: String? = nil, lose: Bool = false) {
@@ -18,7 +19,13 @@ private actor DeletionServer {
     func hold(_ gate: RequestGate) { self.gate = gate }
     func holdSDKUser(_ gate: RequestGate) { sdkUserGate = gate }
     func captured() -> [URLRequest] { requests }
+    func supportTickets() -> [URLRequest] { tickets }
     func send(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        if request.url!.path.hasSuffix("/api/v1/feedback") {
+            tickets.append(request)
+            return (Data(#"{"success":true}"#.utf8),
+                HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!)
+        }
         guard request.url!.path.hasSuffix("/account/delete") else {
             if request.url!.path.hasSuffix("/user"), let sdkUserGate { await sdkUserGate.enter() }
             return try await auth.send(request)
@@ -158,6 +165,30 @@ final class AccountDeletionTests: XCTestCase {
             XCTAssertNil(try fixture.journal())
             XCTAssertNotNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".session"))
         }
+    }
+
+    func testDeletionOffFilesOneSupportTicketForTheSignedInOwnerOnly() async throws {
+        let fixture = DeletionFixture(); let controller = try fixture.controller()
+        let identity = try await fixture.login(controller)
+        await fixture.server.configure(404, ["code": "not_found"])
+        let refused = try await controller.deleteAccount(expectedIdentity: identity)
+        XCTAssertEqual(refused, .refused(.disabled))
+        try await controller.requestAccountDeletionSupport(expectedIdentity: identity)
+        let tickets = await fixture.server.supportTickets()
+        XCTAssertEqual(tickets.count, 1)
+        XCTAssertEqual(tickets[0].httpMethod, "POST")
+        XCTAssertEqual(tickets[0].value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer header."), true)
+        let body = try JSONSerialization.jsonObject(with: tickets[0].httpBody!) as! [String: Any]
+        XCTAssertEqual(body["type"] as? String, "account_deletion_request")
+        XCTAssertEqual((body["context"] as? [String: String])?["source"], "ios_profile")
+        XCTAssertNil(body["user_id"], "the server attaches the session's own account")
+        let snapshot = await controller.snapshot(); XCTAssertEqual(snapshot, identity)
+        XCTAssertNotNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".session"))
+
+        _ = try await controller.signOut()
+        do { try await controller.requestAccountDeletionSupport(expectedIdentity: identity); XCTFail("A retired identity cannot file a ticket") }
+        catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
+        let after = await fixture.server.supportTickets(); XCTAssertEqual(after.count, 1)
     }
 
     func testIncompleteHonorsRetryAfterAndMalformedDoneCannotIssueReceipt() async throws {
