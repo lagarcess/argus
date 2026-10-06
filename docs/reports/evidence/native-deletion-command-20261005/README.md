@@ -117,3 +117,44 @@ including deletion tests and affected Apple-name/session cases. The independent
 bundle above records their later results. Mac and database leases remain with the current verifier; no Swift, Mac,
 Postgres, provider, hosted, activation or root environment work ran here. Root
 still owns PR creation, landing order and all merge decisions.
+
+
+## Landed dependency reconciliation and core PR
+
+Current integration `a2c65549b3ffcb97ee0be24b971110be8c090b32` includes guarded Name PR #874 over session PR #864.
+Normal merge `03e9954744240c2bfd5b21d03005a7faa7e30fe8` reconciles it into the evidenced worker; source preparation
+started from Name `07f768f28be6f900b1a3d2e7b242bcdbad25d93a`, which inherited
+integration `7d037b07d4b98b34c6c0ad3026811c7d2f28ae47`. The immediately preceding
+published evidence head was `21bb4c65c70a472f90b6c92c56c1255e5b0d1017`.
+
+The squash landings caused shared-file conflicts. The resolved native files keep
+the accepted deletion tree, not a hand-combined new implementation. Integration's
+entire iOS tree matches the dependency's exact Name `a6efe6e` tree. All 403 native
+Git objects and SHA-256 fingerprints also match tested `cc58b16f7`; there is no
+new native runtime, identity, grant/capture, profile, vault, migration or test
+behavior to remeasure. Name and Apple backend runtime owners and Supabase
+migrations have no dependency-to-integration delta. The unrelated incoming runtime
+change is Household invite-code lookup; env/web-recovery/docs changes stay owned
+by their landed integration work.
+
+Integration's fixed `tests/test_apple_name_api.py` and
+`tests/test_profile_apple_identity_postgres.py` are preserved byte-for-byte.
+The landed Name report is preserved from integration. No rebase, reset, stash,
+Mac, PostgreSQL, provider, hosted or activation action was performed.
+
+Accepted evidence is retained by exact source identity: full package 164 passes
+and 4 existing opt-in skips, focused 19 passes, one actual local SDK/API/Auth/PG
+case and generic app build. These are separate runs at `cc58`, not fresh execution
+at the reconciliation head. Synthetic RecordingAnalyticsDeletion is not provider
+completion proof. Independent affected-merge source review at `03e995474` found
+no blocker. Fresh combined-tree modularity, changed-document links, Python AST,
+JSON metadata, shell syntax and scoped whitespace checks pass. Terminal CI and
+root PR review remain pending at publication.
+
+This PR adds the command core and minimal exhaustive state cases. Uncertain
+response state quarantines ordinary protected dispatch; accepted 202 retires
+proof but preserves drafts and a per-user acknowledgement; confirmed 200 alone
+issues a cleanup receipt. No one-time code is persisted/replayed or ordinary
+refresh used for deletion. The next owned app adapter must wire entry,
+confirmation, fresh Apple authorization, support and race-safe exact-user receipt
+filesystem cleanup. Actual provider, hosted and physical-phone gates remain open.
