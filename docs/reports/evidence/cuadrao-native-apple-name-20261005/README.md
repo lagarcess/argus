@@ -6,7 +6,7 @@ The native callback now formats Apple's `fullName` with `PersonNameComponentsFor
 
 Original dependency head is PR #864 commit `a24a6c60627460ddfd6042b3f42b342c5eff11f0`. Server name command is settled by PR #869. Original integration reference is `7d037b07d4b98b34c6c0ad3026811c7d2f28ae47`, merged normally into the isolated native branch. Intervening integration changes concern server money/deletion, environment membership and documentation. There is no native session-owner overlap. The name command consumes the landed server contract.
 
-This branch cannot be READY until #864 lands, its final owner changes are reconciled, and exact-head CI completes. Independent native verification has finished at the source head recorded below. Global providers remain off. Evidence publication performs no provider, hosted, paid, simulator or device action.
+PR #864 landed as `5d46a73d4d97b0412dccff517eb43c73e4316977` and was normally merged into this branch as `9144553f8da6dc7c36f02e6f137cd2cb44fa1c6b`. Exact-head CI and the final review remain pending. Independent native verification has finished at the source head recorded below. Global providers remain off. Evidence publication performs no provider, hosted, paid, simulator or device action.
 
 ## Caller and ownership
 
@@ -43,4 +43,14 @@ Both introduced failures remain in the bundle: the XCTest `name` property compil
 
 The 29 source-manifest entries plus original `files.json` are published under the independent report. `publication-manifest.json` records original and published hashes, log whitespace normalization and one report filename correction. Screenshots and diagnostic patches remain byte-for-byte copies. The evidence-only commit preserves every production/test source file from the tested head, so that source-scoped evidence remains applicable; it does not establish later reconciliation or terminal CI.
 
-The parent reports #864 CI blocked (257); this publication does not refresh or close that gate. No PR is opened and no READY claim is made. Physical Apple first/repeat authorization, physical-device acceptance, dependency landing/reconciliation and final CI remain open.
+## Reconciliation and retained evidence
+
+[Reconciliation fingerprints](reconciliation.json) verify all 401 tracked iOS files against the accepted `a6efe6e` source. None changed. The existing session actor, vault, callback, model, package tests, native configuration, shared money/currency actors and native UI sources remain identical. Profile/Apple identity/name command, schema, auth dependencies, Supabase gateway and the signed local name test also remain identical.
+
+Seven textual conflicts arose because the dependency landed by squash. Five incoming native files match original dependency `a24a6c6` byte-for-byte, so their tested Name extensions were retained. The two server test conflicts take integration's final fixture/import and isolated local Auth environment repairs. Those repairs alter test setup, not the profile response or identity contract.
+
+Other integration changes concern web password-recovery IP routing, release environment key ownership/default-off invite declarations, tests, documentation and an invite-secret explanatory comment. They do not change native authentication dispatch, name claim/initialization, durable session state, profile currency or server Apple identity resolution. No new migration or environment setting is introduced by this Name diff. No provider or hosted activation occurred.
+
+All recorded native and signed-local name evidence is retained by this source comparison; none is invalidated. Tests were not rerun during reconciliation. The [merged-tree budget](modularity-reconciled.txt) passes. The Name diff's whitespace check passes outside byte-preserved diagnostic patches; their mandatory context-line spaces are checked with only blank-at-eol/blank-at-eof disabled. Existing whitespace in incoming integration evidence is preserved.
+
+The independent publication review was reported clean by the captain. Physical Apple first/repeat authorization, physical-device acceptance and activation remain open. This PR does not close #800/#798 or assert READY; exact-head CI and final scoped review are still required.
