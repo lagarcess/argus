@@ -355,25 +355,25 @@ CopySwiftLibs /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimul
 
 CodeSign /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app/ArgusFoundation.debug.dylib (in target 'ArgusFoundation' from project 'ArgusFoundation')
     cd /tmp/cuadrao-apple-session-20261005/ios
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app/ArgusFoundation.debug.dylib
 /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app/ArgusFoundation.debug.dylib: replacing existing signature
 
 CodeSign /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app/__preview.dylib (in target 'ArgusFoundation' from project 'ArgusFoundation')
     cd /tmp/cuadrao-apple-session-20261005/ios
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app/__preview.dylib
 /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app/__preview.dylib: replacing existing signature
 
 CodeSign /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app (in target 'ArgusFoundation' from project 'ArgusFoundation')
     cd /tmp/cuadrao-apple-session-20261005/ios
-    
+
     Signing Identity:     "Sign to Run Locally"
-    
+
     /usr/bin/codesign --force --sign - --entitlements /tmp/cuadrao-apple-combined-xcode/Build/Intermediates.noindex/ArgusFoundation.build/Debug-iphonesimulator/ArgusFoundation.build/ArgusFoundation.app.xcent --timestamp\=none --generate-entitlement-der /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app
 /tmp/cuadrao-apple-combined-xcode/Build/Products/Debug-iphonesimulator/ArgusFoundation.app: replacing existing signature
 

@@ -14,7 +14,11 @@ auth/profile API and SQL contracts. The exact recorded QA evidence is retained
 for this unchanged combined source; it was not rerun merely to obtain new images.
 
 The copied QA bundle contains 52 original files, including its 51-entry hash
-manifest and 22 screenshots. All 51 hashes match. All five README file references
+manifest and 22 screenshots. All 51 original hashes matched before publication cleanup. Trailing spaces in
+the copied raw logs failed the initial whitespace check. They were removed without
+changing log text or outcomes; publication-log-normalization.json records actual
+changed files and before/after hashes. files-original.json retains the source
+manifest, and files.json verifies published content. All five README file references
 resolve. A fresh scan against current local credential values found zero matches.
 The reviewer's earlier one-match sanitization is disclosed in its unchanged README.
 Private fixtures, API request logs, xcresults and Docker inspect data are excluded.
