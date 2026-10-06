@@ -13,7 +13,7 @@ or physical-device acceptance claim.
 | Original integration base | `875de09ac2115acec42e09060b92878aa5f18eff` |
 | Integration used for this recovery | `7018e0edebbc370b999005a857230bf3c3a1ad8b` |
 | One-way reconciliation merge | `9b85a4a1329d1cdcaf574f71f325993420bf3eb9` |
-| Latest integration | `70b0cd3891937f026900aceb96ce5f556c76b0b3` |
+| Latest reconciled integration | `70b0cd3891937f026900aceb96ce5f556c76b0b3` |
 | Privacy reconciliation merge | `0a512315142c8d59b71146b0e24e1848072634e2` |
 | Currency reconciliation merge | `2808ae2c1` |
 | First full-shell checkpoint | `e6b7cf325187f0c717634ab750cc258025bbf9a9` |
@@ -62,10 +62,12 @@ integration merge or hosted migration.
 | Profile | Shared grouped rows, avatar and destination presentation | Real identity and existing account actions. Unsupported DEBUG settings are identified as examples. Release gates remain. |
 | Updates | Shared inbox and preferences return path | No synthetic notifications are presented as real. |
 
-There is no balance-history endpoint in this slice. Current balances, future
-scheduled points, and past balances are different records. The approved empty
-history presentation remains until real historical data exists. Known zero is
-still distinct from missing coverage.
+There is no aggregated historical-position projection in this slice. Existing
+account and accepted-check reads do expose raw observations; the reader checkpoint
+below consumes those facts without deriving historical account type or ownership
+share from current metadata. Current balances, future scheduled points and past
+observations remain distinct. Connected historical charts are still unbound.
+Known zero remains distinct from missing coverage.
 
 ## Appearance evidence
 
@@ -383,3 +385,37 @@ records and recorded-only coverage. [The sanitized readback](phone-demo-readback
 records the checks. Credentials and the private journal remain outside the repo.
 This adds local test data without changing Check 3433, Preview 3427 or production.
 Physical rendering and historical chart acceptance remain open.
+
+
+## Personal observation reader, October 5 evening
+
+Source `5aa369d9ef4aee5d1b0fcf55ba2a8280eef04cac` adds one return-valued read through
+FinancialLoopModel and the existing identity-bound SessionController. A fresh
+account read brackets every accepted-check page and a second account read.
+Version changes, identity changes, cancellation, failed pages and the finite
+page cap return no partial facts. No second cache or transport is added.
+
+The normalized value keeps accepted revisions, original dates and zones, signed
+minor-unit amounts and server currency precision. Metadata is explicitly current.
+Missing data, a single observation, partial-period baselines and valid comparisons
+remain separate. A later accepted review can contain an earlier clock time on the
+same day. In that case the reader retains the raw facts but withholds a closing
+selection and change, following the shared-contract owner's accepted fallback.
+It does not replace accepted ordering with the largest timestamp.
+
+Seven focused model tests passed with zero failures or skips. They exercise
+multiple precision/sign cases, corrected observations, complete pagination,
+version races, failure paths, date boundaries, overflow, cancellation, sign-out
+and owner switching. The complete iOS app compiled successfully. Independent
+source review returned no actionable findings; its file hashes match the tested
+source. [Verification](observation-read-verification.json) and the
+[test log](observation-model-tests.log) preserve the evidence. The Mac verification
+slot was released after both commands completed.
+
+This completes the bounded reader, not the Home chart. No screen consumes it yet.
+Historical type/share attribution remains with the foundations owner under
+[#820](https://github.com/lagarcess/argus/issues/820) and
+[#824](https://github.com/lagarcess/argus/issues/824). Current metadata is not
+projected into old periods. Home history, Activity coverage/insights, current
+integration reconciliation and full physical acceptance remain open. Check3433
+and Preview3427 are unchanged by this source checkpoint.
