@@ -1098,7 +1098,7 @@ def test_render_env_sync_audit_declares_mode_specific_render_key_contract() -> N
 
 
 def test_render_blueprint_preserves_optional_posthog_key() -> None:
-    env_contract = ENV_CONTRACT.read_text()
+    env_contract = _contract_array("ARGUS_RENDER_WEB_ENV")
     web_env = _render_env("argus-app")
 
     assert "NEXT_PUBLIC_POSTHOG_KEY" in env_contract
