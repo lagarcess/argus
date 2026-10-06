@@ -15,7 +15,7 @@ _____ test_authenticated_openapi_declares_session_verification_unavailable _____
 
     def test_authenticated_openapi_declares_session_verification_unavailable() -> None:
         openapi = ROOT / "docs" / "api" / "openapi.yaml"
-    
+
         text = openapi.read_text(encoding="utf-8")
         assert "AuthSessionVerificationUnavailable" in text
         assert "auth_session_verification_unavailable" in text
@@ -64,7 +64,7 @@ _____ test_authenticated_openapi_declares_session_verification_unavailable _____
                     "$ref": "#/components/responses/AuthSessionVerificationUnavailable"
                 }
 E               AssertionError: assert {'content': {...be verified.'} == {'$ref': '#/c...nUnavailable'}
-E                 
+E
 E                 Left contains 2 more items:
 E                 {'content': {'application/json': {'schema': {'$ref': '#/components/schemas/Error'}}},
 E                  'description': '`apple_identity_unavailable`: current linked identity could '
@@ -89,7 +89,7 @@ ________ test_registered_auth_truth_ignores_editable_anonymous_metadata ________
         gateway.private_alpha_email_allowed.return_value = True
         gateway.get_or_create_profile_for_auth_user.return_value = profile
         gateway.get_user.return_value = profile
-    
+
         with (
             patch.object(api_state, "supabase_gateway", gateway),
             patch("argus.api.dependencies.auth_session_is_active", return_value=True),
@@ -98,7 +98,7 @@ ________ test_registered_auth_truth_ignores_editable_anonymous_metadata ________
                 "/api/v1/me",
                 headers={"Authorization": "Bearer verified-member-token"},
             )
-    
+
 >       assert response.status_code == 200
 E       assert 503 == 200
 E        +  where 503 = <Response [503 Service Unavailable]>.status_code

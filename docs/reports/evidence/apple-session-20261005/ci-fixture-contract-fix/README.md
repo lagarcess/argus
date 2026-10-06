@@ -40,6 +40,9 @@ exclusive PG60332 sublease. Its own synthetic users, identities and allowlist ro
 were cleaned in the existing finally teardown, then the lease was returned to QA.
 No Auth/container/configuration reset or foreign cleanup occurred.
 
+Trailing spaces in copied pytest failure output were removed before final
+publication. Test messages and outcomes are unchanged.
+
 Only test fixtures/assertions and this evidence changed. No production, native,
 SQL, provider policy or response source changed. All 51 published QA bundle hashes
 and 22 screenshots remain unchanged. The already completed combined native proof
