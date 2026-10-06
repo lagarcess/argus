@@ -1136,6 +1136,29 @@ extraction, start-date preservation, and discovery routing in three unrelated
 places. No unit test sends a message through a model, so nothing but the paid
 eval could have caught it, and that ran after the merge.
 
+## Household and beta invite hosted gate
+
+Before any hosted activation, generate a separate secret for that environment
+with `openssl rand -base64 48`, as defined in
+[Invite code security](API_CONTRACT.md#invite-code-security). Set
+`ARGUS_INVITE_CODE_SECRET` on the API service in Render before the deploy that
+applies destructive migration `20261003150100`. Keep the secret out of release
+evidence and logs. That migration discards old unkeyed codes; existing links
+remain valid. Follow the destructive-migration gate above, including the
+maintenance window, backup/readback plan, and explicit founder approval.
+
+Keep `ARGUS_HOUSEHOLDS_ENABLED`, `ARGUS_BETA_INVITES_ENABLED`, and
+`ARGUS_BETA_INVITE_GATE_ENABLED` false until the secret is installed and the
+approved migration deployment has passed readiness. Enable a flag only through
+an explicit, reviewed hosted change.
+
+Before enabling any of these flags, the operator must verify one API instance
+and `WEB_CONCURRENCY=1` in the deployed Render configuration and record the
+non-secret readback in the release manifest. The invite lookup counters live
+in each API process; multiple instances or workers multiply the budgets.
+If the worker or instance count cannot be confirmed, keep the flags off.
+This local checklist does not authorize hosted configuration or migration work.
+
 ## Guest Staged Rollout
 
 The operational security checklist for later internet-facing Guest exposure is

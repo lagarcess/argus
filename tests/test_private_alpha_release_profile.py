@@ -48,6 +48,14 @@ def _profile() -> dict[str, Any]:
     return json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
 
 
+def test_invite_code_surfaces_are_declared_off_by_default() -> None:
+    from argus.domain.household.invite_codes import CODE_FLAGS
+
+    env = _profile()["services"]["api"]["env"]
+    for flag in CODE_FLAGS:
+        assert env[flag] == "false"
+
+
 def test_release_profile_is_non_secret_and_defines_the_fixed_canary() -> None:
     profile = _profile()
     serialized = json.dumps(profile).lower()
