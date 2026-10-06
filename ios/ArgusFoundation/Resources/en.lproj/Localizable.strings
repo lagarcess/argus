@@ -347,7 +347,7 @@
 "plan.chart.title" = "Projected balance after each movement";
 "plan.chart.inspect" = "Touch to inspect. Each step is a movement, not an equal time interval.";
 "plan.chart.accessibility" = "Inspect movement";
-"plan.status.planned" = "Scheduled";
+"plan.status.planned" = "Planned";
 "plan.status.fulfilled" = "Recorded";
 "plan.status.needs_review" = "Review the linked activity";
 "plan.overdue" = "Overdue, included from today";

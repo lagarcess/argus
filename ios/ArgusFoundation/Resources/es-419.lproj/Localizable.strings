@@ -347,7 +347,7 @@
 "plan.chart.title" = "Saldo proyectado después de cada movimiento";
 "plan.chart.inspect" = "Toca para explorar. Cada paso es un movimiento, no un intervalo de tiempo igual.";
 "plan.chart.accessibility" = "Explorar movimiento";
-"plan.status.planned" = "Programado";
+"plan.status.planned" = "Previsto";
 "plan.status.fulfilled" = "Registrado";
 "plan.status.needs_review" = "Revisa la actividad vinculada";
 "plan.overdue" = "Vencido, incluido desde hoy";

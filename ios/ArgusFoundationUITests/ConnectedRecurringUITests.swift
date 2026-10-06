@@ -33,7 +33,7 @@ extension FinancialLoopUITests {
         selectPlanAccounts([bank])
         let row = homeUpcomingRow(note)
         XCTAssertTrue(row.exists, "Home Upcoming lists the planned occurrence inside the next 30 days")
-        XCTAssertTrue(row.label.contains("Scheduled"), row.label)
+        XCTAssertTrue(row.label.contains("Planned"), row.label)
         XCTAssertEqual(homeUpcomingRows(note).count, 1)
         XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists, "projection details stay on Plan")
         revealOnHome(row)
