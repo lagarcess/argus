@@ -103,17 +103,9 @@ struct CuadraoHomeCanvas: View {
         }
         .overlay(alignment: .bottom) {
             if let archivedID {
-                HStack {
-                    Text(spanish ? "Cuenta archivada" : "Account archived")
-                    Spacer()
-                    Button(spanish ? "Deshacer" : "Undo") {
-                        data.archive(archivedID, false); self.archivedID = nil
-                    }
-                    Button { self.archivedID = nil } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }
-                        .accessibilityLabel(spanish ? "Cerrar" : "Close")
-                }.font(.subheadline).padding(.leading, 20).padding(.trailing, 6)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-                    .padding(.horizontal, 20).padding(.bottom, 90)
+                CuadraoArchivedAccountToast(spanish: spanish, undo: {
+                    data.archive(archivedID, false); self.archivedID = nil
+                }, close: { self.archivedID = nil })
             }
         }
     }

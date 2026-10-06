@@ -18,6 +18,7 @@ struct ConnectedCuadraoHome: View {
     @State private var sheet: HomeSheet?
     @State private var choosingAccount = false
     @State private var moreAccount: FinancialAccount?
+    @State private var archivedID: UUID?
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var activeAccounts: [FinancialAccount] { accounts.accounts.filter { !$0.archived } }
@@ -25,11 +26,13 @@ struct ConnectedCuadraoHome: View {
 
     private enum HomeSheet: Identifiable {
         case customize, archived, options
+        case archive(FinancialAccount)
         var id: String {
             switch self {
             case .customize: "customize"
             case .archived: "archived"
             case .options: "options"
+            case .archive(let account): "archive." + account.id.uuidString
             }
         }
     }
@@ -127,10 +130,34 @@ struct ConnectedCuadraoHome: View {
             if !account.isOptionalAsset {
                 Button(NSLocalizedString("loop.check.title", comment: "")) { loop.check(account) }.accessibilityIdentifier("accounts.more.check")
             }
-            Button(spanish ? "Archivar" : "Archive", role: .destructive) { Task { await accounts.archive(account) } }
+            Button(spanish ? "Archivar" : "Archive", role: .destructive) { sheet = .archive(account) }
                 .accessibilityIdentifier("accounts.more.archive")
         }
         .sheet(item: $sheet) { item in modal(item) }
+        .overlay(alignment: .bottom) {
+            if let archivedID, homePath.isEmpty {
+                CuadraoArchivedAccountToast(spanish: spanish, undo: { restore(archivedID) }, close: { self.archivedID = nil })
+            }
+        }
+        .onChange(of: accounts.identity?.revision) { _, _ in archivedID = nil }
+        .onChange(of: householdDestination) { _, _ in archivedID = nil }
+    }
+
+    /// Archive is one canonical write; the toast appears only once the server returns the account archived.
+    private func archive(_ account: FinancialAccount) {
+        archivedID = nil
+        Task {
+            await accounts.archive(account)
+            guard accounts.accounts.first(where: { $0.id == account.id })?.archived == true else { return }
+            homePath = []
+            archivedID = account.id
+        }
+    }
+
+    private func restore(_ id: UUID) {
+        archivedID = nil
+        guard let account = accounts.accounts.first(where: { $0.id == id }), account.archived else { return }
+        Task { await accounts.archive(account) }
     }
 
     /// Activity routes never belong to the accounts selection, so selection changes leave them alone.
@@ -161,7 +188,8 @@ struct ConnectedCuadraoHome: View {
         if let account = accounts.accounts.first(where: { $0.id == id }) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    AccountDetailView(account: account, model: accounts, loop: loop, nativePlanNavigation: true, search: auth.financialSearch)
+                    AccountDetailView(account: account, model: accounts, loop: loop, nativePlanNavigation: true, search: auth.financialSearch,
+                        archive: { archive($0) })
                 }.padding(24)
             }
             .accessibilityIdentifier("screen.accounts")
@@ -248,9 +276,7 @@ struct ConnectedCuadraoHome: View {
                             .contextMenu {
                                 Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.edit(account) }
                                 Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
-                                Button(spanish ? "Archivar" : "Archive", role: .destructive) {
-                                    Task { await accounts.archive(account) }
-                                }
+                                Button(spanish ? "Archivar" : "Archive", role: .destructive) { sheet = .archive(account) }
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityAddTraits(.isButton)
@@ -346,6 +372,8 @@ struct ConnectedCuadraoHome: View {
             ConnectedArchivedAccounts(accounts: accounts, spanish: spanish, showAll: true)
         case .archived:
             ConnectedArchivedAccounts(accounts: accounts, spanish: spanish)
+        case .archive(let account):
+            CuadraoArchiveAccountReview(spanish: spanish) { archive(account) }
         }
     }
 

@@ -184,7 +184,7 @@ extension FinancialLoopUITests {
         selectPlanAccounts([archived])
         openMoneyAccount(archived)
         tapVisible(app.buttons["accounts.archive"])
-        XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
+        app.confirmAccountArchive()
         selectPlanAccounts([])
         XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
         XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)

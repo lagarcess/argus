@@ -50,6 +50,20 @@ extension XCUIApplication {
         buttons["tab.plan"].tap()
     }
 
+    var archivedUndo: XCUIElement { buttons["accounts.archived.undo"] }
+
+    /// Archiving is reviewed first. Connected Home then returns to the list and offers Undo; the tip shell keeps the detail with Restore.
+    @discardableResult
+    func confirmAccountArchive(file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let confirm = buttons["accounts.archive.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10), "archive asks for review before the write", file: file, line: line)
+        confirm.tap()
+        if archivedUndo.waitForExistence(timeout: 10) { return true }
+        let spanish = ProcessInfo.processInfo.environment["ARGUS_TEST_LANGUAGE"] == "es-419"
+        XCTAssertTrue(buttons[spanish ? "Restaurar cuenta" : "Restore account"].waitForExistence(timeout: 5), file: file, line: line)
+        return false
+    }
+
     var accountBack: XCUIElement {
         let native = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
         return native.exists ? native : buttons["accounts.back"]

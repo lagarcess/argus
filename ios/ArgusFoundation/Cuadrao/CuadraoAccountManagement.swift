@@ -1,19 +1,37 @@
 import SwiftUI
 
 struct CuadraoArchiveAccountReview: View {
-    let data: CuadraoAccountsPreview
-    let id: UUID
     let spanish: Bool
-    let archived: () -> Void
+    let archive: () -> Void
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(spanish ? "¿Archivar esta cuenta?" : "Archive this account?").font(CuadraoTypography.feature)
             Text(spanish ? "El historial se conserva. Puedes recuperarla en Cuentas archivadas." : "Its history stays intact. Restore it from Archived accounts.")
-            Button(spanish ? "Archivar" : "Archive") { data.archive(id, true); archived(); dismiss() }
+            Button(spanish ? "Archivar" : "Archive") { archive(); dismiss() }
                 .buttonStyle(.borderedProminent).tint(WelcomePalette.pine)
+                .accessibilityIdentifier("accounts.archive.confirm")
             Button(spanish ? "Cancelar" : "Cancel") { dismiss() }
+                .accessibilityIdentifier("accounts.archive.cancel")
         }.padding(28).presentationDetents([.medium, .large])
+    }
+}
+
+struct CuadraoArchivedAccountToast: View {
+    let spanish: Bool
+    let undo: () -> Void
+    let close: () -> Void
+    var body: some View {
+        HStack {
+            Text(spanish ? "Cuenta archivada" : "Account archived")
+            Spacer()
+            Button(spanish ? "Deshacer" : "Undo", action: undo).accessibilityIdentifier("accounts.archived.undo")
+            Button(action: close) { Image(systemName: "xmark").frame(width: 44, height: 44) }
+                .accessibilityLabel(spanish ? "Cerrar" : "Close")
+                .accessibilityIdentifier("accounts.archived.close")
+        }.font(.subheadline).padding(.leading, 20).padding(.trailing, 6)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .padding(.horizontal, 20).padding(.bottom, 90)
     }
 }
 
