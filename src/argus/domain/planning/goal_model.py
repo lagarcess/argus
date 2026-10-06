@@ -14,6 +14,7 @@ from argus.domain.recording.currency import (
     normalize_currency,
 )
 from argus.domain.recording.errors import AccountNotFound, StaleVersion
+from argus.domain.recording.money_reads import activity_in_currency
 from argus.domain.recording.repository import StoredAccount
 
 
@@ -253,7 +254,7 @@ def transfer_matches(
 ) -> bool:
     return (
         actual["kind"] == "transfer"
-        and actual["currency"] == currency
+        and activity_in_currency(actual, currency)
         and {(leg["role"], leg["account_id"]) for leg in actual["legs"]}
         == {("source", source), ("destination", destination)}
     )

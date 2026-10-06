@@ -15,6 +15,10 @@ class MoneyLegResponse(BaseModel):
     record_revision: int
     account_id: str
     role: Literal["single", "source", "destination"]
+    amount_minor: int
+    amount: str
+    currency: str
+    currency_fraction_digits: int
     balance_movement_minor: int
     coverage: list[CoverageAnswer]
 

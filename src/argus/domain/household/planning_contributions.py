@@ -10,7 +10,7 @@ from argus.domain.recording.currency import parse_minor_units
 from argus.domain.recording.errors import StaleVersion
 from argus.domain.recording.money_plan import plan, selected
 from argus.domain.recording.money_postgres import persist
-from argus.domain.recording.money_reads import render_activity
+from argus.domain.recording.money_reads import activity_in_currency, render_activity
 
 from . import planning_definitions as definitions
 from . import planning_projection as projection
@@ -55,7 +55,9 @@ def attach(service, ctx, b, current, actual, body):
     purpose = body.purpose
     from .planning import PURPOSES
 
-    if purpose not in PURPOSES[b["kind"]] or actual["currency"] != current["currency"]:
+    if purpose not in PURPOSES[b["kind"]] or not activity_in_currency(
+        actual, current["currency"]
+    ):
         model.fail("plan_contribution_mismatch", "Choose the plan purpose and currency.")
     by_id = {s.account.id: s.account for s in canonical.records}
     roles = {leg["role"]: leg["account_id"] for leg in actual["legs"]}
@@ -233,7 +235,7 @@ def candidates(service, actor, hid, kind, identifier):
             if aid in claimed:
                 continue
             actual = render_activity(aid, canonical.history[aid], revision)
-            if actual["currency"] != body["currency"]:
+            if not activity_in_currency(actual, body["currency"]):
                 continue
             try:
                 require_activity_access(ctx, actual, actor)
