@@ -159,7 +159,7 @@ struct ConnectedPlanEditor: View {
 
     private func detailsView(_ plan: Binding<CanvasPlan>) -> some View {
         let current = plan.wrappedValue
-        return Group {
+        return VStack(alignment: .leading, spacing: 0) {
             switch current.kind {
             case .goal: goalDetails(current)
             case .budget: budgetDetails(current)
