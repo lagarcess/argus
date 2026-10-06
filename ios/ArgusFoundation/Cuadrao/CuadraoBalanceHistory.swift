@@ -98,6 +98,11 @@ struct CanvasBuiltBalanceHistory {
         points = CanvasBalanceHistory.points(accounts: accounts, observations: observations, now: now)
         day = Calendar.current.startOfDay(for: now)
     }
+    /// Points already totalled by their owner, such as the connected hero series.
+    init(points: [CanvasBalancePoint], now: Date) {
+        self.points = points
+        day = Calendar.current.startOfDay(for: now)
+    }
     func points(on now: Date) -> [CanvasBalancePoint]? {
         Calendar.current.startOfDay(for: now) == day ? points : nil
     }
