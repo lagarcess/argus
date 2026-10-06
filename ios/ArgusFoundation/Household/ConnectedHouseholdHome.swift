@@ -117,7 +117,7 @@ struct ConnectedHouseholdHome: View {
     }
 
     private func overview(_ snapshot: HouseholdSnapshot) -> some View {
-        let positions = snapshot.positions
+        let positions = CurrencyPresentation.ordered(snapshot.positions, primary: auth.profile?.currency, currency: { $0.currency })
         let position = positions.first { $0.currency == currency } ?? positions[0]
         return VStack(alignment: .leading, spacing: 12) {
             Text("household.scopeNotice").font(.subheadline).foregroundStyle(.secondary)

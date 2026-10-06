@@ -5,15 +5,19 @@ struct ConnectedCuadraoBalanceOverview: View {
     let home: FinancialHome
     let spanish: Bool
     var space = "Personal"
+    @EnvironmentObject private var auth: ProfileAuthModel
     @State private var chosenCurrency: String?
     @State private var expanded = false
+    private var currencies: [FinancialCurrencySummary] {
+        CurrencyPresentation.ordered(home.currencies, primary: auth.profile?.currency, currency: { $0.currency })
+    }
     private var summary: FinancialCurrencySummary? {
-        home.currencies.first { $0.currency == chosenCurrency } ?? home.currencies.first
+        currencies.first { $0.currency == chosenCurrency } ?? currencies.first
     }
 
     var body: some View {
         if let summary {
-            ConnectedBalanceReading(summary: summary, currencies: home.currencies.map(\.currency),
+            ConnectedBalanceReading(summary: summary, currencies: currencies.map(\.currency),
                 spanish: spanish, timeZone: home.period?.timeZone ?? TimeZone.current.identifier,
                 chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
                 .fullScreenCover(isPresented: $expanded) {

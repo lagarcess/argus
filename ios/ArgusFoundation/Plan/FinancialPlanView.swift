@@ -24,6 +24,7 @@ struct FinancialPlanDestination: View {
 }
 
 struct FinancialPlanView: View {
+    @EnvironmentObject private var auth: ProfileAuthModel
     @ObservedObject var model: FinancialPlanModel
     @ObservedObject var loop: FinancialLoopModel
     var nativeNavigation = false
@@ -97,10 +98,12 @@ struct FinancialPlanView: View {
 
     private func overview(_ projection: FinancialPlanProjection) -> some View {
         VStack(alignment: .leading, spacing: 24) {
-            FinancialPlanForecast(projection: projection, chooseAccounts: { selectingAccounts = true },
-                canChooseAccounts: loop.pendingConfirmation == nil && !model.saving, bottomSpace: bottomSpace) {
-                forecastControls(projection)
+            FinancialPlanForecast(projection: projection, primaryCurrency: auth.profile?.currency, chooseAccounts: { selectingAccounts = true },
+                canChooseAccounts: loop.pendingConfirmation == nil && !model.saving, bottomSpace: bottomSpace) { currency in
+                forecastControls(projection, currency: currency)
             }
+            .id(auth.profile?.id)
+            .id(ObjectIdentifier(model))
             FinancialPlanCards(model: model, loop: loop, projection: projection,
                 create: { creating = true }, bottomSpace: bottomSpace)
             expected(projection)
@@ -113,7 +116,7 @@ struct FinancialPlanView: View {
         }
     }
 
-    private func forecastControls(_ projection: FinancialPlanProjection) -> some View {
+    private func forecastControls(_ projection: FinancialPlanProjection, currency: FinancialForecastCurrency?) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             DatePicker("plan.until.label", selection: Binding(get: { PlanPresentation.date(projection.endDate) },
                 set: { date in Task { await model.refresh(until: PlanPresentation.day(date)) } }),
@@ -124,7 +127,9 @@ struct FinancialPlanView: View {
             Button { selectingAccounts = true } label: {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack { Text("plan.includedAccounts"); Spacer(); Image(systemName: "chevron.right").font(.caption2) }
-                    Text(includedNames(projection)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                    if let currency {
+                        Text(includedNames(projection, currency: currency)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                    }
                 }.font(CuadraoTypography.supporting).frame(minHeight: 48).contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityIdentifier("plan.accounts").disabled(loop.pendingConfirmation != nil || model.saving)
             Text(projection.selection.timeZone).font(CuadraoTypography.caption).foregroundStyle(.secondary)
@@ -188,8 +193,8 @@ struct FinancialPlanView: View {
         case .debts: loop.debts.create()
         }
     }
-    private func includedNames(_ projection: FinancialPlanProjection) -> String {
-        let names = projection.accounts.filter { projection.selection.accountIds.contains($0.id) }.map {
+    private func includedNames(_ projection: FinancialPlanProjection, currency: FinancialForecastCurrency) -> String {
+        let names = projection.accounts.filter { currency.accountIds.contains($0.id) }.map {
             $0.nickname ?? NSLocalizedString("accounts.type." + $0.type, comment: "")
         }.joined(separator: " · ")
         return names.isEmpty ? (spanish ? "Ninguna cuenta seleccionada" : "No accounts selected") : names
