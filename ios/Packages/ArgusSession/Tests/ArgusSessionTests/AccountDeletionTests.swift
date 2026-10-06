@@ -49,6 +49,28 @@ private struct DeletionFixture {
     }
 }
 
+private struct DeletionCleanupFiles: Sendable {
+    let root: URL
+    init() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("argus-cleanup-test-" + UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    }
+    private func directory(_ userID: UUID) -> URL { root.appendingPathComponent(userID.uuidString, isDirectory: true) }
+    func create(_ userID: UUID) throws {
+        let owner = directory(userID)
+        try FileManager.default.createDirectory(at: owner, withIntermediateDirectories: true)
+        try Data("synthetic draft".utf8).write(to: owner.appendingPathComponent("draft.txt"))
+    }
+    func contains(_ userID: UUID) -> Bool { FileManager.default.fileExists(atPath: directory(userID).appendingPathComponent("draft.txt").path) }
+    func remove(_ userID: UUID) throws {
+        do { try FileManager.default.removeItem(at: directory(userID)) }
+        catch let error as CocoaError where error.code == .fileNoSuchFile { }
+    }
+    func removeAll() throws { try FileManager.default.removeItem(at: root) }
+}
+
+private enum DeletionCleanupTestFailure: Error, Sendable { case callbackFailed, expectedCompletion }
+
 final class AccountDeletionTests: XCTestCase {
     func testDoneIssuesOwnerReceiptAndRetiresWithoutRefreshOrCapture() async throws {
         let fixture = DeletionFixture(); let controller = try fixture.controller()
@@ -173,7 +195,7 @@ final class AccountDeletionTests: XCTestCase {
         let restored = try fixture.controller(); _ = try await restored.restore()
         let status = try await restored.accountDeletionStatus(userID: UUID(uuidString: identity.profile!.id)!)
         guard case .completed(let receipt) = status else { return XCTFail("Durable cleanup obligation") }
-        try await restored.acknowledgeConfirmedAccountDeletion(receipt)
+        try await restored.acknowledgeConfirmedAccountDeletion(receipt, cleanup: { _ in })
         XCTAssertNil(try fixture.journal())
         let commands = await fixture.server.captured(); XCTAssertEqual(commands.count, 1)
     }
@@ -286,6 +308,126 @@ final class AccountDeletionTests: XCTestCase {
         XCTAssertNotNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".session"))
         do { _ = try await controller.financialAccounts(expectedIdentity: identity); XCTFail("Notification requires fresh Apple validation") } catch {}
         let reads = await fixture.server.auth.count("/financial-accounts"); XCTAssertEqual(reads, 0)
+    }
+
+
+    private func completedReceipt(_ fixture: DeletionFixture, _ controller: SessionController) async throws -> ConfirmedAccountDeletion {
+        let identity = try await fixture.login(controller)
+        guard case .completed(let receipt) = try await controller.deleteAccount(expectedIdentity: identity) else {
+            throw DeletionCleanupTestFailure.expectedCompletion
+        }
+        return receipt
+    }
+
+    func testStaleCompletedCleanupHasNoFilesystemEffectsWhileBOwnsSession() async throws {
+        let fixture = DeletionFixture(); let controller = try fixture.controller()
+        let receipt = try await completedReceipt(fixture, controller)
+        let files = try DeletionCleanupFiles(); defer { try? files.removeAll() }
+        try files.create(receipt.userID)
+        let bob = try await controller.login(email: "bob@example.test", password: "synthetic-password", captchaToken: "synthetic-captcha")
+        let bobID = try XCTUnwrap(UUID(uuidString: bob.profile!.id)); try files.create(bobID)
+        do {
+            try await controller.acknowledgeConfirmedAccountDeletion(receipt) { try files.remove($0) }
+            XCTFail("A's stale receipt must not authorize filesystem cleanup")
+        } catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
+        XCTAssertTrue(files.contains(receipt.userID)); XCTAssertTrue(files.contains(bobID))
+        XCTAssertEqual(try fixture.journal()?.phase, .completed)
+        let current = await controller.snapshot(); XCTAssertEqual(current, bob)
+    }
+
+    func testCompletedCleanupUsesValidatedOwnerAndMissingDirectoryIsIdempotent() async throws {
+        for exists in [true, false] {
+            let fixture = DeletionFixture(); let controller = try fixture.controller()
+            let receipt = try await completedReceipt(fixture, controller)
+            let files = try DeletionCleanupFiles(); defer { try? files.removeAll() }
+            if exists { try files.create(receipt.userID) }
+            let unrelated = UUID(); try files.create(unrelated)
+            try await controller.acknowledgeConfirmedAccountDeletion(receipt) { try files.remove($0) }
+            XCTAssertFalse(files.contains(receipt.userID)); XCTAssertTrue(files.contains(unrelated))
+            XCTAssertNil(try fixture.journal())
+            let requests = await fixture.server.captured(); XCTAssertEqual(requests.count, 1)
+        }
+    }
+
+    func testCleanupCallbackFailureRetainsJournalAndRelaunchRetriesCleanupOnly() async throws {
+        let fixture = DeletionFixture(); let controller = try fixture.controller()
+        let receipt = try await completedReceipt(fixture, controller)
+        let files = try DeletionCleanupFiles(); defer { try? files.removeAll() }
+        try files.create(receipt.userID)
+        do {
+            try await controller.acknowledgeConfirmedAccountDeletion(receipt) { _ in throw DeletionCleanupTestFailure.callbackFailed }
+            XCTFail("Cleanup did not succeed")
+        } catch { XCTAssertEqual(error as? DeletionCleanupTestFailure, .callbackFailed) }
+        XCTAssertTrue(files.contains(receipt.userID)); XCTAssertEqual(try fixture.journal()?.phase, .completed)
+        let restored = try fixture.controller(); _ = try await restored.restore()
+        let status = try await restored.accountDeletionStatus(userID: receipt.userID)
+        guard case .completed(let recovered) = status else { return XCTFail("Existing journal owns retry") }
+        try await restored.acknowledgeConfirmedAccountDeletion(recovered) { try files.remove($0) }
+        XCTAssertFalse(files.contains(receipt.userID)); XCTAssertNil(try fixture.journal())
+        let requests = await fixture.server.captured(); XCTAssertEqual(requests.count, 1)
+    }
+
+    func testAcknowledgementStorageFailureAfterCleanupRetainsIdempotentRetryObligation() async throws {
+        let fixture = DeletionFixture(); let controller = try fixture.controller()
+        let receipt = try await completedReceipt(fixture, controller)
+        let files = try DeletionCleanupFiles(); defer { try? files.removeAll() }
+        try files.create(receipt.userID); fixture.storage.failRemoves = true
+        do {
+            try await controller.acknowledgeConfirmedAccountDeletion(receipt) { try files.remove($0) }
+            XCTFail("Journal removal must fail")
+        } catch { XCTAssertEqual(error as? SessionFailure, .storageUnavailable) }
+        XCTAssertFalse(files.contains(receipt.userID)); XCTAssertEqual(try fixture.journal()?.phase, .completed)
+        fixture.storage.failRemoves = false
+        try await controller.acknowledgeConfirmedAccountDeletion(receipt) { try files.remove($0) }
+        XCTAssertNil(try fixture.journal())
+        let requests = await fixture.server.captured(); XCTAssertEqual(requests.count, 1)
+    }
+
+    func testCleanupCannotInterruptBAdoptionBeforeSDKProofIsStored() async throws {
+        let fixture = DeletionFixture(); let controller = try fixture.controller()
+        let receipt = try await completedReceipt(fixture, controller)
+        let files = try DeletionCleanupFiles(); defer { try? files.removeAll() }
+        try files.create(receipt.userID)
+        let gate = RequestGate(); await fixture.server.holdSDKUser(gate)
+        let login = Task { try await controller.login(email: "bob@example.test", password: "synthetic-password", captchaToken: "synthetic-captcha") }
+        await gate.waitUntilStarted()
+        let pending = try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending")
+        do {
+            try await controller.acknowledgeConfirmedAccountDeletion(receipt) { try files.remove($0) }
+            XCTFail("B adoption already owns the actor mutation")
+        } catch { XCTAssertEqual(error as? SessionFailure, .busy) }
+        XCTAssertTrue(files.contains(receipt.userID))
+        XCTAssertEqual(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending"), pending)
+        await gate.release(); _ = try await login.value
+    }
+
+    func testPendingUncertaintyAndOrdinarySignOutCannotAuthorizeCleanup() async throws {
+        for status in [202, 503, 0] {
+            let fixture = DeletionFixture(); let controller = try fixture.controller()
+            let identity = try await fixture.login(controller); let userID = try XCTUnwrap(UUID(uuidString: identity.profile!.id))
+            let files = try DeletionCleanupFiles(); defer { try? files.removeAll() }
+            try files.create(userID)
+            let receipt: ConfirmedAccountDeletion
+            if status == 0 {
+                _ = try await controller.signOut()
+                receipt = .init(userID: userID, initiatingRevision: identity.revision, commandID: UUID())
+            } else {
+                if status == 202 {
+                    await fixture.server.configure(status, ["status": "in_progress", "pending": []])
+                } else {
+                    await fixture.server.configure(status, ["code": "account_deletion_incomplete"])
+                }
+                _ = try await controller.deleteAccount(expectedIdentity: identity)
+                let journal = try XCTUnwrap(fixture.journal())
+                receipt = .init(userID: journal.userID, initiatingRevision: journal.initiatingRevision, commandID: journal.id)
+            }
+            let before = try fixture.journal()
+            do {
+                try await controller.acknowledgeConfirmedAccountDeletion(receipt) { try files.remove($0) }
+                XCTFail("Only a completed journal authorizes cleanup")
+            } catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
+            XCTAssertTrue(files.contains(userID)); XCTAssertEqual(try fixture.journal(), before)
+        }
     }
 
 }
