@@ -29,3 +29,18 @@ struct ConnectedBalanceSummary {
         return NSDecimalNumber(decimal: value / assets).doubleValue
     }
 }
+
+/// The server's own monthly period is the only canonical activity read. Its coverage is
+/// `recorded_only`, so a zero is never a proven zero and every other page has no data.
+enum ConnectedSpendingPeriod: Equatable {
+    case recorded(minor: String)
+    case noData
+
+    static func reading(summary: FinancialCurrencySummary, period: FinancialHomePeriod?, page: DateInterval) -> Self {
+        guard let period, let start = AccountPresentation.parseDate(period.startAt),
+              let end = AccountPresentation.parseDate(period.endAtExclusive),
+              start == page.start, end == page.end,
+              let minor = summary.grossPurchasesMinor, let value = Decimal(string: minor), value > 0 else { return .noData }
+        return .recorded(minor: minor)
+    }
+}
