@@ -5,7 +5,6 @@ struct FinancialBudgetList: View {
     @ObservedObject var plan: FinancialPlanModel
     @ObservedObject var model: FinancialBudgetModel
     let origin: FinancialBudgetNavigation.Origin
-    var compact = false
     private var items: [FinancialBudgetProgress] { (plan.projection?.budgets ?? []).filter { !$0.budget.archived } }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -18,18 +17,6 @@ struct FinancialBudgetList: View {
                         FinancialBudgetSummary(progress: progress, compact: true)
                     }.padding(.vertical, 14).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityIdentifier("budget.row." + origin.rawValue + "." + progress.id.uuidString)
-            }
-            if !compact {
-                Button("budget.add") { Task { await model.create() } }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("budget.add")
-                if let archived = plan.projection?.budgets.filter({ $0.budget.archived }), !archived.isEmpty {
-                    DisclosureGroup("budget.archived") {
-                        ForEach(archived) { progress in
-                            Button { Task { await model.open(progress.id, origin: origin) } } label: {
-                                HStack { Text(verbatim: progress.budget.name); Spacer(); Image(systemName: "chevron.right") }.frame(minHeight: 48).contentShape(Rectangle())
-                            }.buttonStyle(.plain).accessibilityIdentifier("budget.archived." + progress.id.uuidString)
-                        }
-                    }
-                }
             }
         }
     }
@@ -75,7 +62,7 @@ struct FinancialBudgetPresenter: View {
                 NavigationStack {
                     FinancialBudgetDetailView(model: model, loop: loop) {
                         if let origin = model.navigation?.origin {
-                            switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .budgets; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search }
+                            switch origin { case .home: destination = .home; case .plan, .planOverview: destination = .plan; case .search: destination = .search }
                         }
                         model.close()
                         Task { await search?.refresh() }

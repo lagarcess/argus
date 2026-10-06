@@ -5,19 +5,12 @@ struct FinancialDebtList: View {
     @ObservedObject var plan: FinancialPlanModel
     @ObservedObject var model: FinancialDebtModel
     let origin: FinancialDebtNavigation.Origin
-    var compact = false
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("plan.debts").font(ArgusStyle.display(23))
             let items = plan.projection?.debts ?? []
             if items.filter({ !$0.debt.archived }).isEmpty { Text("debt.empty").foregroundStyle(ArgusStyle.secondary) }
             ForEach(items.filter { !$0.debt.archived }) { progress in row(progress) }
-            if !compact {
-                Button("debt.add") { model.create() }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("debt.add")
-                if items.contains(where: { $0.debt.archived }) {
-                    DisclosureGroup("debt.archived") { ForEach(items.filter { $0.debt.archived }) { progress in row(progress) } }
-                }
-            }
         }
     }
     private func row(_ progress: FinancialDebtProgress) -> some View {
@@ -79,7 +72,7 @@ struct FinancialDebtPresenter: View {
             if model.navigation != nil {
                 NavigationStack {
                     FinancialDebtDetail(model: model, loop: loop) {
-                        switch model.navigation?.origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .debts; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search, .searchAccount: destination = .search; case .account: destination = .accounts; case nil: break }
+                        switch model.navigation?.origin { case .home: destination = .home; case .plan, .planOverview: destination = .plan; case .search, .searchAccount: destination = .search; case .account: destination = .accounts; case nil: break }
                         model.close(); Task { await search?.refresh() }
                     }
                 }.tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)

@@ -166,7 +166,7 @@ extension FinancialLoopUITests {
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("budget-exact-command-recovered-once")
         app.returnFromDetail("budget.close")
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.plan.' AND label CONTAINS %@", title)).count, 1)
+        XCTAssertEqual(planCards("budget", title).count, 1)
     }
 
     func budgetExpense(amount: String, note: String) {
@@ -182,8 +182,7 @@ extension FinancialLoopUITests {
 
     func prepareBudget(_ title: String, accounts: [MoneyAccount]) {
         app.openPlanSurface()
-        selectPlanSection("budgets")
-        tapVisible(app.buttons["budget.add"])
+        startPlan("budget")
         fillMoneyField("budget.name", with: title)
         fillMoneyField("budget.limit", with: "150")
         dismissMoneyKeyboard()
@@ -201,8 +200,7 @@ extension FinancialLoopUITests {
 
     func openBudget(_ title: String) {
         app.openPlanSurface()
-        selectPlanSection("budgets")
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.row.plan.' AND label CONTAINS %@", title)).firstMatch
+        let row = planCards("budget", title).firstMatch
         tapVisible(row)
         XCTAssertTrue(app.staticTexts["budget.spent"].waitForExistence(timeout: 15))
     }

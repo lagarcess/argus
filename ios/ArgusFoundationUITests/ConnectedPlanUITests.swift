@@ -271,23 +271,18 @@ extension FinancialLoopUITests {
     }
 
     func revealPlanForecastControls() {
-        if !app.buttons["plan.forecast.details"].exists {
-            selectPlanSection("overview")
-        }
         if !app.buttons["plan.accounts"].exists {
             tapVisible(app.buttons["plan.forecast.details"])
         }
     }
 
-    func revealPlanManagement() {
-        if !app.buttons["plan.overview"].exists {
-            tapVisible(app.buttons["plan.manage"])
-        }
+    func startPlan(_ kind: String) {
+        tapVisible(app.buttons["plan-create"])
+        tapVisible(app.buttons["plan-kind-" + kind])
     }
 
-    func selectPlanSection(_ section: String) {
-        revealPlanManagement()
-        tapVisible(app.buttons["plan." + section])
+    func planCards(_ kind: String, _ title: String) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "plan.card." + kind + ".", title))
     }
 
     func openPlanOccurrence(_ title: String) {

@@ -16,6 +16,7 @@ struct FinancialPlanForecast<Details: View>: View {
             explicit: selectedCurrency, primary: primaryCurrency)
         return projection.currencies.first { $0.currency == code }
     }
+    private var start: ConnectedForecastStart? { .reading(projection.currencies, hasAccounts: !projection.accounts.isEmpty) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -37,7 +38,9 @@ struct FinancialPlanForecast<Details: View>: View {
                     CuadraoChoiceLabel(title: currency?.currency ?? NSLocalizedString("context.personal", comment: ""), selectable: false)
                 }
             } content: {
-                if let currency {
+                if let start {
+                    coldStart(start)
+                } else if let currency {
                     FinancialPlanForecastCurrency(currency: currency, start: projection.startDate, end: projection.endDate)
                         .id(currency.currency)
                         .id(projection.selection.accountIds)
@@ -45,16 +48,10 @@ struct FinancialPlanForecast<Details: View>: View {
                         .id(currency.accountIds)
                     Text(spanish ? "Según tus saldos y compromisos registrados. No estima gastos sin programar." : "Based on your balances and scheduled items. Unplanned spending is not estimated.")
                         .font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("plan.coverage")
-                } else if !projection.currencies.isEmpty {
+                } else {
                     Text(spanish ? "Elige una moneda para ver tu previsión." : "Choose a currency to see your forecast.")
                         .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
                         .accessibilityIdentifier("plan.forecast.chooseCurrency")
-                } else {
-                    CuadraoPlanColdStart(spanish: spanish,
-                        detail: spanish ? "Puedes hacer tu primer plan hoy. Elige las cuentas que quieres incluir para ver lo que viene." : "Make your first plan today. Choose the accounts to include to see what's ahead.") {
-                        Button("plan.chooseMoney", action: chooseAccounts).disabled(!canChooseAccounts)
-                            .accessibilityIdentifier("plan.chooseAccounts")
-                    }
                 }
             } explore: {
                 #if DEBUG
@@ -63,31 +60,55 @@ struct FinancialPlanForecast<Details: View>: View {
                 }
                 #endif
             }
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 16) {
-                    if let currency {
-                        PlanValueRow(title: "plan.income", value: amount(currency.expectedIncomeMinor, in: currency))
-                        PlanValueRow(title: "plan.bills", value: amount(currency.expectedBillsMinor, in: currency))
-                        if let effect = currency.transferEffectMinor {
-                            PlanValueRow(title: "goal.transferEffect", value: amount(effect, in: currency))
-                        }
-                        PlanValueRow(title: "plan.netChange", value: amount(currency.netCashChangeMinor, in: currency))
-                        if let asOf = currency.asOf {
-                            Text(NSLocalizedString("plan.asOf", comment: "") + " " + AccountPresentation.date(asOf, zone: projection.selection.timeZone, locale: locale))
-                                .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    details(currency)
-                    Text("plan.assumptions").font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                }.padding(.top, 16)
-            } label: {
-                Text(spanish ? "¿De dónde sale?" : "What's behind this?").font(.subheadline.weight(.medium))
-                    .accessibilityIdentifier("plan.forecast.details")
-            }.padding(.top, 8)
+            if start != .noAccounts { behind }
         }
         .onChange(of: projection.currencies.map(\.currency)) { _, available in
             if let selectedCurrency, !available.contains(selectedCurrency) { self.selectedCurrency = nil }
         }
+    }
+
+    private func coldStart(_ start: ConnectedForecastStart) -> some View {
+        CuadraoPlanColdStart(spanish: spanish, detail: coldStartDetail(start)) {
+            if start != .noAccounts {
+                Button("plan.chooseMoney", action: chooseAccounts).disabled(!canChooseAccounts)
+                    .accessibilityIdentifier("plan.chooseAccounts")
+            }
+        }
+    }
+
+    private func coldStartDetail(_ start: ConnectedForecastStart) -> String {
+        switch start {
+        case .noAccounts:
+            spanish ? "Puedes hacer tu primer plan hoy. Tu previsión tomará forma cuando agregues una cuenta." : "Make your first plan today. Your forecast will take shape once you add an account."
+        case .noAccountsIncluded:
+            spanish ? "Puedes hacer tu primer plan hoy. Elige las cuentas que quieres incluir para ver lo que viene." : "Make your first plan today. Choose the accounts to include to see what's ahead."
+        case .noKnownBalance:
+            spanish ? "Puedes hacer tu primer plan hoy. Tu previsión tomará forma cuando tus cuentas tengan un saldo." : "Make your first plan today. Your forecast will take shape once your accounts have a balance."
+        }
+    }
+
+    private var behind: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 16) {
+                if let currency {
+                    PlanValueRow(title: "plan.income", value: amount(currency.expectedIncomeMinor, in: currency))
+                    PlanValueRow(title: "plan.bills", value: amount(currency.expectedBillsMinor, in: currency))
+                    if let effect = currency.transferEffectMinor {
+                        PlanValueRow(title: "goal.transferEffect", value: amount(effect, in: currency))
+                    }
+                    PlanValueRow(title: "plan.netChange", value: amount(currency.netCashChangeMinor, in: currency))
+                    if let asOf = currency.asOf {
+                        Text(NSLocalizedString("plan.asOf", comment: "") + " " + AccountPresentation.date(asOf, zone: projection.selection.timeZone, locale: locale))
+                            .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                    }
+                }
+                details(currency)
+                Text("plan.assumptions").font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            }.padding(.top, 16)
+        } label: {
+            Text(spanish ? "¿De dónde sale?" : "What's behind this?").font(.subheadline.weight(.medium))
+                .accessibilityIdentifier("plan.forecast.details")
+        }.padding(.top, 8)
     }
     private func amount(_ minor: String, in currency: FinancialForecastCurrency) -> String {
         PlanPresentation.money(minor, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale)

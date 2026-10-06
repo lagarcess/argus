@@ -631,6 +631,7 @@
 "household.personal" = "Personal";
 "household.title" = "Hogar";
 "household.manage" = "Administrar espacios";
+"household.addSpace" = "Añadir un espacio";
 "household.people" = "Personas";
 "household.scopeNotice" = "Solo cuentas registradas y compartidas explícitamente. La parte registrada de cada titular cuenta una vez.";
 "household.knownSubtotal" = "Subtotal conocido";

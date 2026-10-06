@@ -24,3 +24,17 @@ enum ConnectedForecastSeries: Equatable {
         return .series(points, scheduled: currency.points.contains { $0.occurrenceId != nil })
     }
 }
+
+/// Why Plan shows its cold start instead of a forecast. Nil once any included account has a known balance.
+enum ConnectedForecastStart: Equatable {
+    case noAccounts
+    case noAccountsIncluded
+    case noKnownBalance
+
+    static func reading(_ currencies: [FinancialForecastCurrency], hasAccounts: Bool) -> ConnectedForecastStart? {
+        guard hasAccounts else { return .noAccounts }
+        guard !currencies.isEmpty else { return .noAccountsIncluded }
+        let known = currencies.contains { currency in currency.accountIds.contains { !currency.unknownAccountIds.contains($0) } }
+        return known ? nil : .noKnownBalance
+    }
+}
