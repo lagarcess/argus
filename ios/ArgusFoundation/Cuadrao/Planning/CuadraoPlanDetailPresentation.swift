@@ -6,7 +6,7 @@ struct CuadraoPlanDetailDisplay {
     let look: CanvasPlanLook
     let amount: String
     let annotation: String
-    var amountIdentifier = "plan-detail-amount"
+    var amountIdentifier: String? = nil
 }
 
 struct CuadraoPlanDetailPage<Content: View>: View {
@@ -46,7 +46,7 @@ struct CuadraoPlanDetailHeading<Status: View>: View {
             }
             HStack {
                 Text(display.amount).font(CuadraoTypography.secondaryAmount)
-                    .accessibilityIdentifier(display.amountIdentifier)
+                    .accessibilityIdentifier(display.amountIdentifier ?? "")
                 Text(display.annotation).font(.caption).foregroundStyle(.secondary)
             }
             status()

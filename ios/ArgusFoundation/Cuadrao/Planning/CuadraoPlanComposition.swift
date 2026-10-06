@@ -93,7 +93,7 @@ struct CuadraoPlanCollection<Rows: View, Archives: View>: View {
                     Text(spanish ? "Un viaje, un respiro, llegar a fin de mes con más espacio." : "A trip, a little breathing room, a month with more left over.")
                         .font(.subheadline).foregroundStyle(.secondary)
                     PlanPrimaryButton(title: spanish ? "Crear mi primer plan" : "Make my first plan", symbol: "plus", action: create)
-                        .disabled(!canCreate).accessibilityIdentifier("plan-first-create")
+                        .disabled(!canCreate)
                 }.padding(24).background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 26))
             }
         }
