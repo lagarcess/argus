@@ -153,7 +153,7 @@ resolved.
 | `balance-source`: #805 canonical source and settlement owner | Partial. Decision 17 locks the outcome and copy. The source and who may settle are not decided. | #805, #822 deletion journey |
 | `consent-policy`: #828 consent scope, versioning, memory and voice | Partly answered October 6: memory and voice are in release 1. Consent scope and versioning are still not decided; Option A is a proposal, not a lock. | #828, #827, #823 dispatch, #831 AI disclosure |
 | `space-model`: #819 personal roots with household grants versus household-owned roots | Partial. Timing is locked before TestFlight. The model choice is open. | #819, #818, #820 consumers |
-| `release-jobs`: #818 and #826 first retained chat jobs and memory/voice | Partly answered October 6: memory and voice are in release 1, and the assistant is the agentic one, with old Argus code kept until removed ([decision](argus-decision-log.md#october-6-2026-first-release-assistant-and-memory-and-voice-scope)). Which first jobs it does is still not named. | #818, #826, #827, #829 memory rows |
+| `release-jobs`: #818 and #826 first retained chat jobs and memory/voice | Partly answered October 6: memory and voice are in release 1, and the assistant is the agentic one, with old Argus code kept until removed ([decision](../specs/argus-decision-log.md#october-6-2026-first-release-assistant-and-memory-and-voice-scope)). Which first jobs it does is still not named. | #818, #826, #827, #829 memory rows |
 | `apple-late-cleanup`: #803 late provider revocation | Absent. | #803 only |
 
 The recommendations on file are in `foundation-contract-map-proposed.md` and
