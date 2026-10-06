@@ -66,5 +66,19 @@ struct PlanScenario: Equatable {
             : "Scenario as of \(date). Fixed monthly contributions. No returns, new purchases, or fees. The plan doesn't move money."
     }
 
+    func budgetEdges(spanish: Bool) -> (first: String, last: String) {
+        var calendar = Calendar.current; calendar.timeZone = timeZone
+        let start = calendar.dateInterval(of: .month, for: today)?.start ?? today
+        let last = calendar.date(byAdding: .day, value: max(0, budgetDays.total - 1), to: start) ?? start
+        return (dayLabel(start, calendar: calendar, spanish: spanish), dayLabel(last, calendar: calendar, spanish: spanish))
+    }
+    private func dayLabel(_ date: Date, calendar: Calendar, spanish: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Self.locale(spanish); formatter.timeZone = timeZone
+        guard spanish else { formatter.setLocalizedDateFormatFromTemplate("MMM d"); return formatter.string(from: date) }
+        formatter.dateFormat = "MMM"
+        let month = formatter.string(from: date).trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        return "\(calendar.component(.day, from: date)) \(month)."
+    }
     private static func locale(_ spanish: Bool) -> Locale { Locale(identifier: spanish ? "es_DO" : "en_US") }
 }
