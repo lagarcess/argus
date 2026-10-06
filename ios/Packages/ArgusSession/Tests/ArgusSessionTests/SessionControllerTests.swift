@@ -33,6 +33,42 @@ final class SessionControllerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(try JSONSerialization.jsonObject(with: body) as? [String: String], ["currency_override": "USD"])
     }
 
+    func testNamesWriteReadsServerTruthAndClearsPreferredName() async throws {
+        let fixture = try SessionFixture()
+        let client = try fixture.controller()
+        let identity = try await fixture.login(client)
+        XCTAssertEqual(identity.profile?.displayName, "Sample")
+        XCTAssertNil(identity.profile?.preferredName)
+        let saved = try await client.setNames(displayName: "Alexandra Rivera", preferredName: "Alex", expectedIdentity: identity)
+        XCTAssertEqual(saved.profile?.displayName, "Alexandra Rivera")
+        XCTAssertEqual(saved.profile?.preferredName, "Alex")
+        let restored = try await fixture.controller().restore()
+        XCTAssertEqual(restored.profile, saved.profile)
+        let cleared = try await client.setNames(displayName: "Alexandra Rivera", preferredName: "", expectedIdentity: saved)
+        XCTAssertNil(cleared.profile?.preferredName)
+        let writes = await fixture.server.captured().filter { $0.httpMethod == "PATCH" }
+        let bodies = try writes.map { try JSONSerialization.jsonObject(with: XCTUnwrap($0.httpBody)) as? [String: String] }
+        XCTAssertEqual(bodies, [["display_name": "Alexandra Rivera", "preferred_name": "Alex"],
+                                ["display_name": "Alexandra Rivera", "preferred_name": ""]])
+    }
+
+    func testRefusedNamesWriteLeavesProfileUnchangedAndStaleIdentityHasNoDispatch() async throws {
+        let fixture = try SessionFixture()
+        let client = try fixture.controller()
+        let identity = try await fixture.login(client)
+        await fixture.server.configure(meStatuses: [422])
+        do { _ = try await client.setNames(displayName: "Sample", preferredName: String(repeating: "a", count: 41), expectedIdentity: identity); XCTFail("Expected rejection") }
+        catch { XCTAssertEqual(error as? SessionFailure, .rejected(status: 422, code: "unauthorized")) }
+        let unchanged = await client.snapshot()
+        XCTAssertEqual(unchanged.profile, identity.profile)
+        _ = try await client.signOut()
+        let before = await fixture.server.captured().count
+        do { _ = try await client.setNames(displayName: "Other", preferredName: "", expectedIdentity: identity); XCTFail("Expected stale operation") }
+        catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
+        let after = await fixture.server.captured().count
+        XCTAssertEqual(after, before)
+    }
+
     func testRefusedCurrencyWriteLeavesProfileAndRelaunchUnchanged() async throws {
         let fixture = try SessionFixture()
         let client = try fixture.controller()

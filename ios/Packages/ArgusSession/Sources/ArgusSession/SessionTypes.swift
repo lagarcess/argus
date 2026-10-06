@@ -12,14 +12,20 @@ public struct SessionProfile: Equatable, Sendable, Decodable {
     public let id: String
     public let email: String?
     public let displayName: String?
+    /// What greetings call the person; nil means they are greeted without a name.
+    public let preferredName: String?
     public let language: String?
     public let currency: String?
     public let currencyOverride: String?
-    init(id: String, email: String?, displayName: String?, language: String?, currency: String? = nil, currencyOverride: String? = nil) {
-        self.id = id; self.email = email; self.displayName = displayName; self.language = language
+    init(id: String, email: String?, displayName: String?, preferredName: String? = nil, language: String?,
+         currency: String? = nil, currencyOverride: String? = nil) {
+        self.id = id; self.email = email; self.displayName = displayName; self.preferredName = preferredName; self.language = language
         self.currency = currency; self.currencyOverride = currencyOverride
     }
-    enum CodingKeys: String, CodingKey { case id, email, language; case displayName = "display_name"; case currency; case currencyOverride = "currency_override" }
+    enum CodingKeys: String, CodingKey {
+        case id, email, language; case displayName = "display_name"; case preferredName = "preferred_name"
+        case currency; case currencyOverride = "currency_override"
+    }
 }
 
 public struct AppleIdentity: Equatable, Sendable, Decodable {
