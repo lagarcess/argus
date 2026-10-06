@@ -49,3 +49,10 @@
 - Question: Accept #803 rare provider-side late revocation recovery or require stronger coordination. Recommendation: documented forced-sign-out recovery with activation/phone gates; do not claim local CAS cancels an Apple request already received.
 - Options: Founder product decision; no experiment can select product scope
 - Default: Keep dependent implementation blocked; continue independent authorized work.
+
+## home-history-meaning
+
+- Status: open
+- Question: Choose first connected Home history: dated recorded observations with gaps, or reconstruction from current corrected records. Recommend observations first; fuller history and insights acceptance remains open.
+- Options: Founder product meaning decision; recorded observations recommended or corrected-record reconstruction
+- Default: Keep dependent history implementation blocked; continue current-header, currency and independent trust work.

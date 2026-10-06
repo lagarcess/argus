@@ -23,3 +23,5 @@ pr	sha	verdict	evidence	verifier	ts
 849	3c6c95b9a9ea6ee1a5c7b12d3ab96f45ce8ba6c3	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md	manifest_currency_context_review	2026-10-05T22:28:04.131Z
 862	916b4b94e32603405615dfaef5f2e415e4b5f2cf	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md	deletion_currency_context_review	2026-10-05T22:28:04.150Z
 854	c986d060deb7bd7ce50ec13093e175371164c7d0	unit-test-verified	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md	paired_currency_context_review	2026-10-05T22:28:04.167Z
+864	257b1c080658c1b578df6c0edfed2cfa873ee578	verifier-failed	https://github.com/lagarcess/argus/actions/runs/37403404071	root-ci-diagnosis	2026-10-06T02:31:34.319Z
+864	49215121969c17347bcf2e702199196e23ec4ede	unit-test-verified	https://github.com/lagarcess/argus/pull/864#pullrequestreview-5423144255	apple_session_ci_fixture_review	2026-10-06T02:38:45.641Z
