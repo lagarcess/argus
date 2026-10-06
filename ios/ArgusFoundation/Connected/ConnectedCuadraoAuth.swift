@@ -21,6 +21,10 @@ struct ConnectedCuadraoAuthFlow: View {
                 } else if auth.state == .unsupportedAnonymous {
                     authNotice(title: spanish ? "Sesión no admitida." : "Unsupported session.",
                                detail: String(localized: "auth.error.anonymous"))
+                } else if let deletion = auth.deletion {
+                    ConnectedDeletionOutcome(model: deletion, unresolved: auth.state == .accountDeletionUncertain) {
+                        welcome.toolbar(.hidden, for: .navigationBar)
+                    }
                 } else {
                     welcome
                         .toolbar(.hidden, for: .navigationBar)
