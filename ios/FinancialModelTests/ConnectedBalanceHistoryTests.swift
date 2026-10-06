@@ -24,7 +24,8 @@ final class ConnectedBalanceHistoryTests: XCTestCase {
         let account = try facts.account(opening: facts.fact(87800, at: "2026-10-06T09:00:00-04:00", kind: "opening"))
         let summary = try facts.summary(netWorth: "87800", known: 1, unknown: 0)
         let reading = ConnectedBalanceHistory.reading(summary: summary, reads: [facts.read(account)], now: facts.now, calendar: facts.calendar)
-        XCTAssertEqual(reading, .recorded(points: [CanvasBalancePoint(date: facts.day("2026-10-06"), balance: 878)], unavailableAccounts: 0))
+        XCTAssertEqual(reading, .recorded(points: [CanvasBalancePoint(date: facts.day("2026-10-06"), balance: 878)], unavailableAccounts: 0,
+            accounts: [facts.series(account, [("2026-10-06", 87800)])]))
     }
 
     func testTwoDatedObservationsKeepTheirRealGapAndEndOnTheHero() throws {
@@ -37,7 +38,7 @@ final class ConnectedBalanceHistoryTests: XCTestCase {
             CanvasBalancePoint(date: facts.day("2026-09-01"), balance: 1000),
             CanvasBalancePoint(date: facts.day("2026-09-20"), balance: 950),
             CanvasBalancePoint(date: facts.day("2026-10-06"), balance: 878),
-        ], unavailableAccounts: 0))
+        ], unavailableAccounts: 0, accounts: [facts.series(account, [("2026-09-01", 100000), ("2026-09-20", 95000), ("2026-10-06", 87800)])]))
     }
 
     func testConfirmedZeroIsAPointAndADayWithoutObservationsIsNot() throws {
@@ -45,7 +46,7 @@ final class ConnectedBalanceHistoryTests: XCTestCase {
         let zero = facts.fact(0, at: "2026-09-20T12:00:00-04:00")
         let account = try facts.account(opening: opening, latest: zero)
         let summary = try facts.summary(netWorth: "0", known: 1, unknown: 0)
-        guard case .recorded(let points, 0)? = ConnectedBalanceHistory.reading(summary: summary, reads: [facts.read(account, checks: [zero])], now: facts.now, calendar: facts.calendar) else { return XCTFail("Expected recorded history") }
+        guard case .recorded(let points, 0, _)? = ConnectedBalanceHistory.reading(summary: summary, reads: [facts.read(account, checks: [zero])], now: facts.now, calendar: facts.calendar) else { return XCTFail("Expected recorded history") }
         XCTAssertEqual(points.map(\.date), [facts.day("2026-09-01"), facts.day("2026-09-20"), facts.day("2026-10-06")])
         XCTAssertEqual(points.map(\.balance), [50, 0, 0])
         XCTAssertFalse(points.contains { $0.date == facts.day("2026-09-21") })
@@ -71,8 +72,13 @@ final class ConnectedBalanceHistoryTests: XCTestCase {
             CanvasBalancePoint(date: facts.day("2026-09-10"), balance: 800),
             CanvasBalancePoint(date: facts.day("2026-09-15"), balance: 1000),
             CanvasBalancePoint(date: facts.day("2026-10-06"), balance: Decimal(string: "1205.86")!),
-        ], unavailableAccounts: 0))
-        guard case .recorded(let points, _)? = reading else { return XCTFail("Expected recorded history") }
+        ], unavailableAccounts: 0, accounts: [
+            facts.series(checking, [("2026-09-01", 90000), ("2026-09-15", 80000), ("2026-10-06", 100000)]),
+            facts.series(card, [("2026-09-10", -10000), ("2026-10-06", -12500)]),
+            facts.series(savings, [("2026-09-15", 30000), ("2026-10-06", 30000)]),
+            facts.series(property, [("2026-10-06", 3086)]),
+        ]))
+        guard case .recorded(let points, _, _)? = reading else { return XCTFail("Expected recorded history") }
         XCTAssertEqual(points.last?.balance, ConnectedBalanceHistory.amount(Decimal(string: summary.netWorthMinor)!, digits: summary.currencyFractionDigits))
     }
 
@@ -84,7 +90,7 @@ final class ConnectedBalanceHistoryTests: XCTestCase {
         XCTAssertEqual(reading, .recorded(points: [
             CanvasBalancePoint(date: facts.day("2026-09-01"), balance: 1000),
             CanvasBalancePoint(date: facts.day("2026-10-06"), balance: 1000),
-        ], unavailableAccounts: 0))
+        ], unavailableAccounts: 0, accounts: [facts.series(dop, [("2026-09-01", 100000), ("2026-10-06", 100000)])]))
     }
 
     func testIncompleteOrUnavailableReadsAreNamedAndNeverDrawnAsComplete() throws {
@@ -94,7 +100,7 @@ final class ConnectedBalanceHistoryTests: XCTestCase {
         for read in [PersonalObservationRead.incomplete(.pageFailure), .incomplete(.pageLimit), .unavailable] {
             let reads = [facts.read(complete), ConnectedBalanceHistory.AccountRead(account: failed, read: read)]
             XCTAssertEqual(ConnectedBalanceHistory.reading(summary: summary, reads: reads, now: facts.now, calendar: facts.calendar),
-                .recorded(points: [CanvasBalancePoint(date: facts.day("2026-10-06"), balance: 1000)], unavailableAccounts: 1))
+                .recorded(points: [CanvasBalancePoint(date: facts.day("2026-10-06"), balance: 1000)], unavailableAccounts: 1, accounts: []))
         }
     }
 
@@ -111,10 +117,53 @@ final class ConnectedBalanceHistoryTests: XCTestCase {
         let hero = CanvasBalancePoint(date: facts.day("2026-10-06"), balance: 999)
         for (netWorth, known) in [("99900", 1), ("60000", 2)] {
             let summary = try facts.summary(netWorth: netWorth, known: known, unknown: 0)
-            guard case .recorded(let points, 0)? = ConnectedBalanceHistory.reading(summary: summary, reads: [facts.read(account)], now: facts.now, calendar: facts.calendar) else { return XCTFail("Expected the hero alone") }
+            guard case .recorded(let points, 0, [])? = ConnectedBalanceHistory.reading(summary: summary, reads: [facts.read(account)], now: facts.now, calendar: facts.calendar) else { return XCTFail("Expected the hero alone") }
             XCTAssertEqual(points.map(\.date), [hero.date])
             XCTAssertEqual(points.first?.balance, ConnectedBalanceHistory.amount(Decimal(string: netWorth)!, digits: 2))
         }
+    }
+
+    func testChangesEndingTodayUseCurrentBalancesAndCarryTheLastRecordedOpening() throws {
+        let checking = try facts.account(opening: facts.fact(90000, at: "2026-09-01T08:00:00-04:00", kind: "opening"),
+            latest: facts.fact(100000, at: "2026-10-06T08:00:00-04:00"))
+        let card = try facts.account(opening: facts.fact(-20000, at: "2026-09-10T08:00:00-04:00", kind: "opening"),
+            latest: facts.fact(-25000, at: "2026-10-06T08:00:00-04:00"), type: "credit_card", bps: 5000)
+        let property = try facts.account(opening: facts.fact(12345, at: "2026-10-06T07:00:00-04:00", kind: "opening"), type: "property", bps: 2500)
+        let summary = try facts.summary(netWorth: "90586", known: 3, unknown: 0)
+        let check = facts.fact(80000, at: "2026-09-15T12:00:00-04:00")
+        let reads = [facts.read(checking, checks: [check]), facts.read(card), facts.read(property)]
+        guard case .recorded(let points, 0, let accounts)? = ConnectedBalanceHistory.reading(summary: summary, reads: reads, now: facts.now, calendar: facts.calendar) else { return XCTFail("Expected recorded history") }
+        XCTAssertEqual(points.map(\.date), [facts.day("2026-09-01"), facts.day("2026-09-10"), facts.day("2026-09-15"), facts.day("2026-10-06")])
+        let rows = ConnectedBalanceHistory.changes(accounts, opening: facts.day("2026-09-15"), closing: facts.day("2026-10-06"))
+        XCTAssertEqual(rows, [
+            ConnectedBalanceHistory.AccountChange(account: checking, opening: 80000, closing: 100000),
+            ConnectedBalanceHistory.AccountChange(account: card, opening: -10000, closing: -12500),
+            ConnectedBalanceHistory.AccountChange(account: property, opening: nil, closing: 3086),
+        ])
+        let net = rows.compactMap { row in row.opening.flatMap { opening in row.closing.map { $0 - opening } } }.reduce(0, +)
+        XCTAssertEqual(net, 17500)
+    }
+
+    func testChangesInAPastPeriodCarryTheLastRecordedBalanceAndLeaveUnrecordedEndsEmpty() throws {
+        let checking = try facts.account(opening: facts.fact(90000, at: "2026-09-01T08:00:00-04:00", kind: "opening"),
+            latest: facts.fact(100000, at: "2026-10-06T08:00:00-04:00"))
+        let card = try facts.account(opening: facts.fact(-20000, at: "2026-09-10T08:00:00-04:00", kind: "opening"),
+            latest: facts.fact(-25000, at: "2026-10-06T08:00:00-04:00"), type: "credit_card", bps: 5000)
+        let property = try facts.account(opening: facts.fact(12345, at: "2026-10-06T07:00:00-04:00", kind: "opening"), type: "property", bps: 2500)
+        let summary = try facts.summary(netWorth: "90586", known: 3, unknown: 0)
+        let check = facts.fact(80000, at: "2026-09-15T12:00:00-04:00")
+        let reads = [facts.read(checking, checks: [check]), facts.read(card), facts.read(property)]
+        guard case .recorded(_, 0, let accounts)? = ConnectedBalanceHistory.reading(summary: summary, reads: reads, now: facts.now, calendar: facts.calendar) else { return XCTFail("Expected recorded history") }
+        XCTAssertEqual(ConnectedBalanceHistory.changes(accounts, opening: facts.day("2026-09-01"), closing: facts.day("2026-09-15")), [
+            ConnectedBalanceHistory.AccountChange(account: checking, opening: 90000, closing: 80000),
+            ConnectedBalanceHistory.AccountChange(account: card, opening: nil, closing: -10000),
+            ConnectedBalanceHistory.AccountChange(account: property, opening: nil, closing: nil),
+        ])
+        XCTAssertEqual(ConnectedBalanceHistory.changes(accounts, opening: nil, closing: facts.day("2026-09-20")), [
+            ConnectedBalanceHistory.AccountChange(account: checking, opening: nil, closing: 80000),
+            ConnectedBalanceHistory.AccountChange(account: card, opening: nil, closing: -10000),
+            ConnectedBalanceHistory.AccountChange(account: property, opening: nil, closing: nil),
+        ])
     }
 }
 
@@ -150,6 +199,9 @@ private struct HistoryFacts {
             "as_of": "2026-10-06T08:00:00-04:00", "assets_minor": netWorth, "debts_minor": "0", "net_worth_minor": netWorth,
             "known_accounts": known, "unknown_accounts": unknown, "recorded_spending_minor": "0"]
         return try JSONDecoder().decode(FinancialCurrencySummary.self, from: JSONSerialization.data(withJSONObject: body))
+    }
+    func series(_ account: FinancialAccount, _ entries: [(String, Int64)]) -> ConnectedBalanceHistory.AccountSeries {
+        ConnectedBalanceHistory.AccountSeries(account: account, byDay: Dictionary(uniqueKeysWithValues: entries.map { (day($0.0), $0.1) }))
     }
     func read(_ account: FinancialAccount, checks: [[String: Any]] = []) -> ConnectedBalanceHistory.AccountRead {
         let checks = try! JSONDecoder().decode([FinancialCheck].self, from: JSONSerialization.data(withJSONObject: checks))

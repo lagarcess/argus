@@ -30,17 +30,23 @@ struct ConnectedBalanceSummary {
     }
 }
 
-/// The server's own monthly period is the only canonical activity read. Its coverage is
-/// `recorded_only`, so a zero is never a proven zero and every other page has no data.
+/// The server's own monthly period is the only canonical activity read. It binds the month page that
+/// names the same `YYYY-MM`, whatever zone the device pages in. Its coverage is `recorded_only`, so a
+/// zero is never a proven zero and every other page has no data.
 enum ConnectedSpendingPeriod: Equatable {
     case recorded(minor: String)
     case noData
 
-    static func reading(summary: FinancialCurrencySummary, period: FinancialHomePeriod?, page: DateInterval) -> Self {
-        guard let period, let start = AccountPresentation.parseDate(period.startAt),
-              let end = AccountPresentation.parseDate(period.endAtExclusive),
-              start == page.start, end == page.end,
+    static func reading(summary: FinancialCurrencySummary, period: FinancialHomePeriod?, page: DateInterval,
+                        calendar: Calendar = .current) -> Self {
+        guard let period, calendar.dateInterval(of: .month, for: page.start) == page,
+              month(page.start, calendar: calendar) == period.month,
               let minor = summary.grossPurchasesMinor, let value = Decimal(string: minor), value > 0 else { return .noData }
         return .recorded(minor: minor)
+    }
+
+    static func month(_ date: Date, calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.year, .month], from: date)
+        return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
     }
 }

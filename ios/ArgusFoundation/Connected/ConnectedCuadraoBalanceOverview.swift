@@ -35,7 +35,7 @@ struct ConnectedCuadraoBalanceOverview: View {
     var body: some View {
         if let summary {
             ConnectedBalanceReading(summary: summary, currencies: currencies.map(\.currency), spanish: spanish,
-                timeZone: timeZone, history: history, chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
+                history: history, chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
                 .fullScreenCover(isPresented: $expanded) {
                     ConnectedCuadraoInsights(summary: summary, period: home.period, spanish: spanish, space: space,
                         timeZone: timeZone, history: history)
@@ -65,7 +65,6 @@ private struct ConnectedBalanceReading: View {
     let summary: FinancialCurrencySummary
     let currencies: [String]
     let spanish: Bool
-    let timeZone: String
     var expanded = false
     let history: ConnectedBalanceHistory.Reading?
     var chooseCurrency: (String) -> Void = { _ in }
@@ -79,7 +78,7 @@ private struct ConnectedBalanceReading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch history {
-            case .recorded(let points, let unavailableAccounts):
+            case .recorded(let points, let unavailableAccounts, let accounts):
                 CuadraoHomeBalanceChart(accounts: [], observations: [], currency: summary.currency, currencies: currencies,
                     spanish: spanish, shared: false, chooseCurrency: chooseCurrency, expanded: expanded, expand: expand,
                     history: CanvasBuiltBalanceHistory(points: points, now: .now), partial: partial,
@@ -88,6 +87,12 @@ private struct ConnectedBalanceReading: View {
                     Text(unavailableHistory(unavailableAccounts))
                         .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                         .accessibilityIdentifier("home-chart-unavailable-history")
+                }
+                if expanded, !accounts.isEmpty {
+                    let period = breakdown(points: points, accounts: accounts)
+                    if period.closing != nil {
+                        CuadraoBalanceBreakdown(period: period, currency: summary.currency, spanish: spanish, linksToAccounts: false)
+                    }
                 }
             case .unknown, nil:
                 let value = ConnectedBalanceSummary(summary: summary)
@@ -108,15 +113,28 @@ private struct ConnectedBalanceReading: View {
                         .accessibilityIdentifier("home-chart-empty")
                 }
             }
-            if expanded, let asOf = summary.asOf {
-                Text(AccountPresentation.date(asOf, zone: timeZone, locale: locale))
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-            }
             if partial {
                 Text(verbatim: String(format: NSLocalizedString("loop.home.unknownCount", comment: ""), summary.unknownAccounts))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// The approved breakdown over the hero series: the period's opening and closing are its recorded days,
+    /// each row an account's contribution on those days. Unknown-balance accounts stay counted, never listed.
+    private func breakdown(points: [CanvasBalancePoint], accounts: [ConnectedBalanceHistory.AccountSeries]) -> CanvasBalancePeriod {
+        let window = CanvasBalancePeriod(accounts: [], observations: [], range: range.wrappedValue,
+            offset: periodOffset.wrappedValue, now: .now, history: points)
+        let digits = summary.currencyFractionDigits
+        func money(_ minor: Int64?) -> Decimal? { minor.map { ConnectedBalanceHistory.amount(Decimal($0), digits: digits) } }
+        let rows = ConnectedBalanceHistory.changes(accounts, opening: window.opening?.date, closing: window.closing?.date).map { row in
+            let account = CanvasAccount(id: row.account.id, name: ConnectedAccountPresentation.title(row.account, spanish: spanish),
+                kind: ConnectedAccountPresentation.artwork(row.account.type) ?? .asset, currency: row.account.currency,
+                balance: money(row.closing), archived: row.account.archived)
+            return CanvasBalanceChange(account: account, opening: money(row.opening), closing: money(row.closing))
+        }
+        return CanvasBalancePeriod(interval: window.interval, opening: window.opening, closing: window.closing,
+            closingAccounts: rows.map(\.account), changes: rows, isPartial: partial)
     }
 
     private func unavailableHistory(_ count: Int) -> String {
@@ -139,25 +157,26 @@ private struct ConnectedCuadraoInsights: View {
     @State private var selectedGroup: String?
     @Environment(\.locale) private var locale
     private var points: [CanvasBalancePoint] {
-        if case .recorded(let points, _) = history { return points }
+        if case .recorded(let points, _, _) = history { return points }
         return []
     }
 
     var body: some View {
         NavigationStack {
             CuadraoHomeInsightsLayout(spanish: spanish, range: $range, periodOffset: $periodOffset,
-                distribution: $distribution, activity: $activity, oldestOffset: { showingActivity in
+                distribution: $distribution, activity: $activity, distributionOnPastPeriods: false, oldestOffset: { showingActivity in
                     showingActivity ? 0 : range.oldestOffset(points)
                 }) { offset in
                     if activity {
                         spending(range.interval(offset: offset))
-                    } else if distribution {
+                    } else if distribution && offset == 0 {
                         allocation
                     } else {
                         ConnectedBalanceReading(summary: summary, currencies: [summary.currency], spanish: spanish,
-                            timeZone: timeZone, expanded: true, history: history, range: $range, periodOffset: .constant(offset))
+                            expanded: true, history: history, range: $range, periodOffset: .constant(offset))
                     }
                 }.modifier(CuadraoHomeInsightsChrome(title: space, spanish: spanish))
+                .onChange(of: periodOffset) { _, offset in if offset < 0 { distribution = false } }
         }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
     }
 

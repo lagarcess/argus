@@ -66,18 +66,27 @@ import Foundation
             startAt: "2026-10-01T00:00:00-04:00", endAtExclusive: "2026-11-01T00:00:00-04:00")
         let start = AccountPresentation.parseDate(period.startAt)!, end = AccountPresentation.parseDate(period.endAtExclusive)!
         let month = DateInterval(start: start, end: end)
-        func reading(_ page: DateInterval, period: FinancialHomePeriod? = period) -> ConnectedSpendingPeriod {
-            ConnectedSpendingPeriod.reading(summary: summary, period: period, page: page)
+        var santoDomingo = Calendar(identifier: .gregorian)
+        santoDomingo.timeZone = TimeZone(identifier: "America/Santo_Domingo")!
+        var chicago = Calendar(identifier: .gregorian)
+        chicago.timeZone = TimeZone(identifier: "America/Chicago")!
+        func reading(_ page: DateInterval, period: FinancialHomePeriod? = period, calendar: Calendar = santoDomingo) -> ConnectedSpendingPeriod {
+            ConnectedSpendingPeriod.reading(summary: summary, period: period, page: page, calendar: calendar)
         }
         summary.grossPurchasesMinor = "123450"
         check(reading(month) == .recorded(minor: "123450"), "The server's own monthly period binds its recorded purchases")
         check(value.amount("123450", locale: locale) == "123.450", "The recorded total formats with the summary's three-digit precision")
         check(reading(month, period: nil) == .noData, "No server period means no activity read")
         check(reading(DateInterval(start: start, duration: 7 * 86400)) == .noData, "A week page has no canonical read")
-        check(reading(DateInterval(start: start.addingTimeInterval(-30 * 86400), end: start)) == .noData, "An earlier month has no canonical read")
-        check(reading(DateInterval(start: start, end: end.addingTimeInterval(365 * 86400))) == .noData, "A year page has no canonical read")
-        check(reading(DateInterval(start: start.addingTimeInterval(3600), end: end.addingTimeInterval(3600))) == .noData,
-            "A month in another zone is not the server's period")
+        check(reading(chicago.dateInterval(of: .month, for: start.addingTimeInterval(-30 * 86400))!, calendar: chicago) == .noData,
+            "An earlier month has no canonical read")
+        check(reading(santoDomingo.dateInterval(of: .year, for: start)!) == .noData, "A year page has no canonical read")
+        let devicePage = chicago.dateInterval(of: .month, for: start.addingTimeInterval(3600))!
+        check(devicePage.start == start.addingTimeInterval(3600) && devicePage.end == end.addingTimeInterval(3600),
+            "A device paging in Chicago starts October one hour after the reporting zone")
+        check(reading(devicePage, calendar: chicago) == .recorded(minor: "123450"),
+            "The device's month page binds the server month it names, whatever zone it pages in")
+        check(reading(devicePage) == .noData, "An interval that is not a whole month in its own calendar has no read")
         summary.grossPurchasesMinor = "0"
         check(reading(month) == .noData, "Recorded-only coverage never proves a zero")
         summary.grossPurchasesMinor = nil
