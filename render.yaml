@@ -65,6 +65,10 @@ services:
         value: "false"
       - key: ARGUS_HOUSEHOLDS_ENABLED
         value: "false"
+      - key: ARGUS_BETA_INVITES_ENABLED
+        value: "false"
+      - key: ARGUS_BETA_INVITE_GATE_ENABLED
+        value: "false"
       - key: ARGUS_ACCOUNT_DELETION_ENABLED
         value: "false"
       - key: ARGUS_INGESTION_ENABLED

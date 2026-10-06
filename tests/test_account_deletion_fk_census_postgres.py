@@ -708,6 +708,17 @@ def test_deleting_a_sharing_user_reports_every_blocker_and_cascade(lane):  # noq
         per_key, per_table = outcomes(
             keys, before, after, world["b_markers"], world["a"], world["own"]
         )
+        digest_keys = {
+            key.columns: result
+            for key, result in per_key.items()
+            if key.table == "argus_private.invite_code_digests"
+        }
+        household_digests = digest_keys[("household_invitation_id",)]
+        assert household_digests["pinned"] == 3
+        assert household_digests["referencing"] == 0
+        assert household_digests["removed"] == 0
+        beta_digests = digest_keys[("beta_invitation_id",)]
+        assert beta_digests["pinned"] == beta_digests["referencing"] == 0
         report = _report(plain_error, blockers, per_key, per_table)
         REPORT.parent.mkdir(exist_ok=True)
         REPORT.write_text(report, encoding="utf-8")
