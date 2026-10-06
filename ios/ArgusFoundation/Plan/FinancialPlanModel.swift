@@ -300,7 +300,7 @@ enum PlanPresentation {
                             text: (String) -> String = { NSLocalizedString($0, comment: "") }) -> PlanUpcomingRow {
         let income = occurrence.kind == .income
         return PlanUpcomingRow(title: occurrence.title,
-            detail: dateLabel(occurrence.dueDate, locale: locale) + " · " + text("plan.status." + occurrence.status.rawValue),
+            detail: dateLabel(occurrence.dueDate, locale: locale) + "\u{00A0}· " + text("plan.status." + occurrence.status.rawValue),
             amount: (income ? "+" : "") + AccountPresentation.amount(occurrence.amount, locale: locale) + " " + occurrence.currency,
             icon: income ? "arrow.down.left" : "calendar")
     }

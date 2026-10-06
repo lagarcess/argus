@@ -82,14 +82,14 @@ final class ConnectedDetailPresentationTests: XCTestCase {
         let salary = try occurrence(kind: "income", status: "planned", amount: "38500.00")
         let review = try occurrence(kind: "bill", status: "needs_review", amount: "2100.00")
         XCTAssertEqual(PlanPresentation.upcomingRow(bill, locale: locale, text: { english[$0] ?? $0 }),
-                       PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026 · Scheduled", amount: "2,100.00 DOP", icon: "calendar"))
+                       PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026\u{00A0}· Scheduled", amount: "2,100.00 DOP", icon: "calendar"))
         XCTAssertEqual(PlanPresentation.upcomingRow(salary, locale: locale, text: { english[$0] ?? $0 }),
-                       PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026 · Scheduled", amount: "+38,500.00 DOP", icon: "arrow.down.left"))
+                       PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026\u{00A0}· Scheduled", amount: "+38,500.00 DOP", icon: "arrow.down.left"))
         XCTAssertEqual(PlanPresentation.upcomingRow(review, locale: locale, text: { english[$0] ?? $0 }).detail,
-                       "Oct 10, 2026 · Review the linked activity")
+                       "Oct 10, 2026\u{00A0}· Review the linked activity")
         let dominican = Locale(identifier: "es_DO")
         let spanishRow = PlanPresentation.upcomingRow(bill, locale: dominican, text: { spanish[$0] ?? $0 })
-        XCTAssertEqual(spanishRow.detail, PlanPresentation.dateLabel("2026-10-10", locale: dominican) + " · Programado")
+        XCTAssertEqual(spanishRow.detail, PlanPresentation.dateLabel("2026-10-10", locale: dominican) + "\u{00A0}· Programado")
         XCTAssertFalse(spanishRow.detail.contains("Oct"), spanishRow.detail)
         XCTAssertNil(english["plan.home.disclosure"], "Home no longer carries the projection disclosure")
         XCTAssertNil(spanish["plan.home.disclosure"])
