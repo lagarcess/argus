@@ -36,7 +36,8 @@ enum ConnectedSpendingPeriod: Equatable {
     case recorded(minor: String)
     case noData
 
-    static func reading(summary: FinancialCurrencySummary, period: FinancialHomePeriod?, page: DateInterval) -> Self {
+    static func reading(summary: FinancialCurrencySummary, period: FinancialHomePeriod?, page: DateInterval,
+                        calendar: Calendar = .current) -> Self {
         guard let period, let start = AccountPresentation.parseDate(period.startAt),
               let end = AccountPresentation.parseDate(period.endAtExclusive),
               start == page.start, end == page.end,
