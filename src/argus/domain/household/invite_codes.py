@@ -45,8 +45,8 @@ CODE_SECRET_PREVIOUS_ENV = "ARGUS_INVITE_CODE_SECRET_PREVIOUS"
 MIN_SECRET_LENGTH = 32
 # A placeholder like "a" * 32 or "changeme" repeated is refused. This is a
 # floor against obvious mistakes, not a strength proof: generate the secret
-# with `openssl rand -base64 48` (about 288 bits; random hex of 32 characters,
-# about 115 by this estimate, also passes).
+# with `openssl rand -base64 48`. A random 32-character hex value can fail
+# this estimate when its character frequencies are skewed.
 MIN_SECRET_DISTINCT = 10
 MIN_SECRET_BITS = 96
 DIGEST_VERSION = "v2"

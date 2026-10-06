@@ -107,6 +107,16 @@ def test_missing_or_short_secret_fails_closed(secret, monkeypatch):
         repo.preview_invitation(user_id="u2", code="ABCD-EFGH-JKMN")
 
 
+def test_skewed_secret_fails_the_entropy_floor():
+    """Ten distinct characters cannot substitute for the 96-bit estimate."""
+    secret = "a" * 23 + "bcdefghij"
+    assert len(secret) == 32 and len(set(secret)) == 10
+    with pytest.raises(InviteCodesUnavailable, match="placeholder"):
+        CodeHasher.from_secrets(secret)
+    with pytest.raises(InviteCodesUnavailable, match="placeholder"):
+        CodeHasher.from_secrets(SECRET_A, secret)
+
+
 def test_short_previous_secret_also_fails_closed():
     with pytest.raises(InviteCodesUnavailable):
         CodeHasher.from_secrets(SECRET_A, "too-short")
