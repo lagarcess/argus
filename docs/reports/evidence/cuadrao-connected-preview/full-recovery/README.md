@@ -344,3 +344,26 @@ certificate trust step and phone sign-in have not been confirmed. CI passed on
 `089236f8189dcc2b329d78925ac7614131f9eaca` (run `37398966150`); it does not
 establish physical acceptance. The Mac/native verification slot has been
 released to the trust lane. This lane retains the phone app and fixture owners.
+
+
+## Physical sign-in and sparse Home readback, October 5
+
+Safari on the iPhone also rejected the local HTTPS certificate. The founder
+confirmed that a different certificate name was trusted. The served certificate
+and downloadable profile match; Apple SSL verification passes for the exact
+LAN address. After installing and trusting the October 2026 replacement, the
+phone reached `/health` with 200, then authenticated and loaded profile, accounts
+and Plan with 200. The founder confirmed sign-in. No application change or
+reinstallation was needed for this certificate correction.
+
+The founder then reported an empty-looking Home with number placeholders. The
+synthetic phone account contains two active accounts, DOP 6,500 in saved net
+balance and three recent activities. There are no budgets, debts or goals; its
+one expected bill is fulfilled, so no pending item appears in Upcoming. These
+figures are saved test records. Separately, connected balance history and
+Activity insights still render the existing empty chart state without a history
+binding. This confirms that physical Home acceptance remains open. A populated
+fixture alone cannot establish historical chart completion. The trust/foundation
+lane has been asked to reconcile ownership and the available history contract.
+[Issue #824](https://github.com/lagarcess/argus/issues/824) remains open and
+explicitly owns Home history, insights and coverage from canonical records.
