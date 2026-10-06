@@ -430,11 +430,13 @@ extension FinancialLoopUITests {
     }
 
     func fillMoneyField(_ identifier: String, with value: String) {
+        dismissMoneyKeyboard()
         let field = moneyField(identifier)
         tapVisible(field); field.typeText(value)
     }
 
     func replaceMoneyField(_ identifier: String, with value: String) {
+        dismissMoneyKeyboard()
         let field = moneyField(identifier)
         tapVisible(field)
         let old = field.value as? String ?? ""

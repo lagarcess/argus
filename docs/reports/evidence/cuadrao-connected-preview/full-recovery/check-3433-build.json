@@ -9,7 +9,7 @@
   "phone_launch": "passed",
   "installed_check_build": "3433",
   "installed_preview_build": "3427",
-  "physical_acceptance": "pending certificate trust, sign-in and founder review",
+  "physical_acceptance": "Phone still reports connection error; server checks pass, new CA trust confirmation pending",
   "change": "Connected authentication uses the shared adaptive WelcomePalette in every auth state",
   "local_connectivity": {
     "old_test_server_certificate": "expired 2026-10-05T20:41:37Z",
@@ -22,7 +22,13 @@
   },
   "remaining": [
     "Physical Home and Chat visual acceptance",
-    "Physical connected money acceptance",
-    "Focused Debt and Goal test-driver reruns"
-  ]
+    "Physical connected money acceptance"
+  ],
+  "physical_contrast": "Founder confirmed sign-in contrast is fixed on Check3433",
+  "ios26_5": {
+    "goal": "passed at 089236f81",
+    "retained_budget_scroll_and_relaunch": "passed at 089236f81",
+    "debt": "passed after independently reviewed keyboard-driver correction; one executed, no failures or skips, 500.131 seconds",
+    "debt_result": "ui-20261006T013241Z.xcresult"
+  }
 }

@@ -313,3 +313,34 @@ bridge. [The redacted diagnosis](local-login-diagnosis.md) preserves the outage
 evidence and the limit of the earlier 401 diagnosis. Phone trust and sign-in
 remain unconfirmed. The Budget rerun during this outage failed before sign-in;
 it provides no financial acceptance evidence.
+
+## Focused money checks after service recovery
+
+At `089236f81`, the iOS 26.5 run executed three tests. The full Goal journey
+passed in 448.004 seconds. The retained Budget check passed in 109.877 seconds,
+including an actual scroll before cold restoration, unchanged account labels
+and position, correction and the native Edit/Cancel controls.
+
+The Debt journey passed account selection, payment and correction, then failed
+when the test attempted to type principal into a field covered by the existing
+keyboard toolbar. [The failure frame](debt-keyboard-obstruction.png) shows the
+obstruction while the amount field retains focus. The shared money-field driver
+now dismisses the existing keyboard before selecting the next field. Financial
+assertions and product source are unchanged. An independent review of the
+two-line driver correction found no actionable issue. The focused Debt rerun
+then passed in 500.131 seconds (one test, no failures or skips), including the
+return, correction, cold relaunch and Search path. Its result bundle is
+`ui-20261006T013241Z.xcresult`.
+
+The original batch remains two passes and one failure. The corrected Debt
+journey is a separate passing run, not a replacement for that record. Goal and
+Budget evidence remains valid because the correction only dismisses the existing
+keyboard before the shared driver selects another field; app source and the
+assertions are unchanged. All three focused simulator checks are now complete.
+Physical money and Home/Chat acceptance remain open.
+
+The founder confirmed that Check 3433 fixes the sign-in contrast. The replacement
+certificate trust step and phone sign-in have not been confirmed. CI passed on
+`089236f8189dcc2b329d78925ac7614131f9eaca` (run `37398966150`); it does not
+establish physical acceptance. The Mac/native verification slot has been
+released to the trust lane. This lane retains the phone app and fixture owners.
