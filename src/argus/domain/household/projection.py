@@ -76,6 +76,8 @@ def activity(
             body[field] = body[rev_field] = None
             private = True
     if primary_hidden:
+        body["currency"] = visible_legs[0]["currency"]
+        body["currency_fraction_digits"] = visible_legs[0]["currency_fraction_digits"]
         body["amount"] = body["amount_minor"] = None
         body["note"] = body["reason"] = body["source_id"] = body["category_id"] = None
 

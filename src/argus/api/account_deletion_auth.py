@@ -145,6 +145,7 @@ def deletion_requester(request: Request) -> User:
         raise _unauthorized(request) from None
     if str(claims.get("sub") or "") != subject:
         raise _unauthorized(request)
+    request.state.account_deletion_started = True
     # Only the id is used: the run already holds everything else it needs.
     now = datetime.now(timezone.utc)
     return User(id=subject, email=None, created_at=now, updated_at=now)

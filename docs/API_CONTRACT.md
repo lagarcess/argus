@@ -1067,6 +1067,39 @@ Application-facing user object.
   explicit onboarding flow. It stays in responses so deployed clients keep a
   stable `/me` shape, but no product behavior reads it and no API writes it.
 
+### Apple first-authorization display-name initialization
+
+`POST /api/v1/me/apple-name` accepts only `{ "display_name": "María 李" }`.
+It trims surrounding whitespace, preserves Unicode and interior spelling, and
+rejects blank or more than 200 characters with 422. It returns the existing
+canonical `UserResponse`, including when a retry preserves an existing name.
+The text is user-supplied account presentation, not verified legal identity.
+It never fills `preferred_name` or copies names into Auth metadata.
+
+The existing `ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` flag keeps this command
+default off. While off, the plain 404 is returned before authentication or body
+parsing. When on, it requires the verified registered owner's account capability,
+durable PostgreSQL, and one unambiguous current Apple identity from the shared
+Auth identity reader. It makes no Apple or other provider call.
+
+Initialization succeeds only for a new profile whose two name fields are absent
+and whose internal initialization eligibility remains open. A successful seed,
+any explicit display/preferred-name edit, a same-value write, or an explicit
+NULL clear closes eligibility permanently. Unrelated partial profile edits leave
+it open. Historical profiles are conservatively closed by the migration because
+their earlier clear/edit history cannot be proven. They retain ordinary editing.
+
+No request accepts a user ID, Apple subject, email, preferred name or eligibility
+marker. Missing Apple identity returns 409 `apple_identity_missing`; an unavailable
+identity/database returns 503 `apple_name_unavailable`; an account closed or
+admitted to deletion returns 403 `account_unavailable`. Ordinary session and guest
+denials still apply. This server command does not establish native callback,
+journal/relaunch or real first-authorization acceptance. Those remain separate
+work. Name initialization and deletion admission serialize on the same Auth-parent
+lock. A deletion run admitted before initialization acquires that lock prevents
+any name write, including retries. A name transaction that obtains it first can
+finish before deletion admission commits.
+
 ## Conversation
 
 ```json
@@ -3218,12 +3251,37 @@ Argus supports English and Spanish (Latin America) in Alpha.
 Deletes the signed-in person's account, in the app. A guest session is deleted
 by the same command. Off unless
 `ARGUS_ACCOUNT_DELETION_ENABLED` is on; while off it answers `404` before any
-authentication. The account is always the session's. The body is only a
-confirmation, and any other field is a `422`:
+authentication. The account is always the session's. The body requires a
+confirmation and accepts an optional `apple_authorization_code` of 1–512 ASCII
+characters. Any other field is a `422`:
 
 ```json
 { "confirm": true }
 ```
+
+For a new Apple-linked deletion, the command requires a readable stored
+credential bound to the current subject in `auth.identities`. Missing, unbound,
+mismatched or unreadable credentials return `409 apple_reauthorization_required`
+before any deletion run, ban, placeholder, product mutation, third-party
+revocation or Auth deletion. An unavailable identity reader or required service
+returns `503 account_deletion_unavailable` when durable state establishes that
+no run has started. Non-Apple accounts follow ordinary admission only after
+positively verifying that no Apple identity is linked.
+
+A person can supply a fresh Apple authorization code in the same request:
+
+```json
+{ "confirm": true, "apple_authorization_code": "fresh-one-time-code" }
+```
+
+The current Argus JWT still identifies the account. The command awaits one
+capture attempt, without another Supabase sign-in, identity/email overrides or
+automatic replay of the code. A mismatched code can cause an Apple exchange and
+compensating revoke; its refusal guarantees no Argus deletion effects, not no
+provider effects. Capture and admission lock the Auth user, current identities,
+credential and deletion run in that order, then admission rechecks the bound
+readable credential before inserting the run. No database lock spans Apple HTTP.
+Ordinary capture cannot commit once a deletion run exists.
 
 The command runs the Lane 6 order (`docs/specs/lanes/account-deletion-fk-census.md`
 and #787). It hands over or closes the person's households and plans, keeps their
@@ -3241,8 +3299,8 @@ then requires a live `auth.sessions` row for its session that belongs to its
 subject (live: not past its `not_after`, GoTrue's session time-box, when one is
 set), a run in flight for that subject, and a subject that is not a
 placeholder. Anything else is `401`. Anyone not locked goes through the usual session check. The route
-is rate limited per account (6 a minute, `429 too_many_requests` with
-`Retry-After`). A guest create-then-delete loop makes a new account each time,
+is rate limited per account per API worker (6 a minute, `429 too_many_requests`
+with `Retry-After`; N workers permit up to 6N). A guest create-then-delete loop makes a new account each time,
 so it is bounded where guests are made (captcha and the guest limits).
 
 **Response `200`:** everything is deleted, every third party has confirmed,
@@ -3258,7 +3316,7 @@ moment the run opens and the auth user is banned, so clients sign out. A third
 party hasn't confirmed yet, so the auth delete waits. `pending` names it
 (`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
 itself is being retried. Every third-party step (Sign in with Apple through
-#793, Google/Gmail and Plaid tokens, PostHog person deletion) runs before the
+#793, Google/Gmail and Plaid tokens, PostHog personless event deletion) runs before the
 auth delete. A repeat request resumes the run, and so does the operator-run
 sweep (`scripts/ops/resume_account_deletions.py` inside
 `scheduled_maintenance.py`; nothing runs it on a schedule, see
@@ -3272,18 +3330,53 @@ once, on the result; closing the confirmation only clears local state.
 { "status": "in_progress", "pending": ["plaid"] }
 ```
 
+The default-off `ARGUS_ANALYTICS_DELETION_ENABLED` adapter submits a project-scoped
+personless event deletion request using the durable run UUID as its submission
+UUID. Acceptance keeps `analytics` pending. Only a separate provider read with
+matching request and submission UUIDs and status `completed` completes that step.
+Pending, failed and operator-needed outcomes keep the account locked and the
+auth delete waiting. User retries and the existing operator sweep resume the
+same request. Provider approval, credentials and activation remain external
+gates described in the [adapter evidence](reports/evidence/806-personless-deletion/README.md).
+
+Existing runs bypass new-run admission. A linked Apple identity without a
+stored credential remains pending unless the existing run has a terminal Apple
+receipt. A fresh recovery code can be stored only under that run's exact live
+claim, verified after acquiring its locks. Failed recovery capture keeps the
+`202 in_progress` classification, including invalid or mismatched codes. The
+same unexpired JWT and live session are required; a device that already retired
+its session cannot be promised interactive recovery. Missing or expired proof
+remains `401`, with the existing operator path as the fallback.
+
+After Apple confirms revocation, one local transaction verifies the live claim
+and unchanged credential, removes that exact row and writes the existing run's
+`apple_revoke` receipt. An interruption before commit keeps the credential for
+retry; an interruption after commit leaves the receipt that explains its absence.
+A replacement credential is preserved. Existing legacy-pending, key-fingerprint
+and operator-force rules remain in effect.
+
 A request after another one finished the run answers `200` `done`: the session
 was verified, so the person existed a moment ago.
 
-**Errors** (the same for a first request and a resume; all listed in
-`docs/api/openapi.yaml`): `401` (no valid session, or on resume a token that
-doesn't name the person's own live session), `403 account_deletion_not_allowed`,
-`404 not_found` (flag off), `429 too_many_requests`,
-`503 account_deletion_unavailable` (no `DATABASE_URL` or Admin API client;
-nothing happened), `503 account_deletion_incomplete` with `Retry-After` (an
-unexpected failure; the run may be open and the account locked, so clients
-treat it as in progress, and a retry resumes the same run), and the shared
-`503 auth_session_verification_unavailable`.
+**Errors** (listed in `docs/api/openapi.yaml`):
+
+- Before admission, `409 apple_reauthorization_required` requests fresh Apple
+  authorization. A submitted invalid/expired/consumed code returns
+  `400 apple_authorization_invalid`; a different linked subject returns
+  `409 apple_identity_mismatch`. None admits deletion.
+- `503 account_deletion_unavailable` means required deletion, identity or
+  credential services could not be used and durable state establishes that no run
+  has started.
+- `503 account_deletion_incomplete` with `Retry-After` means a run may already
+  be open, or its admission state could not be established. It is neither
+  confirmed acceptance nor a promise that the account is intact. Retry the same
+  command to resolve its durable state. A known pending caller also receives this
+  code if the deletion service cannot be built.
+- `401` means no valid session, including on resume; `403
+  account_deletion_not_allowed` refuses an undeletable account; `404 not_found`
+  means the flag is off; `422` refuses invalid body fields or code bounds;
+  `429 too_many_requests` carries `Retry-After`. The shared
+  `503 auth_session_verification_unavailable` remains unchanged.
 
 
 ## Supported Values
@@ -7077,7 +7170,7 @@ Canonical routes, all under `/api/v1` and the existing registered-owner/default-
 - `GET /financial-activities/options`: `{accounts:[FinancialAccountResponse],eligibility:{kind:[account_type]},destination_eligibility:{paired_kind:[account_type]},categories:[string],sources:[string]}`.
 - `GET /financial-activities/purchases?currency=DOP`: `{items:[Activity]}`; each purchase adds `refunded_minor` and `refundable_minor`.
 
-The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,principal?,interest?,fees?,reversal_of_activity_id?,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
+The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,destination_amount?,principal?,interest?,fees?,reversal_of_activity_id?,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
 Kind is `expense|income|transfer|card_payment|refund|debt_payment|payment_reversal`, immutable on correction. Loan splits and payment-return references follow the connected debt-payment contract below.
 Singles use account_id; pairs use source/destination. Irrelevant non-null fields fail.
 Amount is a positive decimal string; occurred_at requires an offset and cannot be
@@ -7105,7 +7198,7 @@ revision and token must match under locks; stale writes change nothing.
 Activity is `{activity_id,revision,kind,amount_minor,amount,currency,
 currency_fraction_digits,occurred_at,time_zone,note,category_id,source_id,
 purchase_activity_id,purchase_revision,principal_minor,interest_minor,fees_minor,reversal_of_activity_id,reversal_of_revision,reason,recorded_at,recorded_by,legs}`.
-Leg is `{record_id,record_revision,account_id,role,balance_movement_minor,coverage}`;
+Leg is `{record_id,record_revision,account_id,role,amount_minor,amount,currency,currency_fraction_digits,balance_movement_minor,coverage}`;
 role is `single|source|destination`; coverage uses legacy CoverageAnswer.
 Write returns `{activity,accounts:[FinancialAccountResponse],replayed}`: accepted
 historical revision plus all affected accounts' current projections. History is
@@ -7115,10 +7208,38 @@ Home recent activity shows each paired operation once.
 
 Income admits cash/checking/savings/investment; expense/refund cash/checking/savings/
 credit_card. Transfer connects distinct cash/checking/savings/investment accounts;
-card payment uses those sources and credit_card destination. Pairs and linked refunds
-require same currency. No FX conversion. Loan principal, interest and fees use the explicit
+card payment uses those sources and credit_card destination. Payments, returns and linked refunds
+require the same currency. Transfers follow the paired-amount contract below. No FX conversion. Loan principal, interest and fees use the explicit
 `debt_payment` split below; no missing allocation is inferred. Positive card balance exposes credit_minor
 in BalanceResponse. Unknown remains unknown after activity.
+
+### Paired transfer amounts, default-off (#820)
+
+`amount` retains the source amount. `destination_amount` is an optional decimal
+string of at most 40 characters. Only transfers accept a non-null destination
+amount. Mixed currencies require both positive actual amounts, independently
+parsed in each canonical account currency. No exchange rate is supplied or stored.
+Same-currency transfers without the field keep equal legs. An explicit pair in
+one currency must be equal in minor units. Each visible response leg owns its
+formatted amount, minor amount, currency and fraction digits. When the source is
+hidden, the legacy top-level amount stays null and its required currency fields
+derive from the first visible leg. Hidden source denomination is not disclosed.
+
+`ARGUS_CROSS_CURRENCY_TRANSFERS_ENABLED` defaults to false and rejects mixed-currency
+preview and confirmation with `cross_currency_transfers_disabled`. While enabled
+locally, a missing received amount fails with `destination_amount_required`; an
+unequal same-currency pair fails with `transfer_amount_mismatch`. Non-transfer
+second amounts fail with `field_not_applicable`. Existing precision, range,
+positive-amount, access, revision and preview errors retain their contracts.
+
+A null or absent `destination_amount` is omitted from request serialization,
+including nested Household and Plan commands. Other explicit nulls are preserved.
+A supplied amount participates in existing preview and receipt hashes. Corrections
+replace the complete pair under the existing atomic revision and retry rules.
+Current Plan eligibility and credits require every leg to have the Plan currency.
+Mixed-currency Plan credit needs a separate accepted contract. Native entry,
+readback, correction and retry acceptance must pass before hosted activation.
+See [the accepted transfer contract](specs/lanes/cuadrao-cross-currency-transfers.md).
 
 Linked refunds target owned expenses, cannot precede purchase local financial date,
 and cumulative current linked refunds cannot exceed purchase. Purchase corrections

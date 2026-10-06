@@ -15,18 +15,20 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Request, Response
 from loguru import logger
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from argus.api import state as api_state
 from argus.api.account_deletion_auth import deletion_requester
 from argus.api.dependencies import problem
 from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import User
+from argus.domain.account_deletion.apple import AccountDeletionAdmissionError
 from argus.domain.account_deletion.service import (
     AccountDeletionIncomplete,
     AccountDeletionRejected,
     AccountDeletionService,
 )
+from argus.domain.apple_sign_in.client import MAX_CODE_LENGTH
 
 FLAG = "ARGUS_ACCOUNT_DELETION_ENABLED"
 
@@ -37,6 +39,7 @@ router = APIRouter(prefix="/api/v1", tags=["account"])
 # where guests are made (captcha and the per-visitor guest limits), not here.
 _per_account = SlidingWindowLimiter()
 _PER_ACCOUNT = (6, 60)
+_INCOMPLETE_RETRY_SECONDS = 5
 
 
 def account_deletion_enabled() -> bool:
@@ -49,6 +52,9 @@ class AccountDeletionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confirm: Literal[True]
+    apple_authorization_code: str | None = Field(
+        default=None, min_length=1, max_length=MAX_CODE_LENGTH, pattern=r"^[\x00-\x7f]+$"
+    )
 
 
 class AccountDeletionResponse(BaseModel):
@@ -57,7 +63,7 @@ class AccountDeletionResponse(BaseModel):
     # out, its tokens refused everywhere but here), but a step hasn't finished
     # (``pending``: apple, gmail, plaid, analytics; empty when another request
     # holds the run or the data step must be retried). A retry of this route
-    # or the operator-run sweep resumes it; nothing is asked of the person.
+    # or the operator-run sweep resumes it.
     status: Literal["done", "in_progress"]
     pending: list[str]
 
@@ -134,6 +140,12 @@ _RESPONSES: dict = {  # type: ignore[type-arg]
             "operator-run sweep, resumes it."
         ),
     },
+    400: _problem(
+        "`apple_authorization_invalid`: fresh Apple code is invalid or consumed; no run started."
+    ),
+    409: _problem(
+        "`apple_reauthorization_required` or `apple_identity_mismatch`: fresh authorization is required before deletion starts."
+    ),
     401: _problem(
         "No valid session: missing or invalid token, an ended session, or on "
         "resume a token that doesn't name the person's own live session (or "
@@ -168,17 +180,43 @@ def delete_account(
     user: User = Depends(_deleting_user),  # noqa: B008
 ) -> AccountDeletionResponse:
     # A guest session is deleted by the same command (Lane 6 acceptance).
-    service = account_deletion_service()
+    try:
+        service = account_deletion_service()
+    except Exception:
+        service = None
     if service is None:
+        started = getattr(request.state, "account_deletion_started", False)
         raise problem(
             request,
             status_code=503,
-            code="account_deletion_unavailable",
+            code=(
+                "account_deletion_incomplete"
+                if started
+                else "account_deletion_unavailable"
+            ),
             title="Account Deletion Unavailable",
             detail="Account deletion is not available right now.",
+            headers={"Retry-After": str(_INCOMPLETE_RETRY_SECONDS)} if started else None,
         )
     try:
-        outcome = service.delete_account(user_id=user.id)
+        outcome = service.delete_account(
+            user_id=user.id,
+            **(
+                {"apple_authorization_code": payload.apple_authorization_code}
+                if payload.apple_authorization_code is not None
+                else {}
+            ),
+        )
+    except AccountDeletionAdmissionError as exc:
+        raise problem(
+            request,
+            status_code=exc.status,
+            code=exc.code,
+            title="Account Deletion Not Started",
+            detail="Authorize Apple again to delete this account."
+            if exc.status == 409
+            else "Deletion could not start. Please try again.",
+        ) from None
     except AccountDeletionRejected as exc:
         if str(exc) == "unknown_user":
             # The session was verified a moment ago, so the person existed:
@@ -208,6 +246,6 @@ def delete_account(
             # The run may be open and the account locked; a retry of this
             # route resumes it (the web treats this as in progress).
             detail="Deletion did not finish. Try again to finish it.",
-            headers={"Retry-After": "5"},
+            headers={"Retry-After": str(_INCOMPLETE_RETRY_SECONDS)},
         ) from None
     return AccountDeletionResponse(status="done", pending=sorted(outcome.pending))
