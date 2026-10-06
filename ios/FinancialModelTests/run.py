@@ -49,6 +49,10 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     (source / "CanvasBalancePoint.swift").write_text("import Foundation\n" + history[history.index("struct CanvasBalancePoint:"):history.index("enum CanvasBalanceHistory {")])
     shutil.copy(root / "ios/ArgusFoundation/Connected/ConnectedBalanceHistory.swift", source / "ConnectedBalanceHistory.swift")
     shutil.copy(root / "ios/ArgusFoundation/Plan/ConnectedForecastSeries.swift", source / "ConnectedForecastSeries.swift")
+    plans = (canvas / "Planning/CuadraoPlanPreview.swift").read_text()
+    (source / "CanvasPlanKind.swift").write_text("import Foundation\n" + plans[plans.index("enum CanvasPlanKind:"):plans.index("enum PlanCurrency {")])
+    shutil.copy(canvas / "Planning/PlanScenario.swift", source / "PlanScenario.swift")
+    shutil.copy(root / "ios/ArgusFoundation/Plan/ConnectedPlanScenario.swift", source / "ConnectedPlanScenario.swift")
     shutil.copy(root / "ios/Packages/ArgusSession/Tests/ArgusSessionTests/TestSupport.swift", tests / "TestSupport.swift")
     shutil.copy(Path(__file__).with_name("FinancialModelTests.swift"), tests / "FinancialModelTests.swift")
     shutil.copy(Path(__file__).with_name("FinancialScrollRestorationTests.swift"), tests / "FinancialScrollRestorationTests.swift")
@@ -57,6 +61,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     shutil.copy(Path(__file__).with_name("AccountDeletionModelTests.swift"), tests / "AccountDeletionModelTests.swift")
     shutil.copy(Path(__file__).with_name("ConnectedBalanceHistoryTests.swift"), tests / "ConnectedBalanceHistoryTests.swift")
     shutil.copy(Path(__file__).with_name("ConnectedForecastSeriesTests.swift"), tests / "ConnectedForecastSeriesTests.swift")
+    shutil.copy(Path(__file__).with_name("PlanScenarioTests.swift"), tests / "PlanScenarioTests.swift")
     (package / "Package.swift").write_text('''// swift-tools-version: 6.0
 import PackageDescription
 let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], dependencies: [

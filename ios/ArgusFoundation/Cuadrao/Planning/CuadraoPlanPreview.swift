@@ -55,39 +55,14 @@ struct CanvasPlan: Identifiable, Codable, Equatable {
     var annualRate: Double = 0
     var look: CanvasPlanLook = .coast
     var archived = false
-    var remaining: Double { max(0, target - recorded) }
-    var progress: Double { min(1, max(0, recorded / max(target, 1))) }
-
-    // Preview projection with explicit fixed monthly assumptions, never an actual balance.
-    func months(at amount: Double) -> Int? {
-        guard remaining > 0 else { return 0 }
-        guard amount > 0 else { return nil }
-        var balance = remaining
-        for month in 1...600 {
-            let interest = kind == .debt ? balance * annualRate / 1200 : 0
-            guard amount > interest else { return nil }
-            balance = outstanding(after: balance, payment: amount)
-            if balance <= 0.01 { return month }
-        }
-        return nil
+    var scenario: PlanScenario {
+        PlanScenario(kind: kind, currency: currency, target: target, recorded: recorded, monthly: monthly, annualRate: annualRate, look: look)
     }
-    private func outstanding(after balance: Double, payment: Double) -> Double {
-        max(0, balance * (1 + (kind == .debt ? annualRate / 1200 : 0)) - payment)
-    }
-    func projectedValue(at step: Int, monthly amount: Double) -> Double {
-        if kind == .budget { return recorded / Double(CanvasForecast.today) * Double(step) }
-        if kind == .goal { return min(target, recorded + amount * Double(step)) }
-        var balance = remaining
-        for _ in 0..<max(0, step) { balance = outstanding(after: balance, payment: amount) }
-        return balance
-    }
-    func monthlyAmount(finishingIn months: Int) -> Double {
-        let count = Double(max(1, months))
-        let rate = kind == .debt ? annualRate / 1200 : 0
-        let payment = rate == 0 ? remaining / count : remaining * rate / (1 - pow(1 + rate, -count))
-        return max(1, ceil(payment))
-    }
-
+    var remaining: Double { scenario.remaining }
+    var progress: Double { scenario.progress }
+    func months(at amount: Double) -> Int? { scenario.months(at: amount) }
+    func projectedValue(at step: Int, monthly amount: Double) -> Double { scenario.projectedValue(at: step, monthly: amount) }
+    func monthlyAmount(finishingIn months: Int) -> Double { scenario.monthlyAmount(finishingIn: months) }
 }
 
 struct CanvasForecastPoint: Identifiable {
@@ -106,8 +81,8 @@ struct CanvasForecastEvent: Identifiable {
 }
 
 struct CanvasForecast {
-    static let today = 12
-    static let lastDay = 31
+    static let today = PlanScenarioDays.preview.elapsed
+    static let lastDay = PlanScenarioDays.preview.total
     let household: Bool
     var daily: Double { household ? 600 : 1150 }
     var current: Double { household ? 18500 : 38200 }

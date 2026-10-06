@@ -118,7 +118,14 @@ struct FinancialBudgetDetailView: View {
                         if let progress = model.detail {
                             heading(progress)
                             if progress.contributors.isEmpty {
-                                PlanLandscape(look: .sunshine).frame(height: 100)
+                                VStack(alignment: .leading, spacing: 12) {
+                                    PlanLandscape(look: .sunshine).frame(height: 100)
+                                    Text(spanish ? "Tu ritmo aparecerá con tus primeros movimientos." : "Your pace will appear with your first transactions.")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            }
+                            if let scenario = ConnectedPlanScenario.budget(progress, now: Date()) {
+                                CuadraoPlanWhatIf(scenario: scenario, spanish: spanish, apply: applyLimit(progress), showsDisclosure: true)
                             }
                             Text("budget.recordedOnly").font(.caption).foregroundStyle(.secondary)
                             CuadraoPlanDetailFacts(spanish: spanish) {
@@ -223,6 +230,14 @@ struct FinancialBudgetDetailView: View {
                 Text(progress.isOverBudget ? "budget.over" : "budget.remaining")
             }.font(.subheadline).foregroundStyle(progress.isOverBudget ? ArgusStyle.negative : ArgusStyle.secondary)
                 .accessibilityElement(children: .combine).accessibilityIdentifier("budget.remaining")
+        }
+    }
+    private func applyLimit(_ progress: FinancialBudgetProgress) -> ((Double) -> Void)? {
+        guard !progress.budget.archived, loop.pendingConfirmation == nil else { return nil }
+        return { limit in
+            let draft = FinancialBudgetDraft(budget: progress.budget)
+            draft.limit = ConnectedPlanScenario.draftAmount(limit, digits: progress.budget.currencyFractionDigits, locale: locale)
+            Task { await model.save(draft, locale: locale) }
         }
     }
     private func amount(_ value: String, _ progress: FinancialBudgetProgress) -> String {

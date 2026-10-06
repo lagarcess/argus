@@ -128,6 +128,9 @@ struct FinancialGoalDetail: View {
                             if progress.state == "reached" {
                                 PlanLandscape(look: .coast).frame(height: 135)
                             }
+                            if let scenario = ConnectedPlanScenario.goal(progress, now: Date()) {
+                                CuadraoPlanWhatIf(scenario: scenario, spanish: spanish, apply: applyMonthly(progress), showsDisclosure: true)
+                            }
                             ForEach(progress.reasons, id: \.self) { Text(LocalizedStringKey("goal.reason." + $0)).foregroundStyle(ArgusStyle.negative) }
                             projection(progress)
                             Button { model.action = .allocation } label: {
@@ -273,6 +276,14 @@ struct FinancialGoalDetail: View {
                     if let asOf = pool.asOf { Text(AccountPresentation.date(asOf, zone: loop.plan.projection?.selection.timeZone ?? "UTC", locale: locale)).font(.caption) }
                 }
             }
+        }
+    }
+    private func applyMonthly(_ progress: FinancialGoalProgress) -> ((Double) -> Void)? {
+        guard progress.goal.contributionPlan?.schedule.cadence == .monthly, !progress.goal.archived, loop.pendingConfirmation == nil else { return nil }
+        return { monthly in
+            let draft = FinancialGoalDraft(goal: progress.goal)
+            draft.amount = ConnectedPlanScenario.draftAmount(monthly, digits: progress.goal.currencyFractionDigits, locale: locale)
+            Task { await model.save(draft, locale: locale) }
         }
     }
     private func money(_ minor: String?, _ progress: FinancialGoalProgress) -> String {

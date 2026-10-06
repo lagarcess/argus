@@ -11,6 +11,7 @@ with tempfile.TemporaryDirectory(prefix="cuadrao-plan-checks-") as folder:
         str(root / "ios/ArgusFoundation/Cuadrao/CuadraoCollectionOrder.swift"),
         str(root / "ios/ArgusFoundation/Cuadrao/CanvasMoney.swift"),
         str(root / "ios/ArgusFoundation/Cuadrao/Planning/CuadraoPlanPreview.swift"),
+        str(root / "ios/ArgusFoundation/Cuadrao/Planning/PlanScenario.swift"),
         str(root / "ios/ArgusFoundation/Cuadrao/CuadraoDesignPreview.swift"),
         str(Path(__file__).with_name("PlanPreviewChecks.swift")), "-o", str(binary)
     ], check=True)
