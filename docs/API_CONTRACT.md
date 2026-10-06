@@ -1067,6 +1067,39 @@ Application-facing user object.
   explicit onboarding flow. It stays in responses so deployed clients keep a
   stable `/me` shape, but no product behavior reads it and no API writes it.
 
+### Apple first-authorization display-name initialization
+
+`POST /api/v1/me/apple-name` accepts only `{ "display_name": "María 李" }`.
+It trims surrounding whitespace, preserves Unicode and interior spelling, and
+rejects blank or more than 200 characters with 422. It returns the existing
+canonical `UserResponse`, including when a retry preserves an existing name.
+The text is user-supplied account presentation, not verified legal identity.
+It never fills `preferred_name` or copies names into Auth metadata.
+
+The existing `ARGUS_APPLE_REVOCATION_CAPTURE_ENABLED` flag keeps this command
+default off. While off, the plain 404 is returned before authentication or body
+parsing. When on, it requires the verified registered owner's account capability,
+durable PostgreSQL, and one unambiguous current Apple identity from the shared
+Auth identity reader. It makes no Apple or other provider call.
+
+Initialization succeeds only for a new profile whose two name fields are absent
+and whose internal initialization eligibility remains open. A successful seed,
+any explicit display/preferred-name edit, a same-value write, or an explicit
+NULL clear closes eligibility permanently. Unrelated partial profile edits leave
+it open. Historical profiles are conservatively closed by the migration because
+their earlier clear/edit history cannot be proven. They retain ordinary editing.
+
+No request accepts a user ID, Apple subject, email, preferred name or eligibility
+marker. Missing Apple identity returns 409 `apple_identity_missing`; an unavailable
+identity/database returns 503 `apple_name_unavailable`; an account closed or
+admitted to deletion returns 403 `account_unavailable`. Ordinary session and guest
+denials still apply. This server command does not establish native callback,
+journal/relaunch or real first-authorization acceptance. Those remain separate
+work. Name initialization and deletion admission serialize on the same Auth-parent
+lock. A deletion run admitted before initialization acquires that lock prevents
+any name write, including retries. A name transaction that obtains it first can
+finish before deletion admission commits.
+
 ## Conversation
 
 ```json
@@ -3277,7 +3310,7 @@ moment the run opens and the auth user is banned, so clients sign out. A third
 party hasn't confirmed yet, so the auth delete waits. `pending` names it
 (`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
 itself is being retried. Every third-party step (Sign in with Apple through
-#793, Google/Gmail and Plaid tokens, PostHog person deletion) runs before the
+#793, Google/Gmail and Plaid tokens, PostHog personless event deletion) runs before the
 auth delete. A repeat request resumes the run, and so does the operator-run
 sweep (`scripts/ops/resume_account_deletions.py` inside
 `scheduled_maintenance.py`; nothing runs it on a schedule, see
@@ -3290,6 +3323,15 @@ once, on the result; closing the confirmation only clears local state.
 ```json
 { "status": "in_progress", "pending": ["plaid"] }
 ```
+
+The default-off `ARGUS_ANALYTICS_DELETION_ENABLED` adapter submits a project-scoped
+personless event deletion request using the durable run UUID as its submission
+UUID. Acceptance keeps `analytics` pending. Only a separate provider read with
+matching request and submission UUIDs and status `completed` completes that step.
+Pending, failed and operator-needed outcomes keep the account locked and the
+auth delete waiting. User retries and the existing operator sweep resume the
+same request. Provider approval, credentials and activation remain external
+gates described in the [adapter evidence](reports/evidence/806-personless-deletion/README.md).
 
 Existing runs bypass new-run admission. A linked Apple identity without a
 stored credential remains pending unless the existing run has a terminal Apple
