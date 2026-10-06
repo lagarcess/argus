@@ -61,7 +61,6 @@ struct CuadraoAppShell<Content: View>: View {
             } message: {
                 Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.")
             }
-            .font(.body)
             .tint(WelcomePalette.pine)
             .foregroundStyle(WelcomePalette.ink)
             .environment(\.cuadraoChat, chat)
