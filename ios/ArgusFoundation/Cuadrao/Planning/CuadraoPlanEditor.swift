@@ -4,7 +4,7 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
     let host: CuadraoPlanEditorHost
     let initial: CanvasPlan
     let spanish: Bool
-    let details: (CanvasPlan) -> Details
+    let details: (Binding<CanvasPlan>) -> Details
     let footer: () -> Footer
     @State private var draft: CanvasPlan
     @State private var amountErrors: [String: String] = [:]
@@ -29,7 +29,7 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
         && host.canSave(draft)
     }
     init(host: CuadraoPlanEditorHost, initial: CanvasPlan, spanish: Bool,
-         @ViewBuilder details: @escaping (CanvasPlan) -> Details, @ViewBuilder footer: @escaping () -> Footer) {
+         @ViewBuilder details: @escaping (Binding<CanvasPlan>) -> Details, @ViewBuilder footer: @escaping () -> Footer) {
         self.host = host; self.initial = initial; self.spanish = spanish; self.details = details; self.footer = footer
         _draft = State(initialValue: initial)
     }
@@ -58,7 +58,7 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
                             amountRow(monthlyTitle, value: $draft.monthly, id: ids.monthly, primary: true)
                         }
                     }.background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 20))
-                    details(draft)
+                    details($draft)
                     HStack {
                         CuadraoChoiceMenu(title: spanish ? "Espacio" : "Space", selection: $draft.spaceID,
                             values: host.spaces.map(\.id),
