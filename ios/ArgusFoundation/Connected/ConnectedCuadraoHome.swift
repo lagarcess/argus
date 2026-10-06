@@ -312,16 +312,13 @@ struct ConnectedCuadraoHome: View {
                     .font(CuadraoTypography.section)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button {
+                CuadraoSectionAddButton(title: spanish ? "Añadir movimiento" : "Add activity") {
                     if activeAccounts.count == 1, let account = activeAccounts.first {
                         loop.record(account)
                     } else {
                         choosingAccount = true
                     }
-                } label: {
-                    Image(systemName: "plus").frame(width: 44, height: 44)
                 }
-                .accessibilityLabel(spanish ? "Añadir movimiento" : "Add activity")
                 .disabled(activeAccounts.isEmpty || loop.pendingConfirmation != nil)
                 .accessibilityIdentifier("home.record")
             }
