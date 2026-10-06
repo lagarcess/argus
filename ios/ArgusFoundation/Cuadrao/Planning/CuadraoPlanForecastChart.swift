@@ -25,6 +25,8 @@ struct CuadraoPlanForecastChart: View {
     @Binding var selection: Double?
     var detailed = false
     var compact = false
+    /// A schedule-based projection holds each balance until the next scheduled date.
+    var stepped = false
     let identifier: String
     let accessibilityTitle: String
     let accessibilityAmount: String
@@ -45,7 +47,7 @@ struct CuadraoPlanForecastChart: View {
             ForEach(projected) { point in
                 LineMark(x: .value("Date", point.position), y: .value("Balance", point.balance), series: .value("Path", "forecast"))
                     .foregroundStyle(WelcomePalette.pine).lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [5, 5]))
-                    .interpolationMethod(.linear)
+                    .interpolationMethod(stepped ? .stepEnd : .linear)
                 if projected.count == 1 {
                     PointMark(x: .value("Date", point.position), y: .value("Balance", point.balance))
                         .foregroundStyle(WelcomePalette.pine).symbolSize(30)
