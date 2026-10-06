@@ -30,5 +30,15 @@
   ],
   "configuration_disposition": "existing API setting shared via Render YAML anchor to web; WEB release membership derives from canonical validated profile; safe example only, no hosted application",
   "scope_and_limits": "Spoofed forwarded header cannot rotate recovery per-IP key; no silent fallback. Hosted ingress/origin sanitization694/832, fleetwide limits671 and deployment/readback remain gates. Integrationdd041 dependency install failed before tests; owned870 exact-SHA failed-job retry passed and narrow issue closed.",
-  "housekeeping": "pending protected-branch PR860"
+  "housekeeping": "pending protected-branch PR860",
+  "integration_checks": {
+    "CI": {
+      "run": 37396531862,
+      "conclusion": "success"
+    },
+    "Private Alpha Local Smoke": {
+      "run": 37396531822,
+      "conclusion": "success"
+    }
+  }
 }

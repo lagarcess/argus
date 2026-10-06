@@ -15,7 +15,7 @@ ci-release-resolution	operations	landed	codex/cuadrao-ci-release-resolution	851	
 canary-fixture	operations	landed	codex/issue-861-canary-fixture-close	863	d2347166f78df1a1e67f52ab194936ee14ab210b	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 apple-lock-observer	operations	landed	codex/867-apple-lock-observer	868	8a3e80daaf8947a5dfd43268eeb3f2459427de97	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 apple-name-backend	identity	landed	codex/cuadrao-apple-name-backend	869	b62f35d1a25fb344a99df3702a5199b146a1e152	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
-invite-hardening	operations	needs-verify	codex/cuadrao-invite-hardening-804-20261005	871	258aa357dcfd7dc64506572d3dbba092845014c5	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md
+invite-hardening	operations	landed	codex/cuadrao-invite-hardening-804-20261005	871	258aa357dcfd7dc64506572d3dbba092845014c5	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md
 apple-name-native	identity	needs-verify	codex/cuadrao-native-apple-name-20261005		07f768f28be6f900b1a3d2e7b242bcdbad25d93a	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md
 deletion-native-command	deletion	needs-verify	codex/cuadrao-native-deletion-command-20261005		e1a4fb2d055b6a6d06c0f360058bfb5e3878c6b2	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md
 currency-home-c1	foundations	needs-verify	codex/cuadrao-primary-home-bindings-20261005		87a616ef0	docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md

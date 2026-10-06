@@ -1,10 +1,10 @@
 # Orchestrate status
 
-Generated: 2026-10-06T01:05:22.628Z
+Generated: 2026-10-06T01:18:30.824Z
 
 ## Units
 
-States: landed=15, needs-verify=6
+States: landed=16, needs-verify=5
 
 | ID | Track | State | Branch | PR | SHA | Brief |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ States: landed=15, needs-verify=6
 | canary-fixture | operations | landed | codex/issue-861-canary-fixture-close | 863 | d2347166f78df1a1e67f52ab194936ee14ab210b | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | apple-lock-observer | operations | landed | codex/867-apple-lock-observer | 868 | 8a3e80daaf8947a5dfd43268eeb3f2459427de97 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | apple-name-backend | identity | landed | codex/cuadrao-apple-name-backend | 869 | b62f35d1a25fb344a99df3702a5199b146a1e152 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| invite-hardening | operations | needs-verify | codex/cuadrao-invite-hardening-804-20261005 | 871 | 258aa357dcfd7dc64506572d3dbba092845014c5 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
+| invite-hardening | operations | landed | codex/cuadrao-invite-hardening-804-20261005 | 871 | 258aa357dcfd7dc64506572d3dbba092845014c5 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
 | apple-name-native | identity | needs-verify | codex/cuadrao-native-apple-name-20261005 |  | 07f768f28be6f900b1a3d2e7b242bcdbad25d93a | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
 | deletion-native-command | deletion | needs-verify | codex/cuadrao-native-deletion-command-20261005 |  | e1a4fb2d055b6a6d06c0f360058bfb5e3878c6b2 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
 | currency-home-c1 | foundations | needs-verify | codex/cuadrao-primary-home-bindings-20261005 |  | 87a616ef0 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
@@ -80,4 +80,4 @@ Lowest unmerged: none
 | release-jobs | open | Settle #818 first-release retained chat jobs and connected memory/voice inclusion. Recommendation: bounded financial read and revision-confirmed proposed-write jobs; defer unassigned connected memory/voice activation. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 | apple-late-cleanup | open | Accept #803 rare provider-side late revocation recovery or require stronger coordination. Recommendation: documented forced-sign-out recovery with activation/phone gates; do not claim local CAS cancels an Apple request already received. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 
-<!-- orch-summary {"unitStates":{"landed":15,"needs-verify":6},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":22},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->
+<!-- orch-summary {"unitStates":{"landed":16,"needs-verify":5},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":22},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->
