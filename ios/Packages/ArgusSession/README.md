@@ -184,8 +184,12 @@ Account deletion uses the existing session owner and a token-free per-user vault
 journal. `deleteAccount(expectedIdentity:freshAppleAuthorizationCode:)` sends one
 confirmed command; `resumePendingAccountDeletion` checks that same command without
 SDK refresh or Apple-code replay. Accepted deletion retires interactive proof.
-Only a confirmed receipt permits the future app cleanup adapter; acknowledge it
-with `acknowledgeConfirmedAccountDeletion` after exact-user local cleanup succeeds.
+Only a confirmed receipt permits the future app cleanup adapter. Call
+`acknowledgeConfirmedAccountDeletion(_:cleanup:)` with a required synchronous,
+throwing cleanup callback. The actor validates identity and the completed journal
+before invoking that callback, then removes the journal after cleanup succeeds.
+Use its validated UUID for exact-user cleanup. The callback must tolerate a
+missing directory on retry; failure keeps the existing journal as the obligation.
 Relaunch readback comes from `accountDeletionStatuses()`.
 See the source-preparation report at
 `docs/reports/evidence/native-deletion-command-20261005/README.md` for dependency
