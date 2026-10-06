@@ -16,16 +16,18 @@ struct CuadraoUpdatesLayout<Rows: View, Preferences: View>: View {
 
     var body: some View {
         List {
-            Section {
-                Picker(spanish ? "Mostrar" : "Show", selection: $unreadOnly) {
-                    Text(spanish ? "Todas" : "All").tag(false)
-                    Text(spanish ? "Sin leer" : "Unread").tag(true)
-                }.pickerStyle(.segmented).accessibilityIdentifier("cuadrao.updates.filter")
-                if hasUnread {
-                    Button(spanish ? "Marcar todas como leídas" : "Mark all as read", action: markAllRead)
-                        .font(.subheadline).accessibilityIdentifier("cuadrao.updates.read-all")
-                }
-            }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+            if emptyState != .unavailable {
+                Section {
+                    Picker(spanish ? "Mostrar" : "Show", selection: $unreadOnly) {
+                        Text(spanish ? "Todas" : "All").tag(false)
+                        Text(spanish ? "Sin leer" : "Unread").tag(true)
+                    }.pickerStyle(.segmented).accessibilityIdentifier("cuadrao.updates.filter")
+                    if hasUnread {
+                        Button(spanish ? "Marcar todas como leídas" : "Mark all as read", action: markAllRead)
+                            .font(.subheadline).accessibilityIdentifier("cuadrao.updates.read-all")
+                    }
+                }.listRowBackground(Color.clear).listRowSeparator(.hidden)
+            }
             if let emptyState {
                 empty(emptyState).listRowBackground(Color.clear).listRowSeparator(.hidden)
             } else {
