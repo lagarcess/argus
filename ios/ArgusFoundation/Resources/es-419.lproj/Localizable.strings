@@ -837,3 +837,6 @@
 "auth.apple.validation.detail" = "Necesitamos verificar la autorización de Apple antes de continuar. Inténtalo de nuevo o cierra sesión en esta app.";
 "auth.apple.signInAgain.detail" = "Cierra sesión e inicia sesión de nuevo para verificar cómo comenzó esta sesión.";
 "auth.apple.signInAgain.action" = "Cerrar sesión e iniciar de nuevo";
+
+"auth.deletion.uncertain" = "No pudimos confirmar si la eliminación comenzó. Compruébalo antes de usar tu cuenta.";
+"auth.deletion.pending" = "Estamos eliminando tu cuenta. Ya cerraste sesión. Si necesitas ayuda, contacta a soporte.";

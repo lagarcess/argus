@@ -193,6 +193,47 @@ final class CredentialVault: @unchecked Sendable {
         guard let data = try backing.retrieve(key: prefix + ".apple-name") else { return nil }
         return try JSONDecoder().decode(AppleNameIntent.self, from: data)
     }
+    private struct DeletionCommands: Codable {
+        var activeUserID: UUID? = nil
+        var records: [String: AccountDeletionJournal] = [:]
+    }
+    private func deletionCommands() throws -> DeletionCommands {
+        guard let data = try backing.retrieve(key: prefix + ".deletion") else { return DeletionCommands() }
+        return try JSONDecoder().decode(DeletionCommands.self, from: data)
+    }
+    func deletionJournal(userID: UUID? = nil) throws -> AccountDeletionJournal? {
+        try locked {
+            do {
+                let commands = try deletionCommands()
+                guard let owner = userID ?? commands.activeUserID else { return nil }
+                return commands.records[owner.uuidString]
+            } catch { throw SessionFailure.storageUnavailable }
+        }
+    }
+    func deletionOwners() throws -> [UUID] {
+        try locked {
+            do { return try deletionCommands().records.values.map(\.userID) }
+            catch { throw SessionFailure.storageUnavailable }
+        }
+    }
+    func saveDeletionJournal(_ journal: AccountDeletionJournal, epoch: UInt64) throws {
+        try scoped(epoch) {
+            var commands = try deletionCommands()
+            commands.activeUserID = journal.userID
+            commands.records[journal.userID.uuidString] = journal
+            try backing.store(key: prefix + ".deletion", value: JSONEncoder().encode(commands))
+        }
+    }
+    func removeDeletionJournal(epoch: UInt64, userID: UUID? = nil) throws {
+        try scoped(epoch) {
+            var commands = try deletionCommands()
+            guard let owner = userID ?? commands.activeUserID else { return }
+            commands.records.removeValue(forKey: owner.uuidString)
+            if commands.activeUserID == owner { commands.activeUserID = nil }
+            if commands.records.isEmpty { try backing.remove(key: prefix + ".deletion") }
+            else { try backing.store(key: prefix + ".deletion", value: JSONEncoder().encode(commands)) }
+        }
+    }
     func preflight() throws {
         try locked {
             do {
