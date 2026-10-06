@@ -66,6 +66,39 @@ extension FinancialLoopUITests {
         verifyBudgetSearchAndReopen(title)
     }
 
+    func testRetainedBudgetViewportRestoration() throws {
+        guard let title = ProcessInfo.processInfo.environment["ARGUS_TEST_SEARCH_QUERY"] else {
+            throw XCTSkip("Requires a retained isolated budget journey.")
+        }
+        try signIn(fresh: true, user: "A")
+        openPersonalAccounts()
+        openBudget(title)
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'budget.activity.'"))
+        XCTAssertEqual(rows.count, 3)
+        let oldest = rows.element(boundBy: rows.count - 1)
+        tapVisible(oldest)
+        app.returnFromDetail("budget.activity.back")
+        XCTAssertTrue(oldest.waitForExistence(timeout: 15))
+        let savedY = oldest.frame.minY
+        let savedLabels = rows.allElementsBoundByIndex.map(\.label)
+        capture("budget-viewport-before-relaunch")
+        app.terminate(); app.launch()
+        XCTAssertTrue(oldest.waitForExistence(timeout: 15))
+        let restored = NSPredicate { _, _ in oldest.isHittable && abs(oldest.frame.minY - savedY) < 12 }
+        let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: restored, object: nil)], timeout: 15)
+        capture("budget-viewport-after-relaunch")
+        XCTAssertEqual(result, .completed, "Expected Y \(savedY), restored Y \(oldest.frame.minY), hittable \(oldest.isHittable)")
+        XCTAssertEqual(rows.allElementsBoundByIndex.map(\.label), savedLabels)
+        tapVisible(oldest)
+        tapVisible(app.buttons["activity.correct"])
+        XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 10))
+        tapVisible(app.buttons["Cancel"])
+        app.returnFromDetail("budget.activity.back")
+        choosePlanDetailAction("budget.edit")
+        XCTAssertTrue(app.buttons["budget.save"].waitForExistence(timeout: 10))
+        tapVisible(app.buttons["Cancel"])
+    }
+
     func testExistingBudgetHomeSearchAndReopen() throws {
         guard let title = ProcessInfo.processInfo.environment["ARGUS_TEST_SEARCH_QUERY"] else {
             throw XCTSkip("Requires a retained isolated budget journey.")

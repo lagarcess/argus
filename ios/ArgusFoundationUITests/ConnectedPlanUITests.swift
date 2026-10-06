@@ -210,8 +210,12 @@ extension FinancialLoopUITests {
     }
 
     func choosePlanDetailAction(_ identifier: String) {
-        tapVisible(app.buttons["plan-detail-options"])
-        tapVisible(app.buttons[identifier])
+        let options = app.buttons["plan-detail-options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        options.tap()
+        let action = app.buttons[identifier]
+        XCTAssertTrue(action.waitForExistence(timeout: 10))
+        action.tap()
     }
 
     func confirmPlanMoney() {

@@ -62,13 +62,13 @@ private struct FinancialPlanDestinations: ViewModifier {
     func body(content: Content) -> some View {
         content
             .navigationDestination(isPresented: goalPresented) {
-                FinancialPlanDetailLoader(plan: loop.plan) {
+                FinancialPlanDetailLoader(plan: loop.plan, accounts: loop.accounts) {
                     FinancialGoalDetail(model: goals, loop: loop, nativeNavigation: true, close: closeGoal)
                 }
                     .accessibilityElement(children: .contain).accessibilityIdentifier("goal.detail")
             }
             .navigationDestination(isPresented: budgetPresented) {
-                FinancialPlanDetailLoader(plan: loop.plan) {
+                FinancialPlanDetailLoader(plan: loop.plan, accounts: loop.accounts) {
                     FinancialBudgetDetailView(model: budgets, loop: loop, nativeNavigation: true, close: closeBudget)
                 }
                     .accessibilityElement(children: .contain).accessibilityIdentifier("budget.detail")
@@ -119,7 +119,7 @@ private struct FinancialDebtDestination: ViewModifier {
 
     func body(content: Content) -> some View {
         content.navigationDestination(isPresented: presented) {
-            FinancialPlanDetailLoader(plan: loop.plan) {
+            FinancialPlanDetailLoader(plan: loop.plan, accounts: loop.accounts) {
                 FinancialDebtDetail(model: model, loop: loop, nativeNavigation: true, close: close)
             }
                 .accessibilityElement(children: .contain).accessibilityIdentifier("debt.detail")
@@ -140,24 +140,30 @@ private struct FinancialDebtDestination: ViewModifier {
 
 private struct FinancialPlanDetailLoader<Content: View>: View {
     @ObservedObject var plan: FinancialPlanModel
+    @ObservedObject var accounts: AccountsModel
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         Group {
-            if plan.projection != nil { content() }
+            if plan.projection != nil && accounts.hasLoaded { content() }
             else {
                 VStack(spacing: 16) {
-                    if plan.loading { ProgressView("accounts.loading") }
-                    if let error = plan.errorKey {
+                    if plan.loading || accounts.busy { ProgressView("accounts.loading") }
+                    if let error = accounts.errorKey ?? plan.errorKey {
                         Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
-                        Button("accounts.retry") { Task { await plan.refresh() } }.frame(minHeight: 44)
+                        Button("accounts.retry") { Task { await load() } }.frame(minHeight: 44)
                     }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(WelcomePalette.background)
         .toolbar(.visible, for: .navigationBar)
-        .task { if plan.projection == nil { await plan.refresh() } }
+        .task { await load() }
+    }
+
+    private func load() async {
+        if !accounts.hasLoaded { await accounts.load() }
+        if plan.projection == nil { await plan.refresh() }
     }
 }
 

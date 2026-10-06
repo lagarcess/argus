@@ -23,7 +23,7 @@ final class FinancialLoopModel: ObservableObject {
     @Published private(set) var recovering = false
     @Published private(set) var recoveryErrorKey: String?
     private let controller: SessionController
-    private let accounts: AccountsModel
+    let accounts: AccountsModel
     private let journal: FinancialWriteJournal
     private var identity: SessionSnapshot?
     private var generation = UUID()
