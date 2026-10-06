@@ -9,7 +9,7 @@
       "lease_owner": null,
       "worker_stop_allowed": false,
       "release_action": "mark lease_owner null; preserve running container",
-      "health": "healthy after exact-container restart",
+      "health": "Last verified healthy; current health unverified during shared host recovery hold",
       "lease_scope": null,
       "local_tcp_execution": "Use authorized escalated execution for local bind/TCP tests; default sandbox denies these operations."
     },
@@ -21,5 +21,10 @@
       "simulator": "C0F6EE74-6F69-4F0B-B614-2DB422ADDB8A",
       "release_action": "Counsel confirms combined checks finished; no new reservation yet"
     }
-  ]
+  ],
+  "local_run_hold": {
+    "owner": "Counsel",
+    "reason": "Shared Docker/Auth incident; nondestructive recovery preserving all containers and volumes",
+    "active": true
+  }
 }

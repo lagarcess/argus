@@ -1,6 +1,6 @@
 # Cuadrao coordinated delivery evidence
 
-Snapshot: 2026-10-06T00:28:57.117702+00:00. Original integration: `875de09ac2115acec42e09060b92878aa5f18eff`. Current fetched integration: `dd04130e8aa174db3de6139541d3b2e0f36868d0`. Active delivery record; protected-branch housekeeping remains in PR #860.
+Snapshot: 2026-10-06T00:28:57.117702+00:00. Original integration: `875de09ac2115acec42e09060b92878aa5f18eff`. Current fetched integration: `ce7c7350af9a75019a622016ce3a65dbd17e1cc8`. Active delivery record; protected-branch housekeeping remains in PR #860.
 
 Shared Foundations #818–#820 and Trust/Privacy/Operations have one captain and integration queue. [Preflight](preflight.md), [contract owners](foundation-contract-map-proposed.md), [decision gates](orchestration/gates.md), and [current queue](active-queue-20261005.md) preserve scope. Proposed product contracts remain proposed.
 
@@ -20,6 +20,7 @@ Shared Foundations #818–#820 and Trust/Privacy/Operations have one captain and
 | [#847](https://github.com/lagarcess/argus/pull/847) | `70b0cd3891937f026900aceb96ce5f556c76b0b3` | [Evidence](pr847-landing-record.json) |
 | [#854](https://github.com/lagarcess/argus/pull/854) | `7d037b07d4b98b34c6c0ad3026811c7d2f28ae47` | [Evidence](pr854-landing-record.json) |
 | [#845](https://github.com/lagarcess/argus/pull/845) | `dd04130e8aa174db3de6139541d3b2e0f36868d0` | [Evidence](pr845-landing-record.json) |
+| [#865](https://github.com/lagarcess/argus/pull/865) | `ce7c7350af9a75019a622016ce3a65dbd17e1cc8` | [Evidence](pr865-landing-record.json) |
 
 Each slice passed independent review, combined-tree modularity and terminal PR checks before an expected-head guarded merge. Canonical integration is synchronized. Integration CI/smoke and housekeeping have separate gates. Local proof does not mean device verification or activation.
 

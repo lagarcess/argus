@@ -24,5 +24,17 @@
   },
   "configuration_names": [],
   "scope_and_limits": "Dated factual collection/storage/sharing/retention/deletion/SDK/permission inventory and bilingual legal recommendations; existing781 drafts untouched. No new runtime, current signed archive, provider, hosted, device, counsel or activation proof. Parent831/832 remain open.",
-  "housekeeping": "pending protected-branch evidence PR860"
+  "housekeeping": "pending protected-branch evidence PR860",
+  "integration_checks": {
+    "CI": {
+      "run": 37395042662,
+      "attempt": 2,
+      "conclusion": "success",
+      "prior_attempt_disposition": "Next tarball extraction failed before backend tests; issue870 closed after identical-SHA failed-job retry passed"
+    },
+    "Private Alpha Local Smoke": {
+      "run": 37395042347,
+      "conclusion": "success"
+    }
+  }
 }
