@@ -30,7 +30,8 @@ customer discovery continue. It delivers no business application capabilities.
    state. No fetch, storage, analytics, email, account or calendar integration.
 10. Name, business and email are required; a short description is optional.
     Invalid fields have inline errors and focus goes to the first error.
-    Review preserves the entered values for editing; leaving/reloading clears them.
+    Review preserves the entered values for editing. The application sends nothing
+    and writes no persistent storage; browser history may restore an in-memory view.
 11. Personal is only a coming-soon skeleton with a return to Business.
 12. Missing portrait and profile links are omitted. Founder text is draft copy
     based only on supplied facts, with no employer logos or endorsements.
@@ -47,10 +48,12 @@ customer discovery continue. It delivers no business application capabilities.
 - Design guide owns the direction; this spec owns this bounded implementation.
 - `web/lib/business-site.ts` owns preview routing, locale and enablement.
 - New `web/app/business/[[...path]]` route and `web/components/business` own UI.
+- `web/proxy.ts` rejects disabled/unknown Business routes before response streaming
+  so their HTTP status is 404. It uses the same route and enablement owner above.
 - A narrow existing I18nProvider exception lets this server-rendered marketing
   route render before client initialization and sets its language without changing
   the user's saved app preference. Existing routes retain their behavior.
-- `web/.env.example` documents the default-off preview. No API/data contract changes.
+- `web/.env.local.example` documents the default-off preview. No API/data contract changes.
 
 ## 5. Execution contract
 

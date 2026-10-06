@@ -9,6 +9,11 @@ This guide records the decisions from the founder's website discussion. Agreed
 direction stays stable until explicitly revised. Suggestions and open choices do
 not become approved requirements merely because they appear here.
 
+The [local website build spec](../../../docs/superpowers/specs/2026-10-06-cuadrao-business-website.md)
+records the first implementation choices. The [verification report](../../../docs/reports/evidence/cuadrao-business/README.md)
+records the resulting pages, checks, and remaining publication needs. These are
+reviewable draft choices, not approval of final copy or pixels.
+
 The [authority map](../../../docs/DOCUMENTATION_AUTHORITY.md) owns document roles.
 The [MVEE](../../../docs/specs/argus-minimum-viable-ecosystem-experience.md) owns
 product experience. Technical contracts and the execution board retain their
