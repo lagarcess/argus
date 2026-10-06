@@ -13,10 +13,7 @@ with tempfile.TemporaryDirectory(prefix="argus-debt-draft-tests-") as temporary:
     source.mkdir(parents=True)
     tests.mkdir(parents=True)
     # Follow the existing model harness: copy the exact production declarations.
-    draft = (root / "ios/ArgusFoundation/Plan/FinancialDebtForm.swift").read_text()
-    (source / "FinancialDebtDraft.swift").write_text(
-        draft.split("struct FinancialDebtForm: View {")[0]
-    )
+    shutil.copy(root / "ios/ArgusFoundation/Plan/FinancialDebtDraft.swift", source)
     shutil.copy(root / "ios/ArgusFoundation/Accounts/AccountEntry.swift", source)
     for filename, declaration, target in [
         (

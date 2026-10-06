@@ -96,7 +96,7 @@ struct FinancialDebtSheets: View {
     let search: FinancialSearchModel?
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
-            .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in FinancialDebtForm(model: model, loop: loop, draft: draft) }
+            .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in ConnectedPlanEditor(loop: loop, seed: .debt(draft)) }
             .sheet(isPresented: $model.choosingAccount, onDismiss: model.accountChooserDismissed) {
                 NavigationStack {
                     List((loop.plan.projection?.accounts ?? []).filter { account in !account.archived && ["credit_card", "other_debt"].contains(account.type) && !(loop.plan.projection?.debts ?? []).contains(where: { !$0.debt.archived && $0.debt.debtAccountId == account.id }) }) { account in

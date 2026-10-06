@@ -94,7 +94,7 @@ struct FinancialGoalSheets: View {
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
             .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
-                FinancialGoalForm(model: model, loop: loop, draft: draft)
+                ConnectedPlanEditor(loop: loop, seed: .goal(draft))
             }
             .sheet(item: $model.action) { action in
                 if let detail = model.detail {

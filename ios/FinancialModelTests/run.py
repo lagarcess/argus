@@ -20,9 +20,11 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     (source / "AssetShareControl.swift").write_text("import Foundation\nenum AssetShareControl {\n" + percent + "}\n")
     for name in ("FinancialPlanModel.swift", "FinancialBudgetModel.swift", "FinancialGoalModel.swift", "FinancialDebtModel.swift"):
         shutil.copy(root / "ios/ArgusFoundation/Plan" / name, source / name)
-    for kind in ("Goal", "Debt"):
-        form = (root / "ios/ArgusFoundation/Plan" / ("Financial" + kind + "Form.swift")).read_text()
-        (source / ("Financial" + kind + "Draft.swift")).write_text(form.split("struct Financial" + kind + "Form: View {")[0])
+    for name in ("FinancialGoalDraft.swift", "FinancialDebtDraft.swift"):
+        shutil.copy(root / "ios/ArgusFoundation/Plan" / name, source / name)
+    shutil.copy(root / "ios/ArgusFoundation/Plan/ConnectedPlanMapping.swift", source / "ConnectedPlanMapping.swift")
+    plans = (root / "ios/ArgusFoundation/Cuadrao/Planning/CuadraoPlanPreview.swift").read_text()
+    (source / "CanvasPlan.swift").write_text("import Foundation\n" + plans[plans.index("enum CanvasPlanKind:"):plans.index("@Observable final class CuadraoPlanPreview {")])
     navigation = (root / "ios/ArgusFoundation/SampleDestinations.swift").read_text()
     (source / "PlanSection.swift").write_text("import SwiftUI\n" + navigation[navigation.index("enum PlanSection:"):navigation.index("struct PlanSampleView:")])
     shutil.copy(root / "ios/ArgusFoundation/Search/FinancialSearchModel.swift", source / "FinancialSearchModel.swift")
@@ -62,6 +64,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     shutil.copy(Path(__file__).with_name("ConnectedBalanceHistoryTests.swift"), tests / "ConnectedBalanceHistoryTests.swift")
     shutil.copy(Path(__file__).with_name("ConnectedForecastSeriesTests.swift"), tests / "ConnectedForecastSeriesTests.swift")
     shutil.copy(Path(__file__).with_name("PlanScenarioTests.swift"), tests / "PlanScenarioTests.swift")
+    shutil.copy(Path(__file__).with_name("ConnectedPlanMappingTests.swift"), tests / "ConnectedPlanMappingTests.swift")
     (package / "Package.swift").write_text('''// swift-tools-version: 6.0
 import PackageDescription
 let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], dependencies: [

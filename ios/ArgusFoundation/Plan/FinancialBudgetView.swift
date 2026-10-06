@@ -95,7 +95,7 @@ struct FinancialBudgetSheets: View {
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
             .sheet(item: $model.draft, onDismiss: { Task { await search?.refresh() } }) { draft in
-                FinancialBudgetForm(model: model, loop: loop, draft: draft)
+                ConnectedPlanEditor(loop: loop, seed: .budget(draft))
             }
     }
 }
