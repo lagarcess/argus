@@ -109,6 +109,7 @@
       "name": "argus-app",
       "auto_deploy_trigger": "off",
       "env": {
+        "ARGUS_TRUSTED_CLIENT_IP_HEADER": "CF-Connecting-IP",
         "ARGUS_APP_ORIGIN": "https://arguschat.ai",
         "NEXT_PUBLIC_APP_ENV": "production",
         "NEXT_PUBLIC_MOCK_AUTH": "false",

@@ -37,28 +37,22 @@ ARGUS_QA_REQUIRED_ENV=(
   ARGUS_READOUT_FALLBACK_MODEL
 )
 
-ARGUS_RENDER_API_ENV_KEYS="$(python3 "${BASH_SOURCE[0]%/*}/private-alpha-release-profile.py" allowed-keys api)" || return 1
+ARGUS_RENDER_API_ENV_KEYS="$(python3 "${BASH_SOURCE[0]%/*}/private-alpha-release-profile.py" allowed-keys api)" || exit 1
 ARGUS_RENDER_API_ENV=()
 while IFS= read -r argus_api_env_key; do
   ARGUS_RENDER_API_ENV+=("$argus_api_env_key")
 done <<< "$ARGUS_RENDER_API_ENV_KEYS"
 unset ARGUS_RENDER_API_ENV_KEYS argus_api_env_key
 
-ARGUS_RENDER_WEB_ENV=(
-  ARGUS_APP_ORIGIN
-  NEXT_PUBLIC_APP_ENV
-  NEXT_PUBLIC_SUPABASE_URL
-  NEXT_PUBLIC_SUPABASE_ANON_KEY
-  NEXT_PUBLIC_POSTHOG_KEY
-  NEXT_PUBLIC_MOCK_AUTH
-  NEXT_PUBLIC_ENABLE_SPANISH
-  NEXT_PUBLIC_ARGUS_API_URL
-  NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY
-  NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL
-  NEXT_PUBLIC_OMNISEARCH_ENABLED
-  NEXT_PUBLIC_RESEARCH_RAIL_ENABLED
-  NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED
-)
+if ! _argus_web_env_keys="$(python3 "$(dirname "${BASH_SOURCE[0]}")/private-alpha-release-profile.py" allowed-keys web)" || [ -z "$_argus_web_env_keys" ]; then
+  echo "Cannot load web environment keys from the release profile." >&2
+  exit 1
+fi
+ARGUS_RENDER_WEB_ENV=()
+while IFS= read -r _argus_web_env_key; do
+  ARGUS_RENDER_WEB_ENV+=("$_argus_web_env_key")
+done <<< "$_argus_web_env_keys"
+unset _argus_web_env_keys _argus_web_env_key
 
 ARGUS_RENDER_WORKFLOW_PROOF_ENV=(
   APP_ENV

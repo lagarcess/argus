@@ -2493,7 +2493,13 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - A successful reset signs out all sessions, clears both the Supabase browser
   session and Argus's mirrored cookies, and requires a fresh login.
 - Recovery requests are rate-limited by normalized email and client address in
-  addition to provider protections. Rate-limit responses remain
+  addition to provider protections. The web route reads only
+  `ARGUS_TRUSTED_CLIENT_IP_HEADER`, defaulting to `CF-Connecting-IP` when the
+  setting is absent or blank. Missing or blank trusted values share one
+  `unknown` bucket because web requests have no socket peer. Malformed trusted
+  addresses return `400`. Neither `X-Forwarded-For` nor `X-Real-IP` is a
+  fallback. The existing web IP validation remains unchanged; this does not
+  adopt the API visitor key normalization policy. Rate-limit responses remain
   enumeration-safe.
 
 **Password and session controls:**
