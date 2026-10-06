@@ -12,7 +12,7 @@ struct CuadraoAppShell<Content: View>: View {
     let compact: Bool
     let avatar: CuadraoAvatarSelection
     let profileName: String
-    var showProposal: () -> Void = {}
+    var showProposal: (() -> Void)? = nil
     @ViewBuilder let content: (Binding<CuadraoTab>) -> Content
     @State private var pendingTab: CuadraoTab?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -44,11 +44,11 @@ struct CuadraoAppShell<Content: View>: View {
                 keyboard: {
                     selection = .assistant
                     chat.voice.presentation = .keyboard
-                }, showProposal: {
-                    showProposal()
+                }, showProposal: showProposal.map { show in {
+                    show()
                     selection = .plan
                     chat.voice.presentation = .compact
-                })
+                } })
             .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
                 isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {
                 Button(spanish ? "Terminar y salir" : "End and leave", role: .destructive) {

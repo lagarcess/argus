@@ -242,6 +242,15 @@ public actor SessionController {
     }
 
     public func setPrimaryCurrency(_ currency: String, expectedIdentity: SessionSnapshot) async throws -> SessionSnapshot {
+        try await patchProfile(["currency_override": currency], expectedIdentity: expectedIdentity)
+    }
+
+    /// An empty preferred name clears it on the server.
+    public func setNames(displayName: String, preferredName: String, expectedIdentity: SessionSnapshot) async throws -> SessionSnapshot {
+        try await patchProfile(["display_name": displayName, "preferred_name": preferredName], expectedIdentity: expectedIdentity)
+    }
+
+    private func patchProfile(_ fields: [String: String], expectedIdentity: SessionSnapshot) async throws -> SessionSnapshot {
         guard state.phase == .authenticated, state.revision == expectedIdentity.revision,
               state.profile?.id == expectedIdentity.profile?.id else { throw SessionFailure.staleOperation }
         try beginMutation(); defer { mutating = false }
@@ -250,7 +259,7 @@ public actor SessionController {
         var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/me"))
         request.httpMethod = "PATCH"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try encoded(["currency_override": currency])
+        request.httpBody = try encoded(fields)
         _ = try await authenticatedResponse(using: activeAuth(), epoch: epoch, request: request)
         return try await loadProfile(using: activeAuth(), epoch: epoch)
     }

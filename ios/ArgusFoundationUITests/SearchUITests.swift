@@ -217,8 +217,8 @@ extension FinancialLoopUITests {
         field.tap()
         if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); field.tap() }
         field.typeText(query + "\n")
-        if let title = ["expectation": "Income and bills", "budget": "Budgets", "goal": "Goals", "debt": "Debts"][kind] {
-            chooseSearchPlanType(title)
+        if ["expectation", "budget", "goal", "debt"].contains(kind) {
+            chooseSearchPlans()
         } else {
             app.buttons["search.filter." + kind].tap()
         }
@@ -231,14 +231,10 @@ extension FinancialLoopUITests {
         app.buttons["search.currency"].tap(); app.buttons[currency].tap()
         app.buttons["search.filters.done"].tap()
     }
-    func chooseSearchPlanType(_ title: String) {
+    func chooseSearchPlans() {
         tapVisible(app.buttons["search.filter.plans"])
-        tapVisible(app.buttons["search.filters"])
-        tapVisible(app.buttons["search.plan-kind"])
-        tapVisible(app.buttons[title])
-        tapVisible(app.buttons["search.filters.done"])
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
-        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains(title))
+        XCTAssertFalse(app.staticTexts["search.filter-summary"].exists, "Plans is a perspective, not a filter")
     }
     func searchBack() {
         let detail = app.scrollViews["search.detail"]

@@ -20,11 +20,23 @@ extension FinancialLoopUITests {
 
         tapVisible(identity)
         XCTAssertTrue(app.buttons["cuadrao.profile.photo.choose"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.textFields["cuadrao.profile.name"].isEnabled)
+        let name = app.textFields["cuadrao.profile.name"]
+        XCTAssertTrue(name.isEnabled)
+        let preferred = app.textFields["cuadrao.profile.preferred"]
+        let chosen = "Synthetic " + String(UUID().uuidString.prefix(4))
+        name.tap(); name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 80) + "Synthetic Person")
+        preferred.tap(); preferred.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 60) + chosen)
         tapVisible(app.buttons["cuadrao.profile.avatar.moon"])
         app.buttons["cuadrao.profile.save"].tap()
-        XCTAssertTrue(identity.waitForExistence(timeout: 5))
+        XCTAssertTrue(identity.waitForExistence(timeout: 15))
         XCTAssertTrue(identity.label.contains(email))
+        XCTAssertTrue(identity.label.contains("Synthetic Person"))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["home-greeting"].waitForExistence(timeout: 15))
+        XCTAssertEqual(app.staticTexts["home-greeting"].label, "Hello, " + chosen)
+        app.openProfileSurface()
+        XCTAssertTrue(identity.waitForExistence(timeout: 10))
+        XCTAssertTrue(identity.label.contains("Synthetic Person"))
 
         tapVisible(app.buttons["cuadrao.profile.preferences"])
         XCTAssertTrue(app.navigationBars["Preferences"].waitForExistence(timeout: 5))
@@ -57,6 +69,10 @@ extension FinancialLoopUITests {
         app.navigationBars.buttons.firstMatch.tap()
         app.navigationBars.buttons.firstMatch.tap()
         tapVisible(app.buttons["auth.signOut"])
+        app.alerts.firstMatch.buttons["Cancel"].tap()
+        XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 5))
+        tapVisible(app.buttons["auth.signOut"])
+        app.confirmSignOutIfAsked()
         XCTAssertTrue(app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 20))
     }
 
@@ -66,8 +82,14 @@ extension FinancialLoopUITests {
         app.launchArguments.append("--cuadrao-release-gates")
         app.launch()
         app.openProfileSurface()
-        XCTAssertTrue(app.descendants(matching: .any)["release.profile.display"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["cuadrao.profile.identity"].exists)
+        let identity = app.buttons["cuadrao.profile.identity"]
+        XCTAssertTrue(identity.waitForExistence(timeout: 10))
+        tapVisible(identity)
+        XCTAssertTrue(app.textFields["cuadrao.profile.name"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.textFields["cuadrao.profile.name"].isEnabled)
+        XCTAssertTrue(app.textFields["cuadrao.profile.preferred"].isEnabled)
+        XCTAssertFalse(app.buttons["cuadrao.profile.photo.choose"].exists, "Avatar editing stays out of release")
+        app.buttons["cuadrao.profile.cancel"].tap()
         for route in ["personalization", "security", "usage"] {
             XCTAssertFalse(app.buttons["cuadrao.profile." + route].exists, route)
         }

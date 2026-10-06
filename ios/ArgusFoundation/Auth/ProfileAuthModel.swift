@@ -197,6 +197,14 @@ final class ProfileAuthModel: ObservableObject {
         await perform { try await controller.setPrimaryCurrency(currency, expectedIdentity: identity) }
     }
 
+    /// True only when the profile the server returns carries both names.
+    func setNames(displayName: String, preferredName: String) async -> Bool {
+        guard let controller, state == .authenticated, !busy else { return false }
+        let identity = await controller.snapshot()
+        await perform { try await controller.setNames(displayName: displayName, preferredName: preferredName, expectedIdentity: identity) }
+        return profile?.displayName == displayName && (profile?.preferredName ?? "") == preferredName
+    }
+
     func signOut() async {
         guard let controller else { return }
         household?.bind(nil)

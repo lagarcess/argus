@@ -52,7 +52,7 @@ struct FinancialSearchView: View {
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var inputKey: String {
-        (model.ownerID ?? "") + "|" + model.origin.query + "|" + (model.origin.kind?.rawValue ?? "")
+        (model.ownerID ?? "") + "|" + model.origin.query + "|" + model.origin.scope.rawValue
             + "|" + (model.origin.currency ?? "") + "|" + String(describing: unavailableKind)
     }
     private var currencies: [String] {
@@ -60,11 +60,13 @@ struct FinancialSearchView: View {
     }
     private var query: Binding<String> { Binding(get: { model.origin.query }, set: { model.update(query: $0) }) }
     private var kind: Binding<CanvasSearchKind> {
-        Binding(get: { unavailableKind ?? Self.perspective(model.origin.kind) }, set: select)
+        Binding(get: { unavailableKind ?? Self.perspective(model.origin.scope) }, set: select)
     }
-    private static func perspective(_ kind: FinancialSearchKind?) -> CanvasSearchKind {
+    private static func perspective(_ scope: FinancialSearchScope) -> CanvasSearchKind {
+        switch scope { case .all: .all; case .accounts: .accounts; case .activity: .activity; case .plans: .plans }
+    }
+    private static func section(_ kind: FinancialSearchKind) -> CanvasSearchKind {
         switch kind {
-        case nil: .all
         case .account: .accounts
         case .activity: .activity
         case .expectation, .budget, .goal, .debt: .plans
@@ -72,13 +74,9 @@ struct FinancialSearchView: View {
     }
     private var busy: Bool { unavailableKind == nil && (model.loading || model.opening) }
     private var filterCount: Int {
-        guard unavailableKind == nil else { return 0 }
-        return (model.origin.currency == nil ? 0 : 1) + (kind.wrappedValue == .plans ? 1 : 0)
+        unavailableKind == nil && model.origin.currency != nil ? 1 : 0
     }
-    private var filterSummary: String {
-        [kind.wrappedValue == .plans ? model.origin.kind.map(planTitle) : nil, model.origin.currency]
-            .compactMap { $0 }.joined(separator: " · ")
-    }
+    private var filterSummary: String { model.origin.currency ?? "" }
 
     var body: some View {
         NavigationStack {
@@ -161,12 +159,12 @@ struct FinancialSearchView: View {
                     .padding(.top, 36)
             }
             ForEach([CanvasSearchKind.accounts, .activity, .plans], id: \.self) { section in
-                let rows = model.items.filter { Self.perspective($0.kind) == section }
+                let rows = model.items.filter { Self.section($0.kind) == section }
                 if !rows.isEmpty {
                     CuadraoSearchHeading(title: section.title(spanish), count: rows.count)
                     ForEach(rows) { hit in
                         Button { focused = false; Task { await model.open(hit, accounts: accounts, loop: loop) } } label: {
-                            FinancialSearchRow(hit: hit)
+                            FinancialSearchRow(hit: hit, accounts: accounts.accounts)
                         }.buttonStyle(.plain).disabled(model.opening)
                             .id(hit.id).accessibilityIdentifier("search.row." + hit.id)
                             .financialScrollAnchor(hit.id, in: "search.viewport")
@@ -183,14 +181,6 @@ struct FinancialSearchView: View {
 
     @ViewBuilder private var filterControls: some View {
         if unavailableKind == nil {
-            if kind.wrappedValue == .plans {
-                Picker(spanish ? "Tipo de plan" : "Plan type", selection: Binding(
-                    get: { model.origin.kind ?? .expectation }, set: { model.update(kind: .some($0)) })) {
-                    ForEach([FinancialSearchKind.expectation, .budget, .goal, .debt], id: \.self) { value in
-                        Text(planTitle(value)).tag(value).accessibilityIdentifier("search.filter." + value.rawValue)
-                    }
-                }.accessibilityIdentifier("search.plan-kind")
-            }
             Picker(spanish ? "Moneda" : "Currency", selection: Binding(
                 get: { model.origin.currency }, set: { model.update(currency: .some($0)) })) {
                     Text(spanish ? "Todas" : "All").tag(nil as String?)
@@ -231,22 +221,14 @@ struct FinancialSearchView: View {
 
     private func select(_ selected: CanvasSearchKind) {
         switch selected {
-        case .all: unavailableKind = nil; model.update(kind: .some(nil))
-        case .accounts: unavailableKind = nil; model.update(kind: .some(.account))
-        case .activity: unavailableKind = nil; model.update(kind: .some(.activity))
-        case .plans:
-            unavailableKind = nil
-            if Self.perspective(model.origin.kind) != .plans { model.update(kind: .some(.expectation)) }
+        case .all: unavailableKind = nil; model.update(scope: .all)
+        case .accounts: unavailableKind = nil; model.update(scope: .accounts)
+        case .activity: unavailableKind = nil; model.update(scope: .activity)
+        case .plans: unavailableKind = nil; model.update(scope: .plans)
         case .chats, .files, .memory: unavailableKind = selected; model.invalidate()
         }
     }
-    private func clearFilters() { model.update(kind: .some(nil), currency: .some(nil)) }
-    private func planTitle(_ kind: FinancialSearchKind) -> String {
-        switch kind {
-        case .expectation: spanish ? "Ingresos y pagos" : "Income and bills"
-        default: NSLocalizedString("search.filter." + kind.rawValue, comment: "")
-        }
-    }
+    private func clearFilters() { model.update(currency: .some(nil)) }
     private func unavailableDetail(_ kind: CanvasSearchKind) -> String {
         switch kind {
         case .chats: spanish ? "Tus chats aún no están disponibles en esta búsqueda." : "Your chats are not available in this search yet."
@@ -271,6 +253,7 @@ struct FinancialSearchView: View {
 
 struct FinancialSearchRow: View {
     let hit: FinancialSearchHit
+    let accounts: [FinancialAccount]
     @Environment(\.locale) private var locale
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -295,8 +278,10 @@ struct FinancialSearchRow: View {
             parts.append(ConnectedAccountPresentation.artwork(account.type)?.title(spanish) ?? account.type)
         }
         if case .activity(let activity, _) = hit {
-            parts.append(NSLocalizedString("loop.kind." + activity.kind.rawValue, comment: ""))
-            parts.append(AccountPresentation.date(activity.occurredAt, zone: activity.timeZone, locale: locale))
+            let names = activity.legs.sorted { $0.balanceMovementMinor < $1.balanceMovementMinor }
+                .compactMap { leg in accounts.first { $0.id == leg.accountId } }
+                .map { ConnectedAccountPresentation.title($0, spanish: spanish) }
+            if !names.isEmpty { parts.append(names.joined(separator: " → ")) }
         }
         switch hit {
         case .expectation(let expectation): parts.append(NSLocalizedString("plan.kind." + expectation.kind.rawValue, comment: ""))
@@ -305,11 +290,16 @@ struct FinancialSearchRow: View {
         }
         let amount = hit.amount.map { AccountPresentation.amount($0, locale: locale) }
             ?? NSLocalizedString("accounts.unknown", comment: "")
-        let amountLabel = hit.currency + " " + amount
+        let amountLabel = hit.currency + " " + activitySign + amount
         if case .goal = hit { parts.append(NSLocalizedString("goal.target", comment: "") + " · " + amountLabel) }
         else { parts.append(amountLabel) }
         if hit.archived { parts.append(NSLocalizedString("accounts.archived", comment: "")) }
         return parts.joined(separator: " · ")
+    }
+    private var activitySign: String {
+        guard case .activity(let activity, _) = hit, activity.amount != nil, activity.legs.count == 1,
+              let leg = activity.legs.first else { return "" }
+        return FinancialActivityPresentation.sign(for: leg.balanceMovementMinor)
     }
     private var artwork: CanvasAccountKind? {
         if case .account(let account) = hit { return ConnectedAccountPresentation.artwork(account.type) }

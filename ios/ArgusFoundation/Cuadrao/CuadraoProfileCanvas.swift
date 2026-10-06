@@ -147,7 +147,7 @@ struct CuadraoProfileBody<AccountRows: View, AccountActions: View>: View {
     let spanish: Bool
     let identity: CuadraoProfileIdentityValue
     let bottomSpace: CGFloat
-    let editProfile: (() -> Void)?
+    let editProfile: () -> Void
     @ViewBuilder var accountRows: () -> AccountRows
     @ViewBuilder var accountActions: () -> AccountActions
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -165,14 +165,9 @@ struct CuadraoProfileBody<AccountRows: View, AccountActions: View>: View {
         .background(WelcomePalette.background).toolbar(.hidden, for: .navigationBar)
     }
 
-    @ViewBuilder private var identityRow: some View {
-        if let editProfile {
-            Button(action: editProfile) { identityContent }
-                .buttonStyle(.plain).accessibilityIdentifier("cuadrao.profile.identity")
-        } else {
-            identityContent.accessibilityElement(children: .combine)
-                .accessibilityIdentifier("release.profile.display")
-        }
+    private var identityRow: some View {
+        Button(action: editProfile) { identityContent }
+            .buttonStyle(.plain).accessibilityIdentifier("cuadrao.profile.identity")
     }
 
     private var identityContent: some View {
@@ -186,11 +181,9 @@ struct CuadraoProfileBody<AccountRows: View, AccountActions: View>: View {
                     Text(email).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                if editProfile != nil {
-                    Text(spanish ? "Editar perfil" : "Edit profile")
-                        .font(.subheadline.weight(.medium)).foregroundStyle(WelcomePalette.pine)
-                        .padding(.top, 4)
-                }
+                Text(spanish ? "Editar perfil" : "Edit profile")
+                    .font(.subheadline.weight(.medium)).foregroundStyle(WelcomePalette.pine)
+                    .padding(.top, 4)
             }
             Spacer(minLength: 0)
         }.contentShape(Rectangle())
@@ -257,29 +250,32 @@ struct CuadraoProfileEditor: View {
     @Binding private var savedAvatar: CuadraoAvatarSelection
     let emailAddress: String?
     let spanish: Bool
-    let allowsIdentityEdits: Bool
+    private let saveNames: ((String, String) async -> Bool)?
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var preferred: String
     @State private var avatar: CuadraoAvatarSelection
     @State private var photoLoading = false
     @State private var cropRequest: CanvasAvatarCropRequest?
+    @State private var saving = false
+    @State private var saveFailed = false
 
+    /// `saveNames` persists the trimmed names elsewhere and reports whether they were kept.
     init(name: Binding<String>, preferredName: Binding<String>, emailAddress: String?,
-         avatar: Binding<CuadraoAvatarSelection>, spanish: Bool, allowsIdentityEdits: Bool = true) {
+         avatar: Binding<CuadraoAvatarSelection>, spanish: Bool, saveNames: ((String, String) async -> Bool)? = nil) {
         _savedName = name; _savedPreferred = preferredName; _savedAvatar = avatar
-        self.emailAddress = emailAddress; self.spanish = spanish; self.allowsIdentityEdits = allowsIdentityEdits
+        self.emailAddress = emailAddress; self.spanish = spanish; self.saveNames = saveNames
         _name = State(initialValue: name.wrappedValue)
         _preferred = State(initialValue: preferredName.wrappedValue)
         _avatar = State(initialValue: avatar.wrappedValue)
     }
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedPreferred: String { preferred.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var valid: Bool {
-        !allowsIdentityEdits || (!name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && name.count <= 60 && preferred.count <= 40)
+        !trimmedName.isEmpty && name.count <= 60 && preferred.count <= 40
     }
-    private var changed: Bool {
-        (allowsIdentityEdits && (name.trimmingCharacters(in: .whitespacesAndNewlines) != savedName ||
-        preferred.trimmingCharacters(in: .whitespacesAndNewlines) != savedPreferred)) || avatar != savedAvatar
-    }
+    private var namesChanged: Bool { trimmedName != savedName || trimmedPreferred != savedPreferred }
+    private var changed: Bool { namesChanged || avatar != savedAvatar }
     var body: some View {
         Form {
             Section {
@@ -291,18 +287,13 @@ struct CuadraoProfileEditor: View {
             }
             Section {
                 field(spanish ? "Nombre" : "Name", text: $name, id: "cuadrao.profile.name")
-                    .textContentType(.name).disabled(!allowsIdentityEdits)
+                    .textContentType(.name).disabled(saving)
                 field(spanish ? "Cómo te llamamos" : "What we call you", text: $preferred,
                       id: "cuadrao.profile.preferred")
-                    .textContentType(.nickname).disabled(!allowsIdentityEdits)
+                    .textContentType(.nickname).disabled(saving)
             } footer: {
-                if allowsIdentityEdits {
-                    Text(spanish ? "Usaremos tu nombre preferido al conversar contigo."
-                         : "We’ll use your preferred name when we talk with you.")
-                } else {
-                    Text(spanish ? "La edición de nombres aún no está conectada. El avatar cambia solo durante esta sesión."
-                         : "Name editing is not connected yet. The avatar changes only for this session.")
-                }
+                Text(spanish ? "Usaremos tu nombre preferido al conversar contigo."
+                     : "We’ll use your preferred name when we talk with you.")
             }.listRowBackground(CanvasSettingsStyle.surface)
             if let emailAddress {
                 Section {
@@ -317,6 +308,12 @@ struct CuadraoProfileEditor: View {
                      : "Enter a name up to 60 characters and a preferred name up to 40.")
                     .font(.footnote).foregroundStyle(.secondary).listRowBackground(Color.clear)
             }
+            if saveFailed {
+                Text(spanish ? "No pudimos guardar tu nombre. Inténtalo de nuevo."
+                     : "We couldn’t save your name. Try again.")
+                    .font(.footnote).foregroundStyle(.secondary).listRowBackground(Color.clear)
+                    .accessibilityIdentifier("cuadrao.profile.save.error")
+            }
         }.scrollContentBackground(.hidden).background(WelcomePalette.background)
             .sheet(item: $cropRequest) { request in
                 CanvasAvatarCropSheet(request: request, spanish: spanish) { avatar = .photo($0) }
@@ -327,16 +324,23 @@ struct CuadraoProfileEditor: View {
                     Button(spanish ? "Cancelar" : "Cancel") { dismiss() }.accessibilityIdentifier("cuadrao.profile.cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(allowsIdentityEdits ? (spanish ? "Guardar" : "Save") : (spanish ? "Usar esta sesión" : "Use this session")) {
-                        if allowsIdentityEdits {
-                            savedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                            savedPreferred = preferred.trimmingCharacters(in: .whitespacesAndNewlines)
-                        }
-                        savedAvatar = avatar
-                        dismiss()
-                    }.disabled(!valid || !changed || photoLoading).accessibilityIdentifier("cuadrao.profile.save")
+                    Button(spanish ? "Guardar" : "Save", action: save)
+                        .disabled(!valid || !changed || photoLoading || saving).accessibilityIdentifier("cuadrao.profile.save")
                 }
             }
+    }
+    private func save() {
+        guard let saveNames, namesChanged else {
+            savedName = trimmedName; savedPreferred = trimmedPreferred; savedAvatar = avatar
+            dismiss()
+            return
+        }
+        saving = true; saveFailed = false
+        Task {
+            let kept = await saveNames(trimmedName, trimmedPreferred)
+            saving = false
+            if kept { savedAvatar = avatar; dismiss() } else { saveFailed = true }
+        }
     }
     private func field(_ label: String, text: Binding<String>, id: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {

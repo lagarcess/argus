@@ -210,7 +210,7 @@ struct ConnectedCuadraoHome: View {
 
     private var header: some View {
         HStack {
-            CuadraoHomeGreeting(name: auth.profile?.displayName ?? "", spanish: spanish)
+            CuadraoHomeGreeting(name: auth.profile?.preferredName ?? "", spanish: spanish)
             Spacer()
             CuadraoUpdatesButton(spanish: spanish, action: showUpdates)
         }

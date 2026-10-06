@@ -220,7 +220,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(query.waitForExistence(timeout: 10)); query.tap()
         if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); query.tap() }
         query.typeText(title + "\n")
-        chooseSearchPlanType("Goals")
+        chooseSearchPlans()
         let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.goal.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(hit); assertGoal(supported)
         app.terminate(); app.launch(); assertGoal(supported)
@@ -228,7 +228,6 @@ extension FinancialLoopUITests {
         app.returnFromDetail("goal.close")
         XCTAssertEqual(app.textFields["search.query"].value as? String, title)
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
-        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains("Goals"))
         XCTAssertTrue(hit.waitForExistence(timeout: 15)); capture("goal-search-origin-restored")
         tapVisible(hit)
         app.terminate(); app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "light"]

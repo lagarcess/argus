@@ -7,7 +7,8 @@ struct ConnectedCuadraoProfile: View {
     var bottomSpace: CGFloat = 88
     @EnvironmentObject private var auth: ProfileAuthModel
     @Environment(\.locale) private var locale
-    @State private var editingAvatar = false
+    @State private var editing = false
+    @State private var confirmingSignOut = false
     @State private var settingsExamples = CuadraoProfileSettingsDraft()
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var displayName: String { auth.profile?.displayName ?? (spanish ? "Tu perfil" : "Your profile") }
@@ -16,11 +17,10 @@ struct ConnectedCuadraoProfile: View {
         NavigationStack(path: $path) {
             CuadraoProfileBody(spanish: spanish,
                 identity: .init(name: displayName, emailAddress: auth.profile?.email, avatar: avatar),
-                bottomSpace: bottomSpace,
-                editProfile: CuadraoFirstRelease.editsAvatar ? { editingAvatar = true } : nil) {
+                bottomSpace: bottomSpace, editProfile: { editing = true }) {
                 if let invitations = auth.invitations { ConnectedProfileInvitationsRow(model: invitations) }
             } accountActions: {
-                if auth.enabled { ProfileAccountSection(model: auth) }
+                signOut
             }
             .navigationDestination(for: CanvasProfileRoute.self) { route in
                 if route == .invitations, let invitations = auth.invitations {
@@ -30,17 +30,42 @@ struct ConnectedCuadraoProfile: View {
                         includeExamples: true, connection: .connected(appearance: $appearance, profile: auth))
                 }
             }
-            .sheet(isPresented: $editingAvatar) {
+            .sheet(isPresented: $editing) {
                 NavigationStack {
-                    CuadraoProfileEditor(name: .constant(displayName), preferredName: .constant(""),
-                        emailAddress: auth.profile?.email, avatar: $avatar, spanish: spanish, allowsIdentityEdits: false)
+                    CuadraoProfileEditor(name: .constant(auth.profile?.displayName ?? ""),
+                        preferredName: .constant(auth.profile?.preferredName ?? ""),
+                        emailAddress: auth.profile?.email, avatar: $avatar, spanish: spanish,
+                        saveNames: { await auth.setNames(displayName: $0, preferredName: $1) })
                 }.tint(WelcomePalette.pine).preferredColorScheme(appearance.colorScheme)
+            }
+            .alert(spanish ? "¿Cerrar sesión?" : "Sign out?", isPresented: $confirmingSignOut) {
+                Button(spanish ? "Cancelar" : "Cancel", role: .cancel) {}
+                Button(spanish ? "Cerrar sesión" : "Sign out", role: .destructive) { Task { await auth.signOut() } }
+                    .accessibilityIdentifier("auth.signOut.confirm")
+            } message: {
+                Text(spanish ? "Volverás a la pantalla de inicio de sesión." : "You’ll return to the sign-in screen.")
             }
         }
         .toolbar(.hidden, for: .tabBar)
         .onChange(of: auth.profile?.id) { _, _ in
             settingsExamples = CuadraoProfileSettingsDraft()
-            editingAvatar = false
+            editing = false
+            confirmingSignOut = false
+        }
+    }
+
+    private var signOut: some View {
+        VStack(spacing: 6) {
+            Button(spanish ? "Cerrar sesión" : "Sign out") { confirmingSignOut = true }
+                .font(.subheadline).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .disabled(auth.busy)
+                .accessibilityIdentifier("auth.signOut")
+            if let key = auth.errorKey {
+                Text(LocalizedStringKey(key)).font(.footnote).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                    .accessibilityIdentifier("auth.error")
+            }
         }
     }
 }
