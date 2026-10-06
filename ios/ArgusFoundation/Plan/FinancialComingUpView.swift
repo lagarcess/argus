@@ -5,6 +5,7 @@ struct FinancialComingUpView: View {
     @ObservedObject var model: FinancialPlanModel
     let viewPlan: () -> Void
     @State private var expanded = false
+    @EnvironmentObject private var auth: ProfileAuthModel
     @Environment(\.locale) private var locale
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private static let compactCount = 4
@@ -40,7 +41,7 @@ struct FinancialComingUpView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(verbatim: NSLocalizedString("plan.until.label", comment: "") + " " + PlanPresentation.dateLabel(projection.endDate, locale: locale))
                         .accessibilityIdentifier("home.upcoming.until")
-                    ForEach(projection.currencies) { currency in
+                    ForEach(CurrencyPresentation.ordered(projection.currencies, primary: auth.profile?.currency, currency: { $0.currency })) { currency in
                         Text(projection.accounts.filter { currency.accountIds.contains($0.id) }.map {
                             $0.nickname ?? NSLocalizedString("accounts.type." + $0.type, comment: "")
                         }.joined(separator: " · "))

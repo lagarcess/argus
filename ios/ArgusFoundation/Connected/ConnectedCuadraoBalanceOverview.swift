@@ -5,19 +5,23 @@ struct ConnectedCuadraoBalanceOverview: View {
     let home: FinancialHome
     let spanish: Bool
     var space = "Personal"
+    @EnvironmentObject private var auth: ProfileAuthModel
     @State private var chosenCurrency: String?
     @State private var expanded = false
+    private var currencies: [FinancialCurrencySummary] {
+        CurrencyPresentation.ordered(home.currencies, primary: auth.profile?.currency, currency: { $0.currency })
+    }
     private var summary: FinancialCurrencySummary? {
-        home.currencies.first { $0.currency == chosenCurrency } ?? home.currencies.first
+        currencies.first { $0.currency == chosenCurrency } ?? currencies.first
     }
 
     var body: some View {
         if let summary {
-            ConnectedBalanceReading(summary: summary, currencies: home.currencies.map(\.currency),
+            ConnectedBalanceReading(summary: summary, currencies: currencies.map(\.currency),
                 spanish: spanish, timeZone: home.period?.timeZone ?? TimeZone.current.identifier,
                 chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
                 .fullScreenCover(isPresented: $expanded) {
-                    ConnectedCuadraoInsights(summary: summary, spanish: spanish, space: space,
+                    ConnectedCuadraoInsights(summary: summary, period: home.period, spanish: spanish, space: space,
                         timeZone: home.period?.timeZone ?? TimeZone.current.identifier)
                 }
         }
@@ -67,6 +71,7 @@ private struct ConnectedBalanceReading: View {
 
 private struct ConnectedCuadraoInsights: View {
     let summary: FinancialCurrencySummary
+    let period: FinancialHomePeriod?
     let spanish: Bool
     let space: String
     let timeZone: String
@@ -80,14 +85,9 @@ private struct ConnectedCuadraoInsights: View {
     var body: some View {
         NavigationStack {
             CuadraoHomeInsightsLayout(spanish: spanish, range: $range, periodOffset: $periodOffset,
-                distribution: $distribution, activity: $activity, oldestOffset: { _ in 0 }) { _ in
+                distribution: $distribution, activity: $activity, oldestOffset: { _ in 0 }) { offset in
                     if activity {
-                        VStack(alignment: .leading, spacing: 20) {
-                            CuadraoSpendingReading(currency: summary.currency, amount: CuadraoMissingCoverage.amount(spanish),
-                                caption: spanish ? "Gastos registrados" : "Recorded spending")
-                            CuadraoChartState(title: CuadraoMissingCoverage.title(spanish), detail: CuadraoMissingCoverage.detail(spanish))
-                                .accessibilityElement(children: .contain).accessibilityIdentifier("home-spending-chart")
-                        }
+                        spending(range.interval(offset: offset))
                     } else if distribution {
                         allocation
                     } else {
@@ -96,6 +96,26 @@ private struct ConnectedCuadraoInsights: View {
                     }
                 }.modifier(CuadraoHomeInsightsChrome(title: space, spanish: spanish))
         }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
+    }
+
+    @ViewBuilder private func spending(_ page: DateInterval) -> some View {
+        let value = ConnectedBalanceSummary(summary: summary)
+        VStack(alignment: .leading, spacing: 20) {
+            switch ConnectedSpendingPeriod.reading(summary: summary, period: period, page: page) {
+            case .recorded(let minor):
+                CuadraoSpendingReading(currency: summary.currency, amount: value.amount(minor, locale: locale),
+                    caption: spanish ? "Gastos registrados" : "Recorded spending")
+                CuadraoChartState(title: spanish ? "Tus gastos registrados" : "Your recorded spending",
+                    detail: spanish ? "Puedes ver el total registrado de este mes. El desglose por categoría aún no está disponible."
+                        : "You can see this month's recorded total. The category breakdown is not available yet.")
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("home-spending-chart")
+            case .noData:
+                CuadraoSpendingReading(currency: summary.currency, amount: CuadraoMissingCoverage.amount(spanish),
+                    caption: spanish ? "Gastos registrados" : "Recorded spending")
+                CuadraoChartState(title: CuadraoMissingCoverage.title(spanish), detail: CuadraoMissingCoverage.detail(spanish))
+                    .accessibilityElement(children: .contain).accessibilityIdentifier("home-spending-chart")
+            }
+        }
     }
 
     private var allocation: some View {

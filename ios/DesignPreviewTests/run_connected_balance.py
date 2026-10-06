@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parents[2]
 with tempfile.TemporaryDirectory(prefix="cuadrao-connected-balance-") as temporary:
     folder = Path(temporary)
     types = (root / "ios/Packages/ArgusSession/Sources/ArgusSession/FinancialLoopTypes.swift").read_text()
-    summary = types[types.index("public struct FinancialCurrencySummary:"):types.index("public struct FinancialHomePeriod:")]
+    summary = types[types.index("public struct FinancialCurrencySummary:"):types.index("public struct FinancialHome:")]
     (folder / "Summary.swift").write_text("import Foundation\n" + summary)
     formatter = (root / "ios/ArgusFoundation/Accounts/AccountsView.swift").read_text()
     (folder / "AccountPresentation.swift").write_text(

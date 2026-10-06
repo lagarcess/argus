@@ -61,6 +61,31 @@ import Foundation
             check(value.summary.currency == currency, "Currency stays separate without conversion")
         }
         check(value.balance(locale: Locale(identifier: "es_ES")) == "1,001", "Localized separators preserve minor units")
+
+        let period = FinancialHomePeriod(month: "2026-10", timeZone: "America/Santo_Domingo",
+            startAt: "2026-10-01T00:00:00-04:00", endAtExclusive: "2026-11-01T00:00:00-04:00")
+        let start = AccountPresentation.parseDate(period.startAt)!, end = AccountPresentation.parseDate(period.endAtExclusive)!
+        let month = DateInterval(start: start, end: end)
+        func reading(_ page: DateInterval, period: FinancialHomePeriod? = period) -> ConnectedSpendingPeriod {
+            ConnectedSpendingPeriod.reading(summary: summary, period: period, page: page)
+        }
+        summary.grossPurchasesMinor = "123450"
+        check(reading(month) == .recorded(minor: "123450"), "The server's own monthly period binds its recorded purchases")
+        check(value.amount("123450", locale: locale) == "123.450", "The recorded total formats with the summary's three-digit precision")
+        check(reading(month, period: nil) == .noData, "No server period means no activity read")
+        check(reading(DateInterval(start: start, duration: 7 * 86400)) == .noData, "A week page has no canonical read")
+        check(reading(DateInterval(start: start.addingTimeInterval(-30 * 86400), end: start)) == .noData, "An earlier month has no canonical read")
+        check(reading(DateInterval(start: start, end: end.addingTimeInterval(365 * 86400))) == .noData, "A year page has no canonical read")
+        check(reading(DateInterval(start: start.addingTimeInterval(3600), end: end.addingTimeInterval(3600))) == .noData,
+            "A month in another zone is not the server's period")
+        summary.grossPurchasesMinor = "0"
+        check(reading(month) == .noData, "Recorded-only coverage never proves a zero")
+        summary.grossPurchasesMinor = nil
+        check(reading(month) == .noData, "A summary without monthly fields shows no data")
+        summary.grossPurchasesMinor = "18446744073709551613"
+        check(reading(month) == .recorded(minor: "18446744073709551613"), "Aggregate purchases keep every minor unit")
+        summary.grossPurchasesMinor = "-500"
+        check(reading(month) == .noData, "A negative gross total is not recorded spending")
         print("\(checks) connected balance summary checks passed")
     }
 }
