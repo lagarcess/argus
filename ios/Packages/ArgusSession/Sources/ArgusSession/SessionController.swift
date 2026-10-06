@@ -483,13 +483,13 @@ public actor SessionController {
         // Invalidate delivery and SDK writes before journal I/O can fail. Actual
         // credential removal still waits for a successful durable pending write.
         endAccountEpoch(as: .signOutPending)
-        if discardAppleName { try vault.removePregrantAppleName() }
         if let pending = try vault.pending() {
             // A previous failed write may have left this journal only in memory.
             try vault.savePending(pending)
         } else if let current = try vault.session() {
             try vault.savePending(.init(accessToken: current.accessToken, refreshToken: current.refreshToken))
         }
+        if discardAppleName { try vault.removePregrantAppleName() }
         try vault.removeSession()
     }
 
