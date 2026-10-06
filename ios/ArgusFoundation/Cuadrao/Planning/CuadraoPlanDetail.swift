@@ -29,7 +29,7 @@ struct CuadraoPlanDetail: View {
                         }
                     }
                     if plan.remaining > 0 || plan.kind == .budget {
-                        CuadraoPlanWhatIf(scenario: plan.scenario, spanish: spanish) { amount in
+                        CuadraoPlanWhatIf(scenario: plan.scenario, spanish: spanish, resetsOn: plan) { amount in
                             var updated = plan
                             if plan.kind == .budget { updated.target = amount } else { updated.monthly = amount }
                             store.save(updated)
