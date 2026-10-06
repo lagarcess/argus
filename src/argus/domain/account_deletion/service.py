@@ -81,7 +81,10 @@ from argus.domain.apple_sign_in.credentials_postgres import (
 )
 from argus.domain.household import deletion as household_deletion
 from argus.domain.ingestion.secrets import SecretBox
-from argus.observability.analytics_deletion import AnalyticsDeletion
+from argus.observability.analytics_deletion import (
+    AnalyticsDeletion,
+    EventAnalyticsDeletion,
+)
 from argus.observability.product_events import actor_hash_for_user
 
 RunStatus = Literal["started", "data_deleted", "done"]
@@ -179,7 +182,7 @@ class AccountDeletionService:
         households: Any,
         auth_admin: AuthAdmin,
         revoker: ProviderRevoker | None,
-        analytics: AnalyticsDeletion,
+        analytics: AnalyticsDeletion | EventAnalyticsDeletion,
         apple: AppleCredentials | None = None,
         secret_box: SecretBox | None = None,
         allow_fake_analytics: bool = False,
@@ -1128,13 +1131,34 @@ class AccountDeletionService:
         if self._allow_fake_analytics:
             done.add("recorded_by_fake")
         with self._households.connection() as connection:
-            distinct_id, steps = connection.execute(
-                "select analytics_distinct_id, steps from argus_private.account_deletion_runs"
+            run_id, distinct_id, steps = connection.execute(
+                "select id, analytics_distinct_id, steps from argus_private.account_deletion_runs"
                 " where subject_hash = %s",
                 (subject,),
             ).fetchone()
         if (steps or {}).get("analytics") in done:
             return None
+        if isinstance(self._analytics, EventAnalyticsDeletion):
+            submission_id = str(run_id)
+            previous = (steps or {}).get("analytics_evidence") or {}
+            request_id = previous.get("request_id")
+            result = self._analytics.advance(distinct_id, submission_id, request_id)
+            with self._households.connection() as connection, connection.transaction():
+                connection.execute(
+                    "update argus_private.account_deletion_runs"
+                    " set steps = steps || jsonb_build_object("
+                    " 'analytics', %s::text, 'analytics_evidence', %s::jsonb),"
+                    " updated_at = %s where subject_hash = %s",
+                    (
+                        result.outcome,
+                        json.dumps(result.evidence(submission_id)),
+                        self._clock(),
+                        subject,
+                    ),
+                )
+            if result.outcome == "deleted":
+                return None
+            return f"analytics_delete_{result.outcome}"
         outcome = self._analytics.delete_person(distinct_id)
         if outcome == "recorded_by_fake" and not self._allow_fake_analytics:
             # Nothing was deleted at PostHog. Never counted as done here.

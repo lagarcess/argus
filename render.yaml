@@ -61,6 +61,8 @@ services:
         value: "false"
       - key: ARGUS_FINANCIAL_ACCOUNTS_ENABLED
         value: "false"
+      - key: ARGUS_CROSS_CURRENCY_TRANSFERS_ENABLED
+        value: "false"
       - key: ARGUS_HOUSEHOLDS_ENABLED
         value: "false"
       - key: ARGUS_ACCOUNT_DELETION_ENABLED

@@ -2529,6 +2529,14 @@ cron is to be created for it. The
 the cadence and the 7-day operator force; the
 [API contract](API_CONTRACT.md#post-accountdelete) owns the route.
 
+The personless analytics adapter stores `analytics_evidence` in the existing
+run `steps`. It contains submission and request UUIDs, parsed provider status,
+selected-event count, HTTP status and local outcome. The run UUID owns submission
+identity, so retries do not create a separate identity store. Provider bodies,
+queries, distinct IDs and credentials are excluded from this evidence. A selected
+event count is not an independently verified deletion count. The
+[API contract](API_CONTRACT.md#post-accountdelete) owns completion and retry behavior.
+
 ---
 
 # 17. Recents / History Model
@@ -2851,6 +2859,21 @@ reference it. Revision purchase_activity_id/purchase_revision are generated from
 details and enforce an owner-qualified FK to the exact reviewed purchase revision.
 This preserves one source for refund provenance while making cross-owner references
 unrepresentable. The additive integrity migration is 20260929130000.
+
+### Paired currency transfer facts (#820)
+
+No schema or backfill is added. Each exact leg revision retains its own integer
+`amount_minor`; the corresponding canonical account owns its immutable currency.
+Group revisions, memberships, coverage and receipt transactions remain unchanged.
+No rate, converted total or duplicate amount is stored. Per-leg read denomination
+and formatted amount derive from that account and revision after visibility filtering.
+A hidden source does not disclose its denomination through the legacy summary.
+
+The destination input is included in request identity only when non-null. Existing
+receipt and preview preimages remain identical when it is absent. Plan currency
+stays fixed and current attribution rejects pairs with any different-currency leg.
+The write flag and acceptance boundary live in the
+[transfer contract](specs/lanes/cuadrao-cross-currency-transfers.md).
 
 ### Connected Plan storage
 
