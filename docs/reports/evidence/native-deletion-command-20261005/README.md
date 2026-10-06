@@ -1,7 +1,16 @@
 # Native deletion command: source preparation
 
-Status: local source candidate. No Swift package, app build, simulator, device,
-provider, hosted, database or service checks have run for this candidate.
+Status: command-core QA passed at `cc58b16f7f8ee4f520ffa4658f1396ba7a0cc4d7`.
+The [published independent bundle](../native-deletion-core-20261005/independent-review/README.md)
+owns the 168-test package run (164 passed, 4 existing opt-in skips), focused 19
+passes, one real local SDK/API/Auth/Postgres case and generic app build. These
+runs are separate. Analytics was synthetic; no provider, hosted, physical-phone
+or final app-adapter journey was verified. Prerequisite landing and root review
+remain required; this is not a release-ready claim.
+
+The sections below record earlier source preparation and merge evidence, before
+that independent QA. At source preparation, no Swift package, app build,
+simulator, device, provider, hosted, database or service checks had run.
 
 ## Dependency and ownership
 
@@ -60,8 +69,8 @@ write failure, interrupted local cleanup, account B after A acknowledgement,
 stale snapshot/duplicate denial and expired proof.
 
 `git diff --check` and Python modularity-budget checks pass on this source tree.
-They do not verify Swift compilation or behavior. Swift/package/app and all
-real-device/provider/hosted evidence remain unrun pending the root Mac grant.
+They do not verify Swift compilation or behavior. At initial preparation, Swift/package/app and real-device/provider/hosted evidence
+were unrun. The published QA update above supersedes only its executed scope.
 An independent read-only source review found cleanup recovery, new-account entry
 after 202, recovery refusal truth and an adoption race in the interruption
 handlers. Those gaps were fixed. The final review of the moved mutation guards
@@ -72,7 +81,7 @@ mapping. Backend/API, server policy, migrations, obligation semantics, consent,
 space policy, flags and configuration are unchanged by this candidate. No paid,
 live, physical-phone, provider, database, service or hosted claim follows from it.
 
-## Apple-name dependency reconciliation
+## Apple-name dependency reconciliation (before independent QA)
 
 Normal merge `e660fe9990b4a77779ba503b5cc3e3a9517dea70` reconciles current Name
 head `a6efe6e3360f1c4e58c97807b91547de527b0b04` into the published deletion
@@ -103,8 +112,8 @@ merge adds no server, migration, flag, configuration or presentation expansion.
 
 Diff and Python modularity checks pass on the merged tree. This preserves only
 source/static review evidence. There was no deletion execution evidence to
-retain or invalidate: package and app compilation/tests must run at the final
-queued candidate head, including deletion tests and affected Apple-name/session
-cases. Mac and database leases remain with the current verifier; no Swift, Mac,
+retain or invalidate: package and app compilation/tests were queued for the final candidate head,
+including deletion tests and affected Apple-name/session cases. The independent
+bundle above records their later results. Mac and database leases remain with the current verifier; no Swift, Mac,
 Postgres, provider, hosted, activation or root environment work ran here. Root
 still owns PR creation, landing order and all merge decisions.
