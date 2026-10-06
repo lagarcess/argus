@@ -7,15 +7,17 @@ from argus.api import state as api_state
 from argus.api.apple_sign_in import FLAG
 from argus.api.main import app
 from argus.api.routers import profile
-from argus.domain.apple_sign_in.identity import LinkedAppleIdentity
-from tests.apple_sign_in_support import SUBJECT
 from argus.api.routers.profile_apple_name import AppleDisplayNameRequest
 from argus.domain.apple_sign_in.credentials import AppleIdentityMissing
-from argus.domain.apple_sign_in.identity import AppleIdentityUnavailable
+from argus.domain.apple_sign_in.identity import (
+    AppleIdentityUnavailable,
+    LinkedAppleIdentity,
+)
 from argus.domain.apple_sign_in.name import AppleNameAccountUnavailable
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from tests.apple_sign_in_support import SUBJECT
 from tests.financial_accounts.conftest import (  # noqa: F401
     ALICE,
     GUEST,
@@ -116,8 +118,13 @@ def test_failures_keep_accurate_errors(client, error, status, code):
     assert response.json()["code"] == code
 
 
-def test_saved_name_returns_current_identity_envelope(client, gateway, identities):
-    with patch(COMMAND, return_value=gateway.get_or_create_profile_for_auth_user(identities[ALICE]).model_dump()):
+def test_saved_name_returns_current_identity_envelope(client, request):
+    fixture_gateway = request.getfixturevalue("gateway")
+    fixture_identities = request.getfixturevalue("identities")
+    saved = fixture_gateway.get_or_create_profile_for_auth_user(
+        fixture_identities[ALICE]
+    ).model_dump()
+    with patch(COMMAND, return_value=saved):
         response = client.post(
             URL,
             json={"display_name": "Name"},
