@@ -52,7 +52,8 @@
 
 ## home-history-meaning
 
-- Status: open
+- Status: resolved
 - Question: Choose first connected Home history: dated recorded observations with gaps, or reconstruction from current corrected records. Recommend observations first; fuller history and insights acceptance remains open.
 - Options: Founder product meaning decision; recorded observations recommended or corrected-record reconstruction
 - Default: Keep dependent history implementation blocked; continue current-header, currency and independent trust work.
+- Answer: Existing founder-approved Cuadrao design guide at integration a2c65549, lines257-267 and390-404, selects recorded-position observations with actual dates, one-observation no comparison, explicit partial accounts and no fabricated history or later data. No new founder decision needed.

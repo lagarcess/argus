@@ -10,7 +10,7 @@
       "worker_stop_allowed": false,
       "release_action": "mark lease_owner null; preserve running container",
       "health": "Post-recovery lightweight select1 passed; API60340/Auth60331 health200; no full suite rerun",
-      "lease_scope": "Name and deletion core terminal QA cleaned; root database preserved",
+      "lease_scope": "Atomic confirmed-cleanup QA terminal and own synthetic fixtures/services cleaned; root DB preserved",
       "local_tcp_execution": "Use authorized escalated execution for local bind/TCP tests; default sandbox denies these operations."
     },
     {
@@ -19,7 +19,7 @@
       "lease_owner": null,
       "worker_stop_allowed": false,
       "simulator": null,
-      "release_action": "Verifier ends own tests and cleans only new owned simulator/processes; preserve foreign phone/stacks",
+      "release_action": "Privacy verifier released Mac after one archive attempt; own derived output removed, retained bundle/dependencies and foreign resources preserved",
       "simulator_owner": null
     }
   ],

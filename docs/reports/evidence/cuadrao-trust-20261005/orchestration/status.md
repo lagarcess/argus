@@ -1,10 +1,10 @@
 # Orchestrate status
 
-Generated: 2026-10-06T02:54:33.750Z
+Generated: 2026-10-06T04:13:59.100Z
 
 ## Units
 
-States: landed=17, needs-verify=4
+States: landed=20, needs-verify=3
 
 | ID | Track | State | Branch | PR | SHA | Brief |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -25,14 +25,16 @@ States: landed=17, needs-verify=4
 | apple-lock-observer | operations | landed | codex/867-apple-lock-observer | 868 | 8a3e80daaf8947a5dfd43268eeb3f2459427de97 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | apple-name-backend | identity | landed | codex/cuadrao-apple-name-backend | 869 | b62f35d1a25fb344a99df3702a5199b146a1e152 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | invite-hardening | operations | landed | codex/cuadrao-invite-hardening-804-20261005 | 871 | 258aa357dcfd7dc64506572d3dbba092845014c5 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
-| apple-name-native | identity | needs-verify | codex/cuadrao-native-apple-name-20261005 | 874 | 6ec654919775f0f5001c2c7732e18c9507618762 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
-| deletion-native-command | deletion | needs-verify | codex/cuadrao-native-deletion-command-20261005 |  | 21bb4c65c70a472f90b6c92c56c1255e5b0d1017 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
+| apple-name-native | identity | landed | codex/cuadrao-native-apple-name-20261005 | 874 | 6ec654919775f0f5001c2c7732e18c9507618762 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
+| deletion-native-command | deletion | landed | codex/cuadrao-native-deletion-command-20261005 | 875 | a4d403089b91536b0adcf02e2e7164ce921eab94 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
 | currency-home-c1 | foundations | needs-verify | codex/cuadrao-primary-home-bindings-20261005 |  | 87a616ef0 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
 | currency-forecast-c3 | foundations | needs-verify | codex/cuadrao-primary-forecast-binding-20261005 |  | 27dc03711ab93b5a6273da6ab1394ab4d97f6f78 | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md |
+| confirmed-cleanup | deletion | landed | codex/cuadrao-confirmed-deletion-cleanup-20261006 | 876 | 7887546aa644ccc683ec08be88b133ba7283e131 | docs/reports/evidence/cuadrao-trust-20261005/confirmed-cleanup-unit-brief.md |
+| personal-observation-reader | foundations | needs-verify | codex/cuadrao-connected-preview |  | 1eca92329c62c012fc789beb3b9c973c49aaaef2 | docs/reports/evidence/cuadrao-trust-20261005/personal-observation-read-contract.md |
 
 ## Verification ledger
 
-Verdicts: live-ui-verified=2, unit-test-verified=23, verifier-failed=1
+Verdicts: live-ui-verified=2, unit-test-verified=26, verifier-failed=1
 
 | PR | SHA | Verdict | Evidence | Verifier | Timestamp |
 | --- | --- | --- | --- | --- | --- |
@@ -62,6 +64,9 @@ Verdicts: live-ui-verified=2, unit-test-verified=23, verifier-failed=1
 | 854 | c986d060deb7bd7ce50ec13093e175371164c7d0 | unit-test-verified | docs/reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md | paired_currency_context_review | 2026-10-05T22:28:04.167Z |
 | 864 | 257b1c080658c1b578df6c0edfed2cfa873ee578 | verifier-failed | https://github.com/lagarcess/argus/actions/runs/37403404071 | root-ci-diagnosis | 2026-10-06T02:31:34.319Z |
 | 864 | 49215121969c17347bcf2e702199196e23ec4ede | unit-test-verified | https://github.com/lagarcess/argus/pull/864#pullrequestreview-5423144255 | apple_session_ci_fixture_review | 2026-10-06T02:38:45.641Z |
+| 874 | 6ec654919775f0f5001c2c7732e18c9507618762 | unit-test-verified | https://github.com/lagarcess/argus/pull/874#pullrequestreview-5423283949 | apple_session_projection_review | 2026-10-06T03:06:25.391Z |
+| 875 | a4d403089b91536b0adcf02e2e7164ce921eab94 | unit-test-verified | https://github.com/lagarcess/argus/pull/875#pullrequestreview-5423424546 | apple_session_ci_fixture_review | 2026-10-06T03:34:48.092Z |
+| 876 | 7887546aa644ccc683ec08be88b133ba7283e131 | unit-test-verified | https://github.com/lagarcess/argus/pull/876#pullrequestreview-5423623193 | apple_session_ci_fixture_review | 2026-10-06T04:13:59.072Z |
 
 ## Frontier
 
@@ -81,6 +86,6 @@ Lowest unmerged: none
 | space-model | open | Select #819 consumer ownership migration: retain personal roots with existing household grants, or household-owned shared roots. Recommendation: preserve existing ownership/grants for the bounded first migration. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 | release-jobs | open | Settle #818 first-release retained chat jobs and connected memory/voice inclusion. Recommendation: bounded financial read and revision-confirmed proposed-write jobs; defer unassigned connected memory/voice activation. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 | apple-late-cleanup | open | Accept #803 rare provider-side late revocation recovery or require stronger coordination. Recommendation: documented forced-sign-out recovery with activation/phone gates; do not claim local CAS cancels an Apple request already received. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
-| home-history-meaning | open | Choose first connected Home history: dated recorded observations with gaps, or reconstruction from current corrected records. Recommend observations first; fuller history and insights acceptance remains open. | Founder product meaning decision; recorded observations recommended or corrected-record reconstruction | Keep dependent history implementation blocked; continue current-header, currency and independent trust work. |  |
+| home-history-meaning | resolved | Choose first connected Home history: dated recorded observations with gaps, or reconstruction from current corrected records. Recommend observations first; fuller history and insights acceptance remains open. | Founder product meaning decision; recorded observations recommended or corrected-record reconstruction | Keep dependent history implementation blocked; continue current-header, currency and independent trust work. | Existing founder-approved Cuadrao design guide at integration a2c65549, lines257-267 and390-404, selects recorded-position observations with actual dates, one-observation no comparison, explicit partial accounts and no fabricated history or later data. No new founder decision needed. |
 
-<!-- orch-summary {"unitStates":{"landed":17,"needs-verify":4},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":23,"verifier-failed":1},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","home-history-meaning","identity-policy","release-jobs","space-model"]} -->
+<!-- orch-summary {"unitStates":{"landed":20,"needs-verify":3},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":26,"verifier-failed":1},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->

@@ -26,6 +26,28 @@ The six existing product gates remain open in `orchestration/gates.md`: identity
 
 ## Subsequent session landing
 
-#864 merged as `5d46a73d4d97b0412dccff517eb43c73e4316977` after the reviewed repair passed all checks. [Landing record](pr864-landing-record.json) records the actual terminal outcome; earlier failure details above remain historical evidence. Canonical checkout parity is clean. Integration CI and smoke remain running, with housekeeping in #873. Native deletion core subsequently passed 164 package tests with four optional local skips, 19 focused tests, one actual local SDK/API/Auth/PG case and a generic app build; final UI and filesystem work remain open.
+#864 merged as `5d46a73d4d97b0412dccff517eb43c73e4316977` after the reviewed repair passed all checks. [Landing record](pr864-landing-record.json) records the actual terminal outcome; earlier failure details above remain historical evidence. Canonical checkout parity is clean. Integration CI37405778022 and smoke37405778015 both passed, with housekeeping in #873. Native deletion core subsequently passed 164 package tests with four optional local skips, 19 focused tests, one actual local SDK/API/Auth/PG case and a generic app build; final UI and filesystem work remain open.
 
 Focused landing configuration checks at the reconciled tree passed35, zero failures/skips, 8.95 seconds, using isolated synthetic settings with dotenv disabled. [Exact output](root-config-5d46.txt). No new environment variable names were introduced by #864.
+
+## Subsequent name landing
+
+#874 merged as `a2c65549b3ffcb97ee0be24b971110be8c090b32`, with17successful exact-head checks, three expected skips and no unresolved threads after clean final review. [Record](pr874-landing-record.json) preserves its matching tree and source retention. Canonical parity is clean. Integration smoke37407223674 and CI37407223683 both passed. Phone/provider/hosted/activation gates remain open.
+
+## History authority correction
+
+The observations-versus-reconstruction question was unnecessary. Current Cuadrao DESIGN lines257–267 and390–404 already select recorded-position observations, actual dates, same-scope signed contributions, no comparison from one observation, explicit partial accounts and no fabricated flat history or later data. The gate is resolved from that existing founder authority. The audit now cites those locks; no new founder answer is required. Missing temporal metadata, canonical DTO and complete-period spending coverage remain separate technical work. Six original product gates remain open.
+
+## Subsequent deletion core landing and next scope
+
+#875 merged as `8146d16e90633eb543781f8882665482f0d5dca9` after17successful checks, three expected skips, zero unresolved threads and a clean independent review. [Record](pr875-landing-record.json) preserves matching trees and accepted proof. Canonical checkout parity is clean; integration CI37408905271 and smoke37408905356 both passed.
+
+The subsequent atomic cleanup candidate atf787ca63 passed independent package170/four opt-in skips, six real filesystem cases,20focused deletion cases and one actual synthetic SDK/API/Auth/PG case. The old external cleanup-order gap was reproduced, and a new fixture compile error was corrected before tests. Publication and final independent review of PR #876 at7887546 are complete; exact-head CI remains pending. Actual app receipt-store and UI work remain separate.
+
+The existing observation APIs suffice for the raw personal reader. Counsel owns its bounded implementation and Mac verification; root retains historical attribution, authorization and household/move contracts. The former history-meaning question is resolved by existing design, not a new founder choice.
+
+## Subsequent atomic cleanup landing and privacy proof
+
+#876 merged as `184d2614e4d2beb5ed994bd3cd8f3a5ef211f1dd`, matching its reviewed tree. [Record](pr876-landing-record.json) preserves16successful exact-head checks, three expected skips, zero unresolved threads,170package passes/four optional skips, six filesystem cases,20deletion cases and one local SDK/API/Auth/PG case. Final UI/receipt-store, provider, hosted and phone gates remain open. Canonical parity is clean; integration CI37412482876 is running and smoke37412482873 passed.
+
+Current simulator-bundle privacy verification passed7checks over12manifests with source equivalence; its [evidence](current-privacy-bundle/README.md) keeps the scope explicit. One unsigned archive attempt stopped before compilation on simulator-only platform configuration; no archive/report/signing acceptance is claimed. All local Mac and PG leases are released; owned temporary resources were cleaned and root/foreign resources preserved.

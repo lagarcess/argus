@@ -30,7 +30,7 @@
   "accepted_native_proof": "committed combined-native-independent-review; source comparisons retain separate package135+four exercised opted cases/fifth currency case, models51, UI8, notification probe1, PG7; see README for individual counts/warnings",
   "configuration_names": [],
   "scope_and_limits": "Approved Apple session provenance/revalidation and authoritative profile identity. Release providers remain off. Physical/provider/hosted/activation gates and native name/deletion adapters remain open. Parents800/803/798 remain open.",
-  "housekeeping": "protected-branch PR873; integration CI37405778022 and smoke37405778015 running",
+  "housekeeping": "protected-branch PR873 pending; exact integration CI and smoke passed",
   "run_original_integration_base": "875de09ac2115acec42e09060b92878aa5f18eff",
   "root_config_proof": {
     "passed": 35,
@@ -38,5 +38,13 @@
     "skipped": 0,
     "seconds": 8.95,
     "evidence": "root-config-5d46.txt"
+  },
+  "integration_checks": {
+    "sha": "5d46a73d4d97b0412dccff517eb43c73e4316977",
+    "ci_run": 37405778022,
+    "ci": "success",
+    "smoke_run": 37405778015,
+    "smoke": "success",
+    "canonical_clean_parity": true
   }
 }
