@@ -736,7 +736,7 @@ extension FinancialModelTests {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let model = FinancialSearchModel(controller: fixture.client, defaults: defaults)
-        model.bind(identity); model.update(query: "Café %_\\", kind: .some(.account), currency: .some("DOP"))
+        model.bind(identity); model.update(query: "Café %_\\", scope: .accounts, currency: .some("DOP"))
         let second = UUID()
         let pages = [(200, PresentationServer.searchPage([PresentationServer.id], cursor: "next")), (200, PresentationServer.searchPage([second]))]
         await fixture.server.replies(pages)
@@ -772,6 +772,44 @@ extension FinancialModelTests {
         XCTAssertTrue(model.items.isEmpty)
     }
 
+    func testSearchPlansScopeReadsEveryPlanKindAndRelaunchReplaysIt() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let name = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let model = FinancialSearchModel(controller: fixture.client, defaults: defaults)
+        model.bind(identity); model.update(scope: .plans)
+        let bill = UUID(), laterBill = UUID(), goal = UUID()
+        let pages = [(200, PresentationServer.searchPage([bill], cursor: "bills-2")), (200, PresentationServer.searchPage([laterBill])),
+            (200, PresentationServer.searchPage([])), (200, PresentationServer.searchPage([goal])), (200, PresentationServer.searchPage([]))]
+        await fixture.server.replies(pages)
+        await model.activate()
+        XCTAssertEqual(model.items.map(\.recordID), [bill])
+        XCTAssertEqual(model.cursor, "bills-2")
+        await model.more()
+        XCTAssertEqual(model.items.map(\.recordID), [bill, laterBill, goal])
+        XCTAssertNil(model.cursor)
+        func sent(_ requests: [URLRequest]) -> [String] {
+            requests.map { request in
+                let values = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems ?? []
+                return [values.first { $0.name == "kind" }?.value, values.first { $0.name == "cursor" }?.value]
+                    .compactMap { $0 }.joined(separator: "@")
+            }
+        }
+        let expected = ["expectation", "expectation@bills-2", "budget", "goal", "debt"]
+        let first = await fixture.server.searches
+        XCTAssertEqual(sent(first), expected)
+        let reopened = FinancialSearchModel(controller: fixture.client, defaults: defaults)
+        reopened.bind(identity)
+        XCTAssertEqual(reopened.origin.scope, .plans)
+        await fixture.server.replies(pages)
+        await reopened.activate()
+        XCTAssertEqual(reopened.items.map(\.recordID), [bill, laterBill, goal])
+        let all = await fixture.server.searches
+        XCTAssertEqual(sent(Array(all.dropFirst(first.count))), expected)
+    }
+
     func testUnchangedSearchControlsRetainLoadedPagesAndScrollOrigin() async throws {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()
@@ -780,7 +818,7 @@ extension FinancialModelTests {
         defer { defaults.removePersistentDomain(forName: name) }
         let model = FinancialSearchModel(controller: fixture.client, defaults: defaults)
         model.bind(identity)
-        model.update(query: "Synthetic", kind: .some(.account), currency: .some("DOP"))
+        model.update(query: "Synthetic", scope: .accounts, currency: .some("DOP"))
         await fixture.server.replies([(200, PresentationServer.searchPage([PresentationServer.id], cursor: "next")),
             (200, PresentationServer.searchPage([UUID()], cursor: "third"))])
         await model.activate(); await model.more()
@@ -788,7 +826,7 @@ extension FinancialModelTests {
         model.remember(anchor: ids[1], offset: -19)
         let origin = model.origin
         model.update(query: origin.query)
-        model.update(kind: .some(origin.kind))
+        model.update(scope: origin.scope)
         model.update(currency: .some(origin.currency))
         model.update()
         XCTAssertEqual(model.items.map(\.id), ids)
@@ -813,7 +851,7 @@ extension FinancialModelTests {
         await fixture.server.replies([(200, PresentationServer.searchPage([shown], cursor: "next"))])
         await model.activate()
         model.remember(anchor: model.items[0].id, offset: -12)
-        model.update(kind: .some(.account))
+        model.update(scope: .accounts)
         XCTAssertEqual(model.items.map(\.recordID), [shown], "A filter change cannot blank the rows it is replacing")
         XCTAssertNil(model.cursor)
         XCTAssertFalse(model.loading)
@@ -978,7 +1016,7 @@ extension FinancialModelTests {
                 XCTAssertTrue(search.opening)
                 switch field {
                 case "query": search.update(query: "A newer search")
-                case "kind": search.update(kind: .some(.activity))
+                case "kind": search.update(scope: .activity)
                 default: search.update(currency: .some("USD"))
                 }
                 XCTAssertFalse(search.opening)

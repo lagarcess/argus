@@ -194,7 +194,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(query.waitForExistence(timeout: 10)); query.tap()
         if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); query.tap() }
         query.typeText(title + "\n")
-        chooseSearchPlanType("Debts")
+        chooseSearchPlans()
         let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.debt.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(hit)
         if let balance { assertDebt(balance) }
@@ -203,7 +203,6 @@ extension FinancialLoopUITests {
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         XCTAssertEqual(query.value as? String, title)
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
-        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains("Debts"))
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         tapVisible(hit)
         app.terminate(); app.launch()
@@ -212,7 +211,6 @@ extension FinancialLoopUITests {
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         XCTAssertEqual(query.value as? String, title)
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
-        XCTAssertTrue(app.staticTexts["search.filter-summary"].label.contains("Debts"))
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         capture("debt-search-query-and-filter-restored")
     }

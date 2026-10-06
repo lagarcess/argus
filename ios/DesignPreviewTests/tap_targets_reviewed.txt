@@ -43,4 +43,4 @@ a535259d2cd2  ArgusFoundation/Plan/FinancialBudgetView.swift: contributor(_:) ca
 cf242bbfe912  ArgusFoundation/Plan/FinancialPlanView.swift: FinancialOccurrenceRow carries the shape
 6bb8f06b0d8a  ArgusFoundation/ReleaseUI/Identity/ReleaseSocialSignInView.swift: filled label, opaque across its frame
 587a96f7a90f  ArgusFoundation/ReleaseUI/Updates/ReleaseUpdatesInbox.swift: row(_:) carries the shape
-7999f60ac599  ArgusFoundation/Search/FinancialSearchView.swift: FinancialSearchRow carries the shape
+d32a9a61277f  ArgusFoundation/Search/FinancialSearchView.swift: FinancialSearchRow carries the shape
