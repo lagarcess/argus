@@ -164,18 +164,19 @@ private struct ConnectedCuadraoInsights: View {
     var body: some View {
         NavigationStack {
             CuadraoHomeInsightsLayout(spanish: spanish, range: $range, periodOffset: $periodOffset,
-                distribution: $distribution, activity: $activity, oldestOffset: { showingActivity in
+                distribution: $distribution, activity: $activity, distributionOnPastPeriods: false, oldestOffset: { showingActivity in
                     showingActivity ? 0 : range.oldestOffset(points)
                 }) { offset in
                     if activity {
                         spending(range.interval(offset: offset))
-                    } else if distribution {
+                    } else if distribution && offset == 0 {
                         allocation
                     } else {
                         ConnectedBalanceReading(summary: summary, currencies: [summary.currency], spanish: spanish,
                             expanded: true, history: history, range: $range, periodOffset: .constant(offset))
                     }
                 }.modifier(CuadraoHomeInsightsChrome(title: space, spanish: spanish))
+                .onChange(of: periodOffset) { _, offset in if offset < 0 { distribution = false } }
         }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
     }
 

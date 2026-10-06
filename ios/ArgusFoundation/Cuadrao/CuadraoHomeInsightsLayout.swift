@@ -6,6 +6,8 @@ struct CuadraoHomeInsightsLayout<Content: View>: View {
     @Binding var periodOffset: Int
     @Binding var distribution: Bool
     @Binding var activity: Bool
+    /// Owners without per-period closings offer the distribution on the current period only.
+    var distributionOnPastPeriods = true
     let oldestOffset: (Bool) -> Int
     @ViewBuilder let content: (Int) -> Content
 
@@ -27,7 +29,8 @@ struct CuadraoHomeInsightsLayout<Content: View>: View {
             VStack(spacing: 4) {
                 metricChoice.frame(maxWidth: .infinity, alignment: .trailing)
                 CuadraoInsightControls(range: Binding(get: { range }, set: { periodOffset = 0; range = $0 }),
-                    distribution: $distribution, spanish: spanish, activity: activity)
+                    distribution: $distribution, spanish: spanish, activity: activity,
+                    distributionEnabled: distributionOnPastPeriods || periodOffset == 0)
             }.padding(.horizontal, 24)
             TabView(selection: $periodOffset) {
                 ForEach(Array(oldest...0), id: \.self) { offset in
