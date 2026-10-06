@@ -1,29 +1,29 @@
 # Orchestrate status
 
-Generated: 2026-10-05T23:04:21.445Z
+Generated: 2026-10-06T00:09:33.656Z
 
 ## Units
 
-States: landed=9, needs-verify=7
+States: landed=12, needs-verify=4
 
 | ID | Track | State | Branch | PR | SHA | Brief |
 | --- | --- | --- | --- | --- | --- | --- |
 | identity-safety | identity | landed | codex/cuadrao-social-release-safety | 844 | 36c70b91ef03ffcfcc7482a7714a0f244fe5fe4e | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | deletion-recovery | deletion | landed | codex/cuadrao-deletion-recovery-proof | 846 | cea9f6e18c582615dee44cf1a7d3a05b936b660a | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| analytics-deletion | deletion | needs-verify | codex/cuadrao-personless-deletion | 847 | 0334808e08e41baa0305fe28a8c167dbb89ebbbc | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| privacy-evidence | privacy | needs-verify | codex/cuadrao-privacy-evidence | 845 | bdb276c656e160ca39c419d9d61a2dc1ec1fcebc | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| analytics-deletion | deletion | landed | codex/cuadrao-personless-deletion | 847 | ea9d9e57a26cd788d4a92adde4c0984b964ae94d | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| privacy-evidence | privacy | needs-verify | codex/cuadrao-privacy-evidence | 845 | 7d8bf088b98eed0b5c712976e90343013e62fbb0 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | primary-currency | foundations | landed | codex/cuadrao-primary-currency | 853 | c86981c076d4512aaee8d6c61d278f60ef597e75 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| paired-transfers | foundations | needs-verify | codex/cuadrao-paired-transfers | 854 | 2338deab87c0dc6bbd606544197f5a58ce8307c4 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| privacy-manifest | privacy | needs-verify | codex/cuadrao-app-privacy-manifest | 849 | 944515d21d54aa4d0b926e78a070cecdde4baa54 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| paired-transfers | foundations | needs-verify | codex/cuadrao-paired-transfers | 854 | 8efd724a0a3f48139745e2c741dc2e23f2612320 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| privacy-manifest | privacy | landed | codex/cuadrao-app-privacy-manifest | 849 | 944515d21d54aa4d0b926e78a070cecdde4baa54 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | native-buttons | identity | landed | codex/cuadrao-native-provider-appearance | 857 | fb847fc340a7c7acac55922691fa0f99c50e33a6 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | apple-binding | identity | landed | codex/apple-identity-binding-800 | 858 | ad2e7d84236bc2bc0f0ffb82d3e0c9e6b9f6f04d | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | apple-deletion | deletion | landed | codex/apple-deletion-admission-20261005 | 862 | 55f6fe1c415261c86d5a1ada63eee7583c0dc411 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| apple-session | identity | needs-verify | codex/cuadrao-apple-session-20261005 | 864 | 70b2f25646f1d05445704ae25e3d791a2a913568 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| apple-session | identity | needs-verify | codex/cuadrao-apple-session-20261005 | 864 | a24a6c60627460ddfd6042b3f42b342c5eff11f0 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | recovery-address | operations | needs-verify | codex/recovery-trusted-client-ip | 865 | 45939369dcf915660c43a83d3cf54d1348ee4dc3 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | ci-release-resolution | operations | landed | codex/cuadrao-ci-release-resolution | 851 | c4f9a08b6fc9cf429b47c4cd024183db02fcd959 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | canary-fixture | operations | landed | codex/issue-861-canary-fixture-close | 863 | d2347166f78df1a1e67f52ab194936ee14ab210b | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 | apple-lock-observer | operations | landed | codex/867-apple-lock-observer | 868 | 8a3e80daaf8947a5dfd43268eeb3f2459427de97 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
-| apple-name-backend | identity | needs-verify | codex/cuadrao-apple-name-backend | 869 | 97f948020aab0aff899d1ccc3d4522a903a40ad1 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
+| apple-name-backend | identity | landed | codex/cuadrao-apple-name-backend | 869 | b62f35d1a25fb344a99df3702a5199b146a1e152 | docs/reports/evidence/cuadrao-trust-20261005/preflight.md |
 
 ## Verification ledger
 
@@ -75,4 +75,4 @@ Lowest unmerged: none
 | release-jobs | open | Settle #818 first-release retained chat jobs and connected memory/voice inclusion. Recommendation: bounded financial read and revision-confirmed proposed-write jobs; defer unassigned connected memory/voice activation. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 | apple-late-cleanup | open | Accept #803 rare provider-side late revocation recovery or require stronger coordination. Recommendation: documented forced-sign-out recovery with activation/phone gates; do not claim local CAS cancels an Apple request already received. | Founder product decision; no experiment can select product scope | Keep dependent implementation blocked; continue independent authorized work. |  |
 
-<!-- orch-summary {"unitStates":{"landed":9,"needs-verify":7},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":22},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->
+<!-- orch-summary {"unitStates":{"landed":12,"needs-verify":4},"ledgerVerdicts":{"live-ui-verified":2,"unit-test-verified":22},"frontierGeneration":0,"openGateIds":["apple-late-cleanup","balance-source","consent-policy","identity-policy","release-jobs","space-model"]} -->

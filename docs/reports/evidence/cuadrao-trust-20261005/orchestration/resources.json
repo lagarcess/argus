@@ -6,11 +6,11 @@
       "container": "supabase_db_cuadrao-trust-20261005",
       "created_by": "root",
       "physical_owner": "root",
-      "lease_owner": "analytics_deletion_reconcile",
+      "lease_owner": null,
       "worker_stop_allowed": false,
       "release_action": "mark lease_owner null; preserve running container",
       "health": "healthy after exact-container restart",
-      "lease_scope": "synthetic combined Apple admission and personless analytics pending/completion proof",
+      "lease_scope": null,
       "local_tcp_execution": "Use authorized escalated execution for local bind/TCP tests; default sandbox denies these operations."
     },
     {
