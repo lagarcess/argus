@@ -65,12 +65,12 @@ struct CuadraoPlanCanvas: View {
 
     private var header: some View {
         CuadraoPlanHeader(spanish: spanish,
-            createTitle: together ? (spanish ? "Crear grupo" : "Create group") : (spanish ? "Crear plan" : "Create plan")) {
-                if together { newGroup = true } else { creation = PlanEditorRoute(plan: newPlan) }
-            }
-            .contextMenu {
+            createTitle: together ? (spanish ? "Crear grupo" : "Create group") : (spanish ? "Crear plan" : "Create plan"),
+            titleMenu: { AnyView(Group {
                 Button(spanish ? "Ver primer uso" : "See first use") { showEmpty = true; resetConfirmation = true }
                 Button(spanish ? "Restablecer ejemplos" : "Reset examples") { showEmpty = false; resetConfirmation = true }
+            }) }) {
+                if together { newGroup = true } else { creation = PlanEditorRoute(plan: newPlan) }
             }
     }
 

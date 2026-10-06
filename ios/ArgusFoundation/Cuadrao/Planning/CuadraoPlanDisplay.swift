@@ -5,13 +5,16 @@ struct CuadraoPlanHeader: View {
     let createTitle: String
     var canCreate = true
     var createIdentifier = "plan-create"
+    /// The Preview's hold-to-reset menu sits on the title only, never on the create button.
+    var titleMenu: (() -> AnyView)? = nil
     let create: () -> Void
 
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(spanish ? "Lo que viene" : "What’s ahead").font(CuadraoTypography.screen)
+                let title = Text(spanish ? "Lo que viene" : "What’s ahead").font(CuadraoTypography.screen)
                     .accessibilityIdentifier("plan-heading")
+                if let titleMenu { title.contextMenu { titleMenu() } } else { title }
             }
             Spacer()
             Button(action: create) {
