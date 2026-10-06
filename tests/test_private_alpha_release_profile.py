@@ -169,7 +169,17 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
     render_api_env = {
         item["key"]: item.get("value") for item in render_api["envVars"]
     }
-    env_contract = (ROOT / ".github" / "argus-env.sh").read_text(encoding="utf-8")
+    env_contract = subprocess.run(
+        [
+            "bash",
+            "-euc",
+            'source .github/argus-env.sh; printf "%s\\n" "${ARGUS_RENDER_API_ENV[@]}"',
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
     backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
     assert render_api_env["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"] == "true"
@@ -177,7 +187,7 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
         profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
         == "true"
     )
-    assert "  ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED\n" in env_contract
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" in env_contract
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
 
 

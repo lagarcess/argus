@@ -314,7 +314,9 @@ def test_shared_env_contract_requires_unset_indirect_env_under_nounset() -> None
 
 def test_render_blueprint_uses_current_env_contract_names_only() -> None:
     render_yaml = _source("render.yaml")
-    contract = ENV_CONTRACT.read_text()
+    contract = set(_contract_array("ARGUS_RENDER_API_ENV")) | set(
+        _contract_array("ARGUS_RENDER_WEB_ENV")
+    )
 
     for key in (
         "ARGUS_PERSISTENCE_MODE",

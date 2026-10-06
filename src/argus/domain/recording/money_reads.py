@@ -6,6 +6,7 @@ from argus.domain.recording.currency import currency_exponent, format_minor_unit
 from argus.domain.recording.errors import AccountNotFound
 from argus.domain.recording.loop import ExpenseRecord, ExpenseRevision
 from argus.domain.recording.loop_reads import activity_response
+from argus.domain.recording.money_schemas import DESTINATION_ELIGIBILITY
 from argus.domain.recording.repository import StoredAccount
 
 
@@ -54,6 +55,8 @@ def visible_activity(full: dict, account_ids: set[str], history: dict) -> dict:
     primary_hidden = body["legs"][0]["account_id"] not in account_ids
     body["legs"] = legs
     if primary_hidden:
+        body["currency"] = legs[0]["currency"]
+        body["currency_fraction_digits"] = legs[0]["currency_fraction_digits"]
         for key in (
             "amount",
             "amount_minor",
@@ -119,6 +122,10 @@ def render_activity(
                 "account_id": s.account.id,
                 "role": rev.role,
                 "balance_movement_minor": rev.movement_minor,
+                "amount_minor": rev.amount_minor,
+                "amount": format_minor_units(rev.amount_minor, s.account.currency),
+                "currency": s.account.currency,
+                "currency_fraction_digits": currency_exponent(s.account.currency),
                 "coverage": activity_response(s, record, rev.revision)["coverage"],
             }
             for s, record, rev in legs
@@ -139,3 +146,17 @@ def current_activities(accounts: list[StoredAccount]) -> list[dict[str, Any]]:
             ).items()
         ]
     return [render_activity(aid, history) for aid, history in groups(accounts).items()]
+
+
+def activity_in_currency(actual: dict[str, Any], currency: str) -> bool:
+    legs = actual["legs"]
+    roles = (
+        {"source", "destination"}
+        if actual["kind"] in DESTINATION_ELIGIBILITY
+        else {"single"}
+    )
+    return (
+        len(legs) == len(roles)
+        and {leg["role"] for leg in legs} == roles
+        and all(leg["currency"] == currency for leg in legs)
+    )

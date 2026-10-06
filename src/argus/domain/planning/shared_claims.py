@@ -1,5 +1,6 @@
 """Canonical consented credits reduce original intentions without private DTOs."""
 
+from argus.domain.recording.money_reads import activity_in_currency
 from argus.domain.recording.payments import net_total
 
 from . import goal_projection
@@ -8,7 +9,7 @@ from . import goal_projection
 def credit(entry, accepted, purpose, actual, accounts):
     if (
         not entry
-        or entry["currency"] != accepted["currency"]
+        or not activity_in_currency(entry, accepted["currency"])
         or entry["kind"] != accepted["kind"]
     ):
         return None
