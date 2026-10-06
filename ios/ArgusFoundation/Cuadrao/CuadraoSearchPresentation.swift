@@ -33,6 +33,7 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
     var accessibility = CuadraoSearchAccessibility.preview
     var showsFilters = true
     var loading = false
+    var refresh: (@MainActor () async -> Void)?
     @ViewBuilder let results: () -> Results
     @ViewBuilder let filters: () -> Filters
     @State private var showingFilters = false
@@ -42,6 +43,7 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
             VStack(alignment: .leading, spacing: 0, content: results)
                 .padding(.horizontal, 24).padding(.bottom, 24)
         }.coordinateSpace(name: "search.viewport")
+            .modifier(CuadraoSearchRefresh(action: refresh))
             .scrollDismissesKeyboard(.interactively)
             .accessibilityIdentifier(accessibility.prefix + ".results")
             .overlay(alignment: .top) {
@@ -69,7 +71,8 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
                                     .accessibilityIdentifier(accessibility.kind(value))
                             }
                         }
-                    }.accessibilityIdentifier(accessibility.prefix + ".kinds")
+                    }.scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                        .accessibilityIdentifier(accessibility.prefix + ".kinds")
                     if filterCount > 0 {
                         HStack {
                             Text(filterSummary).accessibilityIdentifier(accessibility.prefix + ".filter-summary")
@@ -121,6 +124,14 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
                     .accessibilityLabel(spanish ? "Filtros, \(filterCount) activos" : "Filters, \(filterCount) active")
             }
         }.overlay(alignment: .bottom) { Rectangle().fill(WelcomePalette.separator).frame(height: 1) }
+    }
+}
+
+/// Pull to refresh belongs to the results alone; inherited by the kind rail it lets the rail drag vertically.
+private struct CuadraoSearchRefresh: ViewModifier {
+    let action: (@MainActor () async -> Void)?
+    @ViewBuilder func body(content: Content) -> some View {
+        if let action { content.refreshable { await action() } } else { content }
     }
 }
 

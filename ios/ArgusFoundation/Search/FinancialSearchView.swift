@@ -34,6 +34,7 @@ struct FinancialSearchView: View {
     @Environment(\.locale) private var locale
     @StateObject private var scroll = FinancialScrollOffset()
     @State private var unavailableKind: CanvasSearchKind?
+    @State private var showsProgress = false
     @FocusState private var focused: Bool
 
     init(model: FinancialSearchModel, accounts: AccountsModel, loop: FinancialLoopModel,
@@ -69,6 +70,7 @@ struct FinancialSearchView: View {
         case .expectation, .budget, .goal, .debt: .plans
         }
     }
+    private var busy: Bool { unavailableKind == nil && (model.loading || model.opening) }
     private var filterCount: Int {
         guard unavailableKind == nil else { return 0 }
         return (model.origin.currency == nil ? 0 : 1) + (kind.wrappedValue == .plans ? 1 : 0)
@@ -83,13 +85,13 @@ struct FinancialSearchView: View {
             CuadraoSearchContent(query: query, kind: kind,
                 kinds: CanvasSearchKind.allCases.filter { $0 != .memory }, spanish: spanish,
                 filterCount: filterCount, filterSummary: filterSummary, clearFilters: clearFilters,
-                focused: $focused, accessibility: .connected, loading: unavailableKind == nil && (model.loading || model.opening)) {
+                focused: $focused, accessibility: .connected, loading: showsProgress,
+                refresh: { if unavailableKind == nil { await model.refresh() } }) {
                 FinancialScrollProbe(controller: scroll).frame(height: 0)
                 results
             } filters: {
                 filterControls
             }
-            .refreshable { if unavailableKind == nil { await model.refresh() } }
             .simultaneousGesture(DragGesture(minimumDistance: 1).onChanged { _ in model.userScrolled() })
             .onPreferenceChange(FinancialScrollRowFrames.self) { rememberFrames($0) }
             .onChange(of: model.restoration) { _, restoration in
@@ -117,6 +119,15 @@ struct FinancialSearchView: View {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
             await model.activate()
+        }
+        .task(id: busy) {
+            guard busy else { showsProgress = false; return }
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled { showsProgress = true }
+        }
+        .onChange(of: inputKey) { _, _ in
+            guard let view = scroll.view else { return }
+            view.setContentOffset(CGPoint(x: view.contentOffset.x, y: -view.adjustedContentInset.top), animated: false)
         }
         .onChange(of: active) { _, active in
             if active, unavailableKind == nil { Task { await model.activate() } }

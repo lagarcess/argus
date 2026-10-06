@@ -32,6 +32,7 @@ final class FinancialSearchModel: ObservableObject {
     private var detailRequest = UUID()
     private var loaded = false
     private var dirty = true
+    private var itemsPrecedeOrigin = false
 
     init(controller: SessionController, defaults: UserDefaults = .standard, prefix: String = "financial.search.origin.") {
         self.controller = controller; self.defaults = defaults; self.prefix = prefix
@@ -51,7 +52,7 @@ final class FinancialSearchModel: ObservableObject {
         }
         identity = next; ownerID = nextOwner
         items = []; cursor = nil; destination = nil; opening = false; destinationError = nil
-        loading = false; errorKey = nil; loaded = false; dirty = true; restoration = nil
+        loading = false; errorKey = nil; loaded = false; dirty = true; restoration = nil; itemsPrecedeOrigin = false
     }
 
     func update(query: String? = nil, kind: FinancialSearchKind?? = nil, currency: String?? = nil) {
@@ -63,12 +64,13 @@ final class FinancialSearchModel: ObservableObject {
         origin = next
         detailRequest = UUID(); opening = false; destinationError = nil; destination = nil; restoration = nil
         origin.pages = 1; origin.anchor = nil; origin.anchorOffset = 0
-        request = UUID(); loading = false; items = []; cursor = nil; loaded = false; dirty = true; errorKey = nil
+        request = UUID(); loading = false; cursor = nil; loaded = false; dirty = true; errorKey = nil
+        itemsPrecedeOrigin = !items.isEmpty
         persist()
     }
 
     func remember(anchor: String, offset: Double) {
-        guard !loading, restoration == nil, destination == nil, !opening else { return }
+        guard !loading, !itemsPrecedeOrigin, restoration == nil, destination == nil, !opening else { return }
         origin.anchor = anchor; origin.anchorOffset = offset; persist()
     }
 
@@ -114,6 +116,7 @@ final class FinancialSearchModel: ObservableObject {
             guard request == ticket, self.identity == identity else { return }
             let oldItems = items
             items = append && !restarted ? items + collected : collected
+            itemsPrecedeOrigin = false
             cursor = nextCursor
             origin.pages = append && !restarted ? descriptor.pages + count : count
             origin.pages = max(1, origin.pages)
@@ -184,7 +187,10 @@ final class FinancialSearchModel: ObservableObject {
         if case SessionFailure.rejected(let status, _) = error, status == 404 || status == 403 {
             message = detail ? "search.destination.unavailable" : "search.unavailable"
         } else { message = "search.error" }
-        if detail { destinationError = message } else { errorKey = message }
+        if detail { destinationError = message } else {
+            errorKey = message
+            if itemsPrecedeOrigin { items = []; itemsPrecedeOrigin = false }
+        }
     }
 
     private func persist() {

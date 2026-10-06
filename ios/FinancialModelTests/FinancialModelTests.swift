@@ -798,9 +798,43 @@ extension FinancialModelTests {
         let searches = await fixture.server.searches
         XCTAssertEqual(searches.count, 2, "Repeated control values must not invalidate a loaded search")
         model.update(currency: .some(nil))
-        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertEqual(model.items.map(\.id), ids)
+        XCTAssertNil(model.cursor)
         XCTAssertEqual(model.origin.pages, 1)
         XCTAssertNil(model.origin.currency)
+    }
+
+    func testSearchFilterChangeKeepsRowsUntilTheReplacementLands() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let model = FinancialSearchModel(controller: fixture.client, defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        model.bind(identity)
+        let shown = UUID(), replacement = UUID()
+        await fixture.server.replies([(200, PresentationServer.searchPage([shown], cursor: "next"))])
+        await model.activate()
+        model.remember(anchor: model.items[0].id, offset: -12)
+        model.update(kind: .some(.account))
+        XCTAssertEqual(model.items.map(\.recordID), [shown], "A filter change cannot blank the rows it is replacing")
+        XCTAssertNil(model.cursor)
+        XCTAssertFalse(model.loading)
+        XCTAssertNil(model.origin.anchor)
+        XCTAssertEqual(model.origin.pages, 1)
+        model.remember(anchor: model.items[0].id, offset: -30)
+        XCTAssertNil(model.origin.anchor, "A row from the previous filter cannot become the new scroll origin")
+        let gate = RequestGate(); await fixture.server.holdSearch(gate)
+        await fixture.server.replies([(200, PresentationServer.searchPage([replacement]))])
+        let pending = Task { await model.activate() }
+        await gate.waitUntilStarted()
+        XCTAssertTrue(model.loading)
+        XCTAssertEqual(model.items.map(\.recordID), [shown])
+        await gate.release(); await pending.value
+        XCTAssertEqual(model.items.map(\.recordID), [replacement])
+        XCTAssertNil(model.restoration)
+        model.update(query: "unreachable")
+        await fixture.server.replies([(503, #"{"code":"unavailable"}"#)])
+        await model.activate()
+        XCTAssertTrue(model.items.isEmpty, "A failed filter change cannot leave the previous filter's rows on screen")
+        XCTAssertEqual(model.errorKey, "search.error")
     }
 
     func testSearchRestorationWaitsForLayoutAndAllowsRemovedRowBoundary() {
@@ -901,7 +935,8 @@ extension FinancialModelTests {
         XCTAssertEqual(model.items.map(\.id), retained)
         XCTAssertEqual(model.errorKey, "search.error")
         model.update(query: "different")
-        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertEqual(model.items.map(\.id), retained)
+        XCTAssertNil(model.cursor)
         XCTAssertNil(model.errorKey)
         await fixture.server.replies([(200, PresentationServer.searchPage([first], cursor: "stale")),
             (409, #"{"code":"financial_search_stale_cursor"}"#),
