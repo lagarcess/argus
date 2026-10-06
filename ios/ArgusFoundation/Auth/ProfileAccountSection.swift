@@ -11,6 +11,8 @@ struct ProfileAccountSection: View {
                 ProgressView("auth.working").accessibilityIdentifier("auth.working")
             }
             switch model.state {
+            case .accountDeletionUncertain: Text("auth.deletion.uncertain")
+            case .accountDeletionPending: Text("auth.deletion.pending")
             case .disabled: EmptyView()
             case .configurationInvalid: Text("auth.error.configuration")
             case .signedOut:

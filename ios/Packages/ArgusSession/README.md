@@ -179,3 +179,15 @@ from sign-in and visible to the person. Each supplied code receives at most one 
 401, uncertain transport failure and server failure never replay that code.
 A later attempt requires fresh Apple authorization. Capture does not initialize
 a name or link accounts.
+
+Account deletion uses the existing session owner and a token-free per-user vault
+journal. `deleteAccount(expectedIdentity:freshAppleAuthorizationCode:)` sends one
+confirmed command; `resumePendingAccountDeletion` checks that same command without
+SDK refresh or Apple-code replay. Accepted deletion retires interactive proof.
+Only a confirmed receipt permits the future app cleanup adapter; acknowledge it
+with `acknowledgeConfirmedAccountDeletion` after exact-user local cleanup succeeds.
+Relaunch readback comes from `accountDeletionStatuses()`.
+See the source-preparation report at
+`docs/reports/evidence/native-deletion-command-20261005/README.md` for dependency
+order and explicit unrun checks. The native presentation/receipt cleanup adapter
+is a later owned dependency.

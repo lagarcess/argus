@@ -2,6 +2,7 @@ import Foundation
 
 /// Safe, bounded failures. Never includes server prose, passwords, tokens or SDK errors.
 public enum SessionFailure: Error, Equatable, Sendable {
+    case accountDeletionInProgress
     case busy, invalidConfiguration, invalidResponse, unauthorized, unavailable
     case storageUnavailable, pendingSignOut, unsupportedAnonymousTransfer, staleOperation, credentialValidationRequired
     case rejected(status: Int, code: String?)
@@ -39,6 +40,7 @@ struct UnavailableAppleCredentialChecker: AppleCredentialChecking {
 
 public struct SessionSnapshot: Equatable, Sendable {
     public enum Phase: Equatable, Sendable {
+        case accountDeletionUncertain, accountDeletionPending
         case signedOut, authenticated, signOutPending, unsupportedAnonymousSession, credentialValidationRequired, reauthenticationRequired
     }
     public let phase: Phase
