@@ -15,6 +15,8 @@ struct ConnectedTransactionSheet: View {
     private var reviewing: Bool { model.phase != .editing }
     private var closed: Bool { model.phase == .conflict || model.phase == .retired }
     private var locked: Bool { model.busy || model.phase == .uncertain }
+    /// Until every coverage question is answered the primary action re-runs the review, as the loop.* contract expects.
+    private var confirmable: Bool { model.canConfirm || model.phase == .uncertain }
 
     var body: some View {
         CuadraoTransactionSheet(
@@ -22,7 +24,7 @@ struct ConnectedTransactionSheet: View {
                                                symbol: AccountPresentation.symbol(model.origin.type)),
             spanish: spanish, reviewing: reviewing, title: title, primaryTitle: primaryTitle,
             primaryEnabled: primaryEnabled, primaryBusy: model.busy,
-            primaryIdentifier: closed ? nil : reviewing ? "loop.confirm" : "loop.review",
+            primaryIdentifier: closed ? nil : reviewing && confirmable ? "loop.confirm" : "loop.review",
             cancelDisabled: locked, dismissDisabled: locked,
             scrollTarget: model.focusCategory && model.options != nil && !reviewing ? "loop.category" : nil,
             back: { model.edit() }, primary: primaryAction) {
@@ -47,19 +49,20 @@ struct ConnectedTransactionSheet: View {
     private var primaryTitle: String? {
         if closed { return NSLocalizedString("action.close", comment: "") }
         if model.phase == .uncertain { return NSLocalizedString("accounts.retry", comment: "") }
+        if reviewing, !confirmable { return NSLocalizedString("loop.review", comment: "") }
         if reviewing, model.isCorrection { return NSLocalizedString("loop.activity.saveCorrection", comment: "") }
         return nil
     }
     private var primaryEnabled: Bool {
         if closed || model.phase == .uncertain { return true }
-        if reviewing { return model.canConfirm }
+        if reviewing { return confirmable || (model.phase == .review && !model.busy) }
         return model.readyToReview && !model.busy && model.options != nil && amountError.isEmpty
     }
     private func primaryAction() {
         focused = false
         if closed { dismiss(); return }
         Task {
-            if reviewing {
+            if reviewing, confirmable {
                 await model.confirm()
                 if model.phase == .saved { dismiss() }
             } else {
