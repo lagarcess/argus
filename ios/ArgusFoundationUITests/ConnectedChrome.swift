@@ -109,6 +109,15 @@ extension XCUIApplication {
         }
     }
 
+    /// Connected Profile asks before signing out; the tip account section signs out directly.
+    func confirmSignOutIfAsked() {
+        let alert = alerts.firstMatch
+        guard alert.waitForExistence(timeout: 3) else { return }
+        let confirm = alert.buttons["auth.signOut.confirm"]
+        if confirm.exists { confirm.tap(); return }
+        alert.buttons.matching(NSPredicate(format: "label IN %@", ["Sign out", "Cerrar sesión"])).firstMatch.tap()
+    }
+
     func openProfileSurface() {
         if buttons["header.profile"].waitForExistence(timeout: 3) {
             buttons["header.profile"].tap()

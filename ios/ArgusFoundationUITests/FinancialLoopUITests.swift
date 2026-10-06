@@ -367,6 +367,7 @@ final class FinancialLoopUITests: XCTestCase {
                 app.buttons["header.profile"].tap()
                 if fresh, app.buttons["auth.signOut"].waitForExistence(timeout: 3) {
                     tapVisible(app.buttons["auth.signOut"])
+                    app.confirmSignOutIfAsked()
                     XCTAssertTrue(app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 20))
                 }
             }
