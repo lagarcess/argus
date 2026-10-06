@@ -16,8 +16,8 @@ enum PlanFormat {
         let number = value.formatted(.number.precision(.fractionLength(0...2)).locale(Locale(identifier: "en_US")))
         return "\(currency) \(number)"
     }
-    static func month(after count: Int, spanish: Bool) -> String {
-        let date = Calendar.current.date(from: DateComponents(year: 2026, month: 10 + count, day: 12))!
+    static func month(after count: Int, spanish: Bool, from start: Date = PlanScenario.previewToday) -> String {
+        let date = Calendar.current.date(byAdding: .month, value: count, to: start) ?? start
         let text = date.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
         return text.prefix(1).uppercased() + text.dropFirst()
     }

@@ -165,9 +165,7 @@ struct CuadraoPlanDetail: View {
             if plan.kind == .debt {
                 LabeledContent(spanish ? "Interés anual" : "Annual interest", value: "\(plan.annualRate.formatted())%")
             }
-            Text(plan.kind == .budget
-                ? (spanish ? "Proyección simple con 12 días registrados de un mes de 31 días. No es un gasto confirmado." : "Simple projection using 12 recorded days in a 31-day month. This is not confirmed spending.")
-                : (spanish ? "Escenario al 12 de octubre de 2026. Aportes mensuales constantes. Sin rendimientos, compras nuevas ni comisiones. El plan no mueve dinero." : "Scenario as of October 12, 2026. Fixed monthly contributions. No returns, new purchases, or fees. The plan doesn't move money."))
+            Text(plan.scenario.disclosure(spanish: spanish))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
