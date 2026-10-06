@@ -1,8 +1,11 @@
 # Confirmed deletion cleanup: source handoff
 
 Base: `8146d16e90633eb543781f8882665482f0d5dca9`, guarded #875 landing.
-This is a new isolated actor-boundary slice. The #875 worker and its historical
-QA evidence are unchanged.
+This is a new isolated actor-boundary slice. Independent runtime QA passed at
+`f787ca63af9ba4e6355357ed5e1a8ead5a3dfb21`; the #875 worker and its historical
+QA evidence are unchanged. The [published independent bundle](independent-review/README.md)
+owns those results and the baseline-gap reproduction. Current integration is
+still the original base, so no reconciliation merge is needed.
 
 ## Boundary and source change
 
@@ -36,7 +39,9 @@ is prepared for the exact #875 source test target. It uses the production sessio
 actor with synthetic HTTP responses, unique temporary A/B directories and actual
 filesystem operations. It observes A removal before stale acknowledgement rejects
 while B and its files survive. This is an intentional historical-API baseline
-probe, not a current caller. **It has not run; no runtime reproduction is claimed.**
+probe, not a current caller. Independent QA ran it on exact 8146: one passing probe reproduced the unsafe
+cleanup-before-rejection sequence. This is evidence of the old gap, not old
+boundary correctness.
 
 Current package test source checks:
 
@@ -61,16 +66,19 @@ callbacks. The unsafe production signature is removed.
 
 #875's archived live harness remains immutable historical evidence. Its
 [migrated copy](LiveDeletionTests.swift) passes an explicit no-op callback on its
-stale-owner denial path, which has no filesystem obligation. Root's independent
-QA must exercise that copied harness against this new source; the old 1-pass SDK
-result does not prove the new boundary. The historical baseline probe is the only
+stale-owner denial path, which has no filesystem obligation. Independent QA exercised that copied harness against f787: one current local
+SDK/API/Auth/PG case passed with no skip. The old #875 SDK result is not used as
+proof of this new boundary. The historical baseline probe is the only
 intentional callback-free reference in this new evidence folder.
 
-Source/static review is not runtime proof. Swift package tests, baseline gap
-probe, migrated live harness, app compilation and filesystem behavior remain
-unrun until root schedules independent QA. Do not create the small PR or claim
-READY before that verification. No Mac, PG, hosted, provider or paid calls ran
-while authoring this source.
+Source/static review is not runtime proof. Independent f787 QA executed 174
+package cases (170 passed, 4 existing opt-in skips), filesystem 6, deletion 20
+and one migrated local SDK/API/Auth/PG case, with no focused/live skips or failures.
+These are separate overlapping runs, not a summed count. No app compilation,
+app UI, receipt-store, actual Application Support, hosted/provider or physical
+phone acceptance is claimed for this slice. Analytics completion was synthetic.
+No Mac, PG, hosted, provider or paid calls ran while authoring or publishing.
+Root owns final context/publication review, terminal CI and guarded merge.
 
 ## Author checks
 
@@ -79,3 +87,20 @@ no concrete blocker. It ran no compilation or tests. Python modularity and diff
 whitespace checks pass; source fingerprints are recorded for the queued verifier.
 The callback boundary changes one production method, with no vault, server,
 migration, app UI, receipt-store or actual user filesystem change.
+
+
+## Fixture correction and publication
+
+The initial b77 candidate failed Swift 6 compilation before tests because its
+new denied-state fixture transferred a ternary `[String: Any]` body to the actor.
+The fixture-only f787 commit uses separate literal branches. Production actor
+object `8720b2c26da7c3955bc5b291eef423f3c94f52dc` is unchanged, as are denied-state
+assertions. The failure log and exact correction diff are retained in the bundle.
+No zero-test or failed run is acceptance evidence.
+
+All 16 raw bundle payload hashes and 52 package source objects/fingerprints were
+verified before publication. The baseline and migrated live source match the
+committed copies. Only the documented test port allow-list differs in the live
+package copy. Published text normalization has an explicit raw-to-published hash
+map; the original manifest is retained. Production source and original #875
+evidence are unchanged by this evidence commit. Fresh static checks pass.
