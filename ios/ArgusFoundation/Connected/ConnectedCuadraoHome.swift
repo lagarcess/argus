@@ -69,6 +69,7 @@ struct ConnectedCuadraoHome: View {
                     Button("accounts.retry") { Task { await loop.refresh() } }.frame(minHeight: 44)
                 }
             } section: { homeSection($0) }
+            .connectedSwipeContainer()
             .accessibilityIdentifier("screen.home")
             .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
                 enabled: tab == .home && sheet == nil && homePath.isEmpty))
@@ -257,7 +258,7 @@ struct ConnectedCuadraoHome: View {
                     }
                     .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
                 }
-            }.connectedSwipeContainer()
+            }
             if activeAccounts.isEmpty {
                 if !accounts.hasLoaded && accounts.errorKey == nil { ProgressView("accounts.loading") }
                 else if accounts.errorKey == nil { personalEmpty }
@@ -336,7 +337,7 @@ struct ConnectedCuadraoHome: View {
                         }
                     }
                 }
-            }.connectedSwipeContainer()
+            }
         }
     }
 
