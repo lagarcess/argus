@@ -21,5 +21,15 @@
   "configuration_names": [
     "ARGUS_MIXED_CURRENCY_TRANSFER_ENABLED"
   ],
-  "configuration_disposition": "false .env.example declaration; canonical API env membership derives from validated release profile; no hosted activation"
+  "configuration_disposition": "false .env.example declaration; canonical API env membership derives from validated release profile; no hosted activation",
+  "integration_checks": {
+    "CI": {
+      "run": 37393285779,
+      "conclusion": "success"
+    },
+    "Private Alpha Local Smoke": {
+      "run": 37393286085,
+      "conclusion": "success"
+    }
+  }
 }

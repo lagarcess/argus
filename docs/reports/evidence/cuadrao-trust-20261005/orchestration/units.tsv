@@ -9,8 +9,8 @@ privacy-manifest	privacy	landed	codex/cuadrao-app-privacy-manifest	849	944515d21
 native-buttons	identity	landed	codex/cuadrao-native-provider-appearance	857	fb847fc340a7c7acac55922691fa0f99c50e33a6	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 apple-binding	identity	landed	codex/apple-identity-binding-800	858	ad2e7d84236bc2bc0f0ffb82d3e0c9e6b9f6f04d	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 apple-deletion	deletion	landed	codex/apple-deletion-admission-20261005	862	55f6fe1c415261c86d5a1ada63eee7583c0dc411	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
-apple-session	identity	needs-verify	codex/cuadrao-apple-session-20261005	864	a24a6c60627460ddfd6042b3f42b342c5eff11f0	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
-recovery-address	operations	needs-verify	codex/recovery-trusted-client-ip	865	45939369dcf915660c43a83d3cf54d1348ee4dc3	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
+apple-session	identity	needs-verify	codex/cuadrao-apple-session-20261005	864	7f920b1c14eac6d3642b195b1ec4d127431b450b	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
+recovery-address	operations	needs-verify	codex/recovery-trusted-client-ip	865	3ca063c5a226d3a5c83ae865bc06c121b20c38a3	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 ci-release-resolution	operations	landed	codex/cuadrao-ci-release-resolution	851	c4f9a08b6fc9cf429b47c4cd024183db02fcd959	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 canary-fixture	operations	landed	codex/issue-861-canary-fixture-close	863	d2347166f78df1a1e67f52ab194936ee14ab210b	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
 apple-lock-observer	operations	landed	codex/867-apple-lock-observer	868	8a3e80daaf8947a5dfd43268eeb3f2459427de97	docs/reports/evidence/cuadrao-trust-20261005/preflight.md
