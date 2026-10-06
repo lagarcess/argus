@@ -798,7 +798,8 @@ extension FinancialModelTests {
         let searches = await fixture.server.searches
         XCTAssertEqual(searches.count, 2, "Repeated control values must not invalidate a loaded search")
         model.update(currency: .some(nil))
-        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertEqual(model.items.map(\.id), ids)
+        XCTAssertNil(model.cursor)
         XCTAssertEqual(model.origin.pages, 1)
         XCTAssertNil(model.origin.currency)
     }
@@ -934,7 +935,8 @@ extension FinancialModelTests {
         XCTAssertEqual(model.items.map(\.id), retained)
         XCTAssertEqual(model.errorKey, "search.error")
         model.update(query: "different")
-        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertEqual(model.items.map(\.id), retained)
+        XCTAssertNil(model.cursor)
         XCTAssertNil(model.errorKey)
         await fixture.server.replies([(200, PresentationServer.searchPage([first], cursor: "stale")),
             (409, #"{"code":"financial_search_stale_cursor"}"#),
