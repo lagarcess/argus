@@ -5,6 +5,10 @@ import XCTest
 
 @MainActor
 final class HouseholdPlanModelTests: XCTestCase {
+    func testServerFailureKeepsRetryableLoadMessage() {
+        XCTAssertEqual(HouseholdPlanModel.message(SessionFailure.rejected(status: 503, code: "storage_unavailable")), "household.loadError")
+    }
+
     func testDuplicateBudgetScopeUsesExistingBudgetExplanation() {
         XCTAssertEqual(HouseholdPlanModel.message(SessionFailure.rejected(status: 422, code: "budget_scope_conflict")), "budget.error.duplicate")
         XCTAssertEqual(HouseholdPlanModel.message(SessionFailure.rejected(status: 422, code: "unrecognized_validation")), "household.reviewError")

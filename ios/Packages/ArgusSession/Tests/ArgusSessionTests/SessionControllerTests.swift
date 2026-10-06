@@ -82,7 +82,7 @@ final class SessionControllerTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(refreshCount, 1)
         await fixture.server.configure(meStatuses: [503])
         do { _ = try await client.profile(); XCTFail("Expected retryable server failure") }
-        catch { XCTAssertEqual(error as? SessionFailure, .unavailable) }
+        catch { XCTAssertEqual(error as? SessionFailure, .rejected(status: 503, code: "unauthorized")) }
         let stillSignedIn = await client.snapshot()
         XCTAssertEqual(stillSignedIn.phase, .authenticated)
     }
@@ -227,10 +227,10 @@ final class SessionControllerTests: XCTestCase, @unchecked Sendable {
         _ = try await fixture.login(client)
         let key = fixture.configuration.storagePrefix + ".session"
         let initial = try XCTUnwrap(fixture.storage.retrieve(key: key))
-        var session = try JSONDecoder().decode(Session.self, from: initial)
+        var session = try StoredSession.decode(initial).session
         let originalRefresh = session.refreshToken
         session.expiresAt = Date().timeIntervalSince1970 - 1
-        try fixture.storage.store(key: key, value: JSONEncoder().encode(session))
+        try fixture.storage.store(key: key, value: JSONEncoder().encode(StoredSession(session: session, signInMethod: .email)))
         let results = try await withThrowingTaskGroup(of: SessionSnapshot.self) { group in
             for _ in 0..<8 { group.addTask { try await client.profile() } }
             return try await group.reduce(into: [SessionSnapshot]()) { $0.append($1) }
@@ -238,7 +238,7 @@ final class SessionControllerTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(results.allSatisfy { $0.phase == .authenticated })
         let count = await fixture.server.count("/token")
         XCTAssertEqual(count, 1)
-        let saved = try JSONDecoder().decode(Session.self, from: XCTUnwrap(fixture.storage.retrieve(key: key)))
+        let saved = try StoredSession.decode(XCTUnwrap(fixture.storage.retrieve(key: key))).session
         XCTAssertFalse(saved.refreshToken == originalRefresh)
     }
 
@@ -335,9 +335,9 @@ final class SessionControllerTests: XCTestCase, @unchecked Sendable {
                 _ = try await fixture.login(client)
                 if triggeredByExpiry {
                     let key = fixture.configuration.storagePrefix + ".session"
-                    var session = try JSONDecoder().decode(Session.self, from: XCTUnwrap(fixture.storage.retrieve(key: key)))
+                    var session = try StoredSession.decode(XCTUnwrap(fixture.storage.retrieve(key: key))).session
                     session.expiresAt = Date().timeIntervalSince1970 - 1
-                    try fixture.storage.store(key: key, value: JSONEncoder().encode(session))
+                    try fixture.storage.store(key: key, value: JSONEncoder().encode(StoredSession(session: session, signInMethod: .email)))
                 }
                 await fixture.server.configure(meStatuses: triggeredByExpiry ? [] : [401], refreshStatus: 400, refreshErrorCode: code)
                 do { _ = try await client.profile(); XCTFail("Rejected refresh must end usable auth") }

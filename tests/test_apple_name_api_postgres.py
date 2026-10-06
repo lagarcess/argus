@@ -56,6 +56,7 @@ def test_signed_auth_name_retry_relaunch_and_explicit_clear(monkeypatch):
                 headers=headers,
             )
             assert saved.status_code == 200
+            assert saved.json()["apple_identity"] == {"subject": subject}
             assert saved.json()["user"]["display_name"] == "María 李"
             assert saved.json()["user"]["preferred_name"] is None
             retry = client.post(
@@ -64,6 +65,7 @@ def test_signed_auth_name_retry_relaunch_and_explicit_clear(monkeypatch):
                 headers=headers,
             )
             assert retry.status_code == 200
+            assert retry.json()["apple_identity"] == {"subject": subject}
             assert retry.json()["user"]["display_name"] == "María 李"
             assert (
                 client.patch(
@@ -77,6 +79,7 @@ def test_signed_auth_name_retry_relaunch_and_explicit_clear(monkeypatch):
                 headers=headers,
             )
             assert retry.status_code == 200
+            assert retry.json()["apple_identity"] == {"subject": subject}
             assert retry.json()["user"]["display_name"] is None
             with TestClient(app, base_url="http://localhost:3000") as restarted:
                 assert (

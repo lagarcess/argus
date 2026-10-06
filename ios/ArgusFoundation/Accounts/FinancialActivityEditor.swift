@@ -360,7 +360,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         if let journal = error as? FinancialWriteJournalError {
             return journal == .pendingConfirmation ? "loop.pending.existing" : "auth.error.storage"
         }
-        guard case SessionFailure.rejected(_, let code) = error else { return "loop.error.connection" }
+        guard case SessionFailure.rejected(let status, let code) = error, status < 500 else { return "loop.error.connection" }
         guard let code else { return "loop.error.validation" }
         switch code {
         case "debt_plan_exists": return "debt.error.exists"

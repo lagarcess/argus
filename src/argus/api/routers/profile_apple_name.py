@@ -9,7 +9,7 @@ from argus.api.account_deletion_runtime import deletion_pool
 from argus.api.apple_sign_in import capture_enabled
 from argus.api.dependencies import current_user, problem, require_account_capability
 from argus.api.guest_access import account_context
-from argus.api.routers.profile import _user_response
+from argus.api.routers import profile
 from argus.api.schemas import User, UserResponse
 from argus.domain.apple_sign_in.credentials import AppleIdentityMissing
 from argus.domain.apple_sign_in.name import (
@@ -54,6 +54,7 @@ def initialize_apple_name(
             detail="The name could not be saved.",
         )
     try:
+        identity = profile._apple_identity(request, user.id)
         row = initialize_apple_display_name(
             deletion_pool(api_state.DATABASE_URL),
             user_id=user.id,
@@ -84,4 +85,4 @@ def initialize_apple_name(
             title="Name Save Unavailable",
             detail="The name could not be saved.",
         ) from None
-    return _user_response(saved, account_context(request))
+    return profile._user_response(saved, account_context(request), identity)

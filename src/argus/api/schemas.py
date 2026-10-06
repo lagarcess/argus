@@ -222,8 +222,13 @@ def guest_safe_user(user: User) -> GuestUser:
     return GuestUser.model_validate(user.model_dump())
 
 
+class AppleIdentity(BaseModel):
+    subject: str = Field(min_length=1, max_length=512, repr=False)
+
+
 class UserResponse(BaseModel):
     user: User | GuestUser
+    apple_identity: AppleIdentity | None = None
     account_kind: Literal["guest", "registered"]
     guest: GuestAccountSummary | None
     capabilities: AccountCapabilities
@@ -233,8 +238,10 @@ class UserResponse(BaseModel):
 
     @model_validator(mode="after")
     def _hide_registered_preferences_from_guests(self) -> UserResponse:
-        if self.account_kind == "guest" and isinstance(self.user, User):
-            self.user = guest_safe_user(self.user)
+        if self.account_kind == "guest":
+            self.apple_identity = None
+            if isinstance(self.user, User):
+                self.user = guest_safe_user(self.user)
         return self
 
 
