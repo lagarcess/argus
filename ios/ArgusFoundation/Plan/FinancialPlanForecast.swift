@@ -3,34 +3,52 @@ import ArgusSession
 
 struct FinancialPlanForecast<Details: View>: View {
     let projection: FinancialPlanProjection
+    var primaryCurrency: String? = nil
     let chooseAccounts: () -> Void
     var canChooseAccounts = true
     var bottomSpace: CGFloat = 90
-    @ViewBuilder let details: () -> Details
+    @ViewBuilder let details: (FinancialForecastCurrency?) -> Details
     @State private var selectedCurrency: String?
     @Environment(\.locale) private var locale
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var currency: FinancialForecastCurrency? {
-        projection.currencies.first { $0.currency == selectedCurrency } ?? projection.currencies.first
+        let code = CurrencyPresentation.selectedCode(available: projection.currencies.map(\.currency),
+            explicit: selectedCurrency, primary: primaryCurrency)
+        return projection.currencies.first { $0.currency == code }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             CuadraoPlanForecastSection(period: spanish ? "Tu previsión" : "Your forecast") {
                 if projection.currencies.count > 1 {
-                    CuadraoChoiceMenu(title: NSLocalizedString("accounts.currency", comment: ""),
-                        selection: Binding(get: { currency?.currency ?? "" }, set: { selectedCurrency = $0 }),
-                        values: projection.currencies.map(\.currency), valueTitle: { $0 })
+                    Menu {
+                        ForEach(projection.currencies) { option in
+                            Button { selectedCurrency = option.currency } label: {
+                                if currency?.currency == option.currency {
+                                    Label(option.currency, systemImage: "checkmark")
+                                } else { Text(option.currency) }
+                            }
+                        }
+                    } label: {
+                        CuadraoChoiceLabel(title: currency?.currency ?? NSLocalizedString("accounts.currency", comment: ""))
+                    }
                         .accessibilityIdentifier("plan.forecast.currency")
                 } else {
-                    CuadraoChoiceLabel(title: NSLocalizedString("context.personal", comment: ""), selectable: false)
+                    CuadraoChoiceLabel(title: currency?.currency ?? NSLocalizedString("context.personal", comment: ""), selectable: false)
                 }
             } content: {
                 if let currency {
                     FinancialPlanForecastCurrency(currency: currency, start: projection.startDate, end: projection.endDate)
                         .id(currency.currency)
+                        .id(projection.selection.accountIds)
+                        .id(projection.selection.timeZone)
+                        .id(currency.accountIds)
                     Text(spanish ? "Según tus saldos y compromisos registrados. No estima gastos sin programar." : "Based on your balances and scheduled items. Unplanned spending is not estimated.")
                         .font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("plan.coverage")
+                } else if !projection.currencies.isEmpty {
+                    Text(spanish ? "Elige una moneda para ver tu previsión." : "Choose a currency to see your forecast.")
+                        .font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("plan.forecast.chooseCurrency")
                 } else {
                     CuadraoPlanColdStart(spanish: spanish,
                         detail: spanish ? "Puedes hacer tu primer plan hoy. Elige las cuentas que quieres incluir para ver lo que viene." : "Make your first plan today. Choose the accounts to include to see what's ahead.") {
@@ -59,13 +77,16 @@ struct FinancialPlanForecast<Details: View>: View {
                                 .font(CuadraoTypography.caption).foregroundStyle(.secondary)
                         }
                     }
-                    details()
+                    details(currency)
                     Text("plan.assumptions").font(CuadraoTypography.caption).foregroundStyle(.secondary)
                 }.padding(.top, 16)
             } label: {
                 Text(spanish ? "¿De dónde sale?" : "What's behind this?").font(.subheadline.weight(.medium))
                     .accessibilityIdentifier("plan.forecast.details")
             }.padding(.top, 8)
+        }
+        .onChange(of: projection.currencies.map(\.currency)) { _, available in
+            if let selectedCurrency, !available.contains(selectedCurrency) { self.selectedCurrency = nil }
         }
     }
     private func amount(_ minor: String, in currency: FinancialForecastCurrency) -> String {
@@ -140,7 +161,7 @@ private struct FinancialPlanForecastCurrency: View {
         }
         .onChange(of: start) { _, _ in selected = nil }
         .onChange(of: end) { _, _ in selected = nil }
-        .onChange(of: currency.points.count) { _, _ in selected = nil }
+        .onChange(of: currency.points.map { $0.date + ":" + ($0.balanceMinor ?? "unknown") }) { _, _ in selected = nil }
     }
     private func amount(_ minor: String) -> String {
         PlanPresentation.money(minor, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale)
