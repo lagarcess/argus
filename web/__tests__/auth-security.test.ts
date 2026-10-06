@@ -788,7 +788,7 @@ describe("recovery request safety", () => {
           headers: {
             "Content-Type": "application/json",
             Origin: "https://app.argus.example",
-            "X-Forwarded-For": "not-an-ip-address",
+            "CF-Connecting-IP": "not-an-ip-address",
           },
           body: JSON.stringify({ email: "person@example.com" }),
         }),
@@ -871,7 +871,7 @@ describe("recovery request safety", () => {
         headers: {
           "Content-Type": "application/json",
           Origin: "https://app.argus.example",
-          "X-Forwarded-For": address,
+          "CF-Connecting-IP": address,
         },
         body: JSON.stringify({
           email,
@@ -907,7 +907,7 @@ describe("recovery request safety", () => {
         headers: {
           "Content-Type": "application/json",
           Origin: "https://app.argus.example",
-          "X-Forwarded-For": address,
+          "CF-Connecting-IP": address,
         },
         body: JSON.stringify({ email, captcha_token: "captcha-proof" }),
       });

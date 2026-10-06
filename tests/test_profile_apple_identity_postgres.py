@@ -101,26 +101,27 @@ def test_me_distinguishes_absence_from_unverifiable_identity(owners, mutation):
 
 
 def test_real_local_auth_session_only_exposes_its_owner(monkeypatch):
-    if os.getenv("ARGUS_APPLE_LOCAL_AUTH_PROOF") != "1":
-        pytest.skip("explicit local Auth proof not enabled")
+    if not os.getenv("ARGUS_LOCAL_SUPABASE_URL"):
+        pytest.skip("isolated local Supabase Auth not configured")
     from urllib.parse import urlsplit
 
     import httpx
     from argus.api.main import app
-    from argus.domain.supabase_gateway import SupabaseGateway
 
-    origin = os.environ["SUPABASE_URL"]
+    from tests.local_supabase_support import local_supabase_gateway
+
+    origin = os.environ["ARGUS_LOCAL_SUPABASE_URL"]
     assert urlsplit(origin).hostname in {"127.0.0.1", "localhost"}
     headers = {
-        "apikey": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
-        "Authorization": "Bearer " + os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+        "apikey": os.environ["ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY"],
+        "Authorization": "Bearer " + os.environ["ARGUS_LOCAL_SUPABASE_SERVICE_ROLE_KEY"],
     }
     ids, tokens, emails = [], [], []
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
     monkeypatch.setattr(api_state, "DATABASE_URL", DSN)
-    monkeypatch.setattr(api_state, "supabase_gateway", SupabaseGateway.from_env())
+    monkeypatch.setattr(api_state, "supabase_gateway", local_supabase_gateway())
     try:
         for index in range(2):
             email = f"apple-session-proof-{uuid4()}@example.test"
@@ -137,7 +138,7 @@ def test_real_local_auth_session_only_exposes_its_owner(monkeypatch):
             emails.append(email)
             login = httpx.post(
                 origin + "/auth/v1/token?grant_type=password",
-                headers={"apikey": os.environ["SUPABASE_ANON_KEY"]},
+                headers={"apikey": os.environ["ARGUS_LOCAL_SUPABASE_ANON_KEY"]},
                 json={"email": email, "password": password},
                 timeout=5,
             )
