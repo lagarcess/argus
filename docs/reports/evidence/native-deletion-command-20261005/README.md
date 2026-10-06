@@ -71,3 +71,40 @@ The settled command contract is captured in the captain's native deletion
 mapping. Backend/API, server policy, migrations, obligation semantics, consent,
 space policy, flags and configuration are unchanged by this candidate. No paid,
 live, physical-phone, provider, database, service or hosted claim follows from it.
+
+## Apple-name dependency reconciliation
+
+Normal merge `e660fe9990b4a77779ba503b5cc3e3a9517dea70` reconciles current Name
+head `a6efe6e3360f1c4e58c97807b91547de527b0b04` into the published deletion
+source `e1a4fb2d055b6a6d06c0f360058bfb5e3878c6b2`. The original immutable
+Name base remains `07f768f28be6f900b1a3d2e7b242bcdbad25d93a`. No rebase,
+reset or stash was used.
+
+The dependency delta has two affected files. Commit
+`060a03f883f08fccdb613ee65343a8296a4793d7` renames the Apple XCTest fixture
+property to `seedName`, avoiding the inherited XCTest property. Commit
+`a6efe6e3360f1c4e58c97807b91547de527b0b04` moves Apple-name removal after
+saving durable pending revocation proof in SessionController.
+
+Semantic overlap exists in the shared session actor's retirement path, even
+though Git reported no conflict. Source audit confirms that ordinary retirement
+keeps pending proof before name cleanup can fail. Deletion uncertainty still
+blocks that ordinary path; accepted 202 and confirmed 200 use the deletion
+journal's separate fenced local retirement. The merge does not change the
+CredentialVault deletion journal, deletion response parser, deletion test source,
+completion receipts, minimal app case handling or localized strings. Independent
+read-only affected-merge review at `e660fe999` found no concrete blocker.
+
+The production delta against the current Name head remains this bounded deletion
+slice: typed request/outcome parsing, journaled session command, protected-request
+quarantine, per-user pending acknowledgements and completion cleanup receipts,
+plus exhaustive app case handling and two EN/ES status strings. The dependency
+merge adds no server, migration, flag, configuration or presentation expansion.
+
+Diff and Python modularity checks pass on the merged tree. This preserves only
+source/static review evidence. There was no deletion execution evidence to
+retain or invalidate: package and app compilation/tests must run at the final
+queued candidate head, including deletion tests and affected Apple-name/session
+cases. Mac and database leases remain with the current verifier; no Swift, Mac,
+Postgres, provider, hosted, activation or root environment work ran here. Root
+still owns PR creation, landing order and all merge decisions.
