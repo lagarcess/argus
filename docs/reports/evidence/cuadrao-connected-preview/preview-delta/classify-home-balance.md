@@ -1,8 +1,8 @@
 # Hunk classification: Home and Balance files
 
 Diff base: 5753b5d7cb3e4a13b4bac58a87fa32127b6fcf37 (approved Preview). Candidate: cuadrao-delta HEAD.
-Checkpoint tree read at `/Users/garces/Documents/projects/repos/argus/.claude/worktrees/cuadrao-preview-ref/ios/ArgusFoundation/`.
-Candidate tree read at `/Users/garces/Documents/projects/repos/argus/.claude/worktrees/cuadrao-delta/ios/ArgusFoundation/`.
+Checkpoint tree read at the checkpoint worktree.
+Candidate tree read at the candidate worktree.
 Connected caller paths below are relative to `ios/ArgusFoundation/`.
 
 Reading conventions:

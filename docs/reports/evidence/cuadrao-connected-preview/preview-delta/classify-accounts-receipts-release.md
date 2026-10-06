@@ -1,7 +1,7 @@
 # Hunk classification: accounts, receipts, release identity
 
-Checkpoint: 5753b5d7 (`/Users/garces/Documents/projects/repos/argus/.claude/worktrees/cuadrao-preview-ref`).
-Candidate: HEAD of `/Users/garces/Documents/projects/repos/argus/.claude/worktrees/cuadrao-delta`.
+Checkpoint: 5753b5d7 (checkpoint worktree).
+Candidate: HEAD of the candidate worktree.
 Ref line numbers below are checkpoint lines; "cand" lines are candidate lines.
 Commits that produced these hunks (from `git log` on the files): 46e2f7eca reuse preview account and movement presentation; 9746bb602 bind connected Home to approved Cuadrao views; 3c5f40ac2 review before archiving an account and offer Undo; 5417e9186 use the approved Cuadrao sheets to create and rename accounts; 25daad2c6 harden the archive toast and account sheet dismissal; b12813b39 restore receipt drafts behind a posting gate; f02ad86c9 hide unavailable receipt location action; bfc9b0176 remove one owner's connected drafts on confirmed deletion; d18070101 present the session owner's deletion results without inferring deletion.
 
