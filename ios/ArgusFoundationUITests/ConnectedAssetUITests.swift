@@ -57,10 +57,16 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 15))
         tapVisible(app.buttons["accounts.archive"])
         let spanish = ProcessInfo.processInfo.environment["ARGUS_TEST_LANGUAGE"] == "es-419"
-        let restore = app.buttons[spanish ? "Restaurar cuenta" : "Restore account"]
-        XCTAssertTrue(restore.waitForExistence(timeout: 10))
-        capture("asset-archived-record-preserved")
-        tapVisible(restore)
+        if app.confirmAccountArchive() {
+            XCTAssertTrue(app.buttons["accounts.row." + house.id].waitForNonExistence(timeout: 10))
+            capture("asset-archived-record-preserved")
+            tapVisible(app.archivedUndo)
+            tapVisible(app.buttons["accounts.row." + house.id])
+            XCTAssertTrue(app.scrollViews["screen.accounts"].buttons["assets.update"].waitForExistence(timeout: 15))
+        } else {
+            capture("asset-archived-record-preserved")
+            tapVisible(app.buttons[spanish ? "Restaurar cuenta" : "Restore account"])
+        }
         XCTAssertTrue(app.buttons[spanish ? "Archivar cuenta" : "Archive account"].waitForExistence(timeout: 10))
         assertAssetContribution("DOP 2,250,000.00")
         XCTAssertTrue(app.buttons["assets.debt.open"].exists)
@@ -143,7 +149,10 @@ extension FinancialLoopUITests {
         fillMoneyField("accounts.nickname", with: name)
         if let amount { fillMoneyField("accounts.amount", with: amount) }
         dismissMoneyKeyboard()
-        if half { tapVisible(app.buttons["assets.share.change"]); tapVisible(app.buttons["assets.share.half"]) }
+        if half {
+            let spanish = ProcessInfo.processInfo.environment["ARGUS_TEST_LANGUAGE"] == "es-419"
+            tapVisible(app.buttons["assets.share.change"]); tapVisible(app.buttons[spanish ? "La mitad · 50%" : "Half · 50%"])
+        }
         tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.scrollViews["screen.accounts"].buttons["assets.update"].waitForExistence(timeout: 15))
         scrollMoneyTop(); tapVisible(app.accountBack)

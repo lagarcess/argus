@@ -22,10 +22,11 @@ final class FinancialLoopUITests: XCTestCase {
         let originalID = original.identifier
         tapVisible(original)
         tapVisible(app.buttons["accounts.archive"])
-        XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
-        for _ in 0..<5 { if app.accountBack.isHittable { break }; app.swipeDown() }
-        app.accountBack.tap()
-        XCTAssertFalse(app.buttons[originalID].exists)
+        if !app.confirmAccountArchive() {
+            for _ in 0..<5 { if app.accountBack.isHittable { break }; app.swipeDown() }
+            app.accountBack.tap()
+        }
+        XCTAssertTrue(app.buttons[originalID].waitForNonExistence(timeout: 10))
         capture("archive-active-list")
         assertHome(baseline + 125)
         app.openAccountsList()

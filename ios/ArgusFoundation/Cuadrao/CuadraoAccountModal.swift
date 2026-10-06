@@ -15,7 +15,7 @@ struct CuadraoAccountModal: View {
     var body: some View {
         switch selection {
         case .archive(let id):
-            CuadraoArchiveAccountReview(data: data, id: id, spanish: spanish) { archived(id) }
+            CuadraoArchiveAccountReview(spanish: spanish) { data.archive(id, true); archived(id) }
         case .manageAccounts(let editing):
             CuadraoAccountsCollection(data: data, spanish: spanish, editing: editing)
         case .archived:

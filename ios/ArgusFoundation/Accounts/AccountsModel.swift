@@ -59,6 +59,7 @@ final class AccountsModel: ObservableObject {
     func back() { guard !busy else { return }; selectedID = nil; errorKey = nil }
     func create() { begin(AccountDraft()) }
     func edit(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .metadata)) }
+    func rename(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .rename)) }
     func opening(_ account: FinancialAccount) { begin(AccountDraft(account: account, mode: .opening)) }
     func discard() { clearOpening(); draft = nil; pendingCreate = nil; latest = nil; needsReview = false; errorKey = nil }
     func editLatest() {
@@ -85,7 +86,7 @@ final class AccountsModel: ObservableObject {
                 }
                 guard let confirm = self.confirmCreate else { throw FinancialWriteJournalError.storageUnavailable }
                 saved = try await confirm(self.pendingCreate!)
-            case .metadata:
+            case .metadata, .rename:
                 guard let base = draft.base else { return }
                 saved = try await self.controller.updateFinancialAccount(id: base.id,
                     request: EditFinancialAccountRequest(expectedVersion: base.version, nickname: draft.nickname,
@@ -222,7 +223,8 @@ final class AccountsModel: ObservableObject {
 }
 
 struct AccountDraft: Identifiable {
-    enum Mode { case create, metadata, opening }
+    /// Rename edits only the nickname; metadata also edits type, currency and ownership.
+    enum Mode { case create, metadata, rename, opening }
     let id = UUID()
     var mode: Mode = .create
     var base: FinancialAccount?

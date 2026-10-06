@@ -18,6 +18,7 @@ struct ConnectedCuadraoHome: View {
     @State private var sheet: HomeSheet?
     @State private var choosingAccount = false
     @State private var moreAccount: FinancialAccount?
+    @State private var archivedID: UUID?
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
     private var activeAccounts: [FinancialAccount] { accounts.accounts.filter { !$0.archived } }
@@ -25,11 +26,13 @@ struct ConnectedCuadraoHome: View {
 
     private enum HomeSheet: Identifiable {
         case customize, archived, options
+        case archive(FinancialAccount)
         var id: String {
             switch self {
             case .customize: "customize"
             case .archived: "archived"
             case .options: "options"
+            case .archive(let account): "archive." + account.id.uuidString
             }
         }
     }
@@ -127,10 +130,37 @@ struct ConnectedCuadraoHome: View {
             if !account.isOptionalAsset {
                 Button(NSLocalizedString("loop.check.title", comment: "")) { loop.check(account) }.accessibilityIdentifier("accounts.more.check")
             }
-            Button(spanish ? "Archivar" : "Archive", role: .destructive) { Task { await accounts.archive(account) } }
+            Button(spanish ? "Archivar" : "Archive", role: .destructive) { sheet = .archive(account) }
                 .accessibilityIdentifier("accounts.more.archive")
         }
         .sheet(item: $sheet) { item in modal(item) }
+        .overlay(alignment: .bottom) {
+            if let archivedID, homePath.isEmpty, accounts.accounts.first(where: { $0.id == archivedID })?.archived == true {
+                CuadraoArchivedAccountToast(spanish: spanish, undo: { restore(archivedID) }, close: { self.archivedID = nil })
+            }
+        }
+        .onChange(of: accounts.identity?.revision) { _, _ in archivedID = nil }
+        .onChange(of: householdDestination) { _, _ in archivedID = nil }
+    }
+
+    /// Archive is one canonical write; the toast appears only once the server returns the account archived.
+    private func archive(_ chosen: FinancialAccount) {
+        archivedID = nil
+        let account = accounts.accounts.first(where: { $0.id == chosen.id }) ?? chosen
+        Task {
+            await accounts.archive(account)
+            guard accounts.accounts.first(where: { $0.id == account.id })?.archived == true else { return }
+            homePath = []
+            archivedID = account.id
+        }
+    }
+
+    private func restore(_ id: UUID) {
+        guard let account = accounts.accounts.first(where: { $0.id == id }), account.archived else { archivedID = nil; return }
+        Task {
+            await accounts.archive(account)
+            if accounts.accounts.first(where: { $0.id == id })?.archived == false, archivedID == id { archivedID = nil }
+        }
     }
 
     /// Activity routes never belong to the accounts selection, so selection changes leave them alone.
@@ -161,7 +191,8 @@ struct ConnectedCuadraoHome: View {
         if let account = accounts.accounts.first(where: { $0.id == id }) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    AccountDetailView(account: account, model: accounts, loop: loop, nativePlanNavigation: true, search: auth.financialSearch)
+                    AccountDetailView(account: account, model: accounts, loop: loop, nativePlanNavigation: true, search: auth.financialSearch,
+                        archive: { archive($0) })
                 }.padding(24)
             }
             .accessibilityIdentifier("screen.accounts")
@@ -246,11 +277,9 @@ struct ConnectedCuadraoHome: View {
                                 }
                             }
                             .contextMenu {
-                                Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.edit(account) }
+                                Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.rename(account) }
                                 Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
-                                Button(spanish ? "Archivar" : "Archive", role: .destructive) {
-                                    Task { await accounts.archive(account) }
-                                }
+                                Button(spanish ? "Archivar" : "Archive", role: .destructive) { sheet = .archive(account) }
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityAddTraits(.isButton)
@@ -273,7 +302,7 @@ struct ConnectedCuadraoHome: View {
         case .leading:
             return [.init(id: "accounts.swipe.record", title: spanish ? "Añadir movimiento" : "Add movement", symbol: "plus", tint: WelcomePalette.pine) { loop.record(account) }]
         case .trailing:
-            return [.init(id: "accounts.swipe.edit", title: spanish ? "Editar" : "Edit", symbol: "pencil", tint: .blue) { accounts.edit(account) },
+            return [.init(id: "accounts.swipe.edit", title: spanish ? "Editar" : "Edit", symbol: "pencil", tint: .blue) { accounts.rename(account) },
                     .init(id: "accounts.swipe.more", title: spanish ? "Más" : "More", symbol: "ellipsis", tint: .gray) { moreAccount = account }]
         }
     }
@@ -312,16 +341,13 @@ struct ConnectedCuadraoHome: View {
                     .font(CuadraoTypography.section)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button {
+                CuadraoSectionAddButton(title: spanish ? "Añadir movimiento" : "Add activity") {
                     if activeAccounts.count == 1, let account = activeAccounts.first {
                         loop.record(account)
                     } else {
                         choosingAccount = true
                     }
-                } label: {
-                    Image(systemName: "plus").frame(width: 44, height: 44)
                 }
-                .accessibilityLabel(spanish ? "Añadir movimiento" : "Add activity")
                 .disabled(activeAccounts.isEmpty || loop.pendingConfirmation != nil)
                 .accessibilityIdentifier("home.record")
             }
@@ -349,6 +375,8 @@ struct ConnectedCuadraoHome: View {
             ConnectedArchivedAccounts(accounts: accounts, spanish: spanish, showAll: true)
         case .archived:
             ConnectedArchivedAccounts(accounts: accounts, spanish: spanish)
+        case .archive(let account):
+            CuadraoArchiveAccountReview(spanish: spanish) { archive(account) }
         }
     }
 

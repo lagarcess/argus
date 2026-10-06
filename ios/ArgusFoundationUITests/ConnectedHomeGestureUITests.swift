@@ -84,6 +84,7 @@ extension FinancialLoopUITests {
             row.press(forDuration: 1.0)
             tapVisible(app.buttons["Archive"])
         }
+        XCTAssertTrue(app.confirmAccountArchive(), "Home offers Undo after archiving")
         XCTAssertTrue(row.waitForNonExistence(timeout: 10))
         capture("account-archived-from-more")
         openArchivedAccounts()

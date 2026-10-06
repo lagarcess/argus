@@ -35,6 +35,8 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     canvas = root / "ios/ArgusFoundation/Cuadrao"
     kinds = (canvas / "CuadraoAccountsPreview.swift").read_text()
     (source / "CanvasAccountKind.swift").write_text("import Foundation\n" + kinds[kinds.index("enum CanvasAccountKind:"):kinds.index("struct CanvasAccount:")])
+    entry = (canvas / "CuadraoFirstAccountSheet.swift").read_text()
+    (source / "CanvasAccountEntry.swift").write_text("import Foundation\n" + entry[entry.index("struct CanvasAccountEntry:"):entry.index("struct CanvasAccountEntryIDs {")])
     values = (canvas / "CanvasAccountPresentation.swift").read_text()
     declarations = [("struct CanvasAccountRowValue {", "struct CanvasAccountRowContent:"),
                     ("struct CanvasAccountDetailValue {", "struct CanvasAccountDetailHeader:")]

@@ -341,7 +341,7 @@ struct FinancialDomainPresenter: View {
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
             .sheet(item: $loop.assetEditor, onDismiss: refreshSearch) { editor in FinancialAssetForm(model: editor, accounts: accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
-            .sheet(item: $accounts.draft, onDismiss: refreshSearch) { _ in AccountForm(model: accounts).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
+            .sheet(item: $accounts.draft, onDismiss: refreshSearch) { draft in ConnectedAccountSheet(model: accounts, mode: draft.mode) }
             .sheet(item: $plan.draft, onDismiss: refreshSearch) { draft in FinancialExpectationForm(model: plan, draft: draft, loop: loop).tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink) }
             // One presenter so Home Upcoming and Plan open the same occurrence sheet.
             .sheet(item: $plan.selectedOccurrence, onDismiss: { plan.occurrenceDismissed(); refreshSearch() }) { occurrence in

@@ -8,6 +8,8 @@ struct CuadraoAmountField: View {
     let spanish: Bool
     var allowNegative = false
     var currencySelectable = true
+    var identifier = "cuadrao-amount"
+    var currencyIdentifier = "account-edit-currency"
     @State private var choosingCurrency = false
 
     var body: some View {
@@ -17,13 +19,13 @@ struct CuadraoAmountField: View {
                     Button { choosingCurrency = true } label: { CuadraoChoiceLabel(title: currency) }
                         .buttonStyle(.plain)
                         .accessibilityLabel(spanish ? "Moneda, \(currency)" : "Currency, \(currency)")
-                        .accessibilityIdentifier("account-edit-currency")
+                        .accessibilityIdentifier(currencyIdentifier)
                 } else {
                     CuadraoChoiceLabel(title: currency, selectable: false)
                         .accessibilityLabel(spanish ? "Moneda fija: \(currency)" : "Fixed currency: \(currency)")
                 }
                 CanvasDecimalInput(raw: $raw, error: $error, currency: currency,
-                    spanish: spanish, allowNegative: allowNegative)
+                    spanish: spanish, allowNegative: allowNegative, identifier: identifier)
                     .frame(minHeight: 60)
             }
             .padding(.horizontal, 18).padding(.vertical, 4)

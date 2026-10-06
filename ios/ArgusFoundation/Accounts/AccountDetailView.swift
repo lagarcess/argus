@@ -8,7 +8,10 @@ struct AccountDetailView: View {
     var debtOrigin: FinancialDebtNavigation.Origin = .account
     var nativePlanNavigation = false
     var search: FinancialSearchModel? = nil
+    /// Home pops to the list and offers Undo; without a host the write runs here and the detail stays open.
+    var archive: ((FinancialAccount) -> Void)? = nil
     @Environment(\.locale) private var locale
+    @State private var reviewingArchive = false
 
     private var current: FinancialAccount {
         model.accounts.first(where: { $0.id == account.id }) ?? account
@@ -50,6 +53,12 @@ struct AccountDetailView: View {
         }
         .financialAccountDebtDestination(loop: loop, search: search, accountID: account.id, origin: debtOrigin, enabled: nativePlanNavigation)
         .foregroundStyle(WelcomePalette.ink)
+        .sheet(isPresented: $reviewingArchive) {
+            CuadraoArchiveAccountReview(spanish: spanish) {
+                let account = current
+                if let archive { archive(account) } else { Task { await model.archive(account) } }
+            }
+        }
         .toolbar {
             if #available(iOS 26.0, *) {
                 ToolbarItem(placement: .topBarTrailing) { moreButton }.sharedBackgroundVisibility(.hidden)
@@ -57,6 +66,10 @@ struct AccountDetailView: View {
                 ToolbarItem(placement: .topBarTrailing) { moreButton }
             }
         }
+    }
+
+    private func archiveOrRestore() {
+        if current.archived { Task { await model.archive(current) } } else { reviewingArchive = true }
     }
 
     private var accountActions: some View {
@@ -70,7 +83,7 @@ struct AccountDetailView: View {
             }
             CanvasActionRow(title: NSLocalizedString(current.archived ? "accounts.restore" : "accounts.archive", comment: ""),
                             symbol: current.archived ? "arrow.uturn.backward" : "archivebox") {
-                Task { await model.archive(current) }
+                archiveOrRestore()
             }.disabled(model.busy).accessibilityIdentifier("accounts.archive")
         }
     }
@@ -84,7 +97,7 @@ struct AccountDetailView: View {
                 Button(current.opening == nil ? "accounts.opening.add" : "accounts.opening.correct", systemImage: "clock.arrow.circlepath") { model.opening(current) }
             }
             Button(current.archived ? "accounts.restore" : "accounts.archive", systemImage: current.archived ? "arrow.uturn.backward" : "archivebox") {
-                Task { await model.archive(current) }
+                archiveOrRestore()
             }.disabled(model.busy)
         } label: {
             Image(systemName: "ellipsis").frame(width: 44, height: 44).contentShape(Rectangle())

@@ -354,7 +354,10 @@ extension FinancialLoopUITests {
         fillMoneyField("accounts.nickname", with: name)
         if currency != "DOP" {
             tapVisible(app.buttons["accounts.currency"])
-            app.buttons[currency].tap()
+            // The currency list shows each code with its name.
+            let option = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", currency)).firstMatch
+            XCTAssertTrue(option.waitForExistence(timeout: 5))
+            option.tap()
         }
         if let amount {
             fillMoneyField("accounts.amount", with: amount)
