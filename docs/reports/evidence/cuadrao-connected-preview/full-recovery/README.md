@@ -367,3 +367,19 @@ fixture alone cannot establish historical chart completion. The trust/foundation
 lane has been asked to reconcile ownership and the available history contract.
 [Issue #824](https://github.com/lagarcess/argus/issues/824) remains open and
 explicitly owns Home history, insights and coverage from canonical records.
+
+## Populated phone test records, October 5 evening
+
+The retained synthetic phone account now includes six new demo movements, three
+expectations with four unpaid occurrences, one food budget and one savings goal.
+The goal has a supported DOP 15,000 allocation. The existing accounts, opening
+records, activities, Plan selection and fulfilled Internet payment are unchanged.
+All additions use the existing authenticated API commands. Money writes use their
+reviewed previews. No payment is automatically fulfilled.
+
+The setup ran twice. Its private request journal contains 18 unique preview or
+write attempts, with no duplicate attempt. Fresh API reads verify the resulting
+records and recorded-only coverage. [The sanitized readback](phone-demo-readback.json)
+records the checks. Credentials and the private journal remain outside the repo.
+This adds local test data without changing Check 3433, Preview 3427 or production.
+Physical rendering and historical chart acceptance remain open.
