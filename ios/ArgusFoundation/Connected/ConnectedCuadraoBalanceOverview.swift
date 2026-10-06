@@ -91,7 +91,7 @@ private struct ConnectedBalanceReading: View {
                 if expanded, !accounts.isEmpty {
                     let period = breakdown(points: points, accounts: accounts)
                     if period.closing != nil {
-                        CuadraoBalanceBreakdown(period: period, currency: summary.currency, spanish: spanish, linksToAccounts: false)
+                        CuadraoBalanceBreakdown(period: period, currency: summary.currency, spanish: spanish, linksToAccounts: false, missingCoverage: true)
                     }
                 }
             case .unknown, nil:
