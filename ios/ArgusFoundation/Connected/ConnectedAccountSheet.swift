@@ -67,7 +67,7 @@ private struct ConnectedAccountRenameSheet: View {
                 Task { await model.save() }
             }
         }
-        .interactiveDismissDisabled(model.busy)
+        .interactiveDismissDisabled()
         .onAppear {
             guard let base = model.draft?.base else { return }
             name = ConnectedAccountPresentation.title(base, spanish: spanish)

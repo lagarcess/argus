@@ -194,8 +194,8 @@ struct CuadraoAccountEntryForm: View {
                     HStack(spacing: 12) {
                         CanvasAccountIcon(kind: .asset, size: 21)
                         Text(spanish ? "Otros activos" : "Other assets").foregroundStyle(.primary)
-                    }.padding(.vertical, 10)
-                }.accessibilityIdentifier(ids.otherAssets)
+                    }.padding(.vertical, 10).accessibilityIdentifier(ids.otherAssets)
+                }
             }
         }
     }

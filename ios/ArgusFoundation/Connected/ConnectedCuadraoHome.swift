@@ -135,7 +135,7 @@ struct ConnectedCuadraoHome: View {
         }
         .sheet(item: $sheet) { item in modal(item) }
         .overlay(alignment: .bottom) {
-            if let archivedID, homePath.isEmpty {
+            if let archivedID, homePath.isEmpty, accounts.accounts.first(where: { $0.id == archivedID })?.archived == true {
                 CuadraoArchivedAccountToast(spanish: spanish, undo: { restore(archivedID) }, close: { self.archivedID = nil })
             }
         }
@@ -144,8 +144,9 @@ struct ConnectedCuadraoHome: View {
     }
 
     /// Archive is one canonical write; the toast appears only once the server returns the account archived.
-    private func archive(_ account: FinancialAccount) {
+    private func archive(_ chosen: FinancialAccount) {
         archivedID = nil
+        let account = accounts.accounts.first(where: { $0.id == chosen.id }) ?? chosen
         Task {
             await accounts.archive(account)
             guard accounts.accounts.first(where: { $0.id == account.id })?.archived == true else { return }
@@ -155,9 +156,11 @@ struct ConnectedCuadraoHome: View {
     }
 
     private func restore(_ id: UUID) {
-        archivedID = nil
-        guard let account = accounts.accounts.first(where: { $0.id == id }), account.archived else { return }
-        Task { await accounts.archive(account) }
+        guard let account = accounts.accounts.first(where: { $0.id == id }), account.archived else { archivedID = nil; return }
+        Task {
+            await accounts.archive(account)
+            if accounts.accounts.first(where: { $0.id == id })?.archived == false, archivedID == id { archivedID = nil }
+        }
     }
 
     /// Activity routes never belong to the accounts selection, so selection changes leave them alone.
