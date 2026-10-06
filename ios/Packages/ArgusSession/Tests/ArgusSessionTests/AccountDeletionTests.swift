@@ -412,7 +412,11 @@ final class AccountDeletionTests: XCTestCase {
                 _ = try await controller.signOut()
                 receipt = .init(userID: userID, initiatingRevision: identity.revision, commandID: UUID())
             } else {
-                await fixture.server.configure(status, status == 202 ? ["status": "in_progress", "pending": []] : ["code": "account_deletion_incomplete"])
+                if status == 202 {
+                    await fixture.server.configure(status, ["status": "in_progress", "pending": []])
+                } else {
+                    await fixture.server.configure(status, ["code": "account_deletion_incomplete"])
+                }
                 _ = try await controller.deleteAccount(expectedIdentity: identity)
                 let journal = try XCTUnwrap(fixture.journal())
                 receipt = .init(userID: journal.userID, initiatingRevision: journal.initiatingRevision, commandID: journal.id)
