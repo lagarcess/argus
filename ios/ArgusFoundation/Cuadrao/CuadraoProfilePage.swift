@@ -89,7 +89,7 @@ struct CuadraoProfilePage: View {
         case .usage:
             Section {
                 ContentUnavailableView(spanish ? "Tu uso, aquí" : "Your usage, here", systemImage: "chart.bar",
-                    description: Text(spanish ? "Esta vista previa no consulta tu disponibilidad ni cuándo se renueva." : "This preview does not load your allowance or reset time."))
+                    description: Text(spanish ? "Verás tu disponibilidad y cuándo se renueva al conectar tu cuenta." : "Your allowance and reset time will appear when your account is connected."))
             }
         case .help: help
         case .feedback: EmptyView()
@@ -209,7 +209,7 @@ struct CuadraoProfilePage: View {
                 previewAction(spanish ? "Cerrar otras sesiones" : "Sign out other sessions")
                 previewAction(spanish ? "Cerrar todas las sesiones" : "Sign out all sessions")
             } header: { Text(spanish ? "Sesiones" : "Sessions") }
-              footer: { Text(spanish ? "Estos ejemplos no consultan ni cierran sesiones reales." : "These examples do not load or sign out real sessions.") }
+              footer: { Text(spanish ? "Las sesiones reales se mostrarán al conectar tu cuenta." : "Real sessions will appear when your account is connected.") }
         }
     }
 
