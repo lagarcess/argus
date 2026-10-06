@@ -43,12 +43,18 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     connected = (root / "ios/ArgusFoundation/Connected/ConnectedAccountPresentation.swift").read_text()
     (source / "ConnectedAccountPresentation.swift").write_text("import Foundation\nimport ArgusSession\n@MainActor\n" + connected[connected.index("enum ConnectedAccountPresentation {"):])
     shutil.copy(root / "ios/ArgusFoundation/Accounts/FinancialActivityPresentation.swift", source / "FinancialActivityPresentation.swift")
+    history = (canvas / "CuadraoBalanceHistory.swift").read_text()
+    (source / "CanvasBalancePoint.swift").write_text("import Foundation\n" + history[history.index("struct CanvasBalancePoint:"):history.index("enum CanvasBalanceHistory {")])
+    shutil.copy(root / "ios/ArgusFoundation/Connected/ConnectedBalanceHistory.swift", source / "ConnectedBalanceHistory.swift")
+    shutil.copy(root / "ios/ArgusFoundation/Plan/ConnectedForecastSeries.swift", source / "ConnectedForecastSeries.swift")
     shutil.copy(root / "ios/Packages/ArgusSession/Tests/ArgusSessionTests/TestSupport.swift", tests / "TestSupport.swift")
     shutil.copy(Path(__file__).with_name("FinancialModelTests.swift"), tests / "FinancialModelTests.swift")
     shutil.copy(Path(__file__).with_name("FinancialScrollRestorationTests.swift"), tests / "FinancialScrollRestorationTests.swift")
     shutil.copy(Path(__file__).with_name("ConnectedDetailPresentationTests.swift"), tests / "ConnectedDetailPresentationTests.swift")
     shutil.copy(Path(__file__).with_name("FinancialObservationReadTests.swift"), tests / "FinancialObservationReadTests.swift")
     shutil.copy(Path(__file__).with_name("AccountDeletionModelTests.swift"), tests / "AccountDeletionModelTests.swift")
+    shutil.copy(Path(__file__).with_name("ConnectedBalanceHistoryTests.swift"), tests / "ConnectedBalanceHistoryTests.swift")
+    shutil.copy(Path(__file__).with_name("ConnectedForecastSeriesTests.swift"), tests / "ConnectedForecastSeriesTests.swift")
     (package / "Package.swift").write_text('''// swift-tools-version: 6.0
 import PackageDescription
 let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], dependencies: [

@@ -215,7 +215,7 @@ struct ConnectedCuadraoHome: View {
     }
 
     private func overview(_ home: FinancialHome) -> some View {
-        ConnectedCuadraoBalanceOverview(home: home, spanish: spanish)
+        ConnectedCuadraoBalanceOverview(home: home, spanish: spanish, loop: loop, accounts: accounts.accounts)
     }
 
     private var accountsSection: some View {

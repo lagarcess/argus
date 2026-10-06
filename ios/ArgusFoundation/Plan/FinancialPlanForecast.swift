@@ -119,9 +119,11 @@ private struct FinancialPlanForecastCurrency: View {
     let end: String
     @State private var selected: Int?
     @Environment(\.locale) private var locale
-    private var selectedPoint: FinancialForecastCurrency.Point? {
-        guard let selected, currency.points.indices.contains(selected) else { return nil }
-        return currency.points[selected]
+    private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
+    private var series: ConnectedForecastSeries { .reading(currency, end: end) }
+    private var selectedPoint: ConnectedForecastSeries.Point? {
+        guard let selected, case .series(let points, _) = series, points.indices.contains(selected) else { return nil }
+        return points[selected]
     }
     private var displayedMinor: String? {
         if let selectedPoint { return selectedPoint.balanceMinor }
@@ -145,8 +147,12 @@ private struct FinancialPlanForecastCurrency: View {
                 Text("\(currency.unknownAccountIds.count) · " + NSLocalizedString("accounts.unknown", comment: ""))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
-            if currency.unknownAccountIds.isEmpty, currency.points.allSatisfy({ $0.balanceMinor != nil }), !currency.points.isEmpty {
-                FinancialForecastChart(currency: currency, start: start, end: end, selected: $selected)
+            if case .series(let points, let scheduled) = series {
+                FinancialForecastChart(currency: currency, points: points, start: start, end: end, selected: $selected)
+                if !scheduled {
+                    Text(spanish ? "Sin pagos ni ingresos programados en este período." : "No scheduled bills or income in this period.")
+                        .font(CuadraoTypography.caption).foregroundStyle(.secondary).accessibilityIdentifier("plan.forecast.flat")
+                }
             } else {
                 Text(PlanPresentation.dateLabel(start, locale: locale) + " · " + PlanPresentation.dateLabel(end, locale: locale))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
@@ -170,18 +176,19 @@ private struct FinancialPlanForecastCurrency: View {
 
 struct FinancialForecastChart: View {
     let currency: FinancialForecastCurrency
+    let points: [ConnectedForecastSeries.Point]
     let start: String
     let end: String
     @Binding var selected: Int?
     @Environment(\.locale) private var locale
-    private var points: [CuadraoPlanChartPoint] {
-        currency.points.enumerated().compactMap { index, point in
-            guard let minor = point.balanceMinor, let value = Double(minor) else { return nil }
+    private var marks: [CuadraoPlanChartPoint] {
+        points.enumerated().compactMap { index, point in
+            guard let value = Double(point.balanceMinor) else { return nil }
             return .init(id: index, position: PlanPresentation.date(point.date).timeIntervalSince1970, balance: value)
         }
     }
     private var yRange: ClosedRange<Double> {
-        let values = points.map(\.balance)
+        let values = marks.map(\.balance)
         let low = values.min() ?? 0, high = values.max() ?? 0
         let padding = max((high - low) * 0.1, max(abs(low), abs(high)) * 0.02, 1)
         return (low - padding)...(high + padding)
@@ -197,23 +204,23 @@ struct FinancialForecastChart: View {
         }
     }
     private var readout: String? {
-        guard let selected, currency.points.indices.contains(selected), let minor = currency.points[selected].balanceMinor else { return nil }
-        return PlanPresentation.dateLabel(currency.points[selected].date, locale: locale) + " · " +
-            PlanPresentation.money(minor, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale)
+        guard let selected, points.indices.contains(selected) else { return nil }
+        return PlanPresentation.dateLabel(points[selected].date, locale: locale) + " · " +
+            PlanPresentation.money(points[selected].balanceMinor, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale)
     }
 
     var body: some View {
-        CuadraoPlanForecastChart(recorded: [], projected: points, xRange: xRange, yRange: yRange,
-            ticks: ticks, selected: points.first { $0.id == selected },
-            selection: Binding(get: { points.first { $0.id == selected }?.position }, set: { position in
-                selected = position.flatMap { value in points.reversed().min { abs($0.position - value) < abs($1.position - value) }?.id }
-            }), compact: true, identifier: "plan.chart",
+        CuadraoPlanForecastChart(recorded: [], projected: marks, xRange: xRange, yRange: yRange,
+            ticks: ticks, selected: marks.first { $0.id == selected },
+            selection: Binding(get: { marks.first { $0.id == selected }?.position }, set: { position in
+                selected = position.flatMap { value in marks.reversed().min { abs($0.position - value) < abs($1.position - value) }?.id }
+            }), compact: true, stepped: true, identifier: "plan.chart",
             accessibilityTitle: NSLocalizedString("plan.chart.title", comment: ""),
             accessibilityAmount: readout ?? currency.endingMinor.map { PlanPresentation.money($0, currency: currency.currency, digits: currency.currencyFractionDigits, locale: locale) } ?? "")
             .accessibilityHint(Text("plan.chart.accessibility"))
             .accessibilityAdjustableAction { direction in
                 switch direction {
-                case .increment: selected = min((selected ?? 0) + 1, max(0, currency.points.count - 1))
+                case .increment: selected = min((selected ?? 0) + 1, max(0, points.count - 1))
                 case .decrement: selected = max((selected ?? 0) - 1, 0)
                 @unknown default: break
                 }

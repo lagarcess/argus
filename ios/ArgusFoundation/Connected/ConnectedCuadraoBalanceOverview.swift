@@ -5,67 +5,123 @@ struct ConnectedCuadraoBalanceOverview: View {
     let home: FinancialHome
     let spanish: Bool
     var space = "Personal"
+    @ObservedObject var loop: FinancialLoopModel
+    let accounts: [FinancialAccount]
     @EnvironmentObject private var auth: ProfileAuthModel
     @State private var chosenCurrency: String?
     @State private var expanded = false
+    @State private var history: ConnectedBalanceHistory.Reading?
     private var currencies: [FinancialCurrencySummary] {
         CurrencyPresentation.ordered(home.currencies, primary: auth.profile?.currency, currency: { $0.currency })
     }
     private var summary: FinancialCurrencySummary? {
         currencies.first { $0.currency == chosenCurrency } ?? currencies.first
     }
+    private var timeZone: String { home.period?.timeZone ?? TimeZone.current.identifier }
+
+    /// The reads restart when the hero, the listed accounts, the period or the day changes.
+    private struct HistoryKey: Equatable {
+        let summary: FinancialCurrencySummary
+        let period: FinancialHomePeriod?
+        let accounts: [UUID: Int]
+        let day: Date
+    }
+    private func key(_ summary: FinancialCurrencySummary) -> HistoryKey {
+        HistoryKey(summary: summary, period: home.period,
+            accounts: Dictionary(uniqueKeysWithValues: accounts.filter { $0.currency == summary.currency }.map { ($0.id, $0.version) }),
+            day: Calendar.current.startOfDay(for: .now))
+    }
 
     var body: some View {
         if let summary {
-            ConnectedBalanceReading(summary: summary, currencies: currencies.map(\.currency),
-                spanish: spanish, timeZone: home.period?.timeZone ?? TimeZone.current.identifier,
-                chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
+            ConnectedBalanceReading(summary: summary, currencies: currencies.map(\.currency), spanish: spanish,
+                timeZone: timeZone, history: history, chooseCurrency: { chosenCurrency = $0 }, expand: { expanded = true })
                 .fullScreenCover(isPresented: $expanded) {
                     ConnectedCuadraoInsights(summary: summary, period: home.period, spanish: spanish, space: space,
-                        timeZone: home.period?.timeZone ?? TimeZone.current.identifier)
+                        timeZone: timeZone, history: history)
                 }
+                .task(id: key(summary)) { await load(summary) }
         }
+    }
+
+    /// Reads every known account of the currency through the bounded observation reader, one after another.
+    /// A stale or cancelled read publishes nothing; the key change that caused it starts a fresh read.
+    private func load(_ summary: FinancialCurrencySummary) async {
+        history = nil
+        var reads: [ConnectedBalanceHistory.AccountRead] = []
+        if let period = home.period {
+            for account in accounts where account.currency == summary.currency && account.balance.amountMinor != nil {
+                let read = await loop.observations(accountID: account.id, period: period)
+                reads.append(ConnectedBalanceHistory.AccountRead(account: account, read: read))
+            }
+        }
+        guard !Task.isCancelled, let reading = ConnectedBalanceHistory.reading(summary: summary, reads: reads, now: .now) else { return }
+        history = reading
     }
 }
 
+/// The approved balance chart over the hero and its recorded history; the hero stays readable while history loads.
 private struct ConnectedBalanceReading: View {
     let summary: FinancialCurrencySummary
     let currencies: [String]
     let spanish: Bool
     let timeZone: String
     var expanded = false
+    let history: ConnectedBalanceHistory.Reading?
     var chooseCurrency: (String) -> Void = { _ in }
     var expand: () -> Void = {}
+    var range: Binding<CanvasHistoryRange> = .constant(.month)
+    var periodOffset: Binding<Int> = .constant(0)
     @Environment(\.locale) private var locale
+    private var amountIdentifier: String { expanded ? "home-chart-amount" : "home.netWorth." + summary.currency }
+    private var partial: Bool { summary.unknownAccounts > 0 }
 
     var body: some View {
-        let value = ConnectedBalanceSummary(summary: summary)
         VStack(alignment: .leading, spacing: 12) {
-            CuadraoBalanceAmount(amount: value.balance(locale: locale) ?? "—", currency: summary.currency,
-                currencies: currencies, spanish: spanish, expanded: expanded,
-                amountIdentifier: expanded ? "home-chart-amount" : "home.netWorth." + summary.currency,
-                chooseCurrency: chooseCurrency, expand: expand)
-            Text(summary.unknownAccounts > 0
-                 ? (spanish ? "Balance parcial" : "Partial balance")
-                 : (spanish ? "Balance neto" : "Net balance"))
-                .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                .accessibilityIdentifier("home-chart-date")
+            switch history {
+            case .recorded(let points, let unavailableAccounts):
+                CuadraoHomeBalanceChart(accounts: [], observations: [], currency: summary.currency, currencies: currencies,
+                    spanish: spanish, shared: false, chooseCurrency: chooseCurrency, expanded: expanded, expand: expand,
+                    history: CanvasBuiltBalanceHistory(points: points, now: .now), partial: partial,
+                    amountIdentifier: amountIdentifier, range: range, periodOffset: periodOffset)
+                if unavailableAccounts > 0 {
+                    Text(unavailableHistory(unavailableAccounts))
+                        .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("home-chart-unavailable-history")
+                }
+            case .unknown, nil:
+                let value = ConnectedBalanceSummary(summary: summary)
+                CuadraoBalanceAmount(amount: value.balance(locale: locale) ?? "—", currency: summary.currency,
+                    currencies: currencies, spanish: spanish, expanded: expanded, amountIdentifier: amountIdentifier,
+                    chooseCurrency: chooseCurrency, expand: expand)
+                Text(partial ? (spanish ? "Balance parcial" : "Partial balance") : (spanish ? "Balance neto" : "Net balance"))
+                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("home-chart-date")
+                if history == nil, value.known {
+                    CuadraoChartState(title: spanish ? "Leyendo tus balances registrados" : "Reading your recorded balances",
+                        detail: spanish ? "Tu historial aparece en cuanto termina la lectura." : "Your history appears as soon as the read completes.",
+                        loading: true)
+                        .accessibilityIdentifier("home-chart-loading")
+                } else {
+                    CuadraoChartState(title: spanish ? "Tu balance, a tu ritmo" : "Your balance, at your pace",
+                        detail: spanish ? "Los balances que registres darán forma a este espacio." : "Your recorded balances will give this space its shape.")
+                        .accessibilityIdentifier("home-chart-empty")
+                }
+            }
             if expanded, let asOf = summary.asOf {
                 Text(AccountPresentation.date(asOf, zone: timeZone, locale: locale))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
-            if summary.unknownAccounts > 0 {
+            if partial {
                 Text(verbatim: String(format: NSLocalizedString("loop.home.unknownCount", comment: ""), summary.unknownAccounts))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
-            CuadraoChartState(title: spanish ? "Tu balance, a tu ritmo" : "Your balance, at your pace",
-                detail: value.known
-                    ? (spanish ? "Puedes ver tu balance actual. El historial aún no está disponible."
-                        : "You can see your current balance. History is not available yet.")
-                    : (spanish ? "Los balances que registres darán forma a este espacio."
-                        : "Your recorded balances will give this space its shape."))
-                .accessibilityIdentifier("home-chart-empty")
         }
+    }
+
+    private func unavailableHistory(_ count: Int) -> String {
+        if spanish { return count == 1 ? "El historial de 1 cuenta no está disponible por ahora." : "El historial de \(count) cuentas no está disponible por ahora." }
+        return count == 1 ? "History for 1 account is not available right now." : "History for \(count) accounts is not available right now."
     }
 }
 
@@ -75,24 +131,31 @@ private struct ConnectedCuadraoInsights: View {
     let spanish: Bool
     let space: String
     let timeZone: String
+    let history: ConnectedBalanceHistory.Reading?
     @State private var range: CanvasHistoryRange = .month
     @State private var periodOffset = 0
     @State private var distribution = false
     @State private var activity = false
     @State private var selectedGroup: String?
     @Environment(\.locale) private var locale
+    private var points: [CanvasBalancePoint] {
+        if case .recorded(let points, _) = history { return points }
+        return []
+    }
 
     var body: some View {
         NavigationStack {
             CuadraoHomeInsightsLayout(spanish: spanish, range: $range, periodOffset: $periodOffset,
-                distribution: $distribution, activity: $activity, oldestOffset: { _ in 0 }) { offset in
+                distribution: $distribution, activity: $activity, oldestOffset: { showingActivity in
+                    showingActivity ? 0 : range.oldestOffset(points)
+                }) { offset in
                     if activity {
                         spending(range.interval(offset: offset))
                     } else if distribution {
                         allocation
                     } else {
                         ConnectedBalanceReading(summary: summary, currencies: [summary.currency], spanish: spanish,
-                            timeZone: timeZone, expanded: true)
+                            timeZone: timeZone, expanded: true, history: history, range: $range, periodOffset: .constant(offset))
                     }
                 }.modifier(CuadraoHomeInsightsChrome(title: space, spanish: spanish))
         }.foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
