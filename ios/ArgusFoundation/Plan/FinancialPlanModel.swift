@@ -296,4 +296,19 @@ enum PlanPresentation {
     static func money(_ minor: String, currency: String, digits: Int, locale: Locale) -> String {
         currency + " " + AccountPresentation.amount(AccountPresentation.decimal(minor, digits: digits), locale: locale)
     }
+    static func upcomingRow(_ occurrence: FinancialPlanOccurrence, locale: Locale,
+                            text: (String) -> String = { NSLocalizedString($0, comment: "") }) -> PlanUpcomingRow {
+        let income = occurrence.kind == .income
+        return PlanUpcomingRow(title: occurrence.title,
+            detail: dateLabel(occurrence.dueDate, locale: locale) + " · " + text("plan.status." + occurrence.status.rawValue),
+            amount: (income ? "+" : "") + AccountPresentation.amount(occurrence.amount, locale: locale) + " " + occurrence.currency,
+            icon: income ? "arrow.down.left" : "calendar")
+    }
+}
+
+struct PlanUpcomingRow: Equatable {
+    let title: String
+    let detail: String
+    let amount: String
+    let icon: String
 }

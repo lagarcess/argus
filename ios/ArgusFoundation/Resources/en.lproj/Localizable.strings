@@ -347,14 +347,13 @@
 "plan.chart.title" = "Projected balance after each movement";
 "plan.chart.inspect" = "Touch to inspect. Each step is a movement, not an equal time interval.";
 "plan.chart.accessibility" = "Inspect movement";
-"plan.status.planned" = "Planned, not recorded";
+"plan.status.planned" = "Scheduled";
 "plan.status.fulfilled" = "Recorded";
 "plan.status.needs_review" = "Review the linked activity";
 "plan.overdue" = "Overdue, included from today";
 "plan.exclusion.account_unassigned" = "Choose an account to include this in the forecast.";
 "plan.exclusion.account_not_selected" = "This account is not included in the forecast.";
 "plan.exclusion.link_needs_review" = "Excluded until you review the linked activity.";
-"plan.home.disclosure" = "An estimate from your plan, separate from recorded net worth.";
 "plan.unavailable" = "This part of Plan is not available yet. Expected income and bills are in Overview.";
 "plan.kind" = "Type";
 "plan.kind.income" = "Income";

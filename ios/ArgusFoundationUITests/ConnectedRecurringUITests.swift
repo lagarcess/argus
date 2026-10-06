@@ -31,13 +31,11 @@ extension FinancialLoopUITests {
         assertText("DOP 650.00")
         XCTAssertEqual(movementRows(note).count, 1, "the original movement is untouched and not duplicated")
         selectPlanAccounts([bank])
-        assertHomeProjected("DOP 300.00")
-        let until = app.staticTexts["home.upcoming.until"]
-        XCTAssertTrue(until.waitForExistence(timeout: 10))
-        XCTAssertEqual(until.label, "Until " + planDateLabel(daysAhead: 30))
         let row = homeUpcomingRow(note)
         XCTAssertTrue(row.exists, "Home Upcoming lists the planned occurrence inside the next 30 days")
-        XCTAssertTrue(row.label.contains("Planned, not recorded"))
+        XCTAssertTrue(row.label.contains("Scheduled"), row.label)
+        XCTAssertEqual(homeUpcomingRows(note).count, 1)
+        XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists, "projection details stay on Plan")
         revealOnHome(row)
         capture("home-upcoming-recurring")
         // Plan explores a longer horizon; Home's window and totals stay as they are.
@@ -45,29 +43,26 @@ extension FinancialLoopUITests {
         revealPlanForecastControls()
         chooseDate("plan.until", daysAhead: 60)
         assertPlanProjected("DOP -50.00")
-        assertHomeProjected("DOP 300.00")
-        XCTAssertEqual(app.staticTexts["home.upcoming.until"].label, "Until " + planDateLabel(daysAhead: 30))
-        revealOnHome(app.staticTexts["home.projected.DOP"])
+        XCTAssertEqual(homeUpcomingRows(note).count, 1, "Home keeps its own 30-day window")
+        revealOnHome(homeUpcomingRow(note))
         capture("home-upcoming-unchanged-by-plan-horizon")
         tapVisible(homeUpcomingRow(note))
         tapVisible(app.buttons["plan.record"])
         XCTAssertEqual(app.textFields["loop.amount"].value as? String, "350.00")
         confirmPlanMoney()
-        assertHomeProjected("DOP 300.00")
         XCTAssertFalse(homeUpcomingRow(note).exists, "a recorded payment leaves Upcoming and is not counted again")
-        revealOnHome(app.staticTexts["home.projected.DOP"])
+        revealOnHome(app.staticTexts["home.comingUp"])
         capture("home-upcoming-after-fulfilment")
         assertPlanProjected("DOP -50.00")
         openMoneyAccount(bank)
         assertText("DOP 300.00")
         XCTAssertEqual(movementRows(note).count, 2, "one original movement plus one recorded payment")
         app.terminate(); app.launch()
-        assertHomeProjected("DOP 300.00")
         XCTAssertFalse(homeUpcomingRow(note).exists)
         openPlanOccurrence(note); assertText("Recorded")
         app.buttons["Close"].tap()
-        assertHomeProjected("DOP 300.00")
-        revealOnHome(app.staticTexts["home.projected.DOP"])
+        XCTAssertFalse(homeUpcomingRow(note).exists)
+        revealOnHome(app.staticTexts["home.comingUp"])
         capture("home-upcoming-preserved-after-reopen")
     }
 
@@ -167,32 +162,17 @@ extension FinancialLoopUITests {
         return app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.expectation.' AND label CONTAINS %@", title))
     }
 
+    func homeUpcomingRows(_ note: String) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'home.upcoming.' AND label CONTAINS %@", note))
+    }
+
     func homeUpcomingRow(_ note: String) -> XCUIElement {
         app.revealConnectedTabBar()
         app.buttons["tab.home"].tap()
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'home.upcoming.' AND label CONTAINS %@", note)).firstMatch
+        let row = homeUpcomingRows(note).firstMatch
         if !row.waitForExistence(timeout: 3), app.buttons["home.upcoming.more"].exists { tapVisible(app.buttons["home.upcoming.more"]) }
         _ = row.waitForExistence(timeout: 3)
         return row
-    }
-
-    func assertHomeProjected(_ value: String) {
-        app.revealConnectedTabBar()
-        app.buttons["tab.home"].tap()
-        let amount = app.staticTexts["home.projected.DOP"]
-        XCTAssertTrue(amount.waitForExistence(timeout: 15))
-        let expected = NSPredicate(format: "label == %@", value)
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: expected, object: amount)], timeout: 10), .completed, amount.label)
-    }
-
-    /// Plan dates are calendar days in the reporting time zone (America/Santo_Domingo by default).
-    func planDateLabel(daysAhead: Int) -> String {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "America/Santo_Domingo")!
-        let target = calendar.date(byAdding: .day, value: daysAhead, to: Date())!
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US"); formatter.timeZone = calendar.timeZone; formatter.dateStyle = .medium
-        return formatter.string(from: target)
     }
 
     func expectedNextMonthlyDate(daysAgo: Int) -> (monthDay: String, dayLabel: String) {

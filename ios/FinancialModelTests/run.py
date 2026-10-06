@@ -74,4 +74,4 @@ let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], depend
         command += ["--disable-sandbox", "--disable-automatic-resolution"]
     if selection := os.environ.get("ARGUS_FINANCIAL_MODEL_TEST_FILTER"):
         command += ["--filter", selection]
-    subprocess.run(command, check=True)
+    subprocess.run(command, check=True, env={**os.environ, "ARGUS_REPO_ROOT": str(root)})
