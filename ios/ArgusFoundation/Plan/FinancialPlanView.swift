@@ -68,12 +68,7 @@ struct FinancialPlanView: View {
         .financialPlanDestinations(loop: loop, search: search, host: .plan, enabled: nativeNavigation)
         .task { if model.projection == nil { await model.refresh() } }
         .refreshable { await loop.refresh() }
-        .confirmationDialog(spanish ? "¿Qué tienes en mente?" : "What do you have in mind?", isPresented: $creating, titleVisibility: .visible) {
-            Button("goal.add") { loop.goals.create() }.disabled(!canCreate)
-            Button("budget.add") { Task { await loop.budgets.create() } }.disabled(!canCreate)
-            Button("debt.add") { loop.debts.create() }.disabled(!canCreate)
-            Button("plan.add.title") { model.create() }.disabled(!canCreate)
-        }
+        .sheet(isPresented: $creating) { ConnectedPlanEditor(loop: loop, seed: .create(kind: nil)) }
         .sheet(isPresented: $selectingAccounts) {
             if let projection = model.projection { FinancialPlanSelectionView(model: model, loop: loop, projection: projection) }
         }
