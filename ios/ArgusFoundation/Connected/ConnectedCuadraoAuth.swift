@@ -16,6 +16,8 @@ struct ConnectedCuadraoAuthFlow: View {
                                detail: String(localized: "auth.error.configuration"))
                 } else if auth.state == .pendingSignOut {
                     pendingSignOut
+                } else if auth.state == .credentialValidationRequired || auth.state == .reauthenticationRequired {
+                    validationRequired
                 } else if auth.state == .unsupportedAnonymous {
                     authNotice(title: spanish ? "Sesión no admitida." : "Unsupported session.",
                                detail: String(localized: "auth.error.anonymous"))
@@ -85,6 +87,28 @@ struct ConnectedCuadraoAuthFlow: View {
             }.scrollIndicators(.hidden)
         }
         .background(Color.white.ignoresSafeArea())
+    }
+
+    private var validationRequired: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            RegistrationHeading(title: String(localized: "auth.apple.validation.title"),
+                                detail: String(localized: auth.state == .reauthenticationRequired ? "auth.apple.signInAgain.detail" : "auth.apple.validation.detail"))
+            if auth.busy { ProgressView("auth.working") }
+            Button(auth.state == .reauthenticationRequired ? "auth.apple.signInAgain.action" : "auth.retry") {
+                Task { if auth.state == .reauthenticationRequired { await auth.signOut() } else { await auth.restore() } }
+            }
+            .buttonStyle(PillButtonStyle()).disabled(auth.busy)
+            .accessibilityIdentifier("auth.validation.retry")
+            if auth.state == .credentialValidationRequired {
+                Button("auth.signOut") { Task { await auth.signOut() } }
+                    .buttonStyle(PillButtonStyle(primary: false)).disabled(auth.busy)
+                    .accessibilityIdentifier("auth.signOut")
+            }
+            if let key = auth.errorKey { Text(LocalizedStringKey(key)).foregroundStyle(.secondary) }
+            Spacer()
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var pendingSignOut: some View {

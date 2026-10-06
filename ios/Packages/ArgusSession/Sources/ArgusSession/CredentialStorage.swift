@@ -39,6 +39,47 @@ struct PendingCredentials: Codable, Sendable {
     let refreshToken: String
 }
 
+enum SessionSignInMethod: String, Codable, Sendable {
+    case email, apple, google
+}
+
+struct StoredSession: Codable {
+    var session: Session
+    let signInMethod: SessionSignInMethod?
+
+    private enum CodingKeys: String, CodingKey { case provenance = "cuadrao_session_provenance" }
+    private struct Provenance: Codable {
+        let version: Int
+        let method: SessionSignInMethod
+    }
+
+    init(session: Session, signInMethod: SessionSignInMethod?) {
+        self.session = session; self.signInMethod = signInMethod
+    }
+
+    init(from decoder: Decoder) throws {
+        session = try Session(from: decoder)
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if container.contains(.provenance) {
+            let provenance = try container.decode(Provenance.self, forKey: .provenance)
+            guard provenance.version == 1 else { throw SessionFailure.storageUnavailable }
+            signInMethod = provenance.method
+        } else {
+            signInMethod = nil
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        try session.encode(to: encoder)
+        if let signInMethod {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Provenance(version: 1, method: signInMethod), forKey: .provenance)
+        }
+    }
+
+    static func decode(_ data: Data) throws -> Self { try JSONDecoder().decode(Self.self, from: data) }
+}
+
 /// One lock binds generation validation to the actual storage operation. Checking only
 /// before an async refresh would let a retired SDK overwrite the next account's tokens.
 final class CredentialVault: @unchecked Sendable {
@@ -60,7 +101,16 @@ final class CredentialVault: @unchecked Sendable {
             guard !failed else { throw SessionFailure.storageUnavailable }
         }
     }
-    func session() throws -> Session? { try read("session") }
+    func session() throws -> Session? { try storedSession()?.session }
+    func signInMethod() throws -> SessionSignInMethod? { try storedSession()?.signInMethod }
+    private func storedSession() throws -> StoredSession? {
+        try locked {
+            do {
+                guard let data = try backing.retrieve(key: prefix + ".session") else { return nil }
+                return try StoredSession.decode(data)
+            } catch { throw SessionFailure.storageUnavailable }
+        }
+    }
     func pending() throws -> PendingCredentials? {
         try locked {
             if let recovery { return recovery }
@@ -96,12 +146,23 @@ final class CredentialVault: @unchecked Sendable {
     }
 
     func sdkRead(key: String, epoch: UInt64) throws -> Data? {
-        try scoped(epoch) { key == "argus.session" ? try backing.retrieve(key: prefix + ".session") : nil }
+        try scoped(epoch) {
+            guard key == "argus.session", let data = try backing.retrieve(key: prefix + ".session") else { return nil }
+            return try JSONEncoder().encode(StoredSession.decode(data).session)
+        }
     }
-    func sdkWrite(key: String, value: Data, epoch: UInt64) throws {
+    func sdkWrite(key: String, value: Data, epoch: UInt64, adoptingMethod: SessionSignInMethod? = nil) throws {
         try scoped(epoch) {
             guard key == "argus.session" else { throw SessionFailure.storageUnavailable }
-            do { try backing.store(key: prefix + ".session", value: value) }
+            do {
+                let session = try JSONDecoder().decode(Session.self, from: value)
+                let previous = try backing.retrieve(key: prefix + ".session").map(StoredSession.decode)
+                if let previous, previous.session.user.id != session.user.id {
+                    throw SessionFailure.staleOperation
+                }
+                let stored = StoredSession(session: session, signInMethod: previous == nil ? adoptingMethod : previous?.signInMethod)
+                try backing.store(key: prefix + ".session", value: JSONEncoder().encode(stored))
+            }
             catch {
                 // A refresh can already have rotated the server token. Preserve the
                 // returned credentials for revocation before reporting the failure.
@@ -126,14 +187,6 @@ final class CredentialVault: @unchecked Sendable {
             catch { failed = true; throw SessionFailure.storageUnavailable }
         }
     }
-    private func read<T: Decodable>(_ suffix: String) throws -> T? {
-        try locked {
-            do {
-                guard let data = try backing.retrieve(key: prefix + "." + suffix) else { return nil }
-                return try JSONDecoder().decode(T.self, from: data)
-            } catch { throw SessionFailure.storageUnavailable }
-        }
-    }
     private func remove(_ suffix: String) throws {
         try locked {
             do { try backing.remove(key: prefix + "." + suffix) }
@@ -148,8 +201,9 @@ final class CredentialVault: @unchecked Sendable {
 struct EpochStorage: AuthLocalStorage {
     let vault: CredentialVault
     let epoch: UInt64
+    var adoptingMethod: SessionSignInMethod? = nil
     func retrieve(key: String) throws -> Data? { try vault.sdkRead(key: key, epoch: epoch) }
-    func store(key: String, value: Data) throws { try vault.sdkWrite(key: key, value: value, epoch: epoch) }
+    func store(key: String, value: Data) throws { try vault.sdkWrite(key: key, value: value, epoch: epoch, adoptingMethod: adoptingMethod) }
     func remove(key: String) throws { try vault.sdkRemove(key: key, epoch: epoch) }
 }
 

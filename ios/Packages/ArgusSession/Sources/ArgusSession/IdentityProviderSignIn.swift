@@ -59,13 +59,13 @@ final class ExchangeStorage: AuthLocalStorage, @unchecked Sendable {
     func remove(key: String) throws { lock.lock(); defer { lock.unlock() }; values[key] = nil }
 }
 
-extension SessionController {
-    /// Best effort, after a native Apple sign-in: hands Apple's one-time authorization
-    /// code to Argus so account deletion can revoke the Apple tokens (App Store Review
-    /// Guideline 5.1.1(v)). Throws `.rejected(404, …)` while the server has capture off.
-    public func captureAppleAuthorizationCode(_ code: String, expectedIdentity: SessionSnapshot) async throws {
-        guard !code.isEmpty, code.utf8.count <= 4_096 else { throw SessionFailure.invalidResponse }
-        _ = try await financialRequest(route: "auth/apple/authorization-code", method: "POST",
-                                       body: encoded(["authorization_code": code]), expectedIdentity: expectedIdentity)
-    }
+public enum AppleCaptureOutcome: Equatable, Sendable {
+    case saved
+    case freshAuthorizationRequired
+    case failed(SessionFailure)
+}
+
+public struct ProviderSignInOutcome: Equatable, Sendable {
+    public let session: SessionSnapshot
+    public let appleCapture: AppleCaptureOutcome?
 }

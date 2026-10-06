@@ -5,6 +5,13 @@ import XCTest
 
 @MainActor
 final class FinancialModelTests: XCTestCase {
+    func testServerFailuresStayConnectionErrorsWhileValidationKeepsItsMessage() {
+        for (mapper, validationKey) in [(FinancialEditor.message, "accounts.error.amount_invalid"), (FinancialActivityEditor.message, "loop.error.amount_invalid")] {
+            XCTAssertEqual(mapper(SessionFailure.rejected(status: 503, code: "storage_unavailable")), "loop.error.connection")
+            XCTAssertEqual(mapper(SessionFailure.rejected(status: 422, code: "amount_invalid")), validationKey)
+        }
+    }
+
     func testRedactedOriginalHasUnknownDisplayAndCannotOpenCorrectionOrReturn() async throws {
         let fixture = try PresentationFixture(); let identity = try await fixture.login()
         let accounts = AccountsModel(controller: fixture.client)

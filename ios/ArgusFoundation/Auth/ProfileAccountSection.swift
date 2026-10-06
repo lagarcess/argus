@@ -35,8 +35,23 @@ struct ProfileAccountSection: View {
                     .buttonStyle(PillButtonStyle())
                     .accessibilityIdentifier("auth.retry")
                     .disabled(model.busy)
+            case .credentialValidationRequired, .reauthenticationRequired:
+                Text(model.state == .reauthenticationRequired ? "auth.apple.signInAgain.detail" : "auth.apple.validation.detail")
+                Button(model.state == .reauthenticationRequired ? "auth.apple.signInAgain.action" : "auth.retry") {
+                    Task { if model.state == .reauthenticationRequired { await model.signOut() } else { await model.restore() } }
+                }
+                .buttonStyle(PillButtonStyle()).disabled(model.busy)
+                .accessibilityIdentifier("auth.validation.retry")
+                if model.state == .credentialValidationRequired {
+                    Button("auth.signOut") { Task { await model.signOut() } }
+                        .buttonStyle(PillButtonStyle(primary: false)).disabled(model.busy)
+                }
             case .unsupportedAnonymous:
                 Text("auth.error.anonymous")
+            }
+            if let key = model.captureNoticeKey {
+                Text(LocalizedStringKey(key)).accessibilityIdentifier("auth.apple.capture.notice")
+                Button("auth.apple.capture.dismiss") { model.dismissCaptureNotice() }
             }
             if let key = model.errorKey {
                 Text(LocalizedStringKey(key)).foregroundStyle(ArgusStyle.secondary)

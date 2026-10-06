@@ -590,6 +590,7 @@ def mock_gateway():
     gateway.client = SimpleNamespace(rpc=_rpc)
     with (
         patch("argus.api.state.supabase_gateway", gateway),
+        patch("argus.api.routers.profile._apple_identity", return_value=None),
         patch("argus.api.dependencies.auth_session_is_active", return_value=True),
     ):
         yield gateway

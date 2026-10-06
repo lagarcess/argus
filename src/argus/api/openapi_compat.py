@@ -259,6 +259,21 @@ def customize_openapi_document(document: dict[str, Any]) -> dict[str, Any]:
             responses["503"] = copy.deepcopy(_AUTH_SESSION_UNAVAILABLE_RESPONSE_REF)
             responses["500"] = _error_response("An unexpected server error occurred.")
 
+    profile_op = spec.get("paths", {}).get(f"{API_PREFIX}/me", {}).get("get")
+    if profile_op is not None:
+        profile_op.setdefault("responses", {})["503"] = _error_response(
+            "`apple_identity_unavailable`: current linked identity could not be verified. "
+            "`auth_session_verification_unavailable`: the session could not be verified."
+        )
+
+    profile_patch = spec.get("paths", {}).get(f"{API_PREFIX}/me", {}).get("patch")
+    if profile_patch is not None:
+        profile_patch.setdefault("responses", {})["503"] = _error_response(
+            "`apple_identity_unavailable`: current linked identity could not be verified; "
+            "no profile update is applied. "
+            "`auth_session_verification_unavailable`: the session could not be verified."
+        )
+
     deletion_op = (
         spec.get("paths", {}).get(f"{API_PREFIX}/account/delete", {}).get("post")
     )

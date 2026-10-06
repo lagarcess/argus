@@ -530,7 +530,7 @@ final class FinancialEditor: ObservableObject, Identifiable {
     }
     static func message(_ error: Error) -> String {
         if error is AccountEntry.Failure { return "accounts.error.amount_invalid" }
-        guard case SessionFailure.rejected(_, let code) = error else { return "loop.error.connection" }
+        guard case SessionFailure.rejected(let status, let code) = error, status < 500 else { return "loop.error.connection" }
         let supported = ["stale_version", "amount_precision", "amount_invalid", "amount_out_of_range", "date_in_future", "reason_required", "reason_invalid"]
         if let code, supported.contains(code) { return "accounts.error." + code }
         if code == "check_before_latest_observation" { return "loop.error.checkDate" }

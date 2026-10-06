@@ -167,7 +167,7 @@ final class HouseholdPlanModel: ObservableObject {
         if latest.revision != identity?.revision || latest.phase != .authenticated { household.bind(latest); household.sessionChanged?(latest) }
     }
     static func message(_ error: Error) -> String {
-        guard case SessionFailure.rejected(_, let code) = error else { return "household.loadError" }
+        guard case SessionFailure.rejected(let status, let code) = error, status < 500 else { return "household.loadError" }
         switch code {
         case "budget_scope_conflict": return "budget.error.duplicate"
         case "shared_plan_scope_changed", "stale_version", "stale_activity", "shared_plan_stale": return "sharedPlan.changed"
