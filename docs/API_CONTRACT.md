@@ -1067,12 +1067,20 @@ Application-facing user object.
   explicit onboarding flow. It stays in responses so deployed clients keep a
   stable `/me` shape, but no product behavior reads it and no API writes it.
 
+Profile PATCH responses preserve the same current owner-scoped `apple_identity`
+projection as GET `/me`. After validating the requested profile fields, the route
+reads the existing canonical identity before writing. An unavailable identity
+returns 503 `apple_identity_unavailable` without a profile write. The Apple name
+command also reads this projection before writing and retains its existing
+503 `apple_name_unavailable` error. Neither response infers the session provider.
+
 ### Apple first-authorization display-name initialization
 
 `POST /api/v1/me/apple-name` accepts only `{ "display_name": "María 李" }`.
 It trims surrounding whitespace, preserves Unicode and interior spelling, and
 rejects blank or more than 200 characters with 422. It returns the existing
-canonical `UserResponse`, including when a retry preserves an existing name.
+canonical `UserResponse`, including the current owner-scoped `apple_identity`
+projection and when a retry preserves an existing name.
 The text is user-supplied account presentation, not verified legal identity.
 It never fills `preferred_name` or copies names into Auth metadata.
 
@@ -2493,7 +2501,13 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
 - A successful reset signs out all sessions, clears both the Supabase browser
   session and Argus's mirrored cookies, and requires a fresh login.
 - Recovery requests are rate-limited by normalized email and client address in
-  addition to provider protections. Rate-limit responses remain
+  addition to provider protections. The web route reads only
+  `ARGUS_TRUSTED_CLIENT_IP_HEADER`, defaulting to `CF-Connecting-IP` when the
+  setting is absent or blank. Missing or blank trusted values share one
+  `unknown` bucket because web requests have no socket peer. Malformed trusted
+  addresses return `400`. Neither `X-Forwarded-For` nor `X-Real-IP` is a
+  fallback. The existing web IP validation remains unchanged; this does not
+  adopt the API visitor key normalization policy. Rate-limit responses remain
   enumeration-safe.
 
 **Password and session controls:**
@@ -2602,6 +2616,18 @@ permanent accounts rather than allowing them.
 The response includes `user`, `account_kind`, a nullable `guest` summary with
 expiry plus limits `1/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
+`GET /api/v1/me` also returns nullable `apple_identity: {"subject": "..."}`
+beside `user`. For registered owners it derives from the shared `auth.identities`
+reader. A successful read without an Apple identity returns null; unavailable,
+malformed or conflicting identity data returns `503 apple_identity_unavailable`.
+Guests never trigger this read and always receive null. The explicit in-memory
+mock-auth development path has no provider identity. Native clients hold this
+projection only in the current session snapshot and use it for Apple credential
+validation on launch and foreground return. This is linked-account identity,
+not evidence of the current sign-in method. The native session journal records
+the successful grant method; its [validation contract](../ios/Packages/ArgusSession/README.md)
+keeps known email and Google sessions independent of a linked Apple identity.
+It is not a profile preference.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
 (`can_search_current_workspace`) from broader Grounded Discovery
@@ -2869,17 +2895,20 @@ once per request; there is no automatic code replay or durable capture receipt.
 A later sign-in replaces the stored token without revoking the old one,
 because revoking any token ends the whole Apple authorization for the app.
 The compensating revoke on the 409 and 503 paths is a single attempt with no
-retry, 2 seconds in total, and the request waits at most 4 seconds for it
-however slowly Apple answers. The code exchange before it keeps its 30-second
-limit, so these provider waits can total about 34 seconds before local work.
+retry. Cleanup uses two-second HTTP phase timeouts and elapsed-time checks
+after headers and chunks; the code exchange uses a 30-second HTTP timeout.
+These controls do not guarantee a total wall-clock deadline across stalled
+transport phases. The client must keep a waiting state until the request finishes
+and must not replay an authorization code when the result is uncertain.
 A delayed cleanup revoke can end a newer Apple authorization. Subject binding
 and database locks do not cancel a revoke Apple has already received. Acceptance
 of that recovery policy remains open in #803.
 
 The binding proves the identity at credential commit. Later unlink/relink needs
 a fresh authoritative read before use. Account-deletion admission, its terminal
-receipt, missing-token recovery, and the native `/me` identity projection remain
-separate work in #800. This capture change does not establish those guarantees.
+receipt and missing-token recovery remain separate work in #800. The native
+`/me` projection above establishes current linked identity, not those deletion
+guarantees.
 
 No route revokes or discards. Account deletion (Lane 6) calls
 `AppleCredentialService.revoke`. It deletes the row after Apple answers 200
@@ -7164,7 +7193,7 @@ Canonical routes, all under `/api/v1` and the existing registered-owner/default-
 - `GET /financial-activities/options`: `{accounts:[FinancialAccountResponse],eligibility:{kind:[account_type]},destination_eligibility:{paired_kind:[account_type]},categories:[string],sources:[string]}`.
 - `GET /financial-activities/purchases?currency=DOP`: `{items:[Activity]}`; each purchase adds `refunded_minor` and `refundable_minor`.
 
-The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,principal?,interest?,fees?,reversal_of_activity_id?,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
+The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,destination_amount?,principal?,interest?,fees?,reversal_of_activity_id?,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
 Kind is `expense|income|transfer|card_payment|refund|debt_payment|payment_reversal`, immutable on correction. Loan splits and payment-return references follow the connected debt-payment contract below.
 Singles use account_id; pairs use source/destination. Irrelevant non-null fields fail.
 Amount is a positive decimal string; occurred_at requires an offset and cannot be
@@ -7192,7 +7221,7 @@ revision and token must match under locks; stale writes change nothing.
 Activity is `{activity_id,revision,kind,amount_minor,amount,currency,
 currency_fraction_digits,occurred_at,time_zone,note,category_id,source_id,
 purchase_activity_id,purchase_revision,principal_minor,interest_minor,fees_minor,reversal_of_activity_id,reversal_of_revision,reason,recorded_at,recorded_by,legs}`.
-Leg is `{record_id,record_revision,account_id,role,balance_movement_minor,coverage}`;
+Leg is `{record_id,record_revision,account_id,role,amount_minor,amount,currency,currency_fraction_digits,balance_movement_minor,coverage}`;
 role is `single|source|destination`; coverage uses legacy CoverageAnswer.
 Write returns `{activity,accounts:[FinancialAccountResponse],replayed}`: accepted
 historical revision plus all affected accounts' current projections. History is
@@ -7202,10 +7231,38 @@ Home recent activity shows each paired operation once.
 
 Income admits cash/checking/savings/investment; expense/refund cash/checking/savings/
 credit_card. Transfer connects distinct cash/checking/savings/investment accounts;
-card payment uses those sources and credit_card destination. Pairs and linked refunds
-require same currency. No FX conversion. Loan principal, interest and fees use the explicit
+card payment uses those sources and credit_card destination. Payments, returns and linked refunds
+require the same currency. Transfers follow the paired-amount contract below. No FX conversion. Loan principal, interest and fees use the explicit
 `debt_payment` split below; no missing allocation is inferred. Positive card balance exposes credit_minor
 in BalanceResponse. Unknown remains unknown after activity.
+
+### Paired transfer amounts, default-off (#820)
+
+`amount` retains the source amount. `destination_amount` is an optional decimal
+string of at most 40 characters. Only transfers accept a non-null destination
+amount. Mixed currencies require both positive actual amounts, independently
+parsed in each canonical account currency. No exchange rate is supplied or stored.
+Same-currency transfers without the field keep equal legs. An explicit pair in
+one currency must be equal in minor units. Each visible response leg owns its
+formatted amount, minor amount, currency and fraction digits. When the source is
+hidden, the legacy top-level amount stays null and its required currency fields
+derive from the first visible leg. Hidden source denomination is not disclosed.
+
+`ARGUS_CROSS_CURRENCY_TRANSFERS_ENABLED` defaults to false and rejects mixed-currency
+preview and confirmation with `cross_currency_transfers_disabled`. While enabled
+locally, a missing received amount fails with `destination_amount_required`; an
+unequal same-currency pair fails with `transfer_amount_mismatch`. Non-transfer
+second amounts fail with `field_not_applicable`. Existing precision, range,
+positive-amount, access, revision and preview errors retain their contracts.
+
+A null or absent `destination_amount` is omitted from request serialization,
+including nested Household and Plan commands. Other explicit nulls are preserved.
+A supplied amount participates in existing preview and receipt hashes. Corrections
+replace the complete pair under the existing atomic revision and retry rules.
+Current Plan eligibility and credits require every leg to have the Plan currency.
+Mixed-currency Plan credit needs a separate accepted contract. Native entry,
+readback, correction and retry acceptance must pass before hosted activation.
+See [the accepted transfer contract](specs/lanes/cuadrao-cross-currency-transfers.md).
 
 Linked refunds target owned expenses, cannot precede purchase local financial date,
 and cumulative current linked refunds cannot exceed purchase. Purchase corrections

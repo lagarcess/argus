@@ -18,10 +18,15 @@ struct ConnectedCuadraoRoot: View {
                 } else {
                     ConnectedCuadraoShell(appearance: $appearance)
                 }
-            case .signedOut, .configurationInvalid, .pendingSignOut, .unsupportedAnonymous:
+            case .accountDeletionUncertain, .accountDeletionPending, .signedOut, .configurationInvalid, .pendingSignOut, .unsupportedAnonymous, .credentialValidationRequired, .reauthenticationRequired:
                 ConnectedCuadraoAuthFlow()
                     .safeAreaInset(edge: .top) { if let invitations = auth.invitations { InvitationPendingNotice(model: invitations) } }
             }
+        }
+        .alert("auth.apple.capture.title", isPresented: $auth.captureNoticePresented) {
+            Button("auth.apple.capture.dismiss", role: .cancel) { }
+        } message: {
+            if let key = auth.captureNoticeKey { Text(LocalizedStringKey(key)) }
         }
         .invitationLinks(auth.invitations)
         .onAppear { auth.invitations?.openHousehold = { [weak auth] input in await auth?.household?.beginJoin(input) == true } }

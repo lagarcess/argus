@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 enum AppearancePreference: String, CaseIterable {
     case light, dark, system
@@ -19,7 +20,6 @@ enum AppearancePreference: String, CaseIterable {
 @main
 struct ArgusFoundationApp: App {
     @StateObject private var auth = ProfileAuthModel()
-    @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppearancePreference.storageKey) private var appearance = AppearancePreference.system
     /// Design-preview only; separate from the connected app's appearance preference.
     @AppStorage(CuadraoAppearancePicker.storageKey) private var previewAppearance = AppearancePreference.light
@@ -32,7 +32,9 @@ struct ArgusFoundationApp: App {
 
     @ViewBuilder private var appContent: some View {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--cuadrao-release-ui") {
+        if ProcessInfo.processInfo.arguments.contains("--apple-session-harness") {
+            AppleSessionHarness()
+        } else if ProcessInfo.processInfo.arguments.contains("--cuadrao-release-ui") {
             ReleaseUIReview()
         } else if ProcessInfo.processInfo.arguments.contains("--invitations-harness") {
             InvitationsHarness()
@@ -52,14 +54,27 @@ struct ArgusFoundationApp: App {
             } else {
                 ConnectedCuadraoRoot(appearance: $appearance)
                     .environmentObject(auth)
-                    .task { await auth.start() }
-                    .onChange(of: scenePhase) { _, phase in
-                        if phase == .active { Task { await auth.restore() } }
-                    }
+                    .modifier(SessionLifecycle(model: auth))
                     .preferredColorScheme(appearance.colorScheme)
                     .tint(ArgusStyle.ink)
                     .foregroundStyle(ArgusStyle.ink)
                     .font(ArgusStyle.body())
+            }
+    }
+}
+
+struct SessionLifecycle: ViewModifier {
+    @ObservedObject var model: ProfileAuthModel
+    @Environment(\.scenePhase) private var scenePhase
+
+    func body(content: Content) -> some View {
+        content
+            .task { await model.start() }
+            .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
+                Task { await model.restore() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await model.restore() } }
             }
     }
 }

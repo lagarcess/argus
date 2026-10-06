@@ -28,7 +28,8 @@ final class IdentitySignInTests: XCTestCase, @unchecked Sendable {
         let fixture = try SessionFixture()
         let client = try fixture.controller()
         let nonce = SignInNonce()
-        let snapshot = try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: nonce))
+        let outcome = try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: nonce))
+        let snapshot = outcome.session
         XCTAssertEqual(snapshot.phase, .authenticated)
         XCTAssertEqual(snapshot.profile?.id, fixture.server.alice.uuidString)
 
@@ -56,9 +57,9 @@ final class IdentitySignInTests: XCTestCase, @unchecked Sendable {
     func testGoogleSendsAccessTokenForAtHash() async throws {
         let fixture = try SessionFixture()
         let client = try fixture.controller()
-        let snapshot = try await client.signIn(with: .init(provider: .google, idToken: AuthServer.bobIdToken,
+        let outcome = try await client.signIn(with: .init(provider: .google, idToken: AuthServer.bobIdToken,
                                                            nonce: SignInNonce(), accessToken: "ya29.synthetic"))
-        XCTAssertEqual(snapshot.profile?.id, fixture.server.bob.uuidString)
+        XCTAssertEqual(outcome.session.profile?.id, fixture.server.bob.uuidString)
         let exchanges = await idTokenRequests(fixture)
         let sent = try body(XCTUnwrap(exchanges.first))
         XCTAssertEqual(sent["provider"] as? String, "google")
@@ -142,7 +143,8 @@ final class IdentitySignInTests: XCTestCase, @unchecked Sendable {
     func testAppleCodeCaptureUsesTheSessionBearer() async throws {
         let fixture = try SessionFixture()
         let client = try fixture.controller()
-        let snapshot = try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce()))
+        let outcome = try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce()))
+        let snapshot = outcome.session
         try await client.captureAppleAuthorizationCode("c0de.synthetic", expectedIdentity: snapshot)
         let captured = await fixture.server.captured()
         let capture = try XCTUnwrap(captured.last)
@@ -153,7 +155,7 @@ final class IdentitySignInTests: XCTestCase, @unchecked Sendable {
 
         await fixture.server.configureCapture(status: 404)
         do { try await client.captureAppleAuthorizationCode("c0de.synthetic", expectedIdentity: snapshot); XCTFail("Expected off") }
-        catch { XCTAssertEqual(error as? SessionFailure, .rejected(status: 404, code: "apple_token_capture_unavailable")) }
+        catch { XCTAssertEqual(error as? SessionFailure, .rejected(status: 404, code: nil)) }
         let still = await client.snapshot()
         XCTAssertEqual(still.phase, .authenticated, "A capture failure never ends the session")
     }
@@ -161,9 +163,73 @@ final class IdentitySignInTests: XCTestCase, @unchecked Sendable {
     func testAppleCodeCaptureRefusesStaleIdentity() async throws {
         let fixture = try SessionFixture()
         let client = try fixture.controller()
-        let snapshot = try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce()))
+        let outcome = try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce()))
+        let snapshot = outcome.session
         _ = try await client.signOut()
         do { try await client.captureAppleAuthorizationCode("c0de.synthetic", expectedIdentity: snapshot); XCTFail("Expected stale") }
         catch { XCTAssertEqual(error as? SessionFailure, .staleOperation) }
     }
+    func testCapturePreservesSafeServerFailureAndBoundsCode() async throws {
+        let fixture = try SessionFixture()
+        let client = try fixture.controller()
+        let snapshot = try await fixture.login(client)
+        await fixture.server.configureCapture(status: 503, code: "apple_sign_in_unavailable")
+        do { try await client.captureAppleAuthorizationCode("fresh-code", expectedIdentity: snapshot); XCTFail("Expected unavailable") }
+        catch { XCTAssertEqual(error as? SessionFailure, .rejected(status: 503, code: "apple_sign_in_unavailable")) }
+        for code in ["", String(repeating: "a", count: 513), "á"] {
+            do { try await client.captureAppleAuthorizationCode(code, expectedIdentity: snapshot); XCTFail("Expected local bounds refusal") }
+            catch { XCTAssertEqual(error as? SessionFailure, .invalidResponse) }
+        }
+        let count = await fixture.server.count("/authorization-code")
+        XCTAssertEqual(count, 1)
+    }
+
+    func testProviderSignInAwaitsOneCaptureAndKeepsSessionOnCaptureFailure() async throws {
+        for (status, code) in [(404, Optional<String>.none), (409, "apple_identity_mismatch"), (503, "apple_sign_in_unavailable")] {
+            let fixture = try SessionFixture()
+            let client = try fixture.controller()
+            let gate = RequestGate()
+            await fixture.server.configureCapture(status: status, code: code)
+            await fixture.server.holdCapture(gate)
+            let signIn = Task { try await client.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce()), appleAuthorizationCode: "one-time-code") }
+            await gate.waitUntilStarted()
+            do { _ = try await client.restore(); XCTFail("Composite sign-in must still own mutation") }
+            catch { XCTAssertEqual(error as? SessionFailure, .busy) }
+            await gate.release()
+            let result = try await signIn.value
+            XCTAssertEqual(result.session.phase, .authenticated)
+            XCTAssertEqual(result.appleCapture, .failed(.rejected(status: status, code: code)))
+            let requests = await fixture.server.captured()
+            XCTAssertEqual(requests.filter { $0.url?.path.hasSuffix("/authorization-code") == true }.count, 1)
+            XCTAssertFalse(requests.contains { $0.url?.path.hasSuffix("/logout") == true })
+        }
+    }
+
+    func testCaptureUnauthorizedNeverReplaysConsumedCode() async throws {
+        let fixture = try SessionFixture()
+        let client = try fixture.controller()
+        _ = try await fixture.login(client)
+        await fixture.server.configureCapture(status: 401, code: "unauthorized")
+        let identity = await client.snapshot()
+        do { try await client.captureAppleAuthorizationCode("one-time-code", expectedIdentity: identity); XCTFail("Expected invalid session") }
+        catch { XCTAssertEqual(error as? SessionFailure, .unauthorized) }
+        let captured = await fixture.server.captured()
+        XCTAssertEqual(captured.filter { $0.url?.path.hasSuffix("/authorization-code") == true }.count, 1)
+    }
+
+    func testCaptureErrorCodesAreSafeAndAnExpiredCodeNeedsFreshAuthorization() async throws {
+        for (status, code, expected) in [
+            (400, "apple_authorization_invalid", AppleCaptureOutcome.freshAuthorizationRequired),
+            (503, "private detail with spaces", .failed(.unavailable)),
+            (503, "", .failed(.unavailable)),
+            (204, "", .saved)
+        ] {
+            let fixture = try SessionFixture()
+            await fixture.server.configureCapture(status: status, code: code)
+            let result = try await fixture.controller().signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce()), appleAuthorizationCode: String(repeating: "a", count: 512))
+            XCTAssertEqual(result.appleCapture, expected)
+            XCTAssertEqual(result.session.phase, .authenticated)
+        }
+    }
+
 }

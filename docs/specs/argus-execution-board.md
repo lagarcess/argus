@@ -1,6 +1,6 @@
 # Argus private iPhone execution manifest
 
-**Updated:** October 4, 2026.
+**Updated:** October 6, 2026.
 **Execution state:** The code checkpoint in this tree includes #809, #790, #810 and #812, reconciled with the October 4 foundation documents. See the [code landing record](../reports/2026-10-04-cuadrao-code-integration-landing.md) for merge lineage, exact source trees, reviews and verification limits; the final PR landing comment records its merge and terminal integration CI. Fresh Mac verification passed 24 release UI journeys and ten combined invitation/chart/Search journeys, with no skips or failures. The earlier full candidate suite remains 119 passed, 48 skipped and zero failures. The phone is offline; no new build was installed by this landing. Connected physical-phone acceptance and external TestFlight readiness remain open.
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
@@ -146,6 +146,20 @@ needs the actual connected phone build. Broader Liquid Glass adoption remains
 off the launch critical path.
 
 ### Release gates still open
+
+October 5 Trust and Foundations checkpoint through integration `c0d44d399b8fbf2edcdd0a8fd3ad4759a0e9c548` includes [#851](https://github.com/lagarcess/argus/pull/851), [#844](https://github.com/lagarcess/argus/pull/844), [#846](https://github.com/lagarcess/argus/pull/846), [#858](https://github.com/lagarcess/argus/pull/858), [#857](https://github.com/lagarcess/argus/pull/857), [#863](https://github.com/lagarcess/argus/pull/863) and [#853](https://github.com/lagarcess/argus/pull/853) and [#868](https://github.com/lagarcess/argus/pull/868) and [#862](https://github.com/lagarcess/argus/pull/862), [#849](https://github.com/lagarcess/argus/pull/849), [#869](https://github.com/lagarcess/argus/pull/869) and [#847](https://github.com/lagarcess/argus/pull/847), and [#854](https://github.com/lagarcess/argus/pull/854), and [#845](https://github.com/lagarcess/argus/pull/845), and [#865](https://github.com/lagarcess/argus/pull/865), and [#871](https://github.com/lagarcess/argus/pull/871). These slices add release sign-in safeguards, local deletion recovery proof, Apple credential subject binding, official button appearance, a synthetic canary fixture repair and authoritative primary-currency persistence with partial profile updates. Narrow defects #861, #848 and #867 are resolved. Parent launch issues remain open; social sign-in/deletion remain disabled. [The run record](../reports/evidence/cuadrao-trust-20261005/active-queue-20261005.md) owns exact lineage, independent proof, integration checks and the remaining queue.
+
+October 6 session checkpoint: [#864](https://github.com/lagarcess/argus/pull/864) landed as `5d46a73d4d97b0412dccff517eb43c73e4316977`. Existing session provenance, Apple validation and authoritative profile identity passed independent native/local and exact-head CI checks. [Landing record](../reports/evidence/cuadrao-trust-20261005/pr864-landing-record.json) owns counts and remaining gates. Native name/deletion adapters, phone/provider/hosted proof and activation remain separate; #800/#803 remain open. Housekeeping proceeds through #873.
+
+October 6 name checkpoint: [#874](https://github.com/lagarcess/argus/pull/874) landed as `a2c65549b3ffcb97ee0be24b971110be8c090b32`. The native Apple name journal preserves first-grant input and derives retry from the existing session owner and canonical server initializer. [Landing record](../reports/evidence/cuadrao-trust-20261005/pr874-landing-record.json) owns the separate local proof, retained source hashes and phone/provider/hosted gates. Deletion UI and cleanup remain separate.
+
+October 6 deletion core checkpoint: [#875](https://github.com/lagarcess/argus/pull/875) landed as `8146d16e90633eb543781f8882665482f0d5dca9`. Journaled native deletion handles interruption, uncertainty, pending retirement and validated completion through the existing session owner. [Landing record](../reports/evidence/cuadrao-trust-20261005/pr875-landing-record.json) preserves local proof and limits. Final UI, atomic receipt cleanup, provider/hosted/phone acceptance and activation remain open; no frozen-balance semantics are invented.
+
+October 6 cleanup checkpoint: [#876](https://github.com/lagarcess/argus/pull/876) landed as `184d2614e4d2beb5ed994bd3cd8f3a5ef211f1dd`. Confirmed local cleanup admission is atomic with session validation and acknowledgment; failed cleanup retains the existing completed journal for local-only retry. [Record](../reports/evidence/cuadrao-trust-20261005/pr876-landing-record.json) preserves filesystem and SDK proof. Actual receipt-store/UI integration and external acceptance remain separate.
+
+October 6 reconciliation checkpoint (integration `df3882668413e7978d3983adfe1f054cb83595c4`): the [launch reconciliation](../reports/2026-10-06-cuadrao-launch-reconciliation.md) matches every #817 child to its landed merge commit and acceptance evidence. It records that #835 merged as `7e0c0b1d99c71bf121f3891beab56e74087668c2` and that this board is on integration, correcting #817's October 4 text. Apart from #676 (closed `implemented` and `verified`), no in-scope issue earns `implemented`, `verified` or `enabled` at issue level. Six product decisions (#798 policy, #805 balance source, #828 consent scope, #819 space model, #818/#826 first chat jobs and memory/voice, #803 late revocation) remain open in the Trust gates record and are the exact blockers for #818, #819, #798, #805, #828 and #803. The finite scope matrix in #818 does not exist yet and blocks eleven issues. Open PRs #781 (legal draft), #732 (web preview) and #646 (result follow-up) keep their holds; #774 is superseded by the restored [PR #773 landing register](#pr-773-integration-landing); #744 is merged history. October 6 founder decision: the consumer assistant is the agentic assistant, memory and voice are in release 1, and the old Argus chat code stays until the founder removes it ([decision log](argus-decision-log.md#october-6-2026-first-release-assistant-and-memory-and-voice-scope)). The first chat jobs and the consent scope and versioning remain open. The restored-UI recovery is handed to #877 in the [recovery handoff](../reports/2026-10-06-cuadrao-877-recovery-handoff.md). Final phone acceptance precedes any authorized runtime landing. This checkpoint changes no issue scope and authorizes no merge, flag, migration, provider run, deployment or submission.
+
+The founder selected the existing approved Preview3427 interface for mobile recovery. Counsel owns that presentation work on `codex/cuadrao-connected-preview`; Trust preserves the session, consent and deletion action owners. Money or auth tests alone do not prove full UI acceptance. GitHub runner-allocation mitigation restored executing checks; every remaining slice still requires its terminal exact-head CI. Phone, hosted/provider proof and legal approval remain open.
 
 - [x] October 5 overnight landing: #835, #837, #838, #836 and #839 merged with
   independent reviews; integration `19f0dc3af`. Bounded slices of #822 and #824
@@ -350,7 +364,12 @@ relaxation or feature enablement is authorized.
 
 ## Connected shared Household planning lane
 
-**Assigned 2026-10-01; connected local acceptance complete; independent review clean.** Full original integration base:
+**Landed 2026-10-02 via [PR #773](https://github.com/lagarcess/argus/pull/773)** (Exact head
+`dee829f8a3a7f83fb25cd81aaf3fa6deac8bfe45`; product squash
+`f28b56421caf71d6610caf1cce891e1848e0ace1` onto tip `15e579315…`). See
+[PR #773 integration landing](#pr-773-integration-landing).
+
+**Assigned 2026-10-01; connected local acceptance complete; independent review clean; merge complete.** Full original integration base:
 `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`, freshly fetched and verified to
 include #763/#764, #760/#765 and #766/#767. Worker:
 `codex/shared-household-planning`, isolated managed worktree. Preserve the landed
@@ -555,14 +574,15 @@ shows own correction, authorized bill edit, Search return and Spanish reopen.
 use only 59750–59755, the new bundle/cache and retained synthetic users/data.
 
 **Remaining limits:** no physical-iPhone/internet verification, deployment,
-hosted migration/enablement or external invitation delivery. The lane remains
-unmerged. One non-blocking invalid-frame runtime warning is retained in the
-native result; the established root/design is unchanged. Other MVEE journeys,
-including imports, Updates and conversation/voice, keep their existing owners
-and scope in this manifest. Completed writers/reviewer are stopped. The demo API,
-Auth/Postgres and CAPTCHA bridge remain available; temporary fault/recording
-helpers are stopped. Existing demos, design simulator/cache and phone services
-are preserved.
+hosted migration/enablement or external invitation delivery. The product squash
+is landed on integration; additive migrations are not production-applied. One
+non-blocking invalid-frame runtime warning is retained in the native result; the
+established root/design is unchanged. Other MVEE journeys, including imports,
+Updates and conversation/voice, keep their existing owners and scope in this
+manifest. Completed writers/reviewer are stopped. The demo API, Auth/Postgres
+and CAPTCHA bridge remain available; temporary fault/recording helpers are
+stopped. Existing demos, design simulator/cache and phone services are
+preserved.
 
 ### Outcome, owners and execution
 
@@ -755,6 +775,42 @@ this lane's four shared-plan journeys, recording and assembled acceptance remain
 undelivered and required. The next writer resumes the existing branch and fixed
 design snapshot, not a new roadmap or a replacement environment.
 
+## PR #773 integration landing
+
+Founder-confirmed squash merge of the verified shared Household planning head;
+integration landing completes the register under standing Project authority.
+This grant does not authorize deployment, hosted configuration changes, paid
+providers, phone-environment actions, design-checkpoint adoption, Preview
+repair, ingestion edits (#768–#772), chat/voice stack work or another delivery
+lane.
+
+- [PR #773](https://github.com/lagarcess/argus/pull/773) squash-merged at
+  **October 2, 2026, 00:47:28 UTC** as
+  `f28b56421caf71d6610caf1cce891e1848e0ace1`, from verified Exact head
+  `dee829f8a3a7f83fb25cd81aaf3fa6deac8bfe45` onto tip
+  `15e57931584b21dd7f9e453dbeb9127fc4b8cff3`. Integration was already the
+  worker merge-base; no reconciliation merge and no intervening semantic
+  overlap. Squash tree matches worker tree `2f55d72b…`.
+- Pre-merge Exact head: PR CI / push CI / local smoke SUCCESS; Supabase Preview
+  SKIPPED at concurrent-branch limit (not a sole gate); Codex P1 contributor
+  freeze fixed and resolved; **0** unresolved review threads; modularity budget
+  clean.
+- `ARGUS_HOUSEHOLDS_ENABLED` remains default-off in `.env.example`,
+  `render.yaml`, and the release profile (October 6 readback; the original
+  record also named `.github/argus-env.sh`, which no longer carries it). Additive migrations
+  `20261001190000` and `20261002000000`–`20261002050000` are not applied to
+  production and do not claim ingestion reserved
+  `20261002120000`–`20261002120300`.
+- Accepted proof retains the assembled native/API/Postgres packet under
+  [shared-household-planning evidence](../reports/evidence/shared-household-planning/),
+  including four-kind journey, response-loss recovery, three-user isolation and
+  disabled-Household Personal surfaces. Retained demo ports `59750`–`59755`
+  preserved.
+- Remaining outside this land: physical iPhone/internet delivery; external
+  invitation delivery; hosted enablement; Preview repair; design checkpoint
+  `aba489b0…` adoption. Detail:
+  [landing report](../reports/2026-10-02-pr-773-integration-landing.md).
+
 ## PR #766 integration landing
 
 Founder-confirmed squash merge of the verified Household native head;
@@ -785,9 +841,10 @@ stack work or another delivery lane.
   sign-in rate limit and is **not** claimed passing; same-fixture continuation
   and focused gates are.
 - Remaining outside this land: physical iPhone/internet delivery; external
-  invitation delivery; shared Plan/budgets/goals/debt; Business/Custom;
-  hosted enablement; design-checkpoint adoption; Accounts tab; Apple on the
-  connected path. Detail:
+  invitation delivery; Business/Custom; hosted enablement; design-checkpoint
+  adoption; Accounts tab; Apple on the connected path. Shared
+  Plan/budgets/goals/debt later landed via [PR #773](#pr-773-integration-landing).
+  Detail:
   [landing report](../reports/2026-10-01-pr-766-integration-landing.md).
 
 ## PR #763 integration landing
@@ -816,9 +873,10 @@ design-branch work or another delivery lane.
   (`tests/household/conftest.py`). No durable real Auth/Postgres/RLS evidence is
   cited here.
 - Remaining MVEE Household work after this membership land was completed for the
-  bounded native consent/activity package by [PR #766](#pr-766-integration-landing).
-  Shared plans/contributions, external invitation delivery, physical-phone
-  proof, and hosted enablement remain outside. Detail:
+  bounded native consent/activity package by [PR #766](#pr-766-integration-landing)
+  and for shared Plan consumers by [PR #773](#pr-773-integration-landing).
+  External invitation delivery, physical-phone proof, and hosted enablement
+  remain outside. Detail:
   [landing report](../reports/2026-10-01-pr-763-integration-landing.md).
 
 ## Connected Spaces and Household lane
@@ -835,11 +893,12 @@ policy. `ARGUS_HOUSEHOLDS_ENABLED` stays server-default-off. Durable evidence:
 Restart recipe: [ios/HOUSEHOLD_SETUP.md](../../ios/HOUSEHOLD_SETUP.md).
 
 **Remaining outside the landed package:** physical iPhone/internet delivery;
-external invitation delivery; shared Plan/budgets/goals/debt; Business/Custom
-lifecycle; hosted migration/enablement; Accounts tab; Apple on the connected
-path; design-checkpoint adoption (`1dcd12a5` / `1b2005fd9` parked). Existing
-#760 shared-shell / Personal Search dark contrast polish remains recorded, not
-claimed fixed here.
+external invitation delivery; Business/Custom lifecycle; hosted
+migration/enablement; Accounts tab; Apple on the connected path;
+design-checkpoint adoption (`1dcd12a5` / `1b2005fd9` parked). Shared
+Plan/budgets/goals/debt consumers landed via
+[PR #773](#pr-773-integration-landing). Existing #760 shared-shell / Personal
+Search dark contrast polish remains recorded, not claimed fixed here.
 
 Worker branch `codex/connected-household-native` and its isolated checkout are
 closed for active delivery after this landing. Earlier competing membership
@@ -3087,9 +3146,9 @@ sequence rather than a separate deferral policy in this document.
 | [Activity][mvee-activity] and [refunds][mvee-refunds], D03 | #745 expense/correction core; landed #747 five-kind manual entry, paired correction/history and refunds | Local assembled acceptance and scoped review passed; authorized phone proof remains; intake, household and agentic adapters retain D08/D07/D14 owners | Financial core | Account identity; shared posting contract | Device entry/correction recordings plus atomicity, retry and concurrency tests |
 | [Reconciliation][mvee-activity], D03 | #745 immutable balance checks and coverage; #747 per-account paired coverage; [handoff cases](argus-account-balance-reconciliation-handoff.md) | Paired coverage/recovery passed locally; authorized phone verification remains; checks before the latest observation remain an explicit technical limitation | Financial core | Account/activity identity | Replay the handoff cases on the candidate; retain before/after reads and relaunch evidence |
 | [Home][mvee-home], D05 | #745 known/unknown positions; #747 monthly actuals; PR #749 landed locally verified commitments and dated cash forecast | Complete remaining approved Home contexts/chart/destinations through their owners; verify assembled Home on the physical phone | Planning/Home | D02/D03 position; D06 forecasts; D04/D07 contexts; D08 resume | Phone walkthrough with source-record/read-model comparisons |
-| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants are locally verified in #773 pending merge; physical-phone proof remains pending | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
+| [Plan][mvee-plan], D06 | Existing calculators; locked design; PR #749 landed locally verified commitments, recurrence, fulfillment and forecast | PR #753 landed locally verified personal monthly budgets with actual progress, contributors and Search; PR #755 landed locally verified personal savings goals with approved account-backed allocations and retained native/API/database evidence; PR #757 landed locally verified personal debt-plan lifecycles with native/API/database evidence; shared variants landed locally verified in #773 (`f28b5642…`); physical-phone proof remains pending | Planning/Home | Financial posting/link contract; D07 for shared variants | Device plan lifecycle recordings and linked-record/forecast readbacks |
 | [Spaces][mvee-spaces] and [account moves][mvee-moves], D04 | Personal default; fixed Cuadrao space/household flow in #762 | Assigned Household context adapter in the active lane above; private Business/Custom lifecycle and account moves remain unassigned work | Financial core + Household captain | Account identity; membership/grants for Household; affected links for moves | Two-user native context proof for this lane; later private lifecycle/move evidence remains required |
-| [Household][mvee-household], D07 | #763/#766 landed membership, invitations, explicit account consent and canonical activity with retained native/API/Postgres proof | #773 locally verifies shared budgets, bills, goals, debt commitments and private contributions; merge pending. External invitation delivery, other authorized consumers and physical-phone/hosted delivery remain required | Household captain; existing membership, financial and allocation owners | Approved rights/departure policy; canonical Recording/Plan; fixed `7f72dfd7` presentation | Two member identities plus unauthorized C; four-kind native journey, recovery, English/Spanish, real Postgres privacy/removal tests; phone/internet proof still pending |
+| [Household][mvee-household], D07 | #763/#766/#773 landed membership, invitations, explicit account consent, canonical activity and shared budgets/bills/goals/debt with retained native/API/Postgres proof | External invitation delivery, other authorized consumers and physical-phone/hosted delivery remain required | Household captain; existing membership, financial and allocation owners | Approved rights/departure policy; canonical Recording/Plan; fixed `7f72dfd7` presentation | Two member identities plus unauthorized C; four-kind native journey, recovery, English/Spanish, real Postgres privacy/removal tests; phone/internet proof still pending |
 | [Intake][mvee-intake], D08/D03/D13/D14 | Manual account entry; synthetic review/retry kit | Build production source/review pipeline and shared posting adapter | Intake | File/provider policy; D03 confirmation; D07 shared sources; D14 language actions | Authorized sample corpus runs, source-preview recordings and interrupted-import readbacks |
 | [Argus][mvee-argus], D09 | Existing runtime/SSE/tools and persisted artifacts | Connect native conversation client and authorized context adapters | Conversation/voice | Existing APIs; relevant domain reads; live-provider authority | Phone conversation replay and persisted artifact/evidence comparison |
 | [Voice][mvee-voice], D13 | Existing conversation services; selected provider direction | Integrate audio transport with the existing conversation path | Conversation/voice | Audio policy/provider grant; D14 only for financial actions | Device speech/cancel/recovery recordings and latency/cost receipts |

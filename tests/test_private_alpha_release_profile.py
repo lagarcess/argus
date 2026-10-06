@@ -48,6 +48,14 @@ def _profile() -> dict[str, Any]:
     return json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
 
 
+def test_invite_code_surfaces_are_declared_off_by_default() -> None:
+    from argus.domain.household.invite_codes import CODE_FLAGS
+
+    env = _profile()["services"]["api"]["env"]
+    for flag in CODE_FLAGS:
+        assert env[flag] == "false"
+
+
 def test_release_profile_is_non_secret_and_defines_the_fixed_canary() -> None:
     profile = _profile()
     serialized = json.dumps(profile).lower()
@@ -169,7 +177,17 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
     render_api_env = {
         item["key"]: item.get("value") for item in render_api["envVars"]
     }
-    env_contract = (ROOT / ".github" / "argus-env.sh").read_text(encoding="utf-8")
+    env_contract = subprocess.run(
+        [
+            "bash",
+            "-euc",
+            'source .github/argus-env.sh; printf "%s\\n" "${ARGUS_RENDER_API_ENV[@]}"',
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
     backend_example = (ROOT / ".env.example").read_text(encoding="utf-8")
 
     assert render_api_env["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"] == "true"
@@ -177,7 +195,7 @@ def test_public_account_access_is_open_in_every_release_contract() -> None:
         profile["services"]["api"]["env"]["ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED"]
         == "true"
     )
-    assert "  ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED\n" in env_contract
+    assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED" in env_contract
     assert "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED=true" in backend_example
 
 

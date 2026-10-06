@@ -3,12 +3,15 @@ import ArgusSession
 
 @MainActor
 final class ProfileAuthModel: ObservableObject {
-    enum State { case disabled, configurationInvalid, signedOut, authenticated, pendingSignOut, unsupportedAnonymous }
+    enum State { case accountDeletionUncertain, accountDeletionPending, disabled, configurationInvalid, signedOut, authenticated, pendingSignOut, unsupportedAnonymous, credentialValidationRequired, reauthenticationRequired }
     @Published private(set) var state: State = .disabled
     @Published private(set) var busy = false
     @Published private(set) var profile: SessionProfile?
     @Published private(set) var confirmationRequired = false
     @Published private(set) var errorKey: String?
+    @Published private(set) var appleNameSave: AppleNameSaveOutcome?
+    @Published private(set) var appleCapture: AppleCaptureOutcome?
+    @Published var captureNoticePresented = false
     @Published private(set) var accounts: AccountsModel?
     @Published private(set) var financialLoop: FinancialLoopModel?
     @Published private(set) var household: HouseholdModel?
@@ -19,24 +22,32 @@ final class ProfileAuthModel: ObservableObject {
     let providers: NativeProviderConfiguration
     private let controller: SessionController?
     private var started = false
+    private var revalidationRequested = false
+    private var captureNoticeAwaitingSession = false
 
-    init() {
+    convenience init() {
         var loadedConfiguration: NativeAuthConfiguration?
         var loadedController: SessionController?
         var initialState = State.disabled
         do {
             loadedConfiguration = try NativeAuthConfiguration.load()
             if let loadedConfiguration {
-                loadedController = try SessionController(configuration: loadedConfiguration.session)
+                loadedController = try SessionController(configuration: loadedConfiguration.session, appleChecker: NativeAppleCredentialChecker())
                 initialState = .signedOut
             }
         } catch {
             loadedConfiguration = nil
             initialState = .configurationInvalid
         }
+        self.init(configuration: loadedConfiguration, controller: loadedController,
+                  providers: loadedController == nil ? .off : NativeProviderConfiguration.load(), initialState: initialState)
+    }
+
+    init(configuration loadedConfiguration: NativeAuthConfiguration?, controller loadedController: SessionController?,
+         providers: NativeProviderConfiguration = .off, initialState: State = .signedOut) {
         configuration = loadedConfiguration
         controller = loadedController
-        providers = loadedController == nil ? .off : NativeProviderConfiguration.load()
+        self.providers = providers
         state = initialState
         if let loadedController {
             financialSearch = FinancialSearchModel(controller: loadedController, prefix: (loadedConfiguration?.session.storagePrefix ?? "") + ".search.")
@@ -72,11 +83,32 @@ final class ProfileAuthModel: ObservableObject {
     }
 
     func restore() async {
-        guard let controller, !busy else { return }
-        await perform {
-            if state == .authenticated { return try await controller.profile() }
-            return try await controller.restore()
+        guard let controller else { return }
+        do {
+            accept(try await controller.requestCredentialRevalidation())
+        } catch {
+            accept(await controller.snapshot())
+            errorKey = Self.messageKey(error)
         }
+        revalidationRequested = true
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        repeat {
+            revalidationRequested = false
+            errorKey = nil
+            do {
+                accept(try await controller.restore { [weak self] snapshot in await self?.accept(snapshot) })
+            } catch {
+                accept(await controller.snapshot())
+                errorKey = Self.messageKey(error)
+            }
+        } while revalidationRequested
+    }
+
+    private func finishOperation() {
+        busy = false
+        if revalidationRequested { Task { await restore() } }
     }
 
     func authenticate(email: String, password: String, captchaToken: String, signup: Bool, language: String, displayName: String) async {
@@ -84,7 +116,7 @@ final class ProfileAuthModel: ObservableObject {
         busy = true
         errorKey = nil
         confirmationRequired = false
-        defer { busy = false }
+        defer { finishOperation() }
         do {
             if signup {
                 let outcome = try await controller.signup(email: email, password: password, captchaToken: captchaToken,
@@ -107,26 +139,51 @@ final class ProfileAuthModel: ObservableObject {
     /// Native Apple or Google sign-in through Supabase's id_token grant. Lands in the same
     /// session path as email sign-in. Returns false on failure (errorKey is set).
     @discardableResult
-    func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil) async -> Bool {
+    func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil,
+                appleNameAuthorization: AppleNameAuthorization? = nil) async -> Bool {
         guard let controller, !busy, state == .signedOut else { return false }
         busy = true
         errorKey = nil
         confirmationRequired = false
-        defer { busy = false }
+        defer { finishOperation() }
         do {
-            let snapshot = try await controller.signIn(with: credential)
-            accept(snapshot)
-            if let appleAuthorizationCode {
-                // Best effort, for Apple token revocation at account deletion. The server
-                // answers 404 while capture is off; sign-in never depends on it.
-                Task { try? await controller.captureAppleAuthorizationCode(appleAuthorizationCode, expectedIdentity: snapshot) }
-            }
+            let outcome = try await controller.signIn(with: credential, appleAuthorizationCode: appleAuthorizationCode, appleNameAuthorization: appleNameAuthorization)
+            accept(outcome.session)
+            appleNameSave = outcome.appleName
+            appleCapture = outcome.appleCapture
+            captureNoticeAwaitingSession = state != .authenticated && captureNoticeKey != nil
+            captureNoticePresented = state == .authenticated && captureNoticeKey != nil
             return true
         } catch {
             accept(await controller.snapshot())
             errorKey = Self.messageKey(error)
             return false
         }
+    }
+
+    func retryAppleNameSave() async {
+        guard let controller, state == .authenticated else { return }
+        let identity = await controller.snapshot()
+        await perform { try await controller.retryAppleNameInitialization(expectedIdentity: identity) }
+    }
+
+    func prepareAppleName(displayName: String?, subject: String) throws -> AppleNameAuthorization {
+        guard let controller, !busy, state == .signedOut else { throw SessionFailure.staleOperation }
+        return try controller.prepareAppleName(displayName: displayName, subject: subject)
+    }
+
+    var captureNoticeKey: String? {
+        switch appleCapture {
+        case .freshAuthorizationRequired: "auth.apple.capture.fresh"
+        case .failed: "auth.apple.capture.failed"
+        case .saved, .none: nil
+        }
+    }
+
+    func dismissCaptureNotice() {
+        captureNoticePresented = false
+        captureNoticeAwaitingSession = false
+        appleCapture = nil
     }
 
     func setPrimaryCurrency(_ currency: String) async {
@@ -160,7 +217,7 @@ final class ProfileAuthModel: ObservableObject {
         guard !busy else { return }
         busy = true
         errorKey = nil
-        defer { busy = false }
+        defer { finishOperation() }
         do { accept(try await action()) }
         catch {
             if let controller { accept(await controller.snapshot()) }
@@ -169,6 +226,7 @@ final class ProfileAuthModel: ObservableObject {
     }
 
     private func accept(_ snapshot: SessionSnapshot) {
+        if snapshot.phase != .authenticated { captureNoticePresented = false }
         household?.bind(snapshot)
         invitations?.bind(snapshot)
         financialSearch?.bind(snapshot)
@@ -176,10 +234,19 @@ final class ProfileAuthModel: ObservableObject {
         financialLoop?.bind(snapshot)
         profile = snapshot.profile
         switch snapshot.phase {
-        case .signedOut: state = .signedOut
-        case .authenticated: state = .authenticated
+        case .accountDeletionUncertain: state = .accountDeletionUncertain; dismissCaptureNotice()
+        case .accountDeletionPending: state = .accountDeletionPending; dismissCaptureNotice()
+        case .signedOut: state = .signedOut; appleNameSave = nil; dismissCaptureNotice()
+        case .authenticated:
+            if captureNoticeAwaitingSession {
+                captureNoticePresented = true
+                captureNoticeAwaitingSession = false
+            }
+            state = .authenticated
         case .signOutPending: state = .pendingSignOut
         case .unsupportedAnonymousSession: state = .unsupportedAnonymous
+        case .credentialValidationRequired: state = .credentialValidationRequired
+        case .reauthenticationRequired: state = .reauthenticationRequired
         }
     }
 
@@ -192,6 +259,7 @@ final class ProfileAuthModel: ObservableObject {
         case .unsupportedAnonymousTransfer: return "auth.error.anonymous"
         case .invalidConfiguration: return "auth.error.configuration"
         case .rejected(let status, _):
+            if status >= 500 { return "auth.error.unavailable" }
             return status == 429 ? "auth.error.rateLimit" : "auth.error.rejected"
         default: return "auth.error.unavailable"
         }

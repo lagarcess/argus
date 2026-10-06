@@ -128,10 +128,14 @@ struct ConnectedProviderButtons: View {
                 return
             }
             let code = apple.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
+            let formattedName = apple.fullName.map { PersonNameComponentsFormatter().string(from: $0) }
+            let nameAuthorization: AppleNameAuthorization
+            do { nameAuthorization = try auth.prepareAppleName(displayName: formattedName, subject: apple.user) }
+            catch { failed = true; return }
             Task {
                 failed = false
                 let ok = await auth.signIn(with: IdentityTokenCredential(provider: .apple, idToken: token, nonce: nonce),
-                                           appleAuthorizationCode: code)
+                                           appleAuthorizationCode: code, appleNameAuthorization: nameAuthorization)
                 failed = !ok
             }
         }
@@ -167,4 +171,22 @@ struct ConnectedProviderButtons: View {
         return top
     }
     #endif
+}
+
+
+struct NativeAppleCredentialChecker: AppleCredentialChecking {
+    func state(for subject: String) async throws -> AppleCredentialState {
+        try await withCheckedThrowingContinuation { continuation in
+            ASAuthorizationAppleIDProvider().getCredentialState(forUserID: subject) { state, error in
+                if error != nil { continuation.resume(throwing: SessionFailure.unavailable); return }
+                switch state {
+                case .authorized: continuation.resume(returning: .authorized)
+                case .revoked: continuation.resume(returning: .revoked)
+                case .notFound: continuation.resume(returning: .notFound)
+                case .transferred: continuation.resume(returning: .transferred)
+                @unknown default: continuation.resume(throwing: SessionFailure.unavailable)
+                }
+            }
+        }
+    }
 }

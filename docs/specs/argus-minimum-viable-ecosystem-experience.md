@@ -635,6 +635,11 @@ chat maintenance and security fixes continue independently.
 
 #### Continuous Cuadrao conversation
 
+Founder decision, October 6, 2026: the consumer assistant is this agentic
+assistant, and memory and voice are in release 1. The old Argus chat code stays
+until the founder decides to remove it. See the
+[decision log](argus-decision-log.md#october-6-2026-first-release-assistant-and-memory-and-voice-scope).
+
 Founder direction, October 4, 2026. Cuadrao should support an ongoing conversation
 that carries a person's work forward. The first runtime contract in
 [#826](https://github.com/lagarcess/argus/issues/826) must define the following

@@ -9,6 +9,7 @@ import os
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 
 import pytest
 
@@ -283,7 +284,63 @@ def test_single_use_claim_checks_its_row_count_even_without_the_lock(lane, monke
     ) == (1,)
 
 
-def test_revoke_in_flight_on_a_full_link_is_not_counted_as_overflow(lane):
+def _lock_waiter_count(probe, backend_pid: int) -> int:  # noqa: ANN001
+    return probe.execute(
+        "select count(*) from pg_stat_activity"
+        " where wait_event_type='Lock' and pid=%s",
+        (backend_pid,),
+    ).fetchone()[0]
+
+
+def test_lock_wait_observer_ignores_an_unrelated_owned_waiter():
+    """A second test-owned waiter cannot stand in for the target connection."""
+    import time
+    from uuid import uuid4
+
+    lock_key = uuid4().int % (2**63)
+    with (
+        psycopg.connect(DSN, autocommit=True) as holder,
+        psycopg.connect(DSN, autocommit=True) as unrelated,
+        psycopg.connect(DSN, autocommit=True) as target,
+        psycopg.connect(DSN, autocommit=True) as probe,
+    ):
+        holder.execute("select pg_advisory_lock(%s)", (lock_key,))
+        worker = threading.Thread(
+            target=unrelated.execute,
+            args=("select pg_advisory_lock(%s)", (lock_key,)),
+        )
+        worker.start()
+        try:
+            deadline = time.monotonic() + 10
+            while not _lock_waiter_count(probe, unrelated.info.backend_pid):
+                assert time.monotonic() < deadline, "owned control never waited"
+                time.sleep(0.02)
+            assert _lock_waiter_count(probe, target.info.backend_pid) == 0
+        finally:
+            holder.execute("select pg_advisory_unlock(%s)", (lock_key,))
+            worker.join(timeout=10)
+        assert not worker.is_alive()
+        unrelated.execute("select pg_advisory_unlock(%s)", (lock_key,))
+
+
+def _track_worker_connection(monkeypatch, pool, worker, outcome):  # noqa: ANN001
+    """Only the connection acquired by this test's worker may prove a wait."""
+    connection = pool.connection
+    ready = threading.Event()
+
+    @contextmanager
+    def tracked(*args, **kwargs):  # noqa: ANN002, ANN003
+        with connection(*args, **kwargs) as conn:
+            if threading.current_thread() is worker:
+                outcome["backend_pid"] = conn.info.backend_pid
+                ready.set()
+            yield conn
+
+    monkeypatch.setattr(pool, "connection", tracked)
+    return ready
+
+
+def test_revoke_in_flight_on_a_full_link_is_not_counted_as_overflow(lane, monkeypatch):
     """Priya: removing FOR UPDATE on the group-link re-read broke no test.
 
     The link is at its cap and a revoke is in flight (row locked, not yet
@@ -315,16 +372,14 @@ def test_revoke_in_flight_on_a_full_link_is_not_counted_as_overflow(lane):
             (link.id,),
         )
         worker = threading.Thread(target=tap)
+        ready = _track_worker_connection(monkeypatch, lane.pool, worker, outcome)
         worker.start()
+        assert ready.wait(10), "the worker never acquired its own connection"
         with psycopg.connect(DSN, autocommit=True) as probe:
             deadline = time.monotonic() + 10
             waiting = 0
             while time.monotonic() < deadline and not waiting:
-                waiting = probe.execute(
-                    "select count(*) from pg_stat_activity"
-                    " where wait_event_type='Lock' and pid<>%s",
-                    (revoker.info.backend_pid,),
-                ).fetchone()[0]
+                waiting = _lock_waiter_count(probe, outcome["backend_pid"])
                 time.sleep(0.02)
         assert waiting, "the redeem never waited on the in-flight revoke"
         revoker.commit()
@@ -372,16 +427,14 @@ def test_household_accept_refuses_an_invitation_revoked_under_it(
             (invite.id,),
         )
         worker = threading.Thread(target=accept)
+        ready = _track_worker_connection(monkeypatch, lane.pool, worker, outcome)
         worker.start()
+        assert ready.wait(10), "the worker never acquired its own connection"
         with psycopg.connect(DSN, autocommit=True) as probe:
             deadline = time.monotonic() + 10
             waiting = 0
             while time.monotonic() < deadline and not waiting:
-                waiting = probe.execute(
-                    "select count(*) from pg_stat_activity"
-                    " where wait_event_type='Lock' and pid<>%s",
-                    (revoker.info.backend_pid,),
-                ).fetchone()[0]
+                waiting = _lock_waiter_count(probe, outcome["backend_pid"])
                 time.sleep(0.02)
         assert waiting, "the accept never waited on the in-flight revoke"
         revoker.commit()

@@ -7550,7 +7550,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserResponse'
         '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+          description: '`apple_identity_unavailable`: current linked identity could not be
+            verified. `auth_session_verification_unavailable`: the session could not be verified.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: An unexpected server error occurred.
           content:
@@ -7580,7 +7585,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+          description: '`apple_identity_unavailable`: current linked identity could not be
+            verified; no profile update is applied. `auth_session_verification_unavailable`:
+            the session could not be verified.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: An unexpected server error occurred.
           content:
@@ -8862,6 +8873,15 @@ components:
       type: object
       required:
       - display_name
+    AppleIdentity:
+      properties:
+        subject:
+          type: string
+          maxLength: 512
+          minLength: 1
+      type: object
+      required:
+      - subject
     AssetChangeResponse:
       properties:
         version:
@@ -15204,6 +15224,14 @@ components:
           - single
           - source
           - destination
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
         balance_movement_minor:
           type: integer
         coverage:
@@ -15216,6 +15244,10 @@ components:
       - record_revision
       - account_id
       - role
+      - amount_minor
+      - amount
+      - currency
+      - currency_fraction_digits
       - balance_movement_minor
       - coverage
     MoneyOptionsResponse:
@@ -15320,6 +15352,11 @@ components:
         amount:
           type: string
           maxLength: 40
+        destination_amount:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
         principal:
           anyOf:
           - type: string
@@ -19379,6 +19416,10 @@ components:
           anyOf:
           - $ref: '#/components/schemas/User'
           - $ref: '#/components/schemas/GuestUser'
+        apple_identity:
+          anyOf:
+          - $ref: '#/components/schemas/AppleIdentity'
+          - type: 'null'
         account_kind:
           type: string
           enum:

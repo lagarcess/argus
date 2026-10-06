@@ -314,7 +314,9 @@ def test_shared_env_contract_requires_unset_indirect_env_under_nounset() -> None
 
 def test_render_blueprint_uses_current_env_contract_names_only() -> None:
     render_yaml = _source("render.yaml")
-    contract = ENV_CONTRACT.read_text()
+    contract = set(_contract_array("ARGUS_RENDER_API_ENV")) | set(
+        _contract_array("ARGUS_RENDER_WEB_ENV")
+    )
 
     for key in (
         "ARGUS_PERSISTENCE_MODE",
@@ -1096,7 +1098,7 @@ def test_render_env_sync_audit_declares_mode_specific_render_key_contract() -> N
 
 
 def test_render_blueprint_preserves_optional_posthog_key() -> None:
-    env_contract = ENV_CONTRACT.read_text()
+    env_contract = _contract_array("ARGUS_RENDER_WEB_ENV")
     web_env = _render_env("argus-app")
 
     assert "NEXT_PUBLIC_POSTHOG_KEY" in env_contract

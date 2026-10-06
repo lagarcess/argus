@@ -6,13 +6,18 @@ import pytest
 from argus.api import state as api_state
 from argus.api.apple_sign_in import FLAG
 from argus.api.main import app
+from argus.api.routers import profile
 from argus.api.routers.profile_apple_name import AppleDisplayNameRequest
 from argus.domain.apple_sign_in.credentials import AppleIdentityMissing
-from argus.domain.apple_sign_in.identity import AppleIdentityUnavailable
+from argus.domain.apple_sign_in.identity import (
+    AppleIdentityUnavailable,
+    LinkedAppleIdentity,
+)
 from argus.domain.apple_sign_in.name import AppleNameAccountUnavailable
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from tests.apple_sign_in_support import SUBJECT
 from tests.financial_accounts.conftest import (  # noqa: F401
     ALICE,
     GUEST,
@@ -41,6 +46,7 @@ def test_name_boundary_preserves_unicode_and_interior_spelling():
 @pytest.fixture
 def client(surface_env, gateway, monkeypatch):  # noqa: F811
     monkeypatch.setenv(FLAG, "true")
+    monkeypatch.setattr(profile, "_apple_identity", lambda *_: LinkedAppleIdentity(SUBJECT))
     with (
         patch.object(api_state, "supabase_gateway", gateway),
         patch.object(api_state, "DATABASE_URL", "local-test"),
@@ -110,3 +116,37 @@ def test_failures_keep_accurate_errors(client, error, status, code):
         )
     assert response.status_code == status
     assert response.json()["code"] == code
+
+
+def test_saved_name_returns_current_identity_envelope(client, request):
+    fixture_gateway = request.getfixturevalue("gateway")
+    fixture_identities = request.getfixturevalue("identities")
+    saved = fixture_gateway.get_or_create_profile_for_auth_user(
+        fixture_identities[ALICE]
+    ).model_dump()
+    with patch(COMMAND, return_value=saved):
+        response = client.post(
+            URL,
+            json={"display_name": "Name"},
+            headers={"Authorization": f"Bearer {ALICE}"},
+        )
+    assert response.status_code == 200
+    assert response.json()["apple_identity"] == {"subject": SUBJECT}
+
+
+def test_name_identity_failure_has_no_command_side_effect(client, monkeypatch):
+    from fastapi import HTTPException
+
+    def unavailable(*args):
+        raise HTTPException(status_code=503)
+
+    monkeypatch.setattr(profile, "_apple_identity", unavailable)
+    with patch(COMMAND) as command:
+        response = client.post(
+            URL,
+            json={"display_name": "Name"},
+            headers={"Authorization": f"Bearer {ALICE}"},
+        )
+    assert response.status_code == 503
+    assert response.json()["code"] == "apple_name_unavailable"
+    command.assert_not_called()

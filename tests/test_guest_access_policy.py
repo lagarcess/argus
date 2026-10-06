@@ -155,12 +155,15 @@ def test_registered_auth_truth_ignores_editable_anonymous_metadata() -> None:
     with (
         patch.object(api_state, "supabase_gateway", gateway),
         patch("argus.api.dependencies.auth_session_is_active", return_value=True),
+        patch("argus.api.routers.profile._apple_identity", return_value=None) as identity,
     ):
         response = client.get(
             "/api/v1/me",
             headers={"Authorization": "Bearer verified-member-token"},
         )
 
+    identity.assert_called_once()
+    assert identity.call_args.args[1] == USER_ID
     assert response.status_code == 200
     assert response.json()["account_kind"] == "registered"
     assert response.json()["guest"] is None
