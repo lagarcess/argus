@@ -190,9 +190,15 @@ local build command, not app source.
 
 The local phone API was restarted from this reconciled source without resetting
 its database or Auth. Existing synthetic sign-in, `/me` and financial-account
-reads passed. Installation returned CoreDevice4016 because the physical phone
-was unavailable. No installation or phone-acceptance claim is made. Three full
-Budget, Debt and Goal journeys are running on the owned iOS26.5 fallback simulator.
+reads passed. After Lucas unlocked/reconnected the phone, installation and launch
+passed. Device readback confirms Check3432 and the preserved Preview3427. The
+founder observed the sign-in screen; visual and connected phone acceptance are
+still pending. The existing local synthetic login was verified again.
+
+The iOS26.5 batch completed with Budget passing in531.435seconds. Debt and Goal
+stopped at native account-picker test actions before their financial assertions.
+Those failures remain open while their screenshots and test drivers are checked.
+The result is one pass and two failures, not a complete money acceptance pass.
 [Build readback](check-3432-build.json) records the current delivery state.
 
 ## Review and delivery
@@ -273,9 +279,37 @@ fixture evidence remain the reference.
 
 Lucas returned with the physical phone during verification. The trust and privacy
 lane was informed that this lane owns the next Check install and review. The
-phone was reachable initially, then became unavailable during installation.
-An unlock/reconnect request is pending while simulator verification continues.
+phone initially timed out, then installation succeeded after the founder confirmed
+it was ready. Check3432 is installed and launched; Preview3427 is unchanged.
+The founder is signing in to the existing local test account for visual review.
 
 Automatic approval review previously rejected creation of a new draft PR.
 No alternative PR-creation route has been used. Publication and device evidence
 will be recorded only after those actions actually occur.
+
+## Sign-in contrast and local connection correction, October 5
+
+The founder reported unreadable entered text in Check 3432. The connected auth
+flow forced a white page and dark text while its shared fields used the adaptive
+WelcomePalette. The screen and fields now read that same palette. No layout,
+copy, authentication operation or API contract changed.
+
+At `2a1d911b3993b208a25b51ecd156af8a31b6121c`, the filled sign-in test passed in light and dark
+appearances, including XCTest's contrast audit (one test, zero failures or
+skips). [The screenshots and manifest](auth-contrast/manifest.json) retain the
+visual evidence. An independent source and screenshot review found no
+actionable issue. Signed Check 3433 was installed and launched. Device readback
+confirms Preview 3427 is unchanged. [Build evidence](check-3433-build.json)
+records the exact source and remaining acceptance.
+
+The phone connection also encountered an expired local test-server certificate.
+A replacement certificate now passes HTTPS verification on the Mac. The
+removable certificate-only profile requires the founder's iPhone trust step.
+No TLS validation or product authentication was bypassed. The local Docker VM then stopped responding after memory exhaustion. A
+coordinated Docker Desktop restart preserved all containers and database
+volumes. Both isolated Auth services recovered, and the full application API
+login plus authenticated profile read returned 200 through the validated HTTPS
+bridge. [The redacted diagnosis](local-login-diagnosis.md) preserves the outage
+evidence and the limit of the earlier 401 diagnosis. Phone trust and sign-in
+remain unconfirmed. The Budget rerun during this outage failed before sign-in;
+it provides no financial acceptance evidence.

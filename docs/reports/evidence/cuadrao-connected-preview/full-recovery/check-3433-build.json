@@ -1,0 +1,28 @@
+{
+  "source": "2a1d911b3993b208a25b51ecd156af8a31b6121c",
+  "bundle": "local.argus.founder.47R3855RTJ",
+  "display_name": "Cuadrao Check",
+  "version": "3433",
+  "privacy_manifest": true,
+  "signature_verified": true,
+  "phone_install": "passed",
+  "phone_launch": "passed",
+  "installed_check_build": "3433",
+  "installed_preview_build": "3427",
+  "physical_acceptance": "pending certificate trust, sign-in and founder review",
+  "change": "Connected authentication uses the shared adaptive WelcomePalette in every auth state",
+  "local_connectivity": {
+    "old_test_server_certificate": "expired 2026-10-05T20:41:37Z",
+    "replacement_server_certificate_expires": "2026-11-04T00:48:24Z",
+    "https_health": "200 using verified replacement CA",
+    "phone_certificate_trust": "pending founder installation of removable certificate-only profile",
+    "api_login": "200 through validated HTTPS after local Docker recovery",
+    "authenticated_profile": 200,
+    "docker_recovery": "Nondestructive Docker Desktop restart; all containers and volumes preserved"
+  },
+  "remaining": [
+    "Physical Home and Chat visual acceptance",
+    "Physical connected money acceptance",
+    "Focused Debt and Goal test-driver reruns"
+  ]
+}
