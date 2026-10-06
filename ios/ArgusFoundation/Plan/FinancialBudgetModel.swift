@@ -83,8 +83,12 @@ final class FinancialBudgetModel: ObservableObject {
         await loadOptions()
     }
     func edit() async {
-        guard loop.pendingConfirmation == nil, let detail else { return }
-        draft = FinancialBudgetDraft(budget: detail.budget)
+        guard let budget = detail?.budget else { return }
+        await edit(budget)
+    }
+    func edit(_ budget: FinancialBudget) async {
+        guard loop.pendingConfirmation == nil else { return }
+        draft = FinancialBudgetDraft(budget: budget)
         await loadOptions()
     }
     func loadOptions() async {
@@ -97,18 +101,26 @@ final class FinancialBudgetModel: ObservableObject {
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
     func save(locale: Locale) async {
-        guard let draft, !saving else { return }
+        guard let draft else { return }
+        await save(draft, locale: locale)
+    }
+    func save(_ draft: FinancialBudgetDraft, locale: Locale) async {
+        guard !saving else { return }
         let ticket = generation; saving = true; errorKey = nil
         defer { if generation == ticket { saving = false } }
         do {
             let operation: FinancialPlanOperation = draft.existing.map { .editBudget(id: $0.id, version: $0.version) } ?? .createBudget
             try await loop.confirmPlan(operation, command: draft.command(locale: locale), originAccountId: nil)
             guard generation == ticket else { return }
-            self.draft = nil
+            if self.draft === draft { self.draft = nil }
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
     func archive(_ archived: Bool) async {
-        guard let budget = detail?.budget, !saving else { return }
+        guard let budget = detail?.budget else { return }
+        await archive(budget, archived: archived)
+    }
+    func archive(_ budget: FinancialBudget, archived: Bool) async {
+        guard !saving else { return }
         let ticket = generation; saving = true; errorKey = nil
         defer { if generation == ticket { saving = false } }
         do {

@@ -96,22 +96,32 @@ final class FinancialDebtModel: ObservableObject {
         guard let account = chosenAccount else { return }; chosenAccount = nil; create(account)
     }
     func edit() {
-        guard loop.pendingConfirmation == nil, let debt = detail?.debt else { return }
+        guard let debt = detail?.debt else { return }
+        edit(debt)
+    }
+    func edit(_ debt: FinancialDebt) {
+        guard loop.pendingConfirmation == nil else { return }
         draft = FinancialDebtDraft(debt: debt)
     }
     func save(locale: Locale) async {
         guard let draft else { return }
+        await save(draft, locale: locale)
+    }
+    func save(_ draft: FinancialDebtDraft, locale: Locale) async {
         let ticket = generation
         do {
             let operation: FinancialPlanOperation = draft.existing.map { .editDebt(id: $0.id, version: $0.version) } ?? .createDebt
-            try await perform(operation, command: draft.command(locale: locale))
-            if generation == ticket { self.draft = nil }
+            try await perform(operation, command: draft.command(locale: locale), originAccountId: detail?.debt.sourceAccountId)
+            if generation == ticket, self.draft === draft { self.draft = nil }
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
     func archive(_ archived: Bool) async {
         guard let debt = detail?.debt else { return }
+        await archive(debt, archived: archived)
+    }
+    func archive(_ debt: FinancialDebt, archived: Bool) async {
         let ticket = generation
-        do { try await perform(.editDebt(id: debt.id, version: debt.version), command: FinancialBudgetLifecycleCommand(expectedVersion: debt.version, archived: archived)) }
+        do { try await perform(.editDebt(id: debt.id, version: debt.version), command: FinancialBudgetLifecycleCommand(expectedVersion: debt.version, archived: archived), originAccountId: debt.sourceAccountId) }
         catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
     func loadCandidates() async {
@@ -130,7 +140,7 @@ final class FinancialDebtModel: ObservableObject {
         let ticket = generation
         let versions = projection.accounts.reduce(into: [String: Int]()) { $0[$1.id.uuidString] = $1.version }
         do {
-            try await perform(.linkDebt(id: debt.id, version: debt.version), command: FinancialDebtLinkCommand(expectedVersion: debt.version, activityId: entry.activityId, activityRevision: entry.revision, occurrenceId: occurrenceID, expectedAccountVersions: versions))
+            try await perform(.linkDebt(id: debt.id, version: debt.version), command: FinancialDebtLinkCommand(expectedVersion: debt.version, activityId: entry.activityId, activityRevision: entry.revision, occurrenceId: occurrenceID, expectedAccountVersions: versions), originAccountId: detail?.debt.sourceAccountId)
             if generation == ticket { linking = false }
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
@@ -141,11 +151,11 @@ final class FinancialDebtModel: ObservableObject {
     func confirmed(_ operation: FinancialPlanOperation) {
         switch operation { case .createDebt, .editDebt: draft = nil; case .linkDebt: linking = false; default: break }
     }
-    private func perform<Command: Encodable>(_ operation: FinancialPlanOperation, command: Command) async throws {
+    private func perform<Command: Encodable>(_ operation: FinancialPlanOperation, command: Command, originAccountId: UUID?) async throws {
         guard !saving else { return }
         let ticket = generation; saving = true; errorKey = nil
         defer { if generation == ticket { saving = false } }
-        try await loop.confirmPlan(operation, command: command, originAccountId: detail?.debt.sourceAccountId)
+        try await loop.confirmPlan(operation, command: command, originAccountId: originAccountId)
         guard generation == ticket else { throw SessionFailure.staleOperation }
     }
     private func persist() {
