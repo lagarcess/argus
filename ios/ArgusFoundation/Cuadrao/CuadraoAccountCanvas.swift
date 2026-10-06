@@ -99,54 +99,35 @@ struct CuadraoTransactionCanvas: View {
     @State private var reviewing = false
     private var valid: Bool { error.isEmpty && (Decimal(string: amount) ?? 0) > 0 }
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    HStack(spacing: 12) {
-                        CanvasAccountIcon(kind: account.kind)
-                        Text(account.displayName(spanish)).font(CuadraoTypography.action)
-                    }.padding(.top, 8)
-                    if reviewing {
-                        Text((income ? "+" : "−") + CanvasMoney.format(Decimal(string: amount) ?? 0, currency: account.currency))
-                            .font(CuadraoTypography.amount).monospacedDigit()
-                        LabeledContent(spanish ? "Moneda" : "Currency", value: account.currency)
-                        LabeledContent(spanish ? "Tipo" : "Type", value: income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
-                        if !title.isEmpty { LabeledContent(spanish ? "Concepto" : "Description", value: title) }
-                        LabeledContent(spanish ? "Fecha" : "Date") { Text(date, format: .dateTime.day().month().year()) }
-                    } else {
-                        Picker(spanish ? "Tipo" : "Type", selection: $income) {
-                            Text(spanish ? "Gasto" : "Expense").tag(false)
-                            Text(spanish ? "Ingreso" : "Income").tag(true)
-                        }.pickerStyle(.segmented)
-                        CuadraoAmountField(raw: $amount, currency: $currency, error: $error, spanish: spanish, currencySelectable: false)
-                        TextField(spanish ? "Concepto (opcional)" : "Description (optional)", text: $title)
-                            .modifier(RegistrationField())
-                        DatePicker(spanish ? "Fecha" : "Date", selection: $date, in: ...Date.now, displayedComponents: .date)
-                    }
-                }.padding(24)
-            }.background(WelcomePalette.background)
-                .navigationTitle(reviewing ? (spanish ? "Revisar movimiento" : "Review transaction") : (spanish ? "Añadir movimiento" : "Add transaction"))
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(reviewing ? (spanish ? "Atrás" : "Back") : (spanish ? "Cancelar" : "Cancel")) {
-                            if reviewing { reviewing = false } else { dismiss() }
-                        }
-                    }
+        CuadraoTransactionSheet(account: CuadraoTransactionAccount(title: account.displayName(spanish), artwork: account.kind),
+            spanish: spanish, reviewing: reviewing, primaryEnabled: valid, back: { reviewing = false }, primary: {
+                if reviewing {
+                    data.activity.insert(CanvasActivity(accountID: account.id,
+                        title: title.isEmpty ? (income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense")) : title,
+                        amount: Decimal(string: amount) ?? 0, date: date, income: income), at: 0)
+                    dismiss()
+                } else {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    reviewing = true
                 }
-                .safeAreaInset(edge: .bottom) {
-                    RegistrationButton(title: reviewing ? (spanish ? "Guardar" : "Save") : (spanish ? "Revisar" : "Review"), enabled: valid) {
-                        if reviewing {
-                            data.activity.insert(CanvasActivity(accountID: account.id,
-                                title: title.isEmpty ? (income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense")) : title,
-                                amount: Decimal(string: amount) ?? 0, date: date, income: income), at: 0)
-                            dismiss()
-                        } else {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                            reviewing = true
-                        }
-                    }.padding(24).background(WelcomePalette.background)
-                }
-        }.tint(WelcomePalette.pine).onAppear { currency = account.currency }
+            }) {
+            if reviewing {
+                Text((income ? "+" : "−") + CanvasMoney.format(Decimal(string: amount) ?? 0, currency: account.currency))
+                    .font(CuadraoTypography.amount).monospacedDigit()
+                LabeledContent(spanish ? "Moneda" : "Currency", value: account.currency)
+                LabeledContent(spanish ? "Tipo" : "Type", value: income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
+                if !title.isEmpty { LabeledContent(spanish ? "Concepto" : "Description", value: title) }
+                LabeledContent(spanish ? "Fecha" : "Date") { Text(date, format: .dateTime.day().month().year()) }
+            } else {
+                Picker(spanish ? "Tipo" : "Type", selection: $income) {
+                    Text(spanish ? "Gasto" : "Expense").tag(false)
+                    Text(spanish ? "Ingreso" : "Income").tag(true)
+                }.pickerStyle(.segmented)
+                CuadraoAmountField(raw: $amount, currency: $currency, error: $error, spanish: spanish, currencySelectable: false)
+                TextField(spanish ? "Concepto (opcional)" : "Description (optional)", text: $title)
+                    .modifier(RegistrationField())
+                DatePicker(spanish ? "Fecha" : "Date", selection: $date, in: ...Date.now, displayedComponents: .date)
+            }
+        }.onAppear { currency = account.currency }
     }
 }
