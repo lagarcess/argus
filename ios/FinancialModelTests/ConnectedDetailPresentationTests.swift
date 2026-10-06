@@ -76,6 +76,41 @@ final class ConnectedDetailPresentationTests: XCTestCase {
         XCTAssertEqual(FinancialActivityPresentation.symbol(for: "future_kind"), "doc.text")
     }
 
+    func testComingUpRowsShowTitleDateStatusAndAmountInTheAppLanguage() throws {
+        let english = try strings("en"), spanish = try strings("es-419")
+        let bill = try occurrence(kind: "bill", status: "planned", amount: "2100.00")
+        let salary = try occurrence(kind: "income", status: "planned", amount: "38500.00")
+        let review = try occurrence(kind: "bill", status: "needs_review", amount: "2100.00")
+        XCTAssertEqual(PlanPresentation.upcomingRow(bill, locale: locale, text: { english[$0] ?? $0 }),
+                       PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026 · Scheduled", amount: "2,100.00 DOP", icon: "calendar"))
+        XCTAssertEqual(PlanPresentation.upcomingRow(salary, locale: locale, text: { english[$0] ?? $0 }),
+                       PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026 · Scheduled", amount: "+38,500.00 DOP", icon: "arrow.down.left"))
+        XCTAssertEqual(PlanPresentation.upcomingRow(review, locale: locale, text: { english[$0] ?? $0 }).detail,
+                       "Oct 10, 2026 · Review the linked activity")
+        let dominican = Locale(identifier: "es_DO")
+        let spanishRow = PlanPresentation.upcomingRow(bill, locale: dominican, text: { spanish[$0] ?? $0 })
+        XCTAssertEqual(spanishRow.detail, PlanPresentation.dateLabel("2026-10-10", locale: dominican) + " · Programado")
+        XCTAssertFalse(spanishRow.detail.contains("Oct"), spanishRow.detail)
+        XCTAssertNil(english["plan.home.disclosure"], "Home no longer carries the projection disclosure")
+        XCTAssertNil(spanish["plan.home.disclosure"])
+    }
+
+    private func strings(_ language: String) throws -> [String: String] {
+        let root = try XCTUnwrap(ProcessInfo.processInfo.environment["ARGUS_REPO_ROOT"])
+        let url = URL(fileURLWithPath: root + "/ios/ArgusFoundation/Resources/" + language + ".lproj/Localizable.strings")
+        return try XCTUnwrap(NSDictionary(contentsOf: url) as? [String: String])
+    }
+
+    private func occurrence(kind: String, status: String, amount: String) throws -> FinancialPlanOccurrence {
+        let payload: [String: Any] = [
+            "id": "internet-2026-10-10", "expectation_id": UUID().uuidString, "expectation_version": 1,
+            "kind": kind, "title": "Internet hogar", "currency": "DOP", "currency_fraction_digits": 2,
+            "amount_minor": 210000, "amount": amount, "account_id": UUID().uuidString,
+            "due_date": "2026-10-10", "projection_date": "2026-10-10", "status": status, "overdue": false,
+        ]
+        return try JSONDecoder().decode(FinancialPlanOccurrence.self, from: JSONSerialization.data(withJSONObject: payload))
+    }
+
     private func row(_ account: FinancialAccount) -> CanvasAccountRowValue {
         ConnectedAccountPresentation.row(account, spanish: false, locale: locale)
     }
