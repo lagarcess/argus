@@ -97,6 +97,28 @@ import Foundation
               "Discard still removes a connected draft and its source")
         check(CuadraoReceiptStore.connectedDrafts(userID: owner, applicationSupport: support).receipt(id) == nil,
               "Discard remains durable when the person returns")
+
+        let deletedOwner = UUID()
+        let remainingOwner = UUID()
+        let deleted = CuadraoReceiptStore.connectedDrafts(userID: deletedOwner, applicationSupport: support)
+        let remaining = CuadraoReceiptStore.connectedDrafts(userID: remainingOwner, applicationSupport: support)
+        let deletedID = try deleted.capture(files: [(source, "deleted.pdf", true)], currency: nil,
+            origin: origin, group: nil, example: false, spanish: false)
+        let remainingID = try remaining.capture(files: [(source, "remaining.pdf", true)], currency: nil,
+            origin: origin, group: nil, example: false, spanish: false)
+        let deletedSource = deleted.url(deleted.receipt(deletedID)!.source[0])
+        try CuadraoReceiptStore.removeConnectedDrafts(userID: deletedOwner, applicationSupport: support)
+        check(CuadraoReceiptStore.connectedDrafts(userID: deletedOwner, applicationSupport: support).receipts.isEmpty
+              && !FileManager.default.fileExists(atPath: deletedSource.path),
+              "Confirmed-deletion cleanup removes that person's drafts and their sources")
+        let survivor = CuadraoReceiptStore.connectedDrafts(userID: remainingOwner, applicationSupport: support)
+        check(survivor.receipt(remainingID)?.source.first?.name == "remaining.pdf"
+              && (try? Data(contentsOf: survivor.url(survivor.receipt(remainingID)!.source[0]))) == source,
+              "Another identity's drafts and sources survive the cleanup")
+        try CuadraoReceiptStore.removeConnectedDrafts(userID: deletedOwner, applicationSupport: support)
+        try CuadraoReceiptStore.removeConnectedDrafts(userID: UUID(), applicationSupport: support)
+        check(CuadraoReceiptStore.connectedDrafts(userID: remainingOwner, applicationSupport: support).receipts.map(\.id) == [remainingID],
+              "Repeating cleanup or cleaning an owner with no drafts succeeds without effects")
         print("Receipt draft-only checks passed: \(count)")
     }
 }

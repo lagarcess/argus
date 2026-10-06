@@ -30,10 +30,18 @@ enum ReceiptPostingCapability {
         } catch { loadFailed = true }
     }
     static func connectedDrafts(userID: UUID, applicationSupport: URL? = nil) -> CuadraoReceiptStore {
+        CuadraoReceiptStore(directory: connectedDirectory(userID: userID, applicationSupport: applicationSupport), postingCapability: .draftOnly)
+    }
+    /// Confirmed account deletion only: the session owner passes the validated owner after its identity fence.
+    /// A missing directory is already clean, so a retried cleanup converges.
+    static func removeConnectedDrafts(userID: UUID, applicationSupport: URL? = nil) throws {
+        do { try FileManager.default.removeItem(at: connectedDirectory(userID: userID, applicationSupport: applicationSupport)) }
+        catch let error as CocoaError where error.code == .fileNoSuchFile { }
+    }
+    private static func connectedDirectory(userID: UUID, applicationSupport: URL?) -> URL {
         let root = applicationSupport ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let directory = root.appendingPathComponent("CuadraoConnectedReceiptDrafts", isDirectory: true)
+        return root.appendingPathComponent("CuadraoConnectedReceiptDrafts", isDirectory: true)
             .appendingPathComponent(userID.uuidString, isDirectory: true)
-        return CuadraoReceiptStore(directory: directory, postingCapability: .draftOnly)
     }
     func receipt(_ id: UUID) -> ReceiptDraft? { receipts.first { $0.id == id } }
     func url(_ source: ReceiptSource) -> URL { directory.appendingPathComponent(source.filename) }
