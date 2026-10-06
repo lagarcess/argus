@@ -6,7 +6,7 @@ The native callback now formats Apple's `fullName` with `PersonNameComponentsFor
 
 Original dependency head is PR #864 commit `a24a6c60627460ddfd6042b3f42b342c5eff11f0`. Server name command is settled by PR #869. Original integration reference is `7d037b07d4b98b34c6c0ad3026811c7d2f28ae47`, merged normally into the isolated native branch. Intervening integration changes concern server money/deletion, environment membership and documentation. There is no native session-owner overlap. The name command consumes the landed server contract.
 
-This branch cannot be READY until #864 lands, its final owner changes are reconciled, and the captain grants the serialized native verification slot. Global providers remain off. No provider, hosted, paid, simulator or device action is part of this evidence.
+This branch cannot be READY until #864 lands, its final owner changes are reconciled, and exact-head CI completes. Independent native verification has finished at the source head recorded below. Global providers remain off. Evidence publication performs no provider, hosted, paid, simulator or device action.
 
 ## Caller and ownership
 
@@ -30,4 +30,17 @@ Two alternatives were considered. Replacing the entire vault with one large enve
 
 Synthetic regression source covers callback durability before grant, Unicode/trim, name outage, lost response/relaunch, no code replay, explicit edit/clear no-op, different subjects, sign-out/stale identity, denied adoption, SDK refresh preservation, unknown grant refusal, expiry, late revalidation, uncertain Apple validation, callback storage failure and failed durable acknowledgement.
 
-No Swift build or test has run yet. The Mac lease remains with the captain's active owner. `git diff --check` and the Python modularity budget on the reconciled tree pass. Independent source review found recoverable adoption failures clearing the callback; the fix now preserves it for coded 5xx and storage failure. Review of that fix delta returned clean. Runtime verification and exact-head native build remain pending. This document is source preparation, not terminal acceptance.
+Independent QA passed at production source `a6efe6e3360f1c4e58c97807b91547de527b0b04`. The [published independent report](../apple-name-native-20261005/independent-review/README.md) records these separate runs:
+
+- Full package: 150 passed, 4 opt-in skips, 0 failures.
+- Focused name and existing sign-out regression: 16 passed.
+- Independent changed-boundary cases: 3 passed.
+- Signed current-source local Auth/API/PostgreSQL journey: 1 passed.
+- Actual provider configuration: 22 passed (11 Debug, 11 Release).
+- Actual ProfileAuthModel UI journey: 1 passed, four screenshots.
+
+Both introduced failures remain in the bundle: the XCTest `name` property compile conflict, fixed by `060a03f883f08fccdb613ee65343a8296a4793d7`, and the existing deletion recovery regression caused by pregrant cleanup before pending-credential storage, fixed by `a6efe6e3360f1c4e58c97807b91547de527b0b04`. Baseline and failing outputs are historical evidence, not final acceptance counts. The independent harness's own initial compile failure is also preserved.
+
+The 29 source-manifest entries plus original `files.json` are published under the independent report. `publication-manifest.json` records original and published hashes, log whitespace normalization and one report filename correction. Screenshots and diagnostic patches remain byte-for-byte copies. The evidence-only commit preserves every production/test source file from the tested head, so that source-scoped evidence remains applicable; it does not establish later reconciliation or terminal CI.
+
+The parent reports #864 CI blocked (257); this publication does not refresh or close that gate. No PR is opened and no READY claim is made. Physical Apple first/repeat authorization, physical-device acceptance, dependency landing/reconciliation and final CI remain open.
