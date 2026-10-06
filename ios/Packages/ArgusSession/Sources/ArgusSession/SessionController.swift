@@ -47,6 +47,7 @@ public actor SessionController {
 
     public func restore(onValidationRequired: @Sendable (SessionSnapshot) async -> Void = { _ in }) async throws -> SessionSnapshot {
         guard !mutating else { throw SessionFailure.busy }
+        try vault.prunePregrantAppleName()
         do {
             if try vault.pending() != nil {
                 try beginMutation(); defer { mutating = false }
@@ -71,7 +72,9 @@ public actor SessionController {
         try beginMutation(); defer { mutating = false }
         guard let existing = try vault.session() else { endAccountEpoch(as: .signedOut); return state }
         if existing.user.isAnonymous { setState(.unsupportedAnonymousSession); return state }
-        return try await loadProfile(using: activeAuth(), epoch: vault.epoch(), onValidationRequired: onValidationRequired)
+        _ = try await loadProfile(using: activeAuth(), epoch: vault.epoch(), onValidationRequired: onValidationRequired)
+        _ = await resumeAppleName()
+        return state
     }
 
     public func login(email: String, password: String, captchaToken: String) async throws -> SessionSnapshot {
@@ -98,10 +101,22 @@ public actor SessionController {
     /// then take the same journaled adoption path as email sign-in (pending journal,
     /// setSession, then the canonical /me profile). If Argus refuses the new session
     /// (for example the private-alpha allowlist at /me), it is revoked before returning.
-    public func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil) async throws -> ProviderSignInOutcome {
+    /// Persist the callback before starting asynchronous sign-in. A later callback
+    /// without a name can recover this input only for the same Apple subject.
+    public nonisolated func prepareAppleName(displayName: String?, subject: String) throws -> AppleNameAuthorization {
+        do { return try vault.prepareAppleName(displayName: displayName, subject: subject) }
+        catch let failure as SessionFailure { throw failure }
+        catch { throw SessionFailure.storageUnavailable }
+    }
+
+    public func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil,
+                       appleNameAuthorization: AppleNameAuthorization? = nil) async throws -> ProviderSignInOutcome {
         try beginMutation(); defer { mutating = false }
         try requireEntry()
         guard credential.wellFormed else { throw SessionFailure.invalidResponse }
+        if appleNameAuthorization != nil && credential.provider != .apple { throw SessionFailure.invalidResponse }
+        let initialName = try appleNameAuthorization.flatMap { try vault.appleName(for: $0) }
+        if credential.provider != .apple { try vault.removePregrantAppleName() }
         let exchange = makeAuth(storage: ExchangeStorage(), fetch: transport.sdkFetch(origin: configuration.supabaseURL))
         let issued: Session
         do {
@@ -111,17 +126,21 @@ public actor SessionController {
         } catch {
             if case let AuthError.api(_, code, _, response) = error {
                 if response.statusCode >= 500 { throw SessionFailure.unavailable }
+                try vault.removePregrantAppleName()
                 throw SessionFailure.rejected(status: response.statusCode, code: bounded(code.rawValue))
             }
             throw safe(error)
         }
-        guard !issued.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
+        if let appleNameAuthorization { try vault.check(appleNameAuthorization.epoch) }
+        guard !issued.user.isAnonymous else { try vault.removePregrantAppleName(); throw SessionFailure.unsupportedAnonymousTransfer }
+        let boundName = initialName.map { BoundAppleNameIntent(intent: $0, userID: issued.user.id, grantID: UUID()) }
         do {
-            let snapshot = try await adopt(Credentials(accessToken: issued.accessToken, refreshToken: issued.refreshToken), method: credential.provider == .apple ? .apple : .google)
+            let snapshot = try await adopt(Credentials(accessToken: issued.accessToken, refreshToken: issued.refreshToken), method: credential.provider == .apple ? .apple : .google, appleName: boundName)
             guard credential.provider == .apple else { return .init(session: snapshot, appleCapture: nil) }
             guard snapshot.phase == .authenticated else {
                 let needsFreshCode = snapshot.phase == .credentialValidationRequired || snapshot.phase == .reauthenticationRequired
-                return .init(session: snapshot, appleCapture: needsFreshCode ? .freshAuthorizationRequired : nil)
+                return .init(session: snapshot, appleCapture: needsFreshCode ? .freshAuthorizationRequired : nil,
+                             appleName: boundName == nil ? nil : .pending(.credentialValidationRequired))
             }
             let capture: AppleCaptureOutcome
             if let appleAuthorizationCode {
@@ -134,13 +153,60 @@ public actor SessionController {
                         ? .freshAuthorizationRequired : .failed(failure)
                 }
             } else { capture = .freshAuthorizationRequired }
-            return .init(session: state, appleCapture: capture)
+            let name = await resumeAppleName()
+            return .init(session: state, appleCapture: capture, appleName: name)
         } catch {
             // adopt() has journaled the issued session as pending; revoke it now so a
             // refused provider account doesn't leave the person on the sign-out screen.
             _ = try? await performPendingRevoke()
             throw error
         }
+    }
+
+    public func retryAppleNameInitialization(expectedIdentity: SessionSnapshot) async throws -> SessionSnapshot {
+        guard sameIdentity(as: expectedIdentity) else { throw SessionFailure.staleOperation }
+        try beginMutation(); defer { mutating = false }
+        _ = try await initializePendingAppleName()
+        return state
+    }
+
+    private func resumeAppleName() async -> AppleNameSaveOutcome? {
+        do { return try await initializePendingAppleName() ? .saved : nil }
+        catch {
+            let failure = safe(error)
+            if failure == .storageUnavailable, state.phase == .authenticated {
+                setState(.credentialValidationRequired, profile: state.profile, appleIdentity: state.appleIdentity)
+            }
+            return .pending(failure)
+        }
+    }
+
+    private func initializePendingAppleName() async throws -> Bool {
+        guard let bound = try vault.pendingAppleName() else { return false }
+        guard state.phase == .authenticated else { throw SessionFailure.credentialValidationRequired }
+        let epoch = vault.epoch()
+        guard try vault.signInMethod() == .apple, UUID(uuidString: state.profile?.id ?? "") == bound.userID,
+              state.appleIdentity?.subject == bound.intent.subject else {
+            try vault.acknowledgeAppleName(bound, epoch: epoch)
+            return false
+        }
+        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/me/apple-name"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try encoded(["display_name": bound.intent.displayName])
+        let result = try await authenticatedResponse(using: activeAuth(), epoch: epoch, request: request)
+        struct NameEnvelope: Decodable {
+            let user: SessionProfile
+            let appleIdentity: AppleIdentity?
+            enum CodingKeys: String, CodingKey { case user; case appleIdentity = "apple_identity" }
+        }
+        let envelope = try JSONDecoder().decode(NameEnvelope.self, from: result.0)
+        guard UUID(uuidString: envelope.user.id) == bound.userID,
+              envelope.appleIdentity?.subject == bound.intent.subject else { throw SessionFailure.invalidResponse }
+        try vault.check(epoch)
+        try vault.acknowledgeAppleName(bound, epoch: epoch)
+        setState(.authenticated, profile: envelope.user, appleIdentity: envelope.appleIdentity)
+        return true
     }
 
     public func captureAppleAuthorizationCode(_ code: String, expectedIdentity: SessionSnapshot) async throws {
@@ -182,7 +248,7 @@ public actor SessionController {
     public func signOut() async throws -> SessionSnapshot {
         try beginMutation(); defer { mutating = false }
         if try vault.pending() == nil {
-            guard let current = try vault.session() else { endAccountEpoch(as: .signedOut); return state }
+            guard let current = try vault.session() else { try vault.removePregrantAppleName(); endAccountEpoch(as: .signedOut); return state }
             guard !current.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
         }
         try suspendUsableSession()
@@ -211,9 +277,9 @@ public actor SessionController {
         }
         try vault.preflight()
     }
-    private func activeAuth(adoptingMethod: SessionSignInMethod? = nil) -> AuthClient {
+    private func activeAuth(adoptingMethod: SessionSignInMethod? = nil, adoptingName: BoundAppleNameIntent? = nil) -> AuthClient {
         if let auth { return auth }
-        let client = makeAuth(storage: EpochStorage(vault: vault, epoch: vault.epoch(), adoptingMethod: adoptingMethod), fetch: transport.sdkFetch(origin: configuration.supabaseURL))
+        let client = makeAuth(storage: EpochStorage(vault: vault, epoch: vault.epoch(), adoptingMethod: adoptingMethod, adoptingName: adoptingName), fetch: transport.sdkFetch(origin: configuration.supabaseURL))
         auth = client
         return client
     }
@@ -249,7 +315,7 @@ public actor SessionController {
             return try JSONDecoder().decode(EntryResponse.self, from: data)
         } catch { throw safe(error) }
     }
-    private func adopt(_ credentials: Credentials, method: SessionSignInMethod) async throws -> SessionSnapshot {
+    private func adopt(_ credentials: Credentials, method: SessionSignInMethod, appleName: BoundAppleNameIntent? = nil) async throws -> SessionSnapshot {
         guard !credentials.accessToken.isEmpty, !credentials.refreshToken.isEmpty else { throw SessionFailure.invalidResponse }
         // Journal before SDK adoption: a crash or swallowed persistence error must not
         // leave an issued server session invisible to the next launch.
@@ -257,7 +323,7 @@ public actor SessionController {
         try vault.savePending(.init(accessToken: credentials.accessToken, refreshToken: credentials.refreshToken))
         endAccountEpoch(as: .signOutPending)
         let epoch = vault.epoch()
-        let client = activeAuth(adoptingMethod: method)
+        let client = activeAuth(adoptingMethod: method, adoptingName: appleName)
         do {
             let session = try await client.setSession(accessToken: credentials.accessToken, refreshToken: credentials.refreshToken)
             try vault.check(epoch)
@@ -265,8 +331,13 @@ public actor SessionController {
             guard !session.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
             _ = try await loadProfile(using: client, epoch: epoch, validateCredential: false)
             try vault.removePending()
+            if let appleName { try vault.removePromotedAppleName(appleName.intent.id, epoch: epoch) }
         } catch {
-            try suspendUsableSession()
+            let failure = safe(error)
+            let preserveCallback: Bool
+            if case .rejected(let status, _) = failure { preserveCallback = status >= 500 }
+            else { preserveCallback = failure == .unavailable || failure == .storageUnavailable }
+            try suspendUsableSession(discardAppleName: !preserveCallback)
             throw safe(error)
         }
         return try await validateAppleCredential(epoch: epoch)
@@ -395,10 +466,11 @@ public actor SessionController {
             throw safe(error)
         }
     }
-    private func suspendUsableSession() throws {
+    private func suspendUsableSession(discardAppleName: Bool = true) throws {
         // Invalidate delivery and SDK writes before journal I/O can fail. Actual
         // credential removal still waits for a successful durable pending write.
         endAccountEpoch(as: .signOutPending)
+        if discardAppleName { try vault.removePregrantAppleName() }
         if let pending = try vault.pending() {
             // A previous failed write may have left this journal only in memory.
             try vault.savePending(pending)

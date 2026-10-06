@@ -68,4 +68,9 @@ public enum AppleCaptureOutcome: Equatable, Sendable {
 public struct ProviderSignInOutcome: Equatable, Sendable {
     public let session: SessionSnapshot
     public let appleCapture: AppleCaptureOutcome?
+    public let appleName: AppleNameSaveOutcome?
+
+    init(session: SessionSnapshot, appleCapture: AppleCaptureOutcome?, appleName: AppleNameSaveOutcome? = nil) {
+        self.session = session; self.appleCapture = appleCapture; self.appleName = appleName
+    }
 }
