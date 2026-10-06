@@ -128,10 +128,14 @@ struct ConnectedProviderButtons: View {
                 return
             }
             let code = apple.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
+            let formattedName = apple.fullName.map { PersonNameComponentsFormatter().string(from: $0) }
+            let nameAuthorization: AppleNameAuthorization
+            do { nameAuthorization = try auth.prepareAppleName(displayName: formattedName, subject: apple.user) }
+            catch { failed = true; return }
             Task {
                 failed = false
                 let ok = await auth.signIn(with: IdentityTokenCredential(provider: .apple, idToken: token, nonce: nonce),
-                                           appleAuthorizationCode: code)
+                                           appleAuthorizationCode: code, appleNameAuthorization: nameAuthorization)
                 failed = !ok
             }
         }

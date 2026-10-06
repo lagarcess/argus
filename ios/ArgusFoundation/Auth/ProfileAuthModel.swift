@@ -9,6 +9,7 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var profile: SessionProfile?
     @Published private(set) var confirmationRequired = false
     @Published private(set) var errorKey: String?
+    @Published private(set) var appleNameSave: AppleNameSaveOutcome?
     @Published private(set) var appleCapture: AppleCaptureOutcome?
     @Published var captureNoticePresented = false
     @Published private(set) var accounts: AccountsModel?
@@ -138,15 +139,17 @@ final class ProfileAuthModel: ObservableObject {
     /// Native Apple or Google sign-in through Supabase's id_token grant. Lands in the same
     /// session path as email sign-in. Returns false on failure (errorKey is set).
     @discardableResult
-    func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil) async -> Bool {
+    func signIn(with credential: IdentityTokenCredential, appleAuthorizationCode: String? = nil,
+                appleNameAuthorization: AppleNameAuthorization? = nil) async -> Bool {
         guard let controller, !busy, state == .signedOut else { return false }
         busy = true
         errorKey = nil
         confirmationRequired = false
         defer { finishOperation() }
         do {
-            let outcome = try await controller.signIn(with: credential, appleAuthorizationCode: appleAuthorizationCode)
+            let outcome = try await controller.signIn(with: credential, appleAuthorizationCode: appleAuthorizationCode, appleNameAuthorization: appleNameAuthorization)
             accept(outcome.session)
+            appleNameSave = outcome.appleName
             appleCapture = outcome.appleCapture
             captureNoticeAwaitingSession = state != .authenticated && captureNoticeKey != nil
             captureNoticePresented = state == .authenticated && captureNoticeKey != nil
@@ -156,6 +159,17 @@ final class ProfileAuthModel: ObservableObject {
             errorKey = Self.messageKey(error)
             return false
         }
+    }
+
+    func retryAppleNameSave() async {
+        guard let controller, state == .authenticated else { return }
+        let identity = await controller.snapshot()
+        await perform { try await controller.retryAppleNameInitialization(expectedIdentity: identity) }
+    }
+
+    func prepareAppleName(displayName: String?, subject: String) throws -> AppleNameAuthorization {
+        guard let controller, !busy, state == .signedOut else { throw SessionFailure.staleOperation }
+        return try controller.prepareAppleName(displayName: displayName, subject: subject)
     }
 
     var captureNoticeKey: String? {
@@ -220,7 +234,7 @@ final class ProfileAuthModel: ObservableObject {
         financialLoop?.bind(snapshot)
         profile = snapshot.profile
         switch snapshot.phase {
-        case .signedOut: state = .signedOut; dismissCaptureNotice()
+        case .signedOut: state = .signedOut; appleNameSave = nil; dismissCaptureNotice()
         case .authenticated:
             if captureNoticeAwaitingSession {
                 captureNoticePresented = true

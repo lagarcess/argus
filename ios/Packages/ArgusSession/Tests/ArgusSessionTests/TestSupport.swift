@@ -71,6 +71,12 @@ actor AuthServer {
     var captureCode: String?
     var appleSubject: String?
     var currencyOverride: String?
+    var displayName: String? = "Sample"
+    var nameInitializationClosed = true
+    var appleNameStatuses: [Int] = []
+    var loseAppleNameResponse = false
+    var appleNameGate: RequestGate?
+    var idTokenGate: RequestGate?
 
     func configure(meStatuses: [Int] = [], logoutStatus: Int = 204, refreshStatus: Int = 200, refreshErrorCode: String = "refresh_token_not_found", mismatch: Bool = false, expired: Bool = false) {
         self.meStatuses = meStatuses
@@ -85,6 +91,12 @@ actor AuthServer {
         idTokenErrorCode = errorCode
         anonymousIdToken = anonymous
     }
+    func configureAppleName(statuses: [Int] = [], displayName: String? = nil, closed: Bool = false, loseResponse: Bool = false) {
+        appleNameStatuses = statuses; self.displayName = displayName
+        nameInitializationClosed = closed; loseAppleNameResponse = loseResponse
+    }
+    func holdAppleName(_ gate: RequestGate) { appleNameGate = gate }
+    func holdIdToken(_ gate: RequestGate) { idTokenGate = gate }
     func configureCapture(status: Int, code: String? = nil) { captureStatus = status; captureCode = code }
     func holdCapture(_ gate: RequestGate) { captureGate = gate }
     func configureApple(subject: String?) { appleSubject = subject }
@@ -107,12 +119,24 @@ actor AuthServer {
             return response(url, 200, ["session": makeSession(id), "user": user(id)])
         }
         if path.hasSuffix("/token"), url.query?.contains("grant_type=id_token") == true {
+            if let idTokenGate { await idTokenGate.enter() }
             if idTokenStatus != 200 {
                 return response(url, idTokenStatus, ["error_code": idTokenErrorCode, "msg": "Synthetic failure"])
             }
             let id = body["id_token"] as? String == Self.bobIdToken ? bob : alice
             if body["provider"] as? String == "apple", appleSubject == nil { appleSubject = "canonical-apple-subject" }
             return response(url, 200, makeSession(id, anonymous: anonymousIdToken))
+        }
+        if path.hasSuffix("/me/apple-name") {
+            if let appleNameGate { await appleNameGate.enter() }
+            let status = appleNameStatuses.isEmpty ? 200 : appleNameStatuses.removeFirst()
+            guard status == 200 else { return response(url, status, ["code": "apple_name_unavailable"]) }
+            if !nameInitializationClosed, displayName == nil {
+                displayName = body["display_name"] as? String
+                nameInitializationClosed = true
+            }
+            if loseAppleNameResponse { loseAppleNameResponse = false; throw URLError(.networkConnectionLost) }
+            return response(url, 200, profileEnvelope(accessUsers[bearer] ?? alice))
         }
         if path.hasSuffix("/auth/apple/authorization-code") {
             if let captureGate { await captureGate.enter() }
@@ -133,11 +157,15 @@ actor AuthServer {
             if let gate = meGate { await gate.enter() }
             let status = meStatuses.isEmpty ? 200 : meStatuses.removeFirst()
             if status == 200, request.httpMethod == "PATCH" { currencyOverride = body["currency_override"] as? String }
-            var envelope: [String: Any] = ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": "Sample", "language": "en", "currency": currencyOverride ?? "DOP", "currency_override": currencyOverride as Any? ?? NSNull()]]
-            if let appleSubject { envelope["apple_identity"] = ["subject": appleSubject] }
-            return response(url, status, status == 200 ? envelope : ["code": "unauthorized"])
+            return response(url, status, status == 200 ? profileEnvelope(id) : ["code": "unauthorized"])
         }
         return response(url, 404, [:])
+    }
+
+    private func profileEnvelope(_ id: UUID) -> [String: Any] {
+        var envelope: [String: Any] = ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": displayName as Any? ?? NSNull(), "language": "en", "currency": currencyOverride ?? "DOP", "currency_override": currencyOverride as Any? ?? NSNull()]]
+        if let appleSubject { envelope["apple_identity"] = ["subject": appleSubject] }
+        return envelope
     }
 
     static let aliceIdToken = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.c2lnbmF0dXJl"
