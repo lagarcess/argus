@@ -837,3 +837,6 @@
 "auth.apple.validation.detail" = "Apple authorization needs to be checked before you can continue. Try again, or sign out of this app.";
 "auth.apple.signInAgain.detail" = "Sign out and sign in again to verify how this session was started.";
 "auth.apple.signInAgain.action" = "Sign out and sign in again";
+
+"auth.deletion.uncertain" = "We couldn't confirm whether deletion started. Check again before using your account.";
+"auth.deletion.pending" = "Your account is being deleted. You're signed out. If you need help, contact support.";

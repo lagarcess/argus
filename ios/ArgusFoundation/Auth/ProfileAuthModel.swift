@@ -3,7 +3,7 @@ import ArgusSession
 
 @MainActor
 final class ProfileAuthModel: ObservableObject {
-    enum State { case disabled, configurationInvalid, signedOut, authenticated, pendingSignOut, unsupportedAnonymous, credentialValidationRequired, reauthenticationRequired }
+    enum State { case accountDeletionUncertain, accountDeletionPending, disabled, configurationInvalid, signedOut, authenticated, pendingSignOut, unsupportedAnonymous, credentialValidationRequired, reauthenticationRequired }
     @Published private(set) var state: State = .disabled
     @Published private(set) var busy = false
     @Published private(set) var profile: SessionProfile?
@@ -234,6 +234,8 @@ final class ProfileAuthModel: ObservableObject {
         financialLoop?.bind(snapshot)
         profile = snapshot.profile
         switch snapshot.phase {
+        case .accountDeletionUncertain: state = .accountDeletionUncertain; dismissCaptureNotice()
+        case .accountDeletionPending: state = .accountDeletionPending; dismissCaptureNotice()
         case .signedOut: state = .signedOut; appleNameSave = nil; dismissCaptureNotice()
         case .authenticated:
             if captureNoticeAwaitingSession {

@@ -10,6 +10,7 @@ public actor SessionController {
     private let appleChecker: any AppleCredentialChecking
     private var auth: AuthClient?
     private var mutating = false
+    private var protectedRequests = 0
     private var credentialValidationGeneration: UInt64 = 0
     private var state = SessionSnapshot(phase: .signedOut, profile: nil, revision: 0)
 
@@ -28,6 +29,8 @@ public actor SessionController {
     public func snapshot() -> SessionSnapshot { state }
 
     public func requestCredentialRevalidation() throws -> SessionSnapshot {
+        guard !mutating else { throw SessionFailure.busy }
+        if try restoreDeletionState() { return state }
         credentialValidationGeneration &+= 1
         do {
             if try vault.pending() != nil {
@@ -47,6 +50,7 @@ public actor SessionController {
 
     public func restore(onValidationRequired: @Sendable (SessionSnapshot) async -> Void = { _ in }) async throws -> SessionSnapshot {
         guard !mutating else { throw SessionFailure.busy }
+        if try restoreDeletionState() { return state }
         try vault.prunePregrantAppleName()
         do {
             if try vault.pending() != nil {
@@ -247,6 +251,8 @@ public actor SessionController {
 
     public func signOut() async throws -> SessionSnapshot {
         try beginMutation(); defer { mutating = false }
+        try requireNoUncertainDeletion()
+        if try restoreDeletionState() { return state }
         if try vault.pending() == nil {
             guard let current = try vault.session() else { try vault.removePregrantAppleName(); endAccountEpoch(as: .signedOut); return state }
             guard !current.user.isAnonymous else { throw SessionFailure.unsupportedAnonymousTransfer }
@@ -257,6 +263,8 @@ public actor SessionController {
 
     public func retryPendingSignOut() async throws -> SessionSnapshot {
         try beginMutation(); defer { mutating = false }
+        try requireNoUncertainDeletion()
+        if try restoreDeletionState() { return state }
         guard try vault.pending() != nil else { return state }
         try suspendUsableSession()
         return try await performPendingRevoke()
@@ -267,6 +275,7 @@ public actor SessionController {
         mutating = true
     }
     private func requireEntry() throws {
+        try requireNoUncertainDeletion()
         if try vault.pending() != nil { setState(.signOutPending); throw SessionFailure.pendingSignOut }
         if let existing = try vault.session() {
             if existing.user.isAnonymous {
@@ -403,6 +412,7 @@ public actor SessionController {
     private enum AuthenticatedAccess { case validated, validation }
 
     private func checkAccess(_ access: AuthenticatedAccess, identity: SessionSnapshot) throws {
+        try requireNoUncertainDeletion()
         if access == .validation { return }
         guard state.phase == .authenticated else { throw SessionFailure.credentialValidationRequired }
         guard sameIdentity(as: identity) else { throw SessionFailure.staleOperation }
@@ -416,6 +426,9 @@ public actor SessionController {
     /// refresh coalescing; this layer permits only one 401 refresh/retry.
     private func authenticatedResponse(using client: AuthClient, epoch: UInt64,
                                        request: URLRequest, retryUnauthorized: Bool = true, access: AuthenticatedAccess = .validated) async throws -> (Data, HTTPURLResponse) {
+        try requireNoUncertainDeletion()
+        protectedRequests += 1
+        defer { protectedRequests -= 1 }
         var retiring = false
         let identity = state
         do {
@@ -531,6 +544,146 @@ public actor SessionController {
         if (error as? AuthError) == .sessionMissing { return .unauthorized }
         return .unavailable
     }
+
+    /// Resolves only this owner's journal; never uses SDK refresh or retries an Apple code.
+    public func deleteAccount(expectedIdentity: SessionSnapshot,
+                              freshAppleAuthorizationCode: String? = nil) async throws -> AccountDeletionResult {
+        guard sameIdentity(as: expectedIdentity) else { throw SessionFailure.staleOperation }
+        guard protectedRequests == 0 else { throw SessionFailure.busy }
+        try requireNoUncertainDeletion()
+        let body = try AccountDeletionRequest(code: freshAppleAuthorizationCode)
+        try beginMutation(); defer { mutating = false }
+        guard let userID = UUID(uuidString: expectedIdentity.profile?.id ?? ""),
+              let session = try vault.session(), session.user.id == userID else { throw SessionFailure.staleOperation }
+        guard session.expiresAt > Date().timeIntervalSince1970 else { throw SessionFailure.unauthorized }
+        let journal = AccountDeletionJournal(id: UUID(), userID: userID, initiatingRevision: vault.epoch(), phase: .uncertain,
+                                             retryAfter: nil, canRetry: true)
+        return try await performDeletion(journal, session: session, body: body, resuming: false)
+    }
+
+    public func resumePendingAccountDeletion(freshAppleAuthorizationCode: String? = nil) async throws -> AccountDeletionResult {
+        let body = try AccountDeletionRequest(code: freshAppleAuthorizationCode)
+        try beginMutation(); defer { mutating = false }
+        guard let journal = try vault.deletionJournal(), journal.phase == .uncertain else { throw SessionFailure.staleOperation }
+        guard let session = try vault.session() else {
+            return .uncertain(userID: journal.userID, retryAfter: journal.retryAfter, canRetry: false, recovery: journal.recovery)
+        }
+        guard session.user.id == journal.userID else { throw SessionFailure.staleOperation }
+        guard journal.canRetry, session.expiresAt > Date().timeIntervalSince1970 else {
+            return .uncertain(userID: journal.userID, retryAfter: journal.retryAfter, canRetry: false, recovery: journal.recovery)
+        }
+        if let retry = journal.retryAfter, retry > Date() { throw SessionFailure.busy }
+        return try await performDeletion(journal, session: session, body: body, resuming: true)
+    }
+
+    public func accountDeletionStatus(userID: UUID) throws -> AccountDeletionResult? {
+        guard let journal = try vault.deletionJournal(userID: userID) else { return nil }
+        switch journal.phase {
+        case .pending: return .pending(userID: userID)
+        case .completed:
+            guard try vault.session() == nil, try vault.pending() == nil else { return nil }
+            return .completed(.init(userID: userID, initiatingRevision: journal.initiatingRevision, commandID: journal.id))
+        case .uncertain:
+            let proof = try vault.session()
+            return .uncertain(userID: userID, retryAfter: journal.retryAfter,
+                canRetry: journal.canRetry && proof?.user.id == userID && (proof?.expiresAt ?? 0) > Date().timeIntervalSince1970, recovery: journal.recovery)
+        }
+    }
+
+    /// Relaunch readback derives from the same journal; no separate acknowledgement store.
+    public func accountDeletionStatuses() throws -> [AccountDeletionResult] {
+        try vault.deletionOwners().sorted { $0.uuidString < $1.uuidString }.compactMap { try accountDeletionStatus(userID: $0) }
+    }
+
+    /// The app acknowledges only after its exact-user local cleanup succeeds.
+    public func acknowledgeConfirmedAccountDeletion(_ receipt: ConfirmedAccountDeletion) throws {
+        guard try vault.session() == nil, try vault.pending() == nil,
+              let journal = try vault.deletionJournal(userID: receipt.userID), journal.phase == .completed,
+              journal.id == receipt.commandID, journal.userID == receipt.userID,
+              journal.initiatingRevision == receipt.initiatingRevision else { throw SessionFailure.staleOperation }
+        try vault.removeDeletionJournal(epoch: vault.epoch(), userID: receipt.userID)
+    }
+
+    private func requireNoUncertainDeletion() throws {
+        if let journal = try vault.deletionJournal(), journal.phase == .uncertain {
+            throw SessionFailure.accountDeletionInProgress
+        }
+    }
+
+    private func restoreDeletionState() throws -> Bool {
+        guard let journal = try vault.deletionJournal() else { return false }
+        if journal.phase == .uncertain {
+            setState(.accountDeletionUncertain)
+            return true
+        }
+        if let session = try vault.session(), session.user.id != journal.userID { return false }
+        // An interrupted token removal must finish before ordinary SDK adoption.
+        endAccountEpoch(as: journal.phase == .pending ? .accountDeletionPending : .signedOut)
+        try vault.removeSession()
+        try vault.removePending()
+        return true
+    }
+
+    private func performDeletion(_ existing: AccountDeletionJournal, session: Session,
+                                 body: AccountDeletionRequest, resuming: Bool) async throws -> AccountDeletionResult {
+        let epoch = vault.epoch()
+        var journal = existing
+        // Persist before dispatch, including before cancellation can reach transport.
+        try vault.saveDeletionJournal(journal, epoch: epoch)
+        let identity = state
+        setState(.accountDeletionUncertain)
+        var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/account/delete"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer " + session.accessToken, forHTTPHeaderField: "Authorization")
+        request.httpBody = try encoded(body)
+        let result: AccountDeletionResponse
+        do {
+            try Task.checkCancellation()
+            let response = try await transport.send(request, origin: configuration.argusAPIURL)
+            try vault.check(epoch)
+            guard try vault.session()?.user.id == journal.userID else { throw SessionFailure.staleOperation }
+            result = AccountDeletionResponse.parse(response.0, response: response.1)
+        } catch {
+            if (error as? SessionFailure) == .staleOperation { throw SessionFailure.staleOperation }
+            guard vault.epoch() == epoch else { throw SessionFailure.staleOperation }
+            try vault.check(epoch)
+            return .uncertain(userID: journal.userID, retryAfter: journal.retryAfter, canRetry: session.expiresAt > Date().timeIntervalSince1970, recovery: journal.recovery)
+        }
+        switch result {
+        case .done, .pending:
+            let done: Bool
+            if case .done = result { done = true } else { done = false }
+            journal.phase = done ? .completed : .pending
+            journal.canRetry = false
+            journal.retryAfter = nil
+            try vault.saveDeletionJournal(journal, epoch: epoch)
+            // Fence SDK writes before deleting its stored session. No network logout or token refresh.
+            endAccountEpoch(as: done ? .signedOut : .accountDeletionPending)
+            try vault.removeSession()
+            try vault.removePending()
+            return done ? .completed(.init(userID: journal.userID, initiatingRevision: journal.initiatingRevision, commandID: journal.id)) : .pending(userID: journal.userID)
+        case .uncertain(let retry, let canRetry):
+            journal.retryAfter = retry; journal.canRetry = canRetry; journal.recovery = nil
+            try vault.saveDeletionJournal(journal, epoch: epoch)
+            return .uncertain(userID: journal.userID, retryAfter: retry, canRetry: canRetry && session.expiresAt > Date().timeIntervalSince1970, recovery: nil)
+        case .refused(let refusal):
+            // A refusal to this retry cannot erase an earlier lost response's uncertainty.
+            if resuming {
+                journal.recovery = refusal
+                if case .rateLimited(let retry) = refusal { journal.retryAfter = retry }
+                if refusal == .disabled || refusal == .forbidden || refusal == .invalidRequest { journal.canRetry = false }
+                try vault.saveDeletionJournal(journal, epoch: epoch)
+                return .uncertain(userID: journal.userID, retryAfter: journal.retryAfter,
+                                  canRetry: journal.canRetry, recovery: refusal)
+            } else {
+                try vault.removeDeletionJournal(epoch: epoch)
+                state = identity
+            }
+            return .refused(refusal)
+        }
+    }
+
 }
 
 

@@ -18,7 +18,7 @@ struct ConnectedCuadraoRoot: View {
                 } else {
                     ConnectedCuadraoShell(appearance: $appearance)
                 }
-            case .signedOut, .configurationInvalid, .pendingSignOut, .unsupportedAnonymous, .credentialValidationRequired, .reauthenticationRequired:
+            case .accountDeletionUncertain, .accountDeletionPending, .signedOut, .configurationInvalid, .pendingSignOut, .unsupportedAnonymous, .credentialValidationRequired, .reauthenticationRequired:
                 ConnectedCuadraoAuthFlow()
                     .safeAreaInset(edge: .top) { if let invitations = auth.invitations { InvitationPendingNotice(model: invitations) } }
             }
