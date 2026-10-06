@@ -101,7 +101,7 @@ final class FinancialGoalModel: ObservableObject {
         let ticket = generation
         do {
             let operation: FinancialPlanOperation = draft.existing.map { .editGoal(id: $0.id, version: $0.version) } ?? .createGoal
-            try await perform(operation, command: draft.command(locale: locale), originAccountId: detail?.goal.destinationAccountId)
+            try await perform(operation, command: draft.command(locale: locale), originAccountId: draft.existing?.destinationAccountId ?? detail?.goal.destinationAccountId)
             guard generation == ticket else { return }; if self.draft === draft { self.draft = nil }
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }

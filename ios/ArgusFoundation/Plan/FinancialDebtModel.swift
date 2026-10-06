@@ -111,7 +111,7 @@ final class FinancialDebtModel: ObservableObject {
         let ticket = generation
         do {
             let operation: FinancialPlanOperation = draft.existing.map { .editDebt(id: $0.id, version: $0.version) } ?? .createDebt
-            try await perform(operation, command: draft.command(locale: locale), originAccountId: detail?.debt.sourceAccountId)
+            try await perform(operation, command: draft.command(locale: locale), originAccountId: draft.existing?.sourceAccountId ?? detail?.debt.sourceAccountId)
             if generation == ticket, self.draft === draft { self.draft = nil }
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
