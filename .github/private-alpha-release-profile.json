@@ -28,6 +28,8 @@
         "ARGUS_FINANCIAL_ACCOUNTS_ENABLED": "false",
         "ARGUS_CROSS_CURRENCY_TRANSFERS_ENABLED": "false",
         "ARGUS_HOUSEHOLDS_ENABLED": "false",
+        "ARGUS_BETA_INVITES_ENABLED": "false",
+        "ARGUS_BETA_INVITE_GATE_ENABLED": "false",
         "ARGUS_ACCOUNT_DELETION_ENABLED": "false",
         "ARGUS_INGESTION_ENABLED": "false",
         "PLAID_ENV": "sandbox",
