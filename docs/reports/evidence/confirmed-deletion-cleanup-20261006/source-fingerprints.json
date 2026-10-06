@@ -1,0 +1,21 @@
+{
+  "base": "8146d16e90633eb543781f8882665482f0d5dca9",
+  "runtime_verification": "unrun; source review and static checks only",
+  "files": [
+    {
+      "path": "ios/Packages/ArgusSession/Sources/ArgusSession/SessionController.swift",
+      "sha256": "69e0a36620e6a25142ba672a535b3f34710042fba156bfe6c68cd69d853a6c1d",
+      "git_object": "8720b2c26da7c3955bc5b291eef423f3c94f52dc"
+    },
+    {
+      "path": "ios/Packages/ArgusSession/Tests/ArgusSessionTests/AccountDeletionTests.swift",
+      "sha256": "713cf4d64302462fa7aa31b673f134e8a0f063b60a9bf1abf7d8af4d88930fe4",
+      "git_object": "adeaa97e1f7a047b68c56be51800c22c3492e7aa"
+    },
+    {
+      "path": "ios/Packages/ArgusSession/README.md",
+      "sha256": "aebf5d023d8dd0983e84757c14192f6caabfbbf06c567a283f2d545b430a93a6",
+      "git_object": "5f9370fd385c70fc45c8596839f5cc430581fe23"
+    }
+  ]
+}
