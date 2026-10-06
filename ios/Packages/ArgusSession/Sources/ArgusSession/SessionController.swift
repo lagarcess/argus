@@ -29,10 +29,14 @@ public actor SessionController {
     public func snapshot() -> SessionSnapshot { state }
 
     public func requestCredentialRevalidation() throws -> SessionSnapshot {
-        guard !mutating else { throw SessionFailure.busy }
-        if try restoreDeletionState() { return state }
         credentialValidationGeneration &+= 1
         do {
+            // Admit notifications during adoption without retiring proof owned by its mutation.
+            if !mutating, try restoreDeletionState() { return state }
+            if try vault.deletionJournal()?.phase == .uncertain {
+                setState(.accountDeletionUncertain)
+                return state
+            }
             if try vault.pending() != nil {
                 setState(.signOutPending)
                 return state
@@ -43,7 +47,9 @@ public actor SessionController {
             }
             return state
         } catch {
-            if state.phase != .signOutPending { setState(.credentialValidationRequired) }
+            if state.phase != .signOutPending && state.phase != .accountDeletionUncertain && state.phase != .accountDeletionPending {
+                setState(.credentialValidationRequired)
+            }
             throw SessionFailure.storageUnavailable
         }
     }
@@ -631,6 +637,7 @@ public actor SessionController {
         // Persist before dispatch, including before cancellation can reach transport.
         try vault.saveDeletionJournal(journal, epoch: epoch)
         let identity = state
+        let validationGeneration = credentialValidationGeneration
         setState(.accountDeletionUncertain)
         var request = URLRequest(url: configuration.argusAPIURL.appending(path: "api/v1/account/delete"))
         request.httpMethod = "POST"
@@ -678,7 +685,13 @@ public actor SessionController {
                                   canRetry: journal.canRetry, recovery: refusal)
             } else {
                 try vault.removeDeletionJournal(epoch: epoch)
-                state = identity
+                if validationGeneration == credentialValidationGeneration {
+                    state = identity
+                } else {
+                    setState(.credentialValidationRequired, profile: identity.profile, appleIdentity: identity.appleIdentity)
+                    let method = try vault.signInMethod()
+                    if !(method == .apple || method == nil && identity.appleIdentity != nil) { state = identity }
+                }
             }
             return .refused(refusal)
         }

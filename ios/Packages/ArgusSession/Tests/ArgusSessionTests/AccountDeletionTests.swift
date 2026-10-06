@@ -38,8 +38,8 @@ private struct DeletionFixture {
     let storage = MemoryStore()
     let configuration = try! SessionConfiguration(argusAPIURL: URL(string: "https://api.example.test")!,
         supabaseURL: URL(string: "https://auth.example.test")!, publicAnonKey: "sb_publishable_test", keychainService: UUID().uuidString)
-    func controller() throws -> SessionController {
-        try SessionController(configuration: configuration, storage: storage, fetch: { [server] in try await server.send($0) })
+    func controller(appleChecker: any AppleCredentialChecking = AuthorizedAppleChecker()) throws -> SessionController {
+        try SessionController(configuration: configuration, storage: storage, appleChecker: appleChecker, fetch: { [server] in try await server.send($0) })
     }
     func login(_ controller: SessionController) async throws -> SessionSnapshot {
         try await controller.login(email: "alice@example.test", password: "synthetic-password", captchaToken: "synthetic-captcha")
@@ -214,6 +214,9 @@ final class AccountDeletionTests: XCTestCase {
         let command = Task { try await controller.deleteAccount(expectedIdentity: identity) }
         await gate.waitUntilStarted()
         XCTAssertEqual(try fixture.journal()?.phase, .uncertain)
+        let notification = try await controller.requestCredentialRevalidation()
+        XCTAssertEqual(notification.phase, .accountDeletionUncertain)
+        XCTAssertEqual(notification.revision, identity.revision)
         do { _ = try await controller.deleteAccount(expectedIdentity: identity); XCTFail("Duplicate") } catch {}
         do { _ = try await controller.financialAccounts(expectedIdentity: identity); XCTFail("Protected dispatch") } catch {}
         await gate.release(); _ = try await command.value
@@ -252,12 +255,37 @@ final class AccountDeletionTests: XCTestCase {
         catch { XCTAssertEqual(error as? SessionFailure, .busy) }
         do { _ = try await controller.retryPendingSignOut(); XCTFail("Cannot retire B issued proof") }
         catch { XCTAssertEqual(error as? SessionFailure, .busy) }
-        do { _ = try await controller.requestCredentialRevalidation(); XCTFail("Cannot restore A during B adoption") }
-        catch { XCTAssertEqual(error as? SessionFailure, .busy) }
-        XCTAssertNotNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending"))
+        let adopting = await controller.snapshot()
+        let pendingProof = try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending")
+        let notification = try await controller.requestCredentialRevalidation()
+        XCTAssertEqual(notification.phase, .signOutPending, "Notification must be admitted during adoption")
+        XCTAssertEqual(notification.revision, adopting.revision, "A's deletion acknowledgement must not retire B's epoch")
+        XCTAssertEqual(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".pending"), pendingProof)
         await gate.release(); let bob = try await login.value
         XCTAssertNotEqual(bob.profile?.id, alice.profile?.id)
         let snapshot = await controller.snapshot(); XCTAssertEqual(snapshot, bob)
+    }
+
+
+    func testAppleNotificationDuringRefusedDeletionDoesNotRestoreStaleAuthenticatedAccess() async throws {
+        let fixture = DeletionFixture(); let controller = try fixture.controller()
+        let identity = try await controller.signIn(with: .init(provider: .apple, idToken: AuthServer.aliceIdToken, nonce: SignInNonce())).session
+        XCTAssertEqual(identity.phase, .authenticated)
+        await fixture.server.configure(409, ["code": "apple_reauthorization_required"])
+        let gate = RequestGate(); await fixture.server.hold(gate)
+        let command = Task { try await controller.deleteAccount(expectedIdentity: identity) }
+        await gate.waitUntilStarted()
+        let notification = try await controller.requestCredentialRevalidation()
+        XCTAssertEqual(notification.phase, .accountDeletionUncertain)
+        await gate.release(); let result = try await command.value
+        XCTAssertEqual(result, .refused(.freshAppleAuthorizationRequired))
+        let snapshot = await controller.snapshot()
+        XCTAssertEqual(snapshot.phase, .credentialValidationRequired)
+        XCTAssertEqual(snapshot.revision, identity.revision)
+        XCTAssertNil(try fixture.journal())
+        XCTAssertNotNil(try fixture.storage.retrieve(key: fixture.configuration.storagePrefix + ".session"))
+        do { _ = try await controller.financialAccounts(expectedIdentity: identity); XCTFail("Notification requires fresh Apple validation") } catch {}
+        let reads = await fixture.server.auth.count("/financial-accounts"); XCTAssertEqual(reads, 0)
     }
 
 }
