@@ -12,7 +12,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     tests = package / "Tests/FinancialModelTests"
     source.mkdir(parents=True)
     tests.mkdir(parents=True)
-    for name in ("AccountsModel.swift", "FinancialLoopModel.swift", "FinancialActivityEditor.swift", "AccountEntry.swift"):
+    for name in ("AccountsModel.swift", "FinancialLoopModel.swift", "FinancialObservationRead.swift", "FinancialActivityEditor.swift", "AccountEntry.swift"):
         shutil.copy(root / "ios/ArgusFoundation/Accounts" / name, source / name)
     asset = (root / "ios/ArgusFoundation/Accounts/FinancialAssetEditor.swift").read_text()
     (source / "FinancialAssetEditor.swift").write_text(asset[:asset.index("struct AssetShareControl: View {")])
@@ -45,6 +45,7 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     shutil.copy(Path(__file__).with_name("FinancialModelTests.swift"), tests / "FinancialModelTests.swift")
     shutil.copy(Path(__file__).with_name("FinancialScrollRestorationTests.swift"), tests / "FinancialScrollRestorationTests.swift")
     shutil.copy(Path(__file__).with_name("ConnectedDetailPresentationTests.swift"), tests / "ConnectedDetailPresentationTests.swift")
+    shutil.copy(Path(__file__).with_name("FinancialObservationReadTests.swift"), tests / "FinancialObservationReadTests.swift")
     (package / "Package.swift").write_text('''// swift-tools-version: 6.0
 import PackageDescription
 let package = Package(name: "FinancialModels", platforms: [.macOS(.v14)], dependencies: [

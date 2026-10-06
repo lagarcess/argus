@@ -65,6 +65,54 @@ final class FinancialLoopModel: ObservableObject {
 
     func acceptPlanHome(_ home: FinancialHome) { self.home = home }
 
+    /// Use a task keyed by identity, account and period. Check cancellation before assigning its result.
+    func observations(accountID: UUID, period: FinancialHomePeriod) async -> PersonalObservationRead {
+        guard !Task.isCancelled else { return .cancelled }
+        guard let identity else { return .unavailable }
+        let ticket = generation
+        let pageLimit = 64
+        var readAccount = false; var verifying = false
+        func checkCurrent() throws {
+            try Task.checkCancellation()
+            guard generation == ticket, self.identity == identity else { throw SessionFailure.staleOperation }
+        }
+        do {
+            try checkCurrent()
+            let before = try await controller.financialAccount(id: accountID, expectedIdentity: identity)
+            try checkCurrent()
+            guard before.id == accountID else { return .stale }
+            readAccount = true
+            var checks: [FinancialCheck] = []; var cursor: String?
+            var seen = Set<String>()
+            for index in 0..<pageLimit {
+                try checkCurrent()
+                let page = try await controller.financialChecks(accountId: accountID, cursor: cursor, expectedIdentity: identity)
+                try checkCurrent()
+                checks += page.items
+                guard let next = page.nextCursor else { break }
+                guard seen.insert(next).inserted else { return .incomplete(.repeatedCursor) }
+                guard index + 1 < pageLimit else { return .incomplete(.pageLimit) }
+                cursor = next
+            }
+            verifying = true
+            try checkCurrent()
+            let after = try await controller.financialAccount(id: accountID, expectedIdentity: identity)
+            try checkCurrent()
+            let current = await controller.snapshot()
+            try checkCurrent()
+            guard current == identity else { throw SessionFailure.staleOperation }
+            return PersonalAccountObservations.accepted(requestedID: accountID, before: before,
+                checksInServerOrder: checks, after: after, period: period)
+        } catch {
+            await handle(error, ticket: ticket)
+            if Task.isCancelled || error is CancellationError { return .cancelled }
+            guard generation == ticket, self.identity == identity else { return .stale }
+            if case SessionFailure.staleOperation = error { return .stale }
+            if case SessionFailure.rejected(status: 409, code: _) = error { return .stale }
+            return readAccount ? .incomplete(verifying ? .verificationFailure : .pageFailure) : .unavailable
+        }
+    }
+
     func open(_ account: FinancialAccount) async {
         guard let identity else { return }
         let ticket = generation
