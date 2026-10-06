@@ -37,7 +37,7 @@ ARGUS_QA_REQUIRED_ENV=(
   ARGUS_READOUT_FALLBACK_MODEL
 )
 
-ARGUS_RENDER_API_ENV_KEYS="$(python3 "${BASH_SOURCE[0]%/*}/private-alpha-release-profile.py" allowed-keys api)" || return 1
+ARGUS_RENDER_API_ENV_KEYS="$(python3 "${BASH_SOURCE[0]%/*}/private-alpha-release-profile.py" allowed-keys api)" || exit 1
 ARGUS_RENDER_API_ENV=()
 while IFS= read -r argus_api_env_key; do
   ARGUS_RENDER_API_ENV+=("$argus_api_env_key")
