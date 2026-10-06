@@ -5,7 +5,6 @@ struct FinancialGoalList: View {
     @ObservedObject var plan: FinancialPlanModel
     @ObservedObject var model: FinancialGoalModel
     let origin: FinancialGoalNavigation.Origin
-    var compact = false
     private var items: [FinancialGoalProgress] { (plan.projection?.goals ?? []).filter { !$0.goal.archived } }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -18,18 +17,6 @@ struct FinancialGoalList: View {
                         FinancialGoalSummary(progress: progress, compact: true)
                     }.padding(.vertical, 14).contentShape(Rectangle())
                 }.buttonStyle(.plain).accessibilityIdentifier("goal.row." + origin.rawValue + "." + progress.id.uuidString)
-            }
-            if !compact {
-                Button("goal.add") { model.create() }.buttonStyle(PillButtonStyle()).accessibilityIdentifier("goal.add")
-                if let archived = plan.projection?.goals?.filter({ $0.goal.archived }), !archived.isEmpty {
-                    DisclosureGroup("goal.archived") {
-                        ForEach(archived) { progress in
-                            Button { Task { await model.open(progress.id, origin: origin) } } label: {
-                                HStack { Text(verbatim: progress.goal.name); Spacer(); Image(systemName: "chevron.right") }.frame(minHeight: 48).contentShape(Rectangle())
-                            }.buttonStyle(.plain).accessibilityIdentifier("goal.archived." + progress.id.uuidString)
-                        }
-                    }
-                }
             }
         }
     }
@@ -75,7 +62,7 @@ struct FinancialGoalPresenter: View {
                 NavigationStack {
                     FinancialGoalDetail(model: model, loop: loop) {
                         if let origin = model.navigation?.origin {
-                            switch origin { case .home: destination = .home; case .plan: destination = .plan; loop.plan.section = .goals; case .planOverview: destination = .plan; loop.plan.section = .overview; case .search: destination = .search }
+                            switch origin { case .home: destination = .home; case .plan, .planOverview: destination = .plan; case .search: destination = .search }
                         }
                         model.close(); Task { await search?.refresh() }
                     }

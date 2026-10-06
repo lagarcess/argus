@@ -194,16 +194,6 @@ struct FinancialPlanNavigationState<Content: View>: View {
             case .debt(_, let origin): FinancialPlanHost(origin)
             }
         }
-
-        var section: PlanSection? {
-            switch self {
-            case .goal(_, .plan): .goals
-            case .budget(_, .plan): .budgets
-            case .debt(_, .plan): .debts
-            case .goal(_, .planOverview), .budget(_, .planOverview), .debt(_, .planOverview): .overview
-            default: nil
-            }
-        }
     }
 
     private var routes: [Route] {
@@ -220,7 +210,6 @@ struct FinancialPlanNavigationState<Content: View>: View {
         content(!routes.contains { $0.host.tab == tab })
             .onChange(of: restoredRoute, initial: true) { _, route in
                 guard let route else { return }
-                if let section = route.section { loop.plan.section = section }
                 tab = route.host.tab
             }
     }

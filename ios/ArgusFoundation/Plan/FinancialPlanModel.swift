@@ -3,7 +3,6 @@ import ArgusSession
 
 @MainActor
 final class FinancialPlanModel: ObservableObject {
-    @Published var section = PlanSection.overview
     @Published private(set) var projection: FinancialPlanProjection?
     /// Home's rolling window: the server default horizon, never Plan's chosen end date.
     @Published private(set) var homeProjection: FinancialPlanProjection?
@@ -35,7 +34,6 @@ final class FinancialPlanModel: ObservableObject {
     func bind(_ snapshot: SessionSnapshot?) {
         generation = UUID(); request = UUID(); detailRequest = UUID()
         identity = snapshot?.phase == .authenticated ? snapshot : nil
-        section = .overview
         projection = nil; homeProjection = nil; draft = nil; selectedOccurrence = nil; candidates = []; linkedActivity = nil
         endDate = nil; afterOccurrence = nil; loading = false; loadingDetails = false; saving = false; errorKey = nil; homeErrorKey = nil
     }

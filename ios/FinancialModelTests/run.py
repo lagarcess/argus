@@ -25,8 +25,6 @@ with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     shutil.copy(root / "ios/ArgusFoundation/Plan/ConnectedPlanMapping.swift", source / "ConnectedPlanMapping.swift")
     plans = (root / "ios/ArgusFoundation/Cuadrao/Planning/CuadraoPlanPreview.swift").read_text()
     (source / "CanvasPlan.swift").write_text("import Foundation\n" + plans[plans.index("enum CanvasPlanKind:"):plans.index("@Observable final class CuadraoPlanPreview {")])
-    navigation = (root / "ios/ArgusFoundation/SampleDestinations.swift").read_text()
-    (source / "PlanSection.swift").write_text("import SwiftUI\n" + navigation[navigation.index("enum PlanSection:"):navigation.index("struct PlanSampleView:")])
     shutil.copy(root / "ios/ArgusFoundation/Search/FinancialSearchModel.swift", source / "FinancialSearchModel.swift")
     shutil.copy(root / "ios/ArgusFoundation/Auth/AccountDeletionModel.swift", source / "AccountDeletionModel.swift")
     shutil.copy(root / "ios/ArgusFoundation/ReleaseUI/Identity/ReleaseIdentityModels.swift", source / "ReleaseIdentityModels.swift")

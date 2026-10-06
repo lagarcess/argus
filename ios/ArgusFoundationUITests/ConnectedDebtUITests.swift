@@ -178,8 +178,8 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
     }
     private func openDebt(_ title: String) {
-        app.openPlanSurface(); selectPlanSection("debts")
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'debt.row.plan.' AND label CONTAINS %@", title)).firstMatch
+        app.openPlanSurface()
+        let row = planCards("debt", title).firstMatch
         tapVisible(row)
         XCTAssertTrue(app.staticTexts["debt.recorded"].waitForExistence(timeout: 15))
     }

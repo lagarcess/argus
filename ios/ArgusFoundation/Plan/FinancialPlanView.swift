@@ -34,7 +34,6 @@ struct FinancialPlanView: View {
     @State private var selectingAccounts = false
     @State private var expanded = false
     @State private var creating = false
-    @State private var managing = false
     @Environment(\.locale) private var locale
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -42,7 +41,7 @@ struct FinancialPlanView: View {
 
     var body: some View {
         CuadraoPlanPage(spanish: spanish, audience: audience, bottomSpace: bottomSpace) {
-            CuadraoPlanHeader(spanish: spanish, createTitle: createTitle, canCreate: canCreate, create: create)
+            CuadraoPlanHeader(spanish: spanish, createTitle: spanish ? "Crear plan" : "Create plan", canCreate: canCreate) { creating = true }
         } content: {
             if loop.pendingConfirmation != nil { PlanPendingView(loop: loop) }
             if model.loading { ProgressView("accounts.loading") }
@@ -50,18 +49,7 @@ struct FinancialPlanView: View {
                 Text(LocalizedStringKey(error)).foregroundStyle(.secondary)
                 Button("accounts.retry") { Task { await model.refresh() } }.frame(minHeight: 44)
             }
-            if model.section == .overview {
-                if let projection = model.projection { overview(projection) }
-            } else {
-                sections
-                if model.section == .goals {
-                    FinancialGoalList(plan: model, model: loop.goals, origin: .plan)
-                } else if model.section == .debts {
-                    FinancialDebtList(plan: model, model: loop.debts, origin: .plan)
-                } else if model.section == .budgets {
-                    FinancialBudgetList(plan: model, model: loop.budgets, origin: .plan)
-                }
-            }
+            if let projection = model.projection { overview(projection) }
         } footer: {
             EmptyView()
         }
@@ -71,23 +59,6 @@ struct FinancialPlanView: View {
         .sheet(isPresented: $creating) { ConnectedPlanEditor(loop: loop, seed: .create(kind: nil)) }
         .sheet(isPresented: $selectingAccounts) {
             if let projection = model.projection { FinancialPlanSelectionView(model: model, loop: loop, projection: projection) }
-        }
-    }
-
-    private var sections: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 24) {
-                ForEach(PlanSection.allCases, id: \.self) { item in
-                    Button { model.section = item } label: {
-                        Text(item.title).font(CuadraoTypography.supporting).frame(minWidth: 44, minHeight: 48)
-                            .foregroundStyle(model.section == item ? WelcomePalette.ink : .secondary)
-                            .overlay(alignment: .bottom) {
-                                Rectangle().fill(model.section == item ? WelcomePalette.pine : .clear).frame(height: 1)
-                            }.contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityIdentifier("plan." + item.rawValue)
-                        .accessibilityAddTraits(model.section == item ? .isSelected : [])
-                }
-            }
         }
     }
 
@@ -102,12 +73,6 @@ struct FinancialPlanView: View {
             FinancialPlanCards(model: model, loop: loop, projection: projection,
                 create: { creating = true }, bottomSpace: bottomSpace)
             expected(projection)
-            DisclosureGroup(isExpanded: $managing) {
-                sections.padding(.top, 8)
-            } label: {
-                Text(spanish ? "Administrar mis planes" : "Manage my plans").font(.subheadline.weight(.medium))
-                    .accessibilityIdentifier("plan.manage")
-            }
         }
     }
 
@@ -166,26 +131,6 @@ struct FinancialPlanView: View {
                     }
                 }.padding(.top, 16)
             }
-        }
-    }
-    private var createTitle: String {
-        if model.section == .overview { return spanish ? "Crear plan" : "Create plan" }
-        return NSLocalizedString(createKey, comment: "")
-    }
-    private var createKey: String {
-        switch model.section {
-        case .overview: "plan.add.title"
-        case .goals: "goal.add"
-        case .budgets: "budget.add"
-        case .debts: "debt.add"
-        }
-    }
-    private func create() {
-        switch model.section {
-        case .overview: creating = true
-        case .goals: loop.goals.create()
-        case .budgets: Task { await loop.budgets.create() }
-        case .debts: loop.debts.create()
         }
     }
     private func includedNames(_ projection: FinancialPlanProjection, currency: FinancialForecastCurrency) -> String {
