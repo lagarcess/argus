@@ -631,6 +631,7 @@
 "household.personal" = "Personal";
 "household.title" = "Household";
 "household.manage" = "Manage spaces";
+"household.addSpace" = "Add a space";
 "household.people" = "People";
 "household.scopeNotice" = "Only explicitly shared recorded accounts. Each owner’s recorded share counts once.";
 "household.knownSubtotal" = "Known subtotal";
