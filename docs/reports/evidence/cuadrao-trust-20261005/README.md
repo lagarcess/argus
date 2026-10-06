@@ -1,6 +1,6 @@
 # Cuadrao coordinated delivery evidence
 
-Snapshot: 2026-10-06T00:28:57.117702+00:00. Original integration: `875de09ac2115acec42e09060b92878aa5f18eff`. Current fetched integration: `c0d44d399b8fbf2edcdd0a8fd3ad4759a0e9c548`. Active delivery record; protected-branch housekeeping remains in PR #860.
+Snapshot: October 6, 2026. Original integration: `875de09ac2115acec42e09060b92878aa5f18eff`. Current fetched integration: `184d2614e4d2beb5ed994bd3cd8f3a5ef211f1dd`. Twenty implementation slices and housekeeping #860 landed. Current protected-branch housekeeping is #873; [continuation](continuation-20261006.md) records remaining gates.
 
 Shared Foundations #818–#820 and Trust/Privacy/Operations have one captain and integration queue. [Preflight](preflight.md), [contract owners](foundation-contract-map-proposed.md), [decision gates](orchestration/gates.md), and [current queue](active-queue-20261005.md) preserve scope. Proposed product contracts remain proposed.
 
@@ -22,6 +22,10 @@ Shared Foundations #818–#820 and Trust/Privacy/Operations have one captain and
 | [#845](https://github.com/lagarcess/argus/pull/845) | `dd04130e8aa174db3de6139541d3b2e0f36868d0` | [Evidence](pr845-landing-record.json) |
 | [#865](https://github.com/lagarcess/argus/pull/865) | `ce7c7350af9a75019a622016ce3a65dbd17e1cc8` | [Evidence](pr865-landing-record.json) |
 | [#871](https://github.com/lagarcess/argus/pull/871) | `c0d44d399b8fbf2edcdd0a8fd3ad4759a0e9c548` | [Evidence](pr871-landing-record.json) |
+| [#864](https://github.com/lagarcess/argus/pull/864) | `5d46a73d4d97b0412dccff517eb43c73e4316977` | [Evidence](pr864-landing-record.json) |
+| [#874](https://github.com/lagarcess/argus/pull/874) | `a2c65549b3ffcb97ee0be24b971110be8c090b32` | [Evidence](pr874-landing-record.json) |
+| [#875](https://github.com/lagarcess/argus/pull/875) | `8146d16e90633eb543781f8882665482f0d5dca9` | [Evidence](pr875-landing-record.json) |
+| [#876](https://github.com/lagarcess/argus/pull/876) | `184d2614e4d2beb5ed994bd3cd8f3a5ef211f1dd` | [Evidence](pr876-landing-record.json) |
 
 Each slice passed independent review, combined-tree modularity and terminal PR checks before an expected-head guarded merge. Canonical integration is synchronized. Integration CI/smoke and housekeeping have separate gates. Local proof does not mean device verification or activation.
 
