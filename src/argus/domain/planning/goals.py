@@ -14,7 +14,11 @@ from argus.domain.planning.goal_schemas import (
 )
 from argus.domain.planning.schemas import CASH_TYPES
 from argus.domain.recording.money_plan import plan
-from argus.domain.recording.money_reads import activity, current_activities
+from argus.domain.recording.money_reads import (
+    activity,
+    activity_in_currency,
+    current_activities,
+)
 from argus.domain.recording.money_service import MoneyService
 from argus.domain.recording.repository import StoredAccount
 from argus.domain.recording.schemas import account_response
@@ -86,7 +90,7 @@ class GoalService:
                 for a in current_activities(accounts)
                 if a["activity_id"] not in used
                 and a["kind"] == "transfer"
-                and a["currency"] == item["currency"]
+                and activity_in_currency(a, item["currency"])
                 and all(leg["account_id"] in eligible for leg in a["legs"])
                 and any(
                     leg["role"] == "destination"

@@ -15204,6 +15204,14 @@ components:
           - single
           - source
           - destination
+        amount_minor:
+          type: integer
+        amount:
+          type: string
+        currency:
+          type: string
+        currency_fraction_digits:
+          type: integer
         balance_movement_minor:
           type: integer
         coverage:
@@ -15216,6 +15224,10 @@ components:
       - record_revision
       - account_id
       - role
+      - amount_minor
+      - amount
+      - currency
+      - currency_fraction_digits
       - balance_movement_minor
       - coverage
     MoneyOptionsResponse:
@@ -15320,6 +15332,11 @@ components:
         amount:
           type: string
           maxLength: 40
+        destination_amount:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
         principal:
           anyOf:
           - type: string

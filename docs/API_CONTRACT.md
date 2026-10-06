@@ -7164,7 +7164,7 @@ Canonical routes, all under `/api/v1` and the existing registered-owner/default-
 - `GET /financial-activities/options`: `{accounts:[FinancialAccountResponse],eligibility:{kind:[account_type]},destination_eligibility:{paired_kind:[account_type]},categories:[string],sources:[string]}`.
 - `GET /financial-activities/purchases?currency=DOP`: `{items:[Activity]}`; each purchase adds `refunded_minor` and `refundable_minor`.
 
-The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,principal?,interest?,fees?,reversal_of_activity_id?,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
+The full command is `{kind,account_id?,source_account_id?,destination_account_id?,amount,destination_amount?,principal?,interest?,fees?,reversal_of_activity_id?,occurred_at,time_zone,note?,category_id?,source_id?,purchase_activity_id?,expected_revision?,reason?,expected_versions,coverage,preview_token?}`.
 Kind is `expense|income|transfer|card_payment|refund|debt_payment|payment_reversal`, immutable on correction. Loan splits and payment-return references follow the connected debt-payment contract below.
 Singles use account_id; pairs use source/destination. Irrelevant non-null fields fail.
 Amount is a positive decimal string; occurred_at requires an offset and cannot be
@@ -7192,7 +7192,7 @@ revision and token must match under locks; stale writes change nothing.
 Activity is `{activity_id,revision,kind,amount_minor,amount,currency,
 currency_fraction_digits,occurred_at,time_zone,note,category_id,source_id,
 purchase_activity_id,purchase_revision,principal_minor,interest_minor,fees_minor,reversal_of_activity_id,reversal_of_revision,reason,recorded_at,recorded_by,legs}`.
-Leg is `{record_id,record_revision,account_id,role,balance_movement_minor,coverage}`;
+Leg is `{record_id,record_revision,account_id,role,amount_minor,amount,currency,currency_fraction_digits,balance_movement_minor,coverage}`;
 role is `single|source|destination`; coverage uses legacy CoverageAnswer.
 Write returns `{activity,accounts:[FinancialAccountResponse],replayed}`: accepted
 historical revision plus all affected accounts' current projections. History is
@@ -7202,10 +7202,38 @@ Home recent activity shows each paired operation once.
 
 Income admits cash/checking/savings/investment; expense/refund cash/checking/savings/
 credit_card. Transfer connects distinct cash/checking/savings/investment accounts;
-card payment uses those sources and credit_card destination. Pairs and linked refunds
-require same currency. No FX conversion. Loan principal, interest and fees use the explicit
+card payment uses those sources and credit_card destination. Payments, returns and linked refunds
+require the same currency. Transfers follow the paired-amount contract below. No FX conversion. Loan principal, interest and fees use the explicit
 `debt_payment` split below; no missing allocation is inferred. Positive card balance exposes credit_minor
 in BalanceResponse. Unknown remains unknown after activity.
+
+### Paired transfer amounts, default-off (#820)
+
+`amount` retains the source amount. `destination_amount` is an optional decimal
+string of at most 40 characters. Only transfers accept a non-null destination
+amount. Mixed currencies require both positive actual amounts, independently
+parsed in each canonical account currency. No exchange rate is supplied or stored.
+Same-currency transfers without the field keep equal legs. An explicit pair in
+one currency must be equal in minor units. Each visible response leg owns its
+formatted amount, minor amount, currency and fraction digits. When the source is
+hidden, the legacy top-level amount stays null and its required currency fields
+derive from the first visible leg. Hidden source denomination is not disclosed.
+
+`ARGUS_CROSS_CURRENCY_TRANSFERS_ENABLED` defaults to false and rejects mixed-currency
+preview and confirmation with `cross_currency_transfers_disabled`. While enabled
+locally, a missing received amount fails with `destination_amount_required`; an
+unequal same-currency pair fails with `transfer_amount_mismatch`. Non-transfer
+second amounts fail with `field_not_applicable`. Existing precision, range,
+positive-amount, access, revision and preview errors retain their contracts.
+
+A null or absent `destination_amount` is omitted from request serialization,
+including nested Household and Plan commands. Other explicit nulls are preserved.
+A supplied amount participates in existing preview and receipt hashes. Corrections
+replace the complete pair under the existing atomic revision and retry rules.
+Current Plan eligibility and credits require every leg to have the Plan currency.
+Mixed-currency Plan credit needs a separate accepted contract. Native entry,
+readback, correction and retry acceptance must pass before hosted activation.
+See [the accepted transfer contract](specs/lanes/cuadrao-cross-currency-transfers.md).
 
 Linked refunds target owned expenses, cannot precede purchase local financial date,
 and cumulative current linked refunds cannot exceed purchase. Purchase corrections

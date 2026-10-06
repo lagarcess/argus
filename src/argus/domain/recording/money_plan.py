@@ -30,7 +30,13 @@ from argus.domain.recording.loop_schemas import CATEGORY_IDS
 from argus.domain.recording.loop_service import _stamp, _view
 from argus.domain.recording.loop_storage import Mutation, apply
 from argus.domain.recording.money_reads import activity, current_activities
-from argus.domain.recording.money_schemas import ELIGIBILITY, SOURCE_IDS, MoneyRequest
+from argus.domain.recording.money_schemas import (
+    DESTINATION_ELIGIBILITY,
+    ELIGIBILITY,
+    SOURCE_IDS,
+    MoneyRequest,
+)
+from argus.domain.recording.money_transfers import transfer_amounts
 from argus.domain.recording.records import _normalize_reason
 from argus.domain.recording.repository import StoredAccount
 
@@ -69,12 +75,7 @@ def request_identity(request: MoneyRequest, activity_id: str | None) -> str:
 
 
 def selected(request: MoneyRequest) -> dict[str, str]:
-    pair = request.kind in {
-        "transfer",
-        "card_payment",
-        "debt_payment",
-        "payment_reversal",
-    }
+    pair = request.kind in DESTINATION_ELIGIBILITY
     if pair:
         if (
             request.account_id
@@ -151,9 +152,22 @@ def plan(
                 "account_ineligible", "Choose an account that supports this activity."
             )
     currency = by_id[next(iter(targets))].account.currency
-    if any(by_id[aid].account.currency != currency for aid in targets):
+    if request.kind != "transfer" and any(
+        by_id[aid].account.currency != currency for aid in targets
+    ):
         problem("currency_mismatch", "Choose accounts with the same currency.")
-    amount = parse_minor_units(request.amount, currency)
+    if request.kind != "transfer" and request.destination_amount is not None:
+        problem("field_not_applicable", "A destination amount applies only to transfers.")
+    pair = (
+        transfer_amounts(
+            request,
+            by_id[request.source_account_id].account.currency,
+            by_id[request.destination_account_id].account.currency,
+        )
+        if request.kind == "transfer"
+        else None
+    )
+    amount = pair.source_minor if pair else parse_minor_units(request.amount, currency)
     if amount <= 0:
         problem("amount_positive_required", "Enter a positive amount.")
     from argus.domain.recording.payments import validate as payment_validate
@@ -305,9 +319,14 @@ def plan(
                 if current
                 else (group_id if len(targets) == 1 and not old else str(uuid4()))
             )
+            leg_amount = payment.leg(role) if role else 0
+            if pair and role:
+                leg_amount = (
+                    pair.destination_minor if role == "destination" else pair.source_minor
+                )
             revision = ExpenseRevision(
                 (current.current.revision if current else 0) + 1,
-                payment.leg(role) if role else 0,
+                leg_amount,
                 stamp,
                 request.time_zone,
                 reviewed.note,
