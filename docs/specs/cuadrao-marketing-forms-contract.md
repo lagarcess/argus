@@ -91,6 +91,8 @@ The page promises one message when access is available. The operator sends it wi
 - `--only a@x,b@y` sends to named approved test addresses, never stamps `notified_at`, and uses a different idempotency key from the real send.
 - Each message uses `notice-<template id>-<digest>` as its idempotency key and stamps `notified_at` only after Resend accepts it, so a rerun within Resend's 24-hour key window does not message anyone twice. The stamp applies only to a row that is still active. A message that was sent but whose stamp failed stops the run at once, so nobody further down the list is mailed unrecorded. The tool prints the `email_digest` of each such row, exits non-zero, and tells the operator not to rerun; stamp those rows by hand first, because after 24 hours the same key no longer protects them.
 
+**Known limit.** The notice reads the pending list once at the start of a run. An address removed by hand while that run is in progress can still be mailed once in the same run, because removal and the notice are both operator actions and a run takes seconds. Do not process a removal request while a `--send` run is going. Rechecking each row before its send would close this and is not built because nothing runs concurrently today.
+
 Early-access consent covers this availability notice only. It is not marketing consent and does not feed `news.cuadrao.ai` ([#892](https://github.com/lagarcess/argus/issues/892)).
 
 ## Confirmation email
