@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { ChevronRight, FileText, ImageIcon, MessageCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ReceiptSummary } from "@/lib/business-api";
@@ -48,20 +47,8 @@ export function ReceiptRow({ receipt, onOpen }: { receipt: ReceiptSummary; onOpe
 
 export default function BusinessInboxPanel() {
   const { t } = useTranslation();
-  const { source, revision, openPanel, actions } = useBusiness();
-  const [items, setItems] = useState<ReceiptSummary[] | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    source
-      .receipts("inbox")
-      .then((next) => !cancelled && setItems(next))
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [revision, source]);
+  const { records, openPanel, actions } = useBusiness();
+  const items = records.inbox;
 
   const upload = actions.create.find((action) => action.id === "upload_receipt");
 
@@ -78,7 +65,7 @@ export default function BusinessInboxPanel() {
           ) : null
         }
       />
-      {failed ? (
+      {records.error ? (
         <p role="alert" className="text-[14px] text-black/70 dark:text-white/70">
           {t("business.inbox.error", "We couldn't load your inbox. Try again.")}
         </p>

@@ -62,7 +62,7 @@ export function useBusinessActions({
   openPanel,
 }: ActionInput): BusinessActions {
   const { t } = useTranslation();
-  const awaiting = (records.overview?.awaiting_review ?? 0) + (records.overview?.needs_attention ?? 0);
+  const awaiting = records.inbox?.length ?? 0;
   const canAsk =
     Boolean(records.workspace?.assistant_available) &&
     (records.overview?.totals ?? []).some((total) => total.count > 0);
