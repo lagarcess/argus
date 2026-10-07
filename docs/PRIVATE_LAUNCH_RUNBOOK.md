@@ -948,6 +948,29 @@ Do not copy production deletion credentials into CI. Record the command target,
 timestamp, final summary line, and selected or purged counts in operator
 evidence.
 
+### Applying an approved migration list (non-hosted targets only)
+
+`scripts/ops/apply_approved_migrations.py` applies an explicit, ordered list of
+migration versions to a named database, one transaction per file, and records
+each ledger row the way `production_migration_gate.py` reads it (the file's own
+version and name, statements split by the gate's splitter). Use it where the
+Supabase CLI cannot: production's ledger holds history the CLI would try to
+re-run or rewrite. Versions at or below the gate's reconciliation threshold are
+never recorded; a listed `--unrecorded` version runs without a ledger row.
+
+It refuses any hosted Supabase host. The target URL comes from an environment
+variable (default `ARGUS_APPLY_DATABASE_URL`), never the command line, and the
+host and database must be named with `--allow-host` and `--allow-database`.
+The default run only prints the plan; `--execute` applies it. A hosted target
+needs a separate reviewed change and the founder's approval record.
+
+```bash
+ARGUS_APPLY_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/rehearsal \
+poetry run python scripts/ops/apply_approved_migrations.py \
+  --candidate-sha "$(git rev-parse HEAD)" --approved-file approved.json \
+  --allow-host 127.0.0.1 --allow-database rehearsal            # plan only
+```
+
 ## Runtime Tuning Flags
 
 These are optional runtime knobs (not secrets). Defaults are safe for
