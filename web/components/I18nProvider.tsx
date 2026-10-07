@@ -6,24 +6,26 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from '@/lib/i18n';
 import { normalizeEnabledLanguage } from '@/lib/language-features';
 import { PUBLIC_RECEIPT_PATH_PREFIX } from '@/lib/public-receipt-contract';
+import { resolveBusinessPathname } from '@/lib/business-site';
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const pathname = usePathname();
+  const businessLocale = resolveBusinessPathname(pathname)?.locale;
   // Public receipts resolve their copy on the server and consume no i18next
   // resources, so they must not wait on client initialization. Holding them behind
   // the gate below left a shared link blank until JavaScript ran, and permanently
   // blank when it is blocked or fails, which is the opposite of what a public page
-  // opened from a message needs. Every other route keeps the gate.
+  // opened from a message needs.
   const rendersWithoutI18n = Boolean(
-    pathname?.startsWith(PUBLIC_RECEIPT_PATH_PREFIX),
+    pathname?.startsWith(PUBLIC_RECEIPT_PATH_PREFIX) || businessLocale,
   );
 
   useEffect(() => {
     const syncDocumentLanguage = (language?: string) => {
-      document.documentElement.lang = normalizeEnabledLanguage(
-        language ?? i18n.resolvedLanguage ?? i18n.language,
-      );
+      document.documentElement.lang = businessLocale
+        ? businessLocale === 'es' ? 'es-DO' : 'en'
+        : normalizeEnabledLanguage(language ?? i18n.resolvedLanguage ?? i18n.language);
     };
 
     const handleInitialized = () => {
@@ -43,7 +45,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       i18n.off('initialized', handleInitialized);
       i18n.off('languageChanged', syncDocumentLanguage);
     };
-  }, []);
+  }, [businessLocale]);
 
   if (!isInitialized && !rendersWithoutI18n) {
     // Show a blank screen or a loading shimmer that matches Argus aesthetics
