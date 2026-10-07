@@ -1,7 +1,6 @@
 # Assign the Cuadrao Business owner pilot
 
-Send the following to the Claude lane when assigning it. Replace the scope PR
-reference with the actual PR URL. The founder remains the product reviewer.
+Send the following to the Claude lane when assigning it. The scope is [PR #900](https://github.com/lagarcess/argus/pull/900). The founder remains the product reviewer.
 
 > Own the Cuadrao Business pilot end to end using the scope PR and
 > `docs/specs/lanes/cuadrao-business-owner-pilot.md`.
@@ -12,7 +11,7 @@ reference with the actual PR URL. The founder remains the product reviewer.
 > uncommitted files. Do not rebase a published or evidenced branch.
 >
 > Begin with a short assessment of existing code, missing connections and shared
-> ownership. Inspect #778, #819, #823, #824, #826, #827 and #828 before creating
+> ownership. Inspect #778, #819, #823, #824, #825, #826, #827 and #828 before creating
 > replacement machinery. Confirm the Business context, canonical expense posting,
 > private source storage, reliable preparation and WhatsApp sender-link contracts.
 > Define the actual edited files and verification commands from current code.
@@ -27,7 +26,13 @@ reference with the actual PR URL. The founder remains the product reviewer.
 > capabilities for available inputs and viewport size for layout. Replace the
 > Business asset/indicator @ affordance with an attachment/add control. Preserve
 > the existing Argus chat picker and consumer iOS behavior. Adapt starter chips
-> to working pilot flows. Business welcome/type-out copy is optional later polish.
+> to working pilot flows. Add a sidebar + Create menu for upload receipt, record
+> expense and new chat. Keep it reachable on small screens. Reuse the same action
+> owners across Create, starter chips and the composer. Inbox holds receipts
+> awaiting review. Updates holds real processing results and attention items.
+> Assess #825 reuse; do not make a full notification system a pilot blocker or
+> show an inactive Updates entry. Show these choices in the first preview.
+> Business welcome/type-out copy is optional later polish.
 > Inventory the Argus A in background, loading and corner branding for replacement
 > when the Cuadrao logo is approved; do not make logo design a blocker.
 >

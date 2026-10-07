@@ -72,6 +72,33 @@ Company logo customization, a detachable/draggable desktop composer, dashboard
 builders, invoicing, bank integration, team billing and the native Business app
 are outside this slice.
 
+## Create menu, Inbox and Updates
+
+Founder clarification on October 7 adds a Slack-inspired **+ Create** control.
+Place it near the bottom of the desktop sidebar. Open a short menu with upload
+receipt, record expense and new chat. Expose only working actions. On small
+screens, keep Create reachable through responsive navigation without requiring
+a desktop sidebar. Show both layouts in the first preview.
+
+Use one shared action owner for Create, starter chips and composer entry points.
+The composer attachment adds a receipt to the current conversation. Create can
+start receipt intake outside a conversation. Both enter the same receipt flow
+and preserve unfinished input. Opening a menu must not upload, invoke AI or
+confirm an expense. Support keyboard navigation, Escape and focus return.
+
+Keep two distinct destinations:
+
+- **Inbox:** receipts that need owner review or correction.
+- **Updates:** processing results, failures and other changes that need attention,
+  with a link to the affected record.
+
+Assess the existing #825 contract before implementing Business Updates. This
+slice does not require a full notification system or push delivery. Include an
+Updates sidebar entry only when real events and working destinations support it.
+Until then, surface processing state and recovery in Inbox and the receipt view.
+Do not invent an unread count or duplicate receipt state in a notification store.
+The preview must explain this boundary without adding inactive menu items.
+
 ## Adapt starter chips and preserve personality
 
 Founder clarification on October 7 keeps the existing starter-chip interaction.
