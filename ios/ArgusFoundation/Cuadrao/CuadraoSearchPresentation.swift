@@ -34,14 +34,21 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
     var showsFilters = true
     var loading = false
     var refresh: (@MainActor () async -> Void)?
+    /// Scroll restoration measures every row's frame, so the connected host builds rows eagerly.
+    var eagerRows = false
     @ViewBuilder let results: () -> Results
     @ViewBuilder let filters: () -> Filters
     @State private var showingFilters = false
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0, content: results)
-                .padding(.horizontal, 24).padding(.bottom, 24)
+            Group {
+                if eagerRows {
+                    VStack(alignment: .leading, spacing: 0, content: results)
+                } else {
+                    LazyVStack(alignment: .leading, spacing: 0, content: results)
+                }
+            }.padding(.horizontal, 24).padding(.bottom, 24)
         }.coordinateSpace(name: "search.viewport")
             .modifier(CuadraoSearchRefresh(action: refresh))
             .scrollDismissesKeyboard(.interactively)
@@ -71,7 +78,7 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
                                     .accessibilityIdentifier(accessibility.kind(value))
                             }
                         }
-                    }.scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                    }.scrollBounceBehavior(refresh == nil ? .automatic : .basedOnSize, axes: .horizontal)
                         .accessibilityIdentifier(accessibility.prefix + ".kinds")
                     if filterCount > 0 {
                         HStack {

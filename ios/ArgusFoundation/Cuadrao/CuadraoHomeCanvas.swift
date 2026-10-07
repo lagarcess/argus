@@ -86,6 +86,7 @@ struct CuadraoHomeCanvas: View {
         .sheet(item: $sheet) { item in modal(item) }
         .receiptPresentation(route: $receiptRoute, workspace: receiptWorkspace, spanish: spanish)
         .environment(\.receiptWorkspace, receiptWorkspace)
+        .environment(\.cuadraoChat, chat)
         .task {
             do { try receipts.reconcile(groups: groups, accounts: data) }
             catch { receiptRecoveryError = true }

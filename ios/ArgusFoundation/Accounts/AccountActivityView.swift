@@ -119,7 +119,7 @@ struct FinancialEditorPresenter: View {
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
             .sheet(item: $loop.activityEditor) { editor in
-                FinancialActivityEditorView(model: editor)
+                ConnectedTransactionSheet(model: editor)
                     .preferredColorScheme(appearance.colorScheme).tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
             }
             .sheet(item: $loop.editor) { editor in

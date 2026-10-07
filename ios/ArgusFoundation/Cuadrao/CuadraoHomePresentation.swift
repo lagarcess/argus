@@ -146,7 +146,6 @@ struct CuadraoBalanceAmount: View {
     private var amountLabel: some View {
         Text(amount).font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
             .accessibilityIdentifier(amountIdentifier)
-            .accessibilityLabel(currency + " " + amount)
     }
 
     @ViewBuilder private var expandButton: some View {

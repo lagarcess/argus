@@ -5,6 +5,8 @@ import Charts
 struct CuadraoPlanWhatIf: View {
     let scenario: PlanScenario
     let spanish: Bool
+    /// The Preview drops a pending draft on any plan edit, not only when the scenario moves.
+    var resetsOn: CanvasPlan? = nil
     var apply: ((Double) -> Void)? = nil
     var showsDisclosure = false
     @State private var draftAmount: Double?
@@ -87,11 +89,14 @@ struct CuadraoPlanWhatIf: View {
             PlanExactAmount(amount: Binding(get: { amount }, set: { draftAmount = $0; sliderCeiling = max(sliderCeiling, $0); saved = false; applying = false }), maximum: CanvasMoney.maximumValue, minimum: 1,
                 title: scenario.kind == .budget ? (spanish ? "Mi margen mensual" : "My monthly allowance") : (spanish ? "Cada mes" : "Each month"), currency: scenario.currency, spanish: spanish)
         }
-        .onChange(of: scenario) { _, _ in
-            draftAmount = nil; sliderCeiling = 0
-            if applying { applying = false; saved = true }
-        }
+        .onChange(of: scenario) { _, _ in reset() }
+        .onChange(of: resetsOn) { _, _ in reset() }
         .sensoryFeedback(.success, trigger: saved) { _, new in new }
+    }
+
+    private func reset() {
+        draftAmount = nil; sliderCeiling = 0
+        if applying { applying = false; saved = true }
     }
 }
 

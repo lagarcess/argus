@@ -6,6 +6,8 @@ struct CuadraoBalanceBreakdown: View {
     let spanish: Bool
     /// Rows push the account only where the host stack has an account destination.
     var linksToAccounts = true
+    /// Connected data has periods with no recorded opening; the Preview's fixtures never do.
+    var missingCoverage = false
     @Environment(\.dynamicTypeSize) private var typeSize
     private func money(_ value: Decimal) -> String { CanvasMoney.format(value, currency: currency) }
     private func signed(_ value: Decimal) -> String { (value > 0 ? "+" : "") + money(value) }
@@ -88,22 +90,23 @@ struct CuadraoBalanceBreakdown: View {
     }
     private func accountValue(_ row: CanvasBalanceChange, alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: 4) {
-            Text(row.change.map(signed) ?? startingBalance(row) ?? CuadraoMissingCoverage.amount(spanish)).font(CuadraoTypography.rowAmount)
+            Text(row.change.map(signed) ?? startingBalance(row) ?? missingAmount).font(CuadraoTypography.rowAmount)
             if let caption = caption(row) {
                 Text(caption).font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
         }
     }
-    /// With no opening anywhere, the rows list each account's starting balance. Once the period has an
-    /// opening, an account missing either end shows no data rather than a balance read as a change.
+    private var missingAmount: String { missingCoverage ? CuadraoMissingCoverage.amount(spanish) : "—" }
+    /// With no opening anywhere, the rows list each account's starting balance. Once a connected period has
+    /// an opening, an account missing either end shows no data rather than a balance read as a change.
     private func startingBalance(_ row: CanvasBalanceChange) -> String? {
-        period.change == nil ? row.closing.map(money) : nil
+        missingCoverage && period.change != nil ? nil : row.closing.map(money)
     }
     private func caption(_ row: CanvasBalanceChange) -> String? {
         if let change = row.change {
             return change == 0 ? (spanish ? "Sin cambio" : "Unchanged") : change > 0 ? (spanish ? "Suma al balance" : "Adds to balance") : (spanish ? "Resta al balance" : "Reduces balance")
         }
         if row.closing == nil { return spanish ? "Sin balance" : "No balance" }
-        return period.change == nil ? nil : (spanish ? "Sin inicio registrado" : "No recorded opening")
+        return missingCoverage && period.change != nil ? (spanish ? "Sin inicio registrado" : "No recorded opening") : nil
     }
 }
