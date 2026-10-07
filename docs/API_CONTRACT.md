@@ -8495,6 +8495,17 @@ marked for attention and is never automatically billed again. Explicit prepare
 or resume recovers from retained source; completed preparation is replayed without
 another model call. Identical owner/file captures reuse the same draft.
 
+`ARGUS_DOCUMENT_JOBS_ENABLED` (default off) changes only who runs and recovers
+preparation; routes, bodies, statuses and codes stay the same. Off, the rules
+above hold exactly. On, capture and `/prepare` or `/resume` record one attempt
+before responding and hand it to a worker (a Render Workflow task, or a task in
+the API process). A sweep in the API re-dispatches an attempt whose worker died
+or that failed retryably, up to three provider attempts per explicit
+preparation; a draft may return from `needs_attention` to `queued` meanwhile.
+Past the bound it stays `needs_attention` and explicit prepare or resume starts
+again. A superseded attempt's late result is refused. Design:
+`docs/specs/lanes/cuadrao-document-preparation-jobs.md`.
+
 Preparation preserves extracted observations and receipt itemization separately
 from canonical candidate projection. Compatible observations enter existing
 reconciliation; incompatible observations remain on the draft with review issues.
