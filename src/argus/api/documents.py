@@ -55,12 +55,14 @@ def start_documents(app: object, hub: IngestionHub | None) -> None:
 def _start_documents(app: object, hub: IngestionHub) -> None:
     pool = getattr(getattr(app, "state", None), "financial_accounts_pool", None)
     if api_state.PERSISTENCE_MODE == "supabase":
-        if pool is None:
+        gateway = api_state.supabase_gateway
+        if pool is None or gateway is None:
             configure_documents(None)
             return
+        from argus.domain.ingestion.documents.objects import SupabaseSourceObjects
         from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 
-        store = PostgresDocumentStore(pool)
+        store = PostgresDocumentStore(pool, SupabaseSourceObjects(gateway.client.storage))
     else:
         store = InMemoryDocumentStore(hub.connections)
     # Register cleanup even when extraction is off, so disconnect still erases it.

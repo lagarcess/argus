@@ -1,71 +1,119 @@
-"""Connection-fenced document sources, drafts and preparation checkpoints."""
+"""Connection-fenced document drafts, preparation checkpoints and source references.
+
+A source is written to Storage before its reference commits, so a crash leaves
+an unreferenced object under the connection's prefix, never a row pointing at
+nothing. ``forget`` and account deletion remove objects by prefix, which also
+takes such orphans; an identical retry reuses the same path and adopts it.
+"""
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
 from argus.domain.ingestion.documents.models import DocumentDraft, ExtractionBatch
+from argus.domain.ingestion.documents.objects import (
+    SourceObjects,
+    connection_prefix,
+    source_path,
+)
 
 
 class PostgresDocumentStore:
-    def __init__(self, pool: ConnectionPool) -> None:
+    def __init__(self, pool: ConnectionPool, objects: SourceObjects) -> None:
         self._pool = pool
+        self.objects = objects
 
-    def _read(self, column: str, user_id: str, connection_id: str) -> object | None:
+    def _read(self, user_id: str, connection_id: str, *columns: str) -> tuple | None:
         from psycopg import sql
 
         with self._pool.connection() as connection:
-            row = connection.execute(
+            return connection.execute(
                 sql.SQL(
-                    "select d.{} from public.financial_document_extractions d join "
+                    "select {} from public.financial_document_extractions d join "
                     "public.financial_source_connections c on c.id=d.connection_id "
                     "where d.user_id=%s and d.connection_id=%s and c.user_id=%s "
                     "and c.source='statement' and c.status <> 'disconnected'"
-                ).format(sql.Identifier(column)),
+                ).format(
+                    sql.SQL(",").join(sql.Identifier("d", column) for column in columns)
+                ),
                 (user_id, connection_id, user_id),
             ).fetchone()
-        return row[0] if row else None
 
     def get(self, *, user_id: str, connection_id: str) -> ExtractionBatch | None:
-        raw = self._read("batch", user_id, connection_id)
-        return ExtractionBatch.model_validate(raw) if raw is not None else None
+        row = self._read(user_id, connection_id, "batch")
+        return (
+            ExtractionBatch.model_validate(row[0]) if row and row[0] is not None else None
+        )
 
     def draft(self, *, user_id: str, connection_id: str) -> DocumentDraft | None:
-        raw = self._read("draft", user_id, connection_id)
-        return DocumentDraft.model_validate(raw) if raw is not None else None
+        row = self._read(user_id, connection_id, "draft")
+        return (
+            DocumentDraft.model_validate(row[0]) if row and row[0] is not None else None
+        )
 
     def source(self, *, user_id: str, connection_id: str) -> bytes | None:
-        raw = self._read("source_bytes", user_id, connection_id)
-        return bytes(raw) if raw is not None else None
+        row = self._read(user_id, connection_id, "source_path", "source_bytes")
+        if row is None:
+            return None
+        path, legacy = row
+        if path is not None:
+            return self.objects.get(path)
+        return bytes(legacy) if legacy is not None else None
 
     def capture(self, *, user_id: str, draft: DocumentDraft, content: bytes) -> bool:
+        connection_id = draft.connection_id
+        row = self._read(user_id, connection_id, "source_path", "source_bytes")
+        digest = hashlib.sha256(content).hexdigest()
+        path = source_path(user_id=user_id, connection_id=connection_id, sha256=digest)
+        attach = row is None or row == (None, None)
+        if attach:
+            self.objects.put(path, content, draft.media_type)
         with self._pool.connection() as connection, connection.transaction():
-            row = connection.execute(
+            live = connection.execute(
                 "select id from public.financial_source_connections where id=%s "
                 "and user_id=%s and source='statement' and status <> 'disconnected' for update",
-                (draft.connection_id, user_id),
+                (connection_id, user_id),
             ).fetchone()
-            if row is None:
-                return False
-            connection.execute(
-                "insert into public.financial_document_extractions "
-                "(connection_id,user_id,draft,source_bytes,created_at) values (%s,%s,%s,%s,%s) "
-                "on conflict (connection_id) do update set "
-                "source_bytes=coalesce(financial_document_extractions.source_bytes,excluded.source_bytes), "
-                "draft=coalesce(financial_document_extractions.draft, case "
-                "when financial_document_extractions.batch is not null then "
-                'excluded.draft || \'{"status":"review_ready"}\'::jsonb else excluded.draft end)',
-                (
-                    draft.connection_id,
-                    user_id,
-                    Jsonb(draft.model_dump(mode="json")),
-                    content,
-                    draft.created_at,
-                ),
-            )
+            if live is not None:
+                connection.execute(
+                    "insert into public.financial_document_extractions "
+                    "(connection_id,user_id,draft,created_at) values (%s,%s,%s,%s) "
+                    "on conflict (connection_id) do update set "
+                    "draft=coalesce(financial_document_extractions.draft, case "
+                    "when financial_document_extractions.batch is not null then "
+                    'excluded.draft || \'{"status":"review_ready"}\'::jsonb else excluded.draft end)',
+                    (
+                        connection_id,
+                        user_id,
+                        Jsonb(draft.model_dump(mode="json")),
+                        draft.created_at,
+                    ),
+                )
+                if attach:
+                    connection.execute(
+                        "update public.financial_document_extractions set "
+                        "source_bucket=%s,source_path=%s,source_media_type=%s,"
+                        "source_size_bytes=%s,source_sha256=%s "
+                        "where connection_id=%s and source_path is null and source_bytes is null",
+                        (
+                            self.objects.bucket,
+                            path,
+                            draft.media_type,
+                            len(content),
+                            digest,
+                            connection_id,
+                        ),
+                    )
+        if live is None:
+            if attach:
+                self.objects.delete(
+                    connection_prefix(user_id=user_id, connection_id=connection_id)
+                )
+            return False
         return True
 
     def update(
@@ -133,6 +181,11 @@ class PostgresDocumentStore:
         return True
 
     def forget(self, *, user_id: str, connection_id: str) -> None:
+        """Objects first: a failure keeps the row, so a retried disconnect
+        finds and finishes the cleanup."""
+        self.objects.delete(
+            connection_prefix(user_id=user_id, connection_id=connection_id)
+        )
         with self._pool.connection() as connection:
             connection.execute(
                 "delete from public.financial_document_extractions where user_id=%s and connection_id=%s",

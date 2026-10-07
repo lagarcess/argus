@@ -12,6 +12,7 @@ from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStor
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
+from tests.document_sources_support import source_objects
 
 users = shared.users
 pytestmark = pytest.mark.skipif(
@@ -29,7 +30,8 @@ def test_checkpoint_is_immutable_and_owner_scoped(
     pool: ConnectionPool, users: dict[str, str]
 ) -> None:
     now = datetime.now(timezone.utc)
-    repo, store = PostgresConnectionRepository(pool), PostgresDocumentStore(pool)
+    repo = PostgresConnectionRepository(pool)
+    store = PostgresDocumentStore(pool, source_objects())
     row = repo.create(
         user_id=users["owner"],
         source="statement",
@@ -118,9 +120,12 @@ def test_capture_survives_new_store_handles_and_disconnect_hides_source(
         updated_at=now,
     )
     source = b"%PDF-fixture"
-    assert PostgresDocumentStore(pool).capture(user_id=owner, draft=draft, content=source)
+    objects = source_objects()
+    assert PostgresDocumentStore(pool, objects).capture(
+        user_id=owner, draft=draft, content=source
+    )
     with ConnectionPool(shared.DSN, min_size=0, max_size=2) as restarted:
-        store = PostgresDocumentStore(restarted)
+        store = PostgresDocumentStore(restarted, objects)
         assert store.draft(user_id=owner, connection_id=connection.id) == draft
         assert store.source(user_id=owner, connection_id=connection.id) == source
         assert store.source(user_id=other, connection_id=connection.id) is None
