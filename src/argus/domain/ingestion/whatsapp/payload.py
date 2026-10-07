@@ -9,6 +9,7 @@ unknown fields are ignored rather than rejected.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -35,6 +36,7 @@ class _Media(_Loose):
 class _Message(_Loose):
     id: str = Field(min_length=1, max_length=256)
     sender: str = Field(alias="from", min_length=1, max_length=32)
+    timestamp: str = Field(min_length=1, max_length=12)
     type: str = Field(max_length=32)
     text: _Text | None = None
     image: _Media | None = None
@@ -69,6 +71,7 @@ class _Envelope(_Loose):
 class TextMessage:
     id: str
     sender: str
+    sent_at: datetime
     body: str
 
 
@@ -76,6 +79,7 @@ class TextMessage:
 class MediaMessage:
     id: str
     sender: str
+    sent_at: datetime
     media_id: str
     mime_type: str
     filename: str
@@ -98,14 +102,18 @@ _DEFAULT_NAMES = {"image": "whatsapp-image", "document": "whatsapp-document"}
 def _project(message: _Message) -> InboundMessage | None:
     if not message.sender.isascii() or not message.sender.isdigit():
         raise PayloadInvalid("sender")
+    if not message.timestamp.isascii() or not message.timestamp.isdigit():
+        raise PayloadInvalid("timestamp")
+    sent_at = datetime.fromtimestamp(int(message.timestamp), timezone.utc)
     if message.type == "text" and message.text is not None:
-        return TextMessage(message.id, message.sender, message.text.body)
+        return TextMessage(message.id, message.sender, sent_at, message.text.body)
     media = {"image": message.image, "document": message.document}.get(message.type)
     if media is None:
         return None
     return MediaMessage(
         id=message.id,
         sender=message.sender,
+        sent_at=sent_at,
         media_id=media.id,
         mime_type=media.mime_type.split(";", 1)[0].strip().lower(),
         filename=(media.filename or _DEFAULT_NAMES[message.type])[:80],

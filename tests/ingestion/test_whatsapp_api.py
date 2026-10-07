@@ -1,6 +1,8 @@
 """The WhatsApp HTTP surface: flag, verification, signature gate, linking, logs."""
 
+import logging
 from collections.abc import Iterator
+from datetime import timedelta
 from unittest.mock import patch
 
 import httpx
@@ -8,7 +10,12 @@ import pytest
 from argus.api import state as api_state
 from argus.api.documents import documents_service
 from argus.api.main import app
-from argus.api.whatsapp import build_whatsapp, configure_whatsapp, whatsapp_runtime
+from argus.api.whatsapp import (
+    WEBHOOK_PATH,
+    build_whatsapp,
+    configure_whatsapp,
+    whatsapp_runtime,
+)
 from argus.domain.ingestion.whatsapp.replies import CloudApiTransport
 from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
 from fastapi.testclient import TestClient
@@ -267,3 +274,47 @@ async def test_cloud_api_transport_posts_a_reply_to_the_configured_number() -> N
     [request] = seen
     assert str(request.url) == "https://graph.facebook.com/v23.0/100000000000001/messages"
     assert request.headers["Authorization"] == "Bearer test-access-token"
+
+
+def test_redelivery_during_a_live_claim_answers_503(wa_client: TestClient, graph) -> None:  # noqa: ANN001
+    link_alice(wa_client)
+    graph.media["700000000000001"] = Media(RECEIPT_PNG, "image/png")
+    intake = whatsapp_runtime().intake
+    now = intake.clock()
+    intake.store.claim(
+        provider_message_key=intake.keys.message("wamid.SYNTHETIC0001"),
+        sender_hash=intake.keys.sender(ALICE_PHONE),
+        now=now,
+        claim_until=now + timedelta(seconds=90),
+    )
+    response = post(wa_client, fixture("image_message.json"))
+    assert (response.status_code, response.json()["code"]) == (
+        503,
+        "whatsapp_webhook_retry",
+    )
+    assert graph.requests == []
+
+
+def test_access_log_redacts_only_the_webhook_query() -> None:
+    assert WEBHOOK_PATH in {route.path for route in app.routes}
+    access = logging.getLogger("uvicorn.access")
+
+    def line(path: str) -> str:
+        record = access.makeRecord(
+            "uvicorn.access",
+            logging.INFO,
+            __file__,
+            0,
+            '%s - "%s %s HTTP/%s" %d',
+            ("127.0.0.1:5000", "GET", path, "1.1", 200),
+            None,
+        )
+        assert all(f.filter(record) for f in access.filters)
+        return record.getMessage()
+
+    secret = f"{WEBHOOK_PATH}?hub.mode=subscribe&hub.verify_token={VERIFY_TOKEN}&hub.challenge=1"
+    assert line(secret) == (
+        f'127.0.0.1:5000 - "GET {WEBHOOK_PATH}?<redacted> HTTP/1.1" 200'
+    )
+    other = "/api/v1/financial-documents?limit=5"
+    assert line(other) == f'127.0.0.1:5000 - "GET {other} HTTP/1.1" 200'

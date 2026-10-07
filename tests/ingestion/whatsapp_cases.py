@@ -6,16 +6,23 @@ and a store; only the Graph API and the reply transport are scripted.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from itertools import count
 from uuid import uuid4
 
+import pytest
 from argus.api.whatsapp import DocumentsDestination
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.whatsapp.identity import WhatsAppKeys
-from argus.domain.ingestion.whatsapp.intake import WhatsAppIntake
+from argus.domain.ingestion.whatsapp.intake import (
+    CLAIM_SECONDS,
+    SERVICE_WINDOW,
+    DeliveryInFlight,
+    WhatsAppIntake,
+)
 from argus.domain.ingestion.whatsapp.media import GraphMedia
 from argus.domain.ingestion.whatsapp.payload import parse_delivery
 from argus.domain.ingestion.whatsapp.store import Settlement
@@ -61,9 +68,9 @@ class World:
     bob: str
     keys: WhatsAppKeys
 
-    async def deliver(self, body: dict) -> None:
-        delivery = parse_delivery(encode(body), phone_number_id=PHONE_NUMBER_ID)
-        await self.intake.handle(delivery)
+    async def deliver(self, body: dict, sent_at: datetime | None = None) -> None:
+        raw = encode(body, sent_at or self.clock.now)
+        await self.intake.handle(parse_delivery(raw, phone_number_id=PHONE_NUMBER_ID))
 
     async def link(self, owner: str, phone: str) -> None:
         issued = self.intake.issue_code(destination_owner_id=owner)
@@ -372,19 +379,114 @@ async def a_live_claim_blocks_a_concurrent_redelivery(world: World) -> None:
     store, now = world.store, world.clock()
     key, sender = world.keys.message("wamid.CASE-CLAIM"), world.keys.sender(ALICE_PHONE)
     lease = timedelta(seconds=90)
-    claim = dict(provider_message_key=key, sender_hash=sender, claim_until=now + lease)
-    assert store.claim(now=now, **claim).claimed
-    assert not store.claim(now=now + timedelta(seconds=1), **claim).claimed
+
+    def claim(at: datetime):  # noqa: ANN202
+        return store.claim(
+            provider_message_key=key, sender_hash=sender, now=at, claim_until=at + lease
+        )
+
+    first = claim(now)
+    assert first.claimed
+    assert not claim(now + timedelta(seconds=1)).claimed
     lapsed = now + lease + timedelta(seconds=1)
-    assert store.claim(now=lapsed, **claim).claimed
-    store.settle(
+    second = claim(lapsed)
+    assert second.claimed
+    settled = Settlement("rejected", error_code="whatsapp_sender_not_linked")
+    assert not store.settle(
         provider_message_key=key,
-        settlement=Settlement("rejected", error_code="whatsapp_sender_not_linked"),
+        claim_until=first.record.claim_until,
+        settlement=settled,
         now=lapsed,
     )
-    later = lapsed + lease * 2
-    assert not store.claim(now=later, **claim).claimed
+    assert store.inbound(key).status == "received"
+    assert store.settle(
+        provider_message_key=key,
+        claim_until=second.record.claim_until,
+        settlement=settled,
+        now=lapsed,
+    )
+    assert not claim(lapsed + lease * 2).claimed
     assert store.inbound(key).status == "rejected"
+
+
+async def redelivery_during_a_live_claim_asks_for_retry(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE)
+    world.graph.media["700000000000112"] = Media(RECEIPT_PNG, "image/png")
+    now = world.clock()
+    claimed = world.store.claim(
+        provider_message_key=world.keys.message("wamid.CASE-INFLIGHT"),
+        sender_hash=world.keys.sender(ALICE_PHONE),
+        now=now,
+        claim_until=now + timedelta(seconds=CLAIM_SECONDS),
+    )
+    assert claimed.claimed
+    world.clock.now += timedelta(seconds=30)
+    with pytest.raises(DeliveryInFlight):
+        await world.deliver(image("700000000000112", "wamid.CASE-INFLIGHT"))
+    assert world.captures(world.alice) == []
+
+    world.clock.now += timedelta(seconds=CLAIM_SECONDS)
+    await world.deliver(image("700000000000112", "wamid.CASE-INFLIGHT"))
+    [connection_id] = world.captures(world.alice)
+    assert world.record("wamid.CASE-INFLIGHT").connection_id == connection_id
+
+
+async def slow_processing_times_out_as_failed_and_recovers(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE)
+    world.graph.media["700000000000113"] = Media(RECEIPT_PNG, "image/png")
+    media = world.intake.media
+
+    class Stalled:
+        async def fetch(self, media_id: str):  # noqa: ANN202
+            await asyncio.sleep(5)
+
+    world.intake.media, world.intake.processing_seconds = Stalled(), 0.05
+    with pytest.raises(asyncio.TimeoutError):
+        await world.deliver(image("700000000000113", "wamid.CASE-SLOW"))
+    record = world.record("wamid.CASE-SLOW")
+    assert (record.status, record.error_code, record.claim_until) == (
+        "failed",
+        "whatsapp_processing_timeout",
+        None,
+    )
+
+    world.intake.media = media
+    await world.deliver(image("700000000000113", "wamid.CASE-SLOW"))
+    assert world.record("wamid.CASE-SLOW").status == "captured"
+    assert len(world.captures(world.alice)) == 1
+
+
+async def revoking_also_ends_unused_codes(world: World) -> None:
+    pending = world.intake.issue_code(destination_owner_id=world.alice)
+    world.store.revoke(destination_owner_id=world.alice, now=world.clock())
+    await world.deliver(
+        fixture(
+            "text_link_code.json",
+            id="wamid.CASE-AFTER-REVOKE",
+            text=f"CUADRAO {pending.code}",
+        )
+    )
+    assert (
+        world.record("wamid.CASE-AFTER-REVOKE").error_code == "whatsapp_link_code_invalid"
+    )
+    assert world.store.destination_link(destination_owner_id=world.alice) is None
+
+
+async def no_reply_outside_the_service_window(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE)
+    replies = len(world.transport.sent)
+    world.graph.media["700000000000114"] = Media(RECEIPT_PNG, "image/png")
+    await world.deliver(
+        image("700000000000114", "wamid.CASE-OLD-MESSAGE"),
+        sent_at=world.clock.now - SERVICE_WINDOW - timedelta(minutes=1),
+    )
+    assert world.record("wamid.CASE-OLD-MESSAGE").status == "captured"
+    assert len(world.transport.sent) == replies
+    await world.deliver(
+        image("700000000000114", "wamid.CASE-RECENT"),
+        sent_at=world.clock.now - SERVICE_WINDOW + timedelta(minutes=1),
+    )
+    assert len(world.transport.sent) == replies + 1
 
 
 CASES = (
@@ -398,4 +500,8 @@ CASES = (
     a_sender_only_reaches_its_own_destination,
     revoke_and_relink,
     a_live_claim_blocks_a_concurrent_redelivery,
+    redelivery_during_a_live_claim_asks_for_retry,
+    slow_processing_times_out_as_failed_and_recovers,
+    revoking_also_ends_unused_codes,
+    no_reply_outside_the_service_window,
 )

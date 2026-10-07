@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -58,7 +59,15 @@ def fixture(name: str, **overrides: Any) -> dict[str, Any]:
     return copy.deepcopy(body)
 
 
-def encode(body: dict[str, Any]) -> bytes:
+def encode(body: dict[str, Any], sent_at: datetime | None = None) -> bytes:
+    """The raw body, with every message stamped ``sent_at`` (default: now)."""
+
+    stamp = str(int((sent_at or datetime.now(timezone.utc)).timestamp()))
+    body = copy.deepcopy(body)
+    for entry in body.get("entry", []):
+        for change in entry.get("changes", []):
+            for message in change.get("value", {}).get("messages", []):
+                message["timestamp"] = stamp
     return json.dumps(body).encode()
 
 

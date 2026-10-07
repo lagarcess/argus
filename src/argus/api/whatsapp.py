@@ -7,6 +7,7 @@ cannot be on while documents are off. Every route answers 404 when off.
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -38,6 +39,28 @@ from argus.domain.ingestion.whatsapp.intake import (
 from argus.domain.ingestion.whatsapp.media import GraphMedia
 from argus.domain.ingestion.whatsapp.replies import CloudApiTransport
 from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
+
+WEBHOOK_PATH = "/api/v1/webhooks/whatsapp"
+
+
+class _RedactWebhookQuery(logging.Filter):
+    """uvicorn's access line carries the query string, and so the verify token."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if (
+            isinstance(args, tuple)
+            and len(args) >= 3
+            and isinstance(args[2], str)
+            and args[2].startswith(f"{WEBHOOK_PATH}?")
+        ):
+            record.args = (*args[:2], f"{WEBHOOK_PATH}?<redacted>", *args[3:])
+        return True
+
+
+_access_logger = logging.getLogger("uvicorn.access")
+if not any(isinstance(f, _RedactWebhookQuery) for f in _access_logger.filters):
+    _access_logger.addFilter(_RedactWebhookQuery())
 
 
 def resolve_intake_destination(user_id: str) -> str:

@@ -58,14 +58,20 @@ class PostgresWhatsAppStore:
         return Claim(_record(row), False)
 
     def settle(
-        self, *, provider_message_key: bytes, settlement: Settlement, now: datetime
-    ) -> None:
+        self,
+        *,
+        provider_message_key: bytes,
+        claim_until: datetime | None,
+        settlement: Settlement,
+        now: datetime,
+    ) -> bool:
         with self._pool.connection() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 "update public.whatsapp_inbound_messages set status = %s, "
                 "destination_owner_id = %s, connection_id = %s, error_code = %s, "
                 "claim_until = null, updated_at = %s "
-                "where provider_message_key = %s and status in ('received', 'failed')",
+                "where provider_message_key = %s and status in ('received', 'failed') "
+                "and claim_until is not distinct from %s",
                 (
                     settlement.status,
                     settlement.destination_owner_id,
@@ -73,8 +79,10 @@ class PostgresWhatsAppStore:
                     settlement.error_code,
                     now,
                     provider_message_key,
+                    claim_until,
                 ),
             )
+            return cursor.rowcount == 1
 
     def inbound(self, provider_message_key: bytes) -> InboundRecord | None:
         with self._pool.connection() as connection:
@@ -154,7 +162,12 @@ class PostgresWhatsAppStore:
         return self._active("destination_owner_id", destination_owner_id)
 
     def revoke(self, *, destination_owner_id: str, now: datetime) -> bool:
-        with self._pool.connection() as connection:
+        with self._pool.connection() as connection, connection.transaction():
+            connection.execute(
+                "delete from public.whatsapp_link_codes "
+                "where destination_owner_id = %s and consumed_at is null",
+                (destination_owner_id,),
+            )
             cursor = connection.execute(
                 "update public.whatsapp_sender_links "
                 "set status = 'revoked', revoked_at = %s "

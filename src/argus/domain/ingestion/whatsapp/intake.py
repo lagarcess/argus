@@ -45,10 +45,21 @@ from argus.domain.ingestion.whatsapp.replies import (
     reply_payload,
     review_url,
 )
-from argus.domain.ingestion.whatsapp.store import Settlement, WhatsAppStore
+from argus.domain.ingestion.whatsapp.store import (
+    RETRYABLE,
+    Settlement,
+    WhatsAppStore,
+)
 
 CLAIM_SECONDS = 90
+# Processing must end, and settle, while its claim is still held.
+PROCESSING_SECONDS = CLAIM_SECONDS - 15
 CODE_TTL = timedelta(minutes=10)
+SERVICE_WINDOW = timedelta(hours=24)
+
+
+class DeliveryInFlight(Exception):
+    """Another worker holds a live claim on an unsettled message; ask Meta to retry."""
 
 
 class CaptureRejected(Exception):
@@ -99,6 +110,7 @@ class WhatsAppIntake:
         self.store, self.keys, self.media = store, keys, media
         self.destination, self.clock = destination, clock
         self.transport, self.app_origin, self.max_bytes = transport, app_origin, max_bytes
+        self.processing_seconds: float = PROCESSING_SECONDS
 
     def issue_code(self, *, destination_owner_id: str) -> IssuedCode:
         """A new single-use code; any earlier unused code for this owner stops working."""
@@ -122,10 +134,15 @@ class WhatsAppIntake:
             statuses=delivery.statuses,
             other_numbers=delivery.other_numbers,
         )
+        in_flight = False
         for message in delivery.messages:
-            await self._one(message)
+            in_flight = not await self._one(message) or in_flight
+        if in_flight:
+            raise DeliveryInFlight()
 
-    async def _one(self, message: InboundMessage) -> None:
+    async def _one(self, message: InboundMessage) -> bool:
+        """Process one message; ``False`` while another claim still holds it unsettled."""
+
         sender = self.keys.sender(message.sender)
         key = self.keys.message(message.id)
         now = self.clock()
@@ -139,27 +156,39 @@ class WhatsAppIntake:
         log = logger.bind(message_ref=ref(key), sender_ref=ref(sender))
         if not claim.claimed:
             log.info("WhatsApp message replayed", status=claim.record.status)
-            return
+            return claim.record.status not in RETRYABLE
+        held = claim.record.claim_until
         try:
-            settlement = await self._decide(message, sender)
-        except Exception as error:
-            await self._settle(
-                key, Settlement("failed", error_code="whatsapp_processing_failed")
+            settlement = await asyncio.wait_for(
+                self._decide(message, sender), timeout=self.processing_seconds
             )
+        except Exception as error:
+            code = (
+                "whatsapp_processing_timeout"
+                if isinstance(error, asyncio.TimeoutError)
+                else "whatsapp_processing_failed"
+            )
+            await self._settle(key, held, Settlement("failed", error_code=code))
             log.warning("WhatsApp message failed", failure_mode=type(error).__name__)
             raise
-        await self._settle(key, settlement)
+        if not await self._settle(key, held, settlement):
+            log.warning("WhatsApp message claim lost before settling")
+            return False
         log.info(
             "WhatsApp message settled",
             status=settlement.status,
             error_code=settlement.error_code,
         )
         await self._reply(message, settlement, log)
+        return True
 
-    async def _settle(self, key: bytes, settlement: Settlement) -> None:
-        await asyncio.to_thread(
+    async def _settle(
+        self, key: bytes, held: datetime | None, settlement: Settlement
+    ) -> bool:
+        return await asyncio.to_thread(
             self.store.settle,
             provider_message_key=key,
+            claim_until=held,
             settlement=settlement,
             now=self.clock(),
         )
@@ -206,6 +235,9 @@ class WhatsAppIntake:
 
     async def _reply(self, message: InboundMessage, settlement: Settlement, log) -> None:  # noqa: ANN001
         if self.transport is None:
+            return
+        if self.clock() - message.sent_at > SERVICE_WINDOW:
+            log.info("WhatsApp acknowledgement skipped: outside the service window")
             return
         url = None
         if settlement.status == "captured":

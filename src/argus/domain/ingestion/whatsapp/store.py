@@ -64,8 +64,15 @@ class WhatsAppStore(Protocol):
     ) -> Claim: ...
 
     def settle(
-        self, *, provider_message_key: bytes, settlement: Settlement, now: datetime
-    ) -> None: ...
+        self,
+        *,
+        provider_message_key: bytes,
+        claim_until: datetime | None,
+        settlement: Settlement,
+        now: datetime,
+    ) -> bool:
+        """Settle only while the caller's claim is the one held."""
+        ...
 
     def issue_code(
         self,
@@ -84,7 +91,9 @@ class WhatsAppStore(Protocol):
 
     def destination_link(self, *, destination_owner_id: str) -> SenderLink | None: ...
 
-    def revoke(self, *, destination_owner_id: str, now: datetime) -> bool: ...
+    def revoke(self, *, destination_owner_id: str, now: datetime) -> bool:
+        """End the active link and every unused code for this destination."""
+        ...
 
 
 @dataclass
@@ -143,12 +152,17 @@ class InMemoryWhatsAppStore:
             return Claim(current, False)
 
     def settle(
-        self, *, provider_message_key: bytes, settlement: Settlement, now: datetime
-    ) -> None:
+        self,
+        *,
+        provider_message_key: bytes,
+        claim_until: datetime | None,
+        settlement: Settlement,
+        now: datetime,
+    ) -> bool:
         with self._lock:
             current = self._inbound[provider_message_key]
-            if current.status not in RETRYABLE:
-                return
+            if current.status not in RETRYABLE or current.claim_until != claim_until:
+                return False
             self._inbound[provider_message_key] = replace(
                 current,
                 status=settlement.status,
@@ -158,6 +172,7 @@ class InMemoryWhatsAppStore:
                 claim_until=None,
                 updated_at=now,
             )
+            return True
 
     def inbound(self, provider_message_key: bytes) -> InboundRecord | None:
         return self._inbound.get(provider_message_key)
@@ -209,6 +224,12 @@ class InMemoryWhatsAppStore:
 
     def revoke(self, *, destination_owner_id: str, now: datetime) -> bool:
         with self._lock:
+            for digest in [
+                d
+                for d, c in self._codes.items()
+                if c.owner == destination_owner_id and not c.consumed
+            ]:
+                del self._codes[digest]
             revoked = False
             for link in self._links:
                 if link.active and link.owner == destination_owner_id:

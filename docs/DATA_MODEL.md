@@ -3353,8 +3353,8 @@ and is the person today; it becomes the business principal if the Business
 boundary proposal is approved.
 
 - `whatsapp_link_codes`: `destination_owner_id`, `code_digest` (unique),
-  `created_at`, `expires_at`, `consumed_at`. Single use; issuing a new code
-  deletes the owner's unused ones.
+  `created_at`, `expires_at`, `consumed_at`. Single use; issuing a new code or
+  revoking the link deletes the owner's unused ones.
 - `whatsapp_sender_links`: `destination_owner_id`, `wa_id_hash`, `last4`,
   `status` (`active` or `revoked`), `linked_at`, `revoked_at`. Partial unique
   indexes allow one active link per sender and one per destination; linking
@@ -3365,7 +3365,8 @@ boundary proposal is approved.
   `connection_id` (the captured document's statement connection), `error_code`,
   `claim_until`, `received_at` and `updated_at`. Linked, rejected and captured
   are final. A received row whose claim lapsed, or a failed row, is reclaimed by
-  a redelivery of the same message. A captured row's draft is owned by
+  a redelivery of the same message. Settling requires the claim the worker
+  took, so a worker whose claim lapsed cannot overwrite a newer one. A captured row's draft is owned by
   `financial_document_extractions`.
 
 Row level security is enabled with no policies and every client grant revoked.

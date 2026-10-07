@@ -8666,10 +8666,12 @@ The destination owner is the signed-in person today, read only through
   over 512 KiB is 413 `whatsapp_webhook_too_large`; a signed body that is not
   a WhatsApp `messages` change is 400 `whatsapp_webhook_invalid`. 200
   `{received: true}` means every image, document and text message in it has a
-  committed delivery record; other message types and statuses are ignored. A
-  failure after the record commits answers 503 `whatsapp_webhook_retry`, and
-  Meta's redelivery resumes that record. A replayed message never captures
-  twice or replies twice.
+  settled delivery record; other message types and statuses are ignored. A
+  failure or timeout after the record commits, or a redelivery while another
+  worker still holds an unsettled message, answers 503
+  `whatsapp_webhook_retry`, and Meta's redelivery resumes that record. A
+  replayed message never captures twice or replies twice. The webhook query
+  string is redacted from uvicorn access logs.
 - POST `/api/v1/whatsapp/link-codes` (registered-only) returns 201
   `{code, message_text, expires_at, wa_me_url}`. The code is single use, lives
   10 minutes and replaces any unused code for the same destination.
@@ -8677,9 +8679,10 @@ The destination owner is the signed-in person today, read only through
   `ARGUS_WHATSAPP_DISPLAY_PHONE_NUMBER` is set. Five codes per 10 minutes, then
   429 `whatsapp_link_code_rate_limited`.
 - GET `/api/v1/whatsapp/link` returns `{linked, last4, linked_at}`.
-- DELETE `/api/v1/whatsapp/link` revokes the active link and answers 204,
-  also when nothing was linked.
+- DELETE `/api/v1/whatsapp/link` revokes the active link and every unused code
+  for the destination, and answers 204, also when nothing was linked.
 
 Replies are sent only when `ARGUS_WHATSAPP_OUTBOUND_ENABLED` is true, always as
-a free-form answer to the person's own message inside the 24-hour service
-window. Nothing is sent outside that window.
+a free-form answer to the person's own message. A message whose WhatsApp
+timestamp is more than 24 hours old is still captured but gets no reply, so
+nothing is sent outside the service window.

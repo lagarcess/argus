@@ -1,5 +1,6 @@
 """WhatsApp intake against in-memory stores; the same cases run on Postgres too."""
 
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -24,6 +25,7 @@ from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
 
 from tests.ingestion import whatsapp_cases as cases
 from tests.ingestion.whatsapp_support import (
+    FIXTURES,
     PHONE_NUMBER_ID,
     RefusingExtractor,
     encode,
@@ -71,23 +73,25 @@ def test_signature_is_hmac_of_the_raw_body() -> None:
 
 
 def test_payload_projects_handled_types_and_ignores_the_rest() -> None:
+    recorded = datetime(2026, 10, 7, 11, 0, tzinfo=timezone.utc)
     image = parse_delivery(
-        encode(fixture("image_message.json")), phone_number_id=PHONE_NUMBER_ID
+        (FIXTURES / "image_message.json").read_bytes(), phone_number_id=PHONE_NUMBER_ID
     )
     assert image.messages == (
         MediaMessage(
             id="wamid.SYNTHETIC0001",
             sender="15550101234",
+            sent_at=recorded,
             media_id="700000000000001",
             mime_type="image/png",
             filename="whatsapp-image",
         ),
     )
     text = parse_delivery(
-        encode(fixture("text_link_code.json")), phone_number_id=PHONE_NUMBER_ID
+        (FIXTURES / "text_link_code.json").read_bytes(), phone_number_id=PHONE_NUMBER_ID
     )
     assert text.messages == (
-        TextMessage("wamid.SYNTHETIC0003", "15550101234", "CUADRAO ABCD2345"),
+        TextMessage("wamid.SYNTHETIC0003", "15550101234", recorded, "CUADRAO ABCD2345"),
     )
     audio = parse_delivery(
         encode(fixture("audio_message.json")), phone_number_id=PHONE_NUMBER_ID
