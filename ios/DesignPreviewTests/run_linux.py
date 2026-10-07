@@ -60,13 +60,13 @@ def main() -> None:
         spaces = copy(folder, "Spaces.swift", source("CuadraoSpacesPreview.swift"))
         history = [canvas / n for n in ["CuadraoCollectionOrder.swift", "CuadraoSpendingHistory.swift",
                                         "CuadraoSpendingStory.swift", "CuadraoBalanceHistory.swift", "CuadraoBalancePeriod.swift"]]
-        plan = [canvas / "CuadraoCollectionOrder.swift", canvas / "CanvasMoney.swift", canvas / "Planning/CuadraoPlanPreview.swift", flag]
+        plan = [canvas / "CuadraoCollectionOrder.swift", canvas / "CanvasMoney.swift", canvas / "Planning/PlanScenario.swift", canvas / "Planning/CuadraoPlanPreview.swift", flag]
         run(swiftc, folder, "plan", plan + [here / "PlanPreviewChecks.swift"])
         run(swiftc, folder, "group", plan + [canvas / "Planning/CuadraoGroupPreview.swift",
                                              canvas / "Receipts/CuadraoReceipt.swift", here / "GroupPreviewChecks.swift"])
         run(swiftc, folder, "home", [shim, accounts, household, spaces, *history, here / "HomeBalanceChecks.swift"])
         run(swiftc, folder, "receipt", [shim, accounts, household, spaces, *history, canvas / "CanvasMoney.swift",
-                                        canvas / "Planning/CuadraoPlanPreview.swift", canvas / "Planning/CuadraoGroupPreview.swift",
+                                        canvas / "Planning/PlanScenario.swift", canvas / "Planning/CuadraoPlanPreview.swift", canvas / "Planning/CuadraoGroupPreview.swift",
                                         canvas / "Receipts/CuadraoReceipt.swift", canvas / "Receipts/CuadraoReceiptStore.swift",
                                         flag, here / "ReceiptPreviewChecks.swift"])
         run(swiftc, folder, "avatar", [copy(folder, "Geometry.swift", source("CuadraoAvatarCropGeometry.swift")),
