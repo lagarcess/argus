@@ -37,14 +37,20 @@ export default function ActionMenu({ actions, label, placement, portal = false, 
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const menuId = useId();
 
-  const close = (returnFocus: boolean) => {
+  const close = () => {
     setOpen(false);
-    if (returnFocus) triggerRef.current?.focus();
+    triggerRef.current?.focus();
   };
+
+  // A portaled menu mounts once it has a position; focus lands then, and a
+  // later reposition never moves it.
+  const menuVisible = open && (!portal || fixedStyle !== null);
+  useEffect(() => {
+    if (menuVisible) itemRefs.current[0]?.focus();
+  }, [menuVisible]);
 
   useEffect(() => {
     if (!open) return;
-    itemRefs.current[0]?.focus();
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
@@ -52,7 +58,7 @@ export default function ActionMenu({ actions, label, placement, portal = false, 
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open, fixedStyle]);
+  }, [open]);
 
   useLayoutEffect(() => {
     if (!open || !portal) return;
@@ -76,7 +82,7 @@ export default function ActionMenu({ actions, label, placement, portal = false, 
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      close(true);
+      close();
     } else if (event.key === "ArrowDown") {
       event.preventDefault();
       items[(index + 1) % items.length]?.focus();
@@ -90,12 +96,13 @@ export default function ActionMenu({ actions, label, placement, portal = false, 
       event.preventDefault();
       items[items.length - 1]?.focus();
     } else if (event.key === "Tab") {
-      setOpen(false);
+      event.preventDefault();
+      close();
     }
   };
 
   const menu =
-    open && (!portal || fixedStyle) ? (
+    menuVisible ? (
     <div
       ref={menuRef}
       id={menuId}
@@ -116,7 +123,7 @@ export default function ActionMenu({ actions, label, placement, portal = false, 
             type="button"
             role="menuitem"
             onClick={() => {
-              close(false);
+              close();
               action.run();
             }}
             className="mx-1 my-0.5 flex min-h-11 w-[calc(100%-0.5rem)] items-center gap-3 rounded-[10px] px-3 text-left text-[14px] font-medium text-black transition-colors hover:bg-black/5 focus-visible:bg-black/5 focus-visible:outline-none dark:text-white dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
