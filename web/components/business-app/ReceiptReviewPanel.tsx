@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Download, Sparkles } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { randomId } from "@/lib/random-id";
 import type { ReceiptDetail, ReceiptReviewFields } from "@/lib/business-api";
@@ -253,7 +253,6 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
                 {t("business.review.consent", "Cuadrao can read this receipt with AI and fill in the details for you to check. The receipt is sent to our AI provider only if you choose this. You can also fill in the details yourself.")}
               </p>
               <button type="button" disabled={busy !== null} onClick={() => void prepare()} className={`${secondaryButtonClass} mt-3`}>
-                <Sparkles className="h-4 w-4" />
                 {t("business.review.prepare", "Prepare with AI")}
               </button>
             </div>

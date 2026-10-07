@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Inbox } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { BusinessUpdate } from "@/lib/business-api";
 import { useBusiness } from "./BusinessWorkspace";
@@ -34,7 +34,7 @@ export default function BusinessUpdatesPanel() {
   const describe = (update: BusinessUpdate) => {
     const name = update.label ?? t("business.receipt.untitled", "Receipt");
     if (update.kind === "receipt_ready") {
-      return { Icon: Sparkles, tone: "text-[#5ba897]", text: t("business.updates.ready", "{{name}} is ready to review", { name }) };
+      return { Icon: Inbox, tone: "text-black/45 dark:text-white/45", text: t("business.updates.ready", "{{name}} is ready to review", { name }) };
     }
     if (update.kind === "receipt_needs_attention") {
       return { Icon: AlertCircle, tone: "text-[#d66d75]", text: `${t("business.updates.attention", "{{name}} needs attention", { name })}. ${errorLabel(update.error_code)}` };
