@@ -132,6 +132,7 @@ const es = {
   personal: "Personal",
   idea: "La idea",
   about: "Nosotros",
+  privacyLabel: "Privacidad",
   contactLead: "Empecemos por\ntu negocio.",
   contactBody:
     "No necesitas tener todo organizado para conversar. Cuéntanos qué te cuesta mantener al día.",
@@ -268,6 +269,7 @@ const en: typeof es = {
   personal: "Personal",
   idea: "The idea",
   about: "About",
+  privacyLabel: "Privacy",
   contactLead: "Let’s start with\nyour business.",
   contactBody:
     "You don’t need to have everything organized to talk. Tell us what’s hard to keep up with.",

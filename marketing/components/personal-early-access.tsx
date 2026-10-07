@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { ArrowRight, Check } from "lucide-react";
+import { businessPath } from "@/lib/site-routes";
 import type { BusinessLocale } from "./content";
 import { businessContactEmail } from "./site-copy";
 import styles from "./personal-early-access.module.css";
@@ -23,8 +24,9 @@ const copy = {
     label: "Correo electrónico",
     button: "Avísame cuando pueda probarla",
     saving: "Guardando tu registro…",
-    local: "El registro aún no está conectado. Este formulario no guarda correos ni envía mensajes.",
-    privacy: "Usaremos tu correo para el acceso anticipado a Cuadrao. Para retirar tu registro, escríbenos a",
+    privacy: "Usaremos tu correo solo para avisarte sobre el acceso anticipado a Cuadrao. Para retirar tu registro, escríbenos a",
+    privacyLink: "Política de privacidad",
+    rateLimited: "Hiciste varios intentos seguidos. Espera unos minutos e inténtalo de nuevo.",
     success: "Ya estás en la lista.",
     saved: "Tu correo quedó registrado para el acceso anticipado.",
     next: "Cuando haya invitaciones disponibles, podremos contactarte. Registrarte no garantiza acceso inmediato.",
@@ -43,8 +45,9 @@ const copy = {
     label: "Email address",
     button: "Let me know when I can try it",
     saving: "Saving your signup…",
-    local: "Signup is not connected yet. This form does not save email addresses or send messages.",
-    privacy: "We'll use your email for Cuadrao early access. To remove your signup, email",
+    privacy: "We'll use your email only to tell you about Cuadrao early access. To remove your signup, email",
+    privacyLink: "Privacy policy",
+    rateLimited: "You made several attempts in a row. Wait a few minutes and try again.",
     success: "You're on the list.",
     saved: "Your email is registered for early access.",
     next: "We can contact you when invitations become available. Signing up does not guarantee immediate access.",
@@ -73,21 +76,25 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
     event.preventDefault();
     if (pending.current) return;
     pending.current = true;
+    const website = (event.currentTarget.elements.namedItem("website") as HTMLInputElement | null)?.value ?? "";
     setState({ status: "submitting" });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-      const response = await fetch("/api/personal-waitlist", {
+      const response = await fetch("/api/signups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, locale }),
+        body: JSON.stringify({ email, locale, website }),
         signal: controller.signal,
       });
       const result: unknown = await response.json();
-      if (response.ok && typeof result === "object" && result !== null && "saved" in result && result.saved === true) {
+      if (response.ok && typeof result === "object" && result !== null && "status" in result && result.status === "registered") {
         setState({ status: "success" });
       } else {
-        setState({ status: "error", message: response.status === 400 ? c.invalid : c.error });
+        setState({
+          status: "error",
+          message: response.status === 400 ? c.invalid : response.status === 429 ? c.rateLimited : c.error,
+        });
       }
     } catch {
       setState({ status: "error", message: c.error });
@@ -115,11 +122,15 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
               <p>{c.next}</p>
             </div>
           ) : (
-            <form method="post" action="/api/personal-waitlist" onSubmit={submit} aria-busy={state.status === "submitting"}>
+            <form method="post" action="/api/signups" onSubmit={submit} aria-busy={state.status === "submitting"}>
               <noscript><p className={styles.local}>{c.noScript}</p></noscript>
               <fieldset className={styles.formFields} disabled={!hydrated}>
                 <label htmlFor="personal-email">{c.label}</label>
-                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-local" : "signup-local"} aria-invalid={state.status === "error" || undefined} disabled={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
+                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-privacy" : "signup-privacy"} aria-invalid={state.status === "error" || undefined} disabled={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
+                <div className={styles.trap} aria-hidden="true">
+                  <label htmlFor="personal-website">Website</label>
+                  <input id="personal-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+                </div>
                 <button type="submit" disabled={!hydrated || state.status === "submitting"}>
                   {state.status === "submitting" ? c.saving : c.button}
                   <ArrowRight size={19} aria-hidden="true" />
@@ -129,8 +140,7 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
             </form>
           )}
         </div>
-        <p className={styles.local} id="signup-local">{c.local}</p>
-        <p className={styles.privacy}>{c.privacy} <a href={`mailto:${businessContactEmail}`}>{businessContactEmail}</a>.</p>
+        <p className={styles.privacy} id="signup-privacy">{c.privacy} <a href={`mailto:${businessContactEmail}`}>{businessContactEmail}</a>. <a href={businessPath(locale, "privacy")}>{c.privacyLink}</a>.</p>
       </div>
       <figure className={styles.preview}>
         <div className={styles.previewBackdrop}>

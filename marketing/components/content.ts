@@ -1,4 +1,4 @@
-import { siteCopy } from "./site-copy";
+import { businessContactEmail, siteCopy } from "./site-copy";
 export type { BusinessLocale } from "@/lib/site-routes";
 
 const es = {
@@ -16,11 +16,8 @@ const es = {
     skip: "Ir al contenido",
   },
   closing: { footerLabel: "Navegación al pie" },
-  demo: {
-    noScript:
-      "Activa JavaScript para probar este formulario local. No se enviará ningún dato.",
-    notice:
-      "Vista local. Este formulario no envía datos ni agenda una reunión.",
+  contact: {
+    noScript: `Activa JavaScript para enviar este formulario o escríbenos a ${businessContactEmail}.`,
     name: "Tu nombre",
     email: "Correo electrónico",
     description: "¿Qué te cuesta mantener al día?",
@@ -28,17 +25,19 @@ const es = {
     namePlaceholder: "Tu nombre",
     emailPlaceholder: "tu@negocio.com",
     descriptionPlaceholder: "Unas palabras son suficientes.",
-    submit: "Revisar mi mensaje",
+    submit: "Enviar mensaje",
+    sending: "Enviando…",
     required: "Completa este campo.",
     invalidEmail: "Escribe un correo válido, como tu@negocio.com.",
-    reviewTitle: "Tu mensaje, listo para revisar.",
-    reviewBody:
-      "No se ha enviado nada ni se ha reservado una reunión. El contacto aún no está conectado en esta vista local.",
-    edit: "Editar mensaje",
+    successTitle: "Recibimos tu mensaje.",
+    successBody: "Te responderemos al correo que escribiste.",
     empty: "Sin comentario",
-    privacy:
-      "Los datos permanecen en esta página. No se envían ni se guardan en un servidor.",
+    privacy: "Usamos tu nombre, correo y mensaje solo para responderte.",
+    privacyLink: "Política de privacidad",
     errors: "Revisa los campos marcados.",
+    unavailable: `No pudimos enviar tu mensaje. Lo que escribiste sigue aquí. Inténtalo de nuevo o escríbenos a ${businessContactEmail}.`,
+    rateLimited: "Hiciste varios intentos seguidos. Espera unos minutos e inténtalo de nuevo.",
+    rejected: "Revisa los campos marcados e inténtalo de nuevo.",
   },
   personal: {
     eyebrow: "CUADRAO PERSONAL",
@@ -63,9 +62,8 @@ const en: typeof es = {
     skip: "Skip to content",
   },
   closing: { footerLabel: "Footer navigation" },
-  demo: {
-    noScript: "Enable JavaScript to try this local form. No data will be sent.",
-    notice: "Local preview. This form does not send data or book a meeting.",
+  contact: {
+    noScript: `Enable JavaScript to send this form or email us at ${businessContactEmail}.`,
     name: "Your name",
     email: "Email address",
     description: "What’s hard to keep up with?",
@@ -73,17 +71,19 @@ const en: typeof es = {
     namePlaceholder: "Your name",
     emailPlaceholder: "you@business.com",
     descriptionPlaceholder: "A few words are enough.",
-    submit: "Review my message",
+    submit: "Send message",
+    sending: "Sending…",
     required: "Complete this field.",
     invalidEmail: "Enter a valid email, such as you@business.com.",
-    reviewTitle: "Your message is ready to review.",
-    reviewBody:
-      "Nothing has been sent and no meeting has been booked. Contact is not connected in this local preview yet.",
-    edit: "Edit message",
+    successTitle: "We received your message.",
+    successBody: "We’ll reply to the email address you entered.",
     empty: "No comment",
-    privacy:
-      "Your details stay on this page. Nothing is sent or saved to a server.",
+    privacy: "We use your name, email and message only to reply to you.",
+    privacyLink: "Privacy policy",
     errors: "Check the marked fields.",
+    unavailable: `We couldn’t send your message. What you wrote is still here. Try again or email us at ${businessContactEmail}.`,
+    rateLimited: "You made several attempts in a row. Wait a few minutes and try again.",
+    rejected: "Check the marked fields and try again.",
   },
   personal: {
     eyebrow: "CUADRAO PERSONAL",

@@ -20,6 +20,7 @@ export function BusinessHeader({
   const copy = businessContent[locale].navigation;
   const home = businessPath(locale);
   const personal = page === "personal";
+  const secondary = page === "contact" || page === "privacy";
   const primaryHref = personal ? "#early-access" : businessPath(locale, "contact");
   const primaryLabel = personal ? locale === "es" ? "Acceso anticipado" : "Early access" : copy.demo;
 
@@ -92,7 +93,7 @@ export function BusinessHeader({
             </a>
           </div>
           <div className={styles.utilityNav}>
-            {page === "contact" ? (
+            {secondary ? (
               backLink
             ) : !personal ? (
               <>
@@ -101,7 +102,7 @@ export function BusinessHeader({
               </>
             ) : null}
             {languageLinks}
-            {page !== "contact" && (
+            {!secondary && (
               <a
                 className={styles.buttonSmall}
                 href={primaryHref}
@@ -149,7 +150,7 @@ export function BusinessHeader({
             {!personal && <a href={`${home}#nosotros`}>{copy.about}</a>}
             {page !== "personal" && <a href={`${home}#preguntas`}>{siteCopy[locale].faqLink}</a>}
             {languageLinks}
-            {page === "contact" ? backLink : (
+            {secondary ? backLink : (
               <a className={styles.button} href={primaryHref}>
                 {primaryLabel}
               </a>

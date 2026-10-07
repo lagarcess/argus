@@ -982,6 +982,26 @@
   color: #526057;
   margin-top: 20px !important;
 }
+.formPrivacy a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.formFailure {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #973b2d;
+  margin: 0 0 20px !important;
+}
+.sentMark {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 18px;
+  border: 1px solid #a9b5a7;
+  border-radius: 50%;
+  color: var(--ink);
+}
 .review h2 {
   font-size: 32px;
   margin-bottom: 20px;
