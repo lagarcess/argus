@@ -56,8 +56,8 @@ async def test_intake_case_on_postgres(case, pool, users) -> None:  # noqa: ANN0
 
 
 @pytest.mark.asyncio
-async def test_english_profile_gets_spanish_then_english(pool, users) -> None:  # noqa: ANN001
-    await cases.english_owner_gets_spanish_then_english(_world(pool, users, "en"))
+async def test_english_profile_gets_english_only(pool, users) -> None:  # noqa: ANN001
+    await cases.english_owner_gets_english_only(_world(pool, users, "en"))
 
 
 def test_clients_cannot_read_or_write_whatsapp_tables(users) -> None:  # noqa: ANN001

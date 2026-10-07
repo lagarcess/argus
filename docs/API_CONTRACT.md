@@ -8683,6 +8683,8 @@ The destination owner is the signed-in person today, read only through
   for the destination, and answers 204, also when nothing was linked.
 
 Replies are sent only when `ARGUS_WHATSAPP_OUTBOUND_ENABLED` is true, always as
-a free-form answer to the person's own message. A message whose WhatsApp
+a free-form answer to the person's own message, in one language: the linked
+owner's (Spanish by default, English when the profile says `en`). A new message
+whose bytes the owner's inbox already holds gets the duplicate reply. A message whose WhatsApp
 timestamp is more than 24 hours old is still captured but gets no reply, so
 nothing is sent outside the service window.

@@ -32,6 +32,7 @@ from argus.domain.ingestion.whatsapp.config import (
 )
 from argus.domain.ingestion.whatsapp.identity import WhatsAppKeys
 from argus.domain.ingestion.whatsapp.intake import (
+    Captured,
     CaptureFailed,
     CaptureRejected,
     WhatsAppIntake,
@@ -94,7 +95,7 @@ class DocumentsDestination:
 
     async def capture(
         self, *, owner_id: str, content: bytes, filename: str, media_type: str
-    ) -> str:
+    ) -> Captured:
         try:
             outcome = await self.documents.upload(
                 user_id=owner_id,
@@ -109,7 +110,7 @@ class DocumentsDestination:
             ) from None
         except DocumentServiceError:
             raise CaptureFailed("whatsapp_capture_failed") from None
-        return outcome.connection_id
+        return Captured(outcome.connection_id, already_held=outcome.replayed)
 
     def language(self, owner_id: str) -> str | None:
         return self._language_of(owner_id)

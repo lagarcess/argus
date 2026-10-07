@@ -74,12 +74,18 @@ class CaptureFailed(Exception):
         self.code = code
 
 
+@dataclass(frozen=True)
+class Captured:
+    connection_id: str
+    already_held: bool
+
+
 class IntakeDestination(Protocol):
     """Where a linked sender's receipt lands. Pending the Business boundary."""
 
     async def capture(
         self, *, owner_id: str, content: bytes, filename: str, media_type: str
-    ) -> str: ...
+    ) -> Captured: ...
 
     def language(self, owner_id: str) -> str | None: ...
 
@@ -221,7 +227,7 @@ class WhatsAppIntake:
             return Settlement("rejected", owner, error_code="whatsapp_media_unsupported")
         try:
             fetched = await self.media.fetch(message.media_id)
-            connection_id = await self.destination.capture(
+            captured = await self.destination.capture(
                 owner_id=owner,
                 content=fetched.content,
                 filename=message.filename,
@@ -231,7 +237,12 @@ class WhatsAppIntake:
             return Settlement("rejected", owner, error_code=error.code)
         except (MediaUnavailable, CaptureFailed) as error:
             return Settlement("failed", owner, error_code=error.code)
-        return Settlement("captured", owner, connection_id)
+        return Settlement(
+            "captured",
+            owner,
+            captured.connection_id,
+            duplicate=captured.already_held,
+        )
 
     async def _reply(self, message: InboundMessage, settlement: Settlement, log) -> None:  # noqa: ANN001
         if self.transport is None:
@@ -250,9 +261,11 @@ class WhatsAppIntake:
             await asyncio.to_thread(self.destination.language, owner) if owner else None
         )
         body = compose_reply(
-            reply_key(settlement.status, settlement.error_code),
+            reply_key(
+                settlement.status, settlement.error_code, duplicate=settlement.duplicate
+            ),
             language=language,
-            review_url=url,
+            link=url,
             limit_mb=self.max_bytes // (1024 * 1024),
         )
         try:

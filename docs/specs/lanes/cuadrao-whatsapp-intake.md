@@ -15,7 +15,10 @@ AI" and approval happen only on the web. WhatsApp never queues AI preparation.
 Linking needs proof of possession. The signed-in owner creates a one-time code
 on the web, then sends `CUADRAO <code>` from their own WhatsApp. A typed phone
 number proves nothing. Unknown senders get no capture and a "connect from the
-web app" reply. Contract: `docs/API_CONTRACT.md`, "WhatsApp receipt intake".
+web app" reply. A new message carrying a receipt already in the owner's inbox
+gets a "duplicate" reply instead of "captured". Each reply uses one language:
+the owner's (Spanish by default, English when their profile says `en`).
+Reply copy is **pending founder approval**. Contract: `docs/API_CONTRACT.md`.
 
 ## Proof levels
 
@@ -70,8 +73,7 @@ cloudflared tunnel --url http://localhost:8000
 
 Use the printed `https://<random>.trycloudflare.com` host in step 5. The tunnel
 exposes the whole local API, so keep it up only for the test session, then stop
-it with Ctrl-C and delete the callback URL in the Meta dashboard. A new run gets
-a new host and needs step 5 again.
+it with Ctrl-C and delete the callback URL in the Meta dashboard.
 
 ## Real delivery test
 
@@ -115,4 +117,4 @@ a new host and needs step 5 again.
 - The reply language reads `profiles.language` of the destination owner. A
   principal has no profile, so option A should read the linking person's
   language instead.
-- Reply copy is a Spanish-first draft and needs founder approval.
+- Reply copy in `whatsapp/replies.py` is **pending founder approval**.

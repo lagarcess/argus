@@ -44,6 +44,8 @@ class Settlement:
     destination_owner_id: str | None = None
     connection_id: str | None = None
     error_code: str | None = None
+    # Not stored: the destination already held these bytes, which picks the reply.
+    duplicate: bool = False
 
 
 @dataclass(frozen=True)

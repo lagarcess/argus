@@ -153,7 +153,8 @@ async def linked_image_is_saved_unqueued_and_replay_converges(world: World) -> N
     )
     assert RefusingExtractor.calls == 0
     assert world.transport.bodies()[-1] == (
-        f"Recibimos tu recibo. Revísalo en Cuadrao: {ORIGIN}/biz?receipt={connection_id}"
+        "Recibimos tu recibo y lo guardamos en tu bandeja. "
+        f"Revísalo y confírmalo en Cuadrao: {ORIGIN}/biz?receipt={connection_id}"
     )
     assert len(world.transport.sent) == 2
     assert world.graph.hosts() == {"graph.facebook.com", "lookaside.fbsbx.com"}
@@ -201,7 +202,8 @@ async def unknown_sender_is_rejected_without_capture(world: World) -> None:
     assert (
         world.transport.bodies()
         == [
-            "Este número no está conectado a Cuadrao. Conéctalo desde la app web de Cuadrao."
+            "Este número no está conectado a Cuadrao. "
+            "Conéctalo desde Cuadrao en la web y vuelve a enviar el recibo."
         ]
         * 2
     )
@@ -296,7 +298,8 @@ async def oversize_and_unsupported_media_are_rejected(world: World) -> None:
         "wamid.CASE-FAKE-PNG": ("rejected", "whatsapp_media_invalid"),
     }
     assert (
-        "El archivo pesa más de 10 MB. Envía uno más pequeño." in world.transport.bodies()
+        "El archivo pesa más de 10 MB. Envía una foto o un PDF más pequeño."
+        in world.transport.bodies()
     )
 
 
@@ -367,12 +370,41 @@ async def revoke_and_relink(world: World) -> None:
     assert len(world.captures(world.alice)) == 1
 
 
-async def english_owner_gets_spanish_then_english(world: World) -> None:
+async def english_owner_gets_english_only(world: World) -> None:
     await world.link(world.alice, ALICE_PHONE)
-    assert world.transport.bodies()[-1] == (
-        "Listo. Este WhatsApp quedó conectado a Cuadrao. Envía la foto o el PDF de un recibo."
-        "\n\nDone. This WhatsApp is now connected to Cuadrao. Send a photo or PDF of a receipt."
-    )
+    world.graph.media["700000000000115"] = Media(RECEIPT_PNG, "image/png")
+    await world.deliver(image("700000000000115", "wamid.CASE-ENGLISH"))
+    await world.deliver(image("700000000000115", "wamid.CASE-ENGLISH-AGAIN"))
+    [connection_id] = world.captures(world.alice)
+    link = f"{ORIGIN}/biz?receipt={connection_id}"
+    assert world.transport.bodies() == [
+        "Done. This WhatsApp is now connected to your business in Cuadrao. "
+        "Send a photo or PDF of a receipt here.",
+        "We got your receipt and saved it to your inbox. "
+        f"Review and confirm it in Cuadrao: {link}",
+        "This receipt is already in your inbox, so we didn't save it twice. "
+        f"Review it in Cuadrao: {link}",
+    ]
+
+
+async def same_bytes_in_a_new_message_get_the_duplicate_reply(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE)
+    world.graph.media["700000000000116"] = Media(RECEIPT_PNG, "image/png")
+    await world.deliver(image("700000000000116", "wamid.CASE-FIRST-COPY"))
+    await world.deliver(image("700000000000116", "wamid.CASE-SECOND-COPY"))
+    await world.deliver(image("700000000000116", "wamid.CASE-SECOND-COPY"))
+
+    [connection_id] = world.captures(world.alice)
+    link = f"{ORIGIN}/biz?receipt={connection_id}"
+    for message_id in ("wamid.CASE-FIRST-COPY", "wamid.CASE-SECOND-COPY"):
+        record = world.record(message_id)
+        assert (record.status, record.connection_id) == ("captured", connection_id)
+    assert world.transport.bodies()[1:] == [
+        "Recibimos tu recibo y lo guardamos en tu bandeja. "
+        f"Revísalo y confírmalo en Cuadrao: {link}",
+        "Ya tenemos este recibo en tu bandeja, así que no lo guardamos dos veces. "
+        f"Revísalo en Cuadrao: {link}",
+    ]
 
 
 async def a_live_claim_blocks_a_concurrent_redelivery(world: World) -> None:
@@ -504,4 +536,5 @@ CASES = (
     slow_processing_times_out_as_failed_and_recovers,
     revoking_also_ends_unused_codes,
     no_reply_outside_the_service_window,
+    same_bytes_in_a_new_message_get_the_duplicate_reply,
 )

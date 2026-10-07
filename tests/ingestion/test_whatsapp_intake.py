@@ -58,8 +58,8 @@ async def test_intake_case(case) -> None:  # noqa: ANN001
 
 
 @pytest.mark.asyncio
-async def test_english_owner_gets_spanish_then_english() -> None:
-    await cases.english_owner_gets_spanish_then_english(_world(lambda _owner: "en"))
+async def test_english_owner_gets_english_only() -> None:
+    await cases.english_owner_gets_english_only(_world(lambda _owner: "en"))
 
 
 def test_signature_is_hmac_of_the_raw_body() -> None:
@@ -128,6 +128,7 @@ def test_link_token_is_an_exact_protocol_word_and_code() -> None:
 def test_every_outcome_code_has_a_reply_without_long_dashes() -> None:
     codes = {
         "captured",
+        "duplicate",
         "linked",
         "whatsapp_link_code_invalid",
         "whatsapp_sender_not_linked",
@@ -149,15 +150,22 @@ def test_every_outcome_code_has_a_reply_without_long_dashes() -> None:
     )
 
 
-def test_reply_is_spanish_first_and_adds_english_only_for_english_owners() -> None:
+def test_reply_uses_one_language_spanish_unless_the_owner_is_english() -> None:
     url = "https://app.test/biz?receipt=abc"
-    assert compose_reply("captured", language="es-419", review_url=url) == (
-        "Recibimos tu recibo. Revísalo en Cuadrao: https://app.test/biz?receipt=abc"
+    spanish = (
+        "Recibimos tu recibo y lo guardamos en tu bandeja. "
+        "Revísalo y confírmalo en Cuadrao: https://app.test/biz?receipt=abc"
     )
-    assert compose_reply("captured", language="en", review_url=url) == (
-        "Recibimos tu recibo. Revísalo en Cuadrao: https://app.test/biz?receipt=abc"
-        "\n\nWe received your receipt. Review it in Cuadrao: https://app.test/biz?receipt=abc"
+    assert compose_reply("captured", language="es-419", link=url) == spanish
+    assert compose_reply("captured", language=None, link=url) == spanish
+    assert compose_reply("captured", language="en", link=url) == (
+        "We got your receipt and saved it to your inbox. "
+        "Review and confirm it in Cuadrao: https://app.test/biz?receipt=abc"
     )
+    assert compose_reply("whatsapp_media_too_large", language="en") == (
+        "The file is larger than 10 MB. Send a smaller photo or PDF."
+    )
+    assert reply_key("captured", None, duplicate=True) == "duplicate"
     assert reply_payload(to="15550101234", in_reply_to="wamid.X", body="Hola") == {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
