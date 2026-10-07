@@ -17,15 +17,14 @@ Measured 2026-10-07 with `git fetch origin`:
 
 **Option A, full promotion.** Rejected for this launch: it ships the whole integration backlog and 35 unapplied migrations.
 
-**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Every path in it is new on `main`:
+**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Prepared and measured against `origin/main` (`a9286b21`) from this PR's content: **127 new files and 1 modified file, 10,148 added lines, nothing deleted.**
 
-- `marketing/**`
-- `supabase/migrations/20260920000000_cuadrao_early_access_signups.sql`
-- `tests/test_cuadrao_early_access_postgres.py`
-- the `marketing-checks` job in `.github/workflows/ci.yml`
-- `docs/specs/cuadrao-marketing-forms-contract.md`, this runbook and the launch record
+- `marketing/**` (new)
+- `supabase/migrations/20260920000000_cuadrao_early_access_signups.sql` and `tests/test_cuadrao_early_access_postgres.py` (new)
+- `docs/specs/cuadrao-marketing-forms-contract.md`, this runbook, the launch record and its evidence folder (new)
+- `.github/workflows/ci.yml` (the only modified file): a `marketing-checks` job and its entry in the aggregate `ci` job's `needs`, 46 added lines, written for `main`'s simpler workflow
 
-It carries no change to `web/`, `src/`, `ios/` or any other migration. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so it orders correctly on both branches. Identical content merges cleanly when integration is later promoted.
+It carries no change to `web/`, `src/`, `ios/`, `render.yaml` or any other migration. Left out because they only exist, or only make sense, on integration: the Cuadrao design guide (it links five integration-only documents), the documentation-authority row and the integration-report pointer. They arrive with the normal promotion, and the package README's link to the design guide is dead on `main` until then. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so a fresh replay orders it correctly on both branches. Identical content merges cleanly when integration is later promoted. The candidate was built in a separate worktree from `origin/main`; its typecheck and 112 unit tests pass there.
 
 Applying it to a database that already holds the newer integration migrations (a staging project that tracks integration) needs `--include-all`; confirm that database's applied list first. Production has none of them.
 
