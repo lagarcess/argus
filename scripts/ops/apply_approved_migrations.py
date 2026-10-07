@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -29,6 +30,8 @@ except ImportError:  # run as a script from the repository root
     from scripts.ops import production_migration_gate as gate
 
 _HOSTED_SUFFIXES = (".supabase.co", ".supabase.com")
+_LOCK_TIMEOUT = re.compile(r"\d{1,6}(ms|s|min)")
+_ADVISORY_LOCK_KEY = 7_340_118_221_605
 _LEDGER_INSERT = (
     "insert into supabase_migrations.schema_migrations (version, statements, name)"
     " values (%s, %s, %s)"
@@ -131,12 +134,26 @@ def read_ledger_versions(connection: object) -> list[str]:
     return [str(row[0]) for row in rows]
 
 
-def apply_steps(connection: object, steps: Sequence[Step]) -> list[str]:
+def check_lock_timeout(value: str) -> str:
+    """A file that cannot get its locks in time fails and rolls back instead of queueing behind traffic."""
+
+    if _LOCK_TIMEOUT.fullmatch(value) is None:
+        raise ApplyError("the lock timeout must look like 500ms, 5s or 1min")
+    return value
+
+
+def apply_steps(
+    connection: object, steps: Sequence[Step], lock_timeout: str = "5s"
+) -> list[str]:
     """One transaction per file; stop at the first failure, leaving earlier files applied."""
 
+    check_lock_timeout(lock_timeout)
     done: list[str] = []
     for step in steps:
         with connection.transaction():  # type: ignore[attr-defined]
+            connection.execute(  # type: ignore[attr-defined]
+                "select set_config('lock_timeout', %s, true)", (lock_timeout,)
+            )
             for statement in step.statements:
                 connection.execute(statement)  # type: ignore[attr-defined]
             if step.record:
@@ -162,6 +179,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--database-url-env", default="ARGUS_APPLY_DATABASE_URL")
     parser.add_argument("--allow-host", action="append", required=True)
     parser.add_argument("--allow-database", action="append", required=True)
+    parser.add_argument(
+        "--lock-timeout",
+        default="5s",
+        help="per-file lock timeout such as 500ms, 5s or 1min",
+    )
     parser.add_argument(
         "--execute", action="store_true", help="apply; the default only prints the plan"
     )
@@ -191,7 +213,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.execute:
             print(f"dry run: {len(steps)} step(s); nothing applied")
             return 0
-        done = apply_steps(connection, steps)
+        locked = connection.execute(
+            "select pg_try_advisory_lock(%s)", (_ADVISORY_LOCK_KEY,)
+        ).fetchone()
+        if not locked or not locked[0]:
+            raise ApplyError("another run of this tool holds the migration lock")
+        done = apply_steps(connection, steps, check_lock_timeout(args.lock_timeout))
         print(f"applied {len(done)} step(s)")
     return 0
 

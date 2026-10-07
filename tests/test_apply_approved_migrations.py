@@ -109,7 +109,10 @@ class _Connection:
     def execute(self, statement: str, params: object = None) -> None:
         if self.fail_on and self.fail_on in statement:
             raise RuntimeError("boom")
-        self.log.append("ledger" if params is not None else statement)
+        if params is not None and "set_config" in statement:
+            self.log.append(f"timeout={params[0]}")
+        else:
+            self.log.append("ledger" if params is not None else statement)
 
 
 def test_each_file_is_one_transaction_and_records_its_own_ledger_row() -> None:
@@ -120,9 +123,11 @@ def test_each_file_is_one_transaction_and_records_its_own_ledger_row() -> None:
     assert applier.apply_steps(connection, steps) == ["20260505000001", "20260925120000"]
     assert connection.log == [
         "begin",
+        "timeout=5s",
         "alter table t drop constraint if exists c",
         "commit",
         "begin",
+        "timeout=5s",
         "create table t (id int)",
         "ledger",
         "commit",
@@ -134,4 +139,15 @@ def test_a_failing_file_rolls_back_and_stops_the_run() -> None:
     connection = _Connection(fail_on="create table")
     with pytest.raises(RuntimeError):
         applier.apply_steps(connection, steps)
-    assert connection.log == ["begin", "rollback"]
+    assert connection.log == ["begin", "timeout=5s", "rollback"]
+
+
+@pytest.mark.parametrize("value", ["5s", "500ms", "1min"])
+def test_lock_timeout_accepts_plain_durations(value: str) -> None:
+    assert applier.check_lock_timeout(value) == value
+
+
+@pytest.mark.parametrize("value", ["", "0", "5", "5 s; drop table x", "-1s", "1h"])
+def test_lock_timeout_refuses_anything_else(value: str) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.check_lock_timeout(value)
