@@ -209,10 +209,8 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
     receipts = receipts.map((item) => (item.id === next.id ? next : item));
     return next;
   };
-  const missing = (fields: ReceiptReviewFields) =>
-    (Object.keys(fields) as (keyof ReceiptReviewFields)[]).filter(
-      (key) => key !== "category_id" && !fields[key],
-    );
+  const required: (keyof ReceiptReviewFields)[] = ["merchant", "occurred_on", "amount", "currency", "account_id"];
+  const missing = (fields: ReceiptReviewFields) => required.filter((key) => !fields[key]);
 
   return {
     mode: "fixture",
@@ -330,6 +328,10 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
       }
       if (current.missing_fields.length > 0) {
         throw Object.assign(new Error("missing_fields"), { status: 422, code: "missing_fields" });
+      }
+      const account = ACCOUNTS.find((item) => item.id === current.account_id);
+      if (account && account.currency !== current.currency) {
+        throw Object.assign(new Error("currency_mismatch"), { status: 422, code: "currency_mismatch" });
       }
       const expenseId = `exp-${id}`;
       expenses = [

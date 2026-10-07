@@ -103,7 +103,13 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<"prepare" | "confirm" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const confirmKey = useRef(randomId());
+  // One key per receipt version, so a retry of the same confirm replays it and
+  // a confirm of a newer version is a new request.
+  const confirmKey = useRef<{ version: number; key: string } | null>(null);
+  const confirmKeyFor = (version: number) => {
+    if (confirmKey.current?.version !== version) confirmKey.current = { version, key: randomId() };
+    return confirmKey.current.key;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -122,13 +128,9 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
 
   const accounts = records.workspace?.accounts ?? [];
   const currencies = records.workspace?.currencies ?? [];
-  const selectedAccount = accounts.find((account) => account.id === draft?.account_id);
-  const currencyMismatch = Boolean(
-    selectedAccount && draft?.currency && selectedAccount.currency !== draft.currency,
-  );
   const missing = useMemo(
-    () => (draft ? FIELDS.filter((key) => key !== "category_id" && !draft[key].trim()) : []),
-    [draft],
+    () => (detail && draft ? detail.missing_fields.filter((key) => !draft[key]?.trim()) : []),
+    [detail, draft],
   );
   const confirmed = detail?.status === "confirmed";
   const waitingForAi = detail?.status === "queued" || detail?.status === "preparing";
@@ -147,12 +149,34 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
       FIELDS.filter((key) => (detail[key] ?? "") !== draft[key]).map((key) => [key, draft[key] || null]),
     );
 
+  const show = (next: ReceiptDetail) => {
+    setDetail(next);
+    setDraft(draftFrom(next));
+  };
+
+  const confirmProblem = (code: string | undefined, current: Draft) => {
+    if (code === "stale_version") {
+      return t("business.review.stale", "This receipt changed since you opened it. Review the current details before confirming.");
+    }
+    const account = accounts.find((item) => item.id === current.account_id);
+    if (code === "currency_mismatch" && account) {
+      return t("business.review.currency_mismatch", "This account uses {{account}}. Choose an account in {{receipt}} or correct the currency.", {
+        account: account.currency,
+        receipt: current.currency,
+      });
+    }
+    if (code === "missing_fields") {
+      return t("business.review.missing", "Fill in the details marked Needed to save this expense.");
+    }
+    return t("business.review.confirm_failed", "We couldn't confirm this expense. Nothing was saved twice. Try again.");
+  };
+
   const prepare = async () => {
     setBusy("prepare");
     setProblem(null);
     try {
       await source.prepareReceipt(detail.id);
-      setDetail(await source.receipt(detail.id));
+      show(await source.receipt(detail.id));
       reload();
     } catch {
       setProblem(t("business.review.prepare_failed", "We couldn't start preparation. Your receipt is saved. Try again."));
@@ -164,28 +188,22 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
   const confirm = async () => {
     setBusy("confirm");
     setProblem(null);
+    const submitted = draft;
     try {
       const changes = changedFields();
-      const reviewed = Object.keys(changes).length
-        ? await source.saveReview(detail.id, detail.version, changes)
-        : detail;
-      const saved = await source.confirmReceipt(reviewed.id, reviewed.version, confirmKey.current);
-      setDetail(saved);
-      setDraft(draftFrom(saved));
+      let reviewed = detail;
+      if (Object.keys(changes).length) {
+        reviewed = await source.saveReview(detail.id, detail.version, changes);
+        show(reviewed);
+      }
+      show(await source.confirmReceipt(reviewed.id, reviewed.version, confirmKeyFor(reviewed.version)));
       reload();
     } catch (error) {
       const code = (error as { code?: string }).code;
-      setProblem(
-        code === "stale_version"
-          ? t("business.review.stale", "This receipt changed since you opened it. Review the current details before confirming.")
-          : t("business.review.confirm_failed", "We couldn't confirm this expense. Nothing was saved twice. Try again."),
-      );
+      setProblem(confirmProblem(code, submitted));
       if (code === "stale_version") {
         const fresh = await source.receipt(detail.id).catch(() => null);
-        if (fresh) {
-          setDetail(fresh);
-          setDraft(draftFrom(fresh));
-        }
+        if (fresh) show(fresh);
       }
     } finally {
       setBusy(null);
@@ -307,14 +325,6 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
                 ))}
               </select>,
             )}
-            {currencyMismatch ? (
-              <p className="text-[13px] text-[#a8434c] dark:text-[#ec9aa0]">
-                {t("business.review.currency_mismatch", "This account uses {{account}}. Choose an account in {{receipt}} or correct the currency.", {
-                  account: selectedAccount?.currency,
-                  receipt: draft.currency,
-                })}
-              </p>
-            ) : null}
           </div>
 
           {detail.evidence ? (
@@ -355,7 +365,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
               <button
                 type="button"
                 className={primaryButtonClass}
-                disabled={busy !== null || missing.length > 0 || currencyMismatch || waitingForAi}
+                disabled={busy !== null || missing.length > 0 || waitingForAi}
                 onClick={() => void confirm()}
               >
                 {busy === "confirm" ? t("business.review.confirming", "Saving…") : t("business.review.confirm", "Confirm expense")}
