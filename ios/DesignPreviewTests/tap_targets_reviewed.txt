@@ -26,8 +26,6 @@ ae491bb6b7d8  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carri
 b8a9a65cbca8  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carries the shape
 d9b102efb3ae  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carries the shape
 ff6872434883  ArgusFoundation/Cuadrao/CuadraoSearchCanvas.swift: resultRow carries the shape
-491c5800f0ee  ArgusFoundation/Cuadrao/CuadraoSpacesSheet.swift: spaceChoice carries the shape
-2fcf20220b6f  ArgusFoundation/Cuadrao/CuadraoSpacesSheet.swift: spaceChoice carries the shape
 9392d175d509  ArgusFoundation/Cuadrao/CuadraoSpendingTrends.swift: filled card, opaque across its frame
 3b293c8c2d90  ArgusFoundation/Cuadrao/CuadraoUpdatesCanvas.swift: row(_:) carries the shape
 b868490ad918  ArgusFoundation/Cuadrao/CuadraoVoiceMessagePanel.swift: Stop only, filled capsule, opaque across its frame
