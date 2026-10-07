@@ -3337,7 +3337,8 @@ and the auth user is gone.
 being retried), and the account is locked: its sessions are refused from the
 moment the run opens and the auth user is banned, so clients sign out. A third
 party hasn't confirmed yet, so the auth delete waits. `pending` names it
-(`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
+(`apple`, `gmail`, `plaid`, `analytics`, `storage` for retained document
+sources); it is empty when the data step
 itself is being retried. Every third-party step (Sign in with Apple through
 #793, Google/Gmail and Plaid tokens, PostHog personless event deletion) runs before the
 auth delete. A repeat request resumes the run, and so does the operator-run
@@ -8453,13 +8454,18 @@ is implied by capture or recovery.
 accepts the same true values as the other default-off surfaces (`1`, `true`,
 `yes`, `on`). Unset, `false`, `0`, `no`, `off`, a blank value, or an
 unrecognized value leaves the document surface off. A document setting that
-cannot be read, including a non-integer max-bytes value, also leaves it off.
-While the document surface is off, every `/api/v1/financial-documents` route
-answers 404 `financial_connections_unavailable` and no extraction runs. Plaid,
+cannot be read, including a non-integer or out-of-range max-bytes value (0,
+negative, or above the 10 MiB cap), also leaves it off, with one warning per
+process. While the document surface is off, every `/api/v1/financial-documents`
+route answers 404 `financial_connections_unavailable` with
+`Cache-Control: no-store` and no extraction runs. Plaid,
 Gmail, Shortcuts, disconnect, and `GET /api/v1/financial-connections` keep
 their own gates.
 
-Capture responds with `{connection_id,status,replayed,candidate_count}`. `status`
+Capture responds with `{connection_id,status,replayed,candidate_count}`. Every
+upload answer, success or problem, is `Cache-Control: no-store`. The stored
+filename drops control and format characters (bidi overrides included) and is
+at most 80 characters; an empty result is stored as `document`. `status`
 is preparation state (`saved|queued|preparing|review_ready|needs_attention`), never
 an approval flag. Approval remains owned by reconciliation events on that connection.
 The response can be `queued` even when a fast background task completes before the
@@ -8474,6 +8480,8 @@ client reads it. Poll `GET /financial-documents/{connection_id}` for current sta
   existing import review; no duplicate approval state is stored here.
 - `GET /financial-documents/{connection_id}/source` returns the retained file as a
   download with a safe generic filename, `Cache-Control: no-store` and `nosniff`.
+  The API reads it from private Storage and proxies the bytes; no signed URL
+  leaves the server. Another person's connection is 404.
 - `POST /financial-documents/{connection_id}/prepare` and `/resume` queue explicit
   preparation or replay saved candidate delivery. A fresh provider attempt requires
   `X-Extraction-Consent: true`; replay of saved preparation makes no provider call.
@@ -8512,8 +8520,9 @@ integration work, not implemented financial effects of this foundation.
 
 **Retention amendment:** the former transient-source/re-upload contract is
 superseded by this explicit founder assignment. Supported source files stay in the
-same server-only document store until explicit disconnect/deletion; user/connection
-deletion cascades. Rendered pages and OCR intermediates stay transient. Draft/source
+private, service-role-only Storage bucket until explicit disconnect/deletion;
+disconnect deletes the connection's objects and account deletion the person's.
+Rendered pages and OCR intermediates stay transient. Draft/source
 reads are owner-only and uncached. Disconnect removes retained source and draft
 without deleting already accepted activity. Source and extracted contents never
 belong in logs, analytics, public evidence or automatically shared household data.
