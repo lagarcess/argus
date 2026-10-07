@@ -26,6 +26,8 @@ from argus.api.routers.financial_search import router as search_router
 from argus.api.routers.ingestion_shortcuts import (
     intake_router as shortcuts_intake_router,
 )
+from argus.api.routers.whatsapp import link_router as whatsapp_link_router
+from argus.api.routers.whatsapp import webhook_router as whatsapp_webhook_router
 from argus.domain import backtest_admission
 from argus.domain.recording.loop_schemas import LoopOpeningRequest
 from argus.domain.recording.schemas import (
@@ -168,3 +170,5 @@ router.include_router(imports_router)
 router.include_router(documents_router)
 
 router.include_router(shortcuts_intake_router)
+router.include_router(whatsapp_webhook_router)
+router.include_router(whatsapp_link_router)
