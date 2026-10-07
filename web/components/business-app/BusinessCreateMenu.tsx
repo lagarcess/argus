@@ -35,9 +35,9 @@ export default function BusinessCreateMenu({
             aria-controls={open ? menuId : undefined}
             data-testid="business-create-compact"
             onClick={toggle}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:bg-white dark:text-black"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 active:scale-95 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
           >
-            <Plus className="h-5 w-5" />
+            <Plus className="h-5 w-5 text-black/70 dark:text-white/70" />
           </button>
         )}
       />
@@ -62,13 +62,18 @@ export default function BusinessCreateMenu({
             aria-controls={open ? menuId : undefined}
             data-testid="business-create"
             onClick={toggle}
-            className={`flex h-11 items-center rounded-full bg-black text-white transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:bg-white dark:text-black ${
-              collapsed ? "w-11 justify-center" : "w-full gap-2 px-4"
+            className={`group flex h-11 w-full items-center rounded-[14px] transition-colors duration-200 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:hover:bg-white/5 ${
+              open ? "bg-black/5 dark:bg-white/5" : ""
             }`}
           >
-            <Plus className="h-5 w-5 shrink-0" />
+            {/* Same 44px icon cell and 20px glyph as every other sidebar row. */}
+            <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center">
+              <Plus className="h-5 w-5 text-black/60 transition-transform duration-150 ease-out group-hover:scale-[1.06] group-hover:text-black dark:text-white/60 dark:group-hover:text-white" />
+            </span>
             {collapsed ? null : (
-              <span className="font-display text-[15px] font-medium tracking-tight">{label}</span>
+              <span className="ml-1 whitespace-nowrap font-display text-[15px] font-medium tracking-tight text-black dark:text-white">
+                {label}
+              </span>
             )}
           </button>
         );

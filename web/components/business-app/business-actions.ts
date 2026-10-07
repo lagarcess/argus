@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Inbox,
-  MessageCirclePlus,
   MessageSquareText,
   PenLine,
   ReceiptText,
@@ -19,7 +18,6 @@ import type { IntakeTarget } from "./ReceiptIntakeDialog";
 export type BusinessActionId =
   | "upload_receipt"
   | "record_expense"
-  | "new_chat"
   | "review_inbox"
   | "ask_spending";
 
@@ -31,7 +29,11 @@ export type BusinessAction = Readonly<{
 }>;
 
 export type BusinessActions = Readonly<{
-  /** The + Create menu: only actions that work from anywhere. */
+  /**
+   * The + Create menu: records you can start from anywhere. New chat keeps its
+   * one entry point at the top of the sidebar, as Slack keeps compose apart
+   * from its + menu.
+   */
   create: readonly BusinessAction[];
   /** The composer's + control: actions that attach to this conversation. */
   composer: readonly BusinessAction[];
@@ -87,12 +89,6 @@ export function useBusinessActions({
       PenLine,
       openRecordExpense,
     );
-    const newChat = action(
-      "new_chat",
-      t("chat.new_chat", "New chat"),
-      MessageCirclePlus,
-      () => bridge?.newChat(),
-    );
     const reviewInbox = action(
       "review_inbox",
       t("business.actions.review_inbox", "Review {{count}} receipts", { count: awaiting }),
@@ -117,7 +113,7 @@ export function useBusinessActions({
 
     const chips = [uploadReceipt, ...(awaiting > 0 ? [reviewInbox] : []), ...(canAsk ? [askSpending] : [recordExpense])];
     return {
-      create: [uploadReceipt, recordExpense, newChat],
+      create: [uploadReceipt, recordExpense],
       composer: [attachReceipt, recordExpense],
       starterEntries: chips.map(({ id, icon, label, run }) => ({ key: id, icon, label, onSelect: run })),
     };

@@ -71,7 +71,7 @@ test.describe("Business preview", () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(viewport!.height);
 
     const items = menu.getByRole("menuitem");
-    await expect(items).toHaveText(["Upload receipt", "Record expense", "New chat"]);
+    await expect(items).toHaveText(["Upload receipt", "Record expense"]);
     await expect(items.nth(0)).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(items.nth(1)).toBeFocused();
@@ -85,6 +85,21 @@ test.describe("Business preview", () => {
     await page.keyboard.press("Tab");
     await expect(menu).toHaveCount(0);
     await expect(trigger).toBeFocused();
+  });
+
+  test("New chat has one entry point and Create sits on the nav row grid", async ({ page }) => {
+    await openPreview(page, PREVIEW);
+    await expect(page.getByRole("button", { name: /^New chat/ })).toHaveCount(1);
+
+    const create = page.getByTestId("business-create");
+    const overview = page.getByRole("button", { name: /^Overview/ }).first();
+    const [createBox, overviewBox] = await Promise.all([create.boundingBox(), overview.boundingBox()]);
+    expect(createBox!.height).toBe(overviewBox!.height);
+    const [createIcon, overviewIcon] = await Promise.all([
+      create.locator("svg").boundingBox(),
+      overview.locator("svg").first().boundingBox(),
+    ]);
+    expect(createIcon!.width).toBe(overviewIcon!.width);
   });
 
   test("New chat from the Inbox shows the chat surface", async ({ page }) => {
