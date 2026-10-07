@@ -27,3 +27,7 @@ These follow-ups are not closed by #884. The existing financial APIs, native app
 ## Landing procedure
 
 After GitHub confirms the merge, fast-forward the clean canonical integration checkout, verify merge-tree parity, reconcile the three open issues and wait for exact-head integration CI and smoke. Record that outcome on #884. No documentation-only direct push or protection bypass is required because the execution and integration ledgers are included in the reviewed PR.
+
+## Footer follow-up
+
+[PR #886](https://github.com/lagarcess/argus/pull/886) applies the founder-selected hollow footer while retaining its lowered crop and original Space Grotesk + Inter typography. [Browser evidence](evidence/cuadrao-hollow-footer/README.md) covers Business and Personal in both languages. The terminal PR comment records the reviewed head, merge and integration checks. This presentation change does not complete or alter the remaining launch work above.
