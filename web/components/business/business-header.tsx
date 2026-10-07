@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowLeft, Menu, X } from "lucide-react";
 import { businessPath, type BusinessPage } from "@/lib/business-site";
 import { businessContent, type BusinessLocale } from "./content";
 import styles from "./business.module.css";
+import { siteCopy } from "./site-copy";
 
 export function BusinessHeader({
   locale,
@@ -18,6 +19,9 @@ export function BusinessHeader({
   const menu = useRef<HTMLElement>(null);
   const copy = businessContent[locale].navigation;
   const home = businessPath(locale);
+  const personal = page === "personal";
+  const primaryHref = personal ? "#early-access" : businessPath(locale, "demo");
+  const primaryLabel = personal ? locale === "es" ? "Acceso anticipado" : "Early access" : copy.demo;
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +51,12 @@ export function BusinessHeader({
       ))}
     </span>
   );
+  const backLink = (
+    <a href={home} className={styles.backLink}>
+      <ArrowLeft size={16} aria-hidden="true" />
+      {copy.back}
+    </a>
+  );
 
   return (
     <>
@@ -56,11 +66,14 @@ export function BusinessHeader({
       <header className={styles.header}>
         <a
           className={styles.wordmark}
-          href={home}
-          aria-label="Cuadrao Business"
+          href={personal ? businessPath(locale, "personal") : home}
+          aria-label={page === "personal" ? "Cuadrao Personal" : "Cuadrao Business"}
         >
           cuadrao
         </a>
+        <span className={styles.mobileAudience}>
+          {page === "personal" ? copy.personal : copy.business}
+        </span>
         <nav className={styles.desktopNav} aria-label={copy.label}>
           <div className={styles.audienceNav}>
             <a
@@ -80,23 +93,20 @@ export function BusinessHeader({
           </div>
           <div className={styles.utilityNav}>
             {page === "demo" ? (
-              <a href={home} className={styles.backLink}>
-                {copy.back}
-                <ArrowUpRight size={16} aria-hidden="true" />
-              </a>
-            ) : (
+              backLink
+            ) : !personal ? (
               <>
-                <a href={`${home}#como-funciona`}>{copy.approach}</a>
+                <a href={`${home}#el-producto`}>{locale === "es" ? "El producto" : "The product"}</a>
                 <a href={`${home}#nosotros`}>{copy.about}</a>
               </>
-            )}
+            ) : null}
             {languageLinks}
             {page !== "demo" && (
               <a
                 className={styles.buttonSmall}
-                href={businessPath(locale, "demo")}
+                href={primaryHref}
               >
-                {copy.demo}
+                {primaryLabel}
               </a>
             )}
           </div>
@@ -135,12 +145,15 @@ export function BusinessHeader({
             >
               {copy.personal}
             </a>
-            <a href={`${home}#como-funciona`}>{copy.approach}</a>
-            <a href={`${home}#nosotros`}>{copy.about}</a>
+            {!personal && <a href={`${home}#la-idea`}>{siteCopy[locale].explore}</a>}
+            {!personal && <a href={`${home}#nosotros`}>{copy.about}</a>}
+            {page !== "personal" && <a href={`${home}#preguntas`}>{siteCopy[locale].faqLink}</a>}
             {languageLinks}
-            <a className={styles.button} href={businessPath(locale, "demo")}>
-              {copy.demo}
-            </a>
+            {page === "demo" ? backLink : (
+              <a className={styles.button} href={primaryHref}>
+                {primaryLabel}
+              </a>
+            )}
           </nav>
         )}
       </header>

@@ -24,6 +24,12 @@ export const sampleReceivables = [
   { id: "1040", customer: "C", day: 27, amount: 25000 },
 ] as const;
 
+export const sampleInvoiceStory = {
+  invoice: sampleReceivables[0],
+  customerName: "Comercial La Ceiba",
+  payment: 18000,
+} as const;
+
 export function getSampleSummary(): {
   income: number;
   expenses: number;

@@ -1,8 +1,35 @@
-# Cuadrao business website: local first draft
+# Cuadrao business website delivery
+
+> This spec retains the first local draft as implementation history. Its demo wording and editorial visual
+> choices are under review. The current conversation CTA and approved design
+> delivery sequence live in the [Business design guide](../../../.agent/designs/cuadrao-business/DESIGN.md).
 
 Deliver a polished local business landing page and prototype demo journey.
 Founder authorized implementation October 6 after the discussion recorded in
 the [working design guide](../../../.agent/designs/cuadrao-business/DESIGN.md).
+
+## October 7 delivery amendment
+
+The founder approved opening and merging one labelled PR into
+`codex/private-alpha-next` after review and checks pass. This authorizes the
+integration landing routine, not deployment or public activation.
+
+The [current design guide](../../../.agent/designs/cuadrao-business/DESIGN.md)
+supersedes the initial visual, content and form inventory below. The delivered
+site includes the full owner vision, five FAQ answers, the founder signature,
+ivory/sage Personal and the filled lowered footer. The extra local-business
+footer line is removed. Contact requires name and email; description is optional.
+
+Personal is an email-only early-access presentation. Capture remains unavailable
+with an honest HTTP 503 response. The founder selected existing Supabase for
+follow-up #882; no SQLite runtime or storage is delivered. #881 owns Business
+contact delivery; #880 owns public launch activation. Do not close those issues
+with this presentation PR.
+
+Preserve all approved copy and working sample interactions. Verify the combined
+integration tree, route-off behavior, existing app language/public receipts and
+both website locales. Record final review, checks, source identity and screenshots
+in [delivery evidence](../../reports/evidence/cuadrao-integration-delivery/README.md).
 
 ## 1. Why
 

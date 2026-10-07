@@ -5,18 +5,17 @@ import { ArrowRight, Info, Pencil } from "lucide-react";
 import { businessContent, type BusinessLocale } from "./content";
 import styles from "./business.module.css";
 
-type Field = "name" | "business" | "email" | "description";
+type Field = "name" | "email" | "description";
 type FormValues = Record<Field, string>;
 const EMPTY_VALUES: FormValues = {
   name: "",
-  business: "",
   email: "",
   description: "",
 };
 const subscribeToHydration = (): (() => void) => () => {};
 const clientSnapshot = (): boolean => true;
 const serverSnapshot = (): boolean => false;
-const REQUIRED_FIELDS = ["name", "business", "email"] as const;
+const REQUIRED_FIELDS = ["name", "email"] as const;
 
 export function DemoForm({ locale }: { locale: BusinessLocale }) {
   const copy = businessContent[locale].demo;
@@ -107,7 +106,7 @@ export function DemoForm({ locale }: { locale: BusinessLocale }) {
                   id={`demo-${field}`}
                   name={field}
                   type={field === "email" ? "email" : "text"}
-                  autoComplete={field === "business" ? "organization" : field}
+                  autoComplete={field}
                   maxLength={field === "email" ? 254 : 120}
                   required
                   placeholder={copy[`${field}Placeholder`]}

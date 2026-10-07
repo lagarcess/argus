@@ -16,8 +16,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   // resources, so they must not wait on client initialization. Holding them behind
   // the gate below left a shared link blank until JavaScript ran, and permanently
   // blank when it is blocked or fails, which is the opposite of what a public page
-  // opened from a message needs. Business marketing also owns server copy;
-  // its route locale does not change the user's saved app preference.
+  // opened from a message needs.
   const rendersWithoutI18n = Boolean(
     pathname?.startsWith(PUBLIC_RECEIPT_PATH_PREFIX) || businessLocale,
   );

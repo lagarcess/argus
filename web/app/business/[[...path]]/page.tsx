@@ -28,26 +28,45 @@ async function resolveRoute(params: Props["params"]) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, page } = await resolveRoute(params);
-  const title = {
+  const copy = {
     es: {
-      home: "Tu negocio, claro y cuadrao",
-      demo: "Hablemos de tu negocio",
-      personal: "Cuadrao para ti",
+      home: { title: "Cada cuenta. En su sitio. | Cuadrao", description: "Estamos construyendo Cuadrao para ayudarte a entender el dinero de tu negocio, planear pagos y mantener tus clientes y documentos en orden." },
+      demo: { title: "Hablemos de tu negocio | Cuadrao", description: "Cuéntale a Lucas cómo llevas tu negocio y conoce lo que estamos preparando en Cuadrao." },
+      personal: { title: "Tus finanzas, en orden. | Cuadrao Personal", description: "Conoce Cuadrao Personal y deja tu correo para recibir noticias sobre el acceso anticipado." },
     },
     en: {
-      home: "Your business, clear and squared away",
-      demo: "Let's talk about your business",
-      personal: "Cuadrao for you",
+      home: { title: "Every record. In its place. | Cuadrao", description: "We are building Cuadrao to help you understand your business money, plan payments and keep your customers and documents organized." },
+      demo: { title: "Let's talk about your business | Cuadrao", description: "Tell Lucas how you run your business and explore what we are preparing at Cuadrao." },
+      personal: { title: "Your finances, in order. | Cuadrao Personal", description: "Meet Cuadrao Personal and leave your email to hear about early access." },
     },
   }[locale][page];
+  const image = {
+    url: `https://cuadrao.ai/cuadrao-site/share-${page === "personal" ? "personal" : "business"}-${locale}.png`,
+    width: 1200,
+    height: 630,
+    alt: page === "personal"
+      ? locale === "es" ? "Cuadrao Personal. Tus finanzas, en orden." : "Cuadrao Personal. Your finances, in order."
+      : locale === "es" ? "Cuadrao para negocios. Cada cuenta. En su sitio." : "Cuadrao Business. Every record. In its place.",
+  };
   return {
-    title: `${title} | cuadrao`,
-    description:
-      locale === "es"
-        ? "Estamos construyendo una forma más clara de llevar las finanzas de tu negocio. Conoce Cuadrao for business."
-        : "We're building a clearer way to understand your business finances. Meet Cuadrao for business.",
+    title: { absolute: copy.title },
+    description: copy.description,
+    openGraph: {
+      type: "website",
+      siteName: "Cuadrao",
+      locale: locale === "es" ? "es_DO" : "en_US",
+      title: copy.title,
+      description: copy.description,
+      images: [image],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: copy.title,
+      description: copy.description,
+      images: [image.url],
+    },
     robots: { index: false, follow: false },
-    applicationName: "cuadrao",
+    applicationName: "Cuadrao",
     manifest: null,
     icons: { icon: "/business/icon.svg", apple: [] },
   };
