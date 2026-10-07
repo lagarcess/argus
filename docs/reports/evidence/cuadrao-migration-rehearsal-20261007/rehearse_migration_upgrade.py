@@ -35,14 +35,12 @@ ADMIN = os.environ["ARGUS_REHEARSAL_ADMIN_URL"]
 CONTAINER = os.environ["ARGUS_REHEARSAL_CONTAINER"]
 if urlsplit(ADMIN).hostname not in {"127.0.0.1", "localhost"}:
     raise SystemExit("the rehearsal runs only against a local database")
-CANDIDATE = (
-    os.environ.get("ARGUS_REHEARSAL_CANDIDATE")
-    or subprocess.check_output(
-        ["git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
-    ).strip()
+CANDIDATE = os.environ.get(
+    "ARGUS_REHEARSAL_CANDIDATE", "93571e593e1677561e1dd38f63b6475574942e2d"
 )
-MAIN = os.environ.get("ARGUS_REHEARSAL_MAIN", "origin/main")
+MAIN = os.environ.get("ARGUS_REHEARSAL_MAIN", "a9286b21886eb03df7a21f2f4b7d5e79af570679")
 MISSING_OLDER = "20260505000001"  # group B: genuinely absent from production
+MID_FILE_COMMIT = "20261003120001"  # commits inside itself (NOT VALID, commit, VALIDATE)
 
 
 def url(database: str) -> str:
@@ -105,15 +103,16 @@ def recreate(database: str) -> None:
 def run_file(
     connection: psycopg.Connection, migration: gate.CandidateMigration, record: bool
 ) -> None:
-    with connection.transaction():
-        for statement in migration.statements:
-            connection.execute(statement)
-        if record:
-            connection.execute(
-                "insert into supabase_migrations.schema_migrations (version, statements, name)"
-                " values (%s, %s, %s)",
-                (migration.version, list(migration.statements), migration.name),
-            )
+    """Run a file's statements as written (their own begin and commit included)."""
+
+    for statement in migration.statements:
+        connection.execute(statement)
+    if record:
+        connection.execute(
+            "insert into supabase_migrations.schema_migrations (version, statements, name)"
+            " values (%s, %s, %s)",
+            (migration.version, list(migration.statements), migration.name),
+        )
 
 
 QUERIES = {
@@ -157,12 +156,8 @@ def gate_report(database: str) -> dict[str, object]:
 
 def main() -> int:
     candidate = gate.read_candidate_migrations(ROOT, CANDIDATE)
-    main_files = gate.read_candidate_migrations(
-        ROOT,
-        subprocess.check_output(
-            ["git", "-C", str(ROOT), "rev-parse", MAIN], text=True
-        ).strip(),
-    )
+    main_files = gate.read_candidate_migrations(ROOT, MAIN)
+    print(f"candidate {CANDIDATE[:12]} | main {MAIN[:12]}")
     print(
         f"candidate files {len(candidate)} | main files {len(main_files)} | new {len(candidate) - len(main_files)}"
     )
@@ -220,6 +215,8 @@ def main() -> int:
         handle.name,
         "--unrecorded",
         MISSING_OLDER,
+        "--allow-mid-file-commit",
+        MID_FILE_COMMIT,
         "--allow-host",
         "127.0.0.1",
         "--allow-database",

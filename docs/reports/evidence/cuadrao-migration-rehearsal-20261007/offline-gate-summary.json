@@ -1,4 +1,5 @@
 {
+ "candidate_sha": "93571e593e1677561e1dd38f63b6475574942e2d",
  "status": "blocked",
  "stop_reasons": [
   "missing_candidate_migrations"
@@ -6,6 +7,7 @@
  "advisories": [
   "historical_migration_ledger_variance"
  ],
+ "production_ledger_pin_matches": true,
  "missing": [
   [
    "20260925120000",

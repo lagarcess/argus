@@ -1,3 +1,4 @@
+candidate 93571e593e16 | main a9286b21886e
 candidate files 114 | main files 79 | new 35
 CLEAN INSTALL: applied 114 files, ledger rows 114
 UPGRADE gate before: blocked ['missing_candidate_migrations'] missing 35
