@@ -8504,14 +8504,28 @@ or resume recovers from retained source; completed preparation is replayed witho
 another model call. Identical owner/file captures reuse the same draft.
 
 `ARGUS_DOCUMENT_JOBS_ENABLED` (default off) changes only who runs and recovers
-preparation; routes, bodies, statuses and codes stay the same. Off, the rules
-above hold exactly. On, capture and `/prepare` or `/resume` record one attempt
-before responding and hand it to a worker (a Render Workflow task, or a task in
-the API process). A sweep in the API re-dispatches an attempt whose worker died
-or that failed retryably, up to three provider attempts per explicit
-preparation; a draft may return from `needs_attention` to `queued` meanwhile.
-Past the bound it stays `needs_attention` and explicit prepare or resume starts
-again. A superseded attempt's late result is refused. Design:
+preparation; routes and bodies stay the same. Off, the rules above hold
+exactly. On, capture and `/prepare` or `/resume` record one attempt before
+responding and hand it to a worker (a Render Workflow task, or a task in the
+API process). Before an attempt can reach the provider it durably records that
+its provider call started. The expired-attempt rule above still holds: an
+attempt is never billed again automatically. A sweep in the API settles an
+attempt whose worker died as follows:
+
+- No provider-call record: the provider was never reached, so the sweep
+  re-dispatches it automatically, at most three attempts per explicit
+  preparation. The draft may return to `queued` meanwhile. Past the bound it
+  becomes `needs_attention` with `document_preparation_interrupted`.
+- A provider-call record and no saved preparation: the outcome is unknown.
+  The draft becomes `needs_attention` with
+  `document_preparation_outcome_unknown` and nothing is re-dispatched.
+- A reported provider failure keeps its own code and is not retried.
+
+Only the owner's `/prepare` or `/resume` with `X-Extraction-Consent: true`
+starts a new paid attempt from `needs_attention`. A superseded attempt's late
+result is refused. Instances coordinate through the database, so one attempt is
+dispatched once. Settings are `ARGUS_DOCUMENT_JOBS_ENABLED`,
+`ARGUS_DOCUMENT_JOBS_WORKFLOW_TASK` and `ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS`. Design:
 `docs/specs/lanes/cuadrao-document-preparation-jobs.md`.
 
 Preparation preserves extracted observations and receipt itemization separately

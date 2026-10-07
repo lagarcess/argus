@@ -10,9 +10,12 @@ FastAPI background task. When that task dies, the draft stays `queued` or
 `preparing` until the person explicitly calls `/prepare` or `/resume`. Nothing
 detects a dead worker while the API is up.
 
-## Flag
+## Settings
 
-`ARGUS_DOCUMENT_JOBS_ENABLED` (default off, shared true values). Off, the routes
+`DocumentJobSettings` in `documents/config.py`, one name each, following the
+`ARGUS_DOCUMENT_EXTRACTION_*` convention (shared true values, fails closed):
+`ARGUS_DOCUMENT_JOBS_ENABLED` (default off), `ARGUS_DOCUMENT_JOBS_WORKFLOW_TASK`
+and `ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS` (default 30). Off, the routes
 add `background_prepare` to FastAPI background tasks and a read marks an expired
 attempt `needs_attention` (`document_preparation_interrupted`), exactly as before.
 `test_flag_off_prepares_through_background_tasks_only` and the existing
@@ -42,7 +45,7 @@ sweep. `start` does nothing while an attempt is in flight.
 ## Dead-worker detection
 
 The reconciler sweep (`PreparationJobs.sweep`) runs inside the API process: once
-at startup, then every `ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS` (default 30). It does
+at startup, then every `ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS`. It does
 not depend on a read, a restart, an operator or a cron. It reads drafts that are
 `queued`, `preparing`, or `needs_attention` with a retry request, through a
 partial index.
@@ -61,17 +64,14 @@ plus one sweep interval after its last claim or dispatch. A worker that dies
 after releasing its lease, such as a cancelled task, is detected on the next
 sweep.
 
-The existing backtest reconciliation (`scan_stale_backtest_jobs`) runs only on
-owner reads, at admission backpressure, and in the operator-run
-`scheduled_maintenance.py`; nothing schedules it. Documents reuse its dispatch
-and local-dev plumbing but not its cadence, because a closed app produces no
-reads.
+Backtest reconciliation runs only on reads, backpressure and operator runs.
+Documents reuse its dispatch plumbing, not its cadence: a closed app makes no reads.
 
 ## Attempt and lease model
 
 `financial_document_extractions.preparation_job` holds the current attempt:
 `attempt`, `attempt_id`, `draft_version` (the queued draft it was dispatched
-for), `dispatched_at` and `retry`. One store call, `advance`, replaces it, and
+for), `dispatched_at`, `provider_call_started_at` and `retry`. One store call, `advance`, replaces it, and
 optionally the draft, in one transaction. It refuses while a lease is live,
 when the current attempt is not the expected one, or when the draft version
 moved. A worker leases the connection and then checks that its `attempt_id`
@@ -79,19 +79,35 @@ is still current; a superseded attempt releases and exits before any provider
 call. Because `advance` refuses a live lease, a reconciler cannot supersede an
 attempt that has already claimed.
 
+`advance` locks the connection row and compares the current `attempt_id`, so it
+is the dispatch token: of several API instances sweeping at once, exactly one
+supersedes an attempt and dispatches the next. The others' compare fails and
+they dispatch nothing.
+
+## Provider-call marker
+
+After claiming and reading the source, and before calling the extractor, the
+worker commits `provider_call_started_at` under its live lease
+(`mark_provider_call`). No marker proves the provider was never reached.
+
 ## Retry and spend bounds
 
-`MAX_ATTEMPTS = 3` per user-authorized preparation. An attempt is re-dispatched
-when its worker died (`unclaimed` or `interrupted`) or it reported a retryable
-failure, such as a provider failure or timeout, a delivery failure or a lost
-lease. Each
-attempt makes at most one provider call, so one preparation costs at most three
-vision calls, including attempts whose outcome was uncertain. Past the bound
-the draft is `needs_attention`, keeping the last real error code, or
-`document_preparation_interrupted` when the worker died. That state is
-recoverable: `/prepare` or `/resume` starts a fresh preparation at attempt 1.
-Explicit restarts stay limited by the existing document POST rate limits (5 per
-minute, 30 per day per person).
+An expired attempt is never billed again automatically. The sweep decides:
+
+- Dead with no marker (`unclaimed`, or `interrupted` before the call), or a
+  retryable failure reported before the marker: re-dispatch, at most
+  `MAX_ATTEMPTS = 3` per explicit preparation. Past the bound the draft is
+  `needs_attention` with `document_preparation_interrupted`.
+- Dead with a marker and no saved preparation: `needs_attention` with
+  `document_preparation_outcome_unknown`. Nothing is re-dispatched.
+- Dead with a marker and a saved preparation: re-dispatch, which replays
+  delivery without a provider call.
+- A failure reported after the marker keeps its code and is not retried.
+
+So automatic work never makes a second provider call for one explicit
+preparation. Only `/prepare` or `/resume` with `X-Extraction-Consent: true`
+starts a new paid attempt; those stay limited by the document POST rate limits
+(5 per minute, 30 per day per person).
 
 ## Stale-result rejection
 
@@ -102,16 +118,17 @@ preparation is first-writer-wins, so a late result cannot replace it.
 
 ## Consumer compatibility
 
-Routes, request headers, response bodies, statuses and error codes are
-unchanged. With the flag on, an attempt that would previously stop at
-`needs_attention` may first return to `queued`. `/resume` on a dead
+Routes, request headers, response bodies and statuses are unchanged. With the
+flag on there is one new error code, `document_preparation_outcome_unknown`, and
+an attempt that dies before the marker may return to `queued`. `/resume` on a dead
 `preparing` draft answers 409 `document_busy` until the next sweep.
 
 ## Hosted cost (stated only, not activated)
 
 - One Render Workflow task run per attempt, at most three per preparation, on
   the workflows service's default plan with a 240 second timeout.
-- Up to three vision calls per preparation through the existing OpenRouter key.
+- At most one vision call per explicit preparation through the existing
+  OpenRouter key.
 - One indexed query per API instance every 30 seconds. No new service.
 - The workflows service would need `ARGUS_WORKFLOW_DATABASE_URL`,
   `ARGUS_DOCUMENT_EXTRACTION_ENABLED`, `ARGUS_VISION_MODEL`, the OpenRouter key,
@@ -121,9 +138,11 @@ unchanged. With the flag on, an attempt that would previously stop at
 
 ## Evidence
 
-- `tests/ingestion/test_document_jobs_api.py`: dead worker re-dispatched once
-  inside the window with one prepared draft and one import event; late result
-  refused; cancelled worker recovered; retries stop at the bound and stay
-  recoverable; dead attempts exhaust; flag off unchanged.
-- `tests/test_document_jobs_postgres.py`: the same recovery and refusal on real
-  Postgres, `advance` fencing, and the workflow worker end to end.
+- `tests/ingestion/test_document_jobs_api.py`: a kill before the marker
+  recovers inside the window with one provider call; a kill after the marker
+  settles to `document_preparation_outcome_unknown` and only a consented retry
+  makes the second call; late results refused; reported failures not retried;
+  the bound; settings; flag off unchanged.
+- `tests/test_document_jobs_postgres.py`: the same on real Postgres and
+  Storage, two concurrent sweepers dispatching each attempt once, two running
+  instances recovering a dead worker without restart, and the workflow worker.
