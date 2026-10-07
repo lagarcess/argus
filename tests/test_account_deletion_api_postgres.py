@@ -22,6 +22,7 @@ from argus.api.routers import account as account_route
 from argus.api.schemas import User
 from fastapi.testclient import TestClient
 
+from tests.document_sources_support import LOCAL_STORAGE, source_objects, stored_paths
 from tests.household.financial_fixtures import DSN, NOW
 from tests.household.financial_fixtures import lane as lane  # noqa: F401 - fixture
 from tests.test_account_deletion_fk_census_postgres import (
@@ -30,9 +31,11 @@ from tests.test_account_deletion_fk_census_postgres import (
 from tests.test_account_deletion_postgres import (  # noqa: F401 - fixtures
     BANNED,
     SqlAuthAdmin,
+    _locked,
     _service,
     world,
 )
+from tests.test_account_deletion_third_parties_postgres import _StorageDown
 
 pytestmark = pytest.mark.skipif(not DSN, reason="Disposable PostgreSQL required")
 
@@ -262,3 +265,59 @@ def test_a_session_past_its_not_after_never_unlocks(lane, world, route):  # noqa
     assert not deletion_in_flight(database_url=DSN, token=token, user_id=world["a"])
     _refused(route, token)
     _still_locked_then_finish(lane, world)
+
+
+@pytest.mark.skipif(not LOCAL_STORAGE, reason="Local Supabase Storage required")
+def test_storage_failure_answers_202_until_a_retry_erases_the_sources(
+    lane,  # noqa: ANN001, F811
+    world,  # noqa: ANN001, F811
+    route,  # noqa: ANN001
+) -> None:
+    """#778 at the route: Storage down is a pending third party (202, locked);
+    the retry answers 200 with the person's folder gone and B's file kept."""
+    a, b = world["a"], world["b"]
+    objects = source_objects()
+    mine, theirs = f"{a}/{uuid.uuid4()}/{'a' * 64}", f"{b}/{uuid.uuid4()}/{'b' * 64}"
+    for path in (mine, theirs):
+        objects.put(path, b"%PDF-fixture", "application/pdf")
+    session = _session(a)
+    route["sessions"].append(session)
+    token = _token(a, session)
+    try:
+        admin = SqlAuthAdmin()
+        try:
+            with patch.object(
+                account_route,
+                "account_deletion_service",
+                return_value=_service(lane, admin, source_objects=_StorageDown()),
+            ):
+                first = route["client"].post(
+                    URL, json={"confirm": True}, headers=_bearer(token)
+                )
+        finally:
+            world["placeholders"] += admin.created
+        assert first.status_code == 202, first.text
+        assert first.json() == {"status": "in_progress", "pending": ["storage"]}
+        assert _locked(a) == (True, True)
+        assert not auth_session_is_active(database_url=DSN, token=token, user_id=a)
+
+        admin = SqlAuthAdmin()
+        try:
+            with patch.object(
+                account_route,
+                "account_deletion_service",
+                return_value=_service(lane, admin, source_objects=objects),
+            ):
+                second = route["client"].post(
+                    URL, json={"confirm": True}, headers=_bearer(token)
+                )
+        finally:
+            world["placeholders"] += admin.created
+        assert second.status_code == 200, second.text
+        assert second.json() == {"status": "done", "pending": []}
+        with psycopg.connect(DSN) as c:
+            assert stored_paths(c, f"{a}/") == []
+            assert stored_paths(c, f"{b}/") == [theirs]
+    finally:
+        objects.delete(f"{a}/")
+        objects.delete(f"{b}/")
