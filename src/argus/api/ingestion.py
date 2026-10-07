@@ -99,6 +99,9 @@ def start_ingestion(app) -> None:  # noqa: ANN001
         from argus.api.documents import start_documents
 
         start_documents(app, ingestion_hub())
+        from argus.api.whatsapp import start_whatsapp
+
+        start_whatsapp(app)
     except Exception as exc:
         logger.warning(
             "Ingestion hub construction failed; surface stays off",
@@ -138,6 +141,9 @@ def stop_ingestion(app) -> None:  # noqa: ANN001
     from argus.api.shortcuts import stop_shortcuts
 
     stop_shortcuts()
+    from argus.api.whatsapp import configure_whatsapp
+
+    configure_whatsapp(None)
     from argus.api.documents import configure_documents
 
     configure_documents(None)
