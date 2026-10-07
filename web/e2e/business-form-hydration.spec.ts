@@ -11,7 +11,7 @@ for (const localePath of ["", "/en"]) {
         await page.goto(`/business${localePath}/${surface}`);
         await expect(page.locator(`#${field}`)).toBeDisabled();
         await expect(page.locator('main button[type="submit"]')).toBeDisabled();
-        await expect(page.locator('main noscript')).toContainText("JavaScript");
+        await expect(page.locator('main')).toContainText("JavaScript", { useInnerText: true });
         expect(new URL(page.url()).search).toBe("");
       });
     }

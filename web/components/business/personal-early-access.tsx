@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import type { BusinessLocale } from "./content";
 import { businessContactEmail } from "./site-copy";
@@ -10,6 +10,9 @@ import styles from "./personal-early-access.module.css";
 type SignupState = { status: "idle" } | { status: "submitting" } | { status: "success" } | { status: "error"; message: string };
 
 const homePreview = { src: "/cuadrao-site/personal-home-preview.png", width: 1206, height: 2622 } as const;
+const subscribeToHydration = (): (() => void) => () => {};
+const clientSnapshot = (): boolean => true;
+const serverSnapshot = (): boolean => false;
 
 const copy = {
   es: {
@@ -27,6 +30,7 @@ const copy = {
     next: "Cuando haya invitaciones disponibles, podremos contactarte. Registrarte no garantiza acceso inmediato.",
     error: `No pudimos guardar tu correo. Inténtalo de nuevo o escríbenos a ${businessContactEmail}.`,
     invalid: "Revisa tu correo e inténtalo de nuevo.",
+    noScript: "Activa JavaScript para usar este formulario.",
     caption: "Vista previa · datos de ejemplo. El diseño puede cambiar.",
     nextPayment: "Tu próximo pago",
     alt: "Inicio de Cuadrao Personal con datos de ejemplo: saludo a Alex, balance disponible y próximo pago de Internet.",
@@ -46,6 +50,7 @@ const copy = {
     next: "We can contact you when invitations become available. Signing up does not guarantee immediate access.",
     error: `We couldn't save your email. Try again or write to ${businessContactEmail}.`,
     invalid: "Check your email address and try again.",
+    noScript: "Enable JavaScript to use this form.",
     caption: "Preview in Spanish · sample data. The design may change.",
     nextPayment: "Your next payment",
     alt: "Cuadrao Personal Home preview in Spanish with sample data: a greeting to Alex, available balance and an upcoming Internet payment.",
@@ -54,6 +59,7 @@ const copy = {
 
 export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
   const c = copy[locale];
+  const hydrated = useSyncExternalStore(subscribeToHydration, clientSnapshot, serverSnapshot);
   const [email, setEmail] = useState("");
   const [state, setState] = useState<SignupState>({ status: "idle" });
   const confirmation = useRef<HTMLHeadingElement>(null);
@@ -109,14 +115,17 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
               <p>{c.next}</p>
             </div>
           ) : (
-            <form onSubmit={submit} aria-busy={state.status === "submitting"}>
-              <label htmlFor="personal-email">{c.label}</label>
-              <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-local" : "signup-local"} aria-invalid={state.status === "error" || undefined} disabled={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
-              <button type="submit" disabled={state.status === "submitting"}>
-                {state.status === "submitting" ? c.saving : c.button}
-                <ArrowRight size={19} aria-hidden="true" />
-              </button>
-              {state.status === "error" && <p id="signup-error" className={styles.error} role="alert">{state.message}</p>}
+            <form method="post" action="/api/personal-waitlist" onSubmit={submit} aria-busy={state.status === "submitting"}>
+              <noscript><p className={styles.local}>{c.noScript}</p></noscript>
+              <fieldset className={styles.formFields} disabled={!hydrated}>
+                <label htmlFor="personal-email">{c.label}</label>
+                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-local" : "signup-local"} aria-invalid={state.status === "error" || undefined} disabled={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
+                <button type="submit" disabled={!hydrated || state.status === "submitting"}>
+                  {state.status === "submitting" ? c.saving : c.button}
+                  <ArrowRight size={19} aria-hidden="true" />
+                </button>
+                {state.status === "error" && <p id="signup-error" className={styles.error} role="alert">{state.message}</p>}
+              </fieldset>
             </form>
           )}
         </div>

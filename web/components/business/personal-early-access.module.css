@@ -16,6 +16,7 @@
 .hero .content h1 { font-size: clamp(54px, 5.7vw, 80px); line-height: 1.04; letter-spacing: -.06em; margin: 0 0 26px; text-wrap: balance; }
 .content .intro { font-size: 18px; line-height: 1.65; max-width: 460px; margin: 0; color: #485b54; }
 .signup { margin-top: 23px; max-width: 430px; }
+.formFields { min-width: 0; margin: 0; padding: 0; border: 0; }
 .signup label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 9px; }
 .signup input { display: block; width: 100%; min-height: 56px; border: 1px solid #9caaa3; border-radius: 7px; background: #fffefa; padding: 14px 16px; font: inherit; font-size: 16px; color: #172b26; }
 .signup input::placeholder { color: #687a72; }
