@@ -8,7 +8,8 @@ Owns the two public form endpoints of the independent `marketing/` package: Busi
 | --- | --- | --- |
 | Inquiry acceptance and retry | Resend, under an `Idempotency-Key` the page generates per message | The route reports Resend's answer and stores nothing |
 | Signup durability | `public.cuadrao_early_access_signups` in the existing Supabase project | The route inserts; the operator tool reads, removes and notifies |
-| Inquiry destination | `businessContactEmail` in `marketing/components/site-copy.ts` | The route, both pages and the privacy text read it |
+| Inquiry destination | `CUADRAO_INQUIRY_TO` on the service, chosen by the founder, no default | The route reads it; nothing else assumes where inquiries land |
+| Public contact address shown to visitors, reply-to of availability notices and removal requests | `businessContactEmail` in `marketing/components/site-copy.ts` | Both pages, the privacy text and the operator tool read it. It may differ from the inquiry destination |
 | Address spelling | `normalizeEmail` in `marketing/lib/forms/validation.ts` | The digest, the stored address and the operator tool derive from it |
 | Consent version | `SIGNUP_CONSENT_VERSION` in `marketing/lib/forms/config.ts` | Stored on each row |
 
@@ -35,13 +36,13 @@ Owns the two public form endpoints of the independent `marketing/` package: Busi
 
 | Status | Body | Meaning |
 | --- | --- | --- |
-| 202 | `{"status":"accepted"}` | Resend accepted the message for delivery to `hola@cuadrao.ai`, with the visitor as `Reply-To`. "Accepted" is not "delivered to a mailbox". |
+| 202 | `{"status":"accepted"}` | Resend accepted the message for delivery to the configured inquiry mailbox, with the visitor as `Reply-To`. "Accepted" is not "delivered to a mailbox". |
 | 400 | `{"error":"invalid","fields":["email"]}` | Validation failed. |
 | 403 / 413 / 415 | `{"error":"forbidden"\|"invalid"}` | Wrong origin, body too large, not JSON. |
 | 429 | `{"error":"rate_limited"}` | Over a limit. |
-| 503 | `{"error":"unavailable"}` | Not configured, provider rejected, or timed out. |
+| 503 | `{"error":"unavailable"}` | Not configured (including no valid `CUADRAO_INQUIRY_TO`), provider rejected, or timed out. |
 
-**No duplicates.** The page reuses `submissionId` when the visitor retries the same text and makes a new one after any edit. Resend returns the original result for a repeated key for 24 hours, so a double click, or a retry after a lost response, sends one message. The button is disabled while a request is in flight.
+**No duplicates.** The page reuses `submissionId` when the visitor retries the same text and makes a new one after any edit. Resend returns the original result for a repeated key for 24 hours, so a double click, or a retry after a lost response, sends one message. A second submit is ignored while a request is in flight; the button stays focusable and is marked `aria-disabled`.
 
 **No storage.** The inquiry is an email in Cuadrao's mailbox. There is no inquiry table to retain, secure or erase beyond the mailbox itself.
 
@@ -88,7 +89,7 @@ The page promises one message when access is available. The operator sends it wi
 - A template must carry a Spanish and an English subject and text, and every text must name `hola@cuadrao.ai` so the reader can opt out.
 - The default is a dry run that prints counts. A full send needs `--send` and `--expect <count>` equal to the recipients selected.
 - `--only a@x,b@y` sends to named approved test addresses, never stamps `notified_at`, and uses a different idempotency key from the real send.
-- Each message uses `notice-<template id>-<digest>` as its idempotency key and stamps `notified_at` only after Resend accepts it, so a rerun within Resend's 24-hour key window does not message anyone twice. The stamp applies only to a row that is still active. A message that was sent but whose stamp failed is reported as `sentNotRecorded`, separately from `failed`; resolve those by hand before any rerun, because after 24 hours the same key no longer protects them.
+- Each message uses `notice-<template id>-<digest>` as its idempotency key and stamps `notified_at` only after Resend accepts it, so a rerun within Resend's 24-hour key window does not message anyone twice. The stamp applies only to a row that is still active. A message that was sent but whose stamp failed stops the run at once, so nobody further down the list is mailed unrecorded. The tool prints the `email_digest` of each such row, exits non-zero, and tells the operator not to rerun; stamp those rows by hand first, because after 24 hours the same key no longer protects them.
 
 Early-access consent covers this availability notice only. It is not marketing consent and does not feed `news.cuadrao.ai` ([#892](https://github.com/lagarcess/argus/issues/892)).
 
@@ -102,6 +103,7 @@ None at launch. Durable signup does not depend on a second message. The cost is 
 | --- | --- | --- |
 | `RESEND_API_KEY` | Inquiries, notice tool | Yes |
 | `CUADRAO_INQUIRY_FROM` | Inquiries sender, for example `Cuadrao <website@notify.cuadrao.ai>` | No |
+| `CUADRAO_INQUIRY_TO` | The one mailbox that receives inquiries. A single bare address; a list, a display name or a line break reads as unset. No default, so an unset value means the form is unavailable rather than delivering to an address nobody confirmed | No |
 | `SUPABASE_URL` | Signups, operator tool | No |
 | `SUPABASE_SERVICE_ROLE_KEY` | Signups, operator tool | Yes |
 | `CUADRAO_SITE_INDEXING` | `public` on the approved public host only | No |

@@ -17,12 +17,12 @@ Measured 2026-10-07 with `git fetch origin`:
 
 **Option A, full promotion.** Rejected for this launch: it ships the whole integration backlog and 35 unapplied migrations.
 
-**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Prepared and measured against `origin/main` (`a9286b21`) from this PR's content: **127 new files and 1 modified file, 10,148 added lines, nothing deleted.**
+**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Prepared and measured against `origin/main` (`a9286b21`) from this PR's content: **127 new files and 2 modified files, about 10,200 added lines, nothing deleted.** The count is regenerated with `git diff --name-status origin/main...<candidate>` on each refresh.
 
 - `marketing/**` (new)
 - `supabase/migrations/20260920000000_cuadrao_early_access_signups.sql` and `tests/test_cuadrao_early_access_postgres.py` (new)
 - `docs/specs/cuadrao-marketing-forms-contract.md`, this runbook, the launch record and its evidence folder (new)
-- `.github/workflows/ci.yml` (the only modified file): a `marketing-checks` job and its entry in the aggregate `ci` job's `needs`, 46 added lines, written for `main`'s simpler workflow
+- `.github/workflows/ci.yml` and `tests/test_ci_workflow.py` (the two modified files): a `marketing-checks` job and its entry in the aggregate `ci` job's `needs`, written for `main`'s simpler workflow, and the matching expectations in the workflow test, which asserts that exact `needs` list on `main`
 
 It carries no change to `web/`, `src/`, `ios/`, `render.yaml` or any other migration. Left out because they only exist, or only make sense, on integration: the Cuadrao design guide (it links five integration-only documents), the documentation-authority row and the integration-report pointer. They arrive with the normal promotion, and the package README's link to the design guide is dead on `main` until then. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so a fresh replay orders it correctly on both branches. Identical content merges cleanly when integration is later promoted. The candidate was built in a separate worktree from `origin/main`; its typecheck and 112 unit tests pass there.
 
@@ -33,6 +33,25 @@ Production's newest migration (`20260914120000`) equals `main`'s newest file, bu
 The consumer lane's reviewed applier (PR #894) plans one ordered production batch: an unrecorded `20260505000001_add_currency_pair_asset_class`, then this lane's `20260920000000`, then the consumer's 35 files `20260925120000` to `20261005230000`. The applier refuses a skipped version, so this migration must be applied before theirs, not after. This lane does not apply it alone. The founder holds the only production DSN and runs the read-only gate (`scripts/ops/production_migration_gate.py`) and the applier; the gate report and backup precede the apply.
 
 Option B departs from the usual "main is promoted from integration" practice. It needs the founder's approval as a workflow exception before the second PR is opened. The exact file list is regenerated from `git diff --name-status origin/main...<candidate>` and posted with the request.
+
+### Can the signup migration ship independently of the consumer's 35?
+
+Yes at the schema level, with one ordering rule and one shared-tool gap. Checked 2026-10-07.
+
+- **No schema dependency.** The migration touches only `public.cuadrao_early_access_signups` and the roles `anon`, `authenticated`, `service_role`. It uses `sha256`, `convert_to` and `encode`, all built into Postgres 11 and later. It does not reference `auth.users`, any other table, function or extension, and none of the 35 consumer migrations references it. Its grants are stated explicitly, so it does not rely on the default-privilege change in the consumer's `20261005090000_explicit_client_grants.sql`.
+- **Proof.** A throwaway Postgres 17 with the three roles, and CI on the full integration chain (35 newer migrations present). The bounded candidate branch also runs CI on `main`'s chain plus this migration only, which is the independent case.
+- **Ordering rule (not a dependency).** The reviewed applier (PR #894) records versions as a strict prefix above the ledger head and refuses a skipped version. `20260920000000` is the next version above production's head (`20260914120000`), so it can be applied alone as the first prefix, in its own batch. Once any consumer file with a higher version is applied, `20260920000000` can no longer be applied, so it must go before them, not after.
+- **Shared-tool gap.** The applier refuses hosted Supabase hosts today ("a hosted target needs its own reviewed change that adds the named project ref and the founder's approval record"). That gap blocks every production apply, this one included, and is owned by the consumer lane's tool, not by this migration.
+- **No dependency on the unrecorded currency-pair migration.** The consumer plans to run `20260505000001` first, unrecorded, because production's asset-class checks lack currency pairs. That is a separate repair of production's history; this migration does not read `asset_class`.
+
+The practical consequence: the signup table can go to production alone and early, or with the batch, as the founder prefers, provided it precedes the consumer files.
+
+### Before any promotion
+
+1. Automatic Supabase preview branching is off and the PR 895 branch is removed (launch record, "Disable automatic previews"). On 2026-10-07 it was on.
+2. Automatic production migrations from `main` are off. The evidence says they are not wired (launch record); confirm the integration's deploy-to-production setting in the dashboard once.
+3. Supabase stays on the Free plan; nothing here depends on a plan change.
+4. CI is terminal and green on the exact candidate, and the signup migration is not applied by promotion: the consumer's applier is the only production path.
 
 ## 2. Render service
 
@@ -66,6 +85,7 @@ Set at creation. One owner each; nothing is inherited from an Argus group.
 | `NEXT_TELEMETRY_DISABLED` | `1` | no | this runbook |
 | `RESEND_API_KEY` | key restricted to sending from `notify.cuadrao.ai` | yes | Resend |
 | `CUADRAO_INQUIRY_FROM` | `Cuadrao <website@notify.cuadrao.ai>` | no | #889 |
+| `CUADRAO_INQUIRY_TO` | the mailbox the founder chooses for inquiries; set only after that mailbox is confirmed to receive mail | no | the founder |
 | `SUPABASE_URL` | existing project URL | no | Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | service-role key of the existing project | yes | Supabase |
 | `CUADRAO_SITE_INDEXING` | unset on the `onrender.com` address; `public` only at cutover | no | #891 |
@@ -80,8 +100,8 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 
 1. Candidate merged to `main` through the approved path; exact SHA and CI recorded.
 2. The signup migration is applied as part of the consumer lane's ordered batch (above) by the founder with the reviewed applier, after a recorded gate report and backup, and `public.cuadrao_early_access_signups` reads back with RLS on, no `anon`, `authenticated` or `service_role` delete, and a ledger row. A repository migration file is not production proof.
-2a. The Supabase plan decision is made. The organization reports the Free plan, and the founder rule is to revisit the Pro plan before public signup capture. A Free project pauses when inactive, and a paused project makes the Personal form answer its truthful unavailable state. Until the decision is made, either the Personal page ships with signup unavailable or the page is not published; the Business inquiry does not use Supabase.
-3. `notify.cuadrao.ai` verified in Resend (Section 6) and one approved test message received at `hola@cuadrao.ai`.
+2a. Supabase stays on the Free plan; no plan change is a precondition. Known limit: a Free project pauses when it is inactive, and while it is paused the Personal form answers its truthful unavailable state (503) and keeps the visitor's email. The operator restores the project from the Supabase dashboard. A restore is the only recovery, so check the project's state as part of hosted acceptance and before any announcement. The Business inquiry does not use Supabase.
+3. `notify.cuadrao.ai` verified in Resend (Section 6), the founder has chosen the inquiry mailbox and set `CUADRAO_INQUIRY_TO`, and one approved test message is received at that mailbox.
 4. The founder has typed the three provider values into the Render form, and the complete form has been read back to them before Create.
 5. Rollback target named (Section 8). The first deploy has no earlier artifact, so a rollback cannot be exercised until a second deploy exists.
 
@@ -93,7 +113,7 @@ On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), wit
 - The per-client limit keys on the visitor, not on a shared proxy address: from one network, a request that sends a spoofed leftmost `X-Forwarded-For` is limited exactly like one that does not, and two networks are limited independently. If every visitor shares one key, set `CUADRAO_TRUSTED_CLIENT_IP_HEADER`.
 - Mixed-case URLs (`/EN`, `/en/Personal`) redirect to lowercase and leave `/en` at 200 after a restart.
 - Every page loads in Spanish and English at 390 and 1440 pixels; titles, canonical, hreflang, icons and share images as in the browser specs; `X-Robots-Tag: noindex, nofollow` and a disallow-all `robots.txt`.
-- Real inquiry from the form arrives at `hola@cuadrao.ai` with the visitor as Reply-To, using a founder-approved test address.
+- Real inquiry from the form arrives at the configured `CUADRAO_INQUIRY_TO` mailbox with the visitor as Reply-To, using a founder-approved test address.
 - Real signup is stored; repeating it creates no second row and looks identical; the restart persistence check redeploys with the manual deploy button and re-reads the row; operator removal erases the address and the same address then registers with an identical visitor-facing answer but no new active row.
 - Provider-down and timeout recovery shown by disabling the Resend key in a throwaway state only if the founder approves; otherwise the recorded browser specs stand for recovery.
 - Evidence is committed under `docs/reports/evidence/cuadrao-marketing-launch/` with raw addresses redacted.
@@ -106,7 +126,7 @@ Read, then prepare, then apply only after approval. Do not change root MX, SPF o
 2. Add `notify.cuadrao.ai` to Resend. Resend returns the exact records (SPF `include`, DKIM key, return-path MX). Copy them verbatim; do not invent values.
 3. Add a DMARC record for `_dmarc.notify.cuadrao.ai` (start at `p=none` with a report address the founder owns) unless one already covers the subdomain.
 4. Apply only the named records after approval; wait for Resend to show Verified; send one test message to a founder-approved address; read the received headers for SPF, DKIM and DMARC pass.
-5. `hola@cuadrao.ai` must actually receive mail. Verified sending does not prove that mailbox exists, so the test message is the proof.
+5. The inquiry mailbox must actually receive mail. Verified sending does not prove a mailbox exists, so the test message is the proof. The public address `hola@cuadrao.ai` is shown on the pages and receives removal requests, so it needs a working route before publication whether or not it is also the inquiry mailbox.
 6. Rollback removes only the added `notify` records.
 
 Confirmation email for signups is not selected for launch (forms contract). The availability notice is sent through the operator tool, from a sender the founder chooses at that time.

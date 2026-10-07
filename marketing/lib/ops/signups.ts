@@ -149,10 +149,11 @@ export async function sendNotice(
   plan: NoticePlan,
   doFetch: typeof fetch,
   now: () => Date = () => new Date(),
-): Promise<{ sent: number; failed: number; sentNotRecorded: number }> {
+): Promise<{ sent: number; failed: number; sentNotRecorded: string[]; stoppedEarly: boolean }> {
   let sent = 0;
   let failed = 0;
-  let sentNotRecorded = 0;
+  const sentNotRecorded: string[] = [];
+  let stoppedEarly = false;
   for (const row of plan.recipients) {
     const key = `${plan.stamp ? "notice" : "notice-test"}-${template.id}-${row.email_digest}`;
     try {
@@ -192,10 +193,14 @@ export async function sendNotice(
         "recording the notice",
       );
     } catch {
-      sentNotRecorded += 1;
+      // The database stopped recording. Sending on would mail people it cannot
+      // remember, so stop here and hand the operator exactly who was sent.
+      sentNotRecorded.push(row.email_digest);
+      stoppedEarly = true;
+      break;
     }
   }
-  return { sent, failed, sentNotRecorded };
+  return { sent, failed, sentNotRecorded, stoppedEarly };
 }
 
 export type { OpsConfig };

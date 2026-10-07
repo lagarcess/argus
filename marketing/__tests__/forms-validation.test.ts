@@ -3,6 +3,7 @@ import {
   emailDigest,
   isHoneypotFilled,
   normalizeEmail,
+  parseMailbox,
   validateInquiry,
   validateSignup,
 } from "../lib/forms/validation";
@@ -92,5 +93,23 @@ describe("honeypot", () => {
     [null, false],
   ])("%j is %p", (body, filled) => {
     expect(isHoneypotFilled(body)).toBe(filled);
+  });
+});
+
+describe("configured mailbox", () => {
+  test("accepts one bare address and normalizes it", () => {
+    expect(parseMailbox(" Founder@Example.INVALID ")).toBe("founder@example.invalid");
+  });
+
+  test.each([
+    undefined,
+    "",
+    "   ",
+    "a@example.invalid, b@example.invalid",
+    "Founder <founder@example.invalid>",
+    "founder@example.invalid\nBcc: x@example.invalid",
+    "no-at-sign",
+  ])("refuses %p so it can never become several recipients", (value) => {
+    expect(parseMailbox(value)).toBeNull();
   });
 });

@@ -1,7 +1,10 @@
+import { parseMailbox } from "./validation";
+
 export type FormsConfig = {
   resendApiKey: string | null;
   resendApiUrl: string;
   inquiryFrom: string | null;
+  inquiryTo: string | null;
   supabaseUrl: string | null;
   supabaseServiceKey: string | null;
   trustedClientIpHeader: string | null;
@@ -17,6 +20,7 @@ export function readFormsConfig(env: Record<string, string | undefined>): FormsC
     resendApiKey: value(env.RESEND_API_KEY),
     resendApiUrl: value(env.RESEND_API_URL) ?? "https://api.resend.com",
     inquiryFrom: value(env.CUADRAO_INQUIRY_FROM),
+    inquiryTo: parseMailbox(env.CUADRAO_INQUIRY_TO),
     supabaseUrl: value(env.SUPABASE_URL),
     supabaseServiceKey: value(env.SUPABASE_SERVICE_ROLE_KEY),
     trustedClientIpHeader: value(env.CUADRAO_TRUSTED_CLIENT_IP_HEADER),

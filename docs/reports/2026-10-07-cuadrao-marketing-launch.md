@@ -14,7 +14,7 @@ Status record for [#880](https://github.com/lagarcess/argus/issues/880) and its 
 | --- | --- |
 | #887 independent package | `marketing/` builds from a clean frozen install with Bun 1.3.14 on Node 24.21.0, starts with an empty environment, and renders byte-identical screenshots to the legacy pages in Chromium and WebKit at 1440 and 390 pixels, in both languages. |
 | #888 identity and metadata | One route owner drives canonical, hreflang, sitemap, redirects and navigation. Provisional Cuadrao icons replace the inherited Argus icon. Founder review of the mark is pending. |
-| #881 Business inquiries | Implemented and covered by unit and browser tests against a recording mock. Real receipt at `hola@cuadrao.ai` is not yet proven. |
+| #881 Business inquiries | Implemented and covered by unit and browser tests against a recording mock. The destination is now configurable (`CUADRAO_INQUIRY_TO`, no default); real receipt waits for the founder to choose it. |
 | #882 Personal signups | Implemented. Table contract proven against real Postgres and PostgREST locally. Hosted storage, removal and notice are not yet proven. |
 | #889 transactional email | Plan and records procedure written. Nothing read or changed in Resend or Cloudflare yet. |
 | #890 promotion and Render | Promotion diff measured and a bounded option prepared. Render settings written. Service not created. |
@@ -42,7 +42,33 @@ Through the connected Render and Resend tools and public DNS lookups. Nothing wa
 - **How it was created.** Not by this lane's tools. Its creation time (17:27:22Z) is seven seconds after PR 895 was opened (17:27:15Z), and it carries the Git branch and PR number. That is the Supabase GitHub integration's automatic preview branching, which also produces the `Supabase Preview` check. The check ran schema-only: it replayed the repository's migration chain (it lists this migration at its proper place) and no production data was copied. Earlier PRs show the same check. This lane created no hosted resource.
 - **Charges.** Supabase documents no fixed fee for a branch, only usage. The connector quotes `0.01344` USD per hour for a branch (the default Micro compute), about $0.32 a day or $9.68 for a month if it ran continuously, plus egress and disk beyond the plan quota. Branch usage is not covered by the Spend Cap, and Compute Credits do not apply to it. Branching is documented as a Pro Plan feature, yet the organization (`ARGUS QUANTITATIVE`) reports the `free` plan, and the repository notes elsewhere that preview branches have hit plan quota. The connector exposes no invoice, so whether this branch is billed, and how much, is not confirmed. The Supabase usage page shows "Branching Compute Hours" and settles it.
 - **Lifetime.** A non-persistent branch is removed when its PR is closed or merged, and preview branches auto-pause after inactivity.
-- **Proposed cleanup, not performed.** Do nothing now: the branch is the schema check for this PR and each push re-runs it. Once #895 merges or closes it should be deleted automatically; confirm that in "Manage Branches" within a day and delete it by hand if it remains. Founder decisions: whether to keep GitHub-integration branching on at all (it creates a branch for every PR, including docs-only ones), and whether to make that choice together with the Pro plan decision.
+- **Decision.** Automatic previews are not part of the agreed spending plan. The steps below disable them and remove this branch. They have not been run; each is a hosted write that needs the founder's go.
+
+### Automatic Supabase behavior before promotion (read-only evidence, 2026-10-07)
+
+The integration's settings page cannot be read from here, so each finding rests on what the integration did.
+
+| Behavior | State | Evidence |
+| --- | --- | --- |
+| Automatic production migrations from `main` | **Off, as far as the evidence shows** | The production branch record has no Git branch (`git_branch` is empty). The `Supabase Preview` check on `main`'s promotion commit (2026-09-18) and on integration's head reads "skipped: this git branch is not associated with any Supabase Branch". The record's status has not changed since 2026-06-04 although `main` was promoted since. So a push to `main` is not wired to production migrations. |
+| Automatic preview branching | **On** | A branch was created for PR 895 seven seconds after it opened, and the check says "open a PR to create a new branch". |
+
+Promotion therefore waits on the founder disabling previews (steps below). Founder confirmation of the production-deploy setting in the dashboard is still worth one look, because the evidence is indirect.
+
+### Disable automatic previews and remove this preview
+
+Disable first, then delete. Deleting first lets the next push recreate the branch; disabling first leaves this branch running only until step 2.
+
+1. **Disable automatic creation.** Supabase dashboard, project `Argus` (`lgdhvepyrzbnscqssgqq`), Project Settings, Integrations, GitHub. Turn off branching ("Enable branching" in current documentation; confirm the label in the UI, which this lane has not seen). Leave the repository connection itself alone for now; see the production-deploy check below. The same effect is available from the Management API as `DELETE /v1/projects/{ref}/branches` ("Disables preview branching"), which also needs the founder's authorization.
+2. **Remove this preview.** Dashboard, branch selector, Manage Branches, `codex/cuadrao-marketing-launch`, Delete. Equivalent: the connector's `delete_branch` for branch `4796aa2f-9428-4b26-80c5-b48c2f0da29e`. The branch holds no production data (`with_data: false`), so nothing is lost beyond its schema replay.
+3. **Verify.** Manage Branches lists only the production branch. The next push to #895 must not create a branch. Branching Compute Hours on the organization usage page stops accruing.
+4. **Check the production-deploy setting before any promotion to `main`.** The integration's production branch record has read `MIGRATIONS_FAILED` since 2026-06-04. If the integration's "Deploy to production" is on, a push to `main` can make it try to apply migrations to production on its own. Confirm it is off (or intentionally set) before any promotion, and treat that as separate from step 1.
+
+**Effect on CI.**
+- `Supabase Preview` is not a required check anywhere. Branch protection on `codex/private-alpha-next` requires no checks, `main` requires only `ci`, there are no rulesets, and the aggregate `ci` job does not list it. Disabling previews therefore cannot block a merge. The check simply stops appearing on new pushes; the already-posted result stays on old commits.
+- What is lost is a hosted replay of the migration chain. The repository's own `guest-release-gates` job already replays every migration on a disposable local Supabase stack, on both the pinned and the latest CLI, and runs all `test_*_postgres.py` proofs, including this table's. That is the coverage the founder's merge decision rests on, and it is unchanged.
+- `supabase/config.toml` carries a comment about preview branches failing on a Pro-only setting. It becomes stale and can be edited in a later change; it is not needed for this one.
+- If the branch is deleted without step 1, the next push or a reopened PR recreates it.
 
 ## Not yet true
 

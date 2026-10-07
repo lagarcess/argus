@@ -91,7 +91,7 @@ describe("notice sending", () => {
     const { fetch: doFetch, calls } = recordingFetch(() => Response.json({ id: "x" }));
     const plan = planNotice([row("a@example.invalid", "en")], null);
     const result = await sendNotice(ops, template, plan, doFetch, () => new Date("2026-10-09T00:00:00Z"));
-    expect(result).toEqual({ sent: 1, failed: 0, sentNotRecorded: 0 });
+    expect(result).toEqual({ sent: 1, failed: 0, sentNotRecorded: [], stoppedEarly: false });
     const email = JSON.parse(String(calls[0].init.body));
     expect(email.to).toEqual(["a@example.invalid"]);
     expect(email.subject).toBe("You can try Cuadrao");
@@ -106,7 +106,7 @@ describe("notice sending", () => {
   test("a failed send is counted and is not stamped", async () => {
     const { fetch: doFetch, calls } = recordingFetch(() => new Response("", { status: 422 }));
     const result = await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
-    expect(result).toEqual({ sent: 0, failed: 1, sentNotRecorded: 0 });
+    expect(result).toEqual({ sent: 0, failed: 1, sentNotRecorded: [], stoppedEarly: false });
     expect(calls).toHaveLength(1);
   });
 
@@ -115,8 +115,29 @@ describe("notice sending", () => {
       call.init.method === "PATCH" ? new Response("", { status: 500 }) : Response.json({ id: "x" }),
     );
     const result = await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
-    expect(result).toEqual({ sent: 1, failed: 0, sentNotRecorded: 1 });
+    expect(result).toEqual({
+      sent: 1,
+      failed: 0,
+      sentNotRecorded: [emailDigest("a@example.invalid")],
+      stoppedEarly: true,
+    });
     expect(calls).toHaveLength(2);
+  });
+
+  test("stops at the first unrecorded stamp instead of mailing the rest", async () => {
+    const { fetch: doFetch, calls } = recordingFetch((call) =>
+      call.init.method === "PATCH" ? new Response("", { status: 503 }) : Response.json({ id: "x" }),
+    );
+    const plan = planNotice(
+      [row("a@example.invalid"), row("b@example.invalid"), row("c@example.invalid")],
+      null,
+    );
+    const result = await sendNotice(ops, template, plan, doFetch);
+    expect(result.sent).toBe(1);
+    expect(result.sentNotRecorded).toEqual([emailDigest("a@example.invalid")]);
+    expect(result.stoppedEarly).toBe(true);
+    // one send and one failed stamp; b and c were never mailed
+    expect(calls.map((call) => call.init.method)).toEqual(["POST", "PATCH"]);
   });
 
   test("the stamp only applies to a row that is still active", async () => {

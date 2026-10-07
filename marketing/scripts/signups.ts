@@ -65,7 +65,15 @@ if (command === "summary") {
       fail(`A full send needs --expect ${plan.recipients.length} to confirm the recipient count.`);
     }
     if (!config.resendApiKey || !config.noticeFrom) fail("RESEND_API_KEY and CUADRAO_NOTICE_FROM are required to send.");
-    console.log(JSON.stringify(await sendNotice(config, template, plan, fetch)));
+    const result = await sendNotice(config, template, plan, fetch);
+    console.log(JSON.stringify(result));
+    if (result.sentNotRecorded.length > 0) {
+      console.error(
+        "Stopped: messages were sent but not recorded. Do NOT rerun. Stamp these digests by hand first:\n" +
+          result.sentNotRecorded.join("\n"),
+      );
+    }
+    if (result.failed > 0 || result.stoppedEarly) process.exit(1);
   }
 } else {
   fail("Commands: summary | remove <email> | notice --template <file> [--only a,b] [--send] [--expect N]");

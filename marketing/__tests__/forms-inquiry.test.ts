@@ -18,7 +18,7 @@ function deps(respond = accepted, config = CONFIG) {
 }
 
 describe("inquiry delivery", () => {
-  test("accepts after the provider accepts and sends one message to hola@cuadrao.ai", async () => {
+  test("accepts after the provider accepts and sends one message to the configured mailbox", async () => {
     const { provider, deps: d } = deps();
     const response = await handleInquiry(jsonRequest("/api/inquiries", inquiryBody()), d);
     expect(response.status).toBe(202);
@@ -31,7 +31,7 @@ describe("inquiry delivery", () => {
     expect(headers["Idempotency-Key"]).toBe(`inquiry-${SUBMISSION_ID}`);
     expect(headers.Authorization).toBe("Bearer re_test_key");
     const sent = JSON.parse(String(call.init.body));
-    expect(sent.to).toEqual(["hola@cuadrao.ai"]);
+    expect(sent.to).toEqual(["inbox@example.test"]);
     expect(sent.from).toBe("Cuadrao <website@notify.example.test>");
     expect(sent.reply_to).toBe("marisol@example.invalid");
     expect(sent.text).toContain("Nombre: Marisol Peña");
@@ -63,6 +63,13 @@ describe("inquiry delivery", () => {
     });
     const response = await handleInquiry(jsonRequest("/api/inquiries", inquiryBody()), d);
     expect(response.status).toBe(503);
+  });
+
+  test.each([null])("with no recipient configured the form is unavailable and sends nothing", async (inquiryTo) => {
+    const { provider, deps: d } = deps(accepted, { ...CONFIG, inquiryTo });
+    const response = await handleInquiry(jsonRequest("/api/inquiries", inquiryBody()), d);
+    expect(response.status).toBe(503);
+    expect(provider.calls).toHaveLength(0);
   });
 
   test("missing provider configuration is unavailable and calls nothing", async () => {

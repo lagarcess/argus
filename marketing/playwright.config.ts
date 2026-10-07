@@ -8,6 +8,7 @@ const providerEnv = {
   RESEND_API_KEY: "test-resend-key",
   RESEND_API_URL: `http://127.0.0.1:${MOCK_PORT}`,
   CUADRAO_INQUIRY_FROM: "Cuadrao <website@notify.example.test>",
+  CUADRAO_INQUIRY_TO: "inbox@example.test",
   SUPABASE_URL: `http://127.0.0.1:${MOCK_PORT}`,
   SUPABASE_SERVICE_ROLE_KEY: "test-service-key",
 };
