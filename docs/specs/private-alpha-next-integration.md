@@ -13,6 +13,8 @@ Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
 
+- October 7, 2026: [PR #884](https://github.com/lagarcess/argus/pull/884) delivers the default-off Cuadrao Business and Personal marketing preview. The [website delivery record](../reports/2026-10-07-cuadrao-website-integration.md) links exact-head evidence and launch follow-ups #880–#882. No public activation, hosted persistence, financial-runtime or native-app change.
+
 - October 6, 2026: documentation-only [Cuadrao launch reconciliation](../reports/2026-10-06-cuadrao-launch-reconciliation.md) and [#877 recovery handoff](../reports/2026-10-06-cuadrao-877-recovery-handoff.md) on top of `df3882668413e7978d3983adfe1f054cb83595c4`. It restores the PR #773 landing register recovered from draft #774, and records open-PR dispositions for #781, #774, #732, #646 and #744. No runtime, test, configuration, migration, flag, hosted or deployment change.
 
 - October 6, 2026: atomic confirmed local cleanup #876 landed as `184d2614e4d2beb5ed994bd3cd8f3a5ef211f1dd`. [Record](../reports/evidence/cuadrao-trust-20261005/pr876-landing-record.json) preserves validated filesystem/SDK boundaries, without app UI or provider completion claims. Housekeeping uses #873; integration CI running and smoke passed.

@@ -5,6 +5,10 @@
 **Product owner:** [MVEE](argus-minimum-viable-ecosystem-experience.md).
 **Authority and onboarding:** [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md).
 
+## Cuadrao website integration checkpoint
+
+[PR #884](https://github.com/lagarcess/argus/pull/884) delivers the bilingual Business and Personal marketing preview under its default-off flag. The [delivery record](../reports/2026-10-07-cuadrao-website-integration.md) owns its evidence and merge verification. Public launch, Business inquiry delivery and Supabase early-access capture remain open in #880, #881 and #882. This website assignment does not change the mobile roadmap, enable a Business app or authorize deployment.
+
 ## Current mobile roadmap: October 4 founder lock
 
 The founder approved this execution update on October 4 after reviewing build

@@ -5,8 +5,8 @@ This evidence covers the English and Spanish Business, Personal and contact page
 ## Candidate and evidence
 
 Original integration base: `ad7eb9ccb8261456d12ce5a26686682bbce9ae2f`.
-Verified web tree: `2e29861249b9818d46e866dd069582424c932c5c`.
-The PR and independent review record identify the final head. The web tree hash recorded below binds these browser captures to the exact application source; documentation-only evidence commits do not change that tree.
+Initial verified web tree: `2e29861249b9818d46e866dd069582424c932c5c`.
+The PR and independent review record identify the final head. The initial tree binds the broad matrix to its source. The final privacy fix changes only Personal hydration and fieldset styling; its affected layouts and form paths were reverified below. The final tree is recorded in the PR terminal audit.
 
 All captures were taken on October 7, 2026 against a production Next.js build. Local preview was enabled on port 3223 and disabled on port 3224. No hosted changes, provider turns, real financial records or messages were used.
 
@@ -23,7 +23,13 @@ All captures were taken on October 7, 2026 against a production Next.js build. L
 - [Presentation](presentation-results.json): 24 layouts, five FAQs, valid anchors, mobile form order, no broken images, locale sharing metadata, honest form states, reduced motion and no page errors.
 - [Boundary checks](boundary-results.json): 22 enabled/disabled route checks; existing development-route block and legal pages preserved. English app preference survives Spanish and English marketing pages and the return to the app.
 
-The independent review supplies the additional enabled-Spanish and public-receipt checks before merge. The normal preview build leaves receipt sharing disabled, so it is not evidence for an enabled public receipt.
+Independent browser comparison confirms identical existing home/legal and synthetic public-receipt content against integration, including JavaScript-disabled receipt rendering. Enabled Spanish app preference also survives both marketing languages and the return to the app. The independent PR verdict records these checks and the final fix review.
+
+## Privacy fix verification
+
+The reviewer reproduced a native GET that placed an email in the Personal URL without JavaScript. The form now stays disabled until hydration and declares a POST action. [Before](hydration-red.txt), the two Personal no-JavaScript cases fail while four contact/hydrated cases pass. [After](hydration-green.txt), all six pass. The test lives at `web/e2e/business-form-hydration.spec.ts`; run it with `CUADRAO_WEBSITE_PREVIEW=true` and the production preview as `PLAYWRIGHT_BASE_URL`.
+
+[Eight final Personal layout checks](personal-results-final.json) pass on the production build of source commit `405ee5e5b`; the affected Personal screenshots are refreshed. The original header, Business, contact and owner-example evidence is retained because those runtime files did not change. The final full frontend suite remains 2,249 passed. No JavaScript-free form submission or successful signup is claimed.
 
 ## Visual samples
 
