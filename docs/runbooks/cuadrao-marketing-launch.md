@@ -26,7 +26,11 @@ Measured 2026-10-07 with `git fetch origin`:
 
 It carries no change to `web/`, `src/`, `ios/`, `render.yaml` or any other migration. Left out because they only exist, or only make sense, on integration: the Cuadrao design guide (it links five integration-only documents), the documentation-authority row and the integration-report pointer. They arrive with the normal promotion, and the package README's link to the design guide is dead on `main` until then. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so a fresh replay orders it correctly on both branches. Identical content merges cleanly when integration is later promoted. The candidate was built in a separate worktree from `origin/main`; its typecheck and 112 unit tests pass there.
 
-Applying it to a database that already holds the newer integration migrations (a staging project that tracks integration) needs `--include-all`; confirm that database's applied list first. Production has none of them.
+### Production ledger and the signup migration
+
+Production's newest migration (`20260914120000`) equals `main`'s newest file, but the ledgers do not match (read-only, 2026-10-07; 81 entries). 69 versions match by version and name. Production carries seven April entries `main` lacks, five entries recorded at different versions from the repo files, and lacks the ledger rows of five `main` migrations whose tables already exist. The Supabase GitHub integration's production branch record has read `MIGRATIONS_FAILED` since 2026-06-04. A `supabase db push` would try to replay migrations production already has, so it is never used.
+
+The consumer lane's reviewed applier (PR #894) plans one ordered production batch: an unrecorded `20260505000001_add_currency_pair_asset_class`, then this lane's `20260920000000`, then the consumer's 35 files `20260925120000` to `20261005230000`. The applier refuses a skipped version, so this migration must be applied before theirs, not after. This lane does not apply it alone. The founder holds the only production DSN and runs the read-only gate (`scripts/ops/production_migration_gate.py`) and the applier; the gate report and backup precede the apply.
 
 Option B departs from the usual "main is promoted from integration" practice. It needs the founder's approval as a workflow exception before the second PR is opened. The exact file list is regenerated from `git diff --name-status origin/main...<candidate>` and posted with the request.
 
@@ -75,7 +79,8 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 ## 4. Preconditions before creation
 
 1. Candidate merged to `main` through the approved path; exact SHA and CI recorded.
-2. Existing Supabase project is active, the migration is applied by the founder-approved human procedure, the production migration gate is recorded, and `public.cuadrao_early_access_signups` reads back with RLS on and no `anon` or `authenticated` privilege. A repository migration file is not production proof.
+2. The signup migration is applied as part of the consumer lane's ordered batch (above) by the founder with the reviewed applier, after a recorded gate report and backup, and `public.cuadrao_early_access_signups` reads back with RLS on, no `anon`, `authenticated` or `service_role` delete, and a ledger row. A repository migration file is not production proof.
+2a. The Supabase plan decision is made. The organization reports the Free plan, and the founder rule is to revisit the Pro plan before public signup capture. A Free project pauses when inactive, and a paused project makes the Personal form answer its truthful unavailable state. Until the decision is made, either the Personal page ships with signup unavailable or the page is not published; the Business inquiry does not use Supabase.
 3. `notify.cuadrao.ai` verified in Resend (Section 6) and one approved test message received at `hola@cuadrao.ai`.
 4. The founder has typed the three provider values into the Render form, and the complete form has been read back to them before Create.
 5. Rollback target named (Section 8). The first deploy has no earlier artifact, so a rollback cannot be exercised until a second deploy exists.

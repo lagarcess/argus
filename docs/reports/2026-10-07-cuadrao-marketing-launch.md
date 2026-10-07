@@ -26,7 +26,15 @@ Status record for [#880](https://github.com/lagarcess/argus/issues/880) and its 
 Through the Supabase connector, with no row data read:
 
 - Project `Argus` (`us-east-2`, Postgres 17) reported `INACTIVE` at the first read and `ACTIVE_HEALTHY` minutes later. No activation or plan change was requested by this lane.
-- The production migration ledger has 82 entries. The latest is `20260914120000_share_plain_answer_receipts`, identical to `main`'s newest migration file. The signup migration (`20260920000000`) therefore sorts after everything production has applied and before the 35 integration migrations production lacks.
+- The production migration ledger has 81 entries. The latest is `20260914120000_share_plain_answer_receipts`, identical to `main`'s newest migration file. The signup migration (`20260920000000`) therefore sorts after everything production has applied and before the 35 integration migrations production lacks.
+
+## Supabase preview branch for #895 (read-only, 2026-10-07)
+
+- **What exists.** One branch on project `qzylwjabjfophhipzoev`, name and Git branch `codex/cuadrao-marketing-launch`, PR 895, parent `lgdhvepyrzbnscqssgqq`, `persistent: false`, `with_data: false`, preview project `ACTIVE_HEALTHY`. A second branch record is the production project itself (`main`, status `MIGRATIONS_FAILED`, last updated 2026-06-04).
+- **How it was created.** Not by this lane's tools. Its creation time (17:27:22Z) is seven seconds after PR 895 was opened (17:27:15Z), and it carries the Git branch and PR number. That is the Supabase GitHub integration's automatic preview branching, which also produces the `Supabase Preview` check. The check ran schema-only: it replayed the repository's migration chain (it lists this migration at its proper place) and no production data was copied. Earlier PRs show the same check. This lane created no hosted resource.
+- **Charges.** Supabase documents no fixed fee for a branch, only usage. The connector quotes `0.01344` USD per hour for a branch (the default Micro compute), about $0.32 a day or $9.68 for a month if it ran continuously, plus egress and disk beyond the plan quota. Branch usage is not covered by the Spend Cap, and Compute Credits do not apply to it. Branching is documented as a Pro Plan feature, yet the organization (`ARGUS QUANTITATIVE`) reports the `free` plan, and the repository notes elsewhere that preview branches have hit plan quota. The connector exposes no invoice, so whether this branch is billed, and how much, is not confirmed. The Supabase usage page shows "Branching Compute Hours" and settles it.
+- **Lifetime.** A non-persistent branch is removed when its PR is closed or merged, and preview branches auto-pause after inactivity.
+- **Proposed cleanup, not performed.** Do nothing now: the branch is the schema check for this PR and each push re-runs it. Once #895 merges or closes it should be deleted automatically; confirm that in "Manage Branches" within a day and delete it by hand if it remains. Founder decisions: whether to keep GitHub-integration branching on at all (it creates a branch for every PR, including docs-only ones), and whether to make that choice together with the Pro plan decision.
 
 ## Not yet true
 
