@@ -1,6 +1,7 @@
 # Argus documentation authority
 
 **Updated:** September 29, 2026. Private iPhone direction and financial-loop landing.
+**Business design pointer added:** October 6, 2026. See the working guide below.
 Current delivered work, remaining scope and action authority live in the
 [execution manifest](specs/argus-execution-board.md), not in this ownership guide.
 **Purpose:** Help an agent distinguish approved product direction, existing technical contracts, historical rationale, and authorized implementation work.
@@ -24,6 +25,7 @@ Current delivered work, remaining scope and action authority live in the
 | Which founder decisions changed, and when? | [Decision log](specs/argus-decision-log.md) | Decision provenance and links; detailed requirements remain with their owner |
 | What architecture, payloads, and persistence contracts apply? | Architecture, API contract, and data model docs above | Existing system contracts/technical intent and the [locked interface stacks](ARCHITECTURE.md#approved-platform-direction); some statements describe targets, not proof of implementation |
 | What visual and interaction conventions apply? | [Argus web guide](../.agent/designs/argus/DESIGN.md) and [Cuadrao native guide](../.agent/designs/cuadrao/DESIGN.md) | Each owns its named platform. Cuadrao rules cover preview and connected native adoption; they do not claim implementation. MVEE owns product behavior, while the execution manifest owns status and remaining work. |
+| What brand and design direction applies to the new business website? | [Cuadrao for business working guide](../.agent/designs/cuadrao-business/DESIGN.md) | Owns the approved Business and Personal marketing presentation, founder note, and illustrative examples. The [website delivery record](reports/2026-10-07-cuadrao-website-integration.md) owns integration evidence and remaining launch work. It does not establish Business application or consumer-app availability. |
 | What is an agent authorized to build now? | Explicit assignment and its scoped package/spec | MVEE approval does not assign every feature, unlock stages, or authorize provider integrations |
 | What is next, who owns it, and what counts as done? | [Private iPhone execution manifest](specs/argus-execution-board.md) | One execution map; states and evidence links do not authorize a restart, merge or deployment |
 | How is work reviewed and released? | AGENTS.md, [CI/CD discipline](specs/private-alpha-ci-cd-sota.md), [launch runbook](PRIVATE_LAUNCH_RUNBOOK.md), [manifest template](release-manifests/TEMPLATE.md) | Existing evaluation, privacy, branch, merge, and deployment gates remain in force |
