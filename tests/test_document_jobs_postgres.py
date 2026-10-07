@@ -219,3 +219,73 @@ async def test_dead_worker_recovers_once_and_its_late_result_is_refused(
     assert service.store.job(user_id=owner, connection_id=connection).attempt == 2
     assert jobs.sweep().redispatched == []
     service.forget(hub.connections.get(user_id=owner, connection_id=connection))
+
+
+def test_workflow_worker_prepares_the_dispatched_attempt(
+    pool: ConnectionPool, users: dict[str, str]
+) -> None:
+    from workflows.document_job import (
+        postgres_documents_service,
+        run_document_preparation,
+    )
+
+    class Prepared:
+        calls = 0
+
+        async def extract(self, **kwargs: Any) -> ExtractionBatch:
+            Prepared.calls += 1
+            candidate = ImportCandidate(
+                source=SourceRef(
+                    source="statement",
+                    connection_id=kwargs["connection_id"],
+                    external_id="document:p1:r1",
+                    observed_at=kwargs["observed_at"],
+                ),
+                evidence="transaction",
+                amount="42.00",
+                currency="DOP",
+                direction="outflow",
+            )
+            return ExtractionBatch(candidates=(candidate,))
+
+    api = postgres_documents_service(pool, Prepared())
+    outcomes: list[dict[str, str]] = []
+    jobs = PreparationJobs(
+        api,
+        lambda connection_id, attempt_id: outcomes.append(
+            run_document_preparation(
+                connection_id,
+                attempt_id,
+                env={"ARGUS_WORKFLOW_DATABASE_URL": shared.DSN},
+                extractor=Prepared(),
+            )
+        ),
+    )
+    owner = users["owner"]
+    captured = asyncio.run(
+        api.upload(
+            user_id=owner,
+            content=b"%PDF-" + uuid4().bytes,
+            filename="receipt.pdf",
+            media_type="application/pdf",
+            consent=True,
+        )
+    )
+
+    jobs.start(user_id=owner, connection_id=captured.connection_id)
+
+    assert [outcome["outcome"] for outcome in outcomes] == ["prepared"]
+    assert Prepared.calls == 1
+    assert api.get(user_id=owner, connection_id=captured.connection_id).status == (
+        "review_ready"
+    )
+    with pool.connection() as connection:
+        events = connection.execute(
+            "select count(distinct event_id) from public.financial_import_observations "
+            "where user_id=%s and connection_id=%s",
+            (owner, captured.connection_id),
+        ).fetchone()
+    assert events == (1,)
+    api.forget(
+        api.hub.connections.get(user_id=owner, connection_id=captured.connection_id)
+    )
