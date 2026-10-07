@@ -7,7 +7,11 @@ from datetime import datetime
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
-from argus.domain.ingestion.documents.models import DocumentDraft, ExtractionBatch
+from argus.domain.ingestion.documents.models import (
+    DocumentDraft,
+    ExtractionBatch,
+    PreparationJob,
+)
 
 
 class PostgresDocumentStore:
@@ -138,3 +142,71 @@ class PostgresDocumentStore:
                 "delete from public.financial_document_extractions where user_id=%s and connection_id=%s",
                 (user_id, connection_id),
             )
+
+    def owner(self, *, connection_id: str) -> str | None:
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                "select d.user_id::text from public.financial_document_extractions d "
+                "join public.financial_source_connections c on c.id=d.connection_id "
+                "and c.user_id=d.user_id where d.connection_id=%s "
+                "and c.source='statement' and c.status <> 'disconnected'",
+                (connection_id,),
+            ).fetchone()
+        return row[0] if row else None
+
+    def job(self, *, user_id: str, connection_id: str) -> PreparationJob | None:
+        raw = self._read("preparation_job", user_id, connection_id)
+        return PreparationJob.model_validate(raw) if raw is not None else None
+
+    def pending(self, *, limit: int) -> list[tuple[str, str]]:
+        with self._pool.connection() as connection:
+            rows = connection.execute(
+                "select d.user_id::text, d.connection_id::text "
+                "from public.financial_document_extractions d "
+                "join public.financial_source_connections c on c.id=d.connection_id "
+                "and c.user_id=d.user_id where c.source='statement' "
+                "and c.status <> 'disconnected' and (d.draft->>'status' in "
+                "('queued','preparing') or (d.draft->>'status'='needs_attention' "
+                "and (d.preparation_job->>'retry')::boolean)) "
+                "order by d.created_at, d.connection_id limit %s",
+                (limit,),
+            ).fetchall()
+        return [(row[0], row[1]) for row in rows]
+
+    def advance(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        now: datetime,
+        expected_attempt_id: str | None,
+        job: PreparationJob,
+        draft: DocumentDraft | None = None,
+    ) -> bool:
+        with self._pool.connection() as connection, connection.transaction():
+            row = connection.execute(
+                "select lease_until from public.financial_source_connections "
+                "where id=%s and user_id=%s and source='statement' "
+                "and status <> 'disconnected' for update",
+                (connection_id, user_id),
+            ).fetchone()
+            if row is None or (row[0] is not None and row[0] > now):
+                return False
+            changed = connection.execute(
+                "update public.financial_document_extractions "
+                "set preparation_job=%s, draft=coalesce(%s::jsonb, draft) "
+                "where connection_id=%s and user_id=%s and draft is not null "
+                "and preparation_job->>'attempt_id' is not distinct from %s::text "
+                "and (%s::integer is null or (draft->>'version')::integer=%s) "
+                "returning connection_id",
+                (
+                    Jsonb(job.model_dump(mode="json")),
+                    Jsonb(draft.model_dump(mode="json")) if draft else None,
+                    connection_id,
+                    user_id,
+                    expected_attempt_id,
+                    draft.version - 1 if draft else None,
+                    draft.version - 1 if draft else None,
+                ),
+            ).fetchone()
+        return changed is not None
