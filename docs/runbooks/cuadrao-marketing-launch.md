@@ -17,7 +17,7 @@ Measured 2026-10-07 with `git fetch origin`:
 
 **Option A, full promotion.** Rejected for this launch: it ships the whole integration backlog and 35 unapplied migrations.
 
-**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Prepared and measured against `origin/main` (`a9286b21`) from this PR's content: **127 new files and 2 modified files, about 10,200 added lines, nothing deleted.** The count is regenerated with `git diff --name-status origin/main...<candidate>` on each refresh.
+**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Prepared and measured against `origin/main` (`a9286b21`) from this PR's content: **every file is new except two modified ones, and nothing is deleted.** The exact list and counts come from `git diff --name-status origin/main...<candidate>` on the candidate branch, regenerated on each refresh, so this page does not carry a number that goes stale.
 
 - `marketing/**` (new)
 - `supabase/migrations/20260920000000_cuadrao_early_access_signups.sql` and `tests/test_cuadrao_early_access_postgres.py` (new)
