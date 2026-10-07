@@ -13,7 +13,7 @@ struct CuadraoAppShell<Content: View>: View {
     let avatar: CuadraoAvatarSelection
     let profileName: String
     var showProposal: (() -> Void)? = nil
-    var add: () -> Void = {}
+    let add: () -> Void
     @ViewBuilder let content: (Binding<CuadraoTab>) -> Content
     @State private var pendingTab: CuadraoTab?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

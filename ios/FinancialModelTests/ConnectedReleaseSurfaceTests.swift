@@ -21,17 +21,22 @@ final class ConnectedReleaseSurfaceTests: XCTestCase {
     }
 
     func testAddWithNoAccountStartsTheFirstAccount() throws {
-        guard case .createAccount = ConnectedAddMovement.target(for: []) else { return XCTFail("expected createAccount") }
+        guard case .createAccount = ConnectedAddMovement.target(for: [], loaded: true) else { return XCTFail("expected createAccount") }
     }
 
     func testAddWithOneAccountOpensItsEditor() throws {
         let only = try account()
-        guard case .record(let chosen) = ConnectedAddMovement.target(for: [only]) else { return XCTFail("expected record") }
+        guard case .record(let chosen) = ConnectedAddMovement.target(for: [only], loaded: true) else { return XCTFail("expected record") }
         XCTAssertEqual(chosen.id, only.id)
     }
 
     func testAddWithSeveralAccountsAsksWhich() throws {
-        guard case .choose = ConnectedAddMovement.target(for: [try account(), try account()]) else { return XCTFail("expected choose") }
+        guard case .choose = ConnectedAddMovement.target(for: [try account(), try account()], loaded: true) else { return XCTFail("expected choose") }
+    }
+
+    func testAddBeforeAccountsHaveLoadedLoadsThemInsteadOfStartingAFirstAccount() throws {
+        guard case .loadAccounts = ConnectedAddMovement.target(for: [], loaded: false) else { return XCTFail("expected loadAccounts") }
+        guard case .loadAccounts = ConnectedAddMovement.target(for: [try account()], loaded: false) else { return XCTFail("expected loadAccounts") }
     }
 
     private func account() throws -> FinancialAccount {

@@ -86,7 +86,7 @@ struct ConnectedCuadraoShell: View {
             ForEach(addableAccounts) { account in
                 Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) {
                     auth.financialLoop?.record(account)
-                }
+                }.accessibilityIdentifier("nav.add.account." + account.id.uuidString)
             }
         }
         .connectedReceiptDrafts(
@@ -158,12 +158,21 @@ struct ConnectedCuadraoShell: View {
     }
 
     /// The navigation "+" records a movement from any tab, through the same rule as Home's Activity "+".
+    /// Home explains the two cases the + cannot act on (a write waiting for confirmation, accounts that
+    /// did not load), so the + takes the person there instead of doing nothing.
     private func addMovement() {
-        guard let loop = auth.financialLoop, let accounts = auth.accounts, loop.pendingConfirmation == nil else { return }
-        switch ConnectedAddMovement.target(for: addableAccounts) {
-        case .createAccount: accounts.create()
-        case .record(let account): loop.record(account)
-        case .choose: choosingAddAccount = true
+        guard let loop = auth.financialLoop, let accounts = auth.accounts, loop.pendingConfirmation == nil else {
+            tab = .home
+            return
+        }
+        Task {
+            if !accounts.hasLoaded { await accounts.load() }
+            switch ConnectedAddMovement.target(for: addableAccounts, loaded: accounts.hasLoaded) {
+            case .loadAccounts: tab = .home
+            case .createAccount: accounts.create()
+            case .record(let account): loop.record(account)
+            case .choose: choosingAddAccount = true
+            }
         }
     }
 

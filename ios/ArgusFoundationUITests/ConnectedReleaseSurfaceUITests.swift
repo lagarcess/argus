@@ -24,7 +24,7 @@ extension FinancialLoopUITests {
         add.tap()
         XCTAssertTrue(app.staticTexts["Choose an account"].waitForExistence(timeout: 10), "several accounts ask which one")
         capture("release-surface-add-chooser")
-        chooseFromDialog(second.name)
+        chooseFromDialog(second.id)
         XCTAssertTrue(app.buttons["loop.kind.expense"].waitForExistence(timeout: 10), "the editor opens for the chosen account")
         cancelEditor()
 
@@ -35,13 +35,13 @@ extension FinancialLoopUITests {
         capture("release-surface-bar-collapsed")
         add.tap()
         XCTAssertTrue(app.staticTexts["Choose an account"].waitForExistence(timeout: 10), "the collapsed + still records a movement")
-        chooseFromDialog(first.name)
+        chooseFromDialog(first.id)
         XCTAssertTrue(app.buttons["loop.kind.expense"].waitForExistence(timeout: 10))
     }
 
-    /// The chooser lists accounts as plain buttons; Home's account rows carry `accounts.row.` identifiers.
-    private func chooseFromDialog(_ name: String) {
-        let option = app.buttons.matching(NSPredicate(format: "label CONTAINS %@ AND NOT identifier BEGINSWITH 'accounts.row.'", name)).firstMatch
+    /// The chooser's buttons carry the account id, so Home rows with the same name cannot match.
+    private func chooseFromDialog(_ accountID: String) {
+        let option = app.buttons.matching(identifier: "nav.add.account." + accountID.uppercased()).firstMatch
         XCTAssertTrue(option.waitForExistence(timeout: 5))
         option.tap()
     }

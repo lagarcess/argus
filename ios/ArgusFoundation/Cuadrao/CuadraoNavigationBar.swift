@@ -54,7 +54,7 @@ struct CuadraoNavigationBar: View {
     let spanish: Bool
     var avatar: CuadraoAvatarSelection = .none
     var profileName: String = ""
-    var add: () -> Void = {}
+    let add: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {

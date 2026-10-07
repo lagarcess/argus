@@ -349,10 +349,10 @@ struct ConnectedCuadraoHome: View {
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 CuadraoSectionAddButton(title: spanish ? "Añadir movimiento" : "Add activity") {
-                    switch ConnectedAddMovement.target(for: activeAccounts) {
+                    switch ConnectedAddMovement.target(for: activeAccounts, loaded: accounts.hasLoaded) {
                     case .record(let account): loop.record(account)
                     case .choose: choosingAccount = true
-                    case .createAccount: break
+                    case .createAccount, .loadAccounts: break
                     }
                 }
                 .disabled(activeAccounts.isEmpty || loop.pendingConfirmation != nil)
