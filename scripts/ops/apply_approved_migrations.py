@@ -86,6 +86,8 @@ def check_target(
     host = _plain_host(parts.hostname or "")
     if parts.query or parts.fragment:
         raise ApplyError("the database URL must not carry a query or fragment")
+    if "," in host:
+        raise ApplyError("a multi-host database URL is refused")
     if not host or _is_hosted(host) or any(_is_hosted(value) for value in allow_hosts):
         raise ApplyError("hosted Supabase targets are refused by this tool")
     if host not in {_plain_host(value) for value in allow_hosts}:

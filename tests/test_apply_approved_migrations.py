@@ -55,6 +55,7 @@ def test_only_the_named_local_target_is_accepted() -> None:
         "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co.:5432/rehearsal",
         "postgresql://u:p@db%2Eabcdefghijklmnopqrst%2Esupabase%2Eco:5432/rehearsal",
         "postgresql://u:p@supabase.co:5432/rehearsal",
+        "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co%2C127.0.0.1:5432/rehearsal",
     ],
 )
 def test_hosted_unlisted_and_multi_host_targets_are_refused(url: str) -> None:
