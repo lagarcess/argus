@@ -11,6 +11,7 @@ struct CuadraoSpaceSelector: View {
             ForEach(data.visibleSpaces) { space in
                 Button { data.selectedSpaceID = space.id } label: {
                     CuadraoSpaceLabel(title: space.title(spanish), selected: data.selectedSpaceID == space.id)
+                        .contentShape(Rectangle())
                 }.buttonStyle(.plain).id(space.id)
                     .accessibilityAddTraits(data.selectedSpaceID == space.id ? [.isSelected] : [])
                     .accessibilityIdentifier("cuadrao-space-" + space.id)

@@ -232,7 +232,8 @@ Continuation accepts `ARGUS_TEST_HOUSEHOLD_RESUME_STAMP`,
 xctestrun environment. It requires the assigned local fault URL as an allocation
 guard; no fault needs arming for that continuation.
 
-Stable selectors include `household.add`, `household.intro.create/join`,
+Stable selectors include `household.add` (opens the Spaces sheet), `spaces.choice.household`,
+`household.start`, `household.intro.create/join`,
 `household.selector`, `household.people`, `household.share.account.<UUID>`,
 `household.share.member.<membershipUUID>`, `household.share.edit.<membershipUUID>`,
 `household.account.<UUID>`, `household.correct.<activityUUID>`,

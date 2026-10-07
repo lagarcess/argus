@@ -25,6 +25,27 @@ extension FinancialLoopUITests {
         }
     }
 
+    /// The Home "+" opens Spaces; Hogar leads to the household introduction.
+    private func openHouseholdFromSpaces() {
+        tapVisible(app.buttons["household.add"])
+        tapVisible(app.buttons["spaces.choice.household"])
+    }
+
+    func testSpacesSheetLeadsHogarAndKeepsBusinessAndCustomDisabled() throws {
+        try signIn(fresh: true, user: "A")
+        completePriorHouseholdCommand()
+        tapVisible(app.buttons["household.add"])
+        for kind in ["household", "business", "custom"] {
+            XCTAssertTrue(app.descendants(matching: .any)["spaces.choice." + kind].waitForExistence(timeout: 10), kind)
+        }
+        XCTAssertTrue(app.buttons["spaces.manage"].exists)
+        capture("spaces-sheet-connected")
+        tapVisible(app.buttons["spaces.choice.business"])
+        XCTAssertFalse(app.textFields["space-name"].exists, "Business has no backend and must not open a form")
+        tapVisible(app.buttons["spaces.choice.household"])
+        XCTAssertTrue(app.buttons["household.intro.create"].waitForExistence(timeout: 10))
+    }
+
     private func openHouseholdPeople() {
         openAccountsTab()
         tapVisible(app.scrollViews["screen.home"].buttons["household.people"])
@@ -101,7 +122,7 @@ extension FinancialLoopUITests {
         try signIn(fresh: true, user: "A")
         completePriorHouseholdCommand()
         let title = "HH recovery " + String(UUID().uuidString.prefix(6))
-        tapVisible(app.buttons["household.add"])
+        openHouseholdFromSpaces()
         tapVisible(app.buttons["household.intro.create"])
         fillMoneyField("household.name", with: title)
         replaceMoneyField("household.displayName", with: "Household Retry Alice")
@@ -133,7 +154,7 @@ extension FinancialLoopUITests {
 
         try signIn(fresh: true, user: "B")
         completePriorHouseholdCommand()
-        tapVisible(app.buttons["household.add"])
+        openHouseholdFromSpaces()
         tapVisible(app.buttons["household.intro.join"])
         fillMoneyField("household.invite.input", with: invitation)
         dismissMoneyKeyboard(); tapVisible(app.buttons["household.invite.preview"])
@@ -179,7 +200,7 @@ extension FinancialLoopUITests {
         let shared = createMoneyAccount("HH shared " + stamp, type: "checking", amount: "1000")
         let privateAccount = createMoneyAccount("HH private " + stamp, type: "checking", amount: "9000")
         openAccountsTab()
-        tapVisible(app.buttons["household.add"])
+        openHouseholdFromSpaces()
         tapVisible(app.buttons["household.intro.create"])
         fillMoneyField("household.name", with: "HH native " + stamp)
         replaceMoneyField("household.displayName", with: "Household Alice")
@@ -195,13 +216,13 @@ extension FinancialLoopUITests {
 
         try signIn(fresh: true, user: "B")
         completePriorHouseholdCommand()
-        tapVisible(app.buttons["household.add"])
+        openHouseholdFromSpaces()
         tapVisible(app.buttons["household.intro.join"])
         fillMoneyField("household.invite.input", with: invitation)
         dismissMoneyKeyboard(); tapVisible(app.buttons["household.invite.preview"])
         XCTAssertTrue(app.buttons["household.notNow"].waitForExistence(timeout: 15))
         tapVisible(app.buttons["household.notNow"])
-        tapVisible(app.buttons["household.add"])
+        openHouseholdFromSpaces()
         tapVisible(app.buttons["household.intro.join"])
         fillMoneyField("household.invite.input", with: invitation)
         dismissMoneyKeyboard(); tapVisible(app.buttons["household.invite.preview"])

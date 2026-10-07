@@ -92,6 +92,8 @@ enum CuadraoFirstRelease {
     /// Avatar choices, photos included, live only in this session until profile storage exists.
     static var editsAvatar: Bool { !hidesUnfinished }
     static var showsConversationBulkActions: Bool { !hidesUnfinished }
+    /// Business and custom spaces are designed but have no backend, so Release hides them.
+    static var showsExtraSpaces: Bool { !hidesUnfinished }
     static func shows(_ route: CanvasProfileRoute) -> Bool {
         if route == .voice { return CuadraoDesignPreview.voiceSelection }
         return !(hidesUnfinished && unfinishedProfileRoutes.contains(route))
