@@ -9,6 +9,11 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import problem
+from argus.api.document_jobs import (
+    document_jobs_enabled,
+    start_document_jobs,
+    stop_document_jobs,
+)
 from argus.api.ingestion import (
     IngestionContext,
     require_ingestion_context,
@@ -33,6 +38,7 @@ def documents_service() -> DocumentsService | None:
 
 def configure_documents(service: DocumentsService | None) -> None:
     global _service
+    stop_document_jobs()
     _service = service
     _minute.reset()
     _day.reset()
@@ -64,8 +70,13 @@ def _start_documents(app: object, hub: IngestionHub) -> None:
     else:
         store = InMemoryDocumentStore(hub.connections)
     # Register cleanup even when extraction is off, so disconnect still erases it.
-    service = DocumentsService(hub, store, DocumentExtractor())
+    jobs = document_jobs_enabled()
+    service = DocumentsService(
+        hub, store, DocumentExtractor(), jobs_recover_interruptions=jobs
+    )
     configure_documents(service)
+    if jobs:
+        start_document_jobs(service)
 
 
 def require_document_surface(
