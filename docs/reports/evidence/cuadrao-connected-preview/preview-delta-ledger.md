@@ -209,3 +209,26 @@ result, so they are drift in the shared simulator or test user state since the m
 The first journey also failed once before commit `97e53e363`: the connected sheet exposed `loop.confirm`
 while coverage questions were still open, which the journeys treat as "confirmable"; the fix keeps
 `loop.review` until the review is confirmable, as the old editor did.
+
+## Spaces row and sheet (candidate merge of `codex/cuadrao-spaces-sheet-20261007`)
+
+| Item | Checkpoint | Candidate | Reason |
+| --- | --- | --- | --- |
+| Home row, no household | Personal, Hogar and a trailing plus (Hogar is a fixture space) | `Personal   + Hogar` with the plus and pine tint, no trailing plus in release | A grey label that opens a flow reads as locked. The plus names the action and the trailing plus would open a sheet with one real choice. Debug and `--cuadrao-design` keep the trailing plus so Espacios stays reviewable. |
+| Home row, household exists | Personal and household labels | Same, household label opens the existing select, manage menu | Real household state. |
+| `Espacios` sheet | Hogar, Negocio, Personalizado, Gestionar espacios | Same view, driven by `CuadraoSpacesSource`; Hogar works, Negocio and Personalizado show "Próximamente" and are hidden by `CuadraoFirstRelease.showsExtraSpaces` | No backend exists for business or custom spaces; they stay built and hidden. |
+| Hogar flow | Preview introduction | Existing household management screen | Restyling that screen is a separate slice. |
+
+## Final candidate run (2026-10-07)
+
+On the merged candidate: modularity budget clean, ArgusSession tests pass, household runner 53 tests pass,
+model runner 92 tests with only the four #842 failures, Debug and Release simulator builds succeed.
+`run_linux.py` now compiles `PlanScenario.swift` for its plan slice. Its avatar-crop slice, `run_tap_targets`,
+`run_group_preview` and `run_receipt_preview` still fail; the last three fail identically on the base commit.
+
+All eight journeys pass, each in its own bundle: the seven above plus
+`testSpacesSheetLeadsHogarAndKeepsBusinessAndCustomDisabled`. Three journeys needed test fixes, not product fixes:
+the recurring journey brings Home forward before counting its rows, the sign-out helper takes the first matching
+confirm button, and the spaces journey checks the "Próximamente" caption instead of tapping a row that is not a
+button. A first batch failed because the simulator had a hardware-keyboard flag
+(`HardwareKeyboardLastSeen`) that hid the software keyboard; resetting it fixed that.
