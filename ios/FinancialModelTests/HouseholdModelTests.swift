@@ -457,6 +457,44 @@ final class HouseholdModelTests: XCTestCase {
     }
 }
 
+extension HouseholdModelTests {
+    func testSpacesPolicyOffersHogarAsTheWayInUntilAHouseholdExists() {
+        let none = ConnectedSpacesPolicy(households: 0, active: false, pending: false)
+        XCTAssertFalse(none.showsHouseholdMenu)
+        XCTAssertEqual(none.household, .startHousehold)
+        XCTAssertEqual(none.manage, .emptyManage, "Nothing to manage means an honest empty page, not a fake space")
+        XCTAssertEqual(none.extraSpace, .comingSoon, "Business and custom never act: no backend")
+        for existing in [ConnectedSpacesPolicy(households: 1, active: false, pending: false),
+                         ConnectedSpacesPolicy(households: 0, active: true, pending: false),
+                         ConnectedSpacesPolicy(households: 0, active: false, pending: true)] {
+            XCTAssertTrue(existing.showsHouseholdMenu)
+            XCTAssertEqual(existing.manage, .manageHousehold)
+            XCTAssertEqual(existing.household, .startHousehold, "Hogar still leads to create or join")
+        }
+    }
+    func testPolicyReadsTheLiveModelAndStartHouseholdLeavesForTheIntroduction() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login()
+        XCTAssertEqual(ConnectedSpacesPolicy(model: fixture.model).hasHousehold, !fixture.model.households.isEmpty)
+        await fixture.model.select(HouseholdServer.household)
+        XCTAssertTrue(fixture.model.active)
+        XCTAssertTrue(ConnectedSpacesPolicy(model: fixture.model).showsHouseholdMenu)
+        await fixture.model.startHousehold()
+        XCTAssertNil(fixture.model.selectedId, "The introduction opens over Personal")
+        XCTAssertFalse(fixture.model.active)
+        XCTAssertTrue(fixture.model.showManagement)
+    }
+    func testStartHouseholdDoesNothingWhileHouseholdsAreOff() async throws {
+        let fixture = try HouseholdFixture()
+        _ = try await fixture.login(discover: false)
+        await fixture.server.setEnabled(false)
+        await fixture.model.refresh()
+        XCTAssertFalse(fixture.model.isAvailable)
+        await fixture.model.startHousehold()
+        XCTAssertFalse(fixture.model.showManagement)
+    }
+}
+
 @MainActor
 private struct HouseholdFixture {
     let server = HouseholdServer()
