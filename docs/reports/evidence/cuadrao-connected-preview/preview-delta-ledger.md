@@ -178,4 +178,34 @@ See the "Visual proof" section below once the side-by-side captures are listed.
 
 ## Tests
 
-See the "Tests" section below.
+Run on October 6 from this branch at the simulator 8AFB6084 (iPhone 18 Pro, iOS 27) against the local API
+at 127.0.0.1:58900 (allocation `accounts-local-58900`, CAPTCHA bridge 58905).
+
+| Check | Result |
+| --- | --- |
+| `python3 ios/FinancialModelTests/run.py` | 91 tests, 4 failing, the four known #842 failures only (`testEmptyPlanSelectionIsAnExplicitJournaledPut`, `testPlanConfirmationSurvivesRelaunchAndDifferentOwnerCannotReplay`, `testPostSaveHomeWinsOverEarlierRead`, `testSearchAccountNavigationAndAcceptedEditsPreserveAccountsSelection`). |
+| `ios/DesignPreviewTests/run_plan_preview.py`, `run_home_balance.py`, `run_connected_balance.py`, `run_connected_swipe.py`, `run_currency_presentation.py` | all exit 0. |
+| `python3 scripts/check_modularity_budget.py` | no budget violations. |
+| Debug build (`ios/scripts/verify.sh build`) | succeeded. |
+| Release build (`xcodebuild build -configuration Release -destination 'generic/platform=iOS Simulator'`) | succeeded. |
+| UI tests build-for-testing (`ios/scripts/auth/run-ui.py`) | succeeded on every run below. |
+
+The seven journeys that passed on the candidate this morning, each in its own result bundle under
+`ios/.build/accounts-local-58900/` (one test per bundle; a zero-test bundle counts as a failure):
+
+| Journey | This branch | Candidate `779c22f56`, re-run now in a separate worktree |
+| --- | --- | --- |
+| `testHomeMovementOpensDetailAndBackKeepsPosition` | passed 1, failed 0 (`ui-20261006T231915Z`) | not re-run |
+| `testMovementRowSwipesOpenCorrectionAndCategory` | passed 1, failed 0 (`ui-20261006T232204Z`) | not re-run |
+| `testAccountRowSwipesAddEditAndMoreArchive` | passed 1, failed 0 (`ui-20261006T232415Z`) | not re-run |
+| `testRecurringSetupSpanishCopy` | passed 1, failed 0 (`ui-20261006T233036Z`) | not re-run |
+| `testRecurringFromMovementShowsInHomeUpcomingAndFulfilsOnce` | failed at `ConnectedRecurringUITests.swift:46` ("Home keeps its own 30-day window": `homeUpcomingRows` returns 0 while the Plan tab is shown; the Home tab is no longer in the accessibility tree while Plan is selected) (`ui-20261006T232636Z`) | same failure, same line (base worktree `ui-20261006T234344Z`) |
+| `testConnectedReceiptDraftSurvivesRelaunchWithoutPosting` | failed at `ConnectedChrome.swift:131`: the sign-out alert exposes two `auth.signOut.confirm` buttons (`ui-20261006T233315Z`) | same failure, same line (base worktree `ui-20261006T234304Z`) |
+| `testConnectedProfileUsesRealIdentityAndApprovedDestinations` | failed at `ConnectedProfileRecoveryUITests.swift:14`: after tapping `header.profile` the Home tab stays selected (`ui-20261006T233402Z`, repeated `ui-20261006T233849Z`) | same failure, same line (base worktree `ui-20261006T234118Z`) |
+
+The three failures reproduce identically on the untouched candidate commit under the same simulator and API,
+and reverting this branch's root-font change (`0353f232f`) in the working tree did not change the Profile
+result, so they are drift in the shared simulator or test user state since the morning runs, not this diff.
+The first journey also failed once before commit `97e53e363`: the connected sheet exposed `loop.confirm`
+while coverage questions were still open, which the journeys treat as "confirmable"; the fix keeps
+`loop.review` until the review is confirmable, as the old editor did.
