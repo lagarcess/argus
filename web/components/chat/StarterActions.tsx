@@ -75,7 +75,7 @@ export default function StarterActions({
   // Rail chips are user utterances spanning learn, compare, and test; the
   // static set is the universal fallback, never a capability label. Legacy
   // chips keep the shipped test actions with their icons.
-  const argusEntries: StarterEntry[] = researchRailEnabled
+  const entries: StarterEntry[] = researchRailEnabled
     ? (["q1", "q2", "q3"] as const).map((queryKey) => {
         const value = t(
           `chat.example_queries.${queryKey}`,
@@ -120,9 +120,9 @@ export default function StarterActions({
         },
       ];
 
-  const entries = workspaceEntries
+  const pills = workspaceEntries
     ? workspaceEntries.map(({ key, icon, label, onSelect: select }) => ({ key, icon, label, select }))
-    : argusEntries.map(({ key, icon, label, value, metadata }) => ({
+    : entries.map(({ key, icon, label, value, metadata }) => ({
         key,
         icon,
         label,
@@ -149,7 +149,7 @@ export default function StarterActions({
           : "mt-6 flex flex-wrap items-center justify-center gap-3"
       }
     >
-      {entries.map(({ key, icon: Icon, label, select }) => (
+      {pills.map(({ key, icon: Icon, label, select }) => (
         <button
           key={key}
           type="button"

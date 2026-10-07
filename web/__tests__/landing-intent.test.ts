@@ -465,7 +465,7 @@ describe("landing starter prefill wiring", () => {
     expect(empty).toContain("canConsumeLandingStarter");
     expect(empty).toContain("draftText={draftText}");
     expect(empty).toContain(
-      "key={`new-conversation-${landingStarterSurfaceEpoch()}`}",
+      "`new-conversation-${landingStarterSurfaceEpoch()}`",
     );
     expect(input).toContain("draftText");
     expect(input).not.toContain("onSend(draftText");

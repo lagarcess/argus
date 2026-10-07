@@ -65,9 +65,8 @@ export default function EmptyChatSurface({
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
   const { isBelowTablet } = useResponsiveLayout();
-  const landingDraftText = useLandingStarterPrefill(
-    canConsumeLandingStarter && !workspace,
-  );
+  const landingDraftText = useLandingStarterPrefill(canConsumeLandingStarter);
+  const draftText = workspace ? workspace.composer.draftText : landingDraftText;
   const disabled =
     isStreamingResponse ||
     isHydratingConversation ||
@@ -106,16 +105,12 @@ export default function EmptyChatSurface({
       >
         {composerNotice}
         <ChatInput
-          key={
-            workspace
-              ? workspace.composer.draftKey
-              : `new-conversation-${landingStarterSurfaceEpoch()}`
-          }
+          key={workspace?.composer.draftKey ?? `new-conversation-${landingStarterSurfaceEpoch()}`}
           onSend={onSend}
           disabled={disabled}
           placeholder={workspace?.composer.placeholder ?? placeholder}
           onToast={onToast}
-          draftText={workspace ? workspace.composer.draftText : landingDraftText}
+          draftText={draftText}
           leadingControl={workspace?.composer.leadingControl}
           onDraftChange={workspace?.composer.onDraftChange}
         />
