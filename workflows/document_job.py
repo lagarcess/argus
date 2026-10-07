@@ -31,11 +31,6 @@ from argus.domain.recording.postgres_repository import (
 from argus.domain.recording.service import FinancialAccountService
 from psycopg_pool import ConnectionPool
 
-try:
-    from workflows.proof import require_database_url
-except ModuleNotFoundError:  # pragma: no cover - supports `python workflows/main.py`
-    from proof import require_database_url
-
 
 def _clock() -> datetime:
     return datetime.now(timezone.utc)
@@ -89,6 +84,13 @@ async def run_document_preparation(
     objects: SourceObjects | None = None,
     extractor: Extractor | None = None,
 ) -> dict[str, str]:
+    # Imported per run, as main.py's siblings are, so importing main.py never
+    # depends on proof.py's names.
+    try:
+        from workflows.proof import require_database_url
+    except ModuleNotFoundError:  # pragma: no cover - `python workflows/main.py`
+        from proof import require_database_url
+
     objects = objects if objects is not None else storage_source_objects(env)
     with ConnectionPool(
         require_database_url(env),
