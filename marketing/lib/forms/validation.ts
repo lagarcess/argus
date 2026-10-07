@@ -39,6 +39,13 @@ export function emailDigest(normalized: string): string {
   return createHash("sha256").update(normalized).digest("hex");
 }
 
+// One bare address. A list, a display name or a line break is refused so a
+// configured mailbox can never become several recipients.
+export function parseMailbox(value: string | undefined): string | null {
+  const address = value?.trim().toLowerCase() ?? "";
+  return validEmail(address) ? address : null;
+}
+
 function validEmail(value: string): boolean {
   return value.length <= LIMITS.email && EMAIL.test(value) && !LINE_BREAK.test(value);
 }

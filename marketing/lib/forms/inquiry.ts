@@ -1,4 +1,3 @@
-import { businessContactEmail } from "../../components/site-copy";
 import { PROVIDER_TIMEOUT_MS, type FormsConfig } from "./config";
 import { clientKey, isSameOrigin, jsonResponse, logEvent, readJsonBody } from "./http";
 import { WindowLimiter } from "./rate-limit";
@@ -43,7 +42,7 @@ async function sendThroughResend(
     },
     body: JSON.stringify({
       from: config.inquiryFrom,
-      to: [businessContactEmail],
+      to: [config.inquiryTo],
       reply_to: input.email,
       subject: `Cuadrao: nueva consulta de ${input.name}`.slice(0, 200),
       text: inquiryText(input),
@@ -66,7 +65,9 @@ export async function handleInquiry(request: Request, deps: InquiryDeps): Promis
   const result = validateInquiry(parsed.body);
   if (!result.ok) return jsonResponse(400, { error: "invalid", fields: result.fields });
   const { config } = deps;
-  if (!config.resendApiKey || !config.inquiryFrom) {
+  // No default recipient: the destination is the founder's choice, and a
+  // message must never go to an address nobody has confirmed receives mail.
+  if (!config.resendApiKey || !config.inquiryFrom || !config.inquiryTo) {
     logEvent("inquiry_unavailable", { reason: "not_configured" });
     return jsonResponse(503, { error: "unavailable" });
   }

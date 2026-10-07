@@ -22,7 +22,7 @@ for (const locale of ["es", "en"] as const) {
   const copy = COPY[locale];
 
   test.describe(`contact form ${locale}`, () => {
-    test("sends one message that reaches the inbox with the visitor as reply-to", async ({ page, request }, info) => {
+    test("sends one message that reaches the configured inbox with the visitor as reply-to", async ({ page, request }, info) => {
       const address = uniqueAddress(info);
       await page.goto(copy.path);
       await page.locator("#contact-name").fill("Marisol Peña");
@@ -33,7 +33,7 @@ for (const locale of ["es", "en"] as const) {
 
       const { emails } = await mockState(request);
       expect(emails).toHaveLength(1);
-      expect(emails[0].to).toEqual(["hola@cuadrao.ai"]);
+      expect(emails[0].to).toEqual(["inbox@example.test"]);
       expect(emails[0].reply_to).toBe(address);
       expect(emails[0].text).toContain("Marisol Peña");
       expect(emails[0].text).toContain("ferretería");
