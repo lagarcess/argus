@@ -29,7 +29,8 @@ final class ProfileAuthModel: ObservableObject {
     convenience init() {
         var loadedConfiguration: NativeAuthConfiguration?
         var loadedController: SessionController?
-        var initialState = State.disabled
+        // A Release build without auth configuration reports it; it never falls back to the sample shell.
+        var initialState = CuadraoFirstRelease.hidesUnfinished ? State.configurationInvalid : State.disabled
         do {
             loadedConfiguration = try NativeAuthConfiguration.load()
             if let loadedConfiguration {

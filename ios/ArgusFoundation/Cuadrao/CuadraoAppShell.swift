@@ -13,6 +13,7 @@ struct CuadraoAppShell<Content: View>: View {
     let avatar: CuadraoAvatarSelection
     let profileName: String
     var showProposal: (() -> Void)? = nil
+    var add: () -> Void = {}
     @ViewBuilder let content: (Binding<CuadraoTab>) -> Content
     @State private var pendingTab: CuadraoTab?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -28,7 +29,7 @@ struct CuadraoAppShell<Content: View>: View {
                         ZStack {
                             if chat.voiceMessage.state != .recording {
                                 CuadraoNavigationBar(selection: tabSelection, compact: compact, spanish: spanish,
-                                    avatar: avatar, profileName: profileName)
+                                    avatar: avatar, profileName: profileName, add: add)
                                     .padding(.horizontal, 20)
                                     .frame(height: 64, alignment: .bottom)
                                     .padding(.bottom, 8)
@@ -42,7 +43,7 @@ struct CuadraoAppShell<Content: View>: View {
             .cuadraoSoftScrollEdges()
             .cuadraoVoicePresentation(chat: chat, spanish: spanish, ownsPresentation: chat.voiceContextOwner == nil,
                 keyboard: {
-                    selection = .assistant
+                    if CuadraoFirstRelease.hasAssistant { selection = .assistant }
                     chat.voice.presentation = .keyboard
                 }, showProposal: showProposal.map { show in {
                     show()
@@ -68,6 +69,7 @@ struct CuadraoAppShell<Content: View>: View {
 
     private var tabSelection: Binding<CuadraoTab> {
         Binding(get: { selection }, set: { next in
+            if next == .assistant && !CuadraoFirstRelease.hasAssistant { return }
             if selection == .assistant && next != .assistant && chat.hasTemporaryContent {
                 pendingTab = next
             } else {

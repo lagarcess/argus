@@ -1,4 +1,5 @@
 import SwiftUI
+import ArgusSession
 
 struct ConnectedCuadraoShell: View {
     @Binding var appearance: AppearancePreference
@@ -14,6 +15,7 @@ struct ConnectedCuadraoShell: View {
     @State private var chat = CuadraoChatPreview(spanish: Locale.current.language.languageCode?.identifier == "es", includeExamples: false)
     @State private var chatEditing = false
     @State private var searchDetail = false
+    @State private var choosingAddAccount = false
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -42,8 +44,8 @@ struct ConnectedCuadraoShell: View {
     private func shell(allowsHouseholdNavigation: Bool) -> some View {
         CuadraoAppShell(selection: $tab, chat: chat, spanish: spanish,
             showsNavigation: showsNavigation && allowsHouseholdNavigation, compact: tab == .home && navigationScroll.compact,
-            avatar: avatar, profileName: auth.profile?.displayName ?? "") { _ in
-            ForEach(CuadraoTab.allCases) { item in
+            avatar: avatar, profileName: auth.profile?.displayName ?? "", add: addMovement) { _ in
+            ForEach(CuadraoTab.allCases.filter { $0 != .assistant || CuadraoFirstRelease.hasAssistant }) { item in
                 tabContent(item)
                     .toolbar(.hidden, for: .tabBar)
                     .tag(item)
@@ -80,6 +82,13 @@ struct ConnectedCuadraoShell: View {
                     .foregroundStyle(ArgusStyle.ink)
             }
         }
+        .confirmationDialog("loop.chooseAccount", isPresented: $choosingAddAccount, titleVisibility: .visible) {
+            ForEach(addableAccounts) { account in
+                Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) {
+                    auth.financialLoop?.record(account)
+                }
+            }
+        }
         .connectedReceiptDrafts(
             userID: auth.profile.flatMap { UUID(uuidString: $0.id) },
             chat: chat,
@@ -108,7 +117,7 @@ struct ConnectedCuadraoShell: View {
     @ViewBuilder private func tabContent(_ item: CuadraoTab) -> some View {
         if item != .profile && item != .assistant, let household = auth.household {
             HouseholdDestinationRouter(model: household, tab: householdTab(item), active: tab == item, destination: $destination,
-                navigationScroll: navigationScroll, showUpdates: { sheet = .updates }) { personalTabContent(item) }
+                navigationScroll: navigationScroll, showUpdates: updatesAction) { personalTabContent(item) }
         } else { personalTabContent(item) }
     }
 
@@ -117,7 +126,7 @@ struct ConnectedCuadraoShell: View {
         case .home:
             if let loop = auth.financialLoop, let accounts = auth.accounts {
                 ConnectedCuadraoHome(loop: loop, accounts: accounts, tab: $tab, homePath: $homePath,
-                                     navigationScroll: navigationScroll, showUpdates: { sheet = .updates })
+                                     navigationScroll: navigationScroll, showUpdates: updatesAction)
             } else {
                 ProgressView("accounts.loading")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -136,6 +145,25 @@ struct ConnectedCuadraoShell: View {
             FinancialSearchDestination(active: tab == .search, showProfile: { tab = .profile }, nativePlanNavigation: true, detailChanged: { searchDetail = $0 })
         case .profile:
             ConnectedCuadraoProfile(appearance: $appearance, avatar: $avatar, path: $profilePath)
+        }
+    }
+
+    private var updatesAction: (() -> Void)? {
+        CuadraoFirstRelease.showsUpdates ? { sheet = .updates } : nil
+    }
+
+    private var addableAccounts: [FinancialAccount] {
+        let live = (auth.accounts?.accounts ?? []).filter { !$0.archived }
+        return ConnectedAccountOrder.applying(auth.profile.map { ConnectedAccountOrder.load(for: $0.id) } ?? [], to: live)
+    }
+
+    /// The navigation "+" records a movement from any tab, through the same rule as Home's Activity "+".
+    private func addMovement() {
+        guard let loop = auth.financialLoop, let accounts = auth.accounts, loop.pendingConfirmation == nil else { return }
+        switch ConnectedAddMovement.target(for: addableAccounts) {
+        case .createAccount: accounts.create()
+        case .record(let account): loop.record(account)
+        case .choose: choosingAddAccount = true
         }
     }
 
@@ -173,7 +201,7 @@ struct ConnectedCuadraoShell: View {
         case .home:
             tab = .home
             if !homePath.isEmpty { homePath = [] }
-        case .argus: tab = .assistant
+        case .argus: if CuadraoFirstRelease.hasAssistant { tab = .assistant }
         }
     }
 

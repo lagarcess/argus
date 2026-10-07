@@ -9,7 +9,7 @@ struct ConnectedCuadraoHome: View {
     @Binding var tab: CuadraoTab
     @Binding var homePath: [ConnectedHomeRoute]
     let navigationScroll: CuadraoNavigationScroll
-    let showUpdates: () -> Void
+    let showUpdates: (() -> Void)?
 
     @AppStorage("cuadrao.design.home-section-order") private var homeOrder = CuadraoHomeSection.defaultOrder
     @EnvironmentObject private var auth: ProfileAuthModel
@@ -41,7 +41,7 @@ struct ConnectedCuadraoHome: View {
     }
 
     init(loop: FinancialLoopModel, accounts: AccountsModel, tab: Binding<CuadraoTab>,
-         homePath: Binding<[ConnectedHomeRoute]>, navigationScroll: CuadraoNavigationScroll, showUpdates: @escaping () -> Void) {
+         homePath: Binding<[ConnectedHomeRoute]>, navigationScroll: CuadraoNavigationScroll, showUpdates: (() -> Void)?) {
         self.loop = loop
         self.accounts = accounts
         self.plan = loop.plan
@@ -217,7 +217,7 @@ struct ConnectedCuadraoHome: View {
         HStack {
             CuadraoHomeGreeting(name: auth.profile?.preferredName ?? "", spanish: spanish)
             Spacer()
-            CuadraoUpdatesButton(spanish: spanish, action: showUpdates)
+            if let showUpdates { CuadraoUpdatesButton(spanish: spanish, action: showUpdates) }
         }
     }
 
@@ -349,10 +349,10 @@ struct ConnectedCuadraoHome: View {
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 CuadraoSectionAddButton(title: spanish ? "Añadir movimiento" : "Add activity") {
-                    if activeAccounts.count == 1, let account = activeAccounts.first {
-                        loop.record(account)
-                    } else {
-                        choosingAccount = true
+                    switch ConnectedAddMovement.target(for: activeAccounts) {
+                    case .record(let account): loop.record(account)
+                    case .choose: choosingAccount = true
+                    case .createAccount: break
                     }
                 }
                 .disabled(activeAccounts.isEmpty || loop.pendingConfirmation != nil)
