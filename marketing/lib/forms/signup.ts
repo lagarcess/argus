@@ -45,7 +45,7 @@ async function storeSignup(
 
 export async function handleSignup(request: Request, deps: SignupDeps): Promise<Response> {
   if (!isSameOrigin(request)) return jsonResponse(403, { error: "forbidden" });
-  const wait = deps.perClient.check(clientKey(request)) ?? deps.overall.check("all");
+  const wait = deps.perClient.check(clientKey(request, deps.config.trustedClientIpHeader));
   if (wait !== null) {
     return jsonResponse(429, { error: "rate_limited" }, { "Retry-After": String(wait) });
   }
@@ -54,6 +54,11 @@ export async function handleSignup(request: Request, deps: SignupDeps): Promise<
   if (isHoneypotFilled(parsed.body)) return jsonResponse(200, { status: "registered" });
   const result = validateSignup(parsed.body);
   if (!result.ok) return jsonResponse(400, { error: "invalid", fields: result.fields });
+  // Only a valid signup spends the shared allowance, so junk cannot exhaust it.
+  const overall = deps.overall.check("all");
+  if (overall !== null) {
+    return jsonResponse(429, { error: "rate_limited" }, { "Retry-After": String(overall) });
+  }
   const { config } = deps;
   if (!config.supabaseUrl || !config.supabaseServiceKey) {
     logEvent("signup_unavailable", { reason: "not_configured" });

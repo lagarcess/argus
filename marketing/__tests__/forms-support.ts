@@ -7,6 +7,7 @@ export const CONFIG: FormsConfig = {
   inquiryFrom: "Cuadrao <website@notify.example.test>",
   supabaseUrl: "https://project.supabase.test",
   supabaseServiceKey: "service-role-test-key",
+  trustedClientIpHeader: null,
 };
 
 export const SUBMISSION_ID = "6f1c2b9e-8a4d-4c1e-9b7a-3d5e7f9a1b2c";

@@ -91,7 +91,7 @@ describe("notice sending", () => {
     const { fetch: doFetch, calls } = recordingFetch(() => Response.json({ id: "x" }));
     const plan = planNotice([row("a@example.invalid", "en")], null);
     const result = await sendNotice(ops, template, plan, doFetch, () => new Date("2026-10-09T00:00:00Z"));
-    expect(result).toEqual({ sent: 1, failed: 0 });
+    expect(result).toEqual({ sent: 1, failed: 0, sentNotRecorded: 0 });
     const email = JSON.parse(String(calls[0].init.body));
     expect(email.to).toEqual(["a@example.invalid"]);
     expect(email.subject).toBe("You can try Cuadrao");
@@ -106,8 +106,23 @@ describe("notice sending", () => {
   test("a failed send is counted and is not stamped", async () => {
     const { fetch: doFetch, calls } = recordingFetch(() => new Response("", { status: 422 }));
     const result = await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
-    expect(result).toEqual({ sent: 0, failed: 1 });
+    expect(result).toEqual({ sent: 0, failed: 1, sentNotRecorded: 0 });
     expect(calls).toHaveLength(1);
+  });
+
+  test("a sent message whose stamp fails is reported apart from a failed send", async () => {
+    const { fetch: doFetch, calls } = recordingFetch((call) =>
+      call.init.method === "PATCH" ? new Response("", { status: 500 }) : Response.json({ id: "x" }),
+    );
+    const result = await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
+    expect(result).toEqual({ sent: 1, failed: 0, sentNotRecorded: 1 });
+    expect(calls).toHaveLength(2);
+  });
+
+  test("the stamp only applies to a row that is still active", async () => {
+    const { fetch: doFetch, calls } = recordingFetch(() => Response.json({ id: "x" }));
+    await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
+    expect(calls[1].url).toContain("&removed_at=is.null");
   });
 
   test("a test send neither stamps nor shares an idempotency key with the real notice", async () => {

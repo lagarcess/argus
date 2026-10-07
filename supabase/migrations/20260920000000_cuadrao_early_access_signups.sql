@@ -11,8 +11,8 @@
 -- again, and the visitor cannot tell a new address from a removed one.
 --
 -- Dated after main's latest migration and before the first newer integration
--- migration, so it orders correctly on both branches and a bounded promotion
--- to main does not put it ahead of migrations production has not applied.
+-- migration, so a fresh replay orders it correctly on both branches. A database
+-- that already applied the newer integration migrations needs --include-all.
 --
 -- Only the marketing service writes this table, through service_role. RLS is on
 -- with no policy, and anon and authenticated hold no privilege, so the project's
@@ -52,7 +52,9 @@ comment on table public.cuadrao_early_access_signups is
 
 alter table public.cuadrao_early_access_signups enable row level security;
 
+-- service_role is revoked too: hosted Supabase grants it every privilege on a
+-- new table by default, including delete, which would let suppression rows go.
 revoke all on table public.cuadrao_early_access_signups
-    from public, anon, authenticated;
+    from public, anon, authenticated, service_role;
 grant select, insert, update on table public.cuadrao_early_access_signups
     to service_role;

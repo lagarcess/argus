@@ -10,9 +10,13 @@ export function jsonResponse(
   return Response.json(body, { status, headers: { ...NO_STORE, ...headers } });
 }
 
-export function clientKey(request: Request): string {
+// Render appends the address it saw to any X-Forwarded-For the client sent, so
+// the rightmost entry is the only one the client cannot choose. When a trusted
+// proxy such as Cloudflare sits in front, name the header it sets instead.
+export function clientKey(request: Request, trustedHeader: string | null = null): string {
+  if (trustedHeader) return request.headers.get(trustedHeader)?.trim() || "unknown";
   const forwarded = request.headers.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || "unknown";
+  return forwarded?.split(",").at(-1)?.trim() || "unknown";
 }
 
 // The page posts from its own origin. A browser at another origin could only

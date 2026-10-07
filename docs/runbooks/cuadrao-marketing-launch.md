@@ -27,6 +27,8 @@ Measured 2026-10-07 with `git fetch origin`:
 
 It carries no change to `web/`, `src/`, `ios/` or any other migration. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so it orders correctly on both branches. Identical content merges cleanly when integration is later promoted.
 
+Applying it to a database that already holds the newer integration migrations (a staging project that tracks integration) needs `--include-all`; confirm that database's applied list first. Production has none of them.
+
 Option B departs from the usual "main is promoted from integration" practice. It needs the founder's approval as a workflow exception before the second PR is opened. The exact file list is regenerated from `git diff --name-status origin/main...<candidate>` and posted with the request.
 
 ## 2. Render service
@@ -110,7 +112,7 @@ After hosted acceptance and the founder's publication approval, coordinating wit
 1. Save a sanitized before-state of Cloudflare records and Render custom domains.
 2. In Render add `cuadrao.ai`; Render adds `www.cuadrao.ai` and redirects it to the apex automatically. Use the exact DNS targets Render displays for the apex and `www`; do not assume an apex CNAME.
 3. Keep the records DNS only (grey cloud) so Render issues and renews the certificate. If the domain has CAA records they must allow Let's Encrypt and Google Trust Services.
-4. Set `CUADRAO_SITE_INDEXING=public` and restart.
+4. Set `CUADRAO_SITE_INDEXING=public` and restart. If the records were instead proxied through Cloudflare, also set `CUADRAO_TRUSTED_CLIENT_IP_HEADER=CF-Connecting-IP`; behind a proxy the rightmost `X-Forwarded-For` entry would be the proxy, not the visitor.
 5. Verify HTTPS, certificate, apex/www redirect, language routes, old `/business` redirects, titles, favicon, canonical, hreflang, sitemap, robots and share previews on the public origin; repeat the inquiry and signup/removal journeys; verify Search Console ownership and submit `https://cuadrao.ai/sitemap.xml`. Record the submission; do not promise indexing.
 6. Rollback: set `CUADRAO_SITE_INDEXING` back to unset, remove the two Render custom domains and restore the saved DNS records. Registrations and suppression records are untouched.
 

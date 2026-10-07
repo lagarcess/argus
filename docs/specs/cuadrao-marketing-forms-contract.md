@@ -18,7 +18,7 @@ Owns the two public form endpoints of the independent `marketing/` package: Busi
 - Validation is on the server. Errors name fields, never echo values.
 - A request whose `Origin` header names another host is refused with 403. No CORS headers are sent.
 - A hidden `website` field is a honeypot. When filled, the route answers as if it succeeded and sends or stores nothing.
-- Limits are in-memory counters in the single service instance. A restart forgets them. They slow scripts down and are not a security boundary. Per client (first `X-Forwarded-For` entry): inquiries 5 per 10 minutes, signups 8 per 10 minutes. Per address: inquiries 3 per hour. Overall: inquiries 60 per hour, signups 300 per hour. Over a limit the answer is 429 with `Retry-After`.
+- Limits are in-memory counters in the single service instance. A restart forgets them. They slow scripts down and are not a security boundary. Per client: inquiries 5 per 10 minutes, signups 8 per 10 minutes. The client is the rightmost `X-Forwarded-For` entry, which Render appends and a caller cannot choose; behind a proxy such as Cloudflare, `CUADRAO_TRUSTED_CLIENT_IP_HEADER` names the header it sets (for example `CF-Connecting-IP`). Per address: inquiries 3 per hour. Overall: inquiries 60 per hour, signups 300 per hour. Only requests that passed validation (and are not honeypot hits) spend an overall allowance. Over a limit the answer is 429 with `Retry-After`.
 - Provider calls time out after 10 seconds. A timeout, a provider error or missing configuration is 503 `unavailable`. Nothing reports success it did not receive.
 - Logs carry an event name and an outcome only. They never carry a name, address, message or digest.
 
@@ -74,7 +74,7 @@ Migration `supabase/migrations/20260920000000_cuadrao_early_access_signups.sql`.
 | `source` | `personal-page`, `operator-removal`. |
 | `created_at`, `notified_at`, `removed_at` | Registration, one availability notice sent, removal. |
 
-Checks make the table refuse inconsistent rows: an address exists exactly while `removed_at` is null, and the digest must equal the SHA-256 of the stored address. RLS is on with no policy, `anon` and `authenticated` hold no privilege, and `service_role` holds select, insert and update but not delete. Visitors have no Argus account, so nothing references `auth.users`.
+Checks make the table refuse inconsistent rows: an address exists exactly while `removed_at` is null, and the digest must equal the SHA-256 of the stored address. RLS is on with no policy, `anon` and `authenticated` hold no privilege, and `service_role` holds select, insert and update but not delete. The migration revokes from `service_role` explicitly because hosted Supabase grants it every privilege on new tables by default. Visitors have no Argus account, so nothing references `auth.users`.
 
 ## Removal and suppression
 
@@ -88,7 +88,7 @@ The page promises one message when access is available. The operator sends it wi
 - A template must carry a Spanish and an English subject and text, and every text must name `hola@cuadrao.ai` so the reader can opt out.
 - The default is a dry run that prints counts. A full send needs `--send` and `--expect <count>` equal to the recipients selected.
 - `--only a@x,b@y` sends to named approved test addresses, never stamps `notified_at`, and uses a different idempotency key from the real send.
-- Each message uses `notice-<template id>-<digest>` as its idempotency key and stamps `notified_at` only after Resend accepts it, so a rerun does not message anyone twice.
+- Each message uses `notice-<template id>-<digest>` as its idempotency key and stamps `notified_at` only after Resend accepts it, so a rerun within Resend's 24-hour key window does not message anyone twice. The stamp applies only to a row that is still active. A message that was sent but whose stamp failed is reported as `sentNotRecorded`, separately from `failed`; resolve those by hand before any rerun, because after 24 hours the same key no longer protects them.
 
 Early-access consent covers this availability notice only. It is not marketing consent and does not feed `news.cuadrao.ai` ([#892](https://github.com/lagarcess/argus/issues/892)).
 
@@ -105,6 +105,7 @@ None at launch. Durable signup does not depend on a second message. The cost is 
 | `SUPABASE_URL` | Signups, operator tool | No |
 | `SUPABASE_SERVICE_ROLE_KEY` | Signups, operator tool | Yes |
 | `CUADRAO_SITE_INDEXING` | `public` on the approved public host only | No |
+| `CUADRAO_TRUSTED_CLIENT_IP_HEADER` | Only if a trusted proxy sits in front, for example `CF-Connecting-IP`; unset on the Render address | No |
 | `RESEND_API_URL` | Defaults to `https://api.resend.com`; tests point it at a mock | No |
 | `CUADRAO_NOTICE_FROM` | Operator notice tool only, never set on Render | No |
 

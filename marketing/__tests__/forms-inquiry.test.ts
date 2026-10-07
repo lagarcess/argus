@@ -171,6 +171,39 @@ describe("inquiry limits", () => {
   });
 });
 
+describe("inquiry client identity", () => {
+  test("a spoofed leftmost X-Forwarded-For does not get a fresh allowance", async () => {
+    const { deps: d } = deps();
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await handleInquiry(
+        jsonRequest("/api/inquiries", inquiryBody({ email: `p${attempt}@example.invalid` }), {
+          "x-forwarded-for": `198.51.100.${attempt}, 203.0.113.7`,
+        }),
+        d,
+      );
+      statuses.push(response.status);
+    }
+    expect(statuses).toEqual([202, 202, 202, 202, 202, 429]);
+  });
+
+  test("a configured trusted header names the client instead", async () => {
+    const { deps: d } = deps(accepted, { ...CONFIG, trustedClientIpHeader: "CF-Connecting-IP" });
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await handleInquiry(
+        jsonRequest("/api/inquiries", inquiryBody({ email: `q${attempt}@example.invalid` }), {
+          "x-forwarded-for": `198.51.100.${attempt}`,
+          "cf-connecting-ip": "192.0.2.9",
+        }),
+        d,
+      );
+      statuses.push(response.status);
+    }
+    expect(statuses).toEqual([202, 202, 202, 202, 202, 429]);
+  });
+});
+
 describe("inquiry logging", () => {
   test("never writes the visitor's name, address or message", async () => {
     const logs = captureLogs();

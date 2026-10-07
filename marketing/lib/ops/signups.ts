@@ -149,9 +149,10 @@ export async function sendNotice(
   plan: NoticePlan,
   doFetch: typeof fetch,
   now: () => Date = () => new Date(),
-): Promise<{ sent: number; failed: number }> {
+): Promise<{ sent: number; failed: number; sentNotRecorded: number }> {
   let sent = 0;
   let failed = 0;
+  let sentNotRecorded = 0;
   for (const row of plan.recipients) {
     const key = `${plan.stamp ? "notice" : "notice-test"}-${template.id}-${row.email_digest}`;
     try {
@@ -172,23 +173,29 @@ export async function sendNotice(
         signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      if (plan.stamp) {
-        await checked(
-          await doFetch(table(config, `?email_digest=eq.${row.email_digest}`), {
-            method: "PATCH",
-            headers: restHeaders(config, { Prefer: "return=minimal" }),
-            body: JSON.stringify({ notified_at: now().toISOString() }),
-            signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-          }),
-          "recording the notice",
-        );
-      }
-      sent += 1;
     } catch {
       failed += 1;
+      continue;
+    }
+    sent += 1;
+    if (!plan.stamp) continue;
+    // The message is out. A failed stamp is reported on its own, because
+    // sending that row again after the idempotency window would double-send.
+    try {
+      await checked(
+        await doFetch(table(config, `?email_digest=eq.${row.email_digest}&removed_at=is.null`), {
+          method: "PATCH",
+          headers: restHeaders(config, { Prefer: "return=minimal" }),
+          body: JSON.stringify({ notified_at: now().toISOString() }),
+          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+        }),
+        "recording the notice",
+      );
+    } catch {
+      sentNotRecorded += 1;
     }
   }
-  return { sent, failed };
+  return { sent, failed, sentNotRecorded };
 }
 
 export type { OpsConfig };

@@ -128,6 +128,22 @@ describe("signup input handling", () => {
   });
 });
 
+describe("signup shared allowance", () => {
+  const from = (ip: string, body: Record<string, unknown>) =>
+    jsonRequest("/api/signups", { locale: "es", ...body }, { "x-forwarded-for": ip });
+
+  test("invalid and honeypot requests do not spend the shared allowance", async () => {
+    const { deps: d } = deps();
+    const tight = { ...d, overall: new WindowLimiter(1, 3_600_000, () => 1_000_000) };
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      await handleSignup(from(`192.0.2.${attempt}`, { email: "nope" }), tight);
+      await handleSignup(from(`198.51.100.${attempt}`, { email: "a@example.invalid", website: "x" }), tight);
+    }
+    expect((await handleSignup(from("203.0.113.1", { email: "one@example.invalid" }), tight)).status).toBe(200);
+    expect((await handleSignup(from("203.0.113.2", { email: "two@example.invalid" }), tight)).status).toBe(429);
+  });
+});
+
 describe("signup logging", () => {
   test("never writes the address", async () => {
     const logs = captureLogs();

@@ -56,7 +56,7 @@ async function sendThroughResend(
 
 export async function handleInquiry(request: Request, deps: InquiryDeps): Promise<Response> {
   if (!isSameOrigin(request)) return jsonResponse(403, { error: "forbidden" });
-  const wait = deps.perClient.check(clientKey(request));
+  const wait = deps.perClient.check(clientKey(request, deps.config.trustedClientIpHeader));
   if (wait !== null) {
     return jsonResponse(429, { error: "rate_limited" }, { "Retry-After": String(wait) });
   }

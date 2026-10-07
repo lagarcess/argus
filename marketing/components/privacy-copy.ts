@@ -44,7 +44,7 @@ const es: PrivacyCopy = {
       title: "Quién procesa los datos",
       items: [
         "Render aloja el sitio y puede registrar datos técnicos de la conexión, como la dirección IP.",
-        "Resend envía el correo con tu mensaje al buzón de Cuadrao.",
+        "Resend envía el correo con tu mensaje al buzón de Cuadrao y, más adelante, el aviso de acceso anticipado a quienes se registraron. Puede conservar sus propios registros de envío.",
         "Supabase guarda los registros de acceso anticipado en servidores de Estados Unidos (Ohio).",
         "Cloudflare administra el dominio cuadrao.ai.",
       ],
@@ -96,7 +96,7 @@ const en: PrivacyCopy = {
       title: "Who processes the data",
       items: [
         "Render hosts the site and may log technical connection data, such as the IP address.",
-        "Resend sends the email with your message to Cuadrao's mailbox.",
+        "Resend sends the email with your message to Cuadrao's mailbox and, later, the early-access notice to people who signed up. It may keep its own sending logs.",
         "Supabase stores early-access signups on servers in the United States (Ohio).",
         "Cloudflare manages the cuadrao.ai domain.",
       ],

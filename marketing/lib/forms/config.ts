@@ -4,6 +4,7 @@ export type FormsConfig = {
   inquiryFrom: string | null;
   supabaseUrl: string | null;
   supabaseServiceKey: string | null;
+  trustedClientIpHeader: string | null;
 };
 
 function value(raw: string | undefined): string | null {
@@ -18,6 +19,7 @@ export function readFormsConfig(env: Record<string, string | undefined>): FormsC
     inquiryFrom: value(env.CUADRAO_INQUIRY_FROM),
     supabaseUrl: value(env.SUPABASE_URL),
     supabaseServiceKey: value(env.SUPABASE_SERVICE_ROLE_KEY),
+    trustedClientIpHeader: value(env.CUADRAO_TRUSTED_CLIENT_IP_HEADER),
   };
 }
 
