@@ -9,6 +9,7 @@ import {
   internalPath,
   nextRedirects,
   nextRewrites,
+  pageUrl,
   pageFromSlug,
   slugSegments,
 } from "../lib/site-routes";
@@ -29,7 +30,7 @@ describe("public URL map", () => {
 
   test("every route is canonical on the public origin", () => {
     for (const route of SITE_ROUTES) {
-      expect(route.url).toBe(`${SITE_ORIGIN}${route.path === "/" ? "/" : route.path}`);
+      expect(route.url).toBe(`${SITE_ORIGIN}${route.path === "/" ? "" : route.path}`);
     }
   });
 
@@ -55,8 +56,8 @@ describe("public URL map", () => {
 describe("alternates", () => {
   test.each(PAGES)("%s links both languages and defaults to Spanish", (page) => {
     const alternates = alternateLanguages(page);
-    expect(alternates.es).toBe(`${SITE_ORIGIN}${businessPath("es", page)}`);
-    expect(alternates.en).toBe(`${SITE_ORIGIN}${businessPath("en", page)}`);
+    expect(alternates.es).toBe(pageUrl("es", page));
+    expect(alternates.en).toBe(pageUrl("en", page));
     expect(alternates["x-default"]).toBe(alternates.es);
   });
 });

@@ -40,11 +40,20 @@ export function businessPath(
   return `${prefix}${slug ? `/${slug}` : ""}` || "/";
 }
 
+// The Spanish home is the origin itself, with no trailing slash, which is the
+// form the canonical link and the sitemap both use.
+export function pageUrl(locale: BusinessLocale, page: BusinessPage): string {
+  const path = businessPath(locale, page);
+  return `${SITE_ORIGIN}${path === "/" ? "" : path}`;
+}
+
 export const SITE_ROUTES: readonly SiteRoute[] = LOCALES.flatMap((locale) =>
-  PAGES.map((page) => {
-    const path = businessPath(locale, page);
-    return { locale, page, path, url: `${SITE_ORIGIN}${path}` };
-  }),
+  PAGES.map((page) => ({
+    locale,
+    page,
+    path: businessPath(locale, page),
+    url: pageUrl(locale, page),
+  })),
 );
 
 // The App Router tree is /[locale]/[[...slug]]. Spanish is served at the
@@ -69,7 +78,7 @@ export function slugSegments(locale: BusinessLocale, page: BusinessPage): string
 
 export function alternateLanguages(page: BusinessPage): Record<string, string> {
   const urls = Object.fromEntries(
-    LOCALES.map((locale) => [locale, `${SITE_ORIGIN}${businessPath(locale, page)}`]),
+    LOCALES.map((locale) => [locale, pageUrl(locale, page)]),
   );
   return { ...urls, "x-default": urls.es };
 }

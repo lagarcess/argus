@@ -10,6 +10,10 @@
 -- with it and is ignored, so a removed address is never registered or notified
 -- again, and the visitor cannot tell a new address from a removed one.
 --
+-- Dated after main's latest migration and before the first newer integration
+-- migration, so it orders correctly on both branches and a bounded promotion
+-- to main does not put it ahead of migrations production has not applied.
+--
 -- Only the marketing service writes this table, through service_role. RLS is on
 -- with no policy, and anon and authenticated hold no privilege, so the project's
 -- public API keys cannot read or write it.
