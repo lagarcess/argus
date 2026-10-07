@@ -54,6 +54,19 @@ class DocumentStore(Protocol):
         """Owner and connection of drafts awaiting preparation or a retry."""
         ...
 
+    def mark_provider_call(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        attempt_id: str,
+        holder: str,
+        now: datetime,
+    ) -> bool:
+        """Record that ``attempt_id`` may now reach the provider, only while
+        ``holder`` holds the live lease and the attempt is still current."""
+        ...
+
     def advance(
         self,
         *,
@@ -271,4 +284,28 @@ class InMemoryDocumentStore:
             if draft is not None:
                 self._drafts[key] = draft.model_dump_json()
             self._jobs[key] = job.model_dump_json()
+            return True
+
+    def mark_provider_call(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        attempt_id: str,
+        holder: str,
+        now: datetime,
+    ) -> bool:
+        key = (user_id, connection_id)
+        with self.connections._lock, self._lock:
+            raw = self._jobs.get(key)
+            job = PreparationJob.model_validate_json(raw) if raw is not None else None
+            if (
+                not self._live(user_id, connection_id, holder, now)
+                or job is None
+                or job.attempt_id != attempt_id
+            ):
+                return False
+            self._jobs[key] = job.model_copy(
+                update={"provider_call_started_at": now}
+            ).model_dump_json()
             return True

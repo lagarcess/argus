@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from argus.api.document_jobs import InProcessDispatcher, document_jobs
+from argus.api.document_jobs import document_jobs
 from argus.api.documents import documents_service
 from argus.domain.ingestion.documents.jobs import DISPATCH_WINDOW, MAX_ATTEMPTS
 
@@ -150,108 +150,178 @@ def job(connection: str):
     return service.store.job(user_id=user, connection_id=connection)
 
 
-def dead_worker_recovered(jobs_client, monkeypatch) -> tuple[str, Provider]:
+class SourceGate:
+    """Holds the first ``blocked`` source reads: a worker that dies after claiming
+    the draft and before its provider marker, with its lease still held."""
+
+    def __init__(self, blocked: int) -> None:
+        self.blocked, self.entered = blocked, 0
+        self.release = threading.Event()
+        self._lock = threading.Lock()
+
+    def wrap(self, original):
+        def source(**kwargs):
+            with self._lock:
+                self.entered += 1
+                hold = self.entered <= self.blocked
+            if hold:
+                self.release.wait(10)
+            return original(**kwargs)
+
+        return source
+
+
+@pytest.fixture
+def gate(jobs_client, monkeypatch):
+    holder = {}
+
+    def install_gate(blocked: int = 1) -> SourceGate:
+        store = documents_service().store
+        holder["gate"] = SourceGate(blocked)
+        monkeypatch.setattr(store, "source", holder["gate"].wrap(store.source))
+        return holder["gate"]
+
+    yield install_gate
+    if "gate" in holder:
+        holder["gate"].release.set()
+
+
+def retry_with_consent(client, connection: str, consent: bool = True):
+    headers = (
+        {**bearer(ALICE), "X-Extraction-Consent": "true"} if consent else bearer(ALICE)
+    )
+    return client.post(f"{DOCUMENTS}/{connection}/resume", headers=headers)
+
+
+def stale_attempts():
+    return list(document_jobs().dispatch.tasks)
+
+
+def test_kill_before_the_provider_marker_recovers_with_one_provider_call(
+    jobs_client, gate, monkeypatch
+):
+    provider = Provider("succeed")
+    clock = install(monkeypatch, provider)
+    held = gate()
+    connection = upload(jobs_client)
+    wait_for(lambda: held.entered == 1)
+    assert document(jobs_client, connection)["status"] == "preparing"
+    assert job(connection).provider_call_started_at is None
+
+    clock.offset = DISPATCH_WINDOW - timedelta(seconds=1)
+    time.sleep(0.2)
+    assert job(connection).attempt == 1, "a live lease is never superseded"
+
+    clock.offset = DISPATCH_WINDOW + timedelta(seconds=1)
+    wait_for(lambda: document(jobs_client, connection)["status"] == "review_ready")
+    assert provider.calls == 1
+    assert job(connection).attempt == 2
+    assert job(connection).provider_call_started_at is not None
+    assert len(imports(jobs_client)) == 1
+
+    before = document(jobs_client, connection)
+    [stale] = stale_attempts()
+    held.release.set()
+    wait_for(stale.done)
+    assert stale.result() == "document_lease_lost"
+    assert provider.calls == 1, "the superseded attempt never reaches the provider"
+    assert document(jobs_client, connection) == before
+
+
+def test_kill_after_the_provider_marker_waits_for_a_consented_retry(
+    jobs_client, monkeypatch
+):
     provider = Provider("hang", "succeed")
     clock = install(monkeypatch, provider)
     connection = upload(jobs_client)
     wait_for(lambda: provider.calls == 1)
-    assert document(jobs_client, connection)["status"] == "preparing"
-
-    clock.offset = DISPATCH_WINDOW - timedelta(seconds=1)
-    time.sleep(0.2)
-    assert provider.calls == 1, "a live lease is never superseded"
-    assert document(jobs_client, connection)["status"] == "preparing"
+    assert job(connection).provider_call_started_at is not None
 
     clock.offset = DISPATCH_WINDOW + timedelta(seconds=1)
-    wait_for(lambda: document(jobs_client, connection)["status"] == "review_ready")
-    assert provider.calls == 2, "re-dispatched exactly once"
-    assert job(connection).attempt == 2
-    return connection, provider
-
-
-def test_dead_worker_is_redispatched_once_within_the_lease_window(
-    jobs_client, monkeypatch
-):
-    connection, provider = dead_worker_recovered(jobs_client, monkeypatch)
-    prepared = document(jobs_client, connection)
-    assert [c["amount"] for c in prepared["preparation"]["candidates"]] == ["250.5"]
-    assert len(imports(jobs_client)) == 1
+    wait_for(lambda: document(jobs_client, connection)["status"] == "needs_attention")
+    settled = document(jobs_client, connection)
+    assert settled["error_code"] == "document_preparation_outcome_unknown"
     time.sleep(0.2)
+    assert provider.calls == 1, "an uncertain attempt is never billed again"
+    assert job(connection).attempt == 1
+
+    refused = retry_with_consent(jobs_client, connection, consent=False)
+    assert refused.status_code == 422
+    assert refused.json()["code"] == "document_extraction_consent_required"
+    assert provider.calls == 1
+
+    assert retry_with_consent(jobs_client, connection).status_code == 200
+    wait_for(lambda: document(jobs_client, connection)["status"] == "review_ready")
     assert provider.calls == 2
-    for task in list(document_jobs().dispatch.tasks):
-        task.cancel()
+    assert job(connection).attempt == 1, "an owner retry starts a new preparation"
+    assert len(imports(jobs_client)) == 1
 
-
-def test_late_result_from_superseded_attempt_is_refused(jobs_client, monkeypatch):
-    connection, provider = dead_worker_recovered(jobs_client, monkeypatch)
     before = document(jobs_client, connection)
-    dispatcher = document_jobs().dispatch
-    assert isinstance(dispatcher, InProcessDispatcher)
-    [stale] = list(dispatcher.tasks)
-
+    [stale] = stale_attempts()
     provider.release.set()
     wait_for(stale.done)
-
     assert stale.result() == "document_lease_lost"
-    after = document(jobs_client, connection)
-    assert after == before
-    assert [c["amount"] for c in after["preparation"]["candidates"]] == ["250.5"]
+    assert document(jobs_client, connection) == before
+    assert [c["amount"] for c in before["preparation"]["candidates"]] == ["250.5"]
     assert len(imports(jobs_client)) == 1
-    assert job(connection).retry is False
 
 
-def test_cancelled_worker_is_recovered_by_the_next_sweep(jobs_client, monkeypatch):
-    provider = Provider("hang", "succeed")
+def test_cancelled_worker_before_the_marker_recovers_on_the_next_sweep(
+    jobs_client, gate, monkeypatch
+):
+    provider = Provider("succeed")
     install(monkeypatch, provider)
+    held = gate()
     connection = upload(jobs_client)
-    wait_for(lambda: provider.calls == 1)
-    [worker] = list(document_jobs().dispatch.tasks)
+    wait_for(lambda: held.entered == 1)
+    [worker] = stale_attempts()
 
     worker.cancel()
 
     wait_for(lambda: document(jobs_client, connection)["status"] == "review_ready")
-    assert provider.calls == 2
+    assert provider.calls == 1
     assert len(imports(jobs_client)) == 1
 
 
-def test_retries_stop_at_the_bound_and_stay_recoverable(jobs_client, monkeypatch):
-    provider = Provider("fail")
+def test_reported_provider_failure_is_not_retried_automatically(jobs_client, monkeypatch):
+    provider = Provider("fail", "succeed")
     install(monkeypatch, provider)
     connection = upload(jobs_client)
-
-    wait_for(lambda: provider.calls == MAX_ATTEMPTS and job(connection).retry is False)
-    exhausted = document(jobs_client, connection)
-    assert exhausted["status"] == "needs_attention"
-    assert exhausted["error_code"] == "extraction_provider_failed"
-    time.sleep(0.2)
-    assert provider.calls == MAX_ATTEMPTS, "no automatic attempt past the bound"
-    assert imports(jobs_client) == []
-
-    provider.script = ["succeed"]
-    retried = jobs_client.post(
-        f"{DOCUMENTS}/{connection}/resume",
-        headers={**bearer(ALICE), "X-Extraction-Consent": "true"},
+    wait_for(lambda: document(jobs_client, connection)["status"] == "needs_attention")
+    assert document(jobs_client, connection)["error_code"] == (
+        "extraction_provider_failed"
     )
-    assert retried.status_code == 200, retried.text
+    time.sleep(0.2)
+    assert provider.calls == 1
+    assert job(connection).retry is False
+
+    assert retry_with_consent(jobs_client, connection).status_code == 200
     wait_for(lambda: document(jobs_client, connection)["status"] == "review_ready")
-    assert provider.calls == MAX_ATTEMPTS + 1
-    assert job(connection).attempt == 1
-    assert len(imports(jobs_client)) == 1
+    assert provider.calls == 2
 
 
-def test_dead_attempts_exhaust_to_interrupted_needs_attention(jobs_client, monkeypatch):
-    provider = Provider("hang")
+def test_attempts_dying_before_the_marker_stop_at_the_bound(
+    jobs_client, gate, monkeypatch
+):
+    provider = Provider("succeed")
     clock = install(monkeypatch, provider)
+    held = gate(blocked=MAX_ATTEMPTS)
     connection = upload(jobs_client)
     for attempt in range(1, MAX_ATTEMPTS + 1):
-        wait_for(lambda attempt=attempt: provider.calls == attempt)
+        wait_for(lambda attempt=attempt: held.entered == attempt)
         clock.offset += DISPATCH_WINDOW + timedelta(seconds=1)
     wait_for(lambda: document(jobs_client, connection)["status"] == "needs_attention")
     assert document(jobs_client, connection)["error_code"] == (
         "document_preparation_interrupted"
     )
-    assert provider.calls == MAX_ATTEMPTS
-    provider.release.set()
+    time.sleep(0.2)
+    assert held.entered == MAX_ATTEMPTS
+    assert provider.calls == 0
+
+    held.release.set()
+    assert retry_with_consent(jobs_client, connection).status_code == 200
+    wait_for(lambda: document(jobs_client, connection)["status"] == "review_ready")
+    assert provider.calls == 1
 
 
 def test_flag_off_prepares_through_background_tasks_only(flag_off_client, monkeypatch):

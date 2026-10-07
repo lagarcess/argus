@@ -136,10 +136,12 @@ class DocumentDraft(_Frozen):
 class PreparationJob(_Frozen):
     """One dispatched preparation attempt. Only the attempt named here may claim
     the draft, and only the draft version it was dispatched for is waiting on
-    it; ``retry`` records that it ended with a retryable failure."""
+    it. ``provider_call_started_at`` is committed before the provider can be
+    reached; ``retry`` records a retryable failure that happened before it."""
 
     attempt: int = Field(ge=1)
     attempt_id: str = Field(min_length=1, max_length=64)
     draft_version: int = Field(ge=1)
     dispatched_at: datetime
+    provider_call_started_at: datetime | None = None
     retry: bool = False

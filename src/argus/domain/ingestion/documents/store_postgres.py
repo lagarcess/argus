@@ -265,3 +265,31 @@ class PostgresDocumentStore:
                 ),
             ).fetchone()
         return changed is not None
+
+    def mark_provider_call(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        attempt_id: str,
+        holder: str,
+        now: datetime,
+    ) -> bool:
+        with self._pool.connection() as connection, connection.transaction():
+            leased = connection.execute(
+                "select id from public.financial_source_connections "
+                "where id=%s and user_id=%s and source='statement' "
+                "and status <> 'disconnected' and lease_holder=%s and lease_until > %s "
+                "for update",
+                (connection_id, user_id, holder, now),
+            ).fetchone()
+            if leased is None:
+                return False
+            marked = connection.execute(
+                "update public.financial_document_extractions set preparation_job="
+                "preparation_job || jsonb_build_object('provider_call_started_at', "
+                "%s::timestamptz) where connection_id=%s and user_id=%s "
+                "and preparation_job->>'attempt_id' = %s returning connection_id",
+                (now, connection_id, user_id, attempt_id),
+            ).fetchone()
+        return marked is not None

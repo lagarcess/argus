@@ -1,10 +1,12 @@
 """Durable document preparation: bounded attempts that recover a dead worker.
 
-The API dispatches one attempt per accepted preparation and a reconciler sweep
-re-dispatches an attempt whose worker died, up to ``MAX_ATTEMPTS`` per
-user-authorized preparation. Each attempt may call the extraction provider at
-most once, so the attempt bound is also the spend bound. A superseded attempt
-cannot claim the draft, and its late result is refused by the connection lease.
+The API dispatches one attempt per accepted preparation. A reconciler sweep
+re-dispatches an attempt whose worker died only when the attempt provably never
+reached the provider (no ``provider_call_started_at``), up to ``MAX_ATTEMPTS``.
+An attempt that may have reached the provider is never billed again
+automatically: it settles to ``needs_attention`` and only the owner's consented
+prepare or resume starts a new paid attempt. A superseded attempt cannot claim
+the draft, and its late result is refused by the connection lease.
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from argus.domain.ingestion.documents.service import (
 )
 
 MAX_ATTEMPTS = 3
+OUTCOME_UNKNOWN = "document_preparation_outcome_unknown"
 # An unclaimed dispatch is presumed lost after the same window a lease lasts.
 DISPATCH_WINDOW = DEFAULT_LEASE
 
@@ -64,6 +67,7 @@ def dispatched(draft: DocumentDraft, job: PreparationJob | None) -> bool:
 class SweepReport:
     redispatched: list[str] = field(default_factory=list)
     exhausted: list[str] = field(default_factory=list)
+    outcome_unknown: list[str] = field(default_factory=list)
     errors: int = 0
 
 
@@ -127,6 +131,21 @@ class PreparationJobs:
             reason = "retryable_failure"
         else:
             return
+        if (
+            draft.status == "preparing"
+            and job is not None
+            and job.provider_call_started_at is not None
+            and store.get(user_id=user_id, connection_id=connection_id) is None
+        ):
+            if self._settle(user_id, connection_id, now, job, draft, OUTCOME_UNKNOWN):
+                report.outcome_unknown.append(connection_id)
+                logger.warning(
+                    "Document preparation outcome unknown; waiting for the owner",
+                    connection_id=connection_id,
+                    attempt=job.attempt,
+                    reason=reason,
+                )
+            return
         fresh = job is None or (draft.status == "queued" and not dispatched(draft, job))
         attempt = 1 if fresh or job is None else job.attempt + 1
         if attempt <= MAX_ATTEMPTS:
@@ -142,22 +161,13 @@ class PreparationJobs:
                 )
             return
         assert job is not None
-        exhausted = (
-            None
-            if draft.status == "needs_attention"
-            else self.service.revise(
-                draft,
-                status="needs_attention",
-                error_code="document_preparation_interrupted",
-            )
-        )
-        if store.advance(
-            user_id=user_id,
-            connection_id=connection_id,
-            now=now,
-            expected_attempt_id=job.attempt_id,
-            job=job.model_copy(update={"retry": False}),
-            draft=exhausted,
+        if self._settle(
+            user_id,
+            connection_id,
+            now,
+            job,
+            draft,
+            "document_preparation_interrupted",
         ):
             report.exhausted.append(connection_id)
             logger.warning(
@@ -166,6 +176,27 @@ class PreparationJobs:
                 attempt=job.attempt,
                 reason=reason,
             )
+
+    def _settle(
+        self,
+        user_id: str,
+        connection_id: str,
+        now: datetime,
+        job: PreparationJob,
+        draft: DocumentDraft,
+        code: str,
+    ) -> bool:
+        """End automatic work on this attempt; the owner decides what is next."""
+        return self.service.store.advance(
+            user_id=user_id,
+            connection_id=connection_id,
+            now=now,
+            expected_attempt_id=job.attempt_id,
+            job=job.model_copy(update={"retry": False}),
+            draft=None
+            if draft.status == "needs_attention"
+            else self.service.revise(draft, status="needs_attention", error_code=code),
+        )
 
     def _advance(
         self,
@@ -232,7 +263,11 @@ async def run_attempt(
         if not error.retryable:
             return error.code
         job = service.store.job(user_id=user_id, connection_id=connection_id)
-        if job is not None and job.attempt_id == attempt_id:
+        if (
+            job is not None
+            and job.attempt_id == attempt_id
+            and job.provider_call_started_at is None
+        ):
             service.store.advance(
                 user_id=user_id,
                 connection_id=connection_id,

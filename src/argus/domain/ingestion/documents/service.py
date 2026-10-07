@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import unicodedata
 import uuid
@@ -279,10 +280,21 @@ class DocumentsService:
                 draft = self._update(
                     user_id, draft, holder=holder, status="preparing", error_code=None
                 )
+                content = await asyncio.to_thread(
+                    self.source_bytes, user_id=user_id, connection_id=connection_id
+                )
+                # Committed before the provider can be reached: without it an
+                # attempt provably never called the provider and may be retried.
+                if attempt_id is not None and not self.store.mark_provider_call(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    attempt_id=attempt_id,
+                    holder=holder,
+                    now=self.hub.clock(),
+                ):
+                    raise DocumentServiceError("document_lease_lost", retryable=True)
                 batch = await self.extractor.extract(
-                    content=self.source_bytes(
-                        user_id=user_id, connection_id=connection_id
-                    ),
+                    content=content,
                     filename=draft.filename,
                     media_type=draft.media_type,
                     connection_id=connection_id,
