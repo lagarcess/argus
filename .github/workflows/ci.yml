@@ -378,6 +378,7 @@ jobs:
       - docs-checks
       - backend-checks
       - frontend-checks
+      - marketing-checks
       - guest-release-gates
     steps:
       - name: All checks passed
@@ -388,6 +389,7 @@ jobs:
           DOCS_CHECKS: ${{ needs.docs-checks.result }}
           BACKEND_CHECKS: ${{ needs.backend-checks.result }}
           FRONTEND_CHECKS: ${{ needs.frontend-checks.result }}
+          MARKETING_CHECKS: ${{ needs.marketing-checks.result }}
           GUEST_RELEASE_GATES: ${{ needs.guest-release-gates.result }}
         run: |
           require_success() {
@@ -415,5 +417,6 @@ jobs:
           fi
           require_success_or_skipped backend-checks "$BACKEND_CHECKS"
           require_success_or_skipped frontend-checks "$FRONTEND_CHECKS"
+          require_success_or_skipped marketing-checks "$MARKETING_CHECKS"
           require_success_or_skipped guest-release-gates "$GUEST_RELEASE_GATES"
           echo "CI checks passed."
