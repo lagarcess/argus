@@ -37,6 +37,30 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.descendants(matching: .any)["screen.activity"].waitForNonExistence(timeout: 10))
     }
 
+    func testAccountRowHoldAndDragReordersAndKeepsTheOrderAfterRelaunch() throws {
+        try XCTSkipUnless(homeSwipesAvailable, "Hold reorders on iOS 27; older systems open the row menu")
+        try signIn()
+        let stamp = String(UUID().uuidString.prefix(4))
+        let first = createMoneyAccount("Order first " + stamp, type: "checking", amount: "10")
+        let second = createMoneyAccount("Order second " + stamp, type: "cash", amount: "20")
+        app.openAccountsList()
+        let firstRow = app.buttons["accounts.row." + first.id]
+        let secondRow = app.buttons["accounts.row." + second.id]
+        revealOnHome(secondRow)
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 10))
+        let before = (firstRow.frame.minY, secondRow.frame.minY)
+        XCTAssertLessThan(before.0, before.1, "a new account is listed after the earlier one")
+        secondRow.press(forDuration: 1.2, thenDragTo: firstRow)
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in secondRow.frame.minY < firstRow.frame.minY }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 10), .completed, "hold and drag moves the row above the other")
+        capture("account-row-reordered")
+        app.terminate(); app.launch()
+        app.openAccountsList()
+        revealOnHome(secondRow)
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 10))
+        XCTAssertLessThan(secondRow.frame.minY, firstRow.frame.minY, "the order stays on this device after a relaunch")
+    }
+
     func testAccountRowSwipesAddEditAndMoreArchive() throws {
         try signIn()
         let stamp = String(UUID().uuidString.prefix(4))

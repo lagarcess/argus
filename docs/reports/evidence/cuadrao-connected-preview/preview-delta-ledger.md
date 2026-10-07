@@ -232,3 +232,15 @@ the recurring journey brings Home forward before counting its rows, the sign-out
 confirm button, and the spaces journey checks the "Próximamente" caption instead of tapping a row that is not a
 button. A first batch failed because the simulator had a hardware-keyboard flag
 (`HardwareKeyboardLastSeen`) that hid the software keyboard; resetting it fixed that.
+
+## Home account reorder (2026-10-07)
+
+| Item | Checkpoint | Candidate | Reason |
+| --- | --- | --- | --- |
+| Hold on a Home account row | Preview Home reorders accounts with hold and drag through `CuadraoOrderedCollection`; no hold menu | The connected Home uses the same collection. The hold menu is gone (swipes already cover Rename, Add movement and Archive through More). Order is stored per person on the device | The hold menu duplicated the swipe actions and blocked the Preview's drag. The server keeps no account order. |
+| `CuadraoOrderedCollection` | `Edit` and `Archive` swipes | Same, plus optional `leadingSwipes` and `trailingSwipes` so a connected host supplies its own sets. Preview callers pass none and are unchanged | SEAM. The swipe modifiers stay direct in the ForEach element: wrapping them in a conditional `ViewModifier` made every lift crash with "Unexpected identifier type. Expected UUID, got UUID". |
+| Swipe container on Home | One container on the whole Home scroll | One on the Activity rows; the accounts collection brings its own | Keeps swipes for Activity while accounts reorder. |
+
+Checks: `CuadraoCollectionUITests/testGroupNativeReorderPersistenceAndRecovery` passes, the new
+`testAccountRowHoldAndDragReordersAndKeepsTheOrderAfterRelaunch` passes, and the account and movement swipe journeys,
+the Home movement journey, the spaces journey and the Profile journey still pass.

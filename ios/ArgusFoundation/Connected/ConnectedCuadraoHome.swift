@@ -19,9 +19,12 @@ struct ConnectedCuadraoHome: View {
     @State private var choosingAccount = false
     @State private var moreAccount: FinancialAccount?
     @State private var archivedID: UUID?
+    @State private var accountOrder: [UUID] = []
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
-    private var activeAccounts: [FinancialAccount] { accounts.accounts.filter { !$0.archived } }
+    private var activeAccounts: [FinancialAccount] {
+        ConnectedAccountOrder.applying(accountOrder, to: accounts.accounts.filter { !$0.archived })
+    }
     private var archivedAccounts: [FinancialAccount] { accounts.accounts.filter(\.archived) }
 
     private enum HomeSheet: Identifiable {
@@ -72,7 +75,6 @@ struct ConnectedCuadraoHome: View {
                     Button("accounts.retry") { Task { await loop.refresh() } }.frame(minHeight: 44)
                 }
             } section: { homeSection($0) }
-            .connectedSwipeContainer()
             .accessibilityIdentifier("screen.home")
             .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
                 enabled: tab == .home && sheet == nil && homePath.isEmpty))
@@ -116,6 +118,9 @@ struct ConnectedCuadraoHome: View {
         }
         .onChange(of: loop.editor == nil) { _, closed in
             if closed { restoreDetailPath() }
+        }
+        .task(id: auth.profile?.id) {
+            accountOrder = auth.profile.map { ConnectedAccountOrder.load(for: $0.id) } ?? []
         }
         .refreshable { await accounts.load(); await loop.refresh() }
         .confirmationDialog("loop.chooseAccount", isPresented: $choosingAccount, titleVisibility: .visible) {
@@ -265,34 +270,36 @@ struct ConnectedCuadraoHome: View {
                         .accessibilityIdentifier("accounts.add")
                 }
             }
-            VStack(spacing: 0) {
-                ForEach(activeAccounts) { account in
-                    ConnectedSwipeRow(leading: accountActions(account, edge: .leading), trailing: accountActions(account, edge: .trailing)) {
-                        ConnectedAccountRow(account: account, spanish: spanish)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                Task {
-                                    await accounts.open(account)
-                                    await loop.open(account)
-                                }
-                            }
-                            .contextMenu {
-                                Button(spanish ? "Cambiar nombre" : "Rename account") { accounts.rename(account) }
-                                Button(spanish ? "Añadir movimiento" : "Add transaction") { loop.record(account) }
-                                Button(spanish ? "Archivar" : "Archive", role: .destructive) { sheet = .archive(account) }
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(.isButton)
-                            .accessibilityIdentifier("accounts.row.\(account.id)")
-                    }
-                    .overlay(alignment: .bottom) { Divider().padding(.leading, 54) }
-                }
-            }
+            accountRows
             if activeAccounts.isEmpty {
                 if !accounts.hasLoaded && accounts.errorKey == nil { ProgressView("accounts.loading") }
                 else if accounts.errorKey == nil { personalEmpty }
             }
         }
+    }
+
+    /// The Preview's collection owns hold and drag, so Home accounts reorder the way the Plan cards do. The order
+    /// stays on this device for this person; swipes keep Add movement, Edit and More.
+    private var accountRows: some View {
+        CuadraoOrderedCollection(items: activeAccounts, spanish: spanish, spacing: 0,
+            identifier: { "accounts.row.\($0.id)" },
+            open: { account in Task { await accounts.open(account); await loop.open(account) } },
+            edit: { accounts.rename($0) }, archive: { sheet = .archive($0) }, reorder: saveAccountOrder,
+            leadingSwipes: { swipes(accountActions($0, edge: .leading)) },
+            trailingSwipes: { swipes(accountActions($0, edge: .trailing)) }) { account in
+            ConnectedAccountRow(account: account, spanish: spanish)
+                .overlay(alignment: .bottom) { Rectangle().fill(WelcomePalette.separator).frame(height: 1).padding(.leading, 54) }
+        }.id(loop.pendingConfirmation == nil)
+    }
+
+    private func swipes(_ actions: [ConnectedSwipeAction]) -> [CuadraoCollectionSwipe] {
+        actions.map { CuadraoCollectionSwipe(id: $0.id, title: $0.title, symbol: $0.symbol, tint: $0.tint, action: $0.action) }
+    }
+
+    private func saveAccountOrder(_ ids: [UUID]) {
+        guard let user = auth.profile?.id else { return }
+        accountOrder = ids
+        ConnectedAccountOrder.save(ids, for: user)
     }
 
     /// Swipe right adds a movement; swipe left edits or opens More (Archive and other existing commands).
@@ -363,7 +370,7 @@ struct ConnectedCuadraoHome: View {
                         }
                     }
                 }
-            }
+            }.connectedSwipeContainer()
         }
     }
 

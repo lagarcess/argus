@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// A swipe action a connected host puts in place of the Preview's Edit and Archive.
+struct CuadraoCollectionSwipe: Identifiable {
+    let id: String
+    let title: String
+    let symbol: String
+    let tint: Color
+    let action: () -> Void
+}
+
 /// One collection interaction vocabulary. State and persistence stay with the item owner.
 struct CuadraoOrderedCollection<Item: Identifiable, Row: View>: View where Item.ID == UUID {
     let items: [Item]
@@ -11,6 +20,9 @@ struct CuadraoOrderedCollection<Item: Identifiable, Row: View>: View where Item.
     var canEdit: (Item) -> Bool = { _ in true }
     let archive: (Item) -> Void
     let reorder: ([UUID]) -> Void
+    /// Connected hosts pass their own swipe sets; the Preview leaves these nil and keeps Edit and Archive.
+    var leadingSwipes: ((Item) -> [CuadraoCollectionSwipe])?
+    var trailingSwipes: ((Item) -> [CuadraoCollectionSwipe])?
     @ViewBuilder let row: (Item) -> Row
 
     var body: some View {
@@ -19,10 +31,12 @@ struct CuadraoOrderedCollection<Item: Identifiable, Row: View>: View where Item.
                 ForEach(items) { item in
                     itemButton(item)
                         .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                            if canEdit(item) { Button { edit(item) } label: { Image(systemName: "pencil") }.tint(.blue).accessibilityLabel(spanish ? "Editar" : "Edit") }
+                            if let custom = leadingSwipes?(item) { ForEach(custom) { swipeButton($0) } }
+                            else if canEdit(item) { Button { edit(item) } label: { Image(systemName: "pencil") }.tint(.blue).accessibilityLabel(spanish ? "Editar" : "Edit") }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button { archive(item) } label: { Image(systemName: "archivebox") }.tint(.orange).accessibilityLabel(spanish ? "Archivar" : "Archive")
+                            if let custom = trailingSwipes?(item) { ForEach(custom) { swipeButton($0) } }
+                            else { Button { archive(item) } label: { Image(systemName: "archivebox") }.tint(.orange).accessibilityLabel(spanish ? "Archivar" : "Archive") }
                         }
                 }.reorderable()
             }
@@ -54,12 +68,17 @@ struct CuadraoOrderedCollection<Item: Identifiable, Row: View>: View where Item.
             }
         }
     }
+    private func swipeButton(_ swipe: CuadraoCollectionSwipe) -> some View {
+        Button(action: swipe.action) { Image(systemName: swipe.symbol) }
+            .tint(swipe.tint).accessibilityLabel(swipe.title).accessibilityIdentifier(swipe.id)
+    }
     private func itemButton(_ item: Item) -> some View {
         Button { open(item) } label: { row(item).contentShape(Rectangle()) }
             .buttonStyle(.plain).accessibilityIdentifier(identifier(item))
             .accessibilityAction(named: Text(spanish ? "Archivar" : "Archive")) { archive(item) }
             .accessibilityActions {
-                if canEdit(item) { Button(spanish ? "Editar" : "Edit") { edit(item) } }
+                ForEach((leadingSwipes?(item) ?? []) + (trailingSwipes?(item) ?? [])) { swipe in Button(swipe.title, action: swipe.action) }
+                if leadingSwipes == nil, canEdit(item) { Button(spanish ? "Editar" : "Edit") { edit(item) } }
                 if items.first?.id != item.id {
                     Button(spanish ? "Mover arriba" : "Move up") { step(item.id, by: -1) }
                 }
