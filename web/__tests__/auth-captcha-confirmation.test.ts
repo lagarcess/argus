@@ -266,7 +266,7 @@ describe("password auth CAPTCHA and confirmation contract", () => {
     expect(submitHandler).not.toContain("navigator.webdriver");
     expect(submitHandler).toContain("allowMockSignupNetwork");
     expect(submitHandler.indexOf("needsEmailConfirmation")).toBeLessThan(
-      submitHandler.lastIndexOf("router.replace(currentChatPath())"),
+      submitHandler.lastIndexOf("router.replace(postAuthPath())"),
     );
     expect(form).toContain('data-testid="auth-check-email"');
     expect(form).toContain("captcha_unavailable");

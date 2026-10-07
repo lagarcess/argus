@@ -50,6 +50,7 @@ export default function BusinessCreateMenu({
       actions={actions.create}
       label={label}
       placement="above-start"
+      portal={!shell.isBelowTablet}
       renderTrigger={({ ref, open, toggle, menuId }) => {
         const button = (
           <button
@@ -72,8 +73,10 @@ export default function BusinessCreateMenu({
           </button>
         );
         return collapsed ? (
+          // The tooltip attaches its own ref to its child, so the button keeps
+          // the menu's ref inside a wrapper.
           <Tooltip content={label} side="right" delay={150}>
-            {button}
+            <span className="inline-flex">{button}</span>
           </Tooltip>
         ) : (
           button

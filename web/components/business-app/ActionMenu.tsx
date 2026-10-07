@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { BusinessAction } from "./business-actions";
 
 type ActionMenuProps = {
@@ -8,6 +9,11 @@ type ActionMenuProps = {
   label: string;
   /** Where the menu opens relative to its trigger. */
   placement: "above-start" | "below-end" | "above-start-compact";
+  /**
+   * Render in the body at the trigger's position. Needed inside the desktop
+   * rail, which clips its overflow while it animates its width.
+   */
+  portal?: boolean;
   renderTrigger: (props: {
     ref: React.RefObject<HTMLButtonElement | null>;
     open: boolean;
@@ -23,8 +29,9 @@ const PLACEMENT: Record<ActionMenuProps["placement"], string> = {
 };
 
 /** A short menu of working actions. Opening it does nothing else. */
-export default function ActionMenu({ actions, label, placement, renderTrigger }: ActionMenuProps) {
+export default function ActionMenu({ actions, label, placement, portal = false, renderTrigger }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
+  const [fixedStyle, setFixedStyle] = useState<CSSProperties | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -45,7 +52,23 @@ export default function ActionMenu({ actions, label, placement, renderTrigger }:
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
+  }, [open, fixedStyle]);
+
+  useLayoutEffect(() => {
+    if (!open || !portal) return;
+    const place = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setFixedStyle({
+        position: "fixed",
+        left: Math.max(8, rect.left),
+        bottom: window.innerHeight - rect.top + 8,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open, portal]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const items = itemRefs.current.filter(Boolean) as HTMLButtonElement[];
@@ -71,41 +94,45 @@ export default function ActionMenu({ actions, label, placement, renderTrigger }:
     }
   };
 
+  const menu =
+    open && (!portal || fixedStyle) ? (
+    <div
+      ref={menuRef}
+      id={menuId}
+      role="menu"
+      aria-label={label}
+      onKeyDown={onKeyDown}
+      style={portal ? (fixedStyle ?? undefined) : undefined}
+      className={`z-[70] min-w-[220px] rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225] ${portal ? "" : `absolute ${PLACEMENT[placement]}`}`}
+    >
+      {actions.map((action, index) => {
+        const Icon = action.icon;
+        return (
+          <button
+            key={`${action.id}-${index}`}
+            ref={(element) => {
+              itemRefs.current[index] = element;
+            }}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              close(false);
+              action.run();
+            }}
+            className="mx-1 my-0.5 flex min-h-11 w-[calc(100%-0.5rem)] items-center gap-3 rounded-[10px] px-3 text-left text-[14px] font-medium text-black transition-colors hover:bg-black/5 focus-visible:bg-black/5 focus-visible:outline-none dark:text-white dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
+          >
+            <Icon className="h-[18px] w-[18px] shrink-0 text-black/60 dark:text-white/60" />
+            {action.label}
+          </button>
+        );
+      })}
+    </div>
+    ) : null;
+
   return (
     <div className="relative">
       {renderTrigger({ ref: triggerRef, open, toggle: () => setOpen((value) => !value), menuId })}
-      {open ? (
-        <div
-          ref={menuRef}
-          id={menuId}
-          role="menu"
-          aria-label={label}
-          onKeyDown={onKeyDown}
-          className={`absolute z-[70] min-w-[220px] rounded-[14px] border border-black/10 bg-white py-1.5 dark:border-white/10 dark:bg-[#1f2225] ${PLACEMENT[placement]}`}
-        >
-          {actions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={`${action.id}-${index}`}
-                ref={(element) => {
-                  itemRefs.current[index] = element;
-                }}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  close(false);
-                  action.run();
-                }}
-                className="mx-1 my-0.5 flex min-h-11 w-[calc(100%-0.5rem)] items-center gap-3 rounded-[10px] px-3 text-left text-[14px] font-medium text-black transition-colors hover:bg-black/5 focus-visible:bg-black/5 focus-visible:outline-none dark:text-white dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0 text-black/60 dark:text-white/60" />
-                {action.label}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
+      {menu && portal ? createPortal(menu, document.body) : menu}
     </div>
   );
 }

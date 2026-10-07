@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, FileUp, ReceiptText } from "lucide-react";
+import { Camera, ClipboardPaste, FileUp, ReceiptText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import {
@@ -11,7 +11,7 @@ import {
 } from "@/lib/business-api";
 import { useBusiness } from "./BusinessWorkspace";
 import { primaryButtonClass, secondaryButtonClass } from "./business-ui";
-import { useInputCapabilities } from "./useInputCapabilities";
+import { readClipboardFile, useInputCapabilities } from "./useInputCapabilities";
 
 /** Where a captured receipt goes next: its review, or the composer. */
 export type IntakeTarget = "inbox" | "composer";
@@ -60,9 +60,11 @@ function IntakeSurface({
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<"idle" | "uploading" | "failed">("idle");
   const [dragging, setDragging] = useState(false);
+  const [clipboardEmpty, setClipboardEmpty] = useState(false);
 
   const choose = (candidate: File | null | undefined) => {
     if (!candidate) return;
+    setClipboardEmpty(false);
     const reason = rejectionFor(candidate);
     setRejection(reason);
     setFile(reason ? null : candidate);
@@ -80,6 +82,16 @@ function IntakeSurface({
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
   }, []);
+
+  const pasteFromClipboard = async () => {
+    try {
+      const pasted = await readClipboardFile(BUSINESS_RECEIPT_MEDIA_TYPES);
+      if (pasted) choose(pasted);
+      else setClipboardEmpty(true);
+    } catch {
+      setClipboardEmpty(true);
+    }
+  };
 
   const save = async () => {
     if (!file) return;
@@ -132,13 +144,13 @@ function IntakeSurface({
 
         <div
           onDragOver={(event) => {
-            if (!capabilities.dropAndPaste) return;
+            if (!capabilities.dragAndDrop) return;
             event.preventDefault();
             setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={(event) => {
-            if (!capabilities.dropAndPaste) return;
+            if (!capabilities.dragAndDrop) return;
             event.preventDefault();
             setDragging(false);
             choose(event.dataTransfer.files[0]);
@@ -153,9 +165,9 @@ function IntakeSurface({
               <span className="truncate">{file.name}</span>
               <span className="shrink-0 font-normal text-black/50 dark:text-white/50">{`${sizeLabel(file.size)} MB`}</span>
             </div>
-          ) : capabilities.dropAndPaste ? (
+          ) : capabilities.dragAndDrop ? (
             <p className="text-[14px] text-black/55 dark:text-white/55">
-              {t("business.intake.drop", "Drop a receipt here or paste an image.")}
+              {t("business.intake.drop", "Drop a receipt here.")}
             </p>
           ) : null}
           <div className="mt-3 flex flex-wrap justify-center gap-2">
@@ -163,6 +175,12 @@ function IntakeSurface({
               <FileUp className="h-4 w-4" />
               {file ? t("business.intake.replace", "Choose another") : t("business.intake.choose", "Choose file")}
             </button>
+            {capabilities.clipboardRead ? (
+              <button type="button" className={secondaryButtonClass} onClick={() => void pasteFromClipboard()}>
+                <ClipboardPaste className="h-4 w-4" />
+                {t("business.intake.paste", "Paste")}
+              </button>
+            ) : null}
             {capabilities.cameraCapture ? (
               <button type="button" className={secondaryButtonClass} onClick={() => cameraInputRef.current?.click()}>
                 <Camera className="h-4 w-4" />
@@ -197,6 +215,11 @@ function IntakeSurface({
           />
         </div>
 
+        {clipboardEmpty ? (
+          <p role="status" className="text-[14px] text-black/60 dark:text-white/60">
+            {t("business.intake.clipboard_empty", "There's no receipt image or PDF to paste. Copy one first, or choose a file.")}
+          </p>
+        ) : null}
         {rejection ? (
           <p role="alert" className="text-[14px] text-[#a8434c] dark:text-[#ec9aa0]">{rejectionText[rejection]}</p>
         ) : null}
