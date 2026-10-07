@@ -455,7 +455,7 @@ export default function ChatInterface() {
   }, [conversationId, currentView]);
 
   const resetToEmptyChatSurface = useCallback(
-    (nextConversationId: string | null = null) => {
+    (nextConversationId: string | null = null, view: View = "chat") => {
       cancelTranscriptNavigation();
       retireActiveTranscriptPresentationForNavigation();
       if (nextConversationId) {
@@ -464,7 +464,7 @@ export default function ChatInterface() {
         const clearedRoute = clearActiveConversationPointer();
         if (clearedRoute) router.replace(clearedRoute, { scroll: false });
       }
-      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, nextConversationId, "chat");
+      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, nextConversationId, view);
       hasAcceptedUserInputRef.current = false;
       setConversationId(nextConversationId);
       setMessages([]);
@@ -473,7 +473,7 @@ export default function ChatInterface() {
       setShowChatOptions(false);
       setIsRenamingHeaderChat(false);
       setHeaderRenameValue("");
-      setCurrentView((view) => (view === "workspace" ? view : "chat"));
+      setCurrentView(view);
     },
     [
       cancelTranscriptNavigation,
@@ -589,7 +589,7 @@ export default function ChatInterface() {
       }),
     );
   }, [closeDrawer, sidebarMode]);
-  const { bridge: shellBridge, profileSlot, setProfileSlot } = useChatShellBridge({ workspace, currentView, conversationId, isBelowTablet: mobileShell.isBelowTablet, sidebarCollapsed: !isSidebarOpen, setCurrentView, resetToEmptyChatSurface, closeTransientSidebar });
+  const { bridge: shellBridge, profileSlot, setProfileSlot } = useChatShellBridge({ workspace, currentView, conversationId, isBelowTablet: mobileShell.isBelowTablet, sidebarCollapsed: !isSidebarOpen, resetToEmptyChatSurface, closeTransientSidebar });
 
   function rememberCurrentConversationScroll(): void {
     const currentConversationId = readyTranscriptConversationIdRef.current;
@@ -791,7 +791,7 @@ export default function ChatInterface() {
     setProfileState,
     setMessages,
     setIsHydratingConversation,
-    resetToEmptyChatSurface,
+    resetToEmptyChatSurface: () => resetToEmptyChatSurface(null, workspace?.initialView),
     navigateConversationTranscript,
     cancelActiveNavigation: () => transcriptSessionCache.cancelActiveNavigation(),
   });
@@ -2402,7 +2402,7 @@ export default function ChatInterface() {
           </header>
         )}
         {currentView === "workspace" && workspace && (
-          <WorkspaceMain workspace={workspace} bridge={shellBridge} composerNotice={dailyCap.notice} disabled={conversationComposerUnavailable} onToast={showToast} onSend={(text, selection) => { setCurrentView("chat"); return handleSend(text, selection); }} />
+          <WorkspaceMain workspace={workspace} bridge={shellBridge} composerNotice={dailyCap.notice} disabled={conversationComposerUnavailable} onToast={showToast} onSend={handleSend} setCurrentView={setCurrentView} />
         )}
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">

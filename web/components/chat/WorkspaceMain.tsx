@@ -15,8 +15,7 @@ type ShellBridgeInput = {
   conversationId: string | null;
   isBelowTablet: boolean;
   sidebarCollapsed: boolean;
-  setCurrentView: (view: ChatShellView) => void;
-  resetToEmptyChatSurface: () => void;
+  resetToEmptyChatSurface: (conversationId?: string | null, view?: ChatShellView) => void;
   closeTransientSidebar: () => void;
 };
 
@@ -32,7 +31,6 @@ export function useChatShellBridge({
   conversationId,
   isBelowTablet,
   sidebarCollapsed,
-  setCurrentView,
   resetToEmptyChatSurface,
   closeTransientSidebar,
 }: ShellBridgeInput): ShellBridgeWithSlots {
@@ -45,18 +43,15 @@ export function useChatShellBridge({
       isBelowTablet,
       sidebarCollapsed,
       showWorkspace: () => {
-        resetToEmptyChatSurface();
-        setCurrentView("workspace");
+        resetToEmptyChatSurface(null, "workspace");
         closeTransientSidebar();
       },
       newChat: () => {
         resetToEmptyChatSurface();
-        setCurrentView("chat");
         closeTransientSidebar();
       },
       prepareQuestion: (text: string) => {
         resetToEmptyChatSurface();
-        setCurrentView("chat");
         setPreparedQuestion(text);
         closeTransientSidebar();
       },
@@ -67,7 +62,6 @@ export function useChatShellBridge({
       currentView,
       isBelowTablet,
       resetToEmptyChatSurface,
-      setCurrentView,
       sidebarCollapsed,
     ],
   );
@@ -101,6 +95,7 @@ type WorkspaceMainProps = {
     text: string,
     mentions?: ChatMention[],
   ) => void | boolean | Promise<void | boolean>;
+  setCurrentView: (view: ChatShellView) => void;
 };
 
 /** The main area while a workspace panel is showing, composer included. */
@@ -111,8 +106,21 @@ export function WorkspaceMain({
   disabled,
   onToast,
   onSend,
+  setCurrentView,
 }: WorkspaceMainProps) {
   const composer = workspace.composer(bridge);
+  // The conversation opens while the send is admitted; a refused send comes
+  // back to the panel with its text.
+  const send = async (text: string, mentions?: ChatMention[]) => {
+    composer.onDraftChange("");
+    setCurrentView("chat");
+    const accepted = await onSend(text, mentions);
+    if (accepted === false) {
+      setCurrentView("workspace");
+      composer.replaceDraft(text);
+    }
+    return accepted;
+  };
   return (
     <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
       <div
@@ -130,7 +138,7 @@ export function WorkspaceMain({
               {composerNotice}
               <ChatInput
                 key={composer.draftKey}
-                onSend={onSend}
+                onSend={send}
                 disabled={disabled}
                 placeholder={composer.placeholder}
                 onToast={onToast}
