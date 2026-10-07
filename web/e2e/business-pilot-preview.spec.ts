@@ -6,7 +6,7 @@ const PREVIEW = "/dev/business-preview";
 async function openPreview(
   page: Page,
   url = PREVIEW,
-  options: { sidebarMode?: "expanded" | "collapsed" } = {},
+  options: { sidebarMode?: "expanded" | "collapsed"; emptyChat?: boolean } = {},
 ) {
   await page.route("**/*", (route) => {
     const { hostname } = new URL(route.request().url());
@@ -14,7 +14,11 @@ async function openPreview(
       ? route.continue()
       : route.abort("blockedbyclient");
   });
-  await installBreakpointFixture(page, { language: "en", theme: "light", emptyChat: true });
+  await installBreakpointFixture(page, {
+    language: "en",
+    theme: "light",
+    emptyChat: options.emptyChat ?? true,
+  });
   if (options.sidebarMode) {
     await page.addInitScript((mode) => {
       window.localStorage.setItem("argus:sidebar_mode", mode);
@@ -92,6 +96,20 @@ test.describe("Business preview", () => {
     await expect(page.locator('[data-business-home="new_chat"]')).toBeVisible();
     await expect(page.getByTestId("workspace-panel-region")).toHaveCount(0);
     await expect(page).toHaveURL(/view=chat/);
+  });
+
+  test("leaving a conversation for a panel keeps the panel in the address bar", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?conversation=conversation-alpha`, { emptyChat: false });
+    await expect(page.getByTestId("workspace-panel-region")).toHaveCount(0);
+    await expect(page.getByTestId("chat-input")).toBeVisible();
+
+    await nav(page).getByRole("button", { name: /^Inbox/ }).click();
+    await expect(panelHeading(page, "Inbox")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveURL(/\/dev\/business-preview\?view=inbox$/);
+
+    await page.reload();
+    await expect(panelHeading(page, "Inbox")).toBeVisible();
   });
 
   test("the review screen marks missing_fields Needed and confirms into Expenses", async ({ page }) => {

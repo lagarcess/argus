@@ -10,7 +10,7 @@ export type ActiveConversationRouteState = {
 
 const ACTIVE_CONVERSATION_QUERY_KEY = "conversation";
 /** Every route that hosts the chat shell, Argus chat and workspaces alike. */
-export const CHAT_SHELL_PATHS: ReadonlySet<string> = new Set(["/chat", "/biz"]);
+export const CHAT_SHELL_PATHS: ReadonlySet<string> = new Set(["/chat", "/biz", "/dev/business-preview"]);
 const ACTIVE_MESSAGE_QUERY_KEY = "message";
 
 export function activeConversationRouteStateFromUrl(

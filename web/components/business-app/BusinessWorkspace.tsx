@@ -104,7 +104,7 @@ function writePanelToUrl(view: ChatShellView, panel: BusinessPanelState) {
     }
     const next = `${url.pathname}${url.search}`;
     if (next !== `${window.location.pathname}${window.location.search}`) {
-      window.history.replaceState(window.history.state, "", next);
+      window.history.replaceState(null, "", next);
     }
   } catch {
     // The address bar is a convenience; the shell state is the truth.
