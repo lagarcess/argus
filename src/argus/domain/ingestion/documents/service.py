@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -42,6 +43,14 @@ class DocumentServiceError(RuntimeError):
     def __init__(self, code: str, *, retryable: bool = False) -> None:
         super().__init__(code)
         self.code, self.retryable = code, retryable
+
+
+def stored_filename(filename: str) -> str:
+    """Without control or format characters (bidi overrides included), so a
+    stored name can neither break a log line nor disguise its extension."""
+
+    kept = "".join(c for c in filename if unicodedata.category(c) not in ("Cc", "Cf"))
+    return kept[:80] or "document"
 
 
 @dataclass(frozen=True)
@@ -168,7 +177,7 @@ class DocumentsService:
             replayed = True
         draft = DocumentDraft(
             connection_id=connection.id,
-            filename=filename[:80],
+            filename=stored_filename(filename),
             media_type=media_type,
             proposal=proposal or DraftProposal(),
             sha256=digest,

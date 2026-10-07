@@ -19,6 +19,7 @@ from argus.domain.ingestion.documents.service import DocumentServiceError
 from argus.domain.ingestion.gmail.attachments import MAX_ATTACHMENT_BYTES
 
 router = APIRouter(prefix="/financial-documents", tags=["financial-documents"])
+NO_STORE = {"Cache-Control": "no-store"}
 
 
 class DocumentResponse(BaseModel):
@@ -37,6 +38,7 @@ def _failure(request: Request, error: Exception) -> Exception:
             code="financial_document_not_found",
             title="Not Found",
             detail="No such document.",
+            headers=NO_STORE,
         )
     if isinstance(error, (DocumentServiceError, DocumentExtractionError)):
         unavailable = error.retryable or error.code in {
@@ -55,6 +57,7 @@ def _failure(request: Request, error: Exception) -> Exception:
             code=error.code,
             title="Document unavailable" if unavailable else "Document needs attention",
             detail="The document could not be prepared for review. Retry or upload a clearer copy.",
+            headers=NO_STORE,
         )
     return problem(
         request,
@@ -62,6 +65,7 @@ def _failure(request: Request, error: Exception) -> Exception:
         code="document_extraction_unavailable",
         title="Document unavailable",
         detail="Document extraction is temporarily unavailable.",
+        headers=NO_STORE,
     )
 
 
@@ -80,6 +84,7 @@ def _failure(request: Request, error: Exception) -> Exception:
 )
 async def upload_document(
     request: Request,
+    response: Response,
     background_tasks: BackgroundTasks,
     filename: str | None = Header(default=None, alias="X-Document-Filename"),
     proposal: str | None = Header(
@@ -88,6 +93,7 @@ async def upload_document(
     consent: str | None = Header(default=None, alias="X-Extraction-Consent"),
     context: DocumentContext = Depends(require_document_context),  # noqa: B008
 ) -> dict[str, object]:
+    response.headers.update(NO_STORE)
     try:
         destination = (
             DraftProposal.model_validate_json(proposal)
@@ -106,6 +112,7 @@ async def upload_document(
             code="document_media_type_unsupported",
             title="Unsupported document",
             detail="Upload a PDF, JPEG or PNG file.",
+            headers=NO_STORE,
         )
     content = bytearray()
     async for chunk in request.stream():
@@ -116,6 +123,7 @@ async def upload_document(
                 code="document_too_large",
                 title="Document too large",
                 detail="Upload a document of at most 10 MiB.",
+                headers=NO_STORE,
             )
         content.extend(chunk)
     try:

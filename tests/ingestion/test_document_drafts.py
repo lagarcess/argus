@@ -385,3 +385,55 @@ def test_receipt_conflicting_fields_remain_reviewable_not_confirmable(field, val
     assert batch.observations == (observation,)
     assert batch.receipt == detail
     assert batch.issues[0].code == "receipt_purchase_ambiguous"
+
+
+def _service() -> tuple[DocumentsService, IngestionHub, InMemoryDocumentStore]:
+    repo = InMemoryConnectionRepository()
+    store = InMemoryDocumentStore(repo)
+    hub = IngestionHub(
+        repo, box=None, sink=None, clock=lambda: datetime.now(timezone.utc)
+    )
+    return DocumentsService(hub, store, Mock()), hub, store
+
+
+@pytest.mark.parametrize(
+    ("given", "stored"),
+    [
+        ("state\x00ment\r\n.pdf", "statement.pdf"),
+        ("receipt‮gpj.pdf", "receiptgpj.pdf"),
+        ("\x1b[31m\x7f", "[31m"),
+        ("\x00​\t", "document"),
+        ("recibo-ñandú.pdf", "recibo-ñandú.pdf"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_stored_filenames_keep_no_control_or_format_characters(given, stored):
+    service, _, _ = _service()
+    result = await service.upload(
+        user_id="owner",
+        content=b"%PDF-fixture",
+        filename=given,
+        media_type="application/pdf",
+    )
+    draft = service.get(user_id="owner", connection_id=result.connection_id)
+    assert draft.filename == stored
+
+
+@pytest.mark.asyncio
+async def test_memory_sources_are_one_object_until_disconnect():
+    service, hub, store = _service()
+    first = await service.upload(
+        user_id="owner",
+        content=b"%PDF-fixture",
+        filename="a.pdf",
+        media_type="application/pdf",
+    )
+    await service.upload(
+        user_id="owner",
+        content=b"%PDF-fixture",
+        filename="a.pdf",
+        media_type="application/pdf",
+    )
+    assert list(store.objects.objects.values()) == [b"%PDF-fixture"]
+    hub.disconnect(user_id="owner", connection_id=first.connection_id)
+    assert store.objects.objects == {}

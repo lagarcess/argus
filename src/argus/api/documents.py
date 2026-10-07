@@ -107,6 +107,6 @@ def require_document_context(
                 code="document_rate_limited",
                 title="Too Many Requests",
                 detail="Wait before uploading another document.",
-                headers={"Retry-After": str(retry)},
+                headers={"Retry-After": str(retry), "Cache-Control": "no-store"},
             )
     return DocumentContext(service, context.user_id)
