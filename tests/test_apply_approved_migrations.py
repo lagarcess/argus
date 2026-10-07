@@ -51,11 +51,34 @@ def test_only_the_named_local_target_is_accepted() -> None:
         "postgresql://u:p@127.0.0.1:5432/rehearsal?host=elsewhere",
         "postgresql://u:p@127.0.0.1:5432,db.abcdefghijklmnopqrst.supabase.co:5432/rehearsal",
         "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co,127.0.0.1/rehearsal",
+        "postgresql://u:p@DB.ABCDEFGHIJKLMNOPQRST.SUPABASE.CO:5432/rehearsal",
+        "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co.:5432/rehearsal",
+        "postgresql://u:p@db%2Eabcdefghijklmnopqrst%2Esupabase%2Eco:5432/rehearsal",
+        "postgresql://u:p@supabase.co:5432/rehearsal",
     ],
 )
 def test_hosted_unlisted_and_multi_host_targets_are_refused(url: str) -> None:
     with pytest.raises(applier.ApplyError):
         applier.check_target(url, *ALLOW, environ={})
+
+
+@pytest.mark.parametrize(
+    "allowed",
+    [
+        "db.abcdefghijklmnopqrst.supabase.co.",
+        "DB.ABCDEFGHIJKLMNOPQRST.SUPABASE.CO",
+        "db%2Eabcdefghijklmnopqrst%2Esupabase%2Eco",
+        "aws-0-us-east-1.pooler.supabase.com",
+    ],
+)
+def test_a_hosted_name_on_the_allow_list_is_refused(allowed: str) -> None:
+    with pytest.raises(applier.ApplyError, match="hosted Supabase"):
+        applier.check_target(
+            "postgresql://u:p@127.0.0.1:5432/rehearsal",
+            ["127.0.0.1", allowed],
+            ["rehearsal"],
+            environ={},
+        )
 
 
 @pytest.mark.parametrize(
@@ -92,6 +115,19 @@ def test_the_real_connection_is_checked_not_just_the_url() -> None:
     ):
         with pytest.raises(applier.ApplyError):
             applier.verify_connection(_connected(host, hostaddr, database), *ALLOW)
+
+
+@pytest.mark.parametrize(
+    "host",
+    ["db.abcdefghijklmnopqrst.supabase.co.", "DB.ABCDEFGHIJKLMNOPQRST.SUPABASE.CO"],
+)
+def test_the_connected_host_is_refused_when_it_is_hosted_in_any_spelling(
+    host: str,
+) -> None:
+    with pytest.raises(applier.ApplyError, match="hosted Supabase"):
+        applier.verify_connection(
+            _connected(host, "127.0.0.1", "rehearsal"), [host, "127.0.0.1"], ["rehearsal"]
+        )
 
 
 # --- plan rules -------------------------------------------------------------------
@@ -275,12 +311,35 @@ def test_a_failing_file_rolls_back_and_stops_the_run() -> None:
     assert connection.log == ["begin", "timeout=5s", "rollback"]
 
 
+def test_a_file_with_nothing_to_run_cannot_be_recorded() -> None:
+    candidates = [
+        *CANDIDATES[:3],
+        _migration("20260925120000", "empty", "begin; commit;"),
+    ]
+    with pytest.raises(applier.ApplyError, match="no runnable statement"):
+        applier.plan_steps(candidates, APPLIED, ["20260925120000"])
+
+
+def test_each_committed_transaction_is_reported() -> None:
+    candidates = [*CANDIDATES[:3], _migration("20260925120000", "mid", MID_COMMIT)]
+    steps = applier.plan_steps(
+        candidates, APPLIED, ["20260925120000"], allow_mid_file_commit=["20260925120000"]
+    )
+    seen: list[tuple[str, int, int]] = []
+    applier.apply_steps(
+        _Connection(), steps, on_segment=lambda s, n, t: seen.append((s.version, n, t))
+    )
+    assert seen == [("20260925120000", 1, 2), ("20260925120000", 2, 2)]
+
+
 @pytest.mark.parametrize("value", ["5s", "500ms", "1min"])
 def test_lock_timeout_accepts_plain_durations(value: str) -> None:
     assert applier.check_lock_timeout(value) == value
 
 
-@pytest.mark.parametrize("value", ["", "0", "5", "5 s; drop table x", "-1s", "1h"])
+@pytest.mark.parametrize(
+    "value", ["", "0", "0s", "0ms", "05s", "5", "5 s; drop table x", "-1s", "1h"]
+)
 def test_lock_timeout_refuses_anything_else(value: str) -> None:
     with pytest.raises(applier.ApplyError):
         applier.check_lock_timeout(value)
@@ -360,6 +419,22 @@ def test_a_held_lock_refuses_the_run(
 ) -> None:
     with pytest.raises(applier.ApplyError, match="holds the migration lock"):
         _run(monkeypatch, tmp_path, _Server(APPLIED, lock_free=False), "--execute")
+
+
+def test_the_run_lock_is_taken_before_the_ledger_is_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    server = _Server(APPLIED)
+    _run(monkeypatch, tmp_path, server)
+    lock = next(
+        i for i, sql in enumerate(server.statements) if "pg_try_advisory_lock" in sql
+    )
+    ledger = next(
+        i
+        for i, sql in enumerate(server.statements)
+        if "schema_migrations order by" in sql
+    )
+    assert lock < ledger
 
 
 def test_a_missing_url_is_refused(

@@ -21,7 +21,7 @@ import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 try:
     from scripts.ops import production_migration_gate as gate
@@ -32,7 +32,7 @@ except ImportError:  # run as a script from the repository root
 _HOSTED_SUFFIXES = (".supabase.co", ".supabase.com")
 _LOOPBACK = {"localhost", "127.0.0.1", "::1"}
 _REFUSED_ENVIRONMENT = ("PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE", "PGPASSFILE")
-_LOCK_TIMEOUT = re.compile(r"\d{1,6}(ms|s|min)")
+_LOCK_TIMEOUT = re.compile(r"[1-9]\d{0,5}(ms|s|min)")
 _ADVISORY_LOCK_KEY = 7_340_118_221_605
 _BEGIN = {"begin", "start"}
 _COMMIT = {"commit", "end"}
@@ -41,6 +41,17 @@ _LEDGER_INSERT = (
     "insert into supabase_migrations.schema_migrations (version, statements, name)"
     " values (%s, %s, %s)"
 )
+
+
+def _plain_host(name: str) -> str:
+    """The name libpq would connect to: decoded, lowercase, no trailing dot."""
+
+    return unquote(name).lower().rstrip(".")
+
+
+def _is_hosted(name: str) -> bool:
+    plain = _plain_host(name)
+    return plain.endswith(_HOSTED_SUFFIXES) or plain in {"supabase.co", "supabase.com"}
 
 
 class ApplyError(RuntimeError):
@@ -72,12 +83,12 @@ def check_target(
     parts = urlsplit(url)
     if "," in parts.netloc:
         raise ApplyError("a multi-host database URL is refused")
-    host = (parts.hostname or "").lower()
+    host = _plain_host(parts.hostname or "")
     if parts.query or parts.fragment:
         raise ApplyError("the database URL must not carry a query or fragment")
-    if not host or host.endswith(_HOSTED_SUFFIXES):
+    if not host or _is_hosted(host) or any(_is_hosted(value) for value in allow_hosts):
         raise ApplyError("hosted Supabase targets are refused by this tool")
-    if host not in {value.lower() for value in allow_hosts}:
+    if host not in {_plain_host(value) for value in allow_hosts}:
         raise ApplyError("target host is not on the allowed list")
     if parts.path.lstrip("/") not in set(allow_databases):
         raise ApplyError("target database is not on the allowed list")
@@ -89,9 +100,11 @@ def verify_connection(
     """Check where the connection actually went, not where the URL said."""
 
     info = connection.info  # type: ignore[attr-defined]
-    allowed = {value.lower() for value in allow_hosts}
-    host = (info.host or "").lower()
-    hostaddr = (info.hostaddr or "").lower()
+    allowed = {_plain_host(value) for value in allow_hosts}
+    host = _plain_host(info.host or "")
+    hostaddr = _plain_host(info.hostaddr or "")
+    if _is_hosted(host) or _is_hosted(hostaddr):
+        raise ApplyError("the connection went to a hosted Supabase host")
     if host not in allowed:
         raise ApplyError("the connection went to a host that is not on the allowed list")
     if (
@@ -196,6 +209,10 @@ def plan_steps(
     for version in sorted({*approved, *unrecorded}):
         migration = by_version[version]
         segments = split_segments(migration.statements)
+        if not segments:
+            raise ApplyError(
+                f"version {version} has no runnable statement, so it could not be recorded"
+            )
         if len(segments) > 1 and version not in allow_mid_file_commit:
             raise ApplyError(
                 f"version {version} commits inside the file and would run in {len(segments)} "
@@ -235,11 +252,13 @@ def apply_steps(
     steps: Sequence[Step],
     lock_timeout: str = "5s",
     on_done: object = None,
+    on_segment: object = None,
 ) -> list[str]:
     """Run each file's transactions in order; the ledger row joins the last one.
 
     Stops at the first failure. Files that already committed stay applied, and
-    ``on_done`` is called after each file so the operator knows exactly which.
+    ``on_segment(step, number, total)`` is called after each committed transaction
+    and ``on_done(step)`` after each file, so the operator knows exactly which.
     """
 
     check_lock_timeout(lock_timeout)
@@ -256,6 +275,8 @@ def apply_steps(
                     connection.execute(  # type: ignore[attr-defined]
                         _LEDGER_INSERT, (step.version, list(step.statements), step.name)
                     )
+            if callable(on_segment):
+                on_segment(step, index + 1, len(step.segments))
         done.append(step.version)
         if callable(on_done):
             on_done(step)
@@ -331,12 +352,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         def report(step: Step) -> None:
             print(f"committed {step.version} {step.name}", flush=True)
 
+        def report_segment(step: Step, number: int, total: int) -> None:
+            if total > 1:
+                print(
+                    f"  transaction {number}/{total} of {step.version} committed",
+                    flush=True,
+                )
+
         try:
-            done = apply_steps(connection, steps, lock_timeout, report)
+            done = apply_steps(connection, steps, lock_timeout, report, report_segment)
         except Exception as error:
             raise ApplyError(
-                f"stopped: {error}. Files already reported as committed stay applied; "
-                "read the ledger before any retry"
+                f"stopped: {error}. Everything reported as committed stays applied, including "
+                "the first transactions of a file that commits inside itself. Recorded files can "
+                "be read from the ledger; NO-LEDGER steps leave no trace, so take every one that "
+                "was reported committed out of the retry command"
             ) from error
         print(f"applied {len(done)} step(s)")
     return 0
